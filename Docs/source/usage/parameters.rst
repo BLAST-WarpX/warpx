@@ -2768,7 +2768,7 @@ For each index ``N`` (starting from 0):
 
 * ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
     Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
-    All faces must share the same direction.
+    Set independently per face.
 
 * ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
     Sign of the injected current: :math:`J = \mathrm{sign}\, I(t)/A`.  Use ``-1`` to define a

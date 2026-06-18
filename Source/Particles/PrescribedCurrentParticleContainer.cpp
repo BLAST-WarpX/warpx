@@ -102,7 +102,6 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         n_pairs >= 1, "warpx.current_injection.n_pairs must be >= 1");
 
-    bool dir_set = false;
     for (int p = 0; p < n_pairs; ++p) {
         const std::string base = "current_injection.pair_" + std::to_string(p);
 
@@ -133,11 +132,6 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
             f.dir >= 0 && f.dir < 3, "current_injection drive.dir must be 0, 1 or 2");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             f.A > 0., "current_injection drive.A must be > 0");
-        if (!dir_set) { m_dir = f.dir; dir_set = true; }
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            f.dir == m_dir,
-            "PrescribedCurrentParticleContainer: all drive faces must share the "
-            "same current direction (single global dir) in this port.");
         m_faces.push_back(std::move(f));
     }
 
@@ -266,21 +260,25 @@ PrescribedCurrentParticleContainer::Evolve (
     // box-testing its (fixed) position -- no per-particle tag needed.
     const int nfaces = static_cast<int>(m_faces.size());
     Gpu::DeviceVector<Real> d_speed(nfaces), d_lo(3*nfaces), d_hi(3*nfaces);
+    Gpu::DeviceVector<int>  d_dir(nfaces);
     {
         Vector<Real> h_speed(nfaces), hlo(3*nfaces), hhi(3*nfaces);
+        Vector<int>  hdir(nfaces);
         for (int f = 0; f < nfaces; ++f) {
             h_speed[f] = m_vel_coeff * interpolate(m_faces[f].t, m_faces[f].I, t);
+            hdir[f]    = m_faces[f].dir;
             for (int d = 0; d < 3; ++d) { hlo[3*f+d] = m_faces[f].lo[d]; hhi[3*f+d] = m_faces[f].hi[d]; }
         }
         Gpu::copyAsync(Gpu::hostToDevice, h_speed.begin(), h_speed.end(), d_speed.begin());
+        Gpu::copyAsync(Gpu::hostToDevice, hdir.begin(), hdir.end(), d_dir.begin());
         Gpu::copyAsync(Gpu::hostToDevice, hlo.begin(), hlo.end(), d_lo.begin());
         Gpu::copyAsync(Gpu::hostToDevice, hhi.begin(), hhi.end(), d_hi.begin());
         Gpu::streamSynchronize();
     }
     const Real* const AMREX_RESTRICT speed_f = d_speed.dataPtr();
+    const int*  const AMREX_RESTRICT dir_f   = d_dir.dataPtr();
     const Real* const AMREX_RESTRICT lo_p    = d_lo.dataPtr();
     const Real* const AMREX_RESTRICT hi_p    = d_hi.dataPtr();
-    const int  dir   = m_dir;
     const Real c2    = PhysConst::c * PhysConst::c;
 
     const int thread_num = 0;
@@ -302,10 +300,10 @@ PrescribedCurrentParticleContainer::Evolve (
         ParticleReal* const AMREX_RESTRICT uy_ptr = uyp.dataPtr();
         ParticleReal* const AMREX_RESTRICT uz_ptr = uzp.dataPtr();
 
-        // Set momenta from this cell's face waveform (found by box-testing the
-        // position) and push positions by v*dt so the (possibly charge-
-        // conserving) deposition sees the right displacement. The per-face sign
-        // of J is carried by the (signed) particle weight.
+        // Set momenta from this cell's face (found by box-testing the position):
+        // its waveform sets the speed and its dir sets the component. Push
+        // positions by v*dt so the (possibly charge-conserving) deposition sees
+        // the right displacement; the per-face sign of J is in the signed weight.
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip) noexcept
         {
             ParticleReal x, y, z;
@@ -316,15 +314,17 @@ PrescribedCurrentParticleContainer::Evolve (
                     y >= lo_p[3*f+1] && y < hi_p[3*f+1] &&
                     z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
             }
-            const Real u = speed_f[fc];
-            ux_ptr[ip] = (dir == 0) ? u : 0._rt;
-            uy_ptr[ip] = (dir == 1) ? u : 0._rt;
-            uz_ptr[ip] = (dir == 2) ? u : 0._rt;
+            const int  fdir = dir_f[fc];
+            const Real u    = speed_f[fc];
+            ux_ptr[ip] = (fdir == 0) ? u : 0._rt;
+            uy_ptr[ip] = (fdir == 1) ? u : 0._rt;
+            uz_ptr[ip] = (fdir == 2) ? u : 0._rt;
 
-            const Real v = u / std::sqrt(1._rt + (u*u)/c2);
-            if      (dir == 0) { x += v*dt; }
-            else if (dir == 1) { y += v*dt; }
-            else               { z += v*dt; }
+            // Push along whichever component is non-zero (dir-agnostic).
+            const Real ginv = 1._rt / std::sqrt(1._rt + (u*u)/c2);
+            x += ux_ptr[ip]*ginv*dt;
+            y += uy_ptr[ip]*ginv*dt;
+            z += uz_ptr[ip]*ginv*dt;
             SetPosition(ip, x, y, z);
         });
 
@@ -343,13 +343,13 @@ PrescribedCurrentParticleContainer::Evolve (
         // Reuse the momentum just set (exact undo, no re-box-test).
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip) noexcept
         {
-            const Real u = (dir == 0) ? ux_ptr[ip] : (dir == 1) ? uy_ptr[ip] : uz_ptr[ip];
-            const Real v = u / std::sqrt(1._rt + (u*u)/c2);
+            const Real ux = ux_ptr[ip], uy = uy_ptr[ip], uz = uz_ptr[ip];
+            const Real ginv = 1._rt / std::sqrt(1._rt + (ux*ux+uy*uy+uz*uz)/c2);
             ParticleReal x, y, z;
             GetPosition(ip, x, y, z);
-            if      (dir == 0) { x -= v*dt; }
-            else if (dir == 1) { y -= v*dt; }
-            else               { z -= v*dt; }
+            x -= ux*ginv*dt;
+            y -= uy*ginv*dt;
+            z -= uz*ginv*dt;
             SetPosition(ip, x, y, z);
         });
 

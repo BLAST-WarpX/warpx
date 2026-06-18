@@ -45,8 +45,8 @@
  * n_pairs drive faces, each with a box, area A, sign (+/-1), and an optional
  * per-pair waveform file (pair_N.file) that overrides the global
  * current_injection.file. A "return" is just a drive face with sign = -1, so
- * no dedicated return block exists. Single global current direction `dir`.
- * Requires algo.particle_shape >= 1. Works with algo.current_deposition =
+ * no dedicated return block exists. Each face has its own current direction
+ * `dir`. Requires algo.particle_shape >= 1. Works with algo.current_deposition =
  * direct or a charge-conserving scheme (esirkepov/villasenor): positions are
  * pushed by v*dt before deposition (then reset), so the displacement yields
  * J = q w v either way.
@@ -107,7 +107,6 @@ private:
 
     std::vector<Face> m_faces;
 
-    int        m_dir        = 0;   //!< Common current direction of all faces
     amrex::Real m_vel_coeff = 0.;  //!< C such that speed = C * I(t) [m/s/A]
     bool       m_enabled    = true;
 

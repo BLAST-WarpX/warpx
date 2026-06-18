@@ -29,7 +29,7 @@ works with the explicit **and** implicit field solvers and with the `vacuum` and
 | `warpx.current_injection.pair_N.file` | string, optional | Per-face waveform file, overriding the global file. |
 | `warpx.current_injection.pair_N.drive.{xlo,xhi,ylo,yhi,zlo,zhi}` | float | Bounding box of the drive face [m]. |
 | `warpx.current_injection.pair_N.drive.A` | float | Cross-section area [m²] for `J = I(t)/A`. |
-| `warpx.current_injection.pair_N.drive.dir` | int (0/1/2), optional | Current direction (shared by all faces). |
+| `warpx.current_injection.pair_N.drive.dir` | int (0/1/2), optional | Per-face current direction. |
 | `warpx.current_injection.pair_N.drive.sign` | int (±1), optional | Current sign; `-1` gives a return face. |
 
 Requires `algo.particle_shape >= 1` and `algo.current_deposition` (`direct` or a
