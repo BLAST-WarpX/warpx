@@ -1485,4 +1485,3 @@ WarpX::HandleSignals()
         ExecutePythonCallback("oncheckpointsignal");
     }
 }
-
