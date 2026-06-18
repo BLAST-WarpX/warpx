@@ -12,7 +12,14 @@ class CollisionFuncBase
 {
 public:
 
+    CollisionFuncBase () = default;
     virtual ~CollisionFuncBase () = default;
+
+    CollisionFuncBase (const CollisionFuncBase&) = default;
+    CollisionFuncBase& operator= (const CollisionFuncBase&) = default;
+
+    CollisionFuncBase (CollisionFuncBase&&) noexcept = default;
+    CollisionFuncBase& operator= (CollisionFuncBase&&) noexcept = default;
 
     //! Optional hook to allocate additional data structures.
     virtual void AllocData () {}
