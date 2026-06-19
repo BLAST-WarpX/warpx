@@ -14,6 +14,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 using namespace amrex;
 using namespace warpx::fields;
@@ -225,6 +226,51 @@ ExternalVectorPotential::InitData ()
     }
 
     UpdateHybridExternalFields(warpx.gett_new(0), warpx.getdt(0));
+}
+
+
+void
+ExternalVectorPotential::CheckInitialB ()
+{
+    // One-shot guard against an un-seeded initial magnetic field. The hybrid
+    // external-A push is split-field: between steps Bfield_fp holds the TOTAL
+    // field (plasma + external), and each step subtracts the external part to
+    // recover the plasma field before the Faraday evolve. That assumes Bfield_fp
+    // was initialized to the total field at t = 0. If the external vector
+    // potential produces a nonzero B at t = 0 (time function f(0) != 0) but the
+    // grid B was left at zero, the first step subtracts the external from an
+    // un-seeded B, injecting a spurious turn-on transient. Warn so the user
+    // seeds the initial B to match the external field at t = 0 (e.g. a PICMI
+    // AnalyticInitialField). Called from the first field push -- after the grid
+    // initial B has been applied (WarpX::InitData), unlike InitData() above.
+    if (m_initial_B_checked) { return; }
+    m_initial_B_checked = true;
+
+    using ablastr::fields::Direction;
+    auto& warpx = WarpX::GetInstance();
+
+    amrex::Real b_ext_max = 0.0;
+    amrex::Real b_grid_max = 0.0;
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            b_ext_max = amrex::max(b_ext_max,
+                warpx.m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev)->norm0(0, 0));
+            b_grid_max = amrex::max(b_grid_max,
+                warpx.m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->norm0(0, 0));
+        }
+    }
+    if (b_ext_max > 0.0 && b_grid_max == 0.0) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "The external vector potential gives a nonzero magnetic field at t = 0 "
+            "(max|B_external| = " + std::to_string(b_ext_max) + " T) but the initial "
+            "grid magnetic field is zero. The split-field external-A push expects "
+            "Bfield_fp to be initialized to the total field (plasma + external) at "
+            "t = 0; an un-seeded B injects a turn-on transient over the first step. "
+            "Initialize the grid B to match the external field at t = 0 (e.g. a PICMI "
+            "AnalyticInitialField set to the bias).",
+            ablastr::warn_manager::WarnPriority::high);
+    }
 }
 
 

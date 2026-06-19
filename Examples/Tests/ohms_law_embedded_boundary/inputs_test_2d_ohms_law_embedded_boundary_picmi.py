@@ -736,6 +736,52 @@ def run_marder_battery(sim):
         f"max|dE|={d_t:.3e}",
     )
 
+    # --- 6) Marder RE-APPLIES the EB boundary condition ---------------------
+    # The transitional correction must leave E satisfying the EB BC (the
+    # in-loop ApplyPECBoundaryToField, MarderCorrection.cpp:543, runs after
+    # every E update). Seed a consistent baseline, make it EB-consistent, then
+    # deliberately CORRUPT the covered (x > X_WALL) region -- a BC violation.
+    # The covered cells are eb_update_E = 0, so the div-correction never touches
+    # them (and the transition band at rows 8-16 is far from the wall node 24,
+    # so the corruption does not perturb the correction either): the covered
+    # values are set ONLY by the in-loop EB re-apply. After Marder the field
+    # must again satisfy the EB fill, i.e. re-applying the EB operator is a
+    # no-op (idempotent), and the injected garbage is gone.
+    Jy[...] = 0.0
+    Bz[...] = 0.0
+    set_baseline(0.3, seed=99)
+    wx.hybrid_apply_eb_boundary_to_edge_field("Efield_fp", 0)  # consistent start
+    # covered rows just past the wall node (nodal i >= 25; x-edge i >= 24);
+    # element [0] of each is the actual fill-band row (s = -0.7h / -0.2h)
+    cov_nodes = list(range(X_WALL_NODE + 1, N_X + 1))
+    cov_edges = list(range(X_WALL_NODE, N_X))
+    GARBAGE = 1.0e5
+    for w, rows in ((Ex, cov_edges), (Ey, cov_nodes), (Ez, cov_nodes)):
+        set_xrows(w, rows, GARBAGE)
+    wx.hybrid_marder_correct_e(0, alpha=0.1, max_iterations=10, rtol=0.0, atol=0.0)
+    post = [np.array(np.asarray(w[...])) for w in (Ex, Ey, Ez)]
+    wx.hybrid_apply_eb_boundary_to_edge_field("Efield_fp", 0)
+    after_bc = [np.array(np.asarray(w[...])) for w in (Ex, Ey, Ez)]
+    e_scale = max(float(np.max(np.abs(p))) for p in post) + 1e-300
+    for name, p, q in zip("xyz", post, after_bc):
+        ck.close(
+            f"marder: post-Marder E satisfies the EB BC (E{name})",
+            np.asarray(p) / e_scale,
+            np.asarray(q) / e_scale,
+            1e-10,
+        )
+    # and the corrupted fill-band row was actually overwritten (so the
+    # idempotency above is a genuine re-apply, not an empty covered region)
+    moved = min(
+        float(np.min(np.abs(np.asarray(w[...])[rows[0], ...] - GARBAGE)))
+        for w, rows in ((Ex, cov_edges), (Ey, cov_nodes), (Ez, cov_nodes))
+    )
+    ck.expect(
+        "marder: corrupted covered fill band was overwritten by the EB re-apply",
+        moved > 0.5 * GARBAGE,
+        f"min|E_fillband - garbage| = {moved:.3e} (garbage={GARBAGE:.1e})",
+    )
+
     ck.finish()
 
 

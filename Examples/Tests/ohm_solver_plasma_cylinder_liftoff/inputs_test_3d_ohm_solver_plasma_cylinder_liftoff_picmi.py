@@ -121,6 +121,7 @@ def setup_simulation(
     bz_bias=BZ_BIAS,
     nz=NZ,
     grid_type="collocated",
+    a_external=True,
 ):
     """Create the PICMI simulation object.
 
@@ -220,7 +221,7 @@ def setup_simulation(
         substep_atol=1.0e-8,
         max_substep_attempts=1000,
         use_conformal_eb=True,
-        A_external=A_ext,
+        A_external=A_ext if a_external else None,
         **power_law_resistivity(
             ETA_PLASMA,
             ETA_VAC_FRAC * eta_max,
@@ -229,6 +230,22 @@ def setup_simulation(
             eta_ntrans,
             N_I,
         ),
+    )
+
+    # Seed the initial grid B with the bias field so Bfield_fp starts as the
+    # TOTAL B (plasma 0 + external bias) that the split-field external-A push
+    # expects. Without this, dump 0 has B = 0 and the first push's external
+    # subtract acts on an un-seeded B, seeding a spurious near-wall transient.
+    # The Hermite ramp has f(0) = bz_bias, so the step-1 subtract of the
+    # external A at t = 0 removes this seed and recovers plasma B = 0. A uniform
+    # Bz is divergence-free, so the initial projection div cleaner is disabled.
+    sim.add_applied_field(
+        picmi.AnalyticInitialField(
+            Bx_expression="0",
+            By_expression="0",
+            Bz_expression=f"{bz_bias}",
+            warpx_do_initial_div_cleaning=False,
+        )
     )
 
     sim.embedded_boundary = picmi.EmbeddedBoundary(
@@ -281,6 +298,55 @@ def setup_simulation(
     sim.add_diagnostic(field_diag)
 
     return sim
+
+
+def install_quartz_scraper(r_quartz, species_name="ions", verbose=1):
+    """Scrape ions outside a quartz-liner radius ``r_quartz < R_WALL``.
+
+    Physically the embedded boundary is the metal coil wall, but a quartz
+    dielectric liner sits a few cells inside it: the plasma contacts the
+    quartz, not the metal. This installs a ``particlescraper`` callback (fired
+    each step before the particle boundary conditions / the C++ EB scrape and
+    before Redistribute) that marks any ion with ``x^2 + y^2 > r_quartz^2``
+    invalid (negative id), so it is culled at the next Redistribute. The field
+    EB is left at ``R_WALL`` -- only the plasma is held off the metal-wall band,
+    which is where the artificial near-wall Hall coupling otherwise forms.
+    """
+    from pywarpx import callbacks, libwarpx
+    from pywarpx.particle_containers import ParticleContainerWrapper
+
+    r2_quartz = r_quartz * r_quartz
+    # one-shot bookkeeping so the confirmation line prints only on the first fire
+    state = {"reported": False}
+
+    @callbacks.callfromparticlescraper
+    def _scrape_at_quartz():
+        # libwarpx.amr is only bound once libwarpx_so is loaded (at sim.step()),
+        # which is after this callback is installed -- look it up at call time
+        amr = libwarpx.amr
+        wrapper = ParticleContainerWrapper(species_name)
+        xs = wrapper.get_particle_real_arrays("x", 0)
+        ys = wrapper.get_particle_real_arrays("y", 0)
+        idcpus = wrapper.get_particle_idcpu_arrays(0)
+        scraped = 0
+        for x, y, idcpu in zip(xs, ys, idcpus):
+            outside = (x * x + y * y) > r2_quartz
+            n_out = int(outside.sum())
+            if n_out:
+                # repack negated ids in place: pack_ids writes into the SoA-aliased
+                # idcpu buffer and preserves the cpu bits (verified against pyamrex)
+                ids = np.asarray(amr.unpack_ids(idcpu)).astype(np.int64)
+                ids[outside] = -np.abs(ids[outside])
+                amr.pack_ids(idcpu, ids)
+                scraped += n_out
+        if verbose and not state["reported"]:
+            print(
+                f"[quartz-scraper] active: r_quartz = {r_quartz:.5f} m; "
+                f"first-step scraped {scraped} ions outside the liner"
+            )
+            state["reported"] = True
+
+    return _scrape_at_quartz
 
 
 def main():
@@ -473,6 +539,58 @@ def main():
         choices=["staggered", "collocated"],
         default="collocated",
     )
+    parser.add_argument(
+        "--quartz-cells",
+        help="scrape ions at a quartz-liner radius R_WALL - N*dx (N cells inside "
+        "the metal-wall EB) via a particlescraper callback; 0 disables it and "
+        "ions scrape at the metal EB as usual",
+        type=int,
+        default=0,
+    )
+    parser.add_argument(
+        "--no-a-external",
+        dest="a_external",
+        action="store_false",
+        help="disable the external-A reversal drive (pure bias-field diffusion; "
+        "isolates the EB treatment of the initial/evolved B)",
+    )
+    parser.add_argument(
+        "--eb-b-fill-band-cells",
+        help="width (in cells) of the Bfield_fp EB mirror-fill band (default 1). "
+        "Widening pushes the level-set mirror's div(B) jump deeper into the zeroed "
+        "conductor; with isotropic_resistivity on, the B->solution reach is 2 "
+        "cells, so >=3 keeps the jump causally inert (a null effect on m=4).",
+        type=float,
+        default=None,
+    )
+    parser.add_argument(
+        "--divb-clean-alpha",
+        help="Marder-like diffusive clean of the curved-wall div(B) injection "
+        "(band-aid; 0 disables). A pure-gradient correction, so curl(B)=J is "
+        "preserved; applied after the B EB mirror fill each substage.",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--divj-clean-alpha",
+        help="Marder-like diffusive clean of div(J_total) -- the Ampere current "
+        "(hybrid_current_fp_plasma) only, never the deposited ion species; "
+        "0 disables.",
+        type=float,
+        default=0.0,
+    )
+    parser.add_argument(
+        "--divb-clean-iters",
+        help="fixed-point sweeps per div(B)/div(J) clean application",
+        type=int,
+        default=5,
+    )
+    parser.add_argument(
+        "--divb-clean-band-cells",
+        help="width (in cells) of the near-wall band the div clean acts over",
+        type=float,
+        default=4.0,
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -521,8 +639,47 @@ def main():
         args.bz_bias,
         args.nz,
         grid_type=args.grid_type,
+        a_external=args.a_external,
     )
+
+    # Conformal-EB divergence controls. These are set directly on the hybrid
+    # model (not picmi HybridPICSolver kwargs): the Marder-like div(B)/div(J_total)
+    # clean band-aid and the B mirror-fill band width.
+    from pywarpx import hybridpicmodel
+    if args.eb_b_fill_band_cells is not None:
+        hybridpicmodel.eb_b_fill_band_cells = args.eb_b_fill_band_cells
+    if args.divb_clean_alpha > 0.0:
+        hybridpicmodel.divb_clean_alpha = args.divb_clean_alpha
+    if args.divj_clean_alpha > 0.0:
+        hybridpicmodel.divj_clean_alpha = args.divj_clean_alpha
+    if args.divb_clean_alpha > 0.0 or args.divj_clean_alpha > 0.0:
+        hybridpicmodel.divb_clean_iters = args.divb_clean_iters
+        hybridpicmodel.divb_clean_band_cells = args.divb_clean_band_cells
+
+    # Quartz-liner particle scrape: hold the plasma off the metal-wall EB by
+    # scraping ions a few cells inside R_WALL (see install_quartz_scraper)
+    r_quartz = None
+    if args.quartz_cells > 0:
+        r_quartz = R_WALL - args.quartz_cells * (2.0 / resolution)
+        install_quartz_scraper(r_quartz, species_name="ions", verbose=args.verbose)
+
     sim.step()
+
+    if r_quartz is not None and args.verbose:
+        from pywarpx.particle_containers import ParticleContainerWrapper
+
+        wrapper = ParticleContainerWrapper("ions")
+        rmax = 0.0
+        for x, y in zip(
+            wrapper.get_particle_real_arrays("x", 0),
+            wrapper.get_particle_real_arrays("y", 0),
+        ):
+            if len(x):
+                rmax = max(rmax, float(np.sqrt(x * x + y * y).max()))
+        print(
+            f"[quartz-scraper] post-run max ion radius = {rmax:.5f} m "
+            f"(r_quartz = {r_quartz:.5f} m, R_WALL = {R_WALL:.5f} m)"
+        )
 
 
 if __name__ == "__main__":

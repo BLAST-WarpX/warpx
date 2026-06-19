@@ -13,6 +13,8 @@
 #  include "Utils/Parser/ParserUtils.H"
 #  include "Utils/TextMsg.H"
 
+#  include <ablastr/utils/Communication.H>
+
 #   include <AMReX_BLProfiler.H>
 #   include <AMReX_BoxArray.H>
 #   include <AMReX_Config.H>
@@ -123,7 +125,23 @@ WarpX::ComputeDistanceToEB ()
     for (int lev=0; lev<=maxLevel(); lev++) {
         const amrex::EB2::Level& eb_level = eb_is.getLevel(Geom(lev));
         auto const eb_fact = fieldEBFactory(lev);
-        amrex::FillSignedDistance(*m_fields.get(FieldType::distance_to_eb, lev), eb_level, eb_fact, 1);
+        auto * const distance_to_eb = m_fields.get(FieldType::distance_to_eb, lev);
+        amrex::FillSignedDistance(*distance_to_eb, eb_level, eb_fact, 1);
+
+        // distance_to_eb is nodal and FillSignedDistance computes each box's
+        // values (valid + ghosts) independently from that box's local facet
+        // search, so the shared box-seam nodes can disagree slightly between
+        // neighbouring boxes. The eb_update masks and the EB-fill classification
+        // are derived node-by-node from this distance, so an unreconciled seam
+        // node can be classified inconsistently across boxes (fluid on one side,
+        // covered on the other) right where a box boundary crosses the wall.
+        // Reconcile the shared seam nodes (owner with the smaller global box
+        // index wins) and propagate to ghosts, using the ablastr nodal-sync
+        // FillBoundary (FillBoundaryAndSync under the hood) so the whole
+        // downstream EB machinery is seam-consistent in multi-box runs.
+        ablastr::utils::communication::FillBoundary(
+            *distance_to_eb, WarpX::do_single_precision_comms,
+            Geom(lev).periodicity(), /*nodal_sync=*/true);
     }
 #endif
 }

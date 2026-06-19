@@ -172,6 +172,22 @@ void HybridPICModel::ReadParameters ()
         ? std::sqrt(static_cast<amrex::Real>(AMREX_SPACEDIM))
         : amrex::Real(1.0);
 
+    // Mirror-fill band width for the Bfield_fp EB fill. The level-set mirror
+    // injects a div(B) jump at the band/deep interface; the filled B couples
+    // into the solution only via curl/B reads (effective reach 2 cells with the
+    // isotropic corner-curl E correction on), so a band >= 3 pushes that jump
+    // into the zeroed deep interior where it cannot reach a solution stencil.
+    // Default 1 = legacy behavior.
+    utils::parser::queryWithParser(pp_hybrid, "eb_b_fill_band_cells", m_eb_b_fill_band_cells);
+
+    // Marder-like diffusive clean of the curved-wall div(B) / div(J_total)
+    // injection (band-aid). Each alpha defaults to 0 (off). The clean is a pure
+    // gradient correction, so it dissipates divergence without touching curl/J.
+    utils::parser::queryWithParser(pp_hybrid, "divb_clean_alpha", m_divb_clean_alpha);
+    utils::parser::queryWithParser(pp_hybrid, "divj_clean_alpha", m_divj_clean_alpha);
+    utils::parser::queryWithParser(pp_hybrid, "divb_clean_iters", m_divb_clean_iters);
+    utils::parser::queryWithParser(pp_hybrid, "divb_clean_band_cells", m_divb_clean_band_cells);
+
     // Marder divergence cleaning of the Ohm's-law E field, applied only in the low-density
     // transition band (0 < rho <= n_floor*q_e). Disabled by default (marder_alpha = 0).
     utils::parser::queryWithParser(pp_hybrid, "marder_alpha", m_marder_alpha);
@@ -443,7 +459,7 @@ void HybridPICModel::InitialBEBFill ()
             warpx.Geom(lev),
             m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/true, /*fill_covered_centers=*/false,
-            &m_eb_bc_status_B[lev]);
+            &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
     }
 #endif
 }
@@ -519,6 +535,18 @@ void HybridPICModel::CalculatePlasmaCurrent (
             m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
             &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells);
+
+        // Band-aid: dissipate the curved-wall div(J) the mirror injects in the
+        // TOTAL (Ampere) current. div(J_total)=0 is current continuity (no charge
+        // separation). This acts ONLY on the total current; the deposited
+        // ion-species current is never continuity-constrained.
+        if (m_divj_clean_alpha > 0.0_rt) {
+            MarderCleanDivergence(
+                current_fp_plasma, eb_update_E, &m_eb_bc_status_Jplasma[lev],
+                /*normal_odd=*/false, /*fill_covered_centers=*/true,
+                m_divj_clean_alpha, m_divb_clean_iters,
+                m_divb_clean_band_cells, m_eb_fill_band_cells, lev);
+        }
     }
 }
 
@@ -1376,7 +1404,7 @@ void HybridPICModel::FieldPush (
                 warpx.Geom(lev),
                 m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
                 /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                &m_eb_bc_status_B[lev]);
+                &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
 #else
             if (m_conformal_b_ect) {
                 // Opt-in: the collocated-ECT conformal correction, a finite-volume
@@ -1406,9 +1434,20 @@ void HybridPICModel::FieldPush (
                     warpx.Geom(lev),
                     m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
                     /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                    &m_eb_bc_status_B[lev]);
+                    &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
             }
 #endif
+            // Band-aid: dissipate the curved-wall div(B) the mirror injects (a
+            // pure-gradient correction, so curl(B)=J is untouched). Mirror path
+            // only -- C-ECT is flux-conserving and requires a zeroed covered band.
+            if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect) {
+                MarderCleanDivergence(
+                    warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    warpx.GetEBUpdateBFlag()[lev], &m_eb_bc_status_B[lev],
+                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                    m_divb_clean_alpha, m_divb_clean_iters,
+                    m_divb_clean_band_cells, m_eb_b_fill_band_cells, lev);
+            }
         }
         warpx.FillBoundaryB(ng, nodal_sync);
     }

@@ -264,6 +264,29 @@ public:
         bool allow_target_cache = true) const;
 
     /**
+     * \brief Marder-like diffusive divergence clean of a nodal vector field
+     * (band-aid). Iterates field += alpha_scaled * grad(div(field)) restricted to
+     * a near-wall geometric band (|distance_to_eb| <= band_cells*h), re-applying
+     * the embedded-boundary PEC fill (with the field's own parity) each sweep.
+     * The correction is a pure gradient, so curl(field) -- and hence J=curl(B) /
+     * the physics it feeds -- is unchanged to round-off; only the spurious
+     * curved-wall divergence injected by the mirror fill is dissipated. Used to
+     * remove the secular div(B) and div(J_total) growth at the conformal wall.
+     * No-op when alpha<=0 or no EB. Collocated/nodal Cartesian + RZ/XZ.
+     */
+    void MarderCleanDivergence (
+        ablastr::fields::VectorField const& field,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update,
+        warpx::hybrid::EBFillStatus* status_cache,
+        bool normal_odd,
+        bool fill_covered_centers,
+        amrex::Real alpha,
+        int max_iters,
+        amrex::Real clean_band_cells,
+        amrex::Real fill_band_cells,
+        int lev) const;
+
+    /**
      * \brief
      * Function to calculate the electron pressure using the simulation charge
      * density. Used in the Ohm's law solver (kinetic-fluid hybrid model).
@@ -391,6 +414,17 @@ public:
      *  reflection (Neumann: the wall supports the column) */
     bool m_eb_rho_dirichlet = true;
 
+    /** Marder-like diffusive clean of the curved-wall div(B) and div(J_total)
+     *  injection (band-aid; see MarderCleanDivergence). alpha=0 (default)
+     *  disables each; applied in a near-wall band of width divb_clean_band_cells
+     *  for divb_clean_iters sweeps after the respective EB fill. The J clean acts
+     *  on the TOTAL (Ampere) current hybrid_current_fp_plasma only, never the
+     *  deposited ion-species current (only the total obeys div J = 0). */
+    amrex::Real m_divb_clean_alpha = 0.0;
+    amrex::Real m_divj_clean_alpha = 0.0;
+    int m_divb_clean_iters = 5;
+    amrex::Real m_divb_clean_band_cells = 4.0;
+
     /** Dimensionless damping factor of the transitional Marder divergence
      *  cleaning; 0 (default) disables the correction. The discrete grad(div)
      *  operator scales as 1/min(dx)^2, so the applied factor is
@@ -443,6 +477,14 @@ public:
      *  sqrt(AMREX_SPACEDIM) when the isotropic hyper-resistivity Laplacian is
      *  enabled (so its diagonal corners are filled, not zeroed), else 1. */
     amrex::Real m_eb_fill_band_cells = 1.0;
+    /** Mirror-fill band width (in cells) for the magnetic-field (Bfield_fp) EB
+     *  fill. The filled B couples back into the solution only through curl/B
+     *  reads; with the isotropic corner-curl E correction on, that composite
+     *  reach is 2 cells, so widening this band to >=3 pushes the level-set
+     *  mirror's div(B) jump out of the solution-coupling zone (into the zeroed
+     *  deep interior, where it is causally inert). Runtime knob
+     *  hybrid_pic_model.eb_b_fill_band_cells; default 1 (legacy behavior). */
+    amrex::Real m_eb_b_fill_band_cells = 1.0;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

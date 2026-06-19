@@ -56,6 +56,11 @@ void WarpX::HybridPICEvolveFields ()
             gett_old(0),
             0.5_rt*dt[0]);
 
+        // One-shot (first push, after the grid initial B has been applied): warn
+        // if the external field is nonzero at t = 0 but the grid B was left
+        // un-seeded, which makes the subtract below act on an inconsistent B.
+        m_hybrid_pic_model->m_external_vector_potential->CheckInitialB();
+
         // If using split fields, subtract the external field at the old time
         for (int lev = 0; lev <= finest_level; ++lev) {
             for (int idim = 0; idim < 3; ++idim) {

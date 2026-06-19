@@ -360,7 +360,8 @@ def local_mirror_jx(Jfold_x_cc, Jfold_y_cc, cx_cc, cz_cc):
 # ---------------------------------------------------------------------------
 # mode = operator : the primary assertions
 # ---------------------------------------------------------------------------
-def run_operator(sim, grid_type, ck=None, make_figure=True, quiet=False):
+def run_operator(sim, grid_type, ck=None, make_figure=True, quiet=False,
+                 exact_levelset=False):
     """Drive the directly-set azimuthal band through FOLD then FILL and assert
     the read-back current against the operator replica, the exact image and the
     C4 symmetry, then probe the representation (Ampere field, level-set and
@@ -372,6 +373,23 @@ def run_operator(sim, grid_type, ck=None, make_figure=True, quiet=False):
     owns_ck = ck is None
     if ck is None:
         ck = CheckSet()
+
+    # Optional: replace the AMReX cut-cell level set with the EXACT analytic
+    # cylinder signed distance (R_w - r) -- the infinite-refinement limit, with
+    # boundary m=4 -> 0. This isolates whether better-refined boundary POSITIONS
+    # help the planar-mirror fill (filled-field m=4 would drop) or whether the
+    # m=4 is the planar approximation's curvature error (filled m=4 unchanged ->
+    # a curved correction is required). The fold/fill (mirror_geom) read this
+    # phi directly for the surface distance and normal.
+    if exact_levelset:
+        dphi = sim.fields.get("distance_to_eb", level=0)
+        a = np.array(dphi[...])
+        a3 = a[..., 0] if a.ndim == 4 else a  # view into a
+        xn = LO + np.arange(a3.shape[0]) * H
+        yn = LO + np.arange(a3.shape[1]) * H
+        Xn, Yn = np.meshgrid(xn, yn, indexing="ij")
+        a3[:] = (R_WALL - np.sqrt(Xn * Xn + Yn * Yn))[:, :, None]
+        dphi[...] = a
 
     Jx = fields.JxFPWrapper()
     Jy = fields.JyFPWrapper()
@@ -1072,6 +1090,14 @@ def main():
         default=64,
         help="in-plane resolution N_XY (operator/particle modes)",
     )
+    parser.add_argument(
+        "--exact-levelset",
+        action="store_true",
+        help="overwrite distance_to_eb with the exact analytic cylinder signed "
+        "distance (infinite-refinement limit, boundary m=4 -> 0) before the "
+        "fold/fill, to test whether better boundary positions help the planar "
+        "mirror (operator mode only)",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -1087,7 +1113,7 @@ def main():
     if args.mode == "particle":
         run_particle(sim, args.grid_type)
     else:
-        run_operator(sim, args.grid_type)
+        run_operator(sim, args.grid_type, exact_levelset=args.exact_levelset)
 
 
 if __name__ == "__main__":
