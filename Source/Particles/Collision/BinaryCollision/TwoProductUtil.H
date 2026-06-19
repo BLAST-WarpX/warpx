@@ -138,8 +138,10 @@ namespace {
             ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
                                              engine);
         }
-        else if (scattering_angle_model == ScatteringAngleModel::Forward) {
+        else if (scattering_angle_model == ScatteringAngleModel::Forward ||
+                 scattering_angle_model == ScatteringAngleModel::Backward) {
             // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
+            // Backward scattering: the products have the opposite direction of the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
             if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
             {
@@ -161,8 +163,11 @@ namespace {
             const amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
 
             // Momentum of the first product in the center of mass frame:
-            // same direction as the incident, but scaled to have the magnitude sqrt(p_star_f_sq)
-            const amrex::ParticleReal scaling = std::sqrt(p_star_f_sq)/p1_star_in;
+            // same (forward) or opposite (backward) direction as the incident, scaled to have
+            // the magnitude sqrt(p_star_f_sq)
+            const amrex::ParticleReal sign = (scattering_angle_model == ScatteringAngleModel::Backward)
+                                             ? -1._prt : 1._prt;
+            const amrex::ParticleReal scaling = sign*std::sqrt(p_star_f_sq)/p1_star_in;
             px_star_out = p1x_star_in * scaling;
             py_star_out = p1y_star_in * scaling;
             pz_star_out = p1z_star_in * scaling;
