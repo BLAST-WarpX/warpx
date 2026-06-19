@@ -945,7 +945,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                             // The even axis parity Jz(-dr) = Jz(dr) gives the
                             // ghost-free form 2 * 2*(Jz(dr) - Jz(0))/dr^2.
                             const Real inv_dr2 = coefs_r[0]*coefs_r[0];
-                            nabla2Jz += 4.0_rt*(Jz(i+1, j, 0) - Jz(i, j, 0))*inv_dr2;
+                            nabla2Jz += 4._rt*(Jz(i+1, j, 0) - Jz(i, j, 0))*inv_dr2;
                         }
 
                         Ez(i, j, 0) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
@@ -1115,8 +1115,7 @@ namespace
     // UpwardD then completes the corner. A half (coefficient 1/3) goes through each
     // in-plane E component, which reproduces the (hxa^2+hxb^2)/3 corner for any cell
     // aspect ratio (isotropic for cubic cells, consistent otherwise). Returned values
-    // carry 1/mu0; multiply by eta at the call. Validated to round-off by the
-    // collocated --battery resistive unit test.
+    // carry 1/mu0; multiply by eta at the call.
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::Real CornerResistiveEx_3D_Nodal (
         amrex::Array4<amrex::Real const> const& Bz,

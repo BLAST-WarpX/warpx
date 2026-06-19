@@ -180,9 +180,10 @@ void HybridPICModel::ReadParameters ()
     // Default 1 = legacy behavior.
     utils::parser::queryWithParser(pp_hybrid, "eb_b_fill_band_cells", m_eb_b_fill_band_cells);
 
-    // Marder-like diffusive clean of the curved-wall div(B) / div(J_total)
-    // injection (band-aid). Each alpha defaults to 0 (off). The clean is a pure
-    // gradient correction, so it dissipates divergence without touching curl/J.
+    // Optional Marder-like diffusive clean of the small curved-wall div(B) /
+    // div(J_total) the pointwise mirror injects. Each alpha defaults to 0 (off).
+    // The clean is a pure gradient correction, so it dissipates divergence
+    // without touching curl/J.
     utils::parser::queryWithParser(pp_hybrid, "divb_clean_alpha", m_divb_clean_alpha);
     utils::parser::queryWithParser(pp_hybrid, "divj_clean_alpha", m_divj_clean_alpha);
     utils::parser::queryWithParser(pp_hybrid, "divb_clean_iters", m_divb_clean_iters);
@@ -538,8 +539,9 @@ void HybridPICModel::CalculatePlasmaCurrent (
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
             &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells);
 
-        // Band-aid: dissipate the curved-wall div(J) the mirror injects in the
-        // TOTAL (Ampere) current. div(J_total)=0 is current continuity (no charge
+        // Optional diffusive clean: dissipate the curved-wall div(J) the mirror
+        // injects in the TOTAL (Ampere) current. div(J_total)=0 is current
+        // continuity (no charge
         // separation). This acts ONLY on the total current; the deposited
         // ion-species current is never continuity-constrained.
         // Skipped in the per-step cadence (done once at the FullStep site).
@@ -1440,8 +1442,9 @@ void HybridPICModel::FieldPush (
                     &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
             }
 #endif
-            // Band-aid: dissipate the curved-wall div(B) the mirror injects (a
-            // pure-gradient correction, so curl(B)=J is untouched). Mirror path
+            // Optional diffusive clean: dissipate the curved-wall div(B) the
+            // mirror injects (a pure-gradient correction, so curl(B)=J is
+            // untouched). Mirror path
             // only -- C-ECT is flux-conserving and requires a zeroed covered band.
             // Skipped in the per-step cadence (done once at the FullStep site).
             if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect && !m_divb_clean_per_step) {

@@ -264,8 +264,8 @@ public:
         bool allow_target_cache = true) const;
 
     /**
-     * \brief Marder-like diffusive divergence clean of a nodal vector field
-     * (band-aid). Iterates field += alpha_scaled * grad(div(field)) restricted to
+     * \brief Optional Marder-like diffusive divergence clean of a nodal vector
+     * field. Iterates field += alpha_scaled * grad(div(field)) restricted to
      * a near-wall geometric band (|distance_to_eb| <= band_cells*h), re-applying
      * the embedded-boundary PEC fill (with the field's own parity) each sweep.
      * The correction is a pure gradient, so curl(field) -- and hence J=curl(B) /
@@ -395,7 +395,8 @@ public:
     /** If true, skip the collocated conformal magnetic-field wall treatment
      *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
      *  This reproduces the pre-treatment baseline and isolates the wall fill as
-     *  the source of the grid-locked m = 4 perturbation. For A/B comparison. */
+     *  the source of the grid-locked m = 4 perturbation. Diagnostic only -- it
+     *  leaves spurious fields at the wall, so it is not for production runs. */
     bool m_conformal_b_off = false;
 
     /** Relative residual tolerance of the Jacobi band relaxation of the
@@ -420,8 +421,8 @@ public:
      *  reflection (Neumann: the wall supports the column) */
     bool m_eb_rho_dirichlet = true;
 
-    /** Marder-like diffusive clean of the curved-wall div(B) and div(J_total)
-     *  injection (band-aid; see MarderCleanDivergence). alpha=0 (default)
+    /** Optional Marder-like diffusive clean of the small curved-wall div(B) and
+     *  div(J_total) the pointwise mirror injects (see MarderCleanDivergence). alpha=0 (default)
      *  disables each; applied in a near-wall band of width divb_clean_band_cells
      *  for divb_clean_iters sweeps after the respective EB fill. The J clean acts
      *  on the TOTAL (Ampere) current hybrid_current_fp_plasma only, never the

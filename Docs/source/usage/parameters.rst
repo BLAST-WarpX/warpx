@@ -3849,6 +3849,43 @@ Maxwell solver: kinetic-fluid hybrid
     calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
     :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
 
+.. pp:param:: hybrid_pic_model.conformal_b_ect
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    On a collocated (nodal) grid with :pp:param:`hybrid_pic_model.use_conformal_eb`, selects how the
+    magnetic field is treated at the embedded boundary. The default (``false``) is the direct level-set
+    mirror fill — magnetic parity (normal component odd, tangential even), so the normal ``B`` vanishes
+    at the wall and the tangential ``B`` is wall-supported — applied to ``Bfield_fp`` after each Faraday
+    substep and made consistent with the initial covered band. Setting it ``true`` opts into the
+    collocated enlarged-cell (ECT) finite-volume Faraday correction instead, which requires a zeroed
+    covered band. Ignored on staggered grids (which always use the staggered ECT) and in RZ. (The
+    former ``conformal_b_mirror`` input is renamed to this; setting it now aborts with a migration
+    message.)
+
+.. pp:param:: hybrid_pic_model.conformal_b_off
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Diagnostic only. If ``true``, disables the embedded-boundary ``B``-field treatment entirely on the
+    collocated path (neither the mirror fill nor the ECT correction is applied), reproducing the
+    pre-treatment stair-step baseline. Intended for A/B comparison of the EB ``B`` treatment; not for
+    production runs.
+
+.. pp:param:: hybrid_pic_model.eb_b_fill_band_cells
+    :type: ``float``
+    :default: ``1``
+    :optional:
+
+    Width, in cells, of the band of covered ``Bfield_fp`` nodes set by the direct level-set mirror fill
+    (collocated, non-ECT path). The filled ``B`` couples back into the solution only through the
+    plasma-current curl and the isotropic corner-curl correction — a reach of about two cells when
+    :pp:param:`hybrid_pic_model.isotropic_resistivity` is enabled — so widening this band pushes the
+    mirror's curved-wall divergence error deeper into the zeroed conductor interior, where it can no
+    longer reach a solution-domain stencil.
+
 .. pp:param:: hybrid_pic_model.eb_deposit_fold
     :type: ``string``
     :default: ``pec``
@@ -3990,6 +4027,53 @@ Maxwell solver: kinetic-fluid hybrid
     ``marder_correction_level = all_substeps``). Note that with RKF45 a value above 1 makes
     the right-hand side stage-history dependent, which can mildly bias the embedded error
     estimate of the adaptive stepper.
+
+.. pp:param:: hybrid_pic_model.divb_clean_alpha
+    :type: ``float``
+    :default: ``0``
+    :optional:
+
+    Damping factor of a Marder-style diffusive divergence clean of ``Bfield_fp`` on the collocated
+    direct-mirror embedded-boundary path. ``0`` (default) disables it. The clean iterates
+    ``B += alpha * grad(div B)`` in a near-wall band (see
+    :pp:param:`hybrid_pic_model.divb_clean_band_cells`), re-imposing the embedded-boundary condition
+    after each sweep. Because the correction is a pure gradient it dissipates the small divergence that
+    the curved-wall mirror injects without changing ``curl(B)`` (the plasma current), so the physics
+    that consumes the current is unaffected. Stability-capped near ``0.1`` (the same diffusion CFL as
+    the E-field Marder; larger values diverge).
+
+.. pp:param:: hybrid_pic_model.divj_clean_alpha
+    :type: ``float``
+    :default: ``0``
+    :optional:
+
+    As :pp:param:`hybrid_pic_model.divb_clean_alpha`, but cleans the divergence of the total
+    (Ampère/plasma) current ``hybrid_current_fp_plasma`` — current continuity, :math:`\nabla\cdot J = 0`,
+    which only the total current obeys. It never acts on a deposited ion-species current. ``0``
+    (default) disables it.
+
+.. pp:param:: hybrid_pic_model.divb_clean_iters
+    :type: ``int``
+    :default: ``5``
+    :optional:
+
+    Number of fixed-point sweeps per application of the div(B)/div(J) clean (shared by both).
+
+.. pp:param:: hybrid_pic_model.divb_clean_band_cells
+    :type: ``float``
+    :default: ``4``
+    :optional:
+
+    Width, in cells, of the near-wall band over which the div(B)/div(J) clean acts (shared by both).
+
+.. pp:param:: hybrid_pic_model.divb_clean_per_step
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If ``true``, the div(B)/div(J) clean is applied once per full step (after the plasma-current update)
+    instead of after every RKF45 substage. The divergence accumulates step-to-step, so this gives
+    nearly the same damping at a small fraction of the per-substage cost.
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
