@@ -286,6 +286,12 @@ public:
         amrex::Real fill_band_cells,
         int lev) const;
 
+    /** Once-per-step driver for the div(B)/div(J_total) clean (the
+     *  divb_clean_per_step cadence): cleans Bfield_fp (magnetic parity) and the
+     *  total Ampere current hybrid_current_fp_plasma (electric parity) on every
+     *  level via MarderCleanDivergence. No-op unless the respective alpha>0. */
+    void MarderCleanFieldsPerStep () const;
+
     /**
      * \brief
      * Function to calculate the electron pressure using the simulation charge
@@ -424,6 +430,10 @@ public:
     amrex::Real m_divj_clean_alpha = 0.0;
     int m_divb_clean_iters = 5;
     amrex::Real m_divb_clean_band_cells = 4.0;
+    /** Apply the div(B)/div(J) clean once per full step (cheap) instead of every
+     *  RKF45 substage (default). The per-step clean removes the divergence
+     *  accumulated over the step before the next step begins. */
+    bool m_divb_clean_per_step = false;
 
     /** Dimensionless damping factor of the transitional Marder divergence
      *  cleaning; 0 (default) disables the correction. The discrete grad(div)

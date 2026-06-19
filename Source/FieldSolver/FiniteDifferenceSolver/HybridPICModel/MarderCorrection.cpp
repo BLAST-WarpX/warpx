@@ -709,3 +709,33 @@ void HybridPICModel::MarderCleanDivergence (
         fill_covered_centers, alpha, max_iters, clean_band_cells, fill_band_cells, lev);
 #endif
 }
+
+void HybridPICModel::MarderCleanFieldsPerStep () const
+{
+    if (!m_divb_clean_per_step) { return; }
+    if (m_divb_clean_alpha <= 0.0_rt && m_divj_clean_alpha <= 0.0_rt) { return; }
+
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        // B (magnetic parity); mirror path only -- C-ECT is flux-conserving.
+        if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect) {
+            if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
+            MarderCleanDivergence(
+                warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                warpx.GetEBUpdateBFlag()[lev], &m_eb_bc_status_B[lev],
+                /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                m_divb_clean_alpha, m_divb_clean_iters,
+                m_divb_clean_band_cells, m_eb_b_fill_band_cells, lev);
+        }
+        // Total Ampere current (electric parity), never an ion species.
+        if (m_divj_clean_alpha > 0.0_rt) {
+            if (static_cast<int>(m_eb_bc_status_Jplasma.size()) <= lev) { m_eb_bc_status_Jplasma.resize(lev+1); }
+            MarderCleanDivergence(
+                warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev),
+                warpx.GetEBUpdateEFlag()[lev], &m_eb_bc_status_Jplasma[lev],
+                /*normal_odd=*/false, /*fill_covered_centers=*/true,
+                m_divj_clean_alpha, m_divb_clean_iters,
+                m_divb_clean_band_cells, m_eb_fill_band_cells, lev);
+        }
+    }
+}

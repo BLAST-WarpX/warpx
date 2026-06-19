@@ -591,6 +591,12 @@ def main():
         type=float,
         default=4.0,
     )
+    parser.add_argument(
+        "--divb-clean-per-step",
+        action="store_true",
+        help="apply the div(B)/div(J) clean once per full step (cheap) instead of "
+        "every RKF45 substage",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -655,6 +661,7 @@ def main():
     if args.divb_clean_alpha > 0.0 or args.divj_clean_alpha > 0.0:
         hybridpicmodel.divb_clean_iters = args.divb_clean_iters
         hybridpicmodel.divb_clean_band_cells = args.divb_clean_band_cells
+        hybridpicmodel.divb_clean_per_step = args.divb_clean_per_step
 
     # Quartz-liner particle scrape: hold the plasma off the metal-wall EB by
     # scraping ions a few cells inside R_WALL (see install_quartz_scraper)

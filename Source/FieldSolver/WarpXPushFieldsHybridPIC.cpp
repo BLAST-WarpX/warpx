@@ -239,6 +239,10 @@ void WarpX::HybridPICEvolveFields ()
     m_hybrid_pic_model->CalculatePlasmaCurrent(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_eb_update_E);
+    // Once-per-step div(B)/div(J_total) clean (the divb_clean_per_step cadence):
+    // dissipate the curved-wall divergence accumulated over the step before the
+    // E solve and the next step. No-op in the default per-substage cadence.
+    m_hybrid_pic_model->MarderCleanFieldsPerStep();
     m_hybrid_pic_model->HybridPICSolveE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,

@@ -187,6 +187,7 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "divj_clean_alpha", m_divj_clean_alpha);
     utils::parser::queryWithParser(pp_hybrid, "divb_clean_iters", m_divb_clean_iters);
     utils::parser::queryWithParser(pp_hybrid, "divb_clean_band_cells", m_divb_clean_band_cells);
+    pp_hybrid.query("divb_clean_per_step", m_divb_clean_per_step);
 
     // Marder divergence cleaning of the Ohm's-law E field, applied only in the low-density
     // transition band (0 < rho <= n_floor*q_e). Disabled by default (marder_alpha = 0).
@@ -540,7 +541,8 @@ void HybridPICModel::CalculatePlasmaCurrent (
         // TOTAL (Ampere) current. div(J_total)=0 is current continuity (no charge
         // separation). This acts ONLY on the total current; the deposited
         // ion-species current is never continuity-constrained.
-        if (m_divj_clean_alpha > 0.0_rt) {
+        // Skipped in the per-step cadence (done once at the FullStep site).
+        if (m_divj_clean_alpha > 0.0_rt && !m_divb_clean_per_step) {
             MarderCleanDivergence(
                 current_fp_plasma, eb_update_E, &m_eb_bc_status_Jplasma[lev],
                 /*normal_odd=*/false, /*fill_covered_centers=*/true,
@@ -1440,7 +1442,8 @@ void HybridPICModel::FieldPush (
             // Band-aid: dissipate the curved-wall div(B) the mirror injects (a
             // pure-gradient correction, so curl(B)=J is untouched). Mirror path
             // only -- C-ECT is flux-conserving and requires a zeroed covered band.
-            if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect) {
+            // Skipped in the per-step cadence (done once at the FullStep site).
+            if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect && !m_divb_clean_per_step) {
                 MarderCleanDivergence(
                     warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     warpx.GetEBUpdateBFlag()[lev], &m_eb_bc_status_B[lev],
