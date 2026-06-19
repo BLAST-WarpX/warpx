@@ -369,7 +369,7 @@ private:
 // struct whose getMomentum returns local momentum computed from parser.
 struct InjectorMomentumParser
 {
-    explicit InjectorMomentumParser (GetVelocityVector const& a_velocity) noexcept
+    InjectorMomentumParser (GetVelocityVector const& a_velocity) noexcept
         : m_velocity(a_velocity) {}
 
     [[nodiscard]]
