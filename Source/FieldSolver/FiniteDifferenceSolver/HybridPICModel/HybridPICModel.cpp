@@ -122,21 +122,6 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
-    // Collocated conformal B wall treatment: the direct level-set mirror fill is
-    // the default (it is self-consistent with a Neumann-filled covered band);
-    // setting conformal_b_ect = 1 opts into the collocated-ECT finite-volume
-    // correction instead (which requires the covered band to be zero).
-    pp_hybrid.query("conformal_b_ect", m_conformal_b_ect);
-    // Backward compatibility: conformal_b_mirror was the opt-in for the mirror
-    // fill back when ECT was the default. The mirror is now the default, so the
-    // flag is removed; point users at the new (inverted) opt-in.
-    if (pp_hybrid.contains("conformal_b_mirror")) {
-        WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.conformal_b_mirror has been removed: the direct "
-            "mirror fill is now the default magnetic-field wall treatment. Use "
-            "hybrid_pic_model.conformal_b_ect = 1 to opt into the collocated-ECT "
-            "correction instead.");
-    }
     // Optionally disable the collocated conformal B wall treatment entirely (no
     // EB B fill) to recover the pre-treatment baseline (for A/B comparison).
     pp_hybrid.query("conformal_b_off", m_conformal_b_off);
@@ -445,12 +430,6 @@ void HybridPICModel::InitialBEBFill ()
     using ablastr::utils::enums::GridType;
     if (!EB::enabled() || !m_use_conformal_eb || m_conformal_b_off) { return; }
     if (WarpX::grid_type != GridType::Collocated) { return; }
-#if !defined(WARPX_DIM_RZ)
-    // Cartesian: only the default direct mirror fill writes a nonzero covered
-    // band -- the opt-in C-ECT correction keeps it zero, so it needs no initial
-    // fill. (RZ always uses the mirror, so it always gets the initial fill.)
-    if (m_conformal_b_ect) { return; }
-#endif
     auto& warpx = WarpX::GetInstance();
     auto const& eb_update_B = warpx.GetEBUpdateBFlag();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
@@ -1387,19 +1366,21 @@ void HybridPICModel::FieldPush (
     warpx.FillBoundaryB(ng, nodal_sync);
 
 #ifdef AMREX_USE_EB
-    // On the collocated conformal path there is no enlarged-cell (ECT) extension to
-    // impose the wall condition on B during the Faraday push -- EvolveBCartesianECT
-    // does that on the staggered grid, whereas the collocated push is the unmasked
-    // nodal curl. Impose the wall condition on the freshly pushed B directly from the
-    // level set so the masked covered nodes are wall-consistent for the next substep's
-    // curl(B) plasma current. (The FillBoundaryB above gives the gather/cut stencils
-    // valid ghost values; a second exchange below propagates the band/covered values.)
+    // The collocated push is the unmasked nodal curl, with no enlarged-cell
+    // extension to impose the wall condition on B during the Faraday push.
+    // Impose the wall condition on the freshly pushed B directly from the level
+    // set so the masked covered nodes are wall-consistent for the next substep's
+    // curl(B) plasma current. (The FillBoundaryB above gives the gather stencils
+    // valid ghost values; a second exchange below propagates the band/covered
+    // values.)
     if (m_use_conformal_eb && !m_conformal_b_off &&
         WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-#if defined(WARPX_DIM_RZ)
-            // RZ keeps the pointwise level-set mirror fill with the magnetic
-            // parity (normal odd / tangential even, flux-excluding PEC).
+            // The direct level-set mirror fill (magnetic parity, normal odd /
+            // tangential even, flux-excluding PEC). It is self-consistent with
+            // the Neumann-filled covered band set on the initial field
+            // (InitialBEBFill), so the covered band stays at its wall value
+            // through the substepping.
             auto const& eb_update_B = warpx.GetEBUpdateBFlag();
             if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
             warpx::hybrid::ApplyPECBoundaryToField(
@@ -1410,44 +1391,11 @@ void HybridPICModel::FieldPush (
                 m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
                 /*normal_odd=*/true, /*fill_covered_centers=*/false,
                 &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
-#else
-            if (m_conformal_b_ect) {
-                // Opt-in: the collocated-ECT conformal correction, a finite-volume
-                // Faraday update on the level-set-cut dual cells. Reduces
-                // bit-identically to the nodal push away from the wall and zeros
-                // the deep-interior covered nodes. It requires the covered band to
-                // be zero (so it is paired with a zeroed initial covered band),
-                // which is why it is the opt-in rather than the default.
-                warpx::hybrid::ApplyConformalBCorrection(
-                    warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    warpx.m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    *warpx.m_fields.get(FieldType::distance_to_eb, lev),
-                    warpx.Geom(lev),
-                    dt);
-            } else {
-                // Default: the direct level-set mirror fill (magnetic parity,
-                // normal odd / tangential even). It is self-consistent with the
-                // Neumann-filled covered band set on the initial field
-                // (InitialBEBFill), so the covered band stays at its wall value
-                // through the substepping.
-                auto const& eb_update_B = warpx.GetEBUpdateBFlag();
-                if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
-                warpx::hybrid::ApplyPECBoundaryToField(
-                    warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_update_B[lev],
-                    *warpx.m_fields.get(FieldType::distance_to_eb, lev),
-                    warpx.Geom(lev),
-                    m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
-                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                    &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
-            }
-#endif
             // Optional diffusive clean: dissipate the curved-wall div(B) the
             // mirror injects (a pure-gradient correction, so curl(B)=J is
-            // untouched). Mirror path
-            // only -- C-ECT is flux-conserving and requires a zeroed covered band.
-            // Skipped in the per-step cadence (done once at the FullStep site).
-            if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect && !m_divb_clean_per_step) {
+            // untouched). Skipped in the per-step cadence (done once at the
+            // FullStep site).
+            if (m_divb_clean_alpha > 0.0_rt && !m_divb_clean_per_step) {
                 MarderCleanDivergence(
                     warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                     warpx.GetEBUpdateBFlag()[lev], &m_eb_bc_status_B[lev],

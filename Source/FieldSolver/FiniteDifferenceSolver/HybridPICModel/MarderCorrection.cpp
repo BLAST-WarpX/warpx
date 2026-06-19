@@ -717,8 +717,8 @@ void HybridPICModel::MarderCleanFieldsPerStep () const
 
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        // B (magnetic parity); mirror path only -- C-ECT is flux-conserving.
-        if (m_divb_clean_alpha > 0.0_rt && !m_conformal_b_ect) {
+        // B (magnetic parity).
+        if (m_divb_clean_alpha > 0.0_rt) {
             if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
             MarderCleanDivergence(
                 warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),

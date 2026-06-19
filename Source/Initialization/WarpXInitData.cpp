@@ -913,11 +913,11 @@ WarpX::InitData ()
             AddExternalFields(lev);
         }
         // Make the initial B consistent with the collocated conformal magnetic
-        // wall treatment now that the grid B has been set: the default direct
-        // mirror fill needs the covered band at its Neumann value, otherwise the
-        // first field-push substep sees it jump from the staircase-masked zero and
-        // stalls the RKF45 substepping. No-op for the opt-in C-ECT correction
-        // (which keeps the covered band zero) and for non-hybrid solvers.
+        // wall treatment now that the grid B has been set: the direct mirror
+        // fill needs the covered band at its Neumann value, otherwise the first
+        // field-push substep sees it jump from the staircase-masked zero and
+        // stalls the RKF45 substepping. No-op for non-hybrid solvers and off the
+        // collocated embedded-boundary path.
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
             m_hybrid_pic_model->InitialBEBFill();
         }

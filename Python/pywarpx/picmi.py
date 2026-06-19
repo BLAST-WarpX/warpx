@@ -2194,15 +2194,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         neighbors to avoid time-step restrictions. Requires an embedded
         boundary and a 3D Cartesian staggered grid.
 
-    conformal_b_ect: bool, default=False
-        Collocated (nodal) conformal embedded-boundary magnetic-field wall
-        treatment selector. By default (False) the recovered B uses the direct
-        level-set mirror fill (magnetic parity: normal odd / tangential even),
-        which is self-consistent with the Neumann-filled covered band set on the
-        initial field. If True, opt into the collocated-ECT finite-volume
-        conformal correction instead (which requires the covered band to be
-        zero). Only used with the collocated grid and an embedded boundary.
-
     eb_bc_rtol: float, default=1e-4
         Relative residual tolerance of the embedded-boundary PEC
         boundary-condition band relaxation. With embedded boundaries the
@@ -2348,7 +2339,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
-        conformal_b_ect=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
@@ -2391,7 +2381,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
 
         self.use_conformal_eb = use_conformal_eb
-        self.conformal_b_ect = conformal_b_ect
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
@@ -2458,7 +2447,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
-        pywarpx.hybridpicmodel.conformal_b_ect = self.conformal_b_ect
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill

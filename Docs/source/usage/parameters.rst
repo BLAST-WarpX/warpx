@@ -3849,30 +3849,14 @@ Maxwell solver: kinetic-fluid hybrid
     calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
     :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
 
-.. pp:param:: hybrid_pic_model.conformal_b_ect
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    On a collocated (nodal) grid with :pp:param:`hybrid_pic_model.use_conformal_eb`, selects how the
-    magnetic field is treated at the embedded boundary. The default (``false``) is the direct level-set
-    mirror fill — magnetic parity (normal component odd, tangential even), so the normal ``B`` vanishes
-    at the wall and the tangential ``B`` is wall-supported — applied to ``Bfield_fp`` after each Faraday
-    substep and made consistent with the initial covered band. Setting it ``true`` opts into the
-    collocated enlarged-cell (ECT) finite-volume Faraday correction instead, which requires a zeroed
-    covered band. Ignored on staggered grids (which always use the staggered ECT) and in RZ. (The
-    former ``conformal_b_mirror`` input is renamed to this; setting it now aborts with a migration
-    message.)
-
 .. pp:param:: hybrid_pic_model.conformal_b_off
     :type: ``bool``
     :default: ``false``
     :optional:
 
     Diagnostic only. If ``true``, disables the embedded-boundary ``B``-field treatment entirely on the
-    collocated path (neither the mirror fill nor the ECT correction is applied), reproducing the
-    pre-treatment stair-step baseline. Intended for A/B comparison of the EB ``B`` treatment; not for
-    production runs.
+    collocated path (the direct level-set mirror fill is not applied), reproducing the pre-treatment
+    stair-step baseline. Intended for A/B comparison of the EB ``B`` treatment; not for production runs.
 
 .. pp:param:: hybrid_pic_model.eb_b_fill_band_cells
     :type: ``float``

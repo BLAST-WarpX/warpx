@@ -73,12 +73,11 @@ public:
 
     /**
      * \brief Apply the collocated conformal magnetic-field wall treatment to the
-     * INITIAL B field (call once after the initial grid B has been set). For the
-     * default direct mirror fill the covered band is set to its Neumann value so
-     * the first field-push substep does not see it jump from the staircase-masked
-     * zero (which stalls the RKF45 substepping). A no-op when the opt-in C-ECT
-     * correction is selected (it keeps the covered band zero) or the wall fill is
-     * disabled.
+     * INITIAL B field (call once after the initial grid B has been set). The
+     * direct mirror fill sets the covered band to its Neumann value so the first
+     * field-push substep does not see it jump from the staircase-masked zero
+     * (which stalls the RKF45 substepping). A no-op when the wall fill is
+     * disabled (conformal_b_off) or off the collocated embedded-boundary path.
      */
     void InitialBEBFill ();
 
@@ -386,12 +385,6 @@ public:
      *  instead of the stair-step approximation. Requires embedded boundaries
      *  and a 3D Cartesian staggered grid. */
     bool m_use_conformal_eb = false;
-    /** Collocated conformal magnetic-field wall treatment selector: false
-     *  (default) uses the direct level-set mirror fill (magnetic parity, normal
-     *  odd / tangential even) -- which is self-consistent with a Neumann-filled
-     *  covered band; true opts into the collocated-ECT finite-volume conformal
-     *  correction (which instead requires the covered band to be zero). */
-    bool m_conformal_b_ect = false;
     /** If true, skip the collocated conformal magnetic-field wall treatment
      *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
      *  This reproduces the pre-treatment baseline and isolates the wall fill as
