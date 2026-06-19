@@ -69,7 +69,7 @@ def scalar_ratio(s):
     return s / max(abs(s), D_IMG_MIN)
 
 
-def setup_simulation(hyper=False, resistive=False):
+def setup_simulation(hyper=False, resistive=False, collocated=False):
     grid = picmi.Cartesian2DGrid(
         number_of_cells=[N_X, N_Z],
         lower_bound=[LO, LO],
@@ -85,7 +85,7 @@ def setup_simulation(hyper=False, resistive=False):
         # single box for the hyper battery: the species-free deck allocates
         # the plasma current with zero ghost cells, so the hyper-resistivity
         # stencil must not straddle a box seam
-        warpx_max_grid_size_x=2048 if (hyper or resistive) else N_X // 2,
+        warpx_max_grid_size_x=2048 if (hyper or resistive or collocated) else N_X // 2,
         warpx_blocking_factor=8,
     )
 
@@ -96,7 +96,7 @@ def setup_simulation(hyper=False, resistive=False):
         verbose=0,
     )
     sim.current_deposition_algo = "direct"
-    sim.grid_type = "staggered"
+    sim.grid_type = "collocated" if collocated else "staggered"
 
     # use_conformal_eb was just unguarded for 2D XZ: the ECT masks make the
     # planar-wall closed forms identical to the 3D battery
@@ -1006,20 +1006,204 @@ def run_resistive_battery(sim):
     ck.finish()
 
 
+# ----------------------------------------------------------------------------
+# Div(B) Marder-clean battery (collocated planar wall)
+# ----------------------------------------------------------------------------
+def run_divb_clean_battery(sim):
+    """Div(B) Marder clean on a collocated grid: the band-restricted
+    ``B += alpha*grad(div B)`` diffusion that dissipates the curved-wall
+    divergence the EB mirror fill injects on the conformal-EB collocated B
+    push. The correction is a pure gradient, so curl(B) -- and hence the
+    plasma current J = curl(B) it feeds -- is preserved to round-off while
+    only the near-wall band divergence is reduced. Exercises the production
+    parity (magnetic: normal odd) through the hybrid_marder_clean_divergence
+    binding.
+
+    Key invariant tested: for the centered nodal grad the kernel uses, a
+    centered nodal curl of ``grad(scalar)`` vanishes identically, so curl(B)
+    is unchanged to round-off in the band interior regardless of how the
+    divergence itself is computed.
+    """
+    wx = sim.extension.warpx
+    ck = CheckSet()
+
+    L = HI - LO
+    nx, nz = N_X + 1, N_Z + 1  # collocated: every field is nodal
+    x_node = LO + np.arange(nx) * H
+    z_node = LO + np.arange(nz) * H
+    s_cell = (X_WALL - x_node) / H  # signed distance in cells (fluid s > 0)
+
+    CLEAN_CELLS = 6.0  # the clean band (grad(div) acts on |phi| <= 6 h)
+    FILL_CELLS = 1.0  # the EB mirror re-fill band (rewrites |phi| <~ 1 h)
+
+    Bx = fields.BxFPWrapper()
+    By = fields.ByFPWrapper()
+    Bz = fields.BzFPWrapper()
+    for w in (Bx, By, Bz):
+        w[...] = 0.0
+
+    # Analytic seed (all nodal):
+    #   Bx = A sin(2 pi (z-LO)/L) + P(x) ; Bz = 0 ; By = 0
+    #   curl_y = dBx/dz - dBz/dx = A (2 pi/L) cos(...)   (z-periodic, P drops out)
+    #   div    = dBx/dx + dBz/dz = dP/dx                 (localized in the band)
+    # P(x): a smooth fluid-side bump peaked ~2.5 cells inside the wall, zero in
+    # the bulk and inside the conductor, so the seeded divergence lives in the
+    # near-wall band -- mimicking the curved-wall injection of the mirror fill.
+    A = 3.0
+    sinz = np.sin(2.0 * np.pi * (z_node - LO) / L)
+    P = 0.7 * np.exp(-((s_cell - 2.5) ** 2) / (2.0 * 1.5**2))
+    P[s_cell <= 0.0] = 0.0
+    bx0 = np.broadcast_to(A * sinz[None, :] + P[:, None], arr2d(Bx).shape).copy()
+    bz0 = np.zeros(arr2d(Bz).shape)
+    Bx[...] = bx0
+    Bz[...] = bz0
+    By[...] = 0.0
+
+    def div_nodal(bx, bz):
+        """Centered nodal divergence dBx/dx + dBz/dz (z periodic, x interior)."""
+        d = np.zeros_like(bx)
+        d[1:-1, :] += (bx[2:, :] - bx[:-2, :]) / (2.0 * H)
+        d += (np.roll(bz, -1, axis=1) - np.roll(bz, 1, axis=1)) / (2.0 * H)
+        return d
+
+    def curl_y_nodal(bx, bz):
+        """Centered nodal curl_y = dBx/dz - dBz/dx (z periodic, x interior)."""
+        c = (np.roll(bx, -1, axis=1) - np.roll(bx, 1, axis=1)) / (2.0 * H)
+        c[1:-1, :] -= (bz[2:, :] - bz[:-2, :]) / (2.0 * H)
+        return c
+
+    bx_before = np.array(arr2d(Bx))
+    bz_before = np.array(arr2d(Bz))
+    div_before = div_nodal(bx_before, bz_before)
+    curl_before = curl_y_nodal(bx_before, bz_before)
+
+    # band-interior window: fluid nodes well clear of both the fill re-write
+    # band and the outer clean-band edge, so the centered stencils' x-neighbors
+    # are also inside the actively-corrected band.
+    interior = (s_cell >= FILL_CELLS + 1.0) & (s_cell <= CLEAN_CELLS - 1.0)
+    # bulk fluid the clean must not touch -- a window safely past the clean
+    # band's smooth tail and clear of the x-domain (Dirichlet) boundary nodes.
+    deep = (s_cell >= CLEAN_CELLS + 4.0) & (s_cell <= 20.0)
+
+    # Run a single sweep of the production div(B) clean (magnetic parity, B
+    # mask, nullptr cache). One sweep is the exact unit of the algorithm: the
+    # centered nodal grad(div) is applied once in the band, so curl(B) is
+    # preserved to round-off. (The production cadence takes a few such sweeps;
+    # on this idealized planar wall many sweeps would slowly pump the centered
+    # stencil's undamped checkerboard null-mode, which the per-sweep invariant
+    # below is the clean test of.)
+    wx.hybrid_marder_clean_divergence(
+        field="Bfield_fp",
+        lev=0,
+        alpha=0.1,
+        max_iters=1,
+        clean_band_cells=CLEAN_CELLS,
+        fill_band_cells=FILL_CELLS,
+    )
+
+    bx_after = np.array(arr2d(Bx))
+    bz_after = np.array(arr2d(Bz))
+    div_after = div_nodal(bx_after, bz_after)
+    curl_after = curl_y_nodal(bx_after, bz_after)
+
+    # --- 1) the clean actually modified the band ---------------------------
+    d_band = float(np.max(np.abs(bx_after[interior, :] - bx_before[interior, :])))
+    ck.expect(
+        "divb_clean: the band B field is modified",
+        d_band > 0.0,
+        f"max|dBx|={d_band:.3e}",
+    )
+
+    # --- 2) the divergence in the band is reduced --------------------------
+    dn_before = float(np.sqrt(np.sum(div_before[interior, :] ** 2)))
+    dn_after = float(np.sqrt(np.sum(div_after[interior, :] ** 2)))
+    ck.expect(
+        "divb_clean: the band div(B) is reduced",
+        dn_after < 0.9 * dn_before,
+        f"before={dn_before:.3e} after={dn_after:.3e}",
+    )
+
+    # --- 3) curl(B) is preserved to round-off (pure-gradient correction) ---
+    # This is the safety guarantee of the clean: a centered nodal curl of the
+    # centered nodal grad(div) vanishes identically, so J = curl(B) is left
+    # untouched while the divergence is dissipated.
+    curl_scale = float(np.max(np.abs(curl_before[interior, :])))
+    dcurl = float(np.max(np.abs(curl_after[interior, :] - curl_before[interior, :])))
+    ck.expect(
+        "divb_clean: curl(B) preserved to round-off in the band",
+        dcurl <= 1.0e-12 * curl_scale,
+        f"max|dcurl|={dcurl:.3e} curl_scale={curl_scale:.3e}",
+    )
+
+    # --- 4) the bulk fluid is left essentially untouched (band-restricted) --
+    deep_chg = float(np.max(np.abs(bx_after[deep, :] - bx_before[deep, :])))
+    ck.expect(
+        "divb_clean: deep fluid is unchanged (band-restricted)",
+        deep_chg < 1.0e-3,
+        f"max|dBx_deep|={deep_chg:.3e}",
+    )
+
+    # --- 5) the same clean on the total Ampere current (div(J), electric
+    # parity / E mask): the kernel is identical, so curl(J) -- the physical
+    # current the solver feeds back -- is likewise preserved to round-off while
+    # the band divergence is reduced. Exercises the binding's
+    # hybrid_current_fp_plasma branch.
+    Jx = fields.JxFPPlasmaWrapper()
+    Jy = fields.JyFPPlasmaWrapper()
+    Jz = fields.JzFPPlasmaWrapper()
+    for w in (Jx, Jy, Jz):
+        w[...] = 0.0
+    Jx[...] = np.broadcast_to(A * sinz[None, :] + P[:, None], arr2d(Jx).shape).copy()
+    Jz[...] = np.zeros(arr2d(Jz).shape)
+    jx0, jz0 = np.array(arr2d(Jx)), np.array(arr2d(Jz))
+    jdiv0 = div_nodal(jx0, jz0)
+    jcurl0 = curl_y_nodal(jx0, jz0)
+    wx.hybrid_marder_clean_divergence(
+        field="hybrid_current_fp_plasma",
+        lev=0,
+        alpha=0.1,
+        max_iters=1,
+        clean_band_cells=CLEAN_CELLS,
+        fill_band_cells=FILL_CELLS,
+    )
+    jx1, jz1 = np.array(arr2d(Jx)), np.array(arr2d(Jz))
+    jdiv1 = div_nodal(jx1, jz1)
+    jcurl1 = curl_y_nodal(jx1, jz1)
+    jdn0 = float(np.sqrt(np.sum(jdiv0[interior, :] ** 2)))
+    jdn1 = float(np.sqrt(np.sum(jdiv1[interior, :] ** 2)))
+    ck.expect(
+        "divj_clean: the band div(J) is reduced",
+        jdn1 < 0.9 * jdn0,
+        f"before={jdn0:.3e} after={jdn1:.3e}",
+    )
+    jcurl_scale = float(np.max(np.abs(jcurl0[interior, :])))
+    jdcurl = float(np.max(np.abs(jcurl1[interior, :] - jcurl0[interior, :])))
+    ck.expect(
+        "divj_clean: curl(J) preserved to round-off in the band",
+        jdcurl <= 1.0e-12 * jcurl_scale,
+        f"max|dcurl|={jdcurl:.3e} curl_scale={jcurl_scale:.3e}",
+    )
+
+    ck.finish()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--battery",
-        choices=["eb", "marder", "hyper", "resistive"],
+        choices=["eb", "marder", "hyper", "resistive", "divb_clean"],
         default="eb",
         help="which unit battery to run (eb fills/folds, the transitional "
-        "Marder correction, or the isotropized hyper-resistivity stencil)",
+        "Marder correction, the isotropized hyper-resistivity stencil, or the "
+        "collocated div(B) Marder clean)",
     )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
     sim = setup_simulation(
-        hyper=(args.battery == "hyper"), resistive=(args.battery == "resistive")
+        hyper=(args.battery == "hyper"),
+        resistive=(args.battery == "resistive"),
+        collocated=(args.battery == "divb_clean"),
     )
     if args.battery == "resistive":
         run_resistive_battery(sim)
@@ -1027,6 +1211,8 @@ def main():
         run_hyper_battery(sim)
     elif args.battery == "marder":
         run_marder_battery(sim)
+    elif args.battery == "divb_clean":
+        run_divb_clean_battery(sim)
     else:
         run_plane_battery(sim)
 

@@ -393,6 +393,50 @@ void init_WarpX (py::module& m)
             "default to the hybrid_pic_model.marder_* values; returns "
             "(n_iter, final_resid)."
         )
+        .def("hybrid_marder_clean_divergence",
+            [](WarpX& wx, std::string const& field_name, int const lev,
+               amrex::Real const alpha, int const max_iters,
+               amrex::Real const clean_band_cells,
+               amrex::Real const fill_band_cells) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (hybrid == nullptr) {
+                    throw std::runtime_error(
+                        "hybrid_marder_clean_divergence requires the hybrid solver");
+                }
+                // Pick the field, EB-update mask and parity exactly as the
+                // production once-per-step driver: B is magnetic parity (normal
+                // odd) on the B mask; the total Ampere current is electric
+                // parity (normal even, covered centers filled) on the E mask.
+                if (field_name == "Bfield_fp") {
+                    hybrid->MarderCleanDivergence(
+                        wx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                        wx.GetEBUpdateBFlag()[lev], /*status_cache=*/nullptr,
+                        /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                        alpha, max_iters, clean_band_cells, fill_band_cells, lev);
+                } else if (field_name == "hybrid_current_fp_plasma") {
+                    hybrid->MarderCleanDivergence(
+                        wx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev),
+                        wx.GetEBUpdateEFlag()[lev], /*status_cache=*/nullptr,
+                        /*normal_odd=*/false, /*fill_covered_centers=*/true,
+                        alpha, max_iters, clean_band_cells, fill_band_cells, lev);
+                } else {
+                    throw std::runtime_error(
+                        "hybrid_marder_clean_divergence: field must be "
+                        "'Bfield_fp' or 'hybrid_current_fp_plasma'");
+                }
+            },
+            py::arg("field") = "Bfield_fp", py::arg("lev") = 0,
+            py::arg("alpha") = 0.1, py::arg("max_iters") = 5,
+            py::arg("clean_band_cells") = 4.0, py::arg("fill_band_cells") = 1.0,
+            "Run the band-restricted grad(div) Marder divergence clean on a "
+            "hybrid vector field at one level, with the production parity and "
+            "EB mask: 'Bfield_fp' (magnetic parity, B mask) or "
+            "'hybrid_current_fp_plasma' (electric parity, E mask). The "
+            "correction is a pure gradient, so curl(field) is preserved to "
+            "round-off while the curved-wall divergence the EB mirror fill "
+            "injects is dissipated."
+        )
         .def("hybrid_solve_e",
             [](WarpX& wx, bool const solve_for_faraday) {
                 using warpx::fields::FieldType;
