@@ -58,7 +58,14 @@ TOL_PE_NEUMANN = 0.06
 
 
 def setup_simulation(
-    resolution, substeps, use_conformal_eb, pec_j, verbose, split_z=False
+    resolution,
+    substeps,
+    use_conformal_eb,
+    pec_j,
+    verbose,
+    split_z=False,
+    grid_type="staggered",
+    divb_clean=False,
 ):
     """Create the PICMI simulation object.
 
@@ -70,7 +77,13 @@ def setup_simulation(
         Number of B-field substeps per step (must be even).
     use_conformal_eb: bool
         Use the conformal (enlarged cell technique) embedded-boundary update
-        instead of the default stair-step approximation.
+        instead of the default stair-step approximation. On a collocated grid
+        this selects the direct level-set mirror B fill (the staggered ECT is
+        Yee-only); the near-wall order of that mirror is the edge-order
+        diagnostic's target.
+    grid_type: str
+        "staggered" (Yee, default) or "collocated" (nodal). Collocated forces
+        direct current deposition (Esirkepov is unsupported there).
     pec_j: bool
         Add a uniform external current and a thermal proton fill, and output
         the current densities, to test the embedded-boundary PEC current
@@ -134,6 +147,10 @@ def setup_simulation(
         particle_shape=1,
         verbose=verbose,
     )
+    sim.grid_type = grid_type
+    if grid_type == "collocated":
+        # the collocated (nodal) hybrid path forbids Esirkepov deposition
+        sim.current_deposition_algo = "direct"
 
     sim.solver = picmi.HybridPICSolver(
         grid=grid,
@@ -147,6 +164,14 @@ def setup_simulation(
         use_conformal_eb=True if use_conformal_eb else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
     )
+
+    if divb_clean:
+        # The hybrid div(B)/div(J) Marder clean is not exposed as a PICMI
+        # kwarg; set the hybrid_pic_model.* inputs directly through the bucket.
+        from pywarpx import hybridpicmodel
+
+        hybridpicmodel.divb_clean_alpha = 0.1
+        hybridpicmodel.divj_clean_alpha = 0.1
 
     sim.embedded_boundary = picmi.EmbeddedBoundary(
         implicit_function=(
@@ -337,6 +362,20 @@ def main():
         action="store_true",
     )
     parser.add_argument(
+        "--grid-type",
+        choices=["staggered", "collocated"],
+        default="staggered",
+        help="field staggering: staggered (Yee, default) or collocated (nodal, "
+        "the level-set mirror B fill -- edge-order diagnostic)",
+    )
+    parser.add_argument(
+        "--divb-clean",
+        action="store_true",
+        help="enable the hybrid div(B)/div(J) Marder clean (alpha=0.1) -- "
+        "separates curved-wall div growth from the fill error in the "
+        "edge-order diagnosis",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -353,6 +392,8 @@ def main():
         args.pec_j,
         args.verbose,
         args.split_z,
+        args.grid_type,
+        args.divb_clean,
     )
     sim.step()
 
