@@ -598,6 +598,18 @@ void HybridPICModel::MarderCleanDivergence (
     }
     const Real alpha_scaled = alpha * h_min * h_min * (nodal_grid ? 4.0_rt : 1.0_rt);
     const Real d_clean = clean_band_cells * h_max;
+    // EB-aware band cutoffs. The grad(div) correction must read only fluid data:
+    // a centered nodal grad of a centered nodal divergence reaches +/-2 cells, so
+    // the divergence is trusted as fluid-clean only at phi >= d_div_keep (its own
+    // +/-1 stencil is then in the fluid), and the correction is applied only at
+    // phi >= d_stencil (its full +/-2 stencil is fluid). The immediate wall layer
+    // (phi < d_stencil) is left to the level-set mirror fill -- reading the
+    // mirror-filled covered nodes across the wall would dissipate the staircased
+    // curved-wall divergence artifact and inject an O(h) near-wall error,
+    // dropping the order. phi is the true signed distance, so these cutoffs hold
+    // for any wall orientation. (No clean if d_clean <= d_stencil.)
+    const Real d_div_keep = h_max;
+    const Real d_stencil = 2.0_rt * h_max;
     amrex::GpuArray<Real, AMREX_SPACEDIM> inv_dx{};
     for (int d = 0; d < AMREX_SPACEDIM; ++d) { inv_dx[d] = 1.0_rt/dx[d]; }
 
@@ -618,14 +630,16 @@ void HybridPICModel::MarderCleanDivergence (
         }
         fdtd->ComputeDivE(field, div_f);
 
-        // Restrict the divergence to the near-wall band so we dissipate only the
-        // curved-wall injection, not the already-solenoidal bulk.
+        // Keep the divergence only in the fluid-clean near-wall band
+        // [d_div_keep, d_clean]: drop the bulk (already solenoidal) and the wall
+        // layer / covered nodes (phi < d_div_keep), where the centered divergence
+        // would read the mirror-filled covered nodes across the wall.
         for (MFIter mfi(div_f, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
             Array4<Real> const& d = div_f.array(mfi);
             Array4<Real const> const& phi = phi_mf->const_array(mfi);
             amrex::ParallelFor(mfi.tilebox(),
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    if (amrex::Math::abs(phi(i, j, k)) > d_clean) { d(i, j, k) = 0.0_rt; }
+                    if (phi(i, j, k) < d_div_keep || phi(i, j, k) > d_clean) { d(i, j, k) = 0.0_rt; }
                 });
         }
         if (nodal_grid) {
@@ -655,19 +669,19 @@ void HybridPICModel::MarderCleanDivergence (
 #if defined(WARPX_DIM_3D)
             amrex::ParallelFor(tx, ty, tz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    if (ux(i,j,k)==0 || amrex::Math::abs(phi(i,j,k))>d_clean) { return; }
+                    if (ux(i,j,k)==0 || phi(i,j,k)<d_stencil || phi(i,j,k)>d_clean) { return; }
                     Fx(i,j,k) += nodal_grid
                         ? alpha_scaled*(d(i+1,j,k)-d(i-1,j,k))*(0.5_rt*inv_dx[0])
                         : alpha_scaled*(d(i+1,j,k)-d(i,j,k))*inv_dx[0];
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    if (uy(i,j,k)==0 || amrex::Math::abs(phi(i,j,k))>d_clean) { return; }
+                    if (uy(i,j,k)==0 || phi(i,j,k)<d_stencil || phi(i,j,k)>d_clean) { return; }
                     Fy(i,j,k) += nodal_grid
                         ? alpha_scaled*(d(i,j+1,k)-d(i,j-1,k))*(0.5_rt*inv_dx[1])
                         : alpha_scaled*(d(i,j+1,k)-d(i,j,k))*inv_dx[1];
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    if (uz(i,j,k)==0 || amrex::Math::abs(phi(i,j,k))>d_clean) { return; }
+                    if (uz(i,j,k)==0 || phi(i,j,k)<d_stencil || phi(i,j,k)>d_clean) { return; }
                     Fz(i,j,k) += nodal_grid
                         ? alpha_scaled*(d(i,j,k+1)-d(i,j,k-1))*(0.5_rt*inv_dx[2])
                         : alpha_scaled*(d(i,j,k+1)-d(i,j,k))*inv_dx[2];
@@ -677,13 +691,13 @@ void HybridPICModel::MarderCleanDivergence (
             amrex::ignore_unused(Fy, uy, ty);
             amrex::ParallelFor(tx, tz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                    if (ux(i,j,0)==0 || amrex::Math::abs(phi(i,j,0))>d_clean) { return; }
+                    if (ux(i,j,0)==0 || phi(i,j,0)<d_stencil || phi(i,j,0)>d_clean) { return; }
                     Fx(i,j,0) += nodal_grid
                         ? alpha_scaled*(d(i+1,j,0)-d(i-1,j,0))*(0.5_rt*inv_dx[0])
                         : alpha_scaled*(d(i+1,j,0)-d(i,j,0))*inv_dx[0];
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
-                    if (uz(i,j,0)==0 || amrex::Math::abs(phi(i,j,0))>d_clean) { return; }
+                    if (uz(i,j,0)==0 || phi(i,j,0)<d_stencil || phi(i,j,0)>d_clean) { return; }
                     Fz(i,j,0) += nodal_grid
                         ? alpha_scaled*(d(i,j+1,0)-d(i,j-1,0))*(0.5_rt*inv_dx[1])
                         : alpha_scaled*(d(i,j+1,0)-d(i,j,0))*inv_dx[1];
