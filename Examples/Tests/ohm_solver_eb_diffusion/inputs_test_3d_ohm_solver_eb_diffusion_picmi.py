@@ -32,6 +32,9 @@ constants = picmi.constants
 THETA = np.pi / 8
 CAVITY_SIDE = 1.06  # cavity side length (m)
 HALF_WIDTH = CAVITY_SIDE / 2.0
+R_CYL = (
+    0.6  # cylinder radius for --geometry cylinder (fluid r < R_CYL, fits [-0.8,0.8])
+)
 ETA = 1.0e-3  # plasma resistivity (Ohm m)
 B1 = 0.01  # initial eigenmode amplitude (T)
 N_FLOOR = 1.0e18  # vacuum density floor (m^-3)
@@ -66,6 +69,7 @@ def setup_simulation(
     split_z=False,
     grid_type="staggered",
     divb_clean=False,
+    geometry="square",
 ):
     """Create the PICMI simulation object.
 
@@ -173,15 +177,23 @@ def setup_simulation(
         hybridpicmodel.divb_clean_alpha = 0.1
         hybridpicmodel.divj_clean_alpha = 0.1
 
-    sim.embedded_boundary = picmi.EmbeddedBoundary(
-        implicit_function=(
-            "xr=x*cos(-theta)+z*sin(-theta);"
-            "zr=-x*sin(-theta)+z*cos(-theta);"
-            "max(max(xr-hw,-(xr+hw)),max(zr-hw,-(zr+hw)))"
-        ),
-        theta=THETA,
-        hw=HALF_WIDTH,
-    )
+    if geometry == "cylinder":
+        # Smooth circular wall (extruded along y): conductor at r > R_CYL. No
+        # corners -- isolates the curved-wall edge order of the mirror fill.
+        sim.embedded_boundary = picmi.EmbeddedBoundary(
+            implicit_function="sqrt(x*x+z*z)-rcyl",
+            rcyl=R_CYL,
+        )
+    else:
+        sim.embedded_boundary = picmi.EmbeddedBoundary(
+            implicit_function=(
+                "xr=x*cos(-theta)+z*sin(-theta);"
+                "zr=-x*sin(-theta)+z*cos(-theta);"
+                "max(max(xr-hw,-(xr+hw)),max(zr-hw,-(zr+hw)))"
+            ),
+            theta=THETA,
+            hw=HALF_WIDTH,
+        )
 
     # Initial B field: the (0,1) Neumann eigenmode of the cavity. By depends
     # only on the in-plane coordinates so it is exactly divergence free and
@@ -191,14 +203,22 @@ def setup_simulation(
     # deposition crash, and the boundary-condition check is driven entirely
     # by the external current and the deposited ion current
     if not pec_j:
+        if geometry == "cylinder":
+            # Neumann radial mode By = B1 cos(pi r^2 / R^2): dBy/dr = 0 at r=R
+            # (tangential B -> even mirror), smooth with near-wall structure.
+            # Parser-expressible (no Bessel). Not an eigenmode, so the cylinder
+            # edge order is read from the wall-BC residual, not an interior L2.
+            by_expr = "B1*cos(pi*(x*x+z*z)/rsq)"
+            const = dict(B1=B1, rsq=R_CYL**2)
+        else:
+            by_expr = "B1*cos(pi/a*(-x*sin(-theta)+z*cos(-theta)-a/2))"
+            const = dict(B1=B1, a=CAVITY_SIDE, theta=THETA)
         B_init = picmi.AnalyticInitialField(
             Bx_expression="0",
-            By_expression="B1*cos(pi/a*(-x*sin(-theta)+z*cos(-theta)-a/2))",
+            By_expression=by_expr,
             Bz_expression="0",
-            B1=B1,
-            a=CAVITY_SIDE,
-            theta=THETA,
             warpx_do_initial_div_cleaning=False,
+            **const,
         )
         sim.add_applied_field(B_init)
 
@@ -376,6 +396,13 @@ def main():
         "edge-order diagnosis",
     )
     parser.add_argument(
+        "--geometry",
+        choices=["square", "cylinder"],
+        default="square",
+        help="EB shape: square (rotated cavity, default) or cylinder (smooth "
+        "circular wall -- the curved-wall edge-order diagnostic)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -394,6 +421,7 @@ def main():
         args.split_z,
         args.grid_type,
         args.divb_clean,
+        args.geometry,
     )
     sim.step()
 
