@@ -35,6 +35,7 @@ HALF_WIDTH = CAVITY_SIDE / 2.0
 R_CYL = (
     0.6  # cylinder radius for --geometry cylinder (fluid r < R_CYL, fits [-0.8,0.8])
 )
+J11 = 3.8317059702075125  # first zero of J1 = first nonzero extremum of J0 (Neumann)
 ETA = 1.0e-3  # plasma resistivity (Ohm m)
 B1 = 0.01  # initial eigenmode amplitude (T)
 N_FLOOR = 1.0e18  # vacuum density floor (m^-3)
@@ -58,6 +59,28 @@ PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 # Calibrated at resolution 32 with at least 2x margin; without the even
 # embedded-boundary reflection of the pressure the jump is order unity.
 TOL_PE_NEUMANN = 0.06
+
+
+def init_cylinder_bessel_by():
+    """afterinit hook: overwrite By with the lowest Neumann radial Bessel
+    eigenmode of the disk, By = B1 * J0(J11 * r / R_CYL) (dBy/dr = 0 at r = R,
+    the tangential/even-mirror parity), zero in the conductor. Written through
+    the field wrapper because the input parser has no Bessel function. Assumes a
+    single box (the cylinder decomposition forces it) so the wrapper spans the
+    full nodal domain; r = sqrt(x^2 + z^2) from the nodal coordinates."""
+    from scipy.special import j0
+
+    By = fields.ByFPWrapper()
+    arr = np.asarray(By[...])
+    nx, nz = arr.shape[0], arr.shape[2]
+    x = np.linspace(-0.8, 0.8, nx)
+    z = np.linspace(-0.8, 0.8, nz)
+    xx, zz = np.meshgrid(x, z, indexing="ij")
+    r = np.sqrt(xx * xx + zz * zz)
+    by2d = B1 * j0(J11 * r / R_CYL)
+    by2d[r > R_CYL] = 0.0
+    full = np.broadcast_to(by2d[:, None, :], (nx, arr.shape[1], nz))
+    By[...] = full[..., None] if arr.ndim == 4 else full
 
 
 def setup_simulation(
@@ -98,7 +121,16 @@ def setup_simulation(
     # Run to t_end = 0.5/gamma (mode decays to exp(-0.5) = 0.607 of its
     # initial amplitude) with the same time step at every resolution so that
     # the measured convergence is purely spatial
-    t_end = 0.5 / DECAY_RATE
+    # End time = 0.5/gamma so the mode decays to exp(-0.5)=0.607 -- short enough
+    # that accumulated error stays below the spatial discretization error. The
+    # cylinder Bessel mode decays ~4.6x faster than the square cos mode, so it
+    # needs its own (shorter) end time or the order is swamped by accumulation.
+    decay_rate = (
+        ETA / constants.mu0 * (J11 / R_CYL) ** 2
+        if geometry == "cylinder"
+        else DECAY_RATE
+    )
+    t_end = 0.5 / decay_rate
     dt = t_end / MAX_STEPS
     max_steps = PEC_J_STEPS if pec_j else MAX_STEPS
 
@@ -120,7 +152,14 @@ def setup_simulation(
         # exercise the cross-box reduction of the face-extension passes.
         n_cell = [resolution, 8, resolution]
         y_extent = 0.2
-        if split_z:
+        if geometry == "cylinder":
+            # single box so the afterinit Bessel wrapper write spans the full
+            # nodal domain (no multi-box gather)
+            decomposition = dict(
+                warpx_max_grid_size=2048,
+                warpx_blocking_factor=8,
+            )
+        elif split_z:
             decomposition = dict(
                 warpx_max_grid_size=2048,
                 warpx_max_grid_size_z=max(resolution // 2, 8),
@@ -204,23 +243,22 @@ def setup_simulation(
     # by the external current and the deposited ion current
     if not pec_j:
         if geometry == "cylinder":
-            # Neumann radial mode By = B1 cos(pi r^2 / R^2): dBy/dr = 0 at r=R
-            # (tangential B -> even mirror), smooth with near-wall structure.
-            # Parser-expressible (no Bessel). Not an eigenmode, so the cylinder
-            # edge order is read from the wall-BC residual, not an interior L2.
-            by_expr = "B1*cos(pi*(x*x+z*z)/rsq)"
-            const = dict(B1=B1, rsq=R_CYL**2)
+            # Lowest Neumann radial Bessel eigenmode By = B1 J0(J11 r/R), which
+            # decays at the exact rate gamma = (eta/mu0)(J11/R)^2 -> an exact
+            # analytic for the interior-L2 edge order. The parser has no Bessel,
+            # so it is written via an afterinit field-wrapper hook.
+            callbacks.installafterinit(init_cylinder_bessel_by)
         else:
-            by_expr = "B1*cos(pi/a*(-x*sin(-theta)+z*cos(-theta)-a/2))"
-            const = dict(B1=B1, a=CAVITY_SIDE, theta=THETA)
-        B_init = picmi.AnalyticInitialField(
-            Bx_expression="0",
-            By_expression=by_expr,
-            Bz_expression="0",
-            warpx_do_initial_div_cleaning=False,
-            **const,
-        )
-        sim.add_applied_field(B_init)
+            B_init = picmi.AnalyticInitialField(
+                Bx_expression="0",
+                By_expression="B1*cos(pi/a*(-x*sin(-theta)+z*cos(-theta)-a/2))",
+                Bz_expression="0",
+                warpx_do_initial_div_cleaning=False,
+                B1=B1,
+                a=CAVITY_SIDE,
+                theta=THETA,
+            )
+            sim.add_applied_field(B_init)
 
     if pec_j:
         # Thermal protons filling the cavity (zero density inside the wall);
