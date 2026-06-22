@@ -240,12 +240,12 @@ print("Maxwell-Juttner parser temperature difference:", f5_error)
 assert f5_error < tolerance
 
 # =================================================
-# maxwell-juttner with a constant diagonal bulk drift
+# maxwell-juttner with a constant asymmetric bulk drift
 # =================================================
-# The species drifts with a bulk velocity beta = 0.5 along (1,1,1), i.e. normalized
-# momentum u_mean = (1/3, 1/3, 1/3). The reduced diagnostic h11 histograms the
-# drift-frame Lorentz factor gamma' = gamma_bulk*gamma_lab - u_mean.u, which must
-# follow the rest-frame Maxwell-Juttner distribution with theta = 1.
+# The species drifts with normalized momentum u_mean = (0.5, 0.3, 0), giving
+# gamma_bulk = sqrt(1.34). The drift is asymmetric to verify the per-axis Lorentz
+# decomposition. The reduced diagnostic h11 histograms the drift-frame Lorentz factor
+# gamma' = gamma_bulk*gamma_lab - u_mean.u, which must follow MJ(theta=1).
 
 # load data
 bin_value, bin_data_drift = read_reduced_diags_histogram("h11.txt")[2:]

@@ -323,6 +323,9 @@ struct InjectorMomentumJuttner
             ey = umag*sin_theta*sin_phi;
             ez = umag*cos_theta;
         }
+        if (umean_mag == 0._rt) {
+            return amrex::XDim3 {ex, ey, ez};
+        }
         // Decompose e into the component parallel to the boost direction (u_par)
         // and the perpendicular part (e_perp = e - u_par*n).
         amrex::Real u_par = ex*nx + ey*ny + ez*nz;
@@ -350,8 +353,6 @@ struct InjectorMomentumJuttner
         // where d3u' is the volume element for momentum in the boosted frame.
         // It only affects the component along the boost direction.
         u_par = gamma_bulk*(u_par + gamma*beta);
-        // Note that if beta = 0 then the flipping method and Lorentz transform
-        // have no effect, and the returned momentum is the isotropic rest-frame sample.
         return amrex::XDim3 {ex_perp + u_par*nx, ey_perp + u_par*ny, ez_perp + u_par*nz};
     }
 
@@ -360,8 +361,7 @@ struct InjectorMomentumJuttner
     amrex::XDim3
     getBulkMomentum (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
     {
-        const amrex::XDim3 u_mean = velocity(x,y,z);
-        return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
+        return velocity(x,y,z);
     }
 
 private:
