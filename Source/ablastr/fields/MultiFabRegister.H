@@ -764,12 +764,10 @@ namespace ablastr::fields
             amrex::DistributionMapping const & new_dm
         );
 
-        /** Remake all (i)MultiFab with a new distribution mapping.
+        /** Write out any (i)MultiFabs that are flagged checkpoint_restart to the checkpoint files
          *
-         * If redistribute is true, we also copy from the old data into the new.
-         *
-         * @param other_level the MR level to erase all MultiFabs from
-         * @param new_dm new distribution mapping
+         * @param level the MR level of the MF
+         * @param dir the pathname to the checkpoint files
          */
         void
         write_checkpoints (
@@ -777,12 +775,10 @@ namespace ablastr::fields
             std::string const & dir
         );
 
-        /** Remake all (i)MultiFab with a new distribution mapping.
+        /** Read in any (i)MultiFabs that are flagged checkpoint_restart from the checkpoint files
          *
-         * If redistribute is true, we also copy from the old data into the new.
-         *
-         * @param other_level the MR level to erase all MultiFabs from
-         * @param new_dm new distribution mapping
+         * @param level the MR level of the MF
+         * @param dir the pathname to the checkpoint files
          */
         void
         read_restarts (
