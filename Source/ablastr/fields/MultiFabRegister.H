@@ -782,7 +782,7 @@ namespace ablastr::fields
          */
         void
         read_restarts (
-            int other_level,
+            int level,
             std::string const & dir
         );
 
