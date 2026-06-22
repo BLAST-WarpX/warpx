@@ -104,6 +104,14 @@ namespace warpx::hybrid
      *            is isotropic (reaches the diagonal/corner neighbors) passes
      *            sqrt(AMREX_SPACEDIM) so the corner edges are mirror-filled
      *            instead of left in the zeroed deep interior.
+     * \param[in] eb_cyl apply the cylindrical (surface-of-revolution) radial
+     *            metric correction: the radial and azimuthal parts of the
+     *            reflected field are scaled by the radial Jacobian
+     *            r_image/r_fill (the leading O(h/R) curved-wall correction the
+     *            planar mirror misses). 3D Cartesian only; the wall must be a
+     *            surface of revolution about \c eb_cyl_axis centered on the
+     *            transverse origin. Default false = the planar reflection.
+     * \param[in] eb_cyl_axis symmetry axis for \c eb_cyl (0=x, 1=y, 2=z)
      */
     void ApplyPECBoundaryToField (
         ablastr::fields::VectorField const& field,
@@ -116,7 +124,9 @@ namespace warpx::hybrid
         bool normal_odd = false,
         bool fill_covered_centers = false,
         EBFillStatus* status_cache = nullptr,
-        amrex::Real band_cells = 1.0);
+        amrex::Real band_cells = 1.0,
+        bool eb_cyl = false,
+        int eb_cyl_axis = 2);
 
     /** \brief Enforce an embedded-boundary condition on a nodal scalar field
      * (the hybrid solver's ion charge density and electron pressure).

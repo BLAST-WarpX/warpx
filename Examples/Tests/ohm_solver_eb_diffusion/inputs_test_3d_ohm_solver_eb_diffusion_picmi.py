@@ -93,6 +93,7 @@ def setup_simulation(
     grid_type="staggered",
     divb_clean=False,
     geometry="square",
+    eb_cyl_correction=False,
 ):
     """Create the PICMI simulation object.
 
@@ -215,6 +216,15 @@ def setup_simulation(
 
         hybridpicmodel.divb_clean_alpha = 0.1
         hybridpicmodel.divj_clean_alpha = 0.1
+
+    if eb_cyl_correction:
+        # Cylindrical (surface-of-revolution) radial mirror correction; not a
+        # PICMI kwarg, set through the bucket. Requires use_conformal_eb. This
+        # deck's cylinder is a surface of revolution about y.
+        from pywarpx import hybridpicmodel
+
+        hybridpicmodel.eb_cylindrical_correction = 1
+        hybridpicmodel.eb_cyl_axis = "y"
 
     if geometry == "cylinder":
         # Smooth circular wall (extruded along y): conductor at r > R_CYL. No
@@ -441,6 +451,13 @@ def main():
         "circular wall -- the curved-wall edge-order diagnostic)",
     )
     parser.add_argument(
+        "--eb-cyl-correction",
+        action="store_true",
+        help="apply the cylindrical (surface-of-revolution) radial mirror "
+        "correction to the EB fill of E/J/B (requires --conformal); tests "
+        "whether the curved-wall edge order lifts above the planar mirror",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -460,6 +477,7 @@ def main():
         args.grid_type,
         args.divb_clean,
         args.geometry,
+        args.eb_cyl_correction,
     )
     sim.step()
 
