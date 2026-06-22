@@ -78,7 +78,7 @@ void init_MultiFabRegister (py::module & m)
              py::arg("initial_value"),
              py::arg("redistribute"),
              py::arg("redistribute_on_remake"),
-             py::arg("checkpoint_restart")
+             py::arg("checkpoint_restart") = false
         )
 
         .def("alloc_init",
@@ -106,7 +106,7 @@ void init_MultiFabRegister (py::module & m)
              py::arg("initial_value"),
              py::arg("redistribute"),
              py::arg("redistribute_on_remake"),
-             py::arg("checkpoint_restart")
+             py::arg("checkpoint_restart") = false
         )
 
         .def("alias_init",
