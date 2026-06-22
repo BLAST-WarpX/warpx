@@ -314,7 +314,7 @@ namespace ablastr::fields
     {
         for (auto & element : m_mf_register )
         {
-            MultiFabOwner & mf_owner = element.second;
+            MultiFabOwner const & mf_owner = element.second;
 
             if (mf_owner.m_checkpoint_restart && mf_owner.m_level == level && !mf_owner.is_alias()) {
                 // write MultiFabs to checkpoint directory
