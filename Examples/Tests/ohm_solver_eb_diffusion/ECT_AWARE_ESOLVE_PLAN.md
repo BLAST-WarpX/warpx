@@ -45,7 +45,40 @@ guards "ECT is 2nd-order, Yee is 1st-order, on a curved PEC wall."
 - **Value**: a permanent regression guard that the EM ECT stays 2nd-order on curves, and the
   reference oracle for Part C (the E-solve fix must bring the hybrid toward this).
 
-## Part B — Localize the hybrid 1st-order E-path source (gating; cheap; MUST precede C)
+## Part B — DONE (2026-06-22): localized to the covered B that curl(B)->J reads
+
+Probe `ampere_curl_order.py` feeds the EXACT analytic mode `By = B1 J0(J11 r/R)`
+(written at the true per-component staggered coords) into the hybrid near-wall path
+with NO time stepping, via two new bindings (`hybrid_calculate_plasma_current`;
+`fill_covered_centers`/`cyl_correction` args added to
+`hybrid_apply_eb_boundary_to_face_field`), and measures the radial-shell L2 order of
+`J = curl(B)/mu0` (`hybrid_current_fp_plasma`) and `E = eta J` (`Efield_fp`).
+
+**Findings (decisive, grid-independent, asymptotic over N=48/96/192):**
+1. SANITY: By matches analytic to roundoff (~5e-19), Jy==0 -> coords/forms correct.
+2. The Ampere curl `curl(B)->J` is INTRINSICALLY 2nd order: deep [0,.45] and mid
+   [.45,.54] shells converge at order 2.00 on BOTH staggered (ECT) and collocated.
+3. The near-wall band [.54,.60) DIVERGES (order ~ -0.4..-0.7, rel-L2 ~18x analytic).
+   This is the staircase signature of the NEUMANN mode: `dBy/dr=0` but `By(R)=B1 J0(J11)
+   != 0` at the wall, while the covered cells hold `By=0`; the plain-masked curl
+   straddling the wall sees a spurious `~By(R)/h` jump -> O(1/h) current. The J/E mirror
+   fill only rewrites COVERED cells, so the spurious current on the last FLUID edges
+   survives.
+4. CEILING A/B: writing the smooth analytic Bessel CONTINUATION into the covered cells
+   (covered B exact) -> ALL shells incl the wall recover order 2.00. So the curl is fine;
+   **the covered-B value the curl reads is the sole near-wall 1st-order entry.**
+5. The level-set mirror as a covered-B fill (fill_covered_centers=True) cuts the near-wall
+   error ~20x but does NOT restore order (still diverging) -- the mirror VALUE is only ~3%
+   accurate and NON-converging on the curved wall (~1st order); curl differentiates it.
+6. The surface-of-revolution RADIAL (cyl) weighting does NOT help B: it is a no-op for the
+   AXIAL component (By/Bz along the axis) by construction (mirror_combine scales only the
+   radial+azimuthal parts). The radial Jacobian is for flux-type J/rho, not axial B.
+
+=> The fix target is a genuinely **2nd-order-accurate covered-B EXTENSION feeding the
+Ampere curl** (NOT a new area-scaled curl: the curl is already 2nd order; NOT the J/E
+mirror or the Ohm assembly: E order == J order in vacuum; NOT the radial Jacobian).
+
+## Part B (original gating plan, superseded by the result above)
 
 We know it is the coupling, not the scheme, but the *exact* offending stencil is not yet
 pinned, and one clue cautions against assuming: the `eb_cylindrical_correction` radial-mirror
@@ -67,7 +100,30 @@ Pin it before building, via cheap A/Bs (no new solver):
 Output: the specific stencil(s) to make ECT-aware in Part C. This prevents building the wrong
 fix (the lesson from "validate before Dey-Mittra").
 
-## Part C — ECT-aware boundary stencils for the E-solve (the change, contingent on B)
+## Part C — PROTOTYPE VALIDATED (2026-06-22): 2nd-order covered-B extension for the curl
+
+`ampere_curl_order.py --extrap-b` fills the covered B band by a 2nd-order, fluid-ONLY
+extension (even radial reflection to the interior image + h-scaled local quadratic
+least-squares with rcond truncation) before the Ampere curl. The near-wall current
+recovers a clean >=2nd order on BOTH grids, robust across resolution pairs:
+staggered wall-band 2.04 (48/96) & 2.79 (96/192); collocated 2.44 & 2.39 (was ~ -0.5).
+So the fix is confirmed: **a 2nd-order-accurate covered-B extension feeding curl(B)->J
+is sufficient.** Lessons for the C++ port (each found the hard way; see memory
+[[cect-convergence-followup]]): quadratic (not linear); reflect to the interior image
+and interpolate there (not one-sided extrapolation -> overshoots); non-dimensionalize
+the fit by h (else ill-conditioned and worse as h->0); generous stencil + rcond so
+degenerate near-wall stencils degrade gracefully; uniform (not Gaussian) weight.
+
+**C++ port plan:** upgrade the level-set mirror gather in `ApplyPECBoundaryToField`
+(EBJBoundary.cpp) -- it already has the right STRUCTURE (even reflection to the image
+via the true normal) but a ~1st-order (~3%) gather -- to an h-scaled quadratic MLS at
+the image with singular-value truncation; fill covered CENTERS in a >=2-cell band; on
+the staggered path apply this B fill to `Bfield_fp` BEFORE `CalculateCurrentAmpere`
+(production currently does not fill B for the curl there). Gate behind a flag
+(byte-identical off). The radial cylindrical Jacobian is NOT the lever (no-op for axial
+B). Validate via ampere_curl_order.py and the evolved cylinder_edge_order.py.
+
+## Part C (original) — ECT-aware boundary stencils for the E-solve
 
 Make the hybrid's near-wall E-path conformal/area-scaled, consistent with the ECT B-update,
 so the algebraic E fed into the Faraday circulation is 2nd-order at the curved wall. Likely

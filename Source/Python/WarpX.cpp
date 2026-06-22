@@ -236,7 +236,9 @@ void init_WarpX (py::module& m)
             "edge vector field: Efield_fp, current_fp or hybrid_current_fp_plasma."
         )
         .def("hybrid_apply_eb_boundary_to_face_field",
-            [](WarpX& wx, std::string const& name, int const lev) {
+            [](WarpX& wx, std::string const& name, int const lev,
+               bool const fill_covered_centers, amrex::Real const band_cells,
+               bool const cyl_correction, int const cyl_axis) {
                 using warpx::fields::FieldType;
                 auto* hybrid = wx.get_pointer_HybridPICModel();
                 if (!EB::enabled() || hybrid == nullptr) {
@@ -258,13 +260,20 @@ void init_WarpX (py::module& m)
                     wx.Geom(lev),
                     hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
                     hybrid->m_eb_bc_direct_fill,
-                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                    &hybrid->m_eb_bc_status_B[lev]);
+                    /*normal_odd=*/true, fill_covered_centers,
+                    &hybrid->m_eb_bc_status_B[lev], band_cells,
+                    cyl_correction, cyl_axis);
             },
             py::arg("name"), py::arg("lev") = 0,
+            py::arg("fill_covered_centers") = false,
+            py::arg("band_cells") = 1.0, py::arg("cyl_correction") = false,
+            py::arg("cyl_axis") = 2,
             "Apply the hybrid embedded-boundary PEC fill with magnetic parity "
             "(normal odd / tangential even) to the registered face vector "
-            "field Bfield_fp."
+            "field Bfield_fp. With fill_covered_centers the covered-center faces "
+            "are also extended (the mirror B a near-wall curl(B) read needs); "
+            "cyl_correction applies the surface-of-revolution radial-Jacobian "
+            "weighting (axis cyl_axis) used by the J/rho fills."
         )
         .def("hybrid_fold_eb_deposit_to_edge_field",
             [](WarpX& wx, std::string const& name, int const lev, bool const pec) {
@@ -469,6 +478,34 @@ void init_WarpX (py::module& m)
             "plasma current and electron pressure), including the resistive "
             "and hyper-resistive terms when solve_for_faraday is True (unit "
             "tests of the Ohm's-law stencils)."
+        )
+        .def("hybrid_calculate_plasma_current",
+            [](WarpX& wx) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (hybrid == nullptr) {
+                    throw std::runtime_error(
+                        "hybrid_calculate_plasma_current requires the hybrid solver");
+                }
+                // Refresh B ghosts so the Ampere curl reads valid halo cells,
+                // then compute hybrid_current_fp_plasma = curl(B)/mu0 - J_ext
+                // and apply the EB mirror fill -- the same operations as the
+                // in-step CalculatePlasmaCurrent driver, but without advancing
+                // any field (near-wall operator-order diagnostics).
+                for (int lev = 0; lev <= wx.finestLevel(); ++lev) {
+                    const auto& period = wx.Geom(lev).periodicity();
+                    for (auto* mf : wx.m_fields.get_alldirs(FieldType::Bfield_fp, lev)) {
+                        mf->FillBoundary(period);
+                    }
+                }
+                hybrid->CalculatePlasmaCurrent(
+                    wx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, wx.finestLevel()),
+                    wx.GetEBUpdateEFlag());
+            },
+            "Compute the hybrid Ampere/plasma current "
+            "(hybrid_current_fp_plasma = curl(B)/mu0 - J_ext) from the "
+            "registered Bfield_fp and apply the EB boundary fill, without "
+            "advancing any field (near-wall operator-order diagnostics)."
         )
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
