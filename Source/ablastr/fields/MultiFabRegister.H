@@ -771,7 +771,7 @@ namespace ablastr::fields
          */
         void
         write_checkpoints (
-            int other_level,
+            int level,
             std::string const & dir
         );
 
