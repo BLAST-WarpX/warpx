@@ -109,8 +109,9 @@ public:
             amrex::Real const initial_value = 0.;
             bool const remake = true;
             bool const redistribute_on_remake = true;
+            bool const checkpoint_restart = true;
             warpx.m_fields.alloc_init(m_particle_production_mf_name, level, ba, dmap, ncomps, ng,
-                                      initial_value, remake, redistribute_on_remake);
+                                      initial_value, remake, redistribute_on_remake, checkpoint_restart);
         }
     }
 

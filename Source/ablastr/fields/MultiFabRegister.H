@@ -246,6 +246,9 @@ namespace ablastr::fields
         /** redistribute on @see amrex::AmrCore::RemakeLevel */
         bool m_redistribute_on_remake = true;
 
+        /** whether to include in checkpoint/restart */
+        bool m_checkpoint_restart = false;
+
         /** if m_mf is a non-owning alias, this string tracks the name of the owner */
         std::string m_owner;
 
@@ -292,6 +295,7 @@ namespace ablastr::fields
          * @param initial_value the optional initial value
          * @param remake follow the default domain decomposition of the simulation
          * @param redistribute_on_remake redistribute on @see amrex::AmrCore::RemakeLevel
+         * @param checkpoint_restart whether to include in checkpoint/restart
          * @return pointer to newly allocated MultiFab
          */
         template<typename T>
@@ -305,7 +309,8 @@ namespace ablastr::fields
             amrex::IntVect const & ngrow,
             std::optional<amrex::Real const> initial_value = std::nullopt,
             bool remake = true,
-            bool redistribute_on_remake = true
+            bool redistribute_on_remake = true,
+            bool checkpoint_restart = false
         )
         {
             return internal_alloc_init(
@@ -317,7 +322,8 @@ namespace ablastr::fields
                 ngrow,
                 initial_value,
                 remake,
-                redistribute_on_remake
+                redistribute_on_remake,
+                checkpoint_restart
             );
         }
 
@@ -336,6 +342,7 @@ namespace ablastr::fields
          * @param initial_value the optional initial value
          * @param remake follow the default domain decomposition of the simulation
          * @param redistribute_on_remake redistribute on @see amrex::AmrCore::RemakeLevel
+         * @param checkpoint_restart whether to include in checkpoint/restart
          * @return pointer to newly allocated MultiFab
          */
         template<typename T>
@@ -350,7 +357,8 @@ namespace ablastr::fields
             amrex::IntVect const & ngrow,
             std::optional<amrex::Real const> initial_value = std::nullopt,
             bool remake = true,
-            bool redistribute_on_remake = true
+            bool redistribute_on_remake = true,
+            bool checkpoint_restart = false
         )
         {
             return internal_alloc_init(
@@ -363,7 +371,8 @@ namespace ablastr::fields
                 ngrow,
                 initial_value,
                 remake,
-                redistribute_on_remake
+                redistribute_on_remake,
+                checkpoint_restart
             );
         }
 
@@ -755,6 +764,32 @@ namespace ablastr::fields
             amrex::DistributionMapping const & new_dm
         );
 
+        /** Remake all (i)MultiFab with a new distribution mapping.
+         *
+         * If redistribute is true, we also copy from the old data into the new.
+         *
+         * @param other_level the MR level to erase all MultiFabs from
+         * @param new_dm new distribution mapping
+         */
+        void
+        write_checkpoints (
+            int other_level,
+            std::string const & dir
+        );
+
+        /** Remake all (i)MultiFab with a new distribution mapping.
+         *
+         * If redistribute is true, we also copy from the old data into the new.
+         *
+         * @param other_level the MR level to erase all MultiFabs from
+         * @param new_dm new distribution mapping
+         */
+        void
+        read_restarts (
+            int other_level,
+            std::string const & dir
+        );
+
         /** Create the register name of scalar field and MR level
          *
          * @param name the name of the field
@@ -808,7 +843,8 @@ namespace ablastr::fields
             amrex::IntVect const & ngrow,
             std::optional<amrex::Real const> initial_value = std::nullopt,
             bool remake = true,
-            bool redistribute_on_remake = true
+            bool redistribute_on_remake = true,
+            bool checkpoint_restart = false
         );
         amrex::MultiFab*
         internal_alloc_init (
@@ -821,7 +857,8 @@ namespace ablastr::fields
             amrex::IntVect const & ngrow,
             std::optional<amrex::Real const> initial_value = std::nullopt,
             bool remake = true,
-            bool redistribute_on_remake = true
+            bool redistribute_on_remake = true,
+            bool checkpoint_restart = false
         );
 
         amrex::MultiFab*
