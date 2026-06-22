@@ -8,6 +8,7 @@
 
 #include <ablastr/constant.H>
 #include <ablastr/warn_manager/WarnManager.H>
+#include <Utils/Parser/ParserUtils.H>
 
 #include <AMReX_Array4.H>
 #include <AMReX_BaseFab.H>
@@ -28,6 +29,8 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 
+#include <vector>
+
 namespace ablastr::fields {
 
 void
@@ -47,9 +50,37 @@ computePhiIGF ( amrex::MultiFab const & rho,
     amrex::Box const domain = rho.boxArray().minimalBox();
 
     int nprocs = amrex::ParallelDescriptor::NProcs();
+    amrex::IntVect nprocs_igf_fft_proc_grid{0};
     {
         amrex::ParmParse pp("ablastr");
-        pp.queryAdd("nprocs_igf_fft", nprocs);
+        std::vector<int> nprocs_igf_fft;
+        ::utils::parser::queryArrWithParser(
+            pp, "nprocs_igf_fft", nprocs_igf_fft, 0, AMREX_SPACEDIM);
+        if (nprocs_igf_fft.empty()) {
+            pp.add("nprocs_igf_fft", nprocs);
+        } else if (nprocs_igf_fft.size() == 1) {
+            nprocs = nprocs_igf_fft[0];
+        } else {
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                nprocs_igf_fft.size() == AMREX_SPACEDIM,
+                "ablastr.nprocs_igf_fft, if specified as an array, must have "
+                "AMREX_SPACEDIM numbers");
+            nprocs = 1;
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    nprocs_igf_fft[idim] > 0,
+                    "ablastr.nprocs_igf_fft entries must be positive");
+                nprocs_igf_fft_proc_grid[idim] = nprocs_igf_fft[idim];
+                nprocs *= nprocs_igf_fft[idim];
+            }
+        }
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            nprocs > 0,
+            "ablastr.nprocs_igf_fft must specify a positive number of MPI ranks");
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            nprocs_igf_fft_proc_grid == 0 || nprocs <= amrex::ParallelDescriptor::NProcs(),
+            "The product of ablastr.nprocs_igf_fft entries cannot exceed the total "
+            "number of MPI ranks");
         nprocs = std::max(1,std::min(nprocs, amrex::ParallelDescriptor::NProcs()));
     }
 
@@ -60,7 +91,11 @@ computePhiIGF ( amrex::MultiFab const & rho,
     if (!obc_solver || obc_solver->Domain() != domain) {
         amrex::FFT::Info info{};
         if (is_igf_2d_slices) { info.setTwoDMode(true); } // do 2D FFTs
-        info.setNumProcs(nprocs);
+        if (nprocs_igf_fft_proc_grid != 0) {
+            info.setProcGrid(nprocs_igf_fft_proc_grid);
+        } else {
+            info.setNumProcs(nprocs);
+        }
         obc_solver = std::make_unique<amrex::FFT::OpenBCSolver<amrex::Real>>(domain, info);
     }
 

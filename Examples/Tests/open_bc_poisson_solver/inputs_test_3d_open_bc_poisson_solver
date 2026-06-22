@@ -15,6 +15,7 @@ boundary.field_hi = open open open
 warpx.const_dt = 1e-14
 warpx.do_electrostatic = relativistic
 warpx.poisson_solver = fft
+ablastr.nprocs_igf_fft = 1 1 2
 algo.field_gathering = momentum-conserving
 algo.particle_shape = 1
 

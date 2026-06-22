@@ -418,9 +418,12 @@ Overall simulation parameters
             As a consequence, this solver does not need to do an FFT along the :math:`z` direction,
             and instead uses only transverse FFTs (along :math:`x` and :math:`y`) at each :math:`z` position (or :math:`z` "slice").
 
-          * ``ablastr.nprocs_igf_fft`` (``int``) optional (default: number of MPI ranks): Number of MPI ranks used to parallelize the FFT solver.
-            This can be less or equal than then number of MPI ranks that are used to run the overall simulation.
+          * ``ablastr.nprocs_igf_fft`` (``int`` or list of ``int``) optional (default: number of MPI ranks): Number of MPI ranks used to parallelize the FFT solver.
+            This can be less or equal than the number of MPI ranks that are used to run the overall simulation.
             It can be useful if the auxiliary simulation boxes fit within a single process, so to avoid extra communications.
+            This parameter can be specified either as a single integer or as ``AMREX_SPACEDIM`` integers, similarly to :pp:param:`warpx.numprocs`.
+            When specified as a list, the entries define the FFT solver process grid and their product is the number of MPI ranks used by the FFT solver.
+            This allows the FFT solver to use a decomposition that differs from the overall simulation domain decomposition.
             The auxiliary boxes are extended boxes in real and spectral space that are used to perform the necessary FFTs.
             The extended simulation box size in real space is :math:`2n_x-1, 2n_y-1, 2n_z-1` with the 3D solver, :math:`2n_x-1, 2n_y -1, n_z` with the 2D solver.
             The extended simulation box size in spectral space is :math:`n_x, 2n_y-1, 2n_z-1` with the 3D solver, :math:`n_x, 2n_y-1, n_z` with the 2D solver.
