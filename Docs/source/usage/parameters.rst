@@ -3062,8 +3062,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
 
-    Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
-    ``excitationX``, ``ionization`` or ``twoproduct_reaction``, the energy cost of that process must be given in eV.
+    Only for ``dsmc`` and ``background_mcc``. The energy cost of the process, in eV. It is
+    required for ``excitationX`` and ``ionization``, and optional for the other processes
+    (e.g. an ``elastic`` channel or a ``twoproduct_reaction`` with a fixed energy loss),
+    in which case it defaults to 0.
 
 .. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
     :type: ``string``
