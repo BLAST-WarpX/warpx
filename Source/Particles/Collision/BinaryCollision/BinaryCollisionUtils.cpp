@@ -146,8 +146,8 @@ namespace BinaryCollisionUtils{
                 (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
                  process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
                 ? ScatteringAngleModel::Forward : ScatteringAngleModel::Isotropic;
-            pp_collision_name.query_enum_sloppy(
-                scattering_process + "_scattering_angle_model", scattering_angle_model, "-_");
+            pp_collision_name.query_enum_case_insensitive(
+                scattering_process + "_scattering_angle_model", scattering_angle_model);
 
             scattering_processes.push_back(ScatteringProcess(
                 scattering_process, cross_section_file, energy, scattering_angle_model));
