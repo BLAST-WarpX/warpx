@@ -520,7 +520,7 @@ void HybridPICModel::BfieldEvolve (
     // Step the magnetic field forward (from t -> t + dt_half) using the user
     // specified integration scheme. The loop is set up such that the timestep
     // for a given step (dt_sub) can be modified within the loop, i.e.,
-    // adaptive timestepping.    
+    // adaptive timestepping.
     while (t < dt_half)
     {
         // Adjust size of the last substep, so as to land exactly at t+dt_half.
