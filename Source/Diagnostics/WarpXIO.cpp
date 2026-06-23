@@ -214,7 +214,7 @@ WarpX::InitFromCheckpoint ()
             AllocLevelData(lev, ba, dm);
         }
 
-        ExecutePythonCallback("allocdata")
+        ExecutePythonCallback("allocdata");
 
         mypc->ReadHeader(is);
         const int n_species = mypc->nSpecies();
