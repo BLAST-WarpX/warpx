@@ -130,7 +130,6 @@ AMREX_ENUM(FieldBoundaryType,
            Damped,   // Fields in the guard cells are damped for PSATD
                      //in the moving window direction
            Absorbing_Silver_Mueller, // Silver-Mueller boundary condition
-           absorbingsilvermueller = Absorbing_Silver_Mueller,
            None,    // The fields values at the boundary are not updated. This is
                     // useful for RZ simulations, at r=0.
            Open,    // Used in the Integrated Green Function Poisson solver
