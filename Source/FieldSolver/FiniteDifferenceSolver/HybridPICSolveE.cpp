@@ -1246,6 +1246,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
+    // GOL masking (Lever 2): in partially-covered EB cells (eb_update_E flag == 2)
+    // drop the stiff 1/n Hall + electron-pressure terms and the hyper-resistivity /
+    // corner-curl corrections, leaving the well-posed resistive E = eta*J.
+    const bool eb_resistive_only_partial = hybrid_model->m_eb_resistive_only_partial;
+
     // isotropized hyper-resistivity Laplacian (Mehrstellen / Patra-Karttunen).
     // LaplacianIsotropic is a centered compact stencil keyed off the field's own
     // neighbours, so it is correct for both the Yee (edge-centered) and the
@@ -1445,13 +1450,20 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         // Ex calculation
         amrex::ParallelFor(tex, [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-            // Skip field update in the embedded boundaries
-            if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
+            // Skip fully-covered edges (flag 0); flag 2 = partially covered ->
+            // resistive-only (GOL mask); flag 1 = regular.
+            const int ebf_x = update_Ex_arr ? update_Ex_arr(i, j, k) : 1;
+            if (ebf_x == 0) { return; }
+            const bool partial_resistive_only = eb_resistive_only_partial && (ebf_x == 2);
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            // Drop the stiff 1/n Hall + electron-pressure terms in partial cells
+            // (E = eta*J there) or in the holmstrom vacuum region below the floor.
+            const bool drop_hall_pressure =
+                partial_resistive_only || (rho_val < rho_floor && holmstrom_vacuum_region);
+            if (drop_hall_pressure) {
                 Ex(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1486,7 +1498,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                 Ex(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jx(i, j, k);
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && !partial_resistive_only) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1509,7 +1521,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Isotropize the in-plane resistive diffusion of the
                 // out-of-plane B (Bz in 3D, By in 2D XZ) via the corner-curl
                 // correction; div(B) preserved (added through E).
-                if (iso_resistivity) {
+                if (iso_resistivity && !partial_resistive_only) {
                     const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
                     // Runtime if (not if constexpr): nvcc forbids an extended
                     // __device__ lambda from first-capturing a variable inside a
@@ -1545,13 +1557,20 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         // Ey calculation
         amrex::ParallelFor(tey, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
-            // Skip field update in the embedded boundaries
-            if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
+            // Skip fully-covered edges (flag 0); flag 2 = partially covered ->
+            // resistive-only (GOL mask); flag 1 = regular.
+            const int ebf_y = update_Ey_arr ? update_Ey_arr(i, j, k) : 1;
+            if (ebf_y == 0) { return; }
+            const bool partial_resistive_only = eb_resistive_only_partial && (ebf_y == 2);
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            // Drop the stiff 1/n Hall + electron-pressure terms in partial cells
+            // (E = eta*J there) or in the holmstrom vacuum region below the floor.
+            const bool drop_hall_pressure =
+                partial_resistive_only || (rho_val < rho_floor && holmstrom_vacuum_region);
+            if (drop_hall_pressure) {
                 Ey(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1586,7 +1605,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                 Ey(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jy(i, j, k);
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && !partial_resistive_only) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1609,7 +1628,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // Bz corner-curl correction, second (Ey) half (3D only; in
                 // 2D XZ the out-of-plane corner is delivered via Ex and Ez).
 #if defined(WARPX_DIM_3D)
-                if (iso_resistivity) {
+                if (iso_resistivity && !partial_resistive_only) {
                     const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
                     if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
                         Ey(i, j, k) += eta_val
@@ -1630,13 +1649,20 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         // Ez calculation
         amrex::ParallelFor(tez, [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-            // Skip field update in the embedded boundaries
-            if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
+            // Skip fully-covered edges (flag 0); flag 2 = partially covered ->
+            // resistive-only (GOL mask); flag 1 = regular.
+            const int ebf_z = update_Ez_arr ? update_Ez_arr(i, j, k) : 1;
+            if (ebf_z == 0) { return; }
+            const bool partial_resistive_only = eb_resistive_only_partial && (ebf_z == 2);
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            // Drop the stiff 1/n Hall + electron-pressure terms in partial cells
+            // (E = eta*J there) or in the holmstrom vacuum region below the floor.
+            const bool drop_hall_pressure =
+                partial_resistive_only || (rho_val < rho_floor && holmstrom_vacuum_region);
+            if (drop_hall_pressure) {
                 Ez(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1671,7 +1697,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                 Ez(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jz(i, j, k);
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && !partial_resistive_only) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1694,7 +1720,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // By corner-curl correction, second (Ez) half (2D XZ only;
                 // in 3D the axial Bz corner is delivered via Ex and Ey).
 #if defined(WARPX_DIM_XZ)
-                if (iso_resistivity) {
+                if (iso_resistivity && !partial_resistive_only) {
                     const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
                     if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
                         Ez(i, j, k) += eta_val

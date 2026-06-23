@@ -331,6 +331,14 @@ public:
 
     bool m_holmstrom_vacuum_region = false;
 
+    /** If true, in partially-covered EB cells (the cut-cell wall band) make the
+     *  generalized Ohm's law resistive-only: drop the stiff 1/n Hall and
+     *  electron-pressure terms (and the hyper-resistivity and corner-curl
+     *  corrections, which read J in the covered/mirror region), leaving E = eta*J.
+     *  J = curl(B)/mu0 there is well-posed because the wall-filled B feeds the
+     *  curl. Requires a staggered (ECT) embedded boundary. Default off. */
+    bool m_eb_resistive_only_partial = false;
+
     /** Electron temperature in eV */
     amrex::Real m_elec_temp;
     /** Reference electron density */

@@ -108,6 +108,22 @@ void HybridPICModel::ReadParameters ()
             ablastr::warn_manager::WarnPriority::medium);
     }
 
+    // Resistive-only generalized Ohm's law in partially-covered EB cells (Lever 2 /
+    // GOL masking): drops the stiff 1/n Hall + electron-pressure terms in the cut-cell
+    // wall band, leaving E = eta*J (J from the wall-filled curl B). The partial-cell
+    // classification comes from the 3-state staggered (ECT) eb_update_E flag, so it is
+    // a no-op on a collocated grid (no cut edges are marked partial there).
+    pp_hybrid.query("eb_resistive_only_partial", m_eb_resistive_only_partial);
+    if (m_eb_resistive_only_partial
+        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.eb_resistive_only_partial requires a staggered (Yee) "
+            "embedded boundary; it is ignored on a collocated grid (no cut edges are "
+            "marked partially covered there).",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+
     if (m_use_conformal_eb) {
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
         WARPX_ABORT_WITH_MESSAGE(

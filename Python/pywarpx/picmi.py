@@ -2194,6 +2194,19 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         neighbors to avoid time-step restrictions. Requires an embedded
         boundary and a 3D Cartesian staggered grid.
 
+    eb_resistive_only_partial: bool, default=False
+        If True, the generalized Ohm's law is made resistive-only (E = eta*J) in
+        partially-covered embedded-boundary cells: the stiff 1/n Hall and
+        electron-pressure terms, and the hyper-resistivity and corner-curl
+        corrections, are dropped there. As the density goes to zero toward the
+        wall the Hall/pressure terms are physically negligible but numerically
+        spurious in cut cells; J = curl(B)/mu0 remains well-posed because the
+        wall-filled B feeds the curl, so the resistive E stays clean. This is the
+        geometric companion to ``holmstrom_vacuum_region`` (a density threshold):
+        a cell is treated resistive-only if it is partially covered OR if
+        rho < n_floor*q_e. Requires a staggered (ECT) embedded boundary; ignored
+        on a collocated grid.
+
     eb_bc_rtol: float, default=1e-4
         Relative residual tolerance of the embedded-boundary PEC
         boundary-condition band relaxation. With embedded boundaries the
@@ -2340,6 +2353,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
         conformal_b_curl_fill=None,
+        eb_resistive_only_partial=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
@@ -2383,6 +2397,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.use_conformal_eb = use_conformal_eb
         self.conformal_b_curl_fill = conformal_b_curl_fill
+        self.eb_resistive_only_partial = eb_resistive_only_partial
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
@@ -2450,6 +2465,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
         pywarpx.hybridpicmodel.conformal_b_curl_fill = self.conformal_b_curl_fill
+        pywarpx.hybridpicmodel.eb_resistive_only_partial = (
+            self.eb_resistive_only_partial
+        )
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill

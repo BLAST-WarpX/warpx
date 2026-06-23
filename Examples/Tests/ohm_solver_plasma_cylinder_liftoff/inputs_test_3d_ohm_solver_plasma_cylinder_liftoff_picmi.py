@@ -121,6 +121,7 @@ def setup_simulation(
     bz_bias=BZ_BIAS,
     nz=NZ,
     grid_type="collocated",
+    eb_resistive_only_partial=False,
 ):
     """Create the PICMI simulation object.
 
@@ -220,6 +221,7 @@ def setup_simulation(
         substep_atol=1.0e-8,
         max_substep_attempts=1000,
         use_conformal_eb=True,
+        eb_resistive_only_partial=True if eb_resistive_only_partial else None,
         A_external=A_ext,
         **power_law_resistivity(
             ETA_PLASMA,
@@ -489,6 +491,14 @@ def main():
         choices=["staggered", "collocated"],
         default="collocated",
     )
+    parser.add_argument(
+        "--resistive-only-partial",
+        action="store_true",
+        help="make the generalized Ohm's law resistive-only (E=eta*J) in "
+        "partially-covered EB cells (hybrid_pic_model.eb_resistive_only_partial): "
+        "drop the stiff 1/n Hall+pressure and hyper/corner terms at the cut wall "
+        "band. Staggered (Yee) grid only (GOL masking, Lever 2).",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -537,6 +547,7 @@ def main():
         args.bz_bias,
         args.nz,
         grid_type=args.grid_type,
+        eb_resistive_only_partial=args.resistive_only_partial,
     )
 
     sim.step()

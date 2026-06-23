@@ -1645,8 +1645,9 @@ void WarpX::InitializeEBGridData (int lev)
 
                 ComputeFaceExtensions();
 
-                // Mark on which grid points E should be updated
-                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                // Mark on which grid points E should be updated (3-state: covered /
+                // regular / partially covered, the last for resistive-only Ohm's law)
+                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev, CellSize(lev) );
                 // Mark on which grid points B should be updated
                 warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
 

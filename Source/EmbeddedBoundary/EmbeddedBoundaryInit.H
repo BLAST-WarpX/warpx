@@ -69,12 +69,19 @@ namespace warpx::embedded_boundary
      * the edge on which it is defined is fully covered by the embedded boundary.
      *
      * More specifically, this function fills the iMultiFabs in `eb_update_E`
-     * (which have the same indexType as the E field) with 1 or 0, depending
-     * on whether the grid point should be updated or not.
+     * (which have the same indexType as the E field) with a 3-state flag:
+     * 0 = fully covered (do not update), 1 = regular interior edge,
+     * 2 = partially covered (0 < edge_length < full cell length). The partial
+     * state lets the hybrid Ohm's-law solver treat cut cells as resistive-only
+     * (drop the stiff 1/n Hall and electron-pressure terms there); every other
+     * consumer only tests `== 0`, so states 1 and 2 are both "update".
+     * `cell_size` is needed to recognize a full (uncut) edge: `edge_lengths`
+     * are in SI meters after ScaleEdges, so an uncut edge equals `cell_size[idim]`.
      */
     void MarkUpdateECellsECT (
         std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
-        ablastr::fields::VectorField const& edge_lengths );
+        ablastr::fields::VectorField const& edge_lengths,
+        const std::array<amrex::Real,3>& cell_size );
 
     /** \brief Set a flag to indicate on which grid points the B field
      *  should be updated, depending on their position relative to the embedded boundary.

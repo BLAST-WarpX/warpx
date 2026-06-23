@@ -222,8 +222,20 @@ web::MarkUpdateCellsStairCase (
 void
 web::MarkUpdateECellsECT (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> & eb_update_E,
-    ablastr::fields::VectorField const& edge_lengths )
+    ablastr::fields::VectorField const& edge_lengths,
+    const std::array<amrex::Real,3>& cell_size )
 {
+    using namespace amrex::literals;
+
+    // Full (uncut) edge lengths in SI meters (edge_lengths have been scaled by
+    // ScaleEdges). An edge with 0 < length < full is partially covered (state 2).
+    // A small relative margin keeps numerically-full edges classified as regular.
+    const amrex::Real partial_eps = 1.e-8_rt;
+    const amrex::Real full_lx = cell_size[0];
+    const amrex::Real full_lz = cell_size[2];
+#if defined(WARPX_DIM_3D)
+    const amrex::Real full_ly = cell_size[1];
+#endif
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -251,13 +263,17 @@ web::MarkUpdateECellsECT (
 
         amrex::ParallelFor (tbx, tby, tbz,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // Do not update Ex if the edge on which it lives is fully covered
-                eb_update_Ex_arr(i, j, k) = (lx_arr(i, j, k) == 0)? 0 : 1;
+                // 0 = fully covered (skip), 2 = partially covered, 1 = regular
+                const amrex::Real lx = lx_arr(i, j, k);
+                eb_update_Ex_arr(i, j, k) =
+                    (lx == 0) ? 0 : ((lx < full_lx * (1._rt - partial_eps)) ? 2 : 1);
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 #ifdef WARPX_DIM_3D
-                // In 3D: Do not update Ey if the edge on which it lives is fully covered
-                eb_update_Ey_arr(i, j, k) = (ly_arr(i, j, k) == 0)? 0 : 1;
+                // In 3D: 0 = fully covered (skip), 2 = partially covered, 1 = regular
+                const amrex::Real ly = ly_arr(i, j, k);
+                eb_update_Ey_arr(i, j, k) =
+                    (ly == 0) ? 0 : ((ly < full_ly * (1._rt - partial_eps)) ? 2 : 1);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 // In XZ and RZ: Ey is associated with a mesh node,
                 // so we need to check if  the mesh node is covered
@@ -272,8 +288,10 @@ web::MarkUpdateECellsECT (
 #endif
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                // Do not update Ez if the edge on which it lives is fully covered
-                eb_update_Ez_arr(i, j, k) = (lz_arr(i, j, k) == 0)? 0 : 1;
+                // 0 = fully covered (skip), 2 = partially covered, 1 = regular
+                const amrex::Real lz = lz_arr(i, j, k);
+                eb_update_Ez_arr(i, j, k) =
+                    (lz == 0) ? 0 : ((lz < full_lz * (1._rt - partial_eps)) ? 2 : 1);
             }
         );
 

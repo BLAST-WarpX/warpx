@@ -74,7 +74,10 @@ def init_cylinder_bessel_by(resolution, grid_type):
     from scipy.special import j0
 
     By = fields.ByFPWrapper()
-    arr = np.asarray(By[...])
+    # Do NOT np.asarray() the wrapper: on a GPU build By[...] is a cupy (device)
+    # array and a host copy would segfault. Read only its shape/ndim here and
+    # match the wrapper's array module on assignment (cupy on device).
+    arr = By[...]
     nx, nz = arr.shape[0], arr.shape[2]
     if grid_type == "collocated":
         x = np.linspace(-0.8, 0.8, nx)  # By is nodal in x and z
@@ -88,7 +91,14 @@ def init_cylinder_bessel_by(resolution, grid_type):
     by2d = B1 * j0(J11 * r / R_CYL)
     by2d[r > R_CYL] = 0.0
     full = np.broadcast_to(by2d[:, None, :], (nx, arr.shape[1], nz))
-    By[...] = full[..., None] if arr.ndim == 4 else full
+    full = full[..., None] if arr.ndim == 4 else full
+    try:
+        import cupy
+
+        on_gpu = isinstance(arr, cupy.ndarray)
+    except ImportError:
+        on_gpu = False
+    By[...] = cupy.asarray(full) if on_gpu else full
 
 
 def setup_simulation(
@@ -103,6 +113,7 @@ def setup_simulation(
     geometry="square",
     eb_cyl_correction=False,
     b_curl_fill=False,
+    resistive_only_partial=False,
 ):
     """Create the PICMI simulation object.
 
@@ -199,6 +210,11 @@ def setup_simulation(
         max_steps=max_steps,
         particle_shape=1,
         verbose=verbose,
+        # Managed memory so the afterinit field-wrapper Bessel write is
+        # host-accessible on a CUDA build (WarpX otherwise overrides the arena
+        # to non-managed device memory and the numpy gather in By[...] faults).
+        # No-op on CPU builds.
+        warpx_amrex_the_arena_is_managed=1,
     )
     sim.grid_type = grid_type
     if grid_type == "collocated":
@@ -216,6 +232,7 @@ def setup_simulation(
         holmstrom_vacuum_region=True,
         use_conformal_eb=True if use_conformal_eb else None,
         conformal_b_curl_fill=True if b_curl_fill else None,
+        eb_resistive_only_partial=True if resistive_only_partial else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
     )
 
@@ -477,6 +494,14 @@ def main():
         "current is 2nd order on a curved wall; staggered (Yee) grid only",
     )
     parser.add_argument(
+        "--resistive-only-partial",
+        action="store_true",
+        help="make the generalized Ohm's law resistive-only (E=eta*J) in "
+        "partially-covered EB cells (hybrid_pic_model.eb_resistive_only_partial): "
+        "drop the stiff 1/n Hall + pressure and hyper/corner terms at the cut "
+        "wall band; staggered (Yee) grid only",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -498,6 +523,7 @@ def main():
         args.geometry,
         args.eb_cyl_correction,
         args.b_curl_fill,
+        args.resistive_only_partial,
     )
     sim.step()
 
