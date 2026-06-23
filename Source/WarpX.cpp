@@ -561,7 +561,7 @@ WarpX::ReadParameters ()
 
     {
         const ParmParse pp_algo("algo");
-        pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
+        pp_algo.query_enum_case_insensitive("maxwell_solver", electromagnetic_solver_id);
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
@@ -595,7 +595,7 @@ WarpX::ReadParameters ()
         "PMC boundary not implemented for PSATD, yet!");
 
 
-        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
+        pp_algo.query_enum_case_insensitive("evolve_scheme", evolve_scheme);
     }
 
     {
@@ -726,7 +726,7 @@ WarpX::ReadParameters ()
         maxlevel_extEMfield_init = maxLevel();
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
-        pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-_");
+        pp_warpx.query_enum_case_insensitive("do_electrostatic", electrostatic_solver_id);
         // if an electrostatic solver is used, set the Maxwell solver to None
         if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
@@ -737,7 +737,7 @@ WarpX::ReadParameters ()
                   "Electrostatic solver not supported with 1D cylindrical and spherical");
 #endif
 
-        pp_warpx.query_enum_sloppy("poisson_solver", poisson_solver_id, "-_");
+        pp_warpx.query_enum_case_insensitive("poisson_solver", poisson_solver_id);
 #ifndef WARPX_DIM_3D
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
@@ -1094,7 +1094,7 @@ WarpX::ReadParameters ()
 
         // Integer that corresponds to the type of grid used in the simulation
         // (collocated, staggered, hybrid)
-        pp_warpx.query_enum_sloppy("grid_type", grid_type, "-_");
+        pp_warpx.query_enum_case_insensitive("grid_type", grid_type);
 
         // Use same shape factors in all directions, for gathering
         if (grid_type == GridType::Collocated) { galerkin_interpolation = false; }
@@ -1251,9 +1251,9 @@ WarpX::ReadParameters ()
             electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             current_deposition_algo = CurrentDepositionAlgo::Direct;
         }
-        pp_algo.query_enum_sloppy("current_deposition", current_deposition_algo, "-_");
-        pp_algo.query_enum_sloppy("charge_deposition", charge_deposition_algo, "-_");
-        pp_algo.query_enum_sloppy("particle_pusher", particle_pusher_algo, "-_");
+        pp_algo.query_enum_case_insensitive("current_deposition", current_deposition_algo);
+        pp_algo.query_enum_case_insensitive("charge_deposition", charge_deposition_algo);
+        pp_algo.query_enum_case_insensitive("particle_pusher", particle_pusher_algo);
 
         // check for implicit evolve scheme
         if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
@@ -1303,7 +1303,7 @@ WarpX::ReadParameters ()
 
         // Query algo.field_gathering from input, set field_gathering_algo to
         // "default" if not found (default defined in Utils/WarpXAlgorithmSelection.cpp)
-        pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-_");
+        pp_algo.query_enum_case_insensitive("field_gathering", field_gathering_algo);
 
         // Set default field gathering algorithm for hybrid grids (momentum-conserving)
         std::string tmp_algo;
@@ -1360,10 +1360,10 @@ WarpX::ReadParameters ()
                 " combined with mesh refinement is currently not implemented");
         }
 
-        pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
+        pp_algo.query_enum_case_insensitive("em_solver_medium", m_em_solver_medium);
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
-            pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      m_macroscopic_solver_algo, "-_");
+            pp_algo.query_enum_case_insensitive("macroscopic_sigma_method",
+                                                m_macroscopic_solver_algo);
         }
 
         if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
@@ -1409,7 +1409,7 @@ WarpX::ReadParameters ()
         }
         utils::parser::queryWithParser(pp_algo, "load_balance_efficiency_ratio_threshold",
                         load_balance_efficiency_ratio_threshold);
-        pp_algo.query_enum_sloppy("load_balance_costs_update", load_balance_costs_update_algo, "-_");
+        pp_algo.query_enum_case_insensitive("load_balance_costs_update", load_balance_costs_update_algo);
         if (WarpX::load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Heuristic) {
             utils::parser::queryWithParser(
                 pp_algo, "costs_heuristic_cells_wt", costs_heuristic_cells_wt);
@@ -1592,7 +1592,7 @@ WarpX::ReadParameters ()
         // Integer that corresponds to the order of the PSATD solution
         // (whether the PSATD equations are derived from first-order or
         // second-order solution)
-        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-_");
+        pp_psatd.query_enum_case_insensitive("solution_type", m_psatd_solution_type);
 
         std::string JRhom_input;
         pp_psatd.query("JRhom", JRhom_input);
