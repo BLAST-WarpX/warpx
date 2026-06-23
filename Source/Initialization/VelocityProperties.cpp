@@ -74,19 +74,19 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
         ParseVelocityVector(pp, source_name, "maxwellian_u_mean_distribution_type", *this);
     }
     else if (mom_dist_s == "parse_momentum_function") {
-        std::string str_ux_function, str_uy_function, str_uz_function;
-        utils::parser::Store_parserString(pp, source_name, "momentum_function_ux(x,y,z)", str_ux_function);
-        utils::parser::Store_parserString(pp, source_name, "momentum_function_uy(x,y,z)", str_uy_function);
-        utils::parser::Store_parserString(pp, source_name, "momentum_function_uz(x,y,z)", str_uz_function);
+        std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
+        utils::parser::Store_parserString(pp, source_name, "momentum_function_ux(x,y,z)", str_ux_mean_function);
+        utils::parser::Store_parserString(pp, source_name, "momentum_function_uy(x,y,z)", str_uy_mean_function);
+        utils::parser::Store_parserString(pp, source_name, "momentum_function_uz(x,y,z)", str_uz_mean_function);
         m_ptr_ux_mean_parser =
             std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_ux_function,{"x","y","z"}));
+                utils::parser::makeParser(str_ux_mean_function,{"x","y","z"}));
         m_ptr_uy_mean_parser =
             std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_uy_function,{"x","y","z"}));
+                utils::parser::makeParser(str_uy_mean_function,{"x","y","z"}));
         m_ptr_uz_mean_parser =
             std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_uz_function,{"x","y","z"}));
+                utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
         m_type = VelParserFunctionVector;
     }
     else {
