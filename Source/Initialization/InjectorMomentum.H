@@ -262,6 +262,8 @@ struct InjectorMomentumJuttner
                  amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
+        amrex::Real x1, x2, gamma;
+        amrex::Real u [3];
         amrex::Real const theta = temperature(x,y,z);
         if (theta < 0) {
             amrex::Abort("Temperature parameter theta is less than zero, "
@@ -286,8 +288,6 @@ struct InjectorMomentumJuttner
         // corresponding Lorentz factor gamma. The Maxwell-Juttner distribution is
         // isotropic in the rest frame, so u is sampled directly in the simulation
         // axes; the bulk drift is then applied along the boost direction n further below.
-        amrex::Real u [3] = {0._rt, 0._rt, 0._rt};
-        amrex::Real gamma = 0._rt;
         // The Sobol rejection method used below becomes inefficient at low
         // temperature: its acceptance efficiency is K_2(1/theta)/(2 theta^2),
         // which tends to zero as theta -> 0
@@ -311,7 +311,8 @@ struct InjectorMomentumJuttner
             // from Zenitani et al. Phys. Plasmas 22, 042116, 2015.
             // This condition is equation 10 in Zenitani, though x1 is defined
             // differently.
-            amrex::Real x1 = 0._rt;
+            x1 = 0._rt;
+            gamma = 0._rt;
             amrex::Real umag = 0._rt;
             while(umag-gamma <= x1)
             {
@@ -323,7 +324,7 @@ struct InjectorMomentumJuttner
             // The following code samples a random unit vector
             // and multiplies the result by speed umag.
             x1 = amrex::Random(engine);
-            amrex::Real const x2 = amrex::Random(engine);
+            x2 = amrex::Random(engine);
             auto const [sin_x2, cos_x2] = amrex::Math::sincos(2._rt*MathConst::pi*x2);
             u[0] = 2._rt*umag*std::sqrt(x1*(1._rt-x1))*sin_x2;
             u[1] = 2._rt*umag*std::sqrt(x1*(1._rt-x1))*cos_x2;
