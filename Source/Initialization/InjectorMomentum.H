@@ -307,10 +307,10 @@ struct InjectorMomentumJuttner
             u[2] = amrex::RandomNormal(0._rt, u_th, engine);
             gamma = std::sqrt(1._rt + u[0]*u[0] + u[1]*u[1] + u[2]*u[2]);
         } else {
-            // Sobol method for sampling the rest-frame momentum magnitude umag,
-            // from Zenitani et al. Phys. Plasmas 22, 042116, 2015.
-            // This condition is equation 10 in Zenitani, though x1 is defined
-            // differently.
+            // Sobol method for sampling MJ Speeds,
+            // from Zenitani et al. Phys. Plasmas 22, 042116, 2015, Eq. 13.
+            // This condition is equation 10 in Zenitani,
+            // though x1 is defined differently.
             x1 = 0._rt;
             gamma = 0._rt;
             amrex::Real umag = 0._rt;
