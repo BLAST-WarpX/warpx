@@ -884,6 +884,8 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
+            } else if ( warpx.m_fields.has(m_varnames[comp], Direction{idir}, lev) ) {
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], Direction{idir}, lev), lev, m_crse_ratio);
             }
         }
         // Check if comp was found above
