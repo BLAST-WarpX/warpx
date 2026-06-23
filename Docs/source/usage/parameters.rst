@@ -3046,9 +3046,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
 
-    For ``elastic`` and ``excitationX``, the angular distribution is
-    controlled by the per-process :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model`
-    argument.
+    For ``elastic``, ``excitationX``, ``charge_exchange`` and ``twoproduct_reaction``, the
+    angular distribution is controlled by the per-process
+    :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` argument.
 
 .. pp:param:: <collision_name>.<scattering_process>_cross_section
     :type: ``string``
@@ -3067,12 +3067,14 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
 .. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
     :type: ``string``
-    :default: ``isotropic``
     :optional:
 
-    Only for ``dsmc`` and ``background_mcc``, and only for ``elastic`` and ``excitationX``.
+    Only for ``dsmc`` and ``background_mcc``, and only for ``elastic``, ``excitationX``,
+    ``charge_exchange`` and ``twoproduct_reaction``.
     The model used to determine the scattering angle of the products
     in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
+    The default is ``isotropic`` for ``elastic`` and ``excitationX``, and ``forward`` for
+    ``charge_exchange`` and ``twoproduct_reaction``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction
     as the incident particle (in the center of mass frame).

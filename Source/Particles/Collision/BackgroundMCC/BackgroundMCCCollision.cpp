@@ -114,15 +114,22 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
-        // The angular behavior of a particle-conserving process is controlled by the
-        // per-process `<process>_scattering_angle_model` argument.
+        // The angular behavior of a process is controlled by the per-process
+        // `<process>_scattering_angle_model` argument.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             scattering_process != "back" && scattering_process != "forward",
             "The scattering process names 'back' and 'forward' are no longer supported. "
             "Use 'elastic' with '" + collision_name +
             ".elastic_scattering_angle_model = backward' or '= forward' instead.");
 
-        auto scattering_angle_model = ScatteringAngleModel::Default;
+        // The default angle model depends on the process: product-producing processes
+        // (charge exchange and two-product reactions) default to forward scattering, while
+        // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
+        const auto process_type = ScatteringProcess::parseProcessType(scattering_process);
+        auto scattering_angle_model =
+            (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
+             process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
+            ? ScatteringAngleModel::Forward : ScatteringAngleModel::Default;
         pp_collision_name.query_enum_sloppy(
             scattering_process + "_scattering_angle_model", scattering_angle_model, "-_");
 
@@ -416,17 +423,6 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
 
                                   // check if this collision should be performed
                                   if (col_select > nu_i) { continue; }
-
-                                  // charge exchange is implemented as a simple swap of the projectile
-                                  // and target velocities which doesn't require any of the Lorentz
-                                  // transformations below; note that if the projectile and target
-                                  // have the same mass this is identical to back scattering
-                                  if (scattering_process.m_type == ScatteringProcessType::TWOPRODUCT_REACTION) {
-                                      ux[ip] = ua_x;
-                                      uy[ip] = ua_y;
-                                      uz[ip] = ua_z;
-                                      break;
-                                  }
 
                                   // At this point the given particle has been chosen for a
                                   // collision with a background-gas particle of velocity

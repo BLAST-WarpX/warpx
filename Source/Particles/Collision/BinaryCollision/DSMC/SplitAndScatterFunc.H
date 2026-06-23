@@ -306,6 +306,8 @@ public:
             else if ((proc_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
                      (proc_type == ScatteringProcessType::CHARGE_EXCHANGE))
             {
+                const auto& proc = processes[mask[i]-1];
+
                 // create a copy of the first product species at the location of the first reactant species
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto slot2_idx = products_np_data[2] + with_product_offsets_data[i];
@@ -364,9 +366,9 @@ public:
                     -reaction_energy*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     // We also convert from eV to Joules
-                    ScatteringAngleModel::Forward,
-                    // no angular scattering: the products' momenta have the same direction
-                    // as that of the reactant particle, in the center-of-mass frame
+                    proc.m_scattering_angle_model,
+                    // The angular distribution of the products in the center-of-mass frame is set by
+                    // the process's scattering angle model (forward by default for these processes).
                     engine);
             }
             else if (proc_type == ScatteringProcessType::IONIZATION)

@@ -133,10 +133,10 @@ public:
 
     [[nodiscard]] ScatteringProcessType type () const { return m_exe_h.m_type; }
 
-private:
-
     static
     ScatteringProcessType parseProcessType(const std::string& process);
+
+private:
 
     void init (const std::string& scattering_process, amrex::ParticleReal energy,
                ScatteringAngleModel scattering_angle_model);

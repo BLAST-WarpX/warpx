@@ -83,6 +83,7 @@ coll_ar_ions.elastic_back_cross_section = ../../../../warpx-data/MCC_cross_secti
 coll_ar_ions.elastic_back_scattering_angle_model = backward
 coll_ar_ions.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/ion_scattering.dat
 coll_ar_ions.charge_exchange_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/charge_exchange.dat
+coll_ar_ions.charge_exchange_scattering_angle_model = forward
 
 diagnostics.diags_names = diag1 diag3
 diag1.diag_type = Full
