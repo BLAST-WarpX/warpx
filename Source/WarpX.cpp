@@ -726,7 +726,8 @@ WarpX::ReadParameters ()
         maxlevel_extEMfield_init = maxLevel();
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
-        pp_warpx.query_enum_case_insensitive("do_electrostatic", electrostatic_solver_id);
+        pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-");
+        // query_enum_sloppy with "-" needed to map "labframe-electromagnetostatic" to the enum value
         // if an electrostatic solver is used, set the Maxwell solver to None
         if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
@@ -1593,7 +1594,8 @@ WarpX::ReadParameters ()
         // Integer that corresponds to the order of the PSATD solution
         // (whether the PSATD equations are derived from first-order or
         // second-order solution)
-        pp_psatd.query_enum_case_insensitive("solution_type", m_psatd_solution_type);
+        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-");
+        // query_enum_sloppy with "-" needed to map "first-order" to the enum value
 
         std::string JRhom_input;
         pp_psatd.query("JRhom", JRhom_input);
