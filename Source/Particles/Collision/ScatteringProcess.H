@@ -109,7 +109,7 @@ public:
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
-        ScatteringAngleModel m_scattering_angle_model = ScatteringAngleModel::Isotropic;
+        ScatteringAngleModel m_scattering_angle_model;
     };
 
     [[nodiscard]]
