@@ -61,20 +61,28 @@ PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 TOL_PE_NEUMANN = 0.06
 
 
-def init_cylinder_bessel_by():
+def init_cylinder_bessel_by(resolution, grid_type):
     """afterinit hook: overwrite By with the lowest Neumann radial Bessel
     eigenmode of the disk, By = B1 * J0(J11 * r / R_CYL) (dBy/dr = 0 at r = R,
     the tangential/even-mirror parity), zero in the conductor. Written through
     the field wrapper because the input parser has no Bessel function. Assumes a
     single box (the cylinder decomposition forces it) so the wrapper spans the
-    full nodal domain; r = sqrt(x^2 + z^2) from the nodal coordinates."""
+    full domain. By is evaluated at its TRUE staggered location: cell-centered in
+    x and z on a staggered (Yee) grid, nodal on a collocated grid. Using nodal
+    coordinates for the staggered grid misplaces By by O(h) and silently caps the
+    evolved convergence at 1st order, so the staggering must be respected here."""
     from scipy.special import j0
 
     By = fields.ByFPWrapper()
     arr = np.asarray(By[...])
     nx, nz = arr.shape[0], arr.shape[2]
-    x = np.linspace(-0.8, 0.8, nx)
-    z = np.linspace(-0.8, 0.8, nz)
+    if grid_type == "collocated":
+        x = np.linspace(-0.8, 0.8, nx)  # By is nodal in x and z
+        z = np.linspace(-0.8, 0.8, nz)
+    else:
+        h = 1.6 / resolution  # staggered: By is cell-centered in x and z
+        x = -0.8 + (np.arange(nx) + 0.5) * h
+        z = -0.8 + (np.arange(nz) + 0.5) * h
     xx, zz = np.meshgrid(x, z, indexing="ij")
     r = np.sqrt(xx * xx + zz * zz)
     by2d = B1 * j0(J11 * r / R_CYL)
@@ -259,7 +267,9 @@ def setup_simulation(
             # decays at the exact rate gamma = (eta/mu0)(J11/R)^2 -> an exact
             # analytic for the interior-L2 edge order. The parser has no Bessel,
             # so it is written via an afterinit field-wrapper hook.
-            callbacks.installafterinit(init_cylinder_bessel_by)
+            callbacks.installafterinit(
+                lambda: init_cylinder_bessel_by(resolution, grid_type)
+            )
         else:
             B_init = picmi.AnalyticInitialField(
                 Bx_expression="0",

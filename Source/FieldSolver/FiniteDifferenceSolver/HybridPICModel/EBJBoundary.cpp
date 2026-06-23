@@ -229,7 +229,8 @@ namespace
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
-        int n) noexcept
+        int n,
+        amrex::Real* g_io = nullptr, bool use_cached = false) noexcept
     {
         using namespace amrex::literals;
         constexpr int W = 2;  // +/- window (5 cells per direction)
@@ -241,8 +242,17 @@ namespace
             ic[d] = static_cast<int>(std::floor(lc[d] + 0.5_rt));
         }
 
+        // The fit value is g . b with g = M^{-1} e0 (M = sum p p^T over the fluid
+        // window, b = sum p*field). g is geometry-only, so when use_cached it is
+        // read from g_io and the matrix build + solve are skipped; otherwise it is
+        // solved here and (if g_io) written out for the cache. Either way b is
+        // accumulated over the window (it carries the field values).
         amrex::Real M[QUAD_NB][QUAD_NB];
         amrex::Real bb[QUAD_NB];
+        for (int r = 0; r < QUAD_NB; ++r) {
+            bb[r] = 0._rt;
+            if (!use_cached) { for (int c = 0; c < QUAD_NB; ++c) { M[r][c] = 0._rt; } }
+        }
         int count = 0;
 
         auto accumulate = [&] (int ii, int jj, int kk) {
@@ -260,62 +270,57 @@ namespace
             amrex::Real const f = a(ii, jj, kk, n);
             for (int r = 0; r < QUAD_NB; ++r) {
                 bb[r] += p[r]*f;
-                for (int c = 0; c <= r; ++c) { M[r][c] += p[r]*p[c]; }
+                if (!use_cached) { for (int c = 0; c <= r; ++c) { M[r][c] += p[r]*p[c]; } }
             }
             ++count;
         };
 
-        // Grow the window (+/-2 -> +/-4) until the quadratic is comfortably
-        // overdetermined. A one-sided near-wall stencil (a covered node can sit
-        // on the surface, so its fluid neighbors are all to one side) needs more
-        // points than the minimum to stay well-conditioned -- the fixed small
-        // window is what limited the nodal grid.
-        constexpr int MIN_PTS = 2*QUAD_NB;
-        for (int W = 2; W <= 4; ++W) {
-            count = 0;
-            for (int r = 0; r < QUAD_NB; ++r) {
-                bb[r] = 0._rt;
-                for (int c = 0; c < QUAD_NB; ++c) { M[r][c] = 0._rt; }
-            }
 #if defined(WARPX_DIM_3D)
-            for (int dk = -W; dk <= W; ++dk) {
-                int const kk = ic[2] + dk;
-                if (kk < a.begin[2] || kk >= a.end[2]) { continue; }
-                for (int dj = -W; dj <= W; ++dj) {
-                    int const jj = ic[1] + dj;
-                    if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
-                    for (int di = -W; di <= W; ++di) {
-                        int const ii = ic[0] + di;
-                        if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
-                        if (fluid(ii, jj, kk)) { accumulate(ii, jj, kk); }
-                    }
-                }
-            }
-#else
+        for (int dk = -W; dk <= W; ++dk) {
+            int const kk = ic[2] + dk;
+            if (kk < a.begin[2] || kk >= a.end[2]) { continue; }
             for (int dj = -W; dj <= W; ++dj) {
                 int const jj = ic[1] + dj;
                 if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
                 for (int di = -W; di <= W; ++di) {
                     int const ii = ic[0] + di;
                     if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
-                    if (fluid(ii, jj, 0)) { accumulate(ii, jj, 0); }
+                    if (fluid(ii, jj, kk)) { accumulate(ii, jj, kk); }
                 }
             }
-#endif
-            if (count >= MIN_PTS) { break; }
         }
+#else
+        for (int dj = -W; dj <= W; ++dj) {
+            int const jj = ic[1] + dj;
+            if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+            for (int di = -W; di <= W; ++di) {
+                int const ii = ic[0] + di;
+                if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+                if (fluid(ii, jj, 0)) { accumulate(ii, jj, 0); }
+            }
+        }
+#endif
         if (count < QUAD_NB) { return {0._rt, 0._rt}; }
 
-        // symmetrize and add a per-diagonal (relative) ridge so an
-        // under-determined one-sided stencil regularizes toward its lower-order
-        // fit instead of overshooting (the device analog of SVD truncation)
-        amrex::Real const ridge = 1.e-6_rt * M[0][0];
-        for (int r = 0; r < QUAD_NB; ++r) {
-            for (int c = r+1; c < QUAD_NB; ++c) { M[r][c] = M[c][r]; }
-            M[r][r] += ridge;
+        amrex::Real g[QUAD_NB];
+        if (use_cached) {
+            for (int r = 0; r < QUAD_NB; ++r) { g[r] = g_io[r]; }
+        } else {
+            // symmetrize and add a small ridge so an under-determined one-sided
+            // stencil regularizes toward its lower-order fit instead of
+            // overshooting; then solve M g = e0 (g = M^{-1} e0).
+            amrex::Real const ridge = 1.e-6_rt * M[0][0];
+            for (int r = 0; r < QUAD_NB; ++r) {
+                for (int c = r+1; c < QUAD_NB; ++c) { M[r][c] = M[c][r]; }
+                M[r][r] += ridge;
+                g[r] = (r == 0) ? 1._rt : 0._rt;
+            }
+            if (!solve_spd<QUAD_NB>(M, g)) { return {0._rt, 0._rt}; }
+            if (g_io != nullptr) { for (int r = 0; r < QUAD_NB; ++r) { g_io[r] = g[r]; } }
         }
-        if (!solve_spd<QUAD_NB>(M, bb)) { return {0._rt, 0._rt}; }
-        return {bb[0], static_cast<amrex::Real>(count)};  // fit value at pos (u=0)
+        amrex::Real value = 0._rt;
+        for (int r = 0; r < QUAD_NB; ++r) { value += g[r]*bb[r]; }
+        return {value, static_cast<amrex::Real>(count)};  // fit value at pos (u=0)
     }
 
     // Classification of every staggered point for the embedded-boundary fill
@@ -659,6 +664,42 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             field[c]->FillBoundary(geom.periodicity());
         }
 
+        // 2nd-order gather weight cache: the weights are geometry-only, so on the
+        // first call (per cached status) assign every S_FILL target a compact
+        // band-sparse slot and size the weight buffer; the direct pass below then
+        // computes the weights once (build mode) and reuses them every later call
+        // (apply mode). quadratic_gather is used only for the single-component B
+        // fill, so the per-component weights do not depend on the field index n.
+        bool const cache_weights = quadratic_gather && (status_cache != nullptr);
+        if (cache_weights) {
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(field[0]->nComp() == 1,
+                "quadratic_gather weight cache assumes a single-component field");
+        }
+        if (cache_weights && !st.weights_built) {
+            for (int c = 0; c < 3; ++c) {
+                st.gslot[c] = std::make_unique<amrex::iMultiFab>(
+                    st.status[c]->boxArray(), st.status[c]->DistributionMap(),
+                    1, st.status[c]->nGrowVect());
+                st.gslot[c]->setVal(-1);
+                amrex::Gpu::DeviceScalar<int> counter(0);
+                int* const cptr = counter.dataPtr();
+                for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                    amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+                    auto const& stat = st.status[c]->const_array(mfi);
+                    auto const& slotarr = st.gslot[c]->array(mfi);
+                    amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                    {
+                        if (stat(i, j, k) == S_FILL) {
+                            slotarr(i, j, k) = amrex::Gpu::Atomic::Add(cptr, 1);
+                        }
+                    });
+                }
+                st.n_slots[c] = counter.dataValue();
+                st.gweights[c].resize(std::size_t(st.n_slots[c]) * 3 * QUAD_NB);
+            }
+        }
+        bool const use_cached_weights = cache_weights && st.weights_built;
+
         // The cascade runs only when ill-posed targets exist; it is the only
         // path that mutates (and afterwards restores) the cached status arrays.
         bool const cascade = (st.n_pending > 0);
@@ -671,6 +712,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             auto const stag_x = stag[0];
             auto const stag_y = stag[1];
             auto const stag_z = stag[2];
+            amrex::Real* const gw_ptr = cache_weights ? st.gweights[c].dataPtr() : nullptr;
 
             for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                 amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
@@ -685,6 +727,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 auto const& stat_y = st.status[1]->const_array(mfi);
                 auto const& stat_z = st.status[2]->const_array(mfi);
                 auto const& phi = distance_to_eb.const_array(mfi);
+                amrex::Array4<int const> const slotarr =
+                    cache_weights ? st.gslot[c]->const_array(mfi) : amrex::Array4<int const>{};
 
                 amrex::ParallelFor(tb, ncomp,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -723,9 +767,19 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 
                     amrex::Real Jx_im, Jy_im, Jz_im;
                     if (quadratic_gather) {
-                        auto const [vx, cx] = gather_quadratic_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n);
-                        auto const [vy, cy] = gather_quadratic_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n);
-                        auto const [vz, cz] = gather_quadratic_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n);
+                        // Cached path: read (or, on the build pass, write) the
+                        // geometry-only gather weights g = M^{-1} e0 for each of
+                        // the 3 gathered components from this target's slot.
+                        amrex::Real* gx = nullptr;
+                        amrex::Real* gy = nullptr;
+                        amrex::Real* gz = nullptr;
+                        if (cache_weights) {
+                            auto* const base = gw_ptr + std::size_t(slotarr(i, j, k))*3*QUAD_NB;
+                            gx = base; gy = base + QUAD_NB; gz = base + 2*QUAD_NB;
+                        }
+                        auto const [vx, cx] = gather_quadratic_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n, gx, use_cached_weights);
+                        auto const [vy, cy] = gather_quadratic_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n, gy, use_cached_weights);
+                        auto const [vz, cz] = gather_quadratic_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n, gz, use_cached_weights);
                         // fall back to the linear gather where the quadratic
                         // stencil is degenerate (too few fluid points / non-SPD)
                         Jx_im = (cx > 0._rt) ? vx : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
@@ -749,6 +803,11 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 });
             }
         }
+
+        // The direct pass has now computed every well-posed target's gather
+        // weights (build mode); flag the cache so later calls skip the matrix
+        // build + Cholesky and just do the cached mat-vec (apply mode).
+        if (cache_weights) { st.weights_built = true; }
 
         // Resolve the ill-posed targets by a deterministic cascade: lock the
         // direct-pass values and, sweep by sweep, fill the pending points

@@ -140,17 +140,15 @@ def run_one(
     )
     from scipy.special import j0
 
-    import pywarpx
     from pywarpx import callbacks, fields, libwarpx, picmi
 
     mu0 = picmi.constants.mu0
     k = J11 / R_CYL
 
-    if prod_bfill:
-        # exercise the PRODUCTION path: CalculatePlasmaCurrent itself extends the
-        # covered B (quadratic) before the curl when this flag is set. No --mirror-b.
-        pywarpx.hybridpicmodel.conformal_b_curl_fill = 1
-
+    # exercise the PRODUCTION path: CalculatePlasmaCurrent itself extends the
+    # covered B (quadratic) before the curl when conformal_b_curl_fill is set
+    # (no --mirror-b). Pass it through the PICMI kwarg -- setting the raw bucket
+    # attr is overwritten by HybridPICSolver.initialize_inputs.
     sim = setup_simulation(
         N,
         4,  # substeps (unused: the probe never advances the fields)
@@ -159,6 +157,7 @@ def run_one(
         0,  # verbose
         grid_type=grid_type,
         geometry="cylinder",
+        b_curl_fill=prod_bfill,
     )
 
     def write_exact_by():

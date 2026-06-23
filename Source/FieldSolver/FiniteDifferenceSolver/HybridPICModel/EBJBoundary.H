@@ -12,7 +12,9 @@
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX_Geometry.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_REAL.H>
 #include <AMReX_iMultiFab.H>
 
 #include <array>
@@ -36,8 +38,31 @@ namespace warpx::hybrid
     {
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> status;
         int n_pending = 0;
+
+        /** 2nd-order gather weight cache (quadratic_gather only). The gather
+         * weights are geometry-only (the image point, the per-component
+         * staggering, and which window cells are fluid -- not the field
+         * values), so they are built once and reused every substage. For each
+         * fill-target component c, \c gslot maps an S_FILL cell to its compact
+         * band-sparse slot (or -1); \c gweights[c] packs, per slot, the
+         * QUAD_NB-vector g = M^{-1} e0 for each of the 3 gathered components, so
+         * the per-gather value at apply is g . b (b = sum of the local-quadratic
+         * basis times the field over the window) -- no per-substage matrix build
+         * or Cholesky. Memory scales with the wall band, not the volume. */
+        bool weights_built = false;
+        std::array<int, 3> n_slots = {{0, 0, 0}};
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> gslot;
+        std::array<amrex::Gpu::DeviceVector<amrex::Real>, 3> gweights;
+
         [[nodiscard]] bool empty () const { return !status[0]; }
-        void reset () { for (auto& s : status) { s.reset(); } n_pending = 0; }
+        void reset () {
+            for (auto& s : status) { s.reset(); }
+            for (auto& s : gslot) { s.reset(); }
+            for (auto& g : gweights) { g.clear(); }
+            n_slots = {{0, 0, 0}};
+            weights_built = false;
+            n_pending = 0;
+        }
     };
 
     /** \brief Enforce the PEC boundary condition on embedded-boundary masked
