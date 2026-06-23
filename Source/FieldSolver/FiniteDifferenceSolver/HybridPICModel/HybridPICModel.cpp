@@ -513,6 +513,7 @@ void HybridPICModel::BfieldEvolve (
 
     while (t < dt_half)
     {
+        // Adjust size of the last substep, so as to land exactly at t+dt_half.
         if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
         bool step_succeeded;
         amrex::Real step_change_factor;
