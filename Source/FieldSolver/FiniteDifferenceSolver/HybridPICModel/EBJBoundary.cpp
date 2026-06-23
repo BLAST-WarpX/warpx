@@ -167,6 +167,157 @@ namespace
             pos, stag, plo, dxi, n);
     }
 
+    // Number of terms in the local quadratic basis used by the 2nd-order gather
+    // (1, u, v[, w], u^2, v^2[, w^2], uv[, uw, vw]); u,v,w are per-direction cell
+    // offsets, so the basis is naturally non-dimensional and aspect-aware.
+#if defined(WARPX_DIM_3D)
+    constexpr int QUAD_NB = 10;
+#else
+    constexpr int QUAD_NB = 6;
+#endif
+
+    /** In-place Cholesky solve of a small symmetric positive-definite system
+     *  M x = b (result returned in b). Returns false if M is not SPD (caller
+     *  falls back). Fixed size, no allocation -> GPU friendly. */
+    template <int N>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    bool solve_spd (amrex::Real M[N][N], amrex::Real b[N]) noexcept
+    {
+        using namespace amrex::literals;
+        amrex::Real L[N][N];
+        for (int i = 0; i < N; ++i) { for (int j = 0; j < N; ++j) { L[i][j] = 0._rt; } }
+        for (int i = 0; i < N; ++i) {
+            for (int j = 0; j <= i; ++j) {
+                amrex::Real sum = M[i][j];
+                for (int k = 0; k < j; ++k) { sum -= L[i][k]*L[j][k]; }
+                if (i == j) {
+                    if (!(sum > 0._rt)) { return false; }
+                    L[i][j] = std::sqrt(sum);
+                } else {
+                    L[i][j] = sum / L[j][j];
+                }
+            }
+        }
+        for (int i = 0; i < N; ++i) {  // forward: L y = b
+            amrex::Real s = b[i];
+            for (int k = 0; k < i; ++k) { s -= L[i][k]*b[k]; }
+            b[i] = s / L[i][i];
+        }
+        for (int i = N-1; i >= 0; --i) {  // back: L^T x = y
+            amrex::Real s = b[i];
+            for (int k = i+1; k < N; ++k) { s -= L[k][i]*b[k]; }
+            b[i] = s / L[i][i];
+        }
+        return true;
+    }
+
+    /** 2nd-order moving-least-squares gather of component n at an arbitrary
+     *  position, using ONLY stencil points accepted by the \c fluid predicate.
+     *  A local quadratic (QUAD_NB terms) is fit to the fluid cells in a +/-2-cell
+     *  window by regularized normal equations and evaluated at \c pos. This is
+     *  O(h^3) in the value (vs O(h^2) for the (bi/tri)linear gather), so the
+     *  curl(B) it feeds is 2nd order at a curved wall. The ridge regularization
+     *  lets a degenerate one-sided near-wall stencil degrade gracefully instead
+     *  of overshooting. Returns (value, fluid-point count); count < QUAD_NB or a
+     *  non-SPD system signals the caller to fall back to the linear gather. */
+    template <typename FluidPred>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::GpuTuple<amrex::Real, amrex::Real> gather_quadratic_pred (
+        amrex::Array4<amrex::Real const> const& a,
+        FluidPred const& fluid,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+        int n) noexcept
+    {
+        using namespace amrex::literals;
+        constexpr int W = 2;  // +/- window (5 cells per direction)
+
+        amrex::Real lc[AMREX_SPACEDIM];
+        int ic[AMREX_SPACEDIM];
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            lc[d] = (pos[d] - plo[d])*dxi[d] - stag[d];
+            ic[d] = static_cast<int>(std::floor(lc[d] + 0.5_rt));
+        }
+
+        amrex::Real M[QUAD_NB][QUAD_NB];
+        amrex::Real bb[QUAD_NB];
+        int count = 0;
+
+        auto accumulate = [&] (int ii, int jj, int kk) {
+            amrex::Real const u = ii - lc[0];
+#if defined(WARPX_DIM_3D)
+            amrex::Real const v = jj - lc[1];
+            amrex::Real const w = kk - lc[2];
+            amrex::Real const p[QUAD_NB] =
+                {1._rt, u, v, w, u*u, v*v, w*w, u*v, u*w, v*w};
+#else
+            amrex::Real const v = jj - lc[1];
+            amrex::Real const p[QUAD_NB] = {1._rt, u, v, u*u, u*v, v*v};
+            amrex::ignore_unused(kk);
+#endif
+            amrex::Real const f = a(ii, jj, kk, n);
+            for (int r = 0; r < QUAD_NB; ++r) {
+                bb[r] += p[r]*f;
+                for (int c = 0; c <= r; ++c) { M[r][c] += p[r]*p[c]; }
+            }
+            ++count;
+        };
+
+        // Grow the window (+/-2 -> +/-4) until the quadratic is comfortably
+        // overdetermined. A one-sided near-wall stencil (a covered node can sit
+        // on the surface, so its fluid neighbors are all to one side) needs more
+        // points than the minimum to stay well-conditioned -- the fixed small
+        // window is what limited the nodal grid.
+        constexpr int MIN_PTS = 2*QUAD_NB;
+        for (int W = 2; W <= 4; ++W) {
+            count = 0;
+            for (int r = 0; r < QUAD_NB; ++r) {
+                bb[r] = 0._rt;
+                for (int c = 0; c < QUAD_NB; ++c) { M[r][c] = 0._rt; }
+            }
+#if defined(WARPX_DIM_3D)
+            for (int dk = -W; dk <= W; ++dk) {
+                int const kk = ic[2] + dk;
+                if (kk < a.begin[2] || kk >= a.end[2]) { continue; }
+                for (int dj = -W; dj <= W; ++dj) {
+                    int const jj = ic[1] + dj;
+                    if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+                    for (int di = -W; di <= W; ++di) {
+                        int const ii = ic[0] + di;
+                        if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+                        if (fluid(ii, jj, kk)) { accumulate(ii, jj, kk); }
+                    }
+                }
+            }
+#else
+            for (int dj = -W; dj <= W; ++dj) {
+                int const jj = ic[1] + dj;
+                if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+                for (int di = -W; di <= W; ++di) {
+                    int const ii = ic[0] + di;
+                    if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+                    if (fluid(ii, jj, 0)) { accumulate(ii, jj, 0); }
+                }
+            }
+#endif
+            if (count >= MIN_PTS) { break; }
+        }
+        if (count < QUAD_NB) { return {0._rt, 0._rt}; }
+
+        // symmetrize and add a per-diagonal (relative) ridge so an
+        // under-determined one-sided stencil regularizes toward its lower-order
+        // fit instead of overshooting (the device analog of SVD truncation)
+        amrex::Real const ridge = 1.e-6_rt * M[0][0];
+        for (int r = 0; r < QUAD_NB; ++r) {
+            for (int c = r+1; c < QUAD_NB; ++c) { M[r][c] = M[c][r]; }
+            M[r][r] += ridge;
+        }
+        if (!solve_spd<QUAD_NB>(M, bb)) { return {0._rt, 0._rt}; }
+        return {bb[0], static_cast<amrex::Real>(count)};  // fit value at pos (u=0)
+    }
+
     // Classification of every staggered point for the embedded-boundary fill
     constexpr int S_SOLUTION = 0;  //!< solution domain: gather source, never written
     constexpr int S_FILL     = 1;  //!< fill target with a well-posed image stencil
@@ -455,7 +606,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     EBFillStatus* status_cache,
     amrex::Real band_cells,
     bool eb_cyl,
-    int eb_cyl_axis)
+    int eb_cyl_axis,
+    bool quadratic_gather)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -553,18 +705,45 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                         [&] (int ig, int jg, int kg) { return stat_y(ig, jg, kg) == S_SOLUTION; };
                     auto const in_sol_z =
                         [&] (int ig, int jg, int kg) { return stat_z(ig, jg, kg) == S_SOLUTION; };
-                    auto const [Jx_im, wx_im] = gather_staggered_pred(Jx_l, in_sol_x, g.xim, stag_x, plo, dxi, n);
-                    auto const [Jy_im, wy_im] = gather_staggered_pred(Jy_l, in_sol_y, g.xim, stag_y, plo, dxi, n);
-                    auto const [Jz_im, wz_im] = gather_staggered_pred(Jz_l, in_sol_z, g.xim, stag_z, plo, dxi, n);
-                    amrex::ignore_unused(wx_im, wy_im, wz_im);
+                    // Image point and its surface distance. The default linear
+                    // gather uses the band-decoupled image (>= h_max into the
+                    // plasma). The 2nd-order gather instead uses the TRUE even
+                    // reflection (image at the reflected distance |s|, d_im=|s|)
+                    // and a quadratic fluid-only fit, so the curl(B) it feeds is
+                    // 2nd order at a curved wall; the linear image's >= h_max
+                    // offset is itself an O(h) value error there.
+                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim = g.xim;
+                    amrex::Real d_im = g.d_im;
+                    if (quadratic_gather) {
+                        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                            xim[d] = g.xe[d] - 2._rt*g.s*g.nv[d];
+                        }
+                        d_im = -g.s;
+                    }
+
+                    amrex::Real Jx_im, Jy_im, Jz_im;
+                    if (quadratic_gather) {
+                        auto const [vx, cx] = gather_quadratic_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n);
+                        auto const [vy, cy] = gather_quadratic_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n);
+                        auto const [vz, cz] = gather_quadratic_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n);
+                        // fall back to the linear gather where the quadratic
+                        // stencil is degenerate (too few fluid points / non-SPD)
+                        Jx_im = (cx > 0._rt) ? vx : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
+                        Jy_im = (cy > 0._rt) ? vy : amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
+                        Jz_im = (cz > 0._rt) ? vz : amrex::get<0>(gather_staggered_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n));
+                    } else {
+                        Jx_im = amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
+                        Jy_im = amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
+                        Jz_im = amrex::get<0>(gather_staggered_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n));
+                    }
 
                     // edge fields (E, J): normal even / tangential odd;
                     // magnetic field: normal odd / tangential even
-                    amrex::Real const w_n = normal_odd ? g.s/g.d_im : 1._rt;
-                    amrex::Real const w_t = normal_odd ? 1._rt : g.s/g.d_im;
+                    amrex::Real const w_n = normal_odd ? g.s/d_im : 1._rt;
+                    amrex::Real const w_t = normal_odd ? 1._rt : g.s/d_im;
                     // optional surface-of-revolution radial metric Jacobian
                     amrex::Real const lambda =
-                        eb_cyl ? ::cyl_lambda(g.xe, g.xim, eb_cyl_axis) : 1._rt;
+                        eb_cyl ? ::cyl_lambda(g.xe, xim, eb_cyl_axis) : 1._rt;
                     Jc(i, j, k, n) = ::mirror_combine(c, Jx_im, Jy_im, Jz_im, g.nv,
                         w_n, w_t, eb_cyl, eb_cyl_axis, lambda);
                 });

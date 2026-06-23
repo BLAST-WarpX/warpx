@@ -97,6 +97,16 @@ void HybridPICModel::ReadParameters ()
 
     // conformal (enlarged-cell technique) embedded-boundary Faraday update
     pp_hybrid.query("use_conformal_eb", m_use_conformal_eb);
+    pp_hybrid.query("conformal_b_curl_fill", m_conformal_b_curl_fill);
+    if (m_conformal_b_curl_fill
+        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.conformal_b_curl_fill is only implemented for a "
+            "staggered (Yee) grid; it is ignored on a collocated grid (the nodal "
+            "2nd-order covered-B gather is not yet robust).",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
 
     if (m_use_conformal_eb) {
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
@@ -509,6 +519,29 @@ void HybridPICModel::CalculatePlasmaCurrent (
     ABLASTR_PROFILE("HybridPICModel::CalculatePlasmaCurrent()");
 
     auto& warpx = WarpX::GetInstance();
+
+    // Extend B into the covered cells with a 2nd-order quadratic (even-reflection)
+    // gather BEFORE the Ampere curl, so curl(B) -> J reads a curved-wall-accurate
+    // covered B. The conformal (ECT) B push is 2nd order, but the curl is plain-
+    // masked and otherwise reads the staircased covered B, capping the near-wall
+    // plasma current (and the Ohm's-law E built from it) at 1st order on a curved
+    // wall. Staggered (Yee) grid only -- the nodal quadratic gather is not yet
+    // robust (see m_conformal_b_curl_fill). Magnetic parity (normal odd /
+    // tangential even), covered centers filled, on the B update mask.
+    if (EB::enabled() && m_conformal_b_curl_fill
+        && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
+        if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
+        warpx::hybrid::ApplyPECBoundaryToField(
+            Bfield, warpx.GetEBUpdateBFlag()[lev],
+            *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+            warpx.Geom(lev),
+            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
+            /*normal_odd=*/true, /*fill_covered_centers=*/true,
+            &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells,
+            m_eb_cylindrical_correction, m_eb_cyl_axis,
+            /*quadratic_gather=*/true);
+    }
+
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
         current_fp_plasma, Bfield, eb_update_E, lev

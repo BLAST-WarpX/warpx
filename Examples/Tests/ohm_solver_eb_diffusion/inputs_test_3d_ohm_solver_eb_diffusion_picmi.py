@@ -94,6 +94,7 @@ def setup_simulation(
     divb_clean=False,
     geometry="square",
     eb_cyl_correction=False,
+    b_curl_fill=False,
 ):
     """Create the PICMI simulation object.
 
@@ -206,6 +207,7 @@ def setup_simulation(
         substeps=substeps,
         holmstrom_vacuum_region=True,
         use_conformal_eb=True if use_conformal_eb else None,
+        conformal_b_curl_fill=True if b_curl_fill else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
     )
 
@@ -458,6 +460,13 @@ def main():
         "whether the curved-wall edge order lifts above the planar mirror",
     )
     parser.add_argument(
+        "--b-curl-fill",
+        action="store_true",
+        help="extend the covered B with a 2nd-order quadratic gather before the "
+        "Ampere curl (hybrid_pic_model.conformal_b_curl_fill) so the near-wall "
+        "current is 2nd order on a curved wall; staggered (Yee) grid only",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -478,6 +487,7 @@ def main():
         args.divb_clean,
         args.geometry,
         args.eb_cyl_correction,
+        args.b_curl_fill,
     )
     sim.step()
 

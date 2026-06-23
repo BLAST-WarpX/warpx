@@ -127,6 +127,8 @@ def run_one(
     cyl_b=False,
     extrap_b=False,
     extrap_band=2.0,
+    quad_gather=False,
+    prod_bfill=False,
 ):
     sys.path.insert(0, HERE)
     from inputs_test_3d_ohm_solver_eb_diffusion_picmi import (
@@ -138,10 +140,16 @@ def run_one(
     )
     from scipy.special import j0
 
+    import pywarpx
     from pywarpx import callbacks, fields, libwarpx, picmi
 
     mu0 = picmi.constants.mu0
     k = J11 / R_CYL
+
+    if prod_bfill:
+        # exercise the PRODUCTION path: CalculatePlasmaCurrent itself extends the
+        # covered B (quadratic) before the curl when this flag is set. No --mirror-b.
+        pywarpx.hybridpicmodel.conformal_b_curl_fill = 1
 
     sim = setup_simulation(
         N,
@@ -196,8 +204,10 @@ def run_one(
             # cyl_b: also apply the surface-of-revolution radial-Jacobian weighting
             # (axis y=1) that the J/rho fills use -- tests whether the cylindrical
             # mirror is 2nd-order-accurate enough to restore the near-wall curl.
+            # quad_gather: use the 2nd-order even-reflection + quadratic fluid-only
+            # gather (the C++ port of the validated --extrap-b prototype).
             warpx.hybrid_apply_eb_boundary_to_face_field(
-                "Bfield_fp", 0, True, 1.0, cyl_b, 1
+                "Bfield_fp", 0, True, 1.0, cyl_b, 1, quad_gather
             )
         warpx.hybrid_calculate_plasma_current()  # curl(B)/mu0 - J_ext + EB fill
         warpx.hybrid_solve_e(True)  # algebraic Ohm E (= eta J in vacuum) + EB fill
@@ -293,10 +303,13 @@ def main_driver(
     cyl_b=False,
     extrap_b=False,
     extrap_band=2.0,
+    quad_gather=False,
+    prod_bfill=False,
 ):
     os.makedirs(workdir, exist_ok=True)
     tag = (
         f"{grid_type}{'_conf' if conformal else ''}{'_mb' if mirror_b else ''}"
+        f"{'_qg' if quad_gather else ''}{'_pb' if prod_bfill else ''}"
         f"{'_cyl' if cyl_b else ''}{'_ex' if extrap_b else ''}{'_cb' if continue_b else ''}"
     )
 
@@ -327,6 +340,10 @@ def main_driver(
         if extrap_b:
             cmd.append("--extrap-b")
             cmd += ["--extrap-band", str(extrap_band)]
+        if quad_gather:
+            cmd.append("--quad-gather")
+        if prod_bfill:
+            cmd.append("--prod-bfill")
         print(f"[run] N={N} ({tag}) ...", flush=True)
         with open(os.path.join(rundir, "log.txt"), "w") as log:
             subprocess.run(
@@ -344,7 +361,8 @@ def main_driver(
     # Per-component, per-shell RMS at each resolution + order between consecutive Ns.
     print(
         f"\n=== ampere_curl_order: grid={grid_type} conformal={conformal} "
-        f"mirror_b={mirror_b} cyl_b={cyl_b} extrap_b={extrap_b} continue_b={continue_b} ==="
+        f"mirror_b={mirror_b} quad_gather={quad_gather} cyl_b={cyl_b} "
+        f"extrap_b={extrap_b} continue_b={continue_b} ==="
     )
     print(
         f"resolutions {resolutions}, h {[round(hs[N], 5) for N in resolutions]}, R_wall={Rw}"
@@ -444,6 +462,18 @@ def main():
         default=2.0,
         help="covered-B extrapolation band (cells)",
     )
+    p.add_argument(
+        "--quad-gather",
+        action="store_true",
+        help="with --mirror-b, use the C++ 2nd-order even-reflection + quadratic "
+        "fluid-only covered-B gather (the port of the --extrap-b prototype)",
+    )
+    p.add_argument(
+        "--prod-bfill",
+        action="store_true",
+        help="exercise the production wiring: set hybrid_pic_model.conformal_b_curl_fill "
+        "so CalculatePlasmaCurrent extends covered B before the curl (no --mirror-b)",
+    )
     p.add_argument("--workdir", default=os.path.join(HERE, "ampere_order_runs"))
     args = p.parse_args()
 
@@ -458,6 +488,8 @@ def main():
             args.cyl_b,
             args.extrap_b,
             args.extrap_band,
+            args.quad_gather,
+            args.prod_bfill,
         )
     else:
         main_driver(
@@ -470,6 +502,8 @@ def main():
             args.cyl_b,
             args.extrap_b,
             args.extrap_band,
+            args.quad_gather,
+            args.prod_bfill,
         )
 
 

@@ -385,6 +385,15 @@ public:
      *  instead of the stair-step approximation. Requires embedded boundaries
      *  and a 3D Cartesian staggered grid. */
     bool m_use_conformal_eb = false;
+    /** If true, extend the magnetic field into the covered cells with a 2nd-order
+     *  quadratic (even-reflection) gather BEFORE the Ampere curl curl(B)->J, so
+     *  the near-wall plasma current (and the Ohm's-law E built from it) is 2nd
+     *  order at a curved wall. Without it the curl reads the staircased covered B
+     *  and the hybrid is only 1st order near a curved wall even though the
+     *  conformal (ECT) B push is 2nd order. Staggered (Yee) grid only -- the
+     *  nodal/collocated quadratic gather is not yet robust and is skipped. Opt-in
+     *  (default off -> byte-identical); intended for use_conformal_eb runs. */
+    bool m_conformal_b_curl_fill = false;
     /** If true, skip the collocated conformal magnetic-field wall treatment
      *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
      *  This reproduces the pre-treatment baseline and isolates the wall fill as

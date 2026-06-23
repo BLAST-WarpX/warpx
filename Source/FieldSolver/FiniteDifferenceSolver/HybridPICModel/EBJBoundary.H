@@ -126,7 +126,8 @@ namespace warpx::hybrid
         EBFillStatus* status_cache = nullptr,
         amrex::Real band_cells = 1.0,
         bool eb_cyl = false,
-        int eb_cyl_axis = 2);
+        int eb_cyl_axis = 2,
+        bool quadratic_gather = false);
 
     /** \brief Enforce an embedded-boundary condition on a nodal scalar field
      * (the hybrid solver's ion charge density and electron pressure).
