@@ -312,7 +312,7 @@ struct InjectorMomentumJuttner
             x1 = 0._rt;
             gamma = 0._rt;
             // This condition is equation 10 in Zenitani,
-            // though x1 is defined differently.            
+            // though x1 is defined differently.
             amrex::Real umag = 0._rt;
             while(umag-gamma <= x1)
             {
