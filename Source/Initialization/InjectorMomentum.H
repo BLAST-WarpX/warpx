@@ -411,11 +411,8 @@ private:
 // struct whose getMomentum returns local momentum computed from parser.
 struct InjectorMomentumParser
 {
-    InjectorMomentumParser (amrex::ParserExecutor<3> const& a_ux_parser,
-                            amrex::ParserExecutor<3> const& a_uy_parser,
-                            amrex::ParserExecutor<3> const& a_uz_parser) noexcept
-        : m_ux_parser(a_ux_parser), m_uy_parser(a_uy_parser),
-          m_uz_parser(a_uz_parser) {}
+    explicit InjectorMomentumParser (GetVelocityVector const& a_velocity) noexcept
+        : m_velocity(a_velocity) {}
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -423,7 +420,7 @@ struct InjectorMomentumParser
     getMomentum (amrex::Real x, amrex::Real y, amrex::Real z,
                  amrex::RandomEngine const&) const noexcept
     {
-        return amrex::XDim3{m_ux_parser(x,y,z),m_uy_parser(x,y,z),m_uz_parser(x,y,z)};
+        return m_velocity(x,y,z);
     }
 
     [[nodiscard]]
@@ -431,10 +428,10 @@ struct InjectorMomentumParser
     amrex::XDim3
     getBulkMomentum (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
     {
-        return amrex::XDim3{m_ux_parser(x,y,z),m_uy_parser(x,y,z),m_uz_parser(x,y,z)};
+        return m_velocity(x,y,z);
     }
 
-    amrex::ParserExecutor<3> m_ux_parser, m_uy_parser, m_uz_parser;
+    GetVelocityVector m_velocity;
 };
 
 // Base struct for momentum injector.
@@ -458,11 +455,9 @@ struct InjectorMomentum
 
     // This constructor stores a InjectorMomentumParser in union object.
     InjectorMomentum (InjectorMomentumParser* t,
-                      amrex::ParserExecutor<3> const& a_ux_parser,
-                      amrex::ParserExecutor<3> const& a_uy_parser,
-                      amrex::ParserExecutor<3> const& a_uz_parser)
+                      GetVelocityVector const& a_velocity)
         : type(Type::parser),
-          object(t, a_ux_parser, a_uy_parser, a_uz_parser)
+          object(t, a_velocity)
     { }
 
     // This constructor stores a InjectorMomentumGaussian in union object.
@@ -654,10 +649,8 @@ private:
                 GetTemperature const& t, GetVelocity const& b) noexcept
             : juttner(t,b) {}
         Object (InjectorMomentumParser*,
-                amrex::ParserExecutor<3> const& a_ux_parser,
-                amrex::ParserExecutor<3> const& a_uy_parser,
-                amrex::ParserExecutor<3> const& a_uz_parser) noexcept
-            : parser(a_ux_parser, a_uy_parser, a_uz_parser) {}
+                GetVelocityVector const& a_velocity) noexcept
+            : parser(a_velocity) {}
         InjectorMomentumConstant constant;
         InjectorMomentumGaussian gaussian;
         InjectorMomentumGaussianFlux gaussianflux;
