@@ -180,12 +180,18 @@ computeEffectivePotentialPhi (
                     linop_nodelap->setEBDirichlet(boundary_handler.getPhiEB(current_time.value()));
                 }
             }
+            if (is_rz) {
+                linop_nodelap->setRZ(true);
+            }
             linop_nodelap->setSigma(lev, sigma);
             linop = std::move(linop_nodelap);
 #endif
         }
         else if (is_rz)
         {
+            amrex::Abort("The effective potential ES solver is not supported in RZ without EBs.");
+            // The above assert can be removed once AMReX::MLEBNodeFDLaplacian
+            // is extended to support a sigma MF when not compiled with EB support.
             auto linop_nodelap = std::make_unique<amrex::MLEBNodeFDLaplacian>();
             linop_nodelap->define(
                 amrex::Vector<amrex::Geometry>{geom[lev]},
