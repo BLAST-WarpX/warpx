@@ -517,8 +517,13 @@ void HybridPICModel::BfieldEvolve (
     int n_attempts = 0;
     int n_accepted = 0;
 
+    // Step the magnetic field forward (from t -> t + dt_half) using the user
+    // specified integration scheme. The loop is set up such that the timestep
+    // for a given step (dt_sub) can be modified within the loop, i.e.,
+    // adaptive timestepping.    
     while (t < dt_half)
     {
+        // Adjust size of the last substep, so as to land exactly at t+dt_half.
         if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
         bool step_succeeded = true;
         amrex::Real step_change_factor = 1.0_rt;
