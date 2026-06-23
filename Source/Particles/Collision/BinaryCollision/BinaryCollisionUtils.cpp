@@ -151,7 +151,7 @@ namespace BinaryCollisionUtils{
             auto scattering_angle_model =
                 (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
                  process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
-                ? ScatteringAngleModel::Forward : ScatteringAngleModel::Default;
+                ? ScatteringAngleModel::Forward : ScatteringAngleModel::Isotropic;
             pp_collision_name.query_enum_sloppy(
                 scattering_process + "_scattering_angle_model", scattering_angle_model, "-_");
 

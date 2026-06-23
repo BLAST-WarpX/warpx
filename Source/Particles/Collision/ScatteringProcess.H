@@ -35,7 +35,7 @@ public:
                 const std::string& scattering_process,
                 const std::string& cross_section_file,
                 amrex::ParticleReal energy,
-                ScatteringAngleModel scattering_angle_model = ScatteringAngleModel::Default
+                ScatteringAngleModel scattering_angle_model
                 );
 
     template <typename InputVector>
@@ -44,7 +44,7 @@ public:
                 const InputVector&& energies,
                 const InputVector&& sigmas,
                 amrex::ParticleReal energy,
-                ScatteringAngleModel scattering_angle_model = ScatteringAngleModel::Default
+                ScatteringAngleModel scattering_angle_model
                 );
 
     ~ScatteringProcess() = default;
@@ -109,7 +109,7 @@ public:
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
-        ScatteringAngleModel m_scattering_angle_model = ScatteringAngleModel::Default;
+        ScatteringAngleModel m_scattering_angle_model = ScatteringAngleModel::Isotropic;
     };
 
     [[nodiscard]]
