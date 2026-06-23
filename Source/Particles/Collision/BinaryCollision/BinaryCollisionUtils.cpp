@@ -137,8 +137,7 @@ namespace BinaryCollisionUtils{
             }
 
             // The angular behavior of a process is controlled by the per-process
-            // `<process>_scattering_angle_model` argument. (The legacy `back`/`forward` process
-            // names are rejected in CollisionBase::BackwardCompatibility.)
+            // `<process>_scattering_angle_model` argument.
             // The default angle model depends on the process: product-producing processes
             // (charge exchange and two-product reactions) default to forward scattering, while
             // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
