@@ -24,6 +24,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -218,6 +219,8 @@ WarpX::InitFromCheckpoint ()
         // Do this here so that the MultiFabs can be included in the diagnostics
         // and can be read in from the restart data.
         mypc->AllocData();
+
+        ExecutePythonCallback("allocdata");
 
         mypc->ReadHeader(is);
         const int n_species = mypc->nSpecies();

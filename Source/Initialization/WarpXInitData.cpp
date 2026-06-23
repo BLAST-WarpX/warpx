@@ -1013,6 +1013,7 @@ WarpX::InitFromScratch ()
 
     InitPML();
 
+    ExecutePythonCallback("allocdata");
 }
 
 void
