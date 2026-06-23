@@ -282,11 +282,12 @@ struct InjectorMomentumJuttner
             ny = u_mean.y/umean_mag;
             nz = u_mean.z/umean_mag;
         }
-        // Sample the rest-frame momentum vector e = (ex,ey,ez) and the corresponding
-        // Lorentz factor gamma. The Maxwell-Juttner distribution is isotropic in the
-        // rest frame, so e is sampled directly in the simulation axes; the bulk drift
-        // is then applied along the boost direction n further below.
-        amrex::Real ex = 0._rt, ey = 0._rt, ez = 0._rt, gamma = 0._rt;
+        // Sample the rest-frame momentum vector u = (u[0],u[1],u[2]) and the
+        // corresponding Lorentz factor gamma. The Maxwell-Juttner distribution is
+        // isotropic in the rest frame, so u is sampled directly in the simulation
+        // axes; the bulk drift is then applied along the boost direction n further below.
+        amrex::Real u [3] = {0._rt, 0._rt, 0._rt};
+        amrex::Real gamma = 0._rt;
         // The Sobol rejection method used below becomes inefficient at low
         // temperature: its acceptance efficiency is K_2(1/theta)/(2 theta^2),
         // which tends to zero as theta -> 0
@@ -297,10 +298,10 @@ struct InjectorMomentumJuttner
         // (i.e. sqrt(kB*T/(m*c^2)), in units of c).
         if (theta < 0.1_rt) {
             amrex::Real const u_th = std::sqrt(theta);
-            ex = amrex::RandomNormal(0._rt, u_th, engine);
-            ey = amrex::RandomNormal(0._rt, u_th, engine);
-            ez = amrex::RandomNormal(0._rt, u_th, engine);
-            gamma = std::sqrt(1._rt + ex*ex + ey*ey + ez*ez);
+            u[0] = amrex::RandomNormal(0._rt, u_th, engine);
+            u[1] = amrex::RandomNormal(0._rt, u_th, engine);
+            u[2] = amrex::RandomNormal(0._rt, u_th, engine);
+            gamma = std::sqrt(1._rt + u[0]*u[0] + u[1]*u[1] + u[2]*u[2]);
         } else {
             // Sobol method for sampling the rest-frame momentum magnitude umag,
             // from Zenitani et al. Phys. Plasmas 22, 042116, 2015.
@@ -319,19 +320,19 @@ struct InjectorMomentumJuttner
             amrex::Real const cos_theta = 2._rt*amrex::Random(engine) - 1._rt;
             amrex::Real const sin_theta = std::sqrt(1._rt - cos_theta*cos_theta);
             auto const [sin_phi, cos_phi] = amrex::Math::sincos(2._rt*MathConst::pi*amrex::Random(engine));
-            ex = umag*sin_theta*cos_phi;
-            ey = umag*sin_theta*sin_phi;
-            ez = umag*cos_theta;
+            u[0] = umag*sin_theta*cos_phi;
+            u[1] = umag*sin_theta*sin_phi;
+            u[2] = umag*cos_theta;
         }
         if (umean_mag == 0._rt) {
-            return amrex::XDim3 {ex, ey, ez};
+            return amrex::XDim3 {u[0], u[1], u[2]};
         }
-        // Decompose e into the component parallel to the boost direction (u_par)
-        // and the perpendicular part (e_perp = e - u_par*n).
-        amrex::Real u_par = ex*nx + ey*ny + ez*nz;
-        amrex::Real const ex_perp = ex - u_par*nx;
-        amrex::Real const ey_perp = ey - u_par*ny;
-        amrex::Real const ez_perp = ez - u_par*nz;
+        // Decompose u into the component parallel to the boost direction (u_par)
+        // and the perpendicular part (u_perp = u - u_par*n).
+        amrex::Real u_par = u[0]*nx + u[1]*ny + u[2]*nz;
+        amrex::Real const ux_perp = u[0] - u_par*nx;
+        amrex::Real const uy_perp = u[1] - u_par*ny;
+        amrex::Real const uz_perp = u[2] - u_par*nz;
         // The following condition is equation 32 in Zenitani, called
         // The flipping method. It transforms the integral: d3x' -> d3x
         // where d3x' is the volume element for positions in the boosted frame.
@@ -353,7 +354,7 @@ struct InjectorMomentumJuttner
         // where d3u' is the volume element for momentum in the boosted frame.
         // It only affects the component along the boost direction.
         u_par = gamma_bulk*(u_par + gamma*beta);
-        return amrex::XDim3 {ex_perp + u_par*nx, ey_perp + u_par*ny, ez_perp + u_par*nz};
+        return amrex::XDim3 {ux_perp + u_par*nx, uy_perp + u_par*ny, uz_perp + u_par*nz};
     }
 
     [[nodiscard]]
