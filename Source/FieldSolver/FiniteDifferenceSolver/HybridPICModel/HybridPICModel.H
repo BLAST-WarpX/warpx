@@ -130,7 +130,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        int step, amrex::Real dt_half, SubcyclingHalf subcycling_half,
+        amrex::Real dt_half, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void BfieldEvolve (
@@ -139,7 +139,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        int step, amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+        amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void BfieldEvolveRK4 (

@@ -470,7 +470,7 @@ void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    int step, amrex::Real dt_half, SubcyclingHalf subcycling_half,
+    amrex::Real dt_half, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
@@ -478,7 +478,7 @@ void HybridPICModel::BfieldEvolve (
     {
         BfieldEvolve(
             Bfield, Efield, Jfield, rhofield, eb_update_E,
-            step, dt_half, lev, subcycling_half, ng, nodal_sync
+            dt_half, lev, subcycling_half, ng, nodal_sync
         );
     }
 }
@@ -489,11 +489,10 @@ void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    int step, amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+    amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
-    amrex::ignore_unused(step);
-    const bool use_rkf45 = m_use_rkf45; // use step to get use_rkf45 with intervals
+    const bool use_rkf45 = m_use_rkf45;
     // Make copies of the current B-field multifabs (at t = n) since the
     // starting B-field is needed for the integration logic
     std::array< MultiFab, 3 > B_old;
@@ -511,6 +510,10 @@ void HybridPICModel::BfieldEvolve (
     int n_attempts = 0;
     int n_accepted = 0;
 
+    // Step the magnetic field forward (from t -> t + dt_half) using the user
+    // specified integration scheme. The loop is set up such that the timestep
+    // for a given step (dt_sub) can be modified within the loop, i.e.,
+    // adaptive timestepping.
     while (t < dt_half)
     {
         // Adjust size of the last substep, so as to land exactly at t+dt_half.

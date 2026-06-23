@@ -100,7 +100,6 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp, rho_fp_temp,
         m_eb_update_E,
-        getistep(0),
         0.5_rt*dt[0],
         SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
         WarpX::sync_nodal_points
@@ -132,7 +131,6 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         rho_fp_temp,
         m_eb_update_E,
-        getistep(0),
         0.5_rt*dt[0],
         SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
         WarpX::sync_nodal_points
