@@ -137,13 +137,8 @@ namespace BinaryCollisionUtils{
             }
 
             // The angular behavior of a process is controlled by the per-process
-            // `<process>_scattering_angle_model` argument.
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                scattering_process != "back" && scattering_process != "forward",
-                "The scattering process names 'back' and 'forward' are no longer supported. "
-                "Use 'elastic' or 'excitationX' with '" + collision_name +
-                ".<process>_scattering_angle_model = backward' or '= forward' instead.");
-
+            // `<process>_scattering_angle_model` argument. (The legacy `back`/`forward` process
+            // names are rejected in CollisionBase::BackwardCompatibility.)
             // The default angle model depends on the process: product-producing processes
             // (charge exchange and two-product reactions) default to forward scattering, while
             // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
