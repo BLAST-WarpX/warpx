@@ -726,8 +726,8 @@ WarpX::ReadParameters ()
         maxlevel_extEMfield_init = maxLevel();
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
+        // query_enum_sloppy with "-" needed to map "labframe-electromagnetostatic" to "LabFrameElectroMagnetostatic"
         pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-");
-        // query_enum_sloppy with "-" needed to map "labframe-electromagnetostatic" to the enum value
         // if an electrostatic solver is used, set the Maxwell solver to None
         if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
@@ -1304,8 +1304,8 @@ WarpX::ReadParameters ()
 
         // Query algo.field_gathering from input, set field_gathering_algo to
         // "default" if not found (default defined in Utils/WarpXAlgorithmSelection.cpp)
+        // query_enum_sloppy with "-" needed to map e.g. "energy-conserving" to "EnergyConserving"
         pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-");
-        // query_enum_sloppy with "-" needed to map "energy-conserving" to "Algo::EnergyConserving"
 
         // Set default field gathering algorithm for hybrid grids (momentum-conserving)
         std::string tmp_algo;
@@ -1594,8 +1594,8 @@ WarpX::ReadParameters ()
         // Integer that corresponds to the order of the PSATD solution
         // (whether the PSATD equations are derived from first-order or
         // second-order solution)
+        // query_enum_sloppy with "-" needed to map "first-order" to "FirstOrder"
         pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-");
-        // query_enum_sloppy with "-" needed to map "first-order" to the enum value
 
         std::string JRhom_input;
         pp_psatd.query("JRhom", JRhom_input);

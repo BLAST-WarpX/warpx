@@ -52,6 +52,7 @@ namespace warpx::boundary_conditions
         const auto pp_boundary = amrex::ParmParse{"boundary"};
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            // query_enum_sloppy with "_" needed to map "absorbing_silver_mueller" to "Absorbing_SilverMueller"
             pp_boundary.query_enum_sloppy("field_lo",
                 field_boundary_lo[idim], "_", idim);
             pp_boundary.query_enum_sloppy("field_hi",
