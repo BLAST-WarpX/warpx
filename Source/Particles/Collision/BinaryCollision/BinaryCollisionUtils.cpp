@@ -141,8 +141,8 @@ namespace BinaryCollisionUtils{
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 scattering_process != "back" && scattering_process != "forward",
                 "The scattering process names 'back' and 'forward' are no longer supported. "
-                "Use 'elastic' with '" + collision_name +
-                ".elastic_scattering_angle_model = backward' or '= forward' instead.");
+                "Use 'elastic' or 'excitationX' with '" + collision_name +
+                ".<process>_scattering_angle_model = backward' or '= forward' instead.");
 
             // The default angle model depends on the process: product-producing processes
             // (charge exchange and two-product reactions) default to forward scattering, while

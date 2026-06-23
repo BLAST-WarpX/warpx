@@ -99,18 +99,13 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
         std::string cross_section_file;
         pp_collision_name.query(kw_cross_section, cross_section_file);
 
-        // The energy cost (penalty) of the process, in eV. It is required for excitation
-        // and ionization, and optional otherwise (e.g. an elastic channel with a fixed
-        // energy loss, or forward scattering with a loss).
         amrex::ParticleReal energy = 0.0;
-        const std::string kw_energy = scattering_process + "_energy";
+        // if the scattering process is excitation or ionization get the
+        // energy associated with that process
         if (scattering_process.find("excitation") != std::string::npos ||
             scattering_process.find("ionization") != std::string::npos) {
+            const std::string kw_energy = scattering_process + "_energy";
             utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-        else {
-            utils::parser::queryWithParser(
                 pp_collision_name, kw_energy.c_str(), energy);
         }
 
@@ -119,8 +114,8 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             scattering_process != "back" && scattering_process != "forward",
             "The scattering process names 'back' and 'forward' are no longer supported. "
-            "Use 'elastic' with '" + collision_name +
-            ".elastic_scattering_angle_model = backward' or '= forward' instead.");
+            "Use 'elastic' or 'excitationX' with '" + collision_name +
+            ".<process>_scattering_angle_model = backward' or '= forward' instead.");
 
         // The default angle model depends on the process: product-producing processes
         // (charge exchange and two-product reactions) default to forward scattering, while
