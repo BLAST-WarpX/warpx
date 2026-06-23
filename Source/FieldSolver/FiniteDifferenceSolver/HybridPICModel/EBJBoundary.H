@@ -41,25 +41,34 @@ namespace warpx::hybrid
 
         /** 2nd-order gather weight cache (quadratic_gather only). The gather
          * weights are geometry-only (the image point, the per-component
-         * staggering, and which window cells are fluid -- not the field
-         * values), so they are built once and reused every substage. For each
-         * fill-target component c, \c gslot maps an S_FILL cell to its compact
-         * band-sparse slot (or -1); \c gweights[c] packs, per slot, the
-         * QUAD_NB-vector g = M^{-1} e0 for each of the 3 gathered components, so
-         * the per-gather value at apply is g . b (b = sum of the local-quadratic
-         * basis times the field over the window) -- no per-substage matrix build
-         * or Cholesky. Memory scales with the wall band, not the volume. */
+         * staggering, and which window cells are fluid -- not the field values),
+         * so they are built once (\c weights_built) and reused every substage;
+         * invalidated on regrid via reset(). For each fill-target component c,
+         * \c gslot maps an S_FILL cell to its compact band-sparse slot (or -1).
+         * The fill combines the 3 gathered field components at the image point;
+         * for each slot and each gathered component g the gather collapses to a
+         * sparse dot value_g = sum_t w * field_g(fill_cell + offset). \c gtap_n[c]
+         * holds the per-(slot,g) tap count; \c gtap_off[c]/\c gtap_w[c] pack, per
+         * (slot,g) and padded to \c maxtap, the (packed neighbour offset, weight)
+         * of each tap. The apply therefore does no matrix build, Cholesky, or
+         * basis evaluation. Memory scales with the wall band, not the volume. */
         bool weights_built = false;
+        int maxtap = 0;
         std::array<int, 3> n_slots = {{0, 0, 0}};
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> gslot;
-        std::array<amrex::Gpu::DeviceVector<amrex::Real>, 3> gweights;
+        std::array<amrex::Gpu::DeviceVector<int>, 3> gtap_n;
+        std::array<amrex::Gpu::DeviceVector<int>, 3> gtap_off;
+        std::array<amrex::Gpu::DeviceVector<amrex::Real>, 3> gtap_w;
 
         [[nodiscard]] bool empty () const { return !status[0]; }
         void reset () {
             for (auto& s : status) { s.reset(); }
             for (auto& s : gslot) { s.reset(); }
-            for (auto& g : gweights) { g.clear(); }
+            for (auto& g : gtap_n) { g.clear(); }
+            for (auto& g : gtap_off) { g.clear(); }
+            for (auto& g : gtap_w) { g.clear(); }
             n_slots = {{0, 0, 0}};
+            maxtap = 0;
             weights_built = false;
             n_pending = 0;
         }

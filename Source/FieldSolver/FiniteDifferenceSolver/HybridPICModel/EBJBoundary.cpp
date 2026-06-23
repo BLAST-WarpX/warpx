@@ -323,6 +323,135 @@ namespace
         return {value, static_cast<amrex::Real>(count)};  // fit value at pos (u=0)
     }
 
+    // --- compact per-tap weight cache for the quadratic gather --------------
+    // The fit value g.b is linear in the field: value = sum_tap (g.p(tap))*f_tap.
+    // Caching the collapsed per-tap weight w_tap = g.p(tap) and the tap location
+    // turns every later apply into a sparse dot product -- no window matrix build,
+    // Cholesky, or basis evaluation. Tap locations are stored as a neighbour
+    // offset (di,dj,dk) from the fill cell, packed into one int (6 bits/axis,
+    // range [-32,31], comfortably covering the image window for any sane band).
+    constexpr int TAP_HALF = 32;
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    int pack_tap_offset (int di, int dj, int dk) noexcept {
+        return (di + TAP_HALF) | ((dj + TAP_HALF) << 6) | ((dk + TAP_HALF) << 12);
+    }
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void unpack_tap_offset (int code, int& di, int& dj, int& dk) noexcept {
+        di = (code & 63) - TAP_HALF;
+        dj = ((code >> 6) & 63) - TAP_HALF;
+        dk = ((code >> 12) & 63) - TAP_HALF;
+    }
+
+    // Count the fluid taps a quadratic gather at `pos` would use (the +/-2 window
+    // around the staggered image cell). Used once at build time to size the cache.
+    template <typename F>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    int count_fluid_window (
+        amrex::Array4<amrex::Real const> const& a, F const& fluid,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi) noexcept
+    {
+        using namespace amrex::literals;
+        constexpr int W = 2;
+        int ic[AMREX_SPACEDIM];
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            ic[d] = static_cast<int>(std::floor((pos[d]-plo[d])*dxi[d] - stag[d] + 0.5_rt));
+        }
+        int count = 0;
+#if defined(WARPX_DIM_3D)
+        for (int dk = -W; dk <= W; ++dk) { int const kk = ic[2]+dk; if (kk < a.begin[2] || kk >= a.end[2]) { continue; }
+        for (int dj = -W; dj <= W; ++dj) { int const jj = ic[1]+dj; if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+        for (int di = -W; di <= W; ++di) { int const ii = ic[0]+di; if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+            if (fluid(ii, jj, kk)) { ++count; } } } }
+#else
+        for (int dj = -W; dj <= W; ++dj) { int const jj = ic[1]+dj; if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+        for (int di = -W; di <= W; ++di) { int const ii = ic[0]+di; if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+            if (fluid(ii, jj, 0)) { ++count; } } }
+#endif
+        return count;
+    }
+
+    // Build-time: given the solved geometry weights g = M^{-1} e0, re-traverse the
+    // window and store, per fluid tap, the packed offset from the fill cell and the
+    // collapsed weight w_tap = g.p(tap). Writes up to `maxtap` taps and sets
+    // *ntap_out; on overflow (or an out-of-range offset) it sets *ntap_out = 0 so
+    // the apply falls back to the live gather for that target.
+    template <typename F>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void emit_taps (
+        amrex::Real const* g, F const& fluid,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
+        int ifill, int jfill, int kfill,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+        amrex::Array4<amrex::Real const> const& a,
+        int* tap_off, amrex::Real* tap_w, int* ntap_out, int maxtap) noexcept
+    {
+        using namespace amrex::literals;
+        constexpr int W = 2;
+        amrex::Real lc[AMREX_SPACEDIM];
+        int ic[AMREX_SPACEDIM];
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            lc[d] = (pos[d]-plo[d])*dxi[d] - stag[d];
+            ic[d] = static_cast<int>(std::floor(lc[d] + 0.5_rt));
+        }
+        int t = 0;
+        bool ok = true;
+        auto emit = [&] (int ii, int jj, int kk) {
+            amrex::Real const u = ii - lc[0];
+#if defined(WARPX_DIM_3D)
+            amrex::Real const v = jj - lc[1];
+            amrex::Real const w = kk - lc[2];
+            amrex::Real const p[QUAD_NB] =
+                {1._rt, u, v, w, u*u, v*v, w*w, u*v, u*w, v*w};
+#else
+            amrex::Real const v = jj - lc[1];
+            amrex::Real const p[QUAD_NB] = {1._rt, u, v, u*u, u*v, v*v};
+            amrex::ignore_unused(kk);
+#endif
+            amrex::Real wt = 0._rt;
+            for (int r = 0; r < QUAD_NB; ++r) { wt += g[r]*p[r]; }
+            int const di = ii - ifill, dj = jj - jfill, dk = kk - kfill;
+            if (t >= maxtap || di <= -TAP_HALF || di >= TAP_HALF
+                || dj <= -TAP_HALF || dj >= TAP_HALF
+                || dk <= -TAP_HALF || dk >= TAP_HALF) { ok = false; return; }
+            tap_off[t] = pack_tap_offset(di, dj, dk);
+            tap_w[t] = wt;
+            ++t;
+        };
+#if defined(WARPX_DIM_3D)
+        for (int dk = -W; dk <= W; ++dk) { int const kk = ic[2]+dk; if (kk < a.begin[2] || kk >= a.end[2]) { continue; }
+        for (int dj = -W; dj <= W; ++dj) { int const jj = ic[1]+dj; if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+        for (int di = -W; di <= W; ++di) { int const ii = ic[0]+di; if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+            if (fluid(ii, jj, kk)) { emit(ii, jj, kk); } } } }
+#else
+        for (int dj = -W; dj <= W; ++dj) { int const jj = ic[1]+dj; if (jj < a.begin[1] || jj >= a.end[1]) { continue; }
+        for (int di = -W; di <= W; ++di) { int const ii = ic[0]+di; if (ii < a.begin[0] || ii >= a.end[0]) { continue; }
+            if (fluid(ii, jj, 0)) { emit(ii, jj, 0); } } }
+#endif
+        *ntap_out = ok ? t : 0;
+    }
+
+    // Apply: collapsed sparse dot value = sum_tap w_tap * field(fill_cell + offset).
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real gather_tap_apply (
+        amrex::Array4<amrex::Real const> const& a, int n,
+        int ifill, int jfill, int kfill,
+        int const* tap_off, amrex::Real const* tap_w, int ntap) noexcept
+    {
+        using namespace amrex::literals;
+        amrex::Real value = 0._rt;
+        for (int t = 0; t < ntap; ++t) {
+            int di, dj, dk;
+            unpack_tap_offset(tap_off[t], di, dj, dk);
+            value += tap_w[t] * a(ifill+di, jfill+dj, kfill+dk, n);
+        }
+        return value;
+    }
+
     // Classification of every staggered point for the embedded-boundary fill
     constexpr int S_SOLUTION = 0;  //!< solution domain: gather source, never written
     constexpr int S_FILL     = 1;  //!< fill target with a well-posed image stencil
@@ -676,6 +805,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 "quadratic_gather weight cache assumes a single-component field");
         }
         if (cache_weights && !st.weights_built) {
+            // Pass 1: assign every S_FILL target a compact band-sparse slot.
             for (int c = 0; c < 3; ++c) {
                 st.gslot[c] = std::make_unique<amrex::iMultiFab>(
                     st.status[c]->boxArray(), st.status[c]->DistributionMap(),
@@ -695,7 +825,58 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     });
                 }
                 st.n_slots[c] = counter.dataValue();
-                st.gweights[c].resize(std::size_t(st.n_slots[c]) * 3 * QUAD_NB);
+                st.gtap_n[c].resize(std::size_t(st.n_slots[c]) * 3);
+            }
+            // Pass 2: count the fluid taps per (slot, gathered component) and find
+            // the global max, so the compact (offset, weight) buffers are sized
+            // exactly (no per-cell padding to the full window).
+            amrex::Gpu::DeviceScalar<int> maxtap_s(0);
+            int* const maxtap_ptr = maxtap_s.dataPtr();
+            for (int c = 0; c < 3; ++c) {
+                auto const stag_own = stag[c];
+                auto const stag_x = stag[0];
+                auto const stag_y = stag[1];
+                auto const stag_z = stag[2];
+                int* const gtn = st.gtap_n[c].dataPtr();
+                for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                    amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+                    auto const& stat = st.status[c]->const_array(mfi);
+                    auto const& stat_x = st.status[0]->const_array(mfi);
+                    auto const& stat_y = st.status[1]->const_array(mfi);
+                    auto const& stat_z = st.status[2]->const_array(mfi);
+                    auto const& Jx_l = field[0]->const_array(mfi);
+                    auto const& Jy_l = field[1]->const_array(mfi);
+                    auto const& Jz_l = field[2]->const_array(mfi);
+                    auto const& phi = distance_to_eb.const_array(mfi);
+                    auto const& slotarr = st.gslot[c]->const_array(mfi);
+                    amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                    {
+                        if (stat(i, j, k) != S_FILL) { return; }
+                        auto const gm = ::mirror_geom(i, j, k, stag_own, phi,
+                            plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim;
+                        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                            xim[d] = gm.xe[d] - 2._rt*gm.s*gm.nv[d];
+                        }
+                        auto const in_sol_x = [&] (int ig, int jg, int kg) { return stat_x(ig, jg, kg) == S_SOLUTION; };
+                        auto const in_sol_y = [&] (int ig, int jg, int kg) { return stat_y(ig, jg, kg) == S_SOLUTION; };
+                        auto const in_sol_z = [&] (int ig, int jg, int kg) { return stat_z(ig, jg, kg) == S_SOLUTION; };
+                        int const slot = slotarr(i, j, k);
+                        int const nx = count_fluid_window(Jx_l, in_sol_x, xim, stag_x, plo, dxi);
+                        int const ny = count_fluid_window(Jy_l, in_sol_y, xim, stag_y, plo, dxi);
+                        int const nz = count_fluid_window(Jz_l, in_sol_z, xim, stag_z, plo, dxi);
+                        gtn[slot*3 + 0] = nx;
+                        gtn[slot*3 + 1] = ny;
+                        gtn[slot*3 + 2] = nz;
+                        amrex::Gpu::Atomic::Max(maxtap_ptr, amrex::max(nx, amrex::max(ny, nz)));
+                    });
+                }
+            }
+            st.maxtap = maxtap_s.dataValue();
+            for (int c = 0; c < 3; ++c) {
+                std::size_t const sz = std::size_t(st.n_slots[c]) * 3 * std::size_t(st.maxtap);
+                st.gtap_off[c].resize(sz);
+                st.gtap_w[c].resize(sz);
             }
         }
         bool const use_cached_weights = cache_weights && st.weights_built;
@@ -712,7 +893,10 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             auto const stag_x = stag[0];
             auto const stag_y = stag[1];
             auto const stag_z = stag[2];
-            amrex::Real* const gw_ptr = cache_weights ? st.gweights[c].dataPtr() : nullptr;
+            int* const gtn_ptr = cache_weights ? st.gtap_n[c].dataPtr() : nullptr;
+            int* const goff_ptr = cache_weights ? st.gtap_off[c].dataPtr() : nullptr;
+            amrex::Real* const gtw_ptr = cache_weights ? st.gtap_w[c].dataPtr() : nullptr;
+            int const maxtap = st.maxtap;
 
             for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                 amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
@@ -766,22 +950,46 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     }
 
                     amrex::Real Jx_im, Jy_im, Jz_im;
-                    if (quadratic_gather) {
-                        // Cached path: read (or, on the build pass, write) the
-                        // geometry-only gather weights g = M^{-1} e0 for each of
-                        // the 3 gathered components from this target's slot.
-                        amrex::Real* gx = nullptr;
-                        amrex::Real* gy = nullptr;
-                        amrex::Real* gz = nullptr;
+                    if (quadratic_gather && use_cached_weights) {
+                        // Apply: collapsed sparse dot per gathered component from
+                        // the prebuilt per-tap (offset, weight) cache; no matrix
+                        // build, Cholesky, or basis evaluation. Fall back to the
+                        // linear gather where the cache is empty (degenerate fit).
+                        int const slot = slotarr(i, j, k);
+                        int const* const off = goff_ptr;
+                        amrex::Real const* const wt = gtw_ptr;
+                        int const nx = gtn_ptr[slot*3 + 0];
+                        int const ny = gtn_ptr[slot*3 + 1];
+                        int const nz = gtn_ptr[slot*3 + 2];
+                        std::size_t const bx = (std::size_t(slot)*3 + 0)*maxtap;
+                        std::size_t const by = (std::size_t(slot)*3 + 1)*maxtap;
+                        std::size_t const bz = (std::size_t(slot)*3 + 2)*maxtap;
+                        Jx_im = (nx > 0) ? gather_tap_apply(Jx_l, n, i, j, k, off+bx, wt+bx, nx)
+                                         : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
+                        Jy_im = (ny > 0) ? gather_tap_apply(Jy_l, n, i, j, k, off+by, wt+by, ny)
+                                         : amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
+                        Jz_im = (nz > 0) ? gather_tap_apply(Jz_l, n, i, j, k, off+bz, wt+bz, nz)
+                                         : amrex::get<0>(gather_staggered_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n));
+                    } else if (quadratic_gather) {
+                        // Build (or non-cached live): solve the geometry weights g,
+                        // and on the cache build also emit the collapsed per-tap
+                        // (offset, weight) so later substages take the apply path.
+                        amrex::Real gx[QUAD_NB], gy[QUAD_NB], gz[QUAD_NB];
+                        auto const [vx, cx] = gather_quadratic_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n, gx, false);
+                        auto const [vy, cy] = gather_quadratic_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n, gy, false);
+                        auto const [vz, cz] = gather_quadratic_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n, gz, false);
                         if (cache_weights) {
-                            auto* const base = gw_ptr + std::size_t(slotarr(i, j, k))*3*QUAD_NB;
-                            gx = base; gy = base + QUAD_NB; gz = base + 2*QUAD_NB;
+                            int const slot = slotarr(i, j, k);
+                            std::size_t const bx = (std::size_t(slot)*3 + 0)*maxtap;
+                            std::size_t const by = (std::size_t(slot)*3 + 1)*maxtap;
+                            std::size_t const bz = (std::size_t(slot)*3 + 2)*maxtap;
+                            if (cx > 0._rt) { emit_taps(gx, in_sol_x, xim, stag_x, i, j, k, plo, dxi, Jx_l, goff_ptr+bx, gtw_ptr+bx, gtn_ptr+slot*3+0, maxtap); }
+                            else { gtn_ptr[slot*3 + 0] = 0; }
+                            if (cy > 0._rt) { emit_taps(gy, in_sol_y, xim, stag_y, i, j, k, plo, dxi, Jy_l, goff_ptr+by, gtw_ptr+by, gtn_ptr+slot*3+1, maxtap); }
+                            else { gtn_ptr[slot*3 + 1] = 0; }
+                            if (cz > 0._rt) { emit_taps(gz, in_sol_z, xim, stag_z, i, j, k, plo, dxi, Jz_l, goff_ptr+bz, gtw_ptr+bz, gtn_ptr+slot*3+2, maxtap); }
+                            else { gtn_ptr[slot*3 + 2] = 0; }
                         }
-                        auto const [vx, cx] = gather_quadratic_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n, gx, use_cached_weights);
-                        auto const [vy, cy] = gather_quadratic_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n, gy, use_cached_weights);
-                        auto const [vz, cz] = gather_quadratic_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n, gz, use_cached_weights);
-                        // fall back to the linear gather where the quadratic
-                        // stencil is degenerate (too few fluid points / non-SPD)
                         Jx_im = (cx > 0._rt) ? vx : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
                         Jy_im = (cy > 0._rt) ? vy : amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
                         Jz_im = (cz > 0._rt) ? vz : amrex::get<0>(gather_staggered_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n));
