@@ -953,10 +953,10 @@ WarpX::ReadParameters ()
 
         const auto at_least_one_boundary_is_silver_mueller =
             (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
-                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_SilverMueller;})
+                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             ||
             std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
-                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_SilverMueller;})
+                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             );
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

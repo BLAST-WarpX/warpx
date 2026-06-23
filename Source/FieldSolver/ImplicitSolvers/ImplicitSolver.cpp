@@ -73,7 +73,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
             lbc[i] = LinOpBCType::Dirichlet;
         } else if (a_fbc[i] == FieldBoundaryType::Damped) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
-        } else if (a_fbc[i] == FieldBoundaryType::Absorbing_SilverMueller) {
+        } else if (a_fbc[i] == FieldBoundaryType::Absorbing_Silver_Mueller) {
             ablastr::warn_manager::WMRecordWarning("Implicit solver",
                 "With SilverMueller, in the Curl-Curl preconditioner Symmetry boundary will be used since the full boundary is not yet implemented.",
                 ablastr::warn_manager::WarnPriority::medium);

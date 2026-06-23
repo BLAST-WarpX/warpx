@@ -230,7 +230,7 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, Subcycling
     // E and B are staggered in time, which is only true after the first half-push
     if (lev == 0) {
         if (subcycling_half == SubcyclingHalf::FirstHalf) {
-            if(::isAnyBoundary<FieldBoundaryType::Absorbing_SilverMueller>(field_boundary_lo, field_boundary_hi)){
+            if(::isAnyBoundary<FieldBoundaryType::Absorbing_Silver_Mueller>(field_boundary_lo, field_boundary_hi)){
                 auto Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
                 auto Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, max_level);
                 m_fdtd_solver_fp[0]->ApplySilverMuellerBoundary(

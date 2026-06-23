@@ -316,7 +316,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     val0 = 1.0_rt;
                     val1 = 2.0_rt;
                 }
-                if (bc_type == FieldBoundaryType::Absorbing_SilverMueller) {
+                if (bc_type == FieldBoundaryType::Absorbing_Silver_Mueller) {
                     val0 = 0.5_rt;
                     val1 = 1.0_rt;
                 }
