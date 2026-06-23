@@ -30,7 +30,7 @@ jobs:
       run: |
         .github/workflows/dependencies/gcc_minimal.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -71,7 +71,7 @@ jobs:
       run: |
         .github/workflows/dependencies/gcc.sh 13
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -118,7 +118,7 @@ jobs:
       run: |
         .github/workflows/dependencies/gcc_blaspp_lapackpp.sh 13
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -167,7 +167,7 @@ jobs:
         .github/workflows/dependencies/gcc_minimal.sh
         sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -205,7 +205,7 @@ jobs:
       run: |
         .github/workflows/dependencies/pyfull.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

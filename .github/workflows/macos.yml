@@ -57,7 +57,7 @@ jobs:
         python3 -m pip install --upgrade mpi4py
         python3 -m pip install --upgrade -r Regression/requirements.txt
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/Library/Caches/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

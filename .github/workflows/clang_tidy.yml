@@ -35,7 +35,7 @@ jobs:
         .github/workflows/dependencies/clang.sh 19
     - name: set up cache
       if: ${{ needs.check_changes.outputs.has_non_docs_changes == 'true' }}
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
