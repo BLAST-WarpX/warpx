@@ -464,39 +464,38 @@ void HybridPICModel::FillElectronPressureMF (
     }
 }
 
-void HybridPICModel::BfieldEvolveRK (
+void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     ablastr::fields::MultiLevelVectorField const& Efield,
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt, SubcyclingHalf subcycling_half,
+    amrex::Real dt_half, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
-        BfieldEvolveRK(
-            Bfield, Efield, Jfield, rhofield, eb_update_E, dt, lev, subcycling_half,
-            ng, nodal_sync
+        BfieldEvolve(
+            Bfield, Efield, Jfield, rhofield, eb_update_E,
+            dt_half, lev, subcycling_half, ng, nodal_sync
         );
     }
 }
 
-void HybridPICModel::BfieldEvolveRK (
+void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     ablastr::fields::MultiLevelVectorField const& Efield,
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
+    amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
-    // Make copies of the B-field multifabs at t = n and create multifabs for
-    // each direction to store the Runge-Kutta intermediate terms. Each
-    // multifab has 2 components for the different terms that need to be stored.
+    const bool use_rkf45 = m_use_rkf45;
+    // Make copies of the current B-field multifabs (at t = n) since the
+    // starting B-field is needed for the integration logic
     std::array< MultiFab, 3 > B_old;
-    std::array< MultiFab, 3 > K;
     for (int ii = 0; ii < 3; ii++)
     {
         B_old[ii] = MultiFab(
@@ -504,7 +503,95 @@ void HybridPICModel::BfieldEvolveRK (
             Bfield[lev][ii]->nGrowVect()
         );
         MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+    }
 
+    amrex::Real dt_sub = dt_half / (m_substeps / 2._rt);
+    amrex::Real t = 0._rt;
+    int n_attempts = 0;
+    int n_accepted = 0;
+
+    // Step the magnetic field forward (from t -> t + dt_half) using the user
+    // specified integration scheme. The loop is set up such that the timestep
+    // for a given step (dt_sub) can be modified within the loop, i.e.,
+    // adaptive timestepping.
+    while (t < dt_half)
+    {
+        // Adjust size of the last substep, so as to land exactly at t+dt_half.
+        if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
+        bool step_succeeded;
+        amrex::Real step_change_factor;
+
+        if (use_rkf45) {
+            const amrex::Real error = BfieldEvolveRKF45(
+                Bfield, Efield, Jfield, rhofield, eb_update_E, B_old,
+                dt_sub, lev, subcycling_half, ng, nodal_sync
+            );
+
+            step_change_factor = m_substep_safety * std::pow(error + 1.e-10_rt, -0.2_rt);
+            step_succeeded = (error <= 1._rt);
+
+        } else {
+            BfieldEvolveRK4(
+                Bfield, Efield, Jfield, rhofield, eb_update_E, B_old,
+                dt_sub, lev, subcycling_half, ng, nodal_sync
+            );
+
+            // TODO: check to make sure B-field doesn't have any NaN values
+            step_succeeded = true;
+            step_change_factor = 1.0_rt; // do not adjust substep size
+        }
+
+        if (step_succeeded) {
+            // update time tracker and accepted steps number
+            t += dt_sub;
+            ++n_accepted;
+            // update B_old to the current Bfield
+            for (int ii = 0; ii < 3; ii++) {
+                MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+            }
+            dt_sub *= std::min(m_substep_max_growth, step_change_factor);
+        } else {
+            // reset Bfield to B_old before trying the integration again
+            for (int ii = 0; ii < 3; ii++) {
+                MultiFab::Copy(*Bfield[lev][ii], B_old[ii], 0, 0, 1, ng);
+            }
+            dt_sub *= std::max(0.1_rt, step_change_factor);
+        }
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            ++n_attempts <= m_max_substep_attempts,
+            "BfieldEvolve: exceeded max substep attempts."
+        );
+    }
+
+    // Set the number of substeps such that dt_sub on the next step will be similar
+    // to what was found to work in this step
+    m_substeps = 2*n_accepted;
+
+    if (WarpX::GetInstance().Verbose()) {
+        amrex::Print() << "B-field update "
+            << (subcycling_half == SubcyclingHalf::FirstHalf ? "1st" : "2nd") << " half"
+            << ": " << n_accepted << " accepted, "
+            << (n_attempts - n_accepted) << " rejected substeps"
+            << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
+    }
+}
+
+void HybridPICModel::BfieldEvolveRK4 (
+    ablastr::fields::MultiLevelVectorField const& Bfield,
+    ablastr::fields::MultiLevelVectorField const& Efield,
+    ablastr::fields::MultiLevelVectorField const& Jfield,
+    ablastr::fields::MultiLevelScalarField const& rhofield,
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+    std::array<amrex::MultiFab, 3>& B_old,
+    amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
+    IntVect ng, std::optional<bool> nodal_sync )
+{
+    // Create multifabs for each direction to store the Runge-Kutta intermediate terms.
+    // Each multifab has 2 components for the different terms that need to be stored.
+    std::array< MultiFab, 3 > K;
+    for (int ii = 0; ii < 3; ii++)
+    {
         K[ii] = MultiFab(
             Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 2,
             Bfield[lev][ii]->nGrowVect()
@@ -661,33 +748,14 @@ void HybridPICModel::BfieldEvolveRK (
     }
 }
 
-
-void HybridPICModel::BfieldEvolveRKF45 (
+amrex::Real HybridPICModel::BfieldEvolveRKF45 (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     ablastr::fields::MultiLevelVectorField const& Efield,
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt_half, SubcyclingHalf subcycling_half,
-    IntVect ng, std::optional<bool> nodal_sync )
-{
-    auto& warpx = WarpX::GetInstance();
-    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
-    {
-        BfieldEvolveRKF45(
-            Bfield, Efield, Jfield, rhofield, eb_update_E, dt_half, lev, subcycling_half,
-            ng, nodal_sync
-        );
-    }
-}
-
-void HybridPICModel::BfieldEvolveRKF45 (
-    ablastr::fields::MultiLevelVectorField const& Bfield,
-    ablastr::fields::MultiLevelVectorField const& Efield,
-    ablastr::fields::MultiLevelVectorField const& Jfield,
-    ablastr::fields::MultiLevelScalarField const& rhofield,
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+    std::array<amrex::MultiFab, 3>& B_old,
+    amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     // Fehlberg RKF45 Butcher tableau coefficients
@@ -708,17 +776,10 @@ void HybridPICModel::BfieldEvolveRKF45 (
     // K: 5 components per field direction stored as:
     //   comp 0 = h*k1, comp 1 = h*k2 (overwritten with h*k6 after stage 6),
     //   comp 2 = h*k3, comp 3 = h*k4, comp 4 = h*k5
-    std::array<MultiFab, 3> B_old;
     std::array<MultiFab, 3> K;
     std::array<MultiFab, 3> err_scratch;
     for (int ii = 0; ii < 3; ii++)
     {
-        B_old[ii] = MultiFab(
-            Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 1,
-            Bfield[lev][ii]->nGrowVect()
-        );
-        MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 0, 1, ng);
-
         K[ii] = MultiFab(
             Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 5,
             Bfield[lev][ii]->nGrowVect()
@@ -729,364 +790,321 @@ void HybridPICModel::BfieldEvolveRKF45 (
         );
     }
 
-    amrex::Real dt_sub = 2._rt * dt_half / m_substeps;
-    amrex::Real t = 0._rt;
-    int n_attempts = 0;
-    int n_accepted = 0;
-
-    while (t < dt_half)
-    {
-        if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
-
-        // ---- Stage 1: B = B_old, FieldPush, K[comp0] = h*k1 fused with Stage 2 B-update ----
-        FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
-                  dt_sub, subcycling_half, ng, nodal_sync);
+    // ---- Stage 1: B = B_old, FieldPush, K[comp0] = h*k1 fused with Stage 2 B-update ----
+    FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
+                dt, subcycling_half, ng, nodal_sync);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
-            Array4<Real> const& By = Bfield[lev][1]->array(mfi);
-            Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
-            Array4<Real> const& Kx = K[0].array(mfi);
-            Array4<Real> const& Ky = K[1].array(mfi);
-            Array4<Real> const& Kz = K[2].array(mfi);
-            Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
-            Array4<Real const> const& By_old = B_old[1].const_array(mfi);
-            Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
-            Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
-            Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
-            Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-            amrex::ParallelFor(tjx, tjy, tjz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Bx(i, j, k) - Bx_old(i, j, k);
-                    Kx(i, j, k, 0) = k1;
-                    Bx(i, j, k) = Bx_old(i, j, k) + a21*k1;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = By(i, j, k) - By_old(i, j, k);
-                    Ky(i, j, k, 0) = k1;
-                    By(i, j, k) = By_old(i, j, k) + a21*k1;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Bz(i, j, k) - Bz_old(i, j, k);
-                    Kz(i, j, k, 0) = k1;
-                    Bz(i, j, k) = Bz_old(i, j, k) + a21*k1;
-                }
-            );
-        }
-
-        // ---- Stage 2: FieldPush, K[comp1] = h*k2 fused with Stage 3 B-update ----
-        FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
-                  dt_sub, subcycling_half, ng, nodal_sync);
-        // Stage 2 K[1]-readback fused with Stage 3 B-update.
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
-            Array4<Real> const& By = Bfield[lev][1]->array(mfi);
-            Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
-            Array4<Real> const& Kx = K[0].array(mfi);
-            Array4<Real> const& Ky = K[1].array(mfi);
-            Array4<Real> const& Kz = K[2].array(mfi);
-            Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
-            Array4<Real const> const& By_old = B_old[1].const_array(mfi);
-            Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
-            Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
-            Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
-            Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-            amrex::ParallelFor(tjx, tjy, tjz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kx(i, j, k, 0);
-                    amrex::Real const k2 = Bx(i, j, k) - Bx_old(i, j, k) - a21*k1;
-                    Kx(i, j, k, 1) = k2;
-                    Bx(i, j, k) = Bx_old(i, j, k) + a31*k1 + a32*k2;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Ky(i, j, k, 0);
-                    amrex::Real const k2 = By(i, j, k) - By_old(i, j, k) - a21*k1;
-                    Ky(i, j, k, 1) = k2;
-                    By(i, j, k) = By_old(i, j, k) + a31*k1 + a32*k2;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kz(i, j, k, 0);
-                    amrex::Real const k2 = Bz(i, j, k) - Bz_old(i, j, k) - a21*k1;
-                    Kz(i, j, k, 1) = k2;
-                    Bz(i, j, k) = Bz_old(i, j, k) + a31*k1 + a32*k2;
-                }
-            );
-        }
-
-        // ---- Stage 3: FieldPush, then K[comp2] = h*k3 fused with Stage 4 B-update ----
-        FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
-                  dt_sub, subcycling_half, ng, nodal_sync);
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
-            Array4<Real> const& By = Bfield[lev][1]->array(mfi);
-            Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
-            Array4<Real> const& Kx = K[0].array(mfi);
-            Array4<Real> const& Ky = K[1].array(mfi);
-            Array4<Real> const& Kz = K[2].array(mfi);
-            Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
-            Array4<Real const> const& By_old = B_old[1].const_array(mfi);
-            Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
-            Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
-            Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
-            Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-            amrex::ParallelFor(tjx, tjy, tjz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kx(i, j, k, 0);
-                    amrex::Real const k2 = Kx(i, j, k, 1);
-                    amrex::Real const k3 = Bx(i, j, k) - Bx_old(i, j, k) - a31*k1 - a32*k2;
-                    Kx(i, j, k, 2) = k3;
-                    Bx(i, j, k) = Bx_old(i, j, k) + a41*k1 + a42*k2 + a43*k3;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Ky(i, j, k, 0);
-                    amrex::Real const k2 = Ky(i, j, k, 1);
-                    amrex::Real const k3 = By(i, j, k) - By_old(i, j, k) - a31*k1 - a32*k2;
-                    Ky(i, j, k, 2) = k3;
-                    By(i, j, k) = By_old(i, j, k) + a41*k1 + a42*k2 + a43*k3;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kz(i, j, k, 0);
-                    amrex::Real const k2 = Kz(i, j, k, 1);
-                    amrex::Real const k3 = Bz(i, j, k) - Bz_old(i, j, k) - a31*k1 - a32*k2;
-                    Kz(i, j, k, 2) = k3;
-                    Bz(i, j, k) = Bz_old(i, j, k) + a41*k1 + a42*k2 + a43*k3;
-                }
-            );
-        }
-
-        // ---- Stage 4: FieldPush, then K[comp3] = h*k4 fused with Stage 5 B-update ----
-        FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
-                  dt_sub, subcycling_half, ng, nodal_sync);
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
-            Array4<Real> const& By = Bfield[lev][1]->array(mfi);
-            Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
-            Array4<Real> const& Kx = K[0].array(mfi);
-            Array4<Real> const& Ky = K[1].array(mfi);
-            Array4<Real> const& Kz = K[2].array(mfi);
-            Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
-            Array4<Real const> const& By_old = B_old[1].const_array(mfi);
-            Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
-            Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
-            Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
-            Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-            amrex::ParallelFor(tjx, tjy, tjz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kx(i, j, k, 0);
-                    amrex::Real const k2 = Kx(i, j, k, 1);
-                    amrex::Real const k3 = Kx(i, j, k, 2);
-                    amrex::Real const k4 = Bx(i, j, k) - Bx_old(i, j, k)
-                                         - a41*k1 - a42*k2 - a43*k3;
-                    Kx(i, j, k, 3) = k4;
-                    Bx(i, j, k) = Bx_old(i, j, k) + a51*k1 + a52*k2 + a53*k3 + a54*k4;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Ky(i, j, k, 0);
-                    amrex::Real const k2 = Ky(i, j, k, 1);
-                    amrex::Real const k3 = Ky(i, j, k, 2);
-                    amrex::Real const k4 = By(i, j, k) - By_old(i, j, k)
-                                         - a41*k1 - a42*k2 - a43*k3;
-                    Ky(i, j, k, 3) = k4;
-                    By(i, j, k) = By_old(i, j, k) + a51*k1 + a52*k2 + a53*k3 + a54*k4;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kz(i, j, k, 0);
-                    amrex::Real const k2 = Kz(i, j, k, 1);
-                    amrex::Real const k3 = Kz(i, j, k, 2);
-                    amrex::Real const k4 = Bz(i, j, k) - Bz_old(i, j, k)
-                                         - a41*k1 - a42*k2 - a43*k3;
-                    Kz(i, j, k, 3) = k4;
-                    Bz(i, j, k) = Bz_old(i, j, k) + a51*k1 + a52*k2 + a53*k3 + a54*k4;
-                }
-            );
-        }
-
-        // ---- Stage 5: FieldPush, then K[comp4] = h*k5 fused with Stage 6 B-update ----
-        FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
-                  dt_sub, subcycling_half, ng, nodal_sync);
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
-            Array4<Real> const& By = Bfield[lev][1]->array(mfi);
-            Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
-            Array4<Real> const& Kx = K[0].array(mfi);
-            Array4<Real> const& Ky = K[1].array(mfi);
-            Array4<Real> const& Kz = K[2].array(mfi);
-            Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
-            Array4<Real const> const& By_old = B_old[1].const_array(mfi);
-            Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
-            Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
-            Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
-            Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-            amrex::ParallelFor(tjx, tjy, tjz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kx(i, j, k, 0);
-                    amrex::Real const k2 = Kx(i, j, k, 1);
-                    amrex::Real const k3 = Kx(i, j, k, 2);
-                    amrex::Real const k4 = Kx(i, j, k, 3);
-                    amrex::Real const k5 = Bx(i, j, k) - Bx_old(i, j, k)
-                                         - a51*k1 - a52*k2 - a53*k3 - a54*k4;
-                    Kx(i, j, k, 4) = k5;
-                    Bx(i, j, k) = Bx_old(i, j, k)
-                                + a61*k1 + a62*k2 + a63*k3 + a64*k4 + a65*k5;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Ky(i, j, k, 0);
-                    amrex::Real const k2 = Ky(i, j, k, 1);
-                    amrex::Real const k3 = Ky(i, j, k, 2);
-                    amrex::Real const k4 = Ky(i, j, k, 3);
-                    amrex::Real const k5 = By(i, j, k) - By_old(i, j, k)
-                                         - a51*k1 - a52*k2 - a53*k3 - a54*k4;
-                    Ky(i, j, k, 4) = k5;
-                    By(i, j, k) = By_old(i, j, k)
-                                + a61*k1 + a62*k2 + a63*k3 + a64*k4 + a65*k5;
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kz(i, j, k, 0);
-                    amrex::Real const k2 = Kz(i, j, k, 1);
-                    amrex::Real const k3 = Kz(i, j, k, 2);
-                    amrex::Real const k4 = Kz(i, j, k, 3);
-                    amrex::Real const k5 = Bz(i, j, k) - Bz_old(i, j, k)
-                                         - a51*k1 - a52*k2 - a53*k3 - a54*k4;
-                    Kz(i, j, k, 4) = k5;
-                    Bz(i, j, k) = Bz_old(i, j, k)
-                                + a61*k1 + a62*k2 + a63*k3 + a64*k4 + a65*k5;
-                }
-            );
-        }
-
-        // ---- Stage 6: FieldPush, then K[comp1] = h*k6 (overwrites h*k2) fused with B4 + error ----
-        FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
-                  dt_sub, subcycling_half, ng, nodal_sync);
-        // K[comp1] is overwritten here: reads h*k2 (old value) then writes h*k6 in each cell.
-        // k6, B4 assembly (b2=0, so k2 is not needed for B4), and error assembly are fused into
-        // one ParallelFor per direction. B4 is updated over ghost+valid cells; error is written
-        // only for valid cells (err_scratch has no ghost), guarded by a box check.
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
-            Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
-            Array4<Real> const& By = Bfield[lev][1]->array(mfi);
-            Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
-            Array4<Real> const& Kx = K[0].array(mfi);
-            Array4<Real> const& Ky = K[1].array(mfi);
-            Array4<Real> const& Kz = K[2].array(mfi);
-            Array4<Real> const& error_x = err_scratch[0].array(mfi);
-            Array4<Real> const& error_y = err_scratch[1].array(mfi);
-            Array4<Real> const& error_z = err_scratch[2].array(mfi);
-            Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
-            Array4<Real const> const& By_old = B_old[1].const_array(mfi);
-            Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
-            Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect());
-            Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect());
-            Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect());
-            Box const& tjx_ng = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
-            Box const& tjy_ng = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
-            Box const& tjz_ng = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
-            amrex::ParallelFor(tjx_ng, tjy_ng, tjz_ng,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kx(i, j, k, 0);
-                    amrex::Real const k2 = Kx(i, j, k, 1);
-                    amrex::Real const k3 = Kx(i, j, k, 2);
-                    amrex::Real const k4 = Kx(i, j, k, 3);
-                    amrex::Real const k5 = Kx(i, j, k, 4);
-                    amrex::Real const k6 = Bx(i, j, k) - Bx_old(i, j, k)
-                                         - a61*k1 - a62*k2 - a63*k3 - a64*k4 - a65*k5;
-                    Kx(i, j, k, 1) = k6;
-                    Bx(i, j, k) = Bx_old(i, j, k) + b1*k1 + b3*k3 + b4*k4 + b5*k5;
-                    if (tjx.contains(amrex::IntVect(AMREX_D_DECL(i, j, k)))) {
-                        error_x(i, j, k) = e1*k1 + e3*k3 + e4*k4 + e5*k5 + e6*k6;
-                    }
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Ky(i, j, k, 0);
-                    amrex::Real const k2 = Ky(i, j, k, 1);
-                    amrex::Real const k3 = Ky(i, j, k, 2);
-                    amrex::Real const k4 = Ky(i, j, k, 3);
-                    amrex::Real const k5 = Ky(i, j, k, 4);
-                    amrex::Real const k6 = By(i, j, k) - By_old(i, j, k)
-                                         - a61*k1 - a62*k2 - a63*k3 - a64*k4 - a65*k5;
-                    Ky(i, j, k, 1) = k6;
-                    By(i, j, k) = By_old(i, j, k) + b1*k1 + b3*k3 + b4*k4 + b5*k5;
-                    if (tjy.contains(amrex::IntVect(AMREX_D_DECL(i, j, k)))) {
-                        error_y(i, j, k) = e1*k1 + e3*k3 + e4*k4 + e5*k5 + e6*k6;
-                    }
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k){
-                    amrex::Real const k1 = Kz(i, j, k, 0);
-                    amrex::Real const k2 = Kz(i, j, k, 1);
-                    amrex::Real const k3 = Kz(i, j, k, 2);
-                    amrex::Real const k4 = Kz(i, j, k, 3);
-                    amrex::Real const k5 = Kz(i, j, k, 4);
-                    amrex::Real const k6 = Bz(i, j, k) - Bz_old(i, j, k)
-                                         - a61*k1 - a62*k2 - a63*k3 - a64*k4 - a65*k5;
-                    Kz(i, j, k, 1) = k6;
-                    Bz(i, j, k) = Bz_old(i, j, k) + b1*k1 + b3*k3 + b4*k4 + b5*k5;
-                    if (tjz.contains(amrex::IntVect(AMREX_D_DECL(i, j, k)))) {
-                        error_z(i, j, k) = e1*k1 + e3*k3 + e4*k4 + e5*k5 + e6*k6;
-                    }
-                }
-            );
-        }
-
-        // ---- Error norm and adaptive step control ----
-        // Compute local maxima first, then one combined AllReduce for both norms.
-        amrex::Real err_norm = 0._rt;
-        amrex::Real B4_norm  = 0._rt;
-        for (int ii = 0; ii < 3; ii++) {
-            err_norm = std::max(err_norm, err_scratch[ii].norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
-            B4_norm  = std::max(B4_norm,  Bfield[lev][ii]->norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
-        }
-        amrex::ParallelDescriptor::ReduceRealMax({err_norm, B4_norm});
-        const amrex::Real err_scalar = err_norm / (m_substep_atol + m_substep_rtol * B4_norm);
-        const amrex::Real factor = m_substep_safety * std::pow(err_scalar + 1.e-10_rt, -0.2_rt);
-
-        if (err_scalar <= 1._rt) {
-            t += dt_sub;
-            ++n_accepted;
-            for (int ii = 0; ii < 3; ii++) {
-                MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const& By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const& Kx = K[0].array(mfi);
+        Array4<Real> const& Ky = K[1].array(mfi);
+        Array4<Real> const& Kz = K[2].array(mfi);
+        Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const& By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
+        Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+        amrex::ParallelFor(tjx, tjy, tjz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Bx(i, j, k) - Bx_old(i, j, k);
+                Kx(i, j, k, 0) = k1;
+                Bx(i, j, k) = Bx_old(i, j, k) + a21*k1;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = By(i, j, k) - By_old(i, j, k);
+                Ky(i, j, k, 0) = k1;
+                By(i, j, k) = By_old(i, j, k) + a21*k1;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Bz(i, j, k) - Bz_old(i, j, k);
+                Kz(i, j, k, 0) = k1;
+                Bz(i, j, k) = Bz_old(i, j, k) + a21*k1;
             }
-            dt_sub *= std::min(m_substep_max_growth, factor);
-        } else {
-            for (int ii = 0; ii < 3; ii++) {
-                MultiFab::Copy(*Bfield[lev][ii], B_old[ii], 0, 0, 1, ng);
-            }
-            dt_sub *= std::max(0.1_rt, factor);
-        }
-
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ++n_attempts <= m_max_substep_attempts,
-            "BfieldEvolveRKF45: exceeded max substep attempts; "
-            "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
         );
     }
 
-    // Set the number of substeps such that dt_sub on the next step will be similar
-    // to what was found to work in this step
-    m_substeps = 2*n_accepted;
-
-    if (WarpX::GetInstance().Verbose()) {
-        amrex::Print() << "RKF45 "
-            << (subcycling_half == SubcyclingHalf::FirstHalf ? "1st" : "2nd") << " half"
-            << ": " << n_accepted << " accepted, "
-            << (n_attempts - n_accepted) << " rejected substeps"
-            << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
+    // ---- Stage 2: FieldPush, K[comp1] = h*k2 fused with Stage 3 B-update ----
+    FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
+                dt, subcycling_half, ng, nodal_sync);
+    // Stage 2 K[1]-readback fused with Stage 3 B-update.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const& By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const& Kx = K[0].array(mfi);
+        Array4<Real> const& Ky = K[1].array(mfi);
+        Array4<Real> const& Kz = K[2].array(mfi);
+        Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const& By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
+        Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+        amrex::ParallelFor(tjx, tjy, tjz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kx(i, j, k, 0);
+                amrex::Real const k2 = Bx(i, j, k) - Bx_old(i, j, k) - a21*k1;
+                Kx(i, j, k, 1) = k2;
+                Bx(i, j, k) = Bx_old(i, j, k) + a31*k1 + a32*k2;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Ky(i, j, k, 0);
+                amrex::Real const k2 = By(i, j, k) - By_old(i, j, k) - a21*k1;
+                Ky(i, j, k, 1) = k2;
+                By(i, j, k) = By_old(i, j, k) + a31*k1 + a32*k2;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kz(i, j, k, 0);
+                amrex::Real const k2 = Bz(i, j, k) - Bz_old(i, j, k) - a21*k1;
+                Kz(i, j, k, 1) = k2;
+                Bz(i, j, k) = Bz_old(i, j, k) + a31*k1 + a32*k2;
+            }
+        );
     }
+
+    // ---- Stage 3: FieldPush, then K[comp2] = h*k3 fused with Stage 4 B-update ----
+    FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
+                dt, subcycling_half, ng, nodal_sync);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const& By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const& Kx = K[0].array(mfi);
+        Array4<Real> const& Ky = K[1].array(mfi);
+        Array4<Real> const& Kz = K[2].array(mfi);
+        Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const& By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
+        Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+        amrex::ParallelFor(tjx, tjy, tjz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kx(i, j, k, 0);
+                amrex::Real const k2 = Kx(i, j, k, 1);
+                amrex::Real const k3 = Bx(i, j, k) - Bx_old(i, j, k) - a31*k1 - a32*k2;
+                Kx(i, j, k, 2) = k3;
+                Bx(i, j, k) = Bx_old(i, j, k) + a41*k1 + a42*k2 + a43*k3;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Ky(i, j, k, 0);
+                amrex::Real const k2 = Ky(i, j, k, 1);
+                amrex::Real const k3 = By(i, j, k) - By_old(i, j, k) - a31*k1 - a32*k2;
+                Ky(i, j, k, 2) = k3;
+                By(i, j, k) = By_old(i, j, k) + a41*k1 + a42*k2 + a43*k3;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kz(i, j, k, 0);
+                amrex::Real const k2 = Kz(i, j, k, 1);
+                amrex::Real const k3 = Bz(i, j, k) - Bz_old(i, j, k) - a31*k1 - a32*k2;
+                Kz(i, j, k, 2) = k3;
+                Bz(i, j, k) = Bz_old(i, j, k) + a41*k1 + a42*k2 + a43*k3;
+            }
+        );
+    }
+
+    // ---- Stage 4: FieldPush, then K[comp3] = h*k4 fused with Stage 5 B-update ----
+    FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
+                dt, subcycling_half, ng, nodal_sync);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const& By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const& Kx = K[0].array(mfi);
+        Array4<Real> const& Ky = K[1].array(mfi);
+        Array4<Real> const& Kz = K[2].array(mfi);
+        Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const& By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
+        Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+        amrex::ParallelFor(tjx, tjy, tjz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kx(i, j, k, 0);
+                amrex::Real const k2 = Kx(i, j, k, 1);
+                amrex::Real const k3 = Kx(i, j, k, 2);
+                amrex::Real const k4 = Bx(i, j, k) - Bx_old(i, j, k)
+                                        - a41*k1 - a42*k2 - a43*k3;
+                Kx(i, j, k, 3) = k4;
+                Bx(i, j, k) = Bx_old(i, j, k) + a51*k1 + a52*k2 + a53*k3 + a54*k4;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Ky(i, j, k, 0);
+                amrex::Real const k2 = Ky(i, j, k, 1);
+                amrex::Real const k3 = Ky(i, j, k, 2);
+                amrex::Real const k4 = By(i, j, k) - By_old(i, j, k)
+                                        - a41*k1 - a42*k2 - a43*k3;
+                Ky(i, j, k, 3) = k4;
+                By(i, j, k) = By_old(i, j, k) + a51*k1 + a52*k2 + a53*k3 + a54*k4;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kz(i, j, k, 0);
+                amrex::Real const k2 = Kz(i, j, k, 1);
+                amrex::Real const k3 = Kz(i, j, k, 2);
+                amrex::Real const k4 = Bz(i, j, k) - Bz_old(i, j, k)
+                                        - a41*k1 - a42*k2 - a43*k3;
+                Kz(i, j, k, 3) = k4;
+                Bz(i, j, k) = Bz_old(i, j, k) + a51*k1 + a52*k2 + a53*k3 + a54*k4;
+            }
+        );
+    }
+
+    // ---- Stage 5: FieldPush, then K[comp4] = h*k5 fused with Stage 6 B-update ----
+    FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
+                dt, subcycling_half, ng, nodal_sync);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const& By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const& Kx = K[0].array(mfi);
+        Array4<Real> const& Ky = K[1].array(mfi);
+        Array4<Real> const& Kz = K[2].array(mfi);
+        Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const& By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
+        Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+        amrex::ParallelFor(tjx, tjy, tjz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kx(i, j, k, 0);
+                amrex::Real const k2 = Kx(i, j, k, 1);
+                amrex::Real const k3 = Kx(i, j, k, 2);
+                amrex::Real const k4 = Kx(i, j, k, 3);
+                amrex::Real const k5 = Bx(i, j, k) - Bx_old(i, j, k)
+                                        - a51*k1 - a52*k2 - a53*k3 - a54*k4;
+                Kx(i, j, k, 4) = k5;
+                Bx(i, j, k) = Bx_old(i, j, k)
+                            + a61*k1 + a62*k2 + a63*k3 + a64*k4 + a65*k5;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Ky(i, j, k, 0);
+                amrex::Real const k2 = Ky(i, j, k, 1);
+                amrex::Real const k3 = Ky(i, j, k, 2);
+                amrex::Real const k4 = Ky(i, j, k, 3);
+                amrex::Real const k5 = By(i, j, k) - By_old(i, j, k)
+                                        - a51*k1 - a52*k2 - a53*k3 - a54*k4;
+                Ky(i, j, k, 4) = k5;
+                By(i, j, k) = By_old(i, j, k)
+                            + a61*k1 + a62*k2 + a63*k3 + a64*k4 + a65*k5;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kz(i, j, k, 0);
+                amrex::Real const k2 = Kz(i, j, k, 1);
+                amrex::Real const k3 = Kz(i, j, k, 2);
+                amrex::Real const k4 = Kz(i, j, k, 3);
+                amrex::Real const k5 = Bz(i, j, k) - Bz_old(i, j, k)
+                                        - a51*k1 - a52*k2 - a53*k3 - a54*k4;
+                Kz(i, j, k, 4) = k5;
+                Bz(i, j, k) = Bz_old(i, j, k)
+                            + a61*k1 + a62*k2 + a63*k3 + a64*k4 + a65*k5;
+            }
+        );
+    }
+
+    // ---- Stage 6: FieldPush, then K[comp1] = h*k6 (overwrites h*k2) fused with B4 + error ----
+    FieldPush(Bfield, Efield, Jfield, rhofield, eb_update_E,
+                dt, subcycling_half, ng, nodal_sync);
+    // K[comp1] is overwritten here: reads h*k2 (old value) then writes h*k6 in each cell.
+    // k6, B4 assembly (b2=0, so k2 is not needed for B4), and error assembly are fused into
+    // one ParallelFor per direction. B4 is updated over ghost+valid cells; error is written
+    // only for valid cells (err_scratch has no ghost), guarded by a box check.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Bfield[lev][0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Bx = Bfield[lev][0]->array(mfi);
+        Array4<Real> const& By = Bfield[lev][1]->array(mfi);
+        Array4<Real> const& Bz = Bfield[lev][2]->array(mfi);
+        Array4<Real> const& Kx = K[0].array(mfi);
+        Array4<Real> const& Ky = K[1].array(mfi);
+        Array4<Real> const& Kz = K[2].array(mfi);
+        Array4<Real> const& error_x = err_scratch[0].array(mfi);
+        Array4<Real> const& error_y = err_scratch[1].array(mfi);
+        Array4<Real> const& error_z = err_scratch[2].array(mfi);
+        Array4<Real const> const& Bx_old = B_old[0].const_array(mfi);
+        Array4<Real const> const& By_old = B_old[1].const_array(mfi);
+        Array4<Real const> const& Bz_old = B_old[2].const_array(mfi);
+        Box const& tjx = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect());
+        Box const& tjy = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect());
+        Box const& tjz = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect());
+        Box const& tjx_ng = mfi.tilebox(Bfield[lev][0]->ixType().toIntVect(), ng);
+        Box const& tjy_ng = mfi.tilebox(Bfield[lev][1]->ixType().toIntVect(), ng);
+        Box const& tjz_ng = mfi.tilebox(Bfield[lev][2]->ixType().toIntVect(), ng);
+        amrex::ParallelFor(tjx_ng, tjy_ng, tjz_ng,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kx(i, j, k, 0);
+                amrex::Real const k2 = Kx(i, j, k, 1);
+                amrex::Real const k3 = Kx(i, j, k, 2);
+                amrex::Real const k4 = Kx(i, j, k, 3);
+                amrex::Real const k5 = Kx(i, j, k, 4);
+                amrex::Real const k6 = Bx(i, j, k) - Bx_old(i, j, k)
+                                        - a61*k1 - a62*k2 - a63*k3 - a64*k4 - a65*k5;
+                Kx(i, j, k, 1) = k6;
+                Bx(i, j, k) = Bx_old(i, j, k) + b1*k1 + b3*k3 + b4*k4 + b5*k5;
+                if (tjx.contains(amrex::IntVect(AMREX_D_DECL(i, j, k)))) {
+                    error_x(i, j, k) = e1*k1 + e3*k3 + e4*k4 + e5*k5 + e6*k6;
+                }
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Ky(i, j, k, 0);
+                amrex::Real const k2 = Ky(i, j, k, 1);
+                amrex::Real const k3 = Ky(i, j, k, 2);
+                amrex::Real const k4 = Ky(i, j, k, 3);
+                amrex::Real const k5 = Ky(i, j, k, 4);
+                amrex::Real const k6 = By(i, j, k) - By_old(i, j, k)
+                                        - a61*k1 - a62*k2 - a63*k3 - a64*k4 - a65*k5;
+                Ky(i, j, k, 1) = k6;
+                By(i, j, k) = By_old(i, j, k) + b1*k1 + b3*k3 + b4*k4 + b5*k5;
+                if (tjy.contains(amrex::IntVect(AMREX_D_DECL(i, j, k)))) {
+                    error_y(i, j, k) = e1*k1 + e3*k3 + e4*k4 + e5*k5 + e6*k6;
+                }
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                amrex::Real const k1 = Kz(i, j, k, 0);
+                amrex::Real const k2 = Kz(i, j, k, 1);
+                amrex::Real const k3 = Kz(i, j, k, 2);
+                amrex::Real const k4 = Kz(i, j, k, 3);
+                amrex::Real const k5 = Kz(i, j, k, 4);
+                amrex::Real const k6 = Bz(i, j, k) - Bz_old(i, j, k)
+                                        - a61*k1 - a62*k2 - a63*k3 - a64*k4 - a65*k5;
+                Kz(i, j, k, 1) = k6;
+                Bz(i, j, k) = Bz_old(i, j, k) + b1*k1 + b3*k3 + b4*k4 + b5*k5;
+                if (tjz.contains(amrex::IntVect(AMREX_D_DECL(i, j, k)))) {
+                    error_z(i, j, k) = e1*k1 + e3*k3 + e4*k4 + e5*k5 + e6*k6;
+                }
+            }
+        );
+    }
+
+    // ---- Error norm and adaptive step control ----
+    // Compute local maxima first, then one combined AllReduce for both norms.
+    amrex::Real err_norm = 0._rt;
+    amrex::Real B4_norm  = 0._rt;
+    for (int ii = 0; ii < 3; ii++) {
+        err_norm = std::max(err_norm, err_scratch[ii].norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
+        B4_norm  = std::max(B4_norm,  Bfield[lev][ii]->norm0(/*comp=*/0, /*nghost=*/0, /*local=*/true));
+    }
+    amrex::ParallelDescriptor::ReduceRealMax({err_norm, B4_norm});
+    return err_norm / (m_substep_atol + m_substep_rtol * B4_norm);
 }
 
 
