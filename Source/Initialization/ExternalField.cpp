@@ -391,7 +391,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 
     if (has_load) {
         const auto num_cells = std::accumulate(chunk_extent.begin(), chunk_extent.end(),
-                                               1, std::multiplies<std::uint64_t>());
+                                               1, std::multiplies<>());
         m_FC_data_cpu.reset(
             reinterpret_cast<double*>(amrex::The_Pinned_Arena()->alloc(num_cells*sizeof(double))),
             [](double *p){ amrex::The_Pinned_Arena()->free(reinterpret_cast<void*>(p)); });
