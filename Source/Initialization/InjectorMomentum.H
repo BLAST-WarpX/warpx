@@ -293,9 +293,13 @@ struct InjectorMomentumJuttner
         // which tends to zero as theta -> 0
         // (Zenitani et al. Phys. Plasmas 22, 042116, 2015, Eq. 13).
         // For theta < 0.1 the Maxwell-Juttner distribution is indistinguishable
-        // from a non-relativistic Maxwellian, so we instead sample the momentum
-        // from a Gaussian with thermal spread u_th = sqrt(theta) per component
-        // (i.e. sqrt(kB*T/(m*c^2)), in units of c).
+        // from a non-relativistic Maxwellian, so we instead sample the
+        // momentum from a Gaussian with thermal spread
+        // u_th = sqrt(theta) per component (i.e. sqrt(kB*T/(m*c^2)),
+        // in the Lorentz frame that moves with the bulk drift
+        // where u is the normalized momentum u=gamma*beta.
+        // The flipping method and Lorentz transform below then handle
+        // the bulk drift, exactly as for the Sobol-sampled momentum.
         if (theta < 0.1_rt) {
             amrex::Real const u_th = std::sqrt(theta);
             u[0] = amrex::RandomNormal(0._rt, u_th, engine);
