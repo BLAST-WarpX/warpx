@@ -80,7 +80,7 @@ namespace
 }
 
 LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies, const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
+    : WarpXParticleContainer(amr_core, ispecies, name),
       m_laser_name{name}
 {
     m_charge = 1.0;
@@ -742,12 +742,12 @@ LaserParticleContainer::ComputeSpacing (int lev, Real& Sx, Real& Sy) const
     const auto eps = static_cast<Real>(dx[0]*small_coeff);
 #endif
 #if defined(WARPX_DIM_3D)
-    Sx = std::min(std::min(dx[0]/(std::abs(m_u_X[0])+eps),
-                           dx[1]/(std::abs(m_u_X[1])+eps)),
-                           dx[2]/(std::abs(m_u_X[2])+eps));
-    Sy = std::min(std::min(dx[0]/(std::abs(m_u_Y[0])+eps),
-                           dx[1]/(std::abs(m_u_Y[1])+eps)),
-                           dx[2]/(std::abs(m_u_Y[2])+eps));
+    Sx = std::min({dx[0]/(std::abs(m_u_X[0])+eps),
+                   dx[1]/(std::abs(m_u_X[1])+eps),
+                   dx[2]/(std::abs(m_u_X[2])+eps)});
+    Sy = std::min({dx[0]/(std::abs(m_u_Y[0])+eps),
+                   dx[1]/(std::abs(m_u_Y[1])+eps),
+                   dx[2]/(std::abs(m_u_Y[2])+eps)});
 #elif defined(WARPX_DIM_RZ)
     Sx = dx[0];
     Sy = 1.0;

@@ -30,7 +30,7 @@ jobs:
     container:
       image: alpinedav/ascent:0.9.3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Configure
       run: |
         . /ascent_docker_setup_env.sh
@@ -76,7 +76,7 @@ jobs:
     container:
       image: kitware/paraview:ci-catalyst-amrex-warpx-20240828
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Configure
       run: |
         cmake -S . -B build   \

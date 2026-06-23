@@ -1023,7 +1023,8 @@ method used is similar to that of `Miller et al. (Phys. Plasmas 28, 112702 (2021
 The user specifies a region in which particles will be thermalized, a normal direction, a temperature, and a
 momentum threshold. Inside the thermalizing region, the probability that a particle will be affected increases
 from 0 to 1 as :math:`\frac{1}{1-x}^{1/4}`. Particles that are affected have their momenta thermalized
-using the temperature parameter ``theta`` for any direction in which their momentum component is over the threshold.
+using the temperature parameter ``theta`` for any direction in which their momentum component is over the threshold
+(different thresholds can be set for each direction).
 The parameters affecting this region are as follows:
 
 .. pp:param:: particle_thermalizer.normal
@@ -1052,10 +1053,11 @@ The parameters affecting this region are as follows:
     This parameter is required if the thermalizer is enabled.
 
 .. pp:param:: particle_thermalizer.momentum_threshold
-    :type: ``float``
+    :type: ``float`` or ``3 floats``
 
     Momentum threshold used by the thermalizer. In each direction, if a particle's normalized momentum component (e.g. :math:`\gamma \beta_x`) is above this threshold, that component will be thermalized.
-    This parameter is required if the thermalizer is enabled.
+    This parameter is required if the thermalizer is enabled. One or three values can be provided. In the former case, the same threshold is applied in all directions. In the latter, different thresholds
+    are applied to ``x``, ``y``, and ``z`` directions.
 
 .. pp:param:: particle_thermalizer.theta
     :type: ``float``
@@ -1708,93 +1710,92 @@ Particle initialization
       ``<species_name>.uy_th`` and ``<species_name>.uz_th``.
       ``ux_m``, ``uy_m``, ``uz_m``, ``ux_th``, ``uy_th`` and ``uz_th`` are all ``0.`` by default.
 
-    * ``maxwell_boltzmann``: Maxwell-Boltzmann distribution that takes a dimensionless
-      temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
-      :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, :math:`c` is the speed of light, and :math:`m` is the mass of the species.
-      Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
-      For values of :math:`\theta > 0.01`, errors due to ignored relativistic terms exceed 1%.
-      Temperatures less than zero are not allowed.
-      The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
-      The speed is specified by the parameters :pp:param:`<species_name>.beta_distribution_type`, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).
-      :math:`\beta` can be positive or negative and is limited to the range :math:`-1 < \beta < 1`.
-      The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
-      Please leave no whitespace
-      between the sign and the character on input. A direction without a sign will be treated as
-      positive. The MB distribution is initialized in the drifting frame by sampling three Gaussian
-      distributions in each dimension using, the Box Mueller method, and then the distribution is
-      transformed to the simulation frame using the flipping method. The flipping method can be
-      found in Zenitani 2015 section III. B. (Phys. Plasmas 22, 042116).
-      By default, ``beta`` is equal to ``0.`` and ``bulk_vel_dir`` is ``+x``.
+    * ``maxwellian``: Maxwellian momentum distribution. The mean normalized momentum (bulk drift) and the standard deviation (thermal spread) of each
+      momentum component can be specified independently. They can be given either as constants or as functions of position.
+      Each normalized-momentum component is sampled independently from a Gaussian distribution.
 
-      Note that though the particles may move at relativistic speeds in the simulation frame,
-      they are not relativistic in the drift frame. This is as opposed to the Maxwell Juttner
-      setting, which initializes particles with relativistic momentums in their drifting frame.
+      It requires the following arguments:
 
-    * ``maxwell_juttner``: Maxwell-Juttner distribution for high temperature plasma that takes a dimensionless temperature parameter :math:`\theta` as an input, where :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`,
-      :math:`T` is the temperature in Kelvin, :math:`k_\mathrm{B}` is the Boltzmann constant, and :math:`m` is the mass of the species.
-      Theta is specified by a combination of :pp:param:`<species_name>.theta_distribution_type`, ``<species_name>.theta``, and ``<species_name>.theta_function(x,y,z)`` (see below).
-      The Sobol method used to generate the distribution will not terminate for :math:`\theta \lesssim 0.1`, and the code will abort if it encounters a temperature below that threshold.
-      The Maxwell-Boltzmann distribution is recommended for temperatures in the range :math:`0.01 < \theta < 0.1`.
-      Errors due to relativistic effects can be expected to approximately between 1% and 10%.
-      The plasma can be initialized to move at a bulk velocity :math:`\beta = v/c`.
-      The speed is specified by the parameters :pp:param:`<species_name>.beta_distribution_type`, ``<species_name>.beta``, and ``<species_name>.beta_function(x,y,z)`` (see below).
-      :math:`\beta` can be positive or negative and is limited to the range :math:`-1 < \beta < 1`.
-      The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
-      Please leave no whitespace
-      between the sign and the character on input. A direction without a sign will be treated as
-      positive. The MJ distribution will be initialized in the moving frame using the Sobol method,
-      and then the distribution will be transformed to the simulation frame using the flipping method.
-      Both the Sobol and the flipping method can be found in Zenitani 2015 (Phys. Plasmas 22, 042116).
-      By default, ``beta`` is equal to ``0.`` and ``bulk_vel_dir`` is ``+x``.
+      * ``<species_name>.maxwellian_u_mean_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``.
+        Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
+        representing the normalized momentum, defined as
+        :math:`u_\mathrm{mean} = \gamma \beta`, where
+        :math:`\beta = v/c` and :math:`\gamma = 1/\sqrt{1-\beta^2}`.
 
-      Please take notice that particles initialized with this setting can be relativistic in two ways.
-      In the simulation frame, they can drift with a relativistic speed beta. Then, in the drifting
-      frame they are still moving with relativistic speeds due to high temperature. This is as opposed
-      to the Maxwell Boltzmann setting, which initializes non-relativistic plasma in their relativistic
-      drifting frame.
+        * If ``constant``, the following are required: ``<species_name>.ux_mean``,
+          ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``).
+          The magnitude :math:`|u_\mathrm{mean}|` must be strictly less than 1.
+        * If ``parser``, the following are required:
+          ``<species_name>.ux_mean_function(x,y,z)``,
+          ``<species_name>.uy_mean_function(x,y,z)``,
+          ``<species_name>.uz_mean_function(x,y,z)``.
+
+      * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the thermal spread (standard deviation) of the
+        particle momentum. Here, ``u_std`` is a 3D vector (with components ``ux_std``,
+        ``uy_std``, ``uz_std``) representing the standard deviation of the normalized momentum
+        :math:`u_\mathrm{std} = \sqrt{\theta}`, where
+        :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`.
+
+        * If ``constant``, the following are required: ``<species_name>.ux_std``,
+          ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`, default ``0``).
+          These are standard deviations of :math:`u_x`, :math:`u_y`, :math:`u_z` in the drift
+          frame, i.e. the thermal spread per axis.
+        * If ``parser``, the following are required:
+          ``<species_name>.ux_std_function(x,y,z)``,
+          ``<species_name>.uy_std_function(x,y,z)``,
+          ``<species_name>.uz_std_function(x,y,z)``.
+
+        Particles may be relativistic in the lab frame, but the sampling model treats them as
+        non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
+
+    * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
+      More specifically, the plasma is initialized with a Maxwell-Juttner distribution
+
+      .. math::
+
+        p(\mathbf{u}) \propto \exp(-\gamma(\mathbf{u})mc^2/k_B T) = \exp(-\gamma (\mathbf{u})/\theta)
+
+      (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
+      **drifting Lorentz frame** that is moving with a bulk velocity :math:`\beta = v_{drift}/c`.
+      Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
+      in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
+
+      It requires the following arguments:
+
+      * ``<species_name>.beta_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the bulk velocity :math:`\beta`.
+        The magnitude must satisfy :math:`|\beta| < 1`.
+
+        * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
+        * If ``parser``, the following is required: ``<species_name>.beta_function(x,y,z)``.
+
+      * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
+        Specifies the direction of the bulk velocity :math:`\beta`.
+        The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
+        Please leave no whitespace between the sign and the character on input. A direction without a sign will be treated as positive.
+        The signed bulk velocity is ``beta`` times the direction given here.
+
+      * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the temperature :math:`\theta`.
+        Values less than zero are not allowed.
+
+        * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
+        * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
+
+      Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
+      For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
+      efficiency tends to zero as :math:`\theta \rightarrow 0`) and, at the same time, the Maxwell-Juttner
+      distribution becomes almost indistinguishable from a non-relativistic Maxwellian.
+      Thus, for :math:`\theta < 0.1`, the code instead samples an isotropic Maxwellian with thermal spread
+      :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
+      method and Lorentz transform as for the Sobol-sampled momenta.
 
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
-      which gives the distribution of each component of the momentum as a function of space.
-
-    * ``gaussian_parse_momentum_function``: Gaussian momentum distribution where the mean and the standard deviation are given by functions of position in the input file.
-      Both are assumed to be non-relativistic.
-      The mean is the normalized momentum, :math:`u_m = \gamma v_m/c`.
-      The standard deviation is normalized, :math:`u_{th} = v_{th}/c`.
-      For example, this might be ``u_th = sqrt(T*q_e/mass)/clight`` given the temperature (in eV) and mass.
-      It requires the following arguments:
-
-      * ``<species_name>.momentum_function_ux_m(x,y,z)``: mean :math:`u_{x}`
-      * ``<species_name>.momentum_function_uy_m(x,y,z)``: mean :math:`u_{y}`
-      * ``<species_name>.momentum_function_uz_m(x,y,z)``: mean :math:`u_{z}`
-      * ``<species_name>.momentum_function_ux_th(x,y,z)``: standard deviation of :math:`u_{x}`
-      * ``<species_name>.momentum_function_uy_th(x,y,z)``: standard deviation of :math:`u_{y}`
-      * ``<species_name>.momentum_function_uz_th(x,y,z)``: standard deviation of :math:`u_{z}`
-
-.. pp:param:: <species_name>.theta_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if :pp:param:`<species_name>.momentum_distribution_type` is ``maxwell_boltzmann`` or ``maxwell_juttner``.
-    See documentation for these distributions (above) for constraints on values of theta. Temperatures less than zero are not allowed.
-
-    * If ``constant``, use a constant temperature, given by the required float parameter ``<species_name>.theta``.
-
-    * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.theta_function(x,y,z)``.
-
-.. pp:param:: <species_name>.beta_distribution_type
-    :type: ``string``
-    :default: ``constant``
-    :optional:
-
-    Only read if :pp:param:`<species_name>.momentum_distribution_type` is ``maxwell_boltzmann`` or ``maxwell_juttner``.
-    See documentation for these distributions (above) for constraints on values of beta.
-
-    * If ``constant``, use a constant speed, given by the required float parameter ``<species_name>.beta``.
-
-    * If ``parser``, use a spatially-dependent analytic parser function, given by the required parameter ``<species_name>.beta_function(x,y,z)``.
+      which give the distribution of each component of the momentum as a function of space.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``
@@ -2826,6 +2827,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
       from Goldston and Rutherford, section 14.2.
     - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
       This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
+    - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions of electrons and ions.
+      The absorbed energy and momentum from the photons is distributed among the electrons in the cell so that the quantities are exactly conserved.
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
@@ -2845,16 +2848,16 @@ Details about the collision models can be found in the :ref:`theory section <mul
 .. pp:param:: <collision_name>.species
     :type: ``strings``
 
-    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, or ``bremsstrahlung``, this should be the name(s) of the species,
+    If using ``dsmc``, ``pairwisecoulomb``, ``nuclearfusion``, ``bremsstrahlung``, or ``inverse_bremsstrahlung`` this should be the name(s) of the species,
     between which the collision will be considered. (Provide only one name for intra-species collisions.)
     With ``bremsstrahlung``, the electron species must be given first, followed by the target species.
+    Wtih ``inverse_bremsstrahlung``, this is the photon species being absorbed and the electron species they are colliding with, in that order.
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     If using ``pulsed_decay`` type this should be the name of the parent species.
     In these three cases, only one species name should be given.
     If using ``linear_breit_wheeler`` these should be two photon species.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
-
 
 .. pp:param:: <collision_name>.product_species
     :type: ``strings``
@@ -2884,6 +2887,17 @@ Details about the collision models can be found in the :ref:`theory section <mul
     The effective collision time step is ``dt_collision = dt_PIC / ndt_subcycle``.
     Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
     Useful when a large PIC time step is desired but collisions require finer time resolution.
+
+.. pp:param:: <collision_name>.cumulative_scattering_angle_model
+    :type: ``string``
+    :default: ``bobylev``
+    :optional:
+
+    Only for ``pairwisecoulomb``. Specifies the cumulative scattering distribution used to compute the scattering angle.
+    The possible values are ``bobylev`` and ``nanbu``.
+    With ``bobylev``, the scattering angle is sampled from Bobylev's distribution (see :cite:t:`param-BobylevJCP2013`).
+    With ``nanbu``, the scattering angle is sampled from Nanbu's distribution (see :cite:t:`param-NanbuPRE1997`).
+    See :cite:t:`param-AngusJCP2025` and :cite:t:`param-AngusJCP2026` for further discussion of cumulative scattering distributions.
 
 .. pp:param:: <collision_name>.CoulombLog
     :type: ``float``
@@ -2952,9 +2966,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :optional:
 
     Only for ``nuclearfusion``. The scattering angle for the products of the fusion reaction.
-    The possible values are ``isotropic`` and ``forward``.
+    The possible values are ``isotropic``, ``forward`` and ``backward``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
-    With ``forward``, the scattering angle is set to zero, i.e. the products are emitted in the same direction as the reactant.
+    With ``forward``, the scattering angle is set to zero, i.e. the products are emitted in the same direction as the reactant (in the center of mass frame).
+    With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in the opposite direction of the reactant (in the center of mass frame).
 
 .. pp:param:: <collision_name>.background_density
     :type: ``float``
@@ -3130,9 +3145,12 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: 0.05
     :optional:
 
-    Only for ``pairwisecoulomb`` collisions, with :pp:param:`collisions.correct_energy_momentum` set, the energy correction is applied to pairs of particles in their center of momentum frame.
+    Only for ``pairwisecoulomb`` collisions with :pp:param:`collisions.correct_energy_momentum` set, and for ``inverse_bremsstrahlung``.
+    In both cases, the energy difference is applied to pairs of particles in their center of momentum frame in such a way that the momentum is conserved.
+    This parameter limits the change in the energy of the electrons to the specified fraction of the energy in the COM frame of the pair of particles.
+    With ``pairwisecoulomb`` collisions, energy can be added or removed, and if residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
+    With ``inverse_bremsstrahlung``, energy is always added, and it there if residual energy remaining after 10 passes, that remaining energy is distributed evenly among the particles without conservation of momentum.
     This can be set for each collision using :pp:param:`<collision_name>.energy_fraction`.
-    This parameter is the fraction of the relative energy in the COM frame that is used in the correction. If residual energy error remains after 10 passes over all particle pairs in a cell, the correction is deemed to have failed and particle velocities in the cell are restored to their pre-collision values.
 
 .. pp:param:: collisions.beta_weight_exponent
     :type: ``float``
@@ -3650,7 +3668,7 @@ Maxwell solver: kinetic-fluid hybrid
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the exponent used to calculate
     the electron pressure (see :ref:`here <theory-hybrid-model-elec-temp>`).
 
-.. pp:param:: hybrid_pic_model.plasma_resistivity(rho,J)
+.. pp:param:: hybrid_pic_model.plasma_resistivity(rho,J,t)
     :type: ``float`` or ``str``
     :default: ``0``
     :optional:
@@ -3683,7 +3701,63 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``10``
     :optional:
 
-    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the number of sub-steps to take during the B-field update.
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the total number of sub-steps used to advance
+    the B-field over one full timestep (split evenly between the two half-steps, so ``substeps/2`` RK4 steps are taken
+    per half-step, each of duration :math:`\Delta t / \text{substeps}`). Must be divisible by 2; if not, the value is
+    automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this is
+    instead used only as the initial substep count estimate for the adaptive solver.
+
+.. pp:param:: hybrid_pic_model.use_rkf45
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this selects the B-field sub-step integrator.
+    When ``false`` (default), a fixed-step classical RK4 method is used with exactly
+    :pp:param:`hybrid_pic_model.substeps` total sub-steps per timestep.
+    When ``true``, the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) method :cite:t:`param-Fehlberg1969`
+    is used, controlling the local truncation error to stay within
+    :pp:param:`hybrid_pic_model.substep_rtol` and :pp:param:`hybrid_pic_model.substep_atol`.
+
+.. pp:param:: hybrid_pic_model.substep_rtol
+    :type: ``float``
+    :default: ``1e-4``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the relative tolerance for the RKF45
+    adaptive step-size control.
+
+.. pp:param:: hybrid_pic_model.substep_atol
+    :type: ``float``
+    :default: ``1e-8``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the absolute tolerance for the RKF45
+    adaptive step-size control.
+
+.. pp:param:: hybrid_pic_model.substep_safety
+    :type: ``float``
+    :default: ``0.9``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the safety factor applied to the
+    step-size adjustment formula.
+
+.. pp:param:: hybrid_pic_model.substep_max_growth
+    :type: ``float``
+    :default: ``5.0``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum factor by which the
+    substep size may grow after an accepted step.
+
+.. pp:param:: hybrid_pic_model.max_substep_attempts
+    :type: ``int``
+    :default: ``250``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum number of substep attempts
+    (accepted and rejected combined) per half-step before the simulation aborts.
 
 .. pp:param:: hybrid_pic_model.holmstrom_vacuum_region
     :type: ``bool``
@@ -4173,7 +4247,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
-    ``T_<species_name>`` is the temperature in eV.
+    ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.
