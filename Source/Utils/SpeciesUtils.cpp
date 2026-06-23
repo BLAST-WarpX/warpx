@@ -104,10 +104,13 @@ namespace SpeciesUtils {
                 density_parser->compile<3>()));
         } else if (rho_prof_s == "read_from_file") {
             std::string density_file;
+            std::string field_name = "density";
             bool distributed = true;
             utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
+            utils::parser::querry(pp_species, source_name, "density_mesh_name", field_name);
             pp_species.query("read_density_distributed", distributed);
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom, distributed));
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr,
+                density_file, field_name, geom, distributed));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
