@@ -53,9 +53,9 @@ namespace warpx::boundary_conditions
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             pp_boundary.query_enum_sloppy("field_lo",
-                field_boundary_lo[idim], "-_", idim);
+                field_boundary_lo[idim], "_", idim);
             pp_boundary.query_enum_sloppy("field_hi",
-                field_boundary_hi[idim], "-_", idim);
+                field_boundary_hi[idim], "_", idim);
         }
 
         detail::check_periodicity_consistency(field_boundary_lo, field_boundary_hi);
