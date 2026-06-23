@@ -320,13 +320,14 @@ struct InjectorMomentumJuttner
                 gamma = std::sqrt(1._rt+umag*umag);
                 x1 = theta*std::log(amrex::Random(engine));
             }
-            // Multiply the speed umag by a random isotropic unit vector.
-            amrex::Real const cos_theta = 2._rt*amrex::Random(engine) - 1._rt;
-            amrex::Real const sin_theta = std::sqrt(1._rt - cos_theta*cos_theta);
-            auto const [sin_phi, cos_phi] = amrex::Math::sincos(2._rt*MathConst::pi*amrex::Random(engine));
-            u[0] = umag*sin_theta*cos_phi;
-            u[1] = umag*sin_theta*sin_phi;
-            u[2] = umag*cos_theta;
+            // The following code samples a random unit vector
+            // and multiplies the result by speed umag.
+            x1 = amrex::Random(engine);
+            amrex::Real const x2 = amrex::Random(engine);
+            auto const [sin_x2, cos_x2] = amrex::Math::sincos(2._rt*MathConst::pi*x2);
+            u[0] = 2._rt*umag*std::sqrt(x1*(1._rt-x1))*sin_x2;
+            u[1] = 2._rt*umag*std::sqrt(x1*(1._rt-x1))*cos_x2;
+            u[2] = umag*(2._rt*x1-1._rt);
         }
         if (umean_mag == 0._rt) {
             return amrex::XDim3 {u[0], u[1], u[2]};
