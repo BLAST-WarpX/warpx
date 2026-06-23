@@ -85,8 +85,6 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         // elastic channels (e.g. with different cross-sections and/or scattering angle
         // models) can be included in the same collision under unique names.
         return ScatteringProcessType::ELASTIC;
-    } else if (scattering_process == "back") {
-        return ScatteringProcessType::BACK;
     } else if (scattering_process == "charge_exchange") {
         return ScatteringProcessType::CHARGE_EXCHANGE;
     } else if (scattering_process == "two_product_reaction") {
@@ -95,8 +93,6 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         return ScatteringProcessType::IONIZATION;
     } else if (scattering_process.find("excitation") != std::string::npos) {
         return ScatteringProcessType::EXCITATION;
-    } else if (scattering_process.find("forward") != std::string::npos) {
-        return ScatteringProcessType::FORWARD;
     } else {
         return ScatteringProcessType::INVALID;
     }

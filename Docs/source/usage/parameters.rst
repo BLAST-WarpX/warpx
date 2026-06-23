@@ -3046,11 +3046,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
 
-    The angular distribution of a particle-conserving process (such as ``elastic``) is
+    For ``elastic`` and ``excitationX``, the angular distribution is
     controlled by the per-process :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model`
-    argument. The legacy process names ``forward`` and ``back`` are deprecated: they are still
-    accepted (with a deprecation warning) and are equivalent to specifying ``elastic`` together
-    with ``<collision_name>.elastic_scattering_angle_model = forward`` or ``= backward``, respectively.
+    argument.
 
 .. pp:param:: <collision_name>.<scattering_process>_cross_section
     :type: ``string``
@@ -3072,8 +3070,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :default: ``isotropic``
     :optional:
 
-    Only for ``dsmc`` and ``background_mcc``, and only for particle-conserving processes
-    (such as ``elastic``). The model used to determine the scattering angle of the products
+    Only for ``dsmc`` and ``background_mcc``, and only for ``elastic`` and ``excitationX``.
+    The model used to determine the scattering angle of the products
     in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction

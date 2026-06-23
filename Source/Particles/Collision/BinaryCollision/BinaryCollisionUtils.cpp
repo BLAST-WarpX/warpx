@@ -13,8 +13,6 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
-#include <ablastr/warn_manager/WarnManager.H>
-
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
 
@@ -138,32 +136,20 @@ namespace BinaryCollisionUtils{
                     pp_collision_name, kw_energy.c_str(), energy);
             }
 
-            // Determine the effective process name and the scattering angle model.
             // The angular behavior of a particle-conserving process is controlled by the
-            // per-process `<process>_scattering_angle_model` argument. The legacy process
-            // names `back` and `forward` are still accepted and are translated to `elastic`
-            // with the corresponding angle model (`backward` and `forward`, respectively).
-            std::string effective_process = scattering_process;
+            // per-process `<process>_scattering_angle_model` argument.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                scattering_process != "back" && scattering_process != "forward",
+                "The scattering process names 'back' and 'forward' are no longer supported. "
+                "Use 'elastic' with '" + collision_name +
+                ".elastic_scattering_angle_model = backward' or '= forward' instead.");
+
             auto scattering_angle_model = ScatteringAngleModel::Default;
-            if (scattering_process == "back") {
-                effective_process = "elastic";
-                scattering_angle_model = ScatteringAngleModel::Backward;
-                ablastr::warn_manager::WMRecordWarning("Collisions",
-                    "The scattering process name 'back' is deprecated. Use 'elastic' with '"
-                    + collision_name + ".elastic_scattering_angle_model = backward' instead.");
-            } else if (scattering_process == "forward") {
-                effective_process = "elastic";
-                scattering_angle_model = ScatteringAngleModel::Forward;
-                ablastr::warn_manager::WMRecordWarning("Collisions",
-                    "The scattering process name 'forward' is deprecated. Use 'elastic' with '"
-                    + collision_name + ".elastic_scattering_angle_model = forward' instead.");
-            }
-            // Allow the angle model to be specified (or overridden) explicitly for any process.
             pp_collision_name.query_enum_sloppy(
                 scattering_process + "_scattering_angle_model", scattering_angle_model, "-_");
 
             scattering_processes.push_back(ScatteringProcess(
-                effective_process, cross_section_file, energy, scattering_angle_model));
+                scattering_process, cross_section_file, energy, scattering_angle_model));
         }
 
         return scattering_processes;

@@ -26,14 +26,14 @@ DSMCFunc::DSMCFunc (
     const amrex::ParmParse pp_collision_name(collision_name);
 
     // query for a list of collision processes
-    // these could be elastic, excitation, charge_exchange, back, etc.
+    // these could be elastic, excitation, charge_exchange, etc.
     amrex::Vector<std::string> scattering_process_names;
     pp_collision_name.queryarr("scattering_processes", scattering_process_names);
 
     // Build the ScatteringProcess objects. This shared helper parses the per-process
-    // cross-section, energy and scattering angle model, and translates the legacy
-    // `back`/`forward` process names. The same helper is used by SplitAndScatterFunc so
-    // that both functors agree on the process ordering, type and angle model.
+    // cross-section, energy and scattering angle model. The same helper is used by
+    // SplitAndScatterFunc so that both functors agree on the process ordering, type and
+    // angle model.
     m_scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
 
     // Validate the processes (in the same order as the input list)
