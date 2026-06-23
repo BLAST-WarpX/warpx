@@ -1303,7 +1303,8 @@ WarpX::ReadParameters ()
 
         // Query algo.field_gathering from input, set field_gathering_algo to
         // "default" if not found (default defined in Utils/WarpXAlgorithmSelection.cpp)
-        pp_algo.query_enum_case_insensitive("field_gathering", field_gathering_algo);
+        pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-");
+        // query_enum_sloppy with "-" needed to map "energy-conserving" to "Algo::EnergyConserving"
 
         // Set default field gathering algorithm for hybrid grids (momentum-conserving)
         std::string tmp_algo;
