@@ -339,6 +339,7 @@ struct InjectorMomentumJuttner
         amrex::Real const ux_perp = u[0] - u_par*nx;
         amrex::Real const uy_perp = u[1] - u_par*ny;
         amrex::Real const uz_perp = u[2] - u_par*nz;
+        x1 = amrex::Random(engine);
         // The following condition is equation 32 in Zenitani, called
         // The flipping method. It transforms the integral: d3x' -> d3x
         // where d3x' is the volume element for positions in the boosted frame.
@@ -351,7 +352,7 @@ struct InjectorMomentumJuttner
         // would be to initialize the particle positions and densities in the
         // frame moving at speed beta, and then perform a Lorentz transform
         // on their positions and MJ sampled velocities to the simulation frame.
-        if(-beta*u_par/gamma > amrex::Random(engine))
+        if(-beta*u_par/gamma>x1)
         {
             u_par = -u_par;
         }
