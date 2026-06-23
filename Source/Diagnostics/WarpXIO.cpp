@@ -24,6 +24,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
