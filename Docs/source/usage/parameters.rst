@@ -3896,8 +3896,15 @@ Additional parameters
     :type: ``0`` or ``1``
     :default: 0
 
-    Whether to use projection method to scrub A/B field divergence in externally
-    loaded fields. This is automatically turned on if external/initial B or time varying A fields are loaded.
+    Whether to use a projection method to scrub A/B field divergence in externally
+    loaded fields. This applies to both externally loaded grid fields
+    (``warpx.B_ext_grid_init_style``) and externally applied particle fields
+    (``particles.B_ext_particle_init_style = read_from_file``); when several applied
+    field maps are stacked, each map is cleaned independently. It is supported for the
+    electromagnetic (Yee, hybrid-PIC), electrostatic (labframe) and magnetostatic
+    (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+    This is automatically turned on if external/initial grid B or time varying A fields
+    are loaded; for applied particle fields it must be enabled explicitly (opt-in).
 
 .. pp:param:: warpx.projection_div_cleaner.rtol
     :type: ``float``
