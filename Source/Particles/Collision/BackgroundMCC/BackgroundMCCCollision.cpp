@@ -7,6 +7,7 @@
 #include "BackgroundMCCCollision.H"
 
 #include "ImpactIonization.H"
+#include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
@@ -87,43 +88,12 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     utils::parser::queryWithParser(
         pp_collision_name, "background_mass", m_background_mass);
 
-    // query for a list of collision processes
-    // these could be elastic, excitation, charge_exchange, etc.
-    amrex::Vector<std::string> scattering_process_names;
-    pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+    // Parse the list of collision processes (these could be elastic, excitation,
+    // charge_exchange, etc.) into ScatteringProcess objects. This shared helper reads the
+    // per-process cross-section, energy and scattering angle model.
+    auto scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
 
-    // create a vector of ScatteringProcess objects from each scattering
-    // process name
-    for (const auto& scattering_process : scattering_process_names) {
-        const std::string kw_cross_section = scattering_process + "_cross_section";
-        std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section, cross_section_file);
-
-        amrex::ParticleReal energy = 0.0;
-        // if the scattering process is excitation or ionization get the
-        // energy associated with that process
-        if (scattering_process.find("excitation") != std::string::npos ||
-            scattering_process.find("ionization") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
-            utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-
-        // The angular behavior of a process is controlled by the per-process
-        // `<process>_scattering_angle_model` argument.
-        // The default angle model depends on the process: product-producing processes
-        // (charge exchange and two-product reactions) default to forward scattering, while
-        // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
-        const auto process_type = ScatteringProcess::parseProcessType(scattering_process);
-        auto scattering_angle_model =
-            (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
-             process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
-            ? ScatteringAngleModel::Forward : ScatteringAngleModel::Isotropic;
-        pp_collision_name.query_enum_case_insensitive(
-            scattering_process + "_scattering_angle_model", scattering_angle_model);
-
-        ScatteringProcess process(scattering_process, cross_section_file, energy, scattering_angle_model);
-
+    for (auto& process : scattering_processes) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                          "Cannot add an unknown scattering process type");
 

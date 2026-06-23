@@ -120,15 +120,13 @@ namespace BinaryCollisionUtils{
             std::string cross_section_file;
             pp_collision_name.query(kw_cross_section, cross_section_file);
 
-            // The energy cost (penalty) of the process, in eV. It is required for the
-            // inelastic processes that produce new species or change the internal state
-            // (excitation, ionization, two-product reaction), and optional otherwise (e.g.
-            // an elastic channel with a fixed energy loss, or forward scattering with a loss).
+            // The energy cost (penalty) of the process, in eV. It is required for excitation
+            // and ionization, and optional otherwise (e.g. an elastic channel or a two-product
+            // reaction with a fixed energy loss).
             amrex::ParticleReal energy = 0._prt;
             const std::string kw_energy = scattering_process + "_energy";
             if (scattering_process.find("excitation") != std::string::npos ||
-                scattering_process.find("ionization") != std::string::npos ||
-                scattering_process.find("two_product_reaction") != std::string::npos ) {
+                scattering_process.find("ionization") != std::string::npos) {
                 utils::parser::getWithParser(
                     pp_collision_name, kw_energy.c_str(), energy);
             } else {
