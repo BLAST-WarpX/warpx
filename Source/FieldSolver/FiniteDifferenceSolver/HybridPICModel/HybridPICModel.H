@@ -526,6 +526,15 @@ public:
      *  deep interior, where it is causally inert). Runtime knob
      *  hybrid_pic_model.eb_b_fill_band_cells; default 1 (legacy behavior). */
     amrex::Real m_eb_b_fill_band_cells = 1.0;
+    /** Mirror-fill band width (in cells) for the electric-field (Efield_fp) EB
+     *  fill. A 1-cell band zeros any cut edge whose (staggered) node sits deeper
+     *  than h_max inside a curved wall -- i.e. the diagonal/corner edges between
+     *  h_max and sqrt(AMREX_SPACEDIM)*h_max -- and those zeroed covered-E edges
+     *  feed the ECT Faraday circulation (Rho) of adjacent UNCOVERED cells, so
+     *  they must stay solid. Widen to >= sqrt(AMREX_SPACEDIM) (~1.74 in 3D) so
+     *  the near-wall cut edges are mirror-filled, not zeroed. Runtime knob
+     *  hybrid_pic_model.eb_e_fill_band_cells; default 1 (legacy behavior). */
+    amrex::Real m_eb_e_fill_band_cells = 1.0;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;
