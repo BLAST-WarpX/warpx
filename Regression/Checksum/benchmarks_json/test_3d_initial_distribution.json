@@ -56,9 +56,9 @@
     "particle_weight": 8e+21
   },
   "maxwell_juttner_drift": {
-    "particle_momentum_x": 3.504016468376432e-16,
-    "particle_momentum_y": 2.71535005252522e-16,
-    "particle_momentum_z": 2.215489451689123e-16,
+    "particle_momentum_x": 3.502538965111097e-16,
+    "particle_momentum_y": 2.715438716777594e-16,
+    "particle_momentum_z": 2.2738406064935205e-16,
     "particle_position_x": 256018.3820250526,
     "particle_position_y": 255942.78677654648,
     "particle_position_z": 256079.82187197136,

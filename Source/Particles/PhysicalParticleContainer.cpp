@@ -442,8 +442,11 @@ PhysicalParticleContainer::BackwardCompatibility ()
     for (const std::string old_param : {"bulk_vel_dir", "beta_distribution_type",
                                         "beta_function(x,y,z)", "beta"}) {
         if (pp_species_name.query(old_param.c_str(), backward_string)) {
-            WARPX_ABORT_WITH_MESSAGE(
-                "<species>." + old_param + " is no longer supported. " + juttner_drift_msg);
+            std::string msg = "<species>.";
+            msg += old_param;
+            msg += " is no longer supported. ";
+            msg += juttner_drift_msg;
+            WARPX_ABORT_WITH_MESSAGE(msg);
         }
     }
 }
