@@ -1,8 +1,12 @@
+amr.max_level = 1
+warpx.fine_tag_lo = -0.25 -0.25 -0.25
+warpx.fine_tag_hi =  0.25  0.25  0.25
+
 max_step = 1
 amr.n_cell = 64 64 64
-amr.max_level = 0
 amr.blocking_factor = 8
 amr.max_grid_size = 128
+amr.ref_ratio_vect = 2 2 2
 geometry.dims = 3
 boundary.field_lo = pec pec pec
 boundary.field_hi = pec pec pec
@@ -28,16 +32,6 @@ algo.field_gathering = momentum-conserving
 diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez rho phi eb_covered
+diag1.fields_to_plot = Ex Ey Ez phi eb_covered
 diag1.format = openpmd
 diag1.openpmd_backend = h5
-
-warpx.reduced_diags_names = eb_charge eb_charge_one_eighth
-eb_charge.type = ChargeOnEB
-eb_charge.intervals = 1
-# Select only the inner sphere (r<0.3 is between the inner and outer spheres)
-eb_charge.weighting_function(x,y,z) = (x**2+y**2+z**2 < 0.3**2)
-eb_charge_one_eighth.type = ChargeOnEB
-eb_charge_one_eighth.intervals = 1
-# Select only one eighth of the inner sphere
-eb_charge_one_eighth.weighting_function(x,y,z) = (x**2+y**2+z**2 < 0.3**2)*(x>0)*(y<0)*(z>0)
