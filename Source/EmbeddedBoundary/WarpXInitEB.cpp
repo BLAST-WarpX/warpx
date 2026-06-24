@@ -97,7 +97,15 @@ WarpX::InitEB ()
          // number (e.g., maxLevel()+20) for multigrid solvers.  Because the coarse
          // level has only 1/8 of the cells on the fine level, the memory usage should
          // not be an issue.
-        amrex::EB2::Build(gshop, Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        // Pass all AMR-level geometries explicitly so that AMReX registers the
+        // exact domain box for each level. Without this, AMReX derives coarse
+        // domains by coarsening Geom(maxLevel()) uniformly by 2 in every direction,
+        // which does not match the actual AMR geometry when ref_ratio_vect is
+        // anisotropic (e.g. 2 2 1), causing a "Geometry not found" abort in
+        // EB2::IndexSpace::getLevel.
+        amrex::Vector<amrex::Geometry> geoms;
+        for (int lev = 0; lev <= maxLevel(); lev++) { geoms.push_back(Geom(lev)); }
+        amrex::EB2::Build(gshop, geoms);
     } else {
         amrex::ParmParse pp_eb2("eb2");
         if (!pp_eb2.contains("geom_type")) {
@@ -105,7 +113,7 @@ WarpX::InitEB ()
             pp_eb2.add("geom_type", geom_type); // use all_regular by default
         }
         // See the comment above on amrex::EB2::Build for the hard-wired number 20.
-        amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20, 4, false);
     }
 #endif
 }
