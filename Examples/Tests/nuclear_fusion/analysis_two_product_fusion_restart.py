@@ -53,10 +53,9 @@ def check_restart(filename, tolerance=1e-10):
     # and compare output data generated from initial run with output data generated after restart
     print(f"\ntolerance = {tolerance}")
     print()
-    for field in ['DTF1_particle_production',
-                  'DTF2_particle_production']:
-        dr = ad_restart['boxlib', field].squeeze().v
-        db = ad_benchmark['boxlib', field].squeeze().v
+    for field in ["DTF1_particle_production", "DTF2_particle_production"]:
+        dr = ad_restart["boxlib", field].squeeze().v
+        db = ad_benchmark["boxlib", field].squeeze().v
         error = np.amax(np.abs(dr - db))
         if np.amax(np.abs(db)) != 0.0:
             error /= np.amax(np.abs(db))
