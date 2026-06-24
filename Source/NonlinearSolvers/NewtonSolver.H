@@ -42,18 +42,18 @@ public:
     NewtonSolver(NewtonSolver&&) noexcept = delete;
     NewtonSolver& operator=(NewtonSolver&&) noexcept = delete;
 
-    void Define ( const Vec&  a_U,
-                        Ops*  a_ops ) override;
+    void Define (const Vec&  a_U,
+                       Ops*  a_ops) override;
 
-    void Solve ( Vec&   a_U,
-           const Vec&   a_b,
-           amrex::Real  a_time,
-           amrex::Real  a_dt,
-           int          a_step) const override;
+    void Solve (Vec&   a_U,
+          const Vec&   a_b,
+          amrex::Real  a_time,
+          amrex::Real  a_dt,
+          int          a_step) const override;
 
-    void GetSolverParams ( amrex::Real&  a_rtol,
-                           amrex::Real&  a_atol,
-                           int&          a_maxits ) override
+    void GetSolverParams (amrex::Real&  a_rtol,
+                          amrex::Real&  a_atol,
+                          int&          a_maxits) override
     {
         a_rtol = m_rtol;
         a_atol = m_atol;
@@ -307,11 +307,11 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
 }
 
 template <class Vec, class Ops>
-void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
-                              const Vec&         a_b,
-                                    amrex::Real  a_time,
-                                    amrex::Real  a_dt,
-                                    int          a_step) const
+void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
+                             const Vec&         a_b,
+                                   amrex::Real  a_time,
+                                   amrex::Real  a_dt,
+                                   int          a_step) const
 {
     BL_PROFILE("NewtonSolver::Solve()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -354,6 +354,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs < m_atol) {
+            this->m_exit_status = 2;
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied absolute tolerance " << m_atol << "\n";
@@ -362,6 +363,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_rel < m_rtol) {
+            this->m_exit_status = 3;
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied relative tolerance " << m_rtol << "\n";
@@ -370,6 +372,7 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
         }
 
         if (norm_abs > 100._rt*norm0) {
+            this->m_exit_status = -9;
             amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                            << ". SOLVER DIVERGED! relative tolerance = " << m_rtol << "\n";
             std::stringstream convergenceMsg;
@@ -409,18 +412,17 @@ void NewtonSolver<Vec,Ops>::Solve ( Vec&         a_U,
     m_total_linsol_iters += linear_solver_iters;
 
     if (m_rtol > 0. && iter == m_maxits) {
-       std::stringstream convergenceMsg;
-       convergenceMsg << "Newton solver failed to converge after " << iter <<
-                         " iterations. Relative norm is " << norm_rel <<
-                         " and the relative tolerance is " << m_rtol <<
-                         ". Absolute norm is " << norm_abs <<
-                         " and the absolute tolerance is " << m_atol;
-       if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
-       if (m_require_convergence) {
-           WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
-       } else {
-           ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
-       }
+        std::stringstream convergenceMsg;
+        convergenceMsg << "Newton solver failed to converge after " << iter <<
+                          " iterations. Relative norm is " << norm_rel <<
+                          " and the relative tolerance is " << m_rtol <<
+                          ". Absolute norm is " << norm_abs <<
+                          " and the absolute tolerance is " << m_atol;
+        if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+        ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
+
+        if (m_require_convergence) { this->m_exit_status = -5; }
+        else { this->m_exit_status = 0; }
     }
 
     if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
