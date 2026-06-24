@@ -42,6 +42,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_deuterium_tritium_fusion_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_deuterium_tritium_fusion_restart  # inputs
+    "analysis_two_product_fusion_restart.py diags/diag1000002"  # analysis
+    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_proton_boron_fusion  # name
     3  # dims
     2  # nprocs

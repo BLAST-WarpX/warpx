@@ -2,7 +2,7 @@
 ####### GENERAL PARAMETERS ######
 #################################
 ## With these parameters, each cell has a size of exactly 1 by 1 by 1
-max_step = 1
+max_step = 2
 amr.n_cell = 8 8 16
 amr.max_grid_size = 8
 amr.blocking_factor = 8
@@ -133,7 +133,11 @@ DTF2.create_products = 1
 DTF2.save_particle_production = 1
 
 # Diagnostics
-diagnostics.diags_names = diag1
+diagnostics.diags_names = diag1 checkpoint
 diag1.intervals = 1
 diag1.diag_type = Full
 diag1.fields_to_plot = rho DTF1_particle_production DTF2_particle_production
+
+checkpoint.format = checkpoint
+checkpoint.diag_type = Full
+checkpoint.intervals = 1

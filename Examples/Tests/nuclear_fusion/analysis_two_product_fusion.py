@@ -405,7 +405,7 @@ def check_macroparticle_number(
         w_sum = data[product_species[0] + "_w_end"].sum()
         n_sum = data["particle_production"].sum()
         tolerance = 0.02
-        print("Check particle production diagnostic:")
+        print(f"Check particle production diagnostic for collision {data['collision_name']}:")
         print(f"from particles  = {w_sum}")
         print(f"from diagnostic = {n_sum}")
         print(f"error = {np.abs(w_sum - n_sum) / w_sum}")
@@ -560,6 +560,7 @@ def main():
 
         product_production_name = f"{collision_names[i - 1]}_particle_production"
         if ("boxlib", product_production_name) in ds_end.field_list:
+            data["collision_name"] = collision_names[i - 1]
             data["particle_production"] = field_data_end[
                 "boxlib", product_production_name
             ].to_ndarray()
