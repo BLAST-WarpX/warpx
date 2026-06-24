@@ -985,6 +985,45 @@ void FiniteDifferenceSolver::HybridPICSolveESpherical (
 
 namespace
 {
+    /** True if any edge in the 3x3x3 (3x3 in 2D) neighbourhood of (i,j,k) in the
+     *  eb_update_E[dir] flag array is non-regular (flag != 1).
+     *
+     *  Used (only when eb_resistive_only_partial is on) to extend the
+     *  resistive-only region from the cut edge itself (flag 2) to every regular
+     *  edge whose isotropic Laplacian / corner-curl stencil would otherwise reach
+     *  a non-regular edge in the zeroed deep interior. Dropping the iso-hyper and
+     *  iso-resistivity terms over this band removes the sqrt(SPACEDIM) diagonal
+     *  reach on the plasma-current/E mirror fill, so the fill band can be 1.
+     *
+     *  Bounds-guarded by Array4::contains. This is a per-cell scan; it could be
+     *  precomputed into a mask for performance later.
+     */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    bool StencilTouchesNonregular (
+        amrex::Array4<int> const& flag,
+        int const i, int const j, int const k)
+    {
+        if (!flag) { return false; }
+#if defined(WARPX_DIM_3D)
+        for (int dk = -1; dk <= 1; ++dk) {
+#else
+        constexpr int dk = 0;
+        {
+#endif
+            for (int dj = -1; dj <= 1; ++dj) {
+                for (int di = -1; di <= 1; ++di) {
+                    const int ii = i + di;
+                    const int jj = j + dj;
+                    const int kk = k + dk;
+                    if (flag.contains(ii, jj, kk) && (flag(ii, jj, kk) != 1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     /** Isotropic discrete Laplacian for the hyper-resistivity term.
      *
      *  The cross stencil Dxx+Dyy+Dzz has a leading truncation error whose
@@ -1454,7 +1493,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // resistive-only (GOL mask); flag 1 = regular.
             const int ebf_x = update_Ex_arr ? update_Ex_arr(i, j, k) : 1;
             if (ebf_x == 0) { return; }
-            const bool partial_resistive_only = eb_resistive_only_partial && (ebf_x == 2);
+            const bool partial_resistive_only = eb_resistive_only_partial
+                && (ebf_x == 2
+                    || ::StencilTouchesNonregular(update_Ex_arr, i, j, k));
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
@@ -1564,7 +1605,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // resistive-only (GOL mask); flag 1 = regular.
             const int ebf_y = update_Ey_arr ? update_Ey_arr(i, j, k) : 1;
             if (ebf_y == 0) { return; }
-            const bool partial_resistive_only = eb_resistive_only_partial && (ebf_y == 2);
+            const bool partial_resistive_only = eb_resistive_only_partial
+                && (ebf_y == 2
+                    || ::StencilTouchesNonregular(update_Ey_arr, i, j, k));
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
@@ -1659,7 +1702,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // resistive-only (GOL mask); flag 1 = regular.
             const int ebf_z = update_Ez_arr ? update_Ez_arr(i, j, k) : 1;
             if (ebf_z == 0) { return; }
-            const bool partial_resistive_only = eb_resistive_only_partial && (ebf_z == 2);
+            const bool partial_resistive_only = eb_resistive_only_partial
+                && (ebf_z == 2
+                    || ::StencilTouchesNonregular(update_Ez_arr, i, j, k));
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
