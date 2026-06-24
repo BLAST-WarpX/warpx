@@ -3951,6 +3951,13 @@ Additional parameters
     When running in an accelerated platform, whether to call a ``amrex::Gpu::synchronize()`` around profiling regions.
     This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
 
+.. pp:param:: warpx.tiny_profiler_flush_interval
+    :type: ``string``
+    :default: s: ``-1``
+    :optional:
+
+    When running with tiny profiling, this allows the profiling information to be written out at times during the simulation, specified using the `Time intervals`_ syntax, in addition to at the end.
+
 .. pp:param:: warpx.sort_intervals
     :type: ``string``
     :default: s: ``-1`` on CPU; ``4`` on GPU
