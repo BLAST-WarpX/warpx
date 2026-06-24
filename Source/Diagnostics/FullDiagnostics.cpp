@@ -535,8 +535,18 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 // Use 1 instead of ncomp here because eb_covered is only computed/stored for mode m=0
                 AddRZModesToOutputNames(std::string("eb_covered"), 1);
             }
-        }
-        else {
+        } else if ( warpx.m_fields.has(m_varnames_fields[comp], lev) ) {
+            amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
+            const int mf_ncomp = mf->nComp();
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
+            if (mf_ncomp == ncomp) {
+                AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
+            } else if (mf_ncomp == 1) {
+                m_varnames.push_back(m_varnames_fields[comp]);
+            } else {
+                WARPX_ABORT_WITH_MESSAGE("Error: " + m_varnames_fields[comp] + " has an unexpected number of components and can not be written out");
+            }
+        } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error: " + m_varnames_fields[comp] + " is not a known field output type in RZ geometry");
         }
@@ -884,8 +894,6 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
-            } else if ( warpx.m_fields.has(m_varnames[comp], Direction{idir}, lev) ) {
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], Direction{idir}, lev), lev, m_crse_ratio);
             }
         }
         // Check if comp was found above
