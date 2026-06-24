@@ -8,17 +8,19 @@
 #ifndef WARPX_CURRENTDEPOSITION_H_
 #define WARPX_CURRENTDEPOSITION_H_
 
-#include "Particles/Deposition/SharedDepositionUtils.H"
+#if !defined(WARPX_DIM_RUNTIME)
+#   include "Particles/Deposition/SharedDepositionUtils.H"
+#   include "Utils/ParticleUtils.H"
+#endif
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/ShapeFactors.H"
-#include "Utils/ParticleUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#ifdef WARPX_DIM_RZ
-#   include "Utils/WarpX_Complex.H"
-#endif
+#include "Utils/WarpXDim.H"
+#include "Utils/WarpXDimIndexing.H"
+#include "Utils/WarpX_Complex.H"
 
 #include <AMReX.H>
 #include <AMReX_Arena.H>
@@ -27,8 +29,115 @@
 #include <AMReX_REAL.H>
 
 /**
+ * \brief Shape factors and start indices along one logical axis, for the
+ *        deposition of one 3-component field (e.g., the current density)
+ *
+ * For an axis absent from the grid of the simulated dimensionality
+ * (active = false), the loop bound collapses to 0, weights to 1 and start
+ * indices to 0, so that the surrounding deposition loop nest degenerates to
+ * exactly the per-dimension loop nest of the corresponding compile-time
+ * dimensional code.
+ *
+ * \tparam depos_order deposition order
+ * \tparam active      whether this axis is present on the grid
+ */
+template <int depos_order, bool active>
+struct DepositAxisShape
+{
+    //! inclusive upper bound of the deposition loop along this axis
+    static constexpr int loop_max = active ? depos_order : 0;
+
+    //! shape factors along this axis of components 0, 1, 2, selected by their index type
+    amrex::Real s_j[3][active ? depos_order + 1 : 1] = {{amrex::Real(0.)}};
+    //! leftmost grid point indices along this axis of components 0, 1, 2
+    int i_j[3] = {0, 0, 0};
+
+    /** Compute the shape factors along this axis at position mid (in cell units)
+     *
+     * \param type_0,type_1,type_2 grid index types of the three field components
+     * \param slot                 array slot of this axis (e.g., warpx::IdxMap<D>::z)
+     * \param mid                  particle position along this axis, in cell units
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void compute ([[maybe_unused]] amrex::IntVect const& type_0,
+                  [[maybe_unused]] amrex::IntVect const& type_1,
+                  [[maybe_unused]] amrex::IntVect const& type_2,
+                  [[maybe_unused]] int const slot,
+                  [[maybe_unused]] double const mid)
+    {
+        if constexpr (active) {
+            using namespace amrex::literals;
+
+            constexpr int NODE = amrex::IndexType::NODE;
+            constexpr int CELL = amrex::IndexType::CELL;
+
+            const int t[3] = {type_0[slot], type_1[slot], type_2[slot]};
+
+            // Keep these double to avoid bug in single precision
+            double s_node[depos_order + 1] = {0.};
+            double s_cell[depos_order + 1] = {0.};
+            int i_node = 0;
+            int i_cell = 0;
+            Compute_shape_factor<depos_order> const compute_shape_factor;
+            if (t[0] == NODE || t[1] == NODE || t[2] == NODE) {
+                i_node = compute_shape_factor(s_node, mid);
+            }
+            if (t[0] == CELL || t[1] == CELL || t[2] == CELL) {
+                i_cell = compute_shape_factor(s_cell, mid - 0.5);
+            }
+            for (int c = 0; c < 3; ++c) {
+                for (int i = 0; i <= depos_order; ++i) {
+                    s_j[c][i] = ((t[c] == NODE) ? amrex::Real(s_node[i]) : amrex::Real(s_cell[i]));
+                }
+                i_j[c] = ((t[c] == NODE) ? i_node : i_cell);
+            }
+        }
+    }
+
+    //! shape factor of component c at loop index i; 1 for an absent axis
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real w ([[maybe_unused]] int const c, [[maybe_unused]] int const i) const
+    {
+        using namespace amrex::literals;
+        if constexpr (active) { return s_j[c][i]; } else { return 1._rt; }
+    }
+
+    //! leftmost grid point index of component c; 0 for an absent axis
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    int i0 ([[maybe_unused]] int const c) const
+    {
+        if constexpr (active) { return i_j[c]; } else { return 0; }
+    }
+};
+
+/**
+ * \brief Combine the per-axis shape factors of component c into one weight,
+ *        multiplying only the factors of axes present on the grid (in x, y, z
+ *        order, matching the per-dimension compile-time code)
+ */
+template <warpx::Dim D, typename T_AX, typename T_AY, typename T_AZ>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real combineShapeFactors (T_AX const& ax, T_AY const& ay, T_AZ const& az,
+                                 int const c, int const ix, int const iy, int const iz)
+{
+    if constexpr (!warpx::has_x<D>) {           // 1D (z)
+        amrex::ignore_unused(ax, ay, ix, iy);
+        return az.w(c, iz);
+    } else if constexpr (!warpx::has_z<D>) {    // 1D radial (r)
+        amrex::ignore_unused(ay, az, iy, iz);
+        return ax.w(c, ix);
+    } else if constexpr (!warpx::has_y<D>) {    // 2D (x/r, z)
+        amrex::ignore_unused(ay, iy);
+        return ax.w(c, ix)*az.w(c, iz);
+    } else {                                    // 3D (x, y, z)
+        return ax.w(c, ix)*ay.w(c, iy)*az.w(c, iz);
+    }
+}
+
+/**
  * \brief Kernel for the direct current deposition for thread thread_num
  * \tparam depos_order deposition order
+ * \tparam D           dimensionality of the simulation
  * \param xp, yp, zp    The particle positions.
  * \param wq            The charge of the macroparticle
  * \param vx,vy,vz      The particle velocities
@@ -44,7 +153,7 @@
  * \param lo            Index lower bounds of domain.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  */
-template <int depos_order>
+template <int depos_order, warpx::Dim D = warpx::CompileDim>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
                               [[maybe_unused]] const amrex::ParticleReal yp,
@@ -68,209 +177,103 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
 {
     using namespace amrex::literals;
 
-    constexpr int NODE = amrex::IndexType::NODE;
-    constexpr int CELL = amrex::IndexType::CELL;
+    static_assert(D != warpx::Dim::Runtime,
+        "doDepositionShapeNKernel requires an explicit dimensionality");
 
     // wqx, wqy wqz are particle current in each direction
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    // In RZ and RCYLINDER, wqx is actually wqr, and wqy is wqtheta
-    // Convert to cylindrical at the mid point
-    const amrex::Real xpmid = xp + relative_time*vx;
-    const amrex::Real ypmid = yp + relative_time*vy;
-    const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
-    const amrex::Real costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
-    const amrex::Real sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
-    const amrex::Real wqx = wq*invvol*(+vx*costheta + vy*sintheta);
-    const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
-    const amrex::Real wqz = wq*invvol*vz;
-    #if defined(WARPX_DIM_RZ)
-    const Complex xy0 = Complex{costheta, sintheta};
-    #endif
-#elif defined(WARPX_DIM_RSPHERE)
-    // Convert to cylindrical at the mid point
-    const amrex::Real xpmid = xp + relative_time*vx;
-    const amrex::Real ypmid = yp + relative_time*vy;
-    const amrex::Real zpmid = zp + relative_time*vz;
-    const amrex::Real rpxymid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
-    const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
-    const amrex::Real costheta = (rpxymid > 0._rt ? xpmid/rpxymid : 1._rt);
-    const amrex::Real sintheta = (rpxymid > 0._rt ? ypmid/rpxymid : 0._rt);
-    const amrex::Real cosphi = (rpmid > 0._rt ? rpxymid/rpmid : 1._rt);
-    const amrex::Real sinphi = (rpmid > 0._rt ? zpmid/rpmid : 0._rt);
-    // convert from Cartesian to spherical
-    const amrex::Real wqx = wq*invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi + vz*sinphi);
-    const amrex::Real wqy = wq*invvol*(-vx*sintheta + vy*costheta);
-    const amrex::Real wqz = wq*invvol*(-vx*costheta*sinphi - vy*sintheta*sinphi + vz*cosphi);
-#else
-    const amrex::Real wqx = wq*invvol*vx;
-    const amrex::Real wqy = wq*invvol*vy;
-    const amrex::Real wqz = wq*invvol*vz;
-#endif
-
-    // --- Compute shape factors
-    Compute_shape_factor< depos_order > const compute_shape_factor;
-#if !defined(WARPX_DIM_1D_Z)
-    // x direction
-    // Get particle position after 1/2 push back in position
-    // Keep these double to avoid bug in single precision
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    const double xmid = (rpmid - xyzmin.x)*dinv.x;
-#else
-    const double xmid = ((xp - xyzmin.x) + relative_time*vx)*dinv.x;
-#endif
-
-    // j_j[xyz] leftmost grid point in x that the particle touches for the centering of each current
-    // sx_j[xyz] shape factor along x for the centering of each current
-    // There are only two possible centerings, node or cell centered, so at most only two shape factor
-    // arrays will be needed.
-    // Keep these double to avoid bug in single precision
-    double sx_node[depos_order + 1] = {0.};
-    double sx_cell[depos_order + 1] = {0.};
-    int j_node = 0;
-    int j_cell = 0;
-    if (jx_type[0] == NODE || jy_type[0] == NODE || jz_type[0] == NODE) {
-        j_node = compute_shape_factor(sx_node, xmid);
-    }
-    if (jx_type[0] == CELL || jy_type[0] == CELL || jz_type[0] == CELL) {
-        j_cell = compute_shape_factor(sx_cell, xmid - 0.5);
+    [[maybe_unused]] amrex::Real costheta = 1._rt;
+    [[maybe_unused]] amrex::Real sintheta = 0._rt;
+    [[maybe_unused]] amrex::Real rpmid = 0._rt;
+    amrex::Real wqx, wqy, wqz;
+    if constexpr (D == warpx::Dim::RZ || D == warpx::Dim::RCylinder) {
+        // In RZ and RCYLINDER, wqx is actually wqr, and wqy is wqtheta
+        // Convert to cylindrical at the mid point
+        const amrex::Real xpmid = xp + relative_time*vx;
+        const amrex::Real ypmid = yp + relative_time*vy;
+        rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+        costheta = (rpmid > 0._rt ? xpmid/rpmid : 1._rt);
+        sintheta = (rpmid > 0._rt ? ypmid/rpmid : 0._rt);
+        wqx = wq*invvol*(+vx*costheta + vy*sintheta);
+        wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+        wqz = wq*invvol*vz;
+    } else if constexpr (D == warpx::Dim::RSphere) {
+        // Convert to cylindrical at the mid point
+        const amrex::Real xpmid = xp + relative_time*vx;
+        const amrex::Real ypmid = yp + relative_time*vy;
+        const amrex::Real zpmid = zp + relative_time*vz;
+        const amrex::Real rpxymid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+        rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
+        costheta = (rpxymid > 0._rt ? xpmid/rpxymid : 1._rt);
+        sintheta = (rpxymid > 0._rt ? ypmid/rpxymid : 0._rt);
+        const amrex::Real cosphi = (rpmid > 0._rt ? rpxymid/rpmid : 1._rt);
+        const amrex::Real sinphi = (rpmid > 0._rt ? zpmid/rpmid : 0._rt);
+        // convert from Cartesian to spherical
+        wqx = wq*invvol*(+vx*costheta*cosphi + vy*sintheta*cosphi + vz*sinphi);
+        wqy = wq*invvol*(-vx*sintheta + vy*costheta);
+        wqz = wq*invvol*(-vx*costheta*sinphi - vy*sintheta*sinphi + vz*cosphi);
+    } else {
+        wqx = wq*invvol*vx;
+        wqy = wq*invvol*vy;
+        wqz = wq*invvol*vz;
     }
 
-    amrex::Real sx_jx[depos_order + 1] = {0._rt};
-    amrex::Real sx_jy[depos_order + 1] = {0._rt};
-    amrex::Real sx_jz[depos_order + 1] = {0._rt};
-    for (int ix=0; ix<=depos_order; ix++)
-    {
-        sx_jx[ix] = ((jx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
-        sx_jy[ix] = ((jy_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
-        sx_jz[ix] = ((jz_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
+    // --- Compute shape factors along each axis present on the grid
+    // Keep the particle positions in cell units double to avoid bug in single precision
+    DepositAxisShape<depos_order, warpx::has_x<D>> ax;
+    DepositAxisShape<depos_order, warpx::has_y<D>> ay;
+    DepositAxisShape<depos_order, warpx::has_z<D>> az;
+    if constexpr (warpx::has_x<D>) {
+        // x (or r) direction: get particle position after 1/2 push back in position
+        double xmid;
+        if constexpr (warpx::is_radial<D>) {
+            xmid = (rpmid - xyzmin.x)*dinv.x;
+        } else {
+            xmid = ((xp - xyzmin.x) + relative_time*vx)*dinv.x;
+        }
+        ax.compute(jx_type, jy_type, jz_type, warpx::IdxMap<D>::x, xmid);
+    }
+    if constexpr (warpx::has_y<D>) {
+        const double ymid = ((yp - xyzmin.y) + relative_time*vy)*dinv.y;
+        ay.compute(jx_type, jy_type, jz_type, warpx::IdxMap<D>::y, ymid);
+    }
+    if constexpr (warpx::has_z<D>) {
+        const double zmid = ((zp - xyzmin.z) + relative_time*vz)*dinv.z;
+        az.compute(jx_type, jy_type, jz_type, warpx::IdxMap<D>::z, zmid);
     }
 
-    int const j_jx = ((jx_type[0] == NODE) ? j_node : j_cell);
-    int const j_jy = ((jy_type[0] == NODE) ? j_node : j_cell);
-    int const j_jz = ((jz_type[0] == NODE) ? j_node : j_cell);
-#endif //!defined(WARPX_DIM_1D_Z)
-
-#if defined(WARPX_DIM_3D)
-    // y direction
-    // Keep these double to avoid bug in single precision
-    const double ymid = ((yp - xyzmin.y) + relative_time*vy)*dinv.y;
-    double sy_node[depos_order + 1] = {0.};
-    double sy_cell[depos_order + 1] = {0.};
-    int k_node = 0;
-    int k_cell = 0;
-    if (jx_type[1] == NODE || jy_type[1] == NODE || jz_type[1] == NODE) {
-        k_node = compute_shape_factor(sy_node, ymid);
-    }
-    if (jx_type[1] == CELL || jy_type[1] == CELL || jz_type[1] == CELL) {
-        k_cell = compute_shape_factor(sy_cell, ymid - 0.5);
-    }
-    amrex::Real sy_jx[depos_order + 1] = {0._rt};
-    amrex::Real sy_jy[depos_order + 1] = {0._rt};
-    amrex::Real sy_jz[depos_order + 1] = {0._rt};
-    for (int iy=0; iy<=depos_order; iy++)
-    {
-        sy_jx[iy] = ((jx_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
-        sy_jy[iy] = ((jy_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
-        sy_jz[iy] = ((jz_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
-    }
-    int const k_jx = ((jx_type[1] == NODE) ? k_node : k_cell);
-    int const k_jy = ((jy_type[1] == NODE) ? k_node : k_cell);
-    int const k_jz = ((jz_type[1] == NODE) ? k_node : k_cell);
-#endif
-
-#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    // z direction
-    // Keep these double to avoid bug in single precision
-    constexpr int zdir = WARPX_ZINDEX;
-    const double zmid = ((zp - xyzmin.z) + relative_time*vz)*dinv.z;
-    double sz_node[depos_order + 1] = {0.};
-    double sz_cell[depos_order + 1] = {0.};
-    int l_node = 0;
-    int l_cell = 0;
-    if (jx_type[zdir] == NODE || jy_type[zdir] == NODE || jz_type[zdir] == NODE) {
-        l_node = compute_shape_factor(sz_node, zmid);
-    }
-    if (jx_type[zdir] == CELL || jy_type[zdir] == CELL || jz_type[zdir] == CELL) {
-        l_cell = compute_shape_factor(sz_cell, zmid - 0.5);
-    }
-    amrex::Real sz_jx[depos_order + 1] = {0._rt};
-    amrex::Real sz_jy[depos_order + 1] = {0._rt};
-    amrex::Real sz_jz[depos_order + 1] = {0._rt};
-    for (int iz=0; iz<=depos_order; iz++)
-    {
-        sz_jx[iz] = ((jx_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
-        sz_jy[iz] = ((jy_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
-        sz_jz[iz] = ((jz_type[zdir] == NODE) ? amrex::Real(sz_node[iz]) : amrex::Real(sz_cell[iz]));
-    }
-    int const l_jx = ((jx_type[zdir] == NODE) ? l_node : l_cell);
-    int const l_jy = ((jy_type[zdir] == NODE) ? l_node : l_cell);
-    int const l_jz = ((jz_type[zdir] == NODE) ? l_node : l_cell);
-#endif
+    // index lower bounds of the tile in logical (x, y, z) space
+    const amrex::Dim3 llo = warpx::logical_lo<D>(lo);
 
     // Deposit current into jx_arr, jy_arr and jz_arr
-#if defined(WARPX_DIM_1D_Z)
-    for (int iz=0; iz<=depos_order; iz++){
-        amrex::Gpu::Atomic::AddNoRet(
-            &jx_arr(lo.x+l_jx+iz, 0, 0, 0),
-            sz_jx[iz]*wqx);
-        amrex::Gpu::Atomic::AddNoRet(
-            &jy_arr(lo.x+l_jy+iz, 0, 0, 0),
-            sz_jy[iz]*wqy);
-        amrex::Gpu::Atomic::AddNoRet(
-            &jz_arr(lo.x+l_jz+iz, 0, 0, 0),
-            sz_jz[iz]*wqz);
-    }
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    for (int ix=0; ix<=depos_order; ix++){
-        amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, 0, 0, 0), sx_jx[ix]*wqx);
-        amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, 0, 0, 0), sx_jy[ix]*wqy);
-        amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, 0, 0, 0), sx_jz[ix]*wqz);
-    }
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-    for (int iz=0; iz<=depos_order; iz++){
-        for (int ix=0; ix<=depos_order; ix++){
-            amrex::Gpu::Atomic::AddNoRet(
-                &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 0),
-                sx_jx[ix]*sz_jx[iz]*wqx);
-            amrex::Gpu::Atomic::AddNoRet(
-                &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 0),
-                sx_jy[ix]*sz_jy[iz]*wqy);
-            amrex::Gpu::Atomic::AddNoRet(
-                &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 0),
-                sx_jz[ix]*sz_jz[iz]*wqz);
-#if defined(WARPX_DIM_RZ)
-            Complex xy = xy0; // Note that xy is equal to e^{i m theta}
-            for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
-                // The factor 2 on the weighting comes from the normalization of the modes
-                amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 2*imode-1), 2._rt*sx_jx[ix]*sz_jx[iz]*wqx*xy.real());
-                amrex::Gpu::Atomic::AddNoRet( &jx_arr(lo.x+j_jx+ix, lo.y+l_jx+iz, 0, 2*imode  ), 2._rt*sx_jx[ix]*sz_jx[iz]*wqx*xy.imag());
-                amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 2*imode-1), 2._rt*sx_jy[ix]*sz_jy[iz]*wqy*xy.real());
-                amrex::Gpu::Atomic::AddNoRet( &jy_arr(lo.x+j_jy+ix, lo.y+l_jy+iz, 0, 2*imode  ), 2._rt*sx_jy[ix]*sz_jy[iz]*wqy*xy.imag());
-                amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 2*imode-1), 2._rt*sx_jz[ix]*sz_jz[iz]*wqz*xy.real());
-                amrex::Gpu::Atomic::AddNoRet( &jz_arr(lo.x+j_jz+ix, lo.y+l_jz+iz, 0, 2*imode  ), 2._rt*sx_jz[ix]*sz_jz[iz]*wqz*xy.imag());
-                xy = xy*xy0;
-            }
-#endif
-        }
-    }
-#elif defined(WARPX_DIM_3D)
-    for (int iz=0; iz<=depos_order; iz++){
-        for (int iy=0; iy<=depos_order; iy++){
-            for (int ix=0; ix<=depos_order; ix++){
+    for (int iz=0; iz<=az.loop_max; iz++){
+        for (int iy=0; iy<=ay.loop_max; iy++){
+            for (int ix=0; ix<=ax.loop_max; ix++){
                 amrex::Gpu::Atomic::AddNoRet(
-                    &jx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz),
-                    sx_jx[ix]*sy_jx[iy]*sz_jx[iz]*wqx);
+                    &warpx::field_at<D>(jx_arr, llo.x+ax.i0(0)+ix, llo.y+ay.i0(0)+iy, llo.z+az.i0(0)+iz),
+                    combineShapeFactors<D>(ax, ay, az, 0, ix, iy, iz)*wqx);
                 amrex::Gpu::Atomic::AddNoRet(
-                    &jy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz),
-                    sx_jy[ix]*sy_jy[iy]*sz_jy[iz]*wqy);
+                    &warpx::field_at<D>(jy_arr, llo.x+ax.i0(1)+ix, llo.y+ay.i0(1)+iy, llo.z+az.i0(1)+iz),
+                    combineShapeFactors<D>(ax, ay, az, 1, ix, iy, iz)*wqy);
                 amrex::Gpu::Atomic::AddNoRet(
-                    &jz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz),
-                    sx_jz[ix]*sy_jz[iy]*sz_jz[iz]*wqz);
+                    &warpx::field_at<D>(jz_arr, llo.x+ax.i0(2)+ix, llo.y+ay.i0(2)+iy, llo.z+az.i0(2)+iz),
+                    combineShapeFactors<D>(ax, ay, az, 2, ix, iy, iz)*wqz);
+                if constexpr (D == warpx::Dim::RZ) {
+                    const Complex xy0 = Complex{costheta, sintheta};
+                    Complex xy = xy0; // Note that xy is equal to e^{i m theta}
+                    for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                        // The factor 2 on the weighting comes from the normalization of the modes
+                        amrex::Gpu::Atomic::AddNoRet( &warpx::field_at<D>(jx_arr, llo.x+ax.i0(0)+ix, llo.y+ay.i0(0)+iy, llo.z+az.i0(0)+iz, 2*imode-1), 2._rt*ax.w(0, ix)*az.w(0, iz)*wqx*xy.real());
+                        amrex::Gpu::Atomic::AddNoRet( &warpx::field_at<D>(jx_arr, llo.x+ax.i0(0)+ix, llo.y+ay.i0(0)+iy, llo.z+az.i0(0)+iz, 2*imode  ), 2._rt*ax.w(0, ix)*az.w(0, iz)*wqx*xy.imag());
+                        amrex::Gpu::Atomic::AddNoRet( &warpx::field_at<D>(jy_arr, llo.x+ax.i0(1)+ix, llo.y+ay.i0(1)+iy, llo.z+az.i0(1)+iz, 2*imode-1), 2._rt*ax.w(1, ix)*az.w(1, iz)*wqy*xy.real());
+                        amrex::Gpu::Atomic::AddNoRet( &warpx::field_at<D>(jy_arr, llo.x+ax.i0(1)+ix, llo.y+ay.i0(1)+iy, llo.z+az.i0(1)+iz, 2*imode  ), 2._rt*ax.w(1, ix)*az.w(1, iz)*wqy*xy.imag());
+                        amrex::Gpu::Atomic::AddNoRet( &warpx::field_at<D>(jz_arr, llo.x+ax.i0(2)+ix, llo.y+ay.i0(2)+iy, llo.z+az.i0(2)+iz, 2*imode-1), 2._rt*ax.w(2, ix)*az.w(2, iz)*wqz*xy.real());
+                        amrex::Gpu::Atomic::AddNoRet( &warpx::field_at<D>(jz_arr, llo.x+ax.i0(2)+ix, llo.y+ay.i0(2)+iy, llo.z+az.i0(2)+iz, 2*imode  ), 2._rt*ax.w(2, ix)*az.w(2, iz)*wqz*xy.imag());
+                        xy = xy*xy0;
+                    }
+                }
             }
         }
     }
-#endif
 }
 
 /**
@@ -295,8 +298,8 @@ void doDepositionShapeNKernel([[maybe_unused]] const amrex::ParticleReal xp,
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  */
-template <int depos_order>
-void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+template <int depos_order, warpx::Dim D = warpx::CompileDim>
+void doDepositionShapeN (const GetParticlePosition<PIdx, D>& GetPosition,
                          const amrex::ParticleReal * const wp,
                          const amrex::ParticleReal * const uxp,
                          const amrex::ParticleReal * const uyp,
@@ -350,14 +353,19 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 wq *= ion_lev[ip];
             }
 
-            doDepositionShapeNKernel<depos_order>(xp, yp, zp, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
-                                                  jx_type, jy_type, jz_type,
-                                                  relative_time, dinv, xyzmin,
-                                                  invvol, lo, n_rz_azimuthal_modes);
+            doDepositionShapeNKernel<depos_order, D>(xp, yp, zp, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
+                                                     jx_type, jy_type, jz_type,
+                                                     relative_time, dinv, xyzmin,
+                                                     invvol, lo, n_rz_azimuthal_modes);
 
         }
     );
 }
+
+// Transition to runtime dimensionality: the deposition kernels below still
+// use compile-time WARPX_DIM_* branches; they are converted in later
+// migration steps and are not yet available in unified builds.
+#if !defined(WARPX_DIM_RUNTIME)
 
 /**
  * \brief Direct current deposition for thread thread_num for the implicit scheme
@@ -2670,4 +2678,6 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
 #endif // #if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z)
 }
+#endif // !defined(WARPX_DIM_RUNTIME)
+
 #endif // WARPX_CURRENTDEPOSITION_H_

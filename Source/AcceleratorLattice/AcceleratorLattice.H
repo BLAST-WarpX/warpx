@@ -12,6 +12,8 @@
 #include "LatticeElements/HardEdgedQuadrupole.H"
 #include "LatticeElements/HardEdgedPlasmaLens.H"
 
+#include <AMReX_LayoutData.H>
+
 #include <memory>
 #include <string>
 

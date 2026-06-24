@@ -66,3 +66,33 @@ Conventions
 
 In 2D, we assume that the position of a particle in ``y`` is equal to ``0``.
 In 1D, we assume that the position of a particle in ``x`` and ``y`` is equal to ``0``.
+
+Towards Runtime Dimensionality
+------------------------------
+
+WarpX is migrating towards a single binary that supports all dimensionalities,
+selected at runtime via the ``geometry.dims`` input parameter, built against
+AMReX compiled once with ``AMREX_SPACEDIM=3``.
+The transition infrastructure lives in ``Source/Utils/WarpXDim.H`` (the runtime
+``warpx::Dim`` enum, the ``warpx::CompileDim`` bridge from the macros above and
+constexpr traits like ``warpx::has_x``), ``Source/Utils/WarpXDimDispatch.H``
+(``warpx::dim_dispatch``, mapping the runtime dimensionality to a compile-time
+template argument like the existing particle-shape-order dispatch) and
+``Source/Utils/WarpXDimIndexing.H`` (``warpx::IdxMap``, replacing
+``WARPX_ZINDEX``, and ``warpx::field_at``).
+
+Kernels are converted from ``#if defined(WARPX_DIM_*)`` blocks to
+``template <warpx::Dim D>`` with ``if constexpr`` branches that default to
+``warpx::CompileDim``, so per-dimension builds compile unchanged and produce
+bit-identical results during the migration.
+
+In unified builds (``WARPX_DIM_RUNTIME``), fields of all dimensionalities are
+stored in degenerate-3D ``MultiFab`` s: collapsed dimensions have extent 1,
+``prob_lo/hi = [-0.5, 0.5)`` (unit cell size, matching the conventions of
+``WarpX::CellSize`` for absent dimensions), zero guard cells, cell-centered
+staggering and periodic boundaries; ``z`` is always at index 2 (1D uses
+``(1, 1, nz)``, 2D and RZ use ``(nx, 1, nz)``).
+Particle positions are always three SoA components; components of collapsed
+dimensions are 0 and are never updated by the pusher.
+See ``Tools/Prototypes/RuntimeDims/`` for the prototype application that runs
+1D, 2D and 3D simulations from one executable.
