@@ -21,9 +21,11 @@
 * `momentum_function_uy`, `momentum_function_uz` for `parse_momentum_function`;
 * or `bulk_vel_dir` and `beta` for `maxwell_juttner`.
 */
-VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
-{
 
+VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                        amrex::Geometry const& geom)
+    : m_geom(geom)
+{
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
@@ -116,7 +118,28 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             read_mean_parsers("ux_mean_function(x,y,z)",
                               "uy_mean_function(x,y,z)",
                               "uz_mean_function(x,y,z)");
-        }
+        } else if (u_mean_dist_s == "read_from_file") {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            utils::parser::get(pp, source_name, "read_u_mean_from_path", m_read_u_mean_path);
+            {
+                std::string const key_with_src =
+                    source_name.empty() ? std::string("read_u_mean_distributed")
+                                        : source_name + ".read_u_mean_distributed";
+                if (pp.contains(key_with_src)) {
+                    pp.query(key_with_src, m_read_u_mean_distributed);
+                } else {
+                    pp.query("read_u_mean_distributed", m_read_u_mean_distributed);
+                }
+            }
+            m_type = VelFromFileVector;
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "maxwellian_u_mean_distribution_type = read_from_file requires "
+                "WarpX built with openPMD support and is not yet supported in "
+                "RZ/RCYLINDER/RSPHERE geometries.");
+#endif
+            }
         else {
             std::stringstream stringstream;
             std::string string;

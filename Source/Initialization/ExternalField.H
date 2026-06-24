@@ -14,6 +14,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_BaseFab.H>
+#include <AMReX_Dim3.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuContainers.H>
@@ -22,6 +23,7 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_TableData.H>
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -261,5 +263,79 @@ private:
     amrex::BaseFab<double> m_fab; //! data container for loaded data
     amrex::FabArray<amrex::BaseFab<double>> m_mf; //! non-owning container for communication purpose
 };
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+/**
+ * OpenPMD vector field data reader (x, y, z components).
+ *
+ * Same role as InjectorDensityFromFile for scalar density, but for a 3-component
+ * openPMD field such as u_mean or u_std.
+ */
+struct ExternalFieldVectorFromFile
+{
+    ExternalFieldVectorFromFile () = default;
+
+    ExternalFieldVectorFromFile (std::string const& a_file_name,
+                                 std::string const& a_field_name,
+                                 amrex::Geometry const& a_geom,
+                                 bool a_distributed,
+                                 bool a_active);
+
+    void clear ();
+
+    // This function needs to be called before initializing particles, if the
+    // openPMD data are distributed. When the openPMD data are loaded in the
+    // constructor of this class, we do not know the particle containers'
+    // BoxArray and DistributionMapping yet.
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab = nullptr);
+
+    // This function needs to be called before we do continuous injection of
+    // particles to inform the injector to load the data we need.
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab = nullptr);
+
+    // For distributed data, this function prepares the injector for loading
+    // data in this Box. Here `li` is the local index for the Box in a
+    // particle container.
+    void prepare (int li);
+
+    [[nodiscard]] bool distributed () const;
+
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE
+    amrex::XDim3
+    getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
+    {
+#if (AMREX_SPACEDIM < 3)
+        amrex::ignore_unused(x, y, z);
+#endif
+#if (AMREX_SPACEDIM == 1)
+        amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_XZ)
+        amrex::RealVect const pos{x, z};
+#elif defined(WARPX_DIM_RZ)
+        amrex::RealVect const pos{std::sqrt(x * x + y * y), z};
+#else
+        amrex::RealVect const pos{x, y, z};
+#endif
+        return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};
+    }
+
+private:
+    ExternalFieldView m_x_view;
+    ExternalFieldView m_y_view;
+    ExternalFieldView m_z_view;
+    ExternalFieldReader* m_x_reader{nullptr};
+    ExternalFieldReader* m_y_reader{nullptr};
+    ExternalFieldReader* m_z_reader{nullptr};
+};
+
+// Resources held by ExternalFieldReader pointers are released by clear(), which is
+// called from GetVelocityVector::clear / GetTemperatureVector::clear and ultimately
+// InjectorMomentum::clear.
+#endif
 
 #endif //WARPX_EXTERNAL_FIELD_H_

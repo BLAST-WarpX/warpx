@@ -81,6 +81,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <map>
 #include <random>
@@ -775,7 +776,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
-    InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     InjectorMomentum* h_inj_mom = plasma_injector.getInjectorMomentumHost();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
@@ -794,11 +794,14 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
 
-    auto get_zlab = [=] (amrex::Real z) -> amrex::Real
-    {
-        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
-                                        gamma_boost, beta_boost, t);
-    };
+    std::function<amrex::Real(amrex::Real)> get_zlab;
+    if (gamma_boost != 1._rt || t != 0._rt) {
+        get_zlab = [=] (amrex::Real z) -> amrex::Real
+        {
+            return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
+                                            gamma_boost, beta_boost, t);
+        };
+    }
 
     if (initial_injection) {
         // Initial particle injection
@@ -842,6 +845,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         }
 
         auto* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+        InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentum(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();

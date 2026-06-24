@@ -9,7 +9,20 @@
 #ifndef WARPX_GET_TEMPERATURE_H_
 #define WARPX_GET_TEMPERATURE_H_
 
+#include "ExternalField.H"
 #include "TemperatureProperties.H"
+
+#include <AMReX.H>
+#include <AMReX_Box.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_Dim3.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_RealBox.H>
+
+#include "Utils/WarpXConst.H"
+
+#include <functional>
 
 /**
  * \brief Get temperature at a point on the grid
@@ -69,6 +82,7 @@ struct GetTemperature
         }
     }
 };
+
 struct GetTemperatureVector
 {
     /* Type of temperature initialization */
@@ -76,13 +90,48 @@ struct GetTemperatureVector
 
     amrex::Real m_ux_std{0}, m_uy_std{0}, m_uz_std{0};
     amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    ExternalFieldVectorFromFile m_from_file;
+#endif
+
     /**
      * \brief Construct the functor with information provided by temp
      *
      * \param[in] temp: const reference to the TemperatureProperties object that will be used to
      * populate the functor
      */
-    explicit GetTemperatureVector (TemperatureProperties const& temp) noexcept;
+    explicit GetTemperatureVector (TemperatureProperties const& temp);
+
+    [[nodiscard]] bool needPreparation () const noexcept
+    {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+        return m_type == TempFromFileVector;
+#else
+        return false;
+#endif
+    }
+
+    // When u_std is loaded from openPMD (TempFromFileVector), same distributed-data
+    // prepare requirement as GetVelocityVector.
+    // get_zlab converts simulation-frame z coordinate to lab-frame z before reading
+    // the file (needed in boosted-frame runs).
+    // u_mean must already be prepared; see InjectorMomentumMaxwellian::prepare.
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (int li);
+
+    void clear ();
+
+    [[nodiscard]] bool distributed () const noexcept;
 
     /**
      * \brief Functor call. Returns the value of temperature at the location (x,y,z)
@@ -108,6 +157,13 @@ struct GetTemperatureVector
             {
                 return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
             }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            case (TempFromFileVector):
+            {
+                return m_from_file.getValue(x, y, z);
+            }
+#endif
             default:
             {
                 amrex::Abort("Get initial temperature: unknown type");
@@ -116,4 +172,5 @@ struct GetTemperatureVector
         }
     }
 };
+
 #endif //WARPX_GET_TEMPERATURE_H_

@@ -25,6 +25,15 @@
     "particle_position_y": 256062.7175546781,
     "particle_position_z": 255971.83353801683,
     "particle_weight": 8e+21
+    },
+  "gaussian_momentum_from_file": {
+    "particle_momentum_x": 1.2495207710138256e-17,
+    "particle_momentum_y": 1.3568946435216231e-17,
+    "particle_momentum_z": 1.469563642873113e-17,
+    "particle_position_x": 256015.69619301357,
+    "particle_position_y": 256062.7175546781,
+    "particle_position_z": 255971.83353801683,
+    "particle_weight": 8e+21
   },
   "lev=0": {
     "Bx": 0.0,
@@ -47,12 +56,12 @@
     "particle_weight": 8e+21
   },
   "maxwell_juttner": {
-    "particle_momentum_x": 2.21319029448496e-16,
-    "particle_momentum_y": 2.2159390042429052e-16,
-    "particle_momentum_z": 2.2136915789630448e-16,
     "particle_position_x": 256040.8406483202,
     "particle_position_y": 256006.39845876803,
     "particle_position_z": 255946.40880285134,
+    "particle_momentum_x": 2.21319029448496e-16,
+    "particle_momentum_y": 2.2159390042429054e-16,
+    "particle_momentum_z": 2.2136915789630448e-16,
     "particle_weight": 8e+21
   },
   "maxwell_juttner_low_theta": {

@@ -238,6 +238,48 @@ struct InjectorMomentumMaxwellian
         return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
     }
 
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab)
+    {
+        // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
+        // not call get_zlab while preparing itself.
+        velocity.prepare(grids, dmap, ngrow);
+        temperature.prepare(grids, dmap, ngrow, get_zlab);
+    }
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab)
+    {
+        // get_zlab uses getBulkMomentum(), so the mean-velocity reader must
+        // not call get_zlab while preparing itself.
+        velocity.prepare(pbox, moving_dir, moving_sign);
+        temperature.prepare(pbox, moving_dir, moving_sign, get_zlab);
+    }
+
+    void prepare (int li)
+    {
+        velocity.prepare(li);
+        temperature.prepare(li);
+    }
+
+    void clear ()
+    {
+        velocity.clear();
+        temperature.clear();
+    }
+
+    [[nodiscard]] bool distributed () const noexcept
+    {
+        return velocity.distributed() || temperature.distributed();
+    }
+
+    [[nodiscard]] bool needPreparation () const noexcept
+    {
+        return velocity.needPreparation() || temperature.needPreparation();
+    }
+
 private:
     GetVelocityVector velocity;
     GetTemperatureVector temperature;
@@ -468,6 +510,20 @@ struct InjectorMomentum
 
     void clear ();
 
+    [[nodiscard]] bool needPreparation () const noexcept;
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (int li, InjectorMomentum** inj_mom);
+
+    [[nodiscard]] bool distributed () const noexcept;
+
     // call getMomentum from the object stored in the union
     // (the union is called Object, and the instance is called object).
     [[nodiscard]]
@@ -604,6 +660,10 @@ private:
         InjectorMomentumParser parser;
     };
     Object object;
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+    std::unique_ptr<void, amrex::DataDeleter> inj_mom_mean_file_data;
+    amrex::Vector<InjectorMomentum*> inj_mom_mean_file_omp;
+#endif
 };
 
 // In order for InjectorMomentum to be trivially copyable, its destructor
