@@ -8,6 +8,7 @@
 
 #include "ImpactIonization.H"
 #include "Particles/Algorithms/KineticEnergy.H"
+#include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -86,38 +87,12 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     utils::parser::queryWithParser(
         pp_collision_name, "background_mass", m_background_mass);
 
-    // query for a list of collision processes
-    // these could be elastic, excitation, charge_exchange, back, etc.
-    amrex::Vector<std::string> scattering_process_names;
-    pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+    // Parse the list of scattering processes (these could be elastic,
+    // excitation, charge_exchange, etc.) and create a vector of
+    // ScatteringProcess objects from each scattering process name.
+    auto scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
 
-    // create a vector of ScatteringProcess objects from each scattering
-    // process name
-    for (const auto& scattering_process : scattering_process_names) {
-        const std::string kw_cross_section = scattering_process + "_cross_section";
-        std::string cross_section_file;
-        pp_collision_name.query(kw_cross_section, cross_section_file);
-
-        amrex::ParticleReal energy = 0.0;
-        // if the scattering process is excitation or ionization get the
-        // energy associated with that process
-        if (scattering_process.find("excitation") != std::string::npos ||
-            scattering_process.find("ionization") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
-            utils::parser::getWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-        // if the scattering process is forward scattering get the energy
-        // associated with the process if it is given (this allows forward
-        // scattering to be used both with and without a fixed energy loss)
-        else if (scattering_process.find("forward") != std::string::npos) {
-            const std::string kw_energy = scattering_process + "_energy";
-            utils::parser::queryWithParser(
-                pp_collision_name, kw_energy.c_str(), energy);
-        }
-
-        ScatteringProcess process(scattering_process, cross_section_file, energy);
-
+    for (auto& process : scattering_processes) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                          "Cannot add an unknown scattering process type");
 
