@@ -36,7 +36,7 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-python@v6
       name: Install Python
       with:
@@ -125,7 +125,7 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
@@ -175,7 +175,7 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Dependencies
       run: |
         .github/workflows/dependencies/nvhpc.sh 25.1
