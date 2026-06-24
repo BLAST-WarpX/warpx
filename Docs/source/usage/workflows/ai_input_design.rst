@@ -43,7 +43,56 @@ When writing Python/PICMI scripts, users will also encounter `pyAMReX <https://p
 
 - **pyAMReX**: `context7.com/amrex-codes/pyamrex <https://context7.com/amrex-codes/pyamrex>`__
 
-To configure Context7 for your coding assistant, see the `Context7 documentation <https://context7.com/docs/resources/all-clients>`__.
+To configure Context7 for your coding assistant, pick your client below or see the `Context7 documentation <https://context7.com/docs/resources/all-clients>`__ for further clients.
+
+.. dropdown:: Client configuration examples
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. tab-set::
+
+      .. tab-item:: Claude Code
+
+         Add the Context7 MCP server from the command line:
+
+         .. code-block:: bash
+
+            claude mcp add context7 https://mcp.context7.com/mcp \
+                --scope user --transport http \
+                --header "CONTEXT7_API_KEY: YOUR_API_KEY"
+
+      .. tab-item:: Codex
+
+         Add to ``~/.codex/config.toml``:
+
+         .. code-block:: toml
+
+            [mcp_servers.context7]
+            url = "https://mcp.context7.com/mcp"
+            http_headers = { "CONTEXT7_API_KEY" = "YOUR_API_KEY" }
+
+      .. tab-item:: Cursor
+
+         Add to ``~/.cursor/mcp.json`` (all projects) or ``.cursor/mcp.json`` (per project):
+
+         .. code-block:: json
+
+            {
+              "mcpServers": {
+                "context7": {
+                  "url": "https://mcp.context7.com/mcp",
+                  "headers": {
+                    "CONTEXT7_API_KEY": "YOUR_API_KEY"
+                  }
+                }
+              }
+            }
+
+      .. tab-item:: More Clients
+
+         VS Code Copilot, Windsurf, JetBrains IDEs, Gemini CLI, and many other clients are covered in the `Context7 client documentation <https://context7.com/docs/resources/all-clients>`__.
+
 Once connected, a coding assistant (Claude Code, Cursor, VS Code Copilot, Windsurf, etc.) can retrieve relevant sections of all the above projects in real time when helping you write or debug input files and PICMI scripts.
 
 .. tip::
@@ -52,6 +101,14 @@ Once connected, a coding assistant (Claude Code, Cursor, VS Code Copilot, Windsu
    See the `Context7 client docs <https://context7.com/docs/resources/all-clients>`__ for details on API keys and OAuth options.
 
 After creating a personal account, Context7 is free within limits for open source projects.
+
+.. tip::
+
+   **Berkeley Lab (LBNL) users:** Context7 is available under a commercial license through the laboratory's `CBorg AI Portal <https://cborg.lbl.gov/mcp_servers/>`__.
+   CBorg provides Context7 via its MCP gateway, which is compatible with any MCP-aware client (e.g., Claude Code, Cursor).
+   In the configurations above, replace the server URL with ``https://api.cborg.lbl.gov/mcp/`` and the API-key header with ``Authorization: Bearer YOUR_CBORG_API_KEY`` (`request a CBorg API key <https://cborg.lbl.gov/api_request/>`__).
+   Access requires LBLnet/VPN or registering your IP address by logging in at `api.cborg.lbl.gov/key/manage <https://api.cborg.lbl.gov/key/manage>`__.
+   Under the commercial license, the provider will not use your queries for training.
 
 Best Practices
 --------------
