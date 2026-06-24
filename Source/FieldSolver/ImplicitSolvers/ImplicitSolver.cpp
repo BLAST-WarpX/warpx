@@ -81,7 +81,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
         } else if (a_fbc[i] == FieldBoundaryType::Neumann) {
             // Also for FieldBoundaryType::PMC
             lbc[i] = LinOpBCType::symmetry;
-        } else if (a_fbc[i] == FieldBoundaryType::PECInsulator) {
+        } else if (a_fbc[i] == FieldBoundaryType::PEC_Insulator) {
             const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(i,bdry_side);
             if (voltage_driven) { // Dirichlet for E
                 lbc[i] = LinOpBCType::Dirichlet;

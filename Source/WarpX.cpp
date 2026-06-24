@@ -818,7 +818,7 @@ WarpX::ReadParameters ()
             );
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-                 evolve_scheme == EvolveScheme::ThetaImplicitEM),
+                 evolve_scheme == EvolveScheme::Theta_Implicit_EM),
                 "For electromagnetic solvers, warpx.dt_update_interval can only be used with algo.evolve_scheme = theta_implicit_em."
             );
         }
@@ -1257,19 +1257,19 @@ WarpX::ReadParameters ()
         pp_algo.query_enum_case_insensitive("particle_pusher", particle_pusher_algo);
 
         // check for implicit evolve scheme
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM) {
             m_implicit_solver = std::make_unique<SemiImplicitEM>();
         }
-        else if (evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+        else if (evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             m_implicit_solver = std::make_unique<ThetaImplicitEM>();
         }
-        else if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        else if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
 
         // implicit evolve schemes not setup to use mirrors
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
         }
@@ -1368,9 +1368,9 @@ WarpX::ReadParameters ()
                                                 m_macroscopic_solver_algo);
         }
 
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -1393,7 +1393,7 @@ WarpX::ReadParameters ()
                 field_gathering_algo != GatheringAlgo::MomentumConserving,
                     "With implicit and semi-implicit schemes, the momentum conserving field gather is not supported as it would not conserve energy");
         }
-        if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
                 "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
@@ -1470,8 +1470,8 @@ WarpX::ReadParameters ()
             }
 
             // These evolve schemes permit time steps that violate the CFL condition
-            if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+                evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
 
@@ -3100,7 +3100,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
-    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }
@@ -3159,7 +3159,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
-    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }

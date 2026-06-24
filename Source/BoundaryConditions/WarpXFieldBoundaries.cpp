@@ -124,7 +124,7 @@ void WarpX::ApplyEfieldBoundary(const int lev, PatchType patch_type, amrex::Real
         }
     }
 
-    if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
+    if (::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
         if (patch_type == PatchType::fine) {
             pec_insulator_boundary->ApplyPEC_InsulatortoEfield(
                     m_fields.get_alldirs(FieldType::Efield_fp, lev),
@@ -209,7 +209,7 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, Subcycling
         }
     }
 
-    if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
+    if (::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
         if (patch_type == PatchType::fine) {
             pec_insulator_boundary->ApplyPEC_InsulatortoBfield(
                 m_fields.get_alldirs(FieldType::Bfield_fp, lev),
@@ -260,7 +260,7 @@ void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
-        ::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi) ||
+        ::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PMC>(field_boundary_lo, field_boundary_hi))
     {
         PEC::ApplyReflectiveBoundarytoRhofield(rho,
@@ -269,7 +269,7 @@ void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
             Geom(lev), lev, patch_type, ref_ratio);
     }
 
-    if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
+    if (::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
         pec_insulator_boundary->ZeroParallelScalarInConductor(rho,
             field_boundary_lo, field_boundary_hi,
             Geom(lev), lev, patch_type, ref_ratio);
@@ -284,7 +284,7 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
-        ::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi) ||
+        ::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PMC>(field_boundary_lo, field_boundary_hi))
     {
         PEC::ApplyReflectiveBoundarytoJfield(Jx, Jy, Jz,
@@ -293,7 +293,7 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
             Geom(lev), lev, patch_type, ref_ratio);
     }
 
-    if (::isAnyBoundary<FieldBoundaryType::PECInsulator>(field_boundary_lo, field_boundary_hi)) {
+    if (::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
         pec_insulator_boundary->ZeroParallelFieldInConductor({Jx, Jy, Jz},
             field_boundary_lo, field_boundary_hi,
             get_ng_fieldgather(), Geom(lev),
