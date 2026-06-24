@@ -50,7 +50,7 @@ jobs:
             max_step = 40              \
             diag1.intervals = 30:40:10 \
             diag1.format = ascent
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: ascent-test-artifacts
         path: |
@@ -107,7 +107,7 @@ jobs:
             diagnostics.diags_names = diag1 \
             diag1.format = catalyst\
             diag1.intervals = 3
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: catalyst-test-artifacts
         path: |
