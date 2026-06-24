@@ -105,7 +105,7 @@ public:
             amrex::BoxArray const & ba = warpx.boxArray(level);
             amrex::DistributionMapping const & dmap = warpx.DistributionMap(level);
             int const ncomps = 1;
-            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
             amrex::Real const initial_value = 0.;
             bool const remake = true;
             bool const redistribute_on_remake = true;
