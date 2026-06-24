@@ -1025,7 +1025,14 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                      - std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const xb = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
-                amrex::Real const yb = theta;
+                // `xb` and `yb` are used in the `insideBounds` checks below, i.e. they are
+                // compared against the (Cartesian) species bounds xmin/xmax and ymin/ymax.
+                // They must therefore be the radius and the y position *before* the azimuthal
+                // rotation (which is 0, since injection happens in the r-z plane). Using `theta`
+                // here would compare the azimuthal angle (in [-pi, pi]) against ymin/ymax (in
+                // meters), which spuriously rejects all particles whenever ymin/ymax are set
+                // (see https://github.com/BLAST-WarpX/warpx/discussions/6788).
+                amrex::Real const yb = 0._rt;
 
                 pos.x = xb*std::cos(theta);
                 pos.y = xb*std::sin(theta);
@@ -1046,7 +1053,10 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                      - std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const xb = std::pow(xu*rc + rminp, 1._rt/(1._rt + radial_numpercell_power));
-                amrex::Real const yb = theta;
+                // See the comment in the RZ/RCYLINDER branch above: `yb` is compared against
+                // ymin/ymax in the `insideBounds` checks and must be the y position before the
+                // azimuthal rotation (0), not the azimuthal angle `theta`.
+                amrex::Real const yb = 0._rt;
 
                 pos.x = xb*cos_phi*std::cos(theta);
                 pos.y = xb*cos_phi*std::sin(theta);
