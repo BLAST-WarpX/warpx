@@ -27,7 +27,20 @@ class SpectralFieldDataRZ
         // Define the FFTplans type, which holds one fft plan per box
         // (plans are only initialized for the boxes that are owned by
         // the local MPI rank)
+#if defined(AMREX_USE_SYCL)
+        // SYCL/MKL: RZ needs complex-to-complex transforms, while
+        // VendorFFTPlan uses domain::REAL. Define a C2C descriptor type.
+        using SyclC2CPlan = oneapi::mkl::dft::descriptor<
+#   ifdef AMREX_USE_FLOAT
+            oneapi::mkl::dft::precision::SINGLE,
+#   else
+            oneapi::mkl::dft::precision::DOUBLE,
+#   endif
+            oneapi::mkl::dft::domain::COMPLEX>*;
+        using FFTplans = amrex::LayoutData<SyclC2CPlan>;
+#else
         using FFTplans = amrex::LayoutData<ablastr::math::anyfft::VendorFFTPlan>;
+#endif
 
         // Similarly, define the Hankel transformers and filter for each box.
         using MultiSpectralHankelTransformer = amrex::LayoutData<SpectralHankelTransformer>;

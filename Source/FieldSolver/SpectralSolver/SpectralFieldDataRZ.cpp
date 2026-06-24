@@ -61,9 +61,9 @@ SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
 
     // Allocate and initialize the FFT plans and Hankel transformer.
     forward_plan = FFTplans(spectralspace_ba, dm);
-#ifndef AMREX_USE_CUDA
-    // The backward plan is not needed with CUDA since it would be the same
-    // as the forward plan anyway.
+#if !defined(AMREX_USE_CUDA) && !defined(AMREX_USE_SYCL)
+    // The backward plan is not needed with CUDA or SYCL since the same
+    // descriptor/plan is used for both directions.
     backward_plan = FFTplans(spectralspace_ba, dm);
 #endif
     multi_spectral_hankel_transformer = MultiSpectralHankelTransformer(spectralspace_ba, dm);
@@ -150,6 +150,32 @@ SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
                 "rocfft_plan_description_destroy failed!\n",
                 ablastr::warn_manager::WarnPriority::high);
         }
+#elif defined(AMREX_USE_SYCL)
+        // Create MKL DFT descriptor for complex-to-complex Z transforms.
+        // Like CUDA, we create one descriptor and execute per azimuthal mode,
+        // batching over r-points within each mode.
+        using MklC2CDescriptor = std::remove_pointer_t<SyclC2CPlan>;
+        auto* fwd_desc = new MklC2CDescriptor(std::int64_t(grid_size[1]));
+
+        // Strides: elements along Z are separated by grid_size[0] (nr) in memory
+        // (Fortran-order FAB with shape (nr, nz, n_modes))
+        std::vector<std::int64_t> strides = {0, std::int64_t(grid_size[0])};
+        fwd_desc->set_value(oneapi::mkl::dft::config_param::FWD_STRIDES, strides);
+        fwd_desc->set_value(oneapi::mkl::dft::config_param::BWD_STRIDES, strides);
+
+        // Batch over r-points: grid_size[0] transforms, distance 1 between batches
+        fwd_desc->set_value(oneapi::mkl::dft::config_param::NUMBER_OF_TRANSFORMS,
+                            std::int64_t(grid_size[0]));
+        fwd_desc->set_value(oneapi::mkl::dft::config_param::FWD_DISTANCE, std::int64_t(1));
+        fwd_desc->set_value(oneapi::mkl::dft::config_param::BWD_DISTANCE, std::int64_t(1));
+
+        // Not-in-place transform
+        fwd_desc->set_value(oneapi::mkl::dft::config_param::PLACEMENT,
+                            oneapi::mkl::dft::config_value::NOT_INPLACE);
+
+        fwd_desc->commit(amrex::Gpu::Device::streamQueue());
+        forward_plan[mfi] = fwd_desc;
+        // backward_plan is not needed — same descriptor handles both directions
 #else
         // Create FFTW plans.
         fftw_iodim dims[1];
@@ -216,6 +242,10 @@ SpectralFieldDataRZ::~SpectralFieldDataRZ()
 #elif defined(AMREX_USE_HIP)
             rocfft_plan_destroy(forward_plan[mfi]);
             rocfft_plan_destroy(backward_plan[mfi]);
+#elif defined(AMREX_USE_SYCL)
+            // Destroy MKL DFT descriptor.
+            delete forward_plan[mfi];
+            // backward_plan was never allocated for SYCL.
 #else
             // Destroy FFTW plans.
 #  ifdef AMREX_USE_FLOAT
@@ -303,6 +333,17 @@ SpectralFieldDataRZ::FABZForwardTransform (amrex::MFIter const & mfi, amrex::Box
     amrex::Gpu::streamSynchronize();
     amrex::The_Arena()->free(buffer);
     result = rocfft_execution_info_destroy(execinfo);
+#elif defined(AMREX_USE_SYCL)
+    // Perform forward complex-to-complex FFT using MKL DFT, one mode at a time.
+    amrex::Gpu::streamSynchronize();
+    for (int mode = 0; mode < n_rz_azimuthal_modes; mode++) {
+        auto* in_ptr = reinterpret_cast<std::complex<amrex::Real>*>(
+            tempHTransformed[mfi].dataPtr(mode));
+        auto* out_ptr = reinterpret_cast<std::complex<amrex::Real>*>(
+            tmpSpectralField[mfi].dataPtr(mode));
+        oneapi::mkl::dft::compute_forward(
+            *forward_plan[mfi], in_ptr, out_ptr).wait();
+    }
 #else
 #  ifdef AMREX_USE_FLOAT
     fftwf_execute(forward_plan[mfi]);
@@ -422,6 +463,17 @@ SpectralFieldDataRZ::FABZBackwardTransform (amrex::MFIter const & mfi, amrex::Bo
     amrex::Gpu::streamSynchronize();
     amrex::The_Arena()->free(buffer);
     result = rocfft_execution_info_destroy(execinfo);
+#elif defined(AMREX_USE_SYCL)
+    // Perform backward complex-to-complex FFT using MKL DFT, one mode at a time.
+    amrex::Gpu::streamSynchronize();
+    for (int mode = 0; mode < n_rz_azimuthal_modes; mode++) {
+        auto* in_ptr = reinterpret_cast<std::complex<amrex::Real>*>(
+            tmpSpectralField[mfi].dataPtr(mode));
+        auto* out_ptr = reinterpret_cast<std::complex<amrex::Real>*>(
+            tempHTransformed[mfi].dataPtr(mode));
+        oneapi::mkl::dft::compute_backward(
+            *forward_plan[mfi], in_ptr, out_ptr).wait();
+    }
 #else
 #  ifdef AMREX_USE_FLOAT
     fftwf_execute(backward_plan[mfi]);
