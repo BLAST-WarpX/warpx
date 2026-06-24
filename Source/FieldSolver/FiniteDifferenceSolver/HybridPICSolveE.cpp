@@ -1496,7 +1496,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ex(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jx(i, j, k);
+                // Evaluate the resistivity parser once: the same eta(rho,jtot,t)
+                // is reused below by the corner-curl (iso_resistivity) term.
+                const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+
+                Ex(i, j, k) += eta_val * Jx(i, j, k);
 
                 if (include_hyper_resistivity_term && !partial_resistive_only) {
 
@@ -1522,7 +1526,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // out-of-plane B (Bz in 3D, By in 2D XZ) via the corner-curl
                 // correction; div(B) preserved (added through E).
                 if (iso_resistivity && !partial_resistive_only) {
-                    const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
                     // Runtime if (not if constexpr): nvcc forbids an extended
                     // __device__ lambda from first-capturing a variable inside a
                     // constexpr-if. The condition is still compile-time constant,
@@ -1603,7 +1606,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ey(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jy(i, j, k);
+                // Evaluate the resistivity parser once: the same eta(rho,jtot,t)
+                // is reused below by the corner-curl (iso_resistivity) term.
+                const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+
+                Ey(i, j, k) += eta_val * Jy(i, j, k);
 
                 if (include_hyper_resistivity_term && !partial_resistive_only) {
 
@@ -1629,7 +1636,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // 2D XZ the out-of-plane corner is delivered via Ex and Ez).
 #if defined(WARPX_DIM_3D)
                 if (iso_resistivity && !partial_resistive_only) {
-                    const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
                     if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
                         Ey(i, j, k) += eta_val
                             * ::CornerResistiveEy_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0);
@@ -1695,7 +1701,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ez(i, j, k) += eta(rho_val_eta, jtot_val, t_new) * Jz(i, j, k);
+                // Evaluate the resistivity parser once: the same eta(rho,jtot,t)
+                // is reused below by the corner-curl (iso_resistivity) term.
+                const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
+
+                Ez(i, j, k) += eta_val * Jz(i, j, k);
 
                 if (include_hyper_resistivity_term && !partial_resistive_only) {
 
@@ -1721,7 +1731,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // in 3D the axial Bz corner is delivered via Ex and Ey).
 #if defined(WARPX_DIM_XZ)
                 if (iso_resistivity && !partial_resistive_only) {
-                    const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
                     if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
                         Ez(i, j, k) += eta_val
                             * ::CornerResistiveEz_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0);

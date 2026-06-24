@@ -327,20 +327,13 @@ namespace
     // The fit value g.b is linear in the field: value = sum_tap (g.p(tap))*f_tap.
     // Caching the collapsed per-tap weight w_tap = g.p(tap) and the tap location
     // turns every later apply into a sparse dot product -- no window matrix build,
-    // Cholesky, or basis evaluation. Tap locations are stored as a neighbour
-    // offset (di,dj,dk) from the fill cell, packed into one int (6 bits/axis,
-    // range [-32,31], comfortably covering the image window for any sane band).
+    // Cholesky, or basis evaluation. Tap locations are stored as the neighbour
+    // offset (di,dj,dk) from the fill cell, kept as three contiguous ints (one
+    // TAP_NCOMP-wide stride per tap) so the apply forms the gather address with a
+    // plain add instead of a per-tap mask/shift/subtract unpack. TAP_HALF bounds
+    // the representable offset so the build-time range check is unchanged.
     constexpr int TAP_HALF = 32;
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    int pack_tap_offset (int di, int dj, int dk) noexcept {
-        return (di + TAP_HALF) | ((dj + TAP_HALF) << 6) | ((dk + TAP_HALF) << 12);
-    }
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    void unpack_tap_offset (int code, int& di, int& dj, int& dk) noexcept {
-        di = (code & 63) - TAP_HALF;
-        dj = ((code >> 6) & 63) - TAP_HALF;
-        dk = ((code >> 12) & 63) - TAP_HALF;
-    }
+    constexpr int TAP_NCOMP = 3;  // di, dj, dk stored contiguously per tap
 
     // Count the fluid taps a quadratic gather at `pos` would use (the +/-2 window
     // around the staggered image cell). Used once at build time to size the cache.
@@ -418,7 +411,9 @@ namespace
             if (t >= maxtap || di <= -TAP_HALF || di >= TAP_HALF
                 || dj <= -TAP_HALF || dj >= TAP_HALF
                 || dk <= -TAP_HALF || dk >= TAP_HALF) { ok = false; return; }
-            tap_off[t] = pack_tap_offset(di, dj, dk);
+            tap_off[t*TAP_NCOMP + 0] = di;
+            tap_off[t*TAP_NCOMP + 1] = dj;
+            tap_off[t*TAP_NCOMP + 2] = dk;
             tap_w[t] = wt;
             ++t;
         };
@@ -445,8 +440,9 @@ namespace
         using namespace amrex::literals;
         amrex::Real value = 0._rt;
         for (int t = 0; t < ntap; ++t) {
-            int di, dj, dk;
-            unpack_tap_offset(tap_off[t], di, dj, dk);
+            int const di = tap_off[t*TAP_NCOMP + 0];
+            int const dj = tap_off[t*TAP_NCOMP + 1];
+            int const dk = tap_off[t*TAP_NCOMP + 2];
             value += tap_w[t] * a(ifill+di, jfill+dj, kfill+dk, n);
         }
         return value;
@@ -875,8 +871,10 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             st.maxtap = maxtap_s.dataValue();
             for (int c = 0; c < 3; ++c) {
                 std::size_t const sz = std::size_t(st.n_slots[c]) * 3 * std::size_t(st.maxtap);
-                st.gtap_off[c].resize(sz);
+                st.gtap_off[c].resize(sz * TAP_NCOMP);  // di,dj,dk per tap
                 st.gtap_w[c].resize(sz);
+                st.ggeom[c].resize(std::size_t(st.n_slots[c])
+                                   * warpx::hybrid::EBFillStatus::geom_nr);
             }
         }
         bool const use_cached_weights = cache_weights && st.weights_built;
@@ -896,7 +894,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             int* const gtn_ptr = cache_weights ? st.gtap_n[c].dataPtr() : nullptr;
             int* const goff_ptr = cache_weights ? st.gtap_off[c].dataPtr() : nullptr;
             amrex::Real* const gtw_ptr = cache_weights ? st.gtap_w[c].dataPtr() : nullptr;
+            amrex::Real* const ggeom_ptr = cache_weights ? st.ggeom[c].dataPtr() : nullptr;
             int const maxtap = st.maxtap;
+            constexpr int geom_nr = warpx::hybrid::EBFillStatus::geom_nr;
 
             for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                 amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
@@ -924,13 +924,29 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     }
                     if (s0 != S_FILL) { return; }
 
-                    // NOTE (perf, deferred): on the cached apply path this
-                    // mirror_geom (a per-substage level-set gradient/normal) is the
-                    // only remaining geometry-only recompute. It could be cached
-                    // per band slot (nv, w_n=s/d_im, w_t, lambda) for ~2% more, but
-                    // the apply is memory-bound on the tap gather, so it was left.
-                    auto const g = ::mirror_geom(i, j, k, stag_own, phi,
-                        plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                    // mirror_geom is geometry-only (it reads the static level-set
+                    // phi -- a second scattered field, ~32 reads/cell, plus a sqrt
+                    // and the normal-gradient stencil -- and returns the signed
+                    // distance, image position and boundary normal, none of which
+                    // depend on the field values). On the cached apply path it is
+                    // therefore read back from the per-slot ggeom cache built once
+                    // alongside the tap weights, so the apply never touches phi.
+                    MirrorGeom g{};
+                    if (use_cached_weights) {
+                        int const slot = slotarr(i, j, k);
+                        amrex::Real const* const gp = ggeom_ptr + std::size_t(slot)*geom_nr;
+                        g.band = true;
+                        g.s = gp[0];
+                        g.d_im = gp[1];
+                        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                            g.nv[d]  = gp[2 + d];
+                            g.xe[d]  = gp[2 + AMREX_SPACEDIM + d];
+                            g.xim[d] = gp[2 + 2*AMREX_SPACEDIM + d];
+                        }
+                    } else {
+                        g = ::mirror_geom(i, j, k, stag_own, phi,
+                            plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                    }
 
                     auto const in_sol_x =
                         [&] (int ig, int jg, int kg) { return stat_x(ig, jg, kg) == S_SOLUTION; };
@@ -969,11 +985,12 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                         std::size_t const bx = (std::size_t(slot)*3 + 0)*maxtap;
                         std::size_t const by = (std::size_t(slot)*3 + 1)*maxtap;
                         std::size_t const bz = (std::size_t(slot)*3 + 2)*maxtap;
-                        Jx_im = (nx > 0) ? gather_tap_apply(Jx_l, n, i, j, k, off+bx, wt+bx, nx)
+                        // the offset stream stores TAP_NCOMP ints per tap
+                        Jx_im = (nx > 0) ? gather_tap_apply(Jx_l, n, i, j, k, off+bx*TAP_NCOMP, wt+bx, nx)
                                          : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
-                        Jy_im = (ny > 0) ? gather_tap_apply(Jy_l, n, i, j, k, off+by, wt+by, ny)
+                        Jy_im = (ny > 0) ? gather_tap_apply(Jy_l, n, i, j, k, off+by*TAP_NCOMP, wt+by, ny)
                                          : amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
-                        Jz_im = (nz > 0) ? gather_tap_apply(Jz_l, n, i, j, k, off+bz, wt+bz, nz)
+                        Jz_im = (nz > 0) ? gather_tap_apply(Jz_l, n, i, j, k, off+bz*TAP_NCOMP, wt+bz, nz)
                                          : amrex::get<0>(gather_staggered_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n));
                     } else if (quadratic_gather) {
                         // Build (or non-cached live): solve the geometry weights g,
@@ -988,12 +1005,23 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                             std::size_t const bx = (std::size_t(slot)*3 + 0)*maxtap;
                             std::size_t const by = (std::size_t(slot)*3 + 1)*maxtap;
                             std::size_t const bz = (std::size_t(slot)*3 + 2)*maxtap;
-                            if (cx > 0._rt) { emit_taps(gx, in_sol_x, xim, stag_x, i, j, k, plo, dxi, Jx_l, goff_ptr+bx, gtw_ptr+bx, gtn_ptr+slot*3+0, maxtap); }
+                            // the offset stream stores TAP_NCOMP ints per tap
+                            if (cx > 0._rt) { emit_taps(gx, in_sol_x, xim, stag_x, i, j, k, plo, dxi, Jx_l, goff_ptr+bx*TAP_NCOMP, gtw_ptr+bx, gtn_ptr+slot*3+0, maxtap); }
                             else { gtn_ptr[slot*3 + 0] = 0; }
-                            if (cy > 0._rt) { emit_taps(gy, in_sol_y, xim, stag_y, i, j, k, plo, dxi, Jy_l, goff_ptr+by, gtw_ptr+by, gtn_ptr+slot*3+1, maxtap); }
+                            if (cy > 0._rt) { emit_taps(gy, in_sol_y, xim, stag_y, i, j, k, plo, dxi, Jy_l, goff_ptr+by*TAP_NCOMP, gtw_ptr+by, gtn_ptr+slot*3+1, maxtap); }
                             else { gtn_ptr[slot*3 + 1] = 0; }
-                            if (cz > 0._rt) { emit_taps(gz, in_sol_z, xim, stag_z, i, j, k, plo, dxi, Jz_l, goff_ptr+bz, gtw_ptr+bz, gtn_ptr+slot*3+2, maxtap); }
+                            if (cz > 0._rt) { emit_taps(gz, in_sol_z, xim, stag_z, i, j, k, plo, dxi, Jz_l, goff_ptr+bz*TAP_NCOMP, gtw_ptr+bz, gtn_ptr+slot*3+2, maxtap); }
                             else { gtn_ptr[slot*3 + 2] = 0; }
+                            // cache the geometry-only mirror outputs for this slot
+                            // so later (apply) calls skip the mirror_geom recompute
+                            amrex::Real* const gp = ggeom_ptr + std::size_t(slot)*geom_nr;
+                            gp[0] = g.s;
+                            gp[1] = g.d_im;
+                            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                                gp[2 + d]                  = g.nv[d];
+                                gp[2 + AMREX_SPACEDIM + d] = g.xe[d];
+                                gp[2 + 2*AMREX_SPACEDIM + d] = g.xim[d];
+                            }
                         }
                         Jx_im = (cx > 0._rt) ? vx : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
                         Jy_im = (cy > 0._rt) ? vy : amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));

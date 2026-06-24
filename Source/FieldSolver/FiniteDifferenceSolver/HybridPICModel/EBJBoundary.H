@@ -60,6 +60,21 @@ namespace warpx::hybrid
         std::array<amrex::Gpu::DeviceVector<int>, 3> gtap_off;
         std::array<amrex::Gpu::DeviceVector<amrex::Real>, 3> gtap_w;
 
+        /** Geometry-only mirror outputs cached per band slot (quadratic_gather
+         * only). mirror_geom() reads the static level-set phi (a second
+         * scattered field, ~32 reads/cell, plus a sqrt and the normal-gradient
+         * stencil) and produces quantities -- signed distance, image distance,
+         * unit boundary normal, point/image positions -- that depend ONLY on
+         * the embedded geometry, not on the field values. They are therefore
+         * identical on every substage and are computed once in the build pass
+         * (alongside the tap cache) and read in the apply path, so the apply
+         * never touches phi. Invalidated on regrid via reset() (assumes a
+         * static EB: the production case has no moving/deforming wall).
+         * Layout per slot: [s, d_im, nv[AMREX_SPACEDIM], xe[AMREX_SPACEDIM],
+         * xim[AMREX_SPACEDIM]]. */
+        static constexpr int geom_nr = 2 + 3*AMREX_SPACEDIM;
+        std::array<amrex::Gpu::DeviceVector<amrex::Real>, 3> ggeom;
+
         [[nodiscard]] bool empty () const { return !status[0]; }
         void reset () {
             for (auto& s : status) { s.reset(); }
@@ -67,6 +82,7 @@ namespace warpx::hybrid
             for (auto& g : gtap_n) { g.clear(); }
             for (auto& g : gtap_off) { g.clear(); }
             for (auto& g : gtap_w) { g.clear(); }
+            for (auto& g : ggeom) { g.clear(); }
             n_slots = {{0, 0, 0}};
             maxtap = 0;
             weights_built = false;
