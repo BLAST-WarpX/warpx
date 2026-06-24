@@ -65,7 +65,8 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
                         const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
                         const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& prob_lo,
                         const PlasmaInjector& plasma_injector,
-                        amrex::RealBox& overlap_realbox, amrex::Box& overlap_box, amrex::IntVect& shifted);
+                        amrex::RealBox& overlap_realbox, amrex::Box& overlap_box, amrex::IntVect& shifted,
+                        amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> & emitting_cell_location);
 
 /*
   This computes the scale_fac (used for setting the particle weights) on a volumetric basis.
@@ -212,26 +213,37 @@ void rotate_momentum_eb (
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real compute_scale_fac_area_plane (const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
-                                    const amrex::Real num_ppc_real, const int flux_normal_axis) {
+                                          const amrex::Real dt,
+                                          const amrex::Real num_ppc_real,
+                                          const bool fixed_ppc_is_specified, const int fixed_ppc,
+                                          const int flux_normal_axis) {
     using namespace amrex::literals;
-    amrex::Real scale_fac = AMREX_D_TERM(dx[0],*dx[1],*dx[2])/num_ppc_real;
-    // Scale particle weight by the area of the emitting surface, within one cell
+    amrex::Real scale_fac = AMREX_D_TERM(dx[0],*dx[1],*dx[2]);
+    if (fixed_ppc_is_specified) {
+        // This divides by the total number of particles in the cell
+        scale_fac /= fixed_ppc;
+    } else {
+        // Divide out the grid cell size along the normal direction to
+        // get the emitting area.
 #if defined(WARPX_DIM_3D)
-    scale_fac /= dx[flux_normal_axis];
+        scale_fac /= dx[flux_normal_axis];
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_XZ)
-    // When emission is in the r direction, the emitting surface is a cylinder.
-    // The factor 2*pi*r is added later below.
-    if (flux_normal_axis == 0) { scale_fac /= dx[0]; }
-    // When emission is in the z direction, the emitting surface is an annulus
-    // The factor 2*pi*r is added later below.
-    if (flux_normal_axis == 2) { scale_fac /= dx[1]; }
-    // When emission is in the theta direction (flux_normal_axis == 1),
-    // the emitting surface is a rectangle, within the plane of the simulation
+        // When emission is in the r direction, the emitting surface is a cylinder.
+        // The factor 2*pi*r is added later below.
+        if (flux_normal_axis == 0) { scale_fac /= dx[0]; }
+        // When emission is in the z direction, the emitting surface is an annulus
+        // The factor 2*pi*r is added later below.
+        if (flux_normal_axis == 2) { scale_fac /= dx[1]; }
+        // When emission is in the theta direction (flux_normal_axis == 1),
+        // the emitting surface is a rectangle, within the plane of the simulation
 #elif defined(WARPX_DIM_1D_Z)
-    if (flux_normal_axis == 2) { scale_fac /= dx[0]; }
+        if (flux_normal_axis == 2) { scale_fac /= dx[0]; }
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    if (flux_normal_axis == 0) { scale_fac /= dx[0]; }
+        if (flux_normal_axis == 0) { scale_fac /= dx[0]; }
 #endif
+        // This divides by the number of particles injected each step
+        scale_fac *= dt/num_ppc_real;
+    }
     return scale_fac;
 }
 

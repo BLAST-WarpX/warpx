@@ -818,16 +818,40 @@ class UniformFluxDistribution(
     warpx_inject_from_embedded_boundary: bool
         When true, the flux is injected from the embedded boundaries instead
         of a plane.
+
+    warpx_fixed_num_particles_per_cell: bool, optional
+        When True, the number of particles injected each time step is updated dynamically
+        so that the number of particles per cell in the cells along the flux surface will be
+        the specified num_particles_per_cell. This provides a stable way of including an
+        in-flowing bulk plasma. Note that when this optin is specified, the "flux" input
+        parameter is ignored. The density is set by warpx_density.
+
+    warpx_density: float, optional
+        When warpx_fixed_num_particles_per_cell is True, this specifies the density to
+        be injected.
     """
 
     def init(self, kw):
         FluxDistributionBase.init(self, kw)
+        self.fixed_num_particles_per_cell = kw.pop(
+            "warpx_fixed_num_particles_per_cell", False
+        )
+        self.density = kw.pop("warpx_density", None)
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
-        species.add_new_group_attr(source_name, "flux_profile", "constant")
-        species.add_new_group_attr(source_name, "flux", self.flux)
-        if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
+        if self.fixed_num_particles_per_cell:
+            species.add_new_group_attr(
+                source_name, "flux_profile", "fixed_num_particles_per_cell"
+            )
+            species.add_new_group_attr(source_name, "profile", "constant")
+            species.add_new_group_attr(source_name, "density", self.density)
+            if density_scale is not None:
+                species.add_new_group_attr(source_name, "density", density_scale)
+        else:
+            species.add_new_group_attr(source_name, "flux_profile", "constant")
+            species.add_new_group_attr(source_name, "flux", self.flux)
+            if density_scale is not None:
+                species.add_new_group_attr(source_name, "flux", density_scale)
 
 
 class AnalyticDistribution(

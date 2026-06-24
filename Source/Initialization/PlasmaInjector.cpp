@@ -593,16 +593,22 @@ void PlasmaInjector::parseFlux (amrex::ParmParse const& pp_species)
     std::transform(flux_prof_s.begin(), flux_prof_s.end(),
                    flux_prof_s.begin(), ::tolower);
     if (flux_prof_s == "constant") {
+        utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
         utils::parser::getWithParser(pp_species, source_name, "flux", flux);
         // Construct InjectorFlux with InjectorFluxConstant.
         h_inj_flux.reset(new InjectorFlux((InjectorFluxConstant*)nullptr, flux));
     } else if (flux_prof_s == "parse_flux_function") {
+        utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
         utils::parser::Store_parserString(pp_species, source_name, "flux_function(x,y,z,t)", str_flux_function);
         // Construct InjectorFlux with InjectorFluxParser.
         flux_parser = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(str_flux_function,{"x","y","z","t"}));
         h_inj_flux.reset(new InjectorFlux((InjectorFluxParser*)nullptr,
             flux_parser->compile<4>()));
+    } else if (flux_prof_s == "fixed_num_particles_per_cell") {
+        fixed_ppc_is_specified = true;
+        utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell);
+        SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     } else {
         SpeciesUtils::StringParseAbortMessage("Flux profile type", flux_prof_s);
     }

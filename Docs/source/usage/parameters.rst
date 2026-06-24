@@ -1521,8 +1521,6 @@ Particle initialization
 
       * ``<species_name>.flux_direction`` (only used when injecting from a plane, ``-1`` or ``+1``, direction of flux relative to the plane)
 
-      * ``<species_name>.num_particles_per_cell`` (``double``)
-
       * ``<species_name>.flux_tmin`` (``double``, Optional time at which the flux will be turned on. Ignored when negative.)
 
       * ``<species_name>.flux_tmax`` (``double``, Optional time at which the flux will be turned off. Ignored when negative.)
@@ -1641,12 +1639,20 @@ Particle initialization
 
     Defines the expression of the flux, when using :pp:param:`<species_name>.injection_style = NFluxPerCell`
 
-    * ``constant``: Constant flux. This requires the additional parameter ``<species_name>.flux``.
+    * ``constant``: Constant flux, specified by the input parameter ``<species_name>.flux``.
       i.e., the injection flux in :math:`m^{-2}.s^{-1}`.
+      The number of simulation particles injected each step is specified by ``<species_name>.num_particles_per_cell``.
+      If it is non-integer, the number injected is the specified values plus a random number between 0 and 1, rounded down to the
+      nearest integer below.
 
-    * ``parse_flux_function``: the flux is given by a function in the input file.
-      It requires the additional argument ``<species_name>.flux_function(x,y,z,t)``, which is a
-      mathematical expression for the flux of the species.
+    * ``parse_flux_function``: The flux is given by an analytic expression, specified by the input parameter ``<species_name>.flux_function(x,y,z,t)``.
+      The number of simulation particles injected each step is specified by ``<species_name>.num_particles_per_cell``.
+      If it is non-integer, the number injected is the specified values plus a random number between 0 and 1, rounded down to the
+      nearest integer below.
+
+    * ``fixed_num_particles_per_cell``: The flux is dynamically adjusted so that the number of simulation particles in each cell at the flux surface for the species is held constant.
+      In this case, the density is specified, using the input parameter ``<species_name>.profile`` as described above.
+      The desired fixed number of particles in each cell is specified by ``<species_name>.num_particles_per_cell``, which must be an integer.
 
 .. pp:param:: <species_name>.density_min
     :type: ``float``
