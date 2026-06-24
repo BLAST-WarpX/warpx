@@ -40,6 +40,7 @@
 #include "Initialization/WarpXInit.H"
 #include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/PrescribedCurrentParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
@@ -48,6 +49,7 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXUtil.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
@@ -93,6 +95,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 #include <limits>
 #include <optional>
 #include <random>
@@ -113,6 +117,9 @@ bool WarpX::fft_do_time_averaging = false;
 
 amrex::IntVect WarpX::m_fill_guards_fields  = amrex::IntVect(0);
 amrex::IntVect WarpX::m_fill_guards_current = amrex::IntVect(0);
+
+Real WarpX::c_light = PhysConst::c;
+Real WarpX::c_light_sq = PhysConst::c * PhysConst::c;
 
 Real WarpX::gamma_boost = 1._rt;
 Real WarpX::beta_boost = 0._rt;
@@ -437,7 +444,13 @@ WarpX::WarpX ()
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
 
-    // Set default values for particle and cell weights for costs update;
+    // Prescribed current injection (warpx.current_injection.*) is realized by
+    // PrescribedCurrentParticleContainer, created by MultiParticleContainer and
+    // parsed there. It deposits through the standard particle current path, so
+    // no field-level injection or input parsing is needed here.
+    // ------------------------------------------------------------------------
+
+
     // Default values listed here for the case AMREX_USE_GPU are determined
     // from single-GPU tests on Summit.
     if (costs_heuristic_cells_wt<=0. && costs_heuristic_particles_wt<=0.
@@ -692,6 +705,22 @@ WarpX::ReadParameters ()
                                          "Subcycling method 1 only works for 2 levels.");
 
         ReadBoostedFrameParameters(gamma_boost, beta_boost, boost_direction);
+
+        // Reduced speed of light model
+        {
+            amrex::Real c_light_factor = 1.0;
+            utils::parser::queryWithParser(pp_warpx, "c_light_factor", c_light_factor);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(c_light_factor >= 1.0,
+                "warpx.c_light_factor must be >= 1.0");
+            c_light = PhysConst::c / c_light_factor;
+            c_light_sq = c_light * c_light;
+            if (c_light_factor > 1.0) {
+                amrex::Print() << "\n*** Reduced speed of light model enabled ***\n"
+                               << "    c_light_factor = " << c_light_factor << "\n"
+                               << "    c_eff = " << c_light << " m/s"
+                               << " (physical c = " << PhysConst::c << " m/s)\n\n";
+            }
+        }
 
         // queryWithParser returns 1 if argument zmax_plasma_to_compute_max_step is
         // specified by the user, 0 otherwise.
@@ -1442,7 +1471,8 @@ WarpX::ReadParameters ()
 
         std::vector<std::string> sort_intervals_string_vec = {"-1"};
         int particle_shape;
-        if (!species_names.empty() || !lasers_names.empty()) {
+        if (!species_names.empty() || !lasers_names.empty()
+            || PrescribedCurrentParticleContainer::is_enabled()) {
             if (utils::parser::queryWithParser(pp_algo, "particle_shape", particle_shape)){
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     (particle_shape >= 1) && (particle_shape <=4),
