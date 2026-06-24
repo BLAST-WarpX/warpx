@@ -69,8 +69,9 @@ maxwell_juttner.momentum_distribution_type = "maxwell_juttner"
 maxwell_juttner.theta                      = 1.0
 
 # Maxwell-Juttner with an asymmetric bulk drift (normalized momentum gamma*v/c).
-# ux_mean=0.5, uy_mean=0.3, uz_mean=0 gives |u_mean|^2=0.34, gamma_bulk=sqrt(1.34).
-# The drift is intentionally asymmetric to verify the per-axis Lorentz decomposition.
+# ux_mean=0.5, uy_mean=0.3, uz_mean=0.1 gives |u_mean|^2=0.35, gamma_bulk=sqrt(1.35).
+# The drift is intentionally asymmetric (all three components non-zero) to verify that
+# each axis is read and applied correctly.
 maxwell_juttner_drift.charge                                 = -q_e
 maxwell_juttner_drift.mass                                   = m_e
 maxwell_juttner_drift.injection_style                        = "NRandomPerCell"
@@ -82,7 +83,7 @@ maxwell_juttner_drift.theta                                  = 1.0
 maxwell_juttner_drift.maxwell_juttner_u_mean_distribution_type = "constant"
 maxwell_juttner_drift.ux_mean                                = 0.5
 maxwell_juttner_drift.uy_mean                                = 0.3
-maxwell_juttner_drift.uz_mean                                = 0.0
+maxwell_juttner_drift.uz_mean                                = 0.1
 
 maxwell_juttner_low_theta.charge                     = -q_e
 maxwell_juttner_low_theta.mass                       = m_e
@@ -200,7 +201,7 @@ gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
 # 8 for cuboid in momentum space
 # 10 for maxwell-juttner with low theta (Gaussian fallback)
 # 11 for maxwell-juttner with constant diagonal bulk drift
-warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h10 h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z h11
+warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z h10 h11
 
 h1x.type                                 = ParticleHistogram
 h1x.intervals                            = 1
@@ -444,7 +445,7 @@ h9z.histogram_function(t,x,y,z,ux,uy,uz) = "uz/z"
 
 # Maxwell-Juttner with asymmetric bulk drift: histogram the drift-frame Lorentz factor
 # gamma' = gamma_bulk*gamma - u_mean.u, which must follow the rest-frame MJ(theta=1).
-# u_mean = (0.5, 0.3, 0), gamma_bulk = sqrt(1 + 0.5^2 + 0.3^2) = sqrt(1.34).
+# u_mean = (0.5, 0.3, 0.1), gamma_bulk = sqrt(1 + 0.5^2 + 0.3^2 + 0.1^2) = sqrt(1.35).
 h11.type                                 = ParticleHistogram
 h11.intervals                            = 1
 h11.path                                 = "./"
@@ -452,7 +453,7 @@ h11.species                              = maxwell_juttner_drift
 h11.bin_number                           = 50
 h11.bin_min                              = 1.0
 h11.bin_max                              = 12.0
-h11.histogram_function(t,x,y,z,ux,uy,uz) = "1.1575836902790225*sqrt(1.0 + ux*ux + uy*uy + uz*uz) - 0.5*ux - 0.3*uy"
+h11.histogram_function(t,x,y,z,ux,uy,uz) = "1.161895003862225*sqrt(1.0 + ux*ux + uy*uy + uz*uz) - 0.5*ux - 0.3*uy - 0.1*uz"
 
 # our little beam monitor
 bmmntr.type                              = BeamRelevant

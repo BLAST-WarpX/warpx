@@ -1759,7 +1759,7 @@ Particle initialization
 
       (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
       **drifting Lorentz frame** that is moving with a bulk velocity specified by the normalized momentum
-      :math:`u_{\rm mean} = (u_{x,{\rm mean}}, u_{y,{\rm mean}}, u_{z,{\rm mean}}) = \gamma \boldsymbol{v}/c` (see below).
+      :math:`\boldsymbol{u}_{\rm mean} = (u_{x,{\rm mean}}, u_{y,{\rm mean}}, u_{z,{\rm mean}}) = \gamma \boldsymbol{v}/c` (see below).
       Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
       in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
 
@@ -1769,11 +1769,11 @@ Particle initialization
         Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``.
         Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
         representing the normalized momentum, defined as
-        :math:`u_\mathrm{mean} = \gamma \beta`, where
-        :math:`\beta = v/c` and :math:`\gamma = 1/\sqrt{1-\beta^2}`.
+        :math:`\boldsymbol{u}_\mathrm{mean} = \gamma \boldsymbol{\beta}`, where
+        :math:`\boldsymbol{\beta} = \boldsymbol{v}/c` and :math:`\gamma = 1/\sqrt{1-|\boldsymbol{\beta}|^2}`.
         The distribution is boosted from the drift frame to the simulation frame along the
-        direction of :math:`u_\mathrm{mean}`; the bulk velocity :math:`\beta` derived from
-        :math:`u_\mathrm{mean}` is therefore always in the physical range :math:`|\beta| < 1`.
+        direction of :math:`\boldsymbol{u}_\mathrm{mean}`; the bulk velocity :math:`|\boldsymbol{\beta}|` derived from
+        :math:`\boldsymbol{u}_\mathrm{mean}` is therefore always in the physical range :math:`|\boldsymbol{\beta}| < 1`.
 
         * If ``constant``, the following are required: ``<species_name>.ux_mean``,
           ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``).
@@ -1788,6 +1788,14 @@ Particle initialization
 
         * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
         * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
+
+      Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
+      For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
+      efficiency tends to zero as :math:`\theta \rightarrow 0`) and, at the same time, the Maxwell-Juttner
+      distribution becomes almost indistinguishable from a non-relativistic Maxwellian.
+      Thus, for :math:`\theta < 0.1`, the code instead samples an isotropic Maxwellian with thermal spread
+      :math:`\sqrt{\theta}` per component in the drift frame, then applies the same flipping
+      method and Lorentz transform as for the Sobol-sampled momenta.
 
     * ``parse_momentum_function``: the momentum :math:`u = (u_{x},u_{y},u_{z})=(\gamma v_{x}/c,\gamma v_{y}/c,\gamma v_{z}/c)` is given by a function in the input
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,

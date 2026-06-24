@@ -439,21 +439,12 @@ PhysicalParticleContainer::BackwardCompatibility ()
         "(in which case provide <species>.ux_mean_function(x,y,z), uy_mean_function(x,y,z), "
         "uz_mean_function(x,y,z)).";
     std::string backward_string;
-    if (pp_species_name.query("bulk_vel_dir", backward_string)) {
-        WARPX_ABORT_WITH_MESSAGE(
-            "<species>.bulk_vel_dir is no longer supported. " + juttner_drift_msg);
-    }
-    if (pp_species_name.query("beta_distribution_type", backward_string)) {
-        WARPX_ABORT_WITH_MESSAGE(
-            "<species>.beta_distribution_type is no longer supported. " + juttner_drift_msg);
-    }
-    if (pp_species_name.query("beta_function(x,y,z)", backward_string)) {
-        WARPX_ABORT_WITH_MESSAGE(
-            "<species>.beta_function(x,y,z) is no longer supported. " + juttner_drift_msg);
-    }
-    if (pp_species_name.query("beta", backward_string)) {
-        WARPX_ABORT_WITH_MESSAGE(
-            "<species>.beta is no longer supported. " + juttner_drift_msg);
+    for (const std::string old_param : {"bulk_vel_dir", "beta_distribution_type",
+                                        "beta_function(x,y,z)", "beta"}) {
+        if (pp_species_name.query(old_param.c_str(), backward_string)) {
+            WARPX_ABORT_WITH_MESSAGE(
+                "<species>." + old_param + " is no longer supported. " + juttner_drift_msg);
+        }
     }
 }
 

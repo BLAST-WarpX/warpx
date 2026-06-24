@@ -242,10 +242,11 @@ assert f5_error < tolerance
 # =================================================
 # maxwell-juttner with a constant asymmetric bulk drift
 # =================================================
-# The species drifts with normalized momentum u_mean = (0.5, 0.3, 0), giving
-# gamma_bulk = sqrt(1.34). The drift is asymmetric to verify the per-axis Lorentz
-# decomposition. The reduced diagnostic h11 histograms the drift-frame Lorentz factor
-# gamma' = gamma_bulk*gamma_lab - u_mean.u, which must follow MJ(theta=1).
+# The species drifts with normalized momentum u_mean = (0.5, 0.3, 0.1), giving
+# gamma_bulk = sqrt(1.35). All three components are non-zero to verify that each
+# axis is read and applied correctly. The reduced diagnostic h11 histograms the
+# drift-frame Lorentz factor gamma' = gamma_bulk*gamma_lab - u_mean.u, which must
+# follow MJ(theta=1).
 
 # load data
 bin_value, bin_data_drift = read_reduced_diags_histogram("h11.txt")[2:]
