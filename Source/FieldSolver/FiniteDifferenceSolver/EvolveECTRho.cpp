@@ -63,8 +63,14 @@ namespace {
      *  centered slope). `delta` is 0 on uncut/covered edges, so the result is
      *  byte-identical to the unshifted sample there; `apply_curvature == false`
      *  (EM-ECT, or the opt-in flag off) returns the unshifted sample everywhere.
-     *  Falls back to no shift if an along-edge neighbor edge is covered
-     *  (edge_length <= 0), to avoid reaching into covered E. */
+     *
+     *  The along-edge slope dE/ds*dx is a centered difference when both neighbor
+     *  edges are open. At a convex curved wall the OUTWARD along-edge neighbor of
+     *  a cut edge is typically covered, so a centered-only stencil would disable
+     *  the correction on exactly the cut edges that need it; we therefore fall
+     *  back to a ONE-SIDED slope using whichever neighbor is open (still 2nd-order
+     *  accurate for the O(h) sample-point shift). Only a fully isolated cut edge
+     *  (both along-edge neighbors covered) gets no shift. */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::Real ect_edge_E (
         bool apply_curvature, int i, int j, int k, int dir,
@@ -72,7 +78,7 @@ namespace {
         amrex::Array4<amrex::Real const> const& off,
         amrex::Array4<amrex::Real const> const& len)
     {
-        amrex::Real e = E(i, j, k);
+        amrex::Real const e = E(i, j, k);
         if (!apply_curvature) { return e; }
         amrex::Real const delta = off(i, j, k);
         if (delta == amrex::Real(0.0)) { return e; }
@@ -87,10 +93,21 @@ namespace {
 #elif defined(WARPX_DIM_XZ)
         else { jp = j + 1; jm = j - 1; }
 #endif
-        if (len(ip, jp, kp) > amrex::Real(0.0) && len(im, jm, km) > amrex::Real(0.0)) {
-            e += amrex::Real(0.5) * delta * (E(ip, jp, kp) - E(im, jm, km));
+        bool const plus_open  = len(ip, jp, kp) > amrex::Real(0.0);
+        bool const minus_open = len(im, jm, km) > amrex::Real(0.0);
+        // slope_dx approximates (dE/ds)*dx at the edge center (cell size cancels
+        // against the dimensionless delta).
+        amrex::Real slope_dx;
+        if (plus_open && minus_open) {
+            slope_dx = amrex::Real(0.5) * (E(ip, jp, kp) - E(im, jm, km));
+        } else if (plus_open) {
+            slope_dx = E(ip, jp, kp) - e;
+        } else if (minus_open) {
+            slope_dx = e - E(im, jm, km);
+        } else {
+            return e; // isolated cut edge: no usable along-edge slope
         }
-        return e;
+        return e + delta * slope_dx;
     }
 }
 #endif
