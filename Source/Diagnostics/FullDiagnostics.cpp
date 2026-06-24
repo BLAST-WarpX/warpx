@@ -456,6 +456,20 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
                 }
+            } else if ( warpx.m_fields.has(m_varnames_fields[comp].substr(0, m_varnames_fields[comp].size() - 1), lev) &&
+                        m_varnames_fields[comp].back() == field_names[idir].front()) {
+                // This assumes a name like fieldname + field_names[idir]
+                const std::string fieldname = m_varnames_fields[comp].substr(0, m_varnames_fields[comp].size() - 1);
+                const amrex::MultiFab * mf = warpx.m_fields.get(fieldname, Direction{idir}, lev);
+                const int mf_ncomp = mf->nComp();
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
+                if (mf_ncomp == ncomp) {
+                    AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
+                } else if (mf_ncomp == 1) {
+                    m_varnames.push_back(m_varnames_fields[comp]);
+                } else {
+                    WARPX_ABORT_WITH_MESSAGE("Error: " + m_varnames_fields[comp] + " has an unexpected number of components and can not be written out");
+                }
             }
         }
         // Check if comp was found above
@@ -894,6 +908,12 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
+            } else if ( warpx.m_fields.has(m_varnames[comp].substr(0, m_varnames[comp].size() - 1), lev) &&
+                        m_varnames[comp].back() == field_names[idir].front()) {
+                // This assumes a name like fieldname + field_names[idir]
+                const std::string fieldname = m_varnames[comp].substr(0, m_varnames[comp].size() - 1);
+                const amrex::MultiFab * mf = warpx.m_fields.get(fieldname, Direction{idir}, lev);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio);
             }
         }
         // Check if comp was found above
