@@ -72,31 +72,32 @@ computePhiIGF ( amrex::MultiFab const & rho,
     if (!is_igf_2d_slices){
         // fully 3D solver
         obc_solver->setGreensFunction(
-        [=]<int WIDTH> AMREX_GPU_DEVICE (amrex::simd::stdx::fixed_size_simd<int, WIDTH> i, int j, int k) -> amrex::simd::SIMDReal<WIDTH>
+        [=] AMREX_GPU_DEVICE (auto i, int j, int k)
         {
-            auto const i0 = i - lo[0];
-            int const j0 = j - lo[1];
-            int const k0 = k - lo[2];
+            // i is a scalar int (GPU / non-SIMD CPU) or a SIMD int register
+            // (CPU with SIMD); WIDTH is deduced accordingly (1 in the scalar case).
+            constexpr int WIDTH = amrex::simd::lane_count_v<decltype(i)>;
             using ST = amrex::simd::SIMDReal<WIDTH>;
-            ST const x = amrex::simd::stdx::static_simd_cast<ST>(i0) * dx;
-            amrex::Real const y = j0*dy;
-            amrex::Real const z = k0*dz;
+            ST const x = amrex::simd::index_to_real<ST>(i - lo[0]) * dx;
+            amrex::Real const y = (j - lo[1]) * dy;
+            amrex::Real const z = (k - lo[2]) * dz;
 
-            return SumOfIntegratedPotential3D(x, y, z, dx, dy, dz);
+            return SumOfIntegratedPotential3D<WIDTH>(x, y, z, dx, dy, dz);
         });
     }else{
         // 2D sliced solver
         obc_solver->setGreensFunction(
-        [=]<int WIDTH> AMREX_GPU_DEVICE (amrex::simd::stdx::fixed_size_simd<int, WIDTH> i, int j, int k) -> amrex::simd::SIMDReal<WIDTH>
+        [=] AMREX_GPU_DEVICE (auto i, int j, int k)
         {
-            auto const i0 = i - lo[0];
-            int const j0 = j - lo[1];
+            // i is a scalar int (GPU / non-SIMD CPU) or a SIMD int register
+            // (CPU with SIMD); WIDTH is deduced accordingly (1 in the scalar case).
+            constexpr int WIDTH = amrex::simd::lane_count_v<decltype(i)>;
             using ST = amrex::simd::SIMDReal<WIDTH>;
-            ST const x = amrex::simd::stdx::static_simd_cast<ST>(i0) * dx;
-            amrex::Real const y = j0*dy;
+            ST const x = amrex::simd::index_to_real<ST>(i - lo[0]) * dx;
+            amrex::Real const y = (j - lo[1]) * dy;
             amrex::ignore_unused(k);
 
-            return SumOfIntegratedPotential2D(x, y, dx, dy);
+            return SumOfIntegratedPotential2D<WIDTH>(x, y, dx, dy);
         });
 
     }

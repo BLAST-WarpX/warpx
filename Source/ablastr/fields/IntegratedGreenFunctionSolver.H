@@ -38,7 +38,10 @@ namespace ablastr::fields
     amrex::simd::SIMDReal<WIDTH>
     IntegratedPotential3D (amrex::simd::SIMDReal<WIDTH> x, amrex::Real y, amrex::Real z)
     {
-        using namespace std; // for cmath(float)
+        // unqualified math below resolves to std:: for scalar (non-SIMD / GPU)
+        // arguments and, via ADL, to the std::experimental SIMD overloads for
+        // SIMDReal arguments (CPU with SIMD).
+        using namespace std;
 
         amrex::simd::SIMDReal<WIDTH> const r = sqrt( x*x + y*y + z*z );
         amrex::simd::SIMDReal<WIDTH> const G = - 0.5_rt * z*z * atan( x*y / (z*r) )
@@ -63,7 +66,10 @@ namespace ablastr::fields
     amrex::simd::SIMDReal<WIDTH>
     IntegratedPotential2D (amrex::simd::SIMDReal<WIDTH> x, amrex::Real y)
     {
-        using namespace std; // for cmath(float)
+        // unqualified math below resolves to std:: for scalar (non-SIMD / GPU)
+        // arguments and, via ADL, to the std::experimental SIMD overloads for
+        // SIMDReal arguments (CPU with SIMD).
+        using namespace std;
 
         amrex::simd::SIMDReal<WIDTH> const G = 3_rt*x*y
                                           - x*x * atan(y/x)
@@ -90,15 +96,17 @@ namespace ablastr::fields
     SumOfIntegratedPotential3D(amrex::simd::SIMDReal<WIDTH> x, amrex::Real y, amrex::Real z, amrex::Real dx, amrex::Real dy,
                                amrex::Real dz)
     {
+        // explicit <WIDTH>: in non-SIMD builds SIMDReal<WIDTH> is amrex::Real for
+        // every WIDTH, so WIDTH is non-deducible from the argument here.
         return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::epsilon_0) * (
-                  IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
-                - IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
-                - IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
-                + IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
-                - IntegratedPotential3D( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
-                + IntegratedPotential3D( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
-                + IntegratedPotential3D( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
-                - IntegratedPotential3D( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
+                  IntegratedPotential3D<WIDTH>( x+0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
+                - IntegratedPotential3D<WIDTH>( x-0.5_rt*dx, y+0.5_rt*dy, z+0.5_rt*dz )
+                - IntegratedPotential3D<WIDTH>( x+0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
+                + IntegratedPotential3D<WIDTH>( x-0.5_rt*dx, y-0.5_rt*dy, z+0.5_rt*dz )
+                - IntegratedPotential3D<WIDTH>( x+0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
+                + IntegratedPotential3D<WIDTH>( x-0.5_rt*dx, y+0.5_rt*dy, z-0.5_rt*dz )
+                + IntegratedPotential3D<WIDTH>( x+0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
+                - IntegratedPotential3D<WIDTH>( x-0.5_rt*dx, y-0.5_rt*dy, z-0.5_rt*dz )
                 );
     }
 
@@ -117,11 +125,13 @@ namespace ablastr::fields
     amrex::simd::SIMDReal<WIDTH>
     SumOfIntegratedPotential2D (amrex::simd::SIMDReal<WIDTH> x, amrex::Real y, amrex::Real dx, amrex::Real dy)
     {
+        // explicit <WIDTH>: in non-SIMD builds SIMDReal<WIDTH> is amrex::Real for
+        // every WIDTH, so WIDTH is non-deducible from the argument here.
         return 1._rt/(4._rt*ablastr::constant::math::pi*ablastr::constant::SI::epsilon_0) * (
-                  IntegratedPotential2D( x+0.5_rt*dx, y+0.5_rt*dy )
-                - IntegratedPotential2D( x+0.5_rt*dx, y-0.5_rt*dy )
-                - IntegratedPotential2D( x-0.5_rt*dx, y+0.5_rt*dy )
-                + IntegratedPotential2D( x-0.5_rt*dx, y-0.5_rt*dy )
+                  IntegratedPotential2D<WIDTH>( x+0.5_rt*dx, y+0.5_rt*dy )
+                - IntegratedPotential2D<WIDTH>( x+0.5_rt*dx, y-0.5_rt*dy )
+                - IntegratedPotential2D<WIDTH>( x-0.5_rt*dx, y+0.5_rt*dy )
+                + IntegratedPotential2D<WIDTH>( x-0.5_rt*dx, y-0.5_rt*dy )
                 );
     }
 
