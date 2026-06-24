@@ -924,6 +924,11 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     }
                     if (s0 != S_FILL) { return; }
 
+                    // NOTE (perf, deferred): on the cached apply path this
+                    // mirror_geom (a per-substage level-set gradient/normal) is the
+                    // only remaining geometry-only recompute. It could be cached
+                    // per band slot (nv, w_n=s/d_im, w_t, lambda) for ~2% more, but
+                    // the apply is memory-bound on the tap gather, so it was left.
                     auto const g = ::mirror_geom(i, j, k, stag_own, phi,
                         plo, dxi, dx_arr, d_band, d_img_min, h_max);
 

@@ -560,6 +560,66 @@ web::ComputeEdgeLengths (
 
 
 void
+web::ComputeEdgeCentroidOffsets (
+    ablastr::fields::VectorField& edge_cent_offset,
+    const amrex::EBFArrayBoxFactory& eb_fact)
+{
+    BL_PROFILE("ComputeEdgeCentroidOffsets");
+
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ)
+    WARPX_ABORT_WITH_MESSAGE("ComputeEdgeCentroidOffsets only implemented in 2D and 3D");
+#endif
+
+    // AMReX's edge centroid (intercept_to_edge_centroid) is the centroid of the
+    // uncovered edge segment, measured from the edge center, already in full-cell
+    // units (range [-0.5, 0.5]); +1/-1 are the fully-open/fully-covered sentinels.
+    // The Faraday curvature shift uses this offset directly (delta = edge_cent), so
+    // there is no ScaleEdges step here (the offset is dimensionless, not a length).
+    auto const &flags = eb_fact.getMultiEBCellFlagFab();
+    auto const &edge_centroid = eb_fact.getEdgeCent();
+    for (int idim = 0; idim < 3; ++idim){
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        if (idim == 1) {
+            edge_cent_offset[1]->setVal(0.);
+            continue;
+        }
+#endif
+        for (amrex::MFIter mfi(flags); mfi.isValid(); ++mfi){
+            amrex::Box const box = mfi.tilebox(edge_cent_offset[idim]->ixType().toIntVect(),
+                                               edge_cent_offset[idim]->nGrowVect());
+            amrex::FabType const fab_type = flags[mfi].getType(box);
+            auto const &offset_dim = edge_cent_offset[idim]->array(mfi);
+
+            if (fab_type == amrex::FabType::regular || fab_type == amrex::FabType::covered) {
+                // Uncut (fully open) or fully covered: no centroid shift.
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    offset_dim(i, j, k) = 0.;
+                });
+            } else {
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                int idim_amrex = idim;
+                if (idim == 2) { idim_amrex = 1; }
+                auto const &edge_cent = edge_centroid[idim_amrex]->const_array(mfi);
+#elif defined(WARPX_DIM_3D)
+                auto const &edge_cent = edge_centroid[idim]->const_array(mfi);
+#endif
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    amrex::Real const ec = edge_cent(i, j, k);
+                    if (ec == amrex::Real(-1.0) || ec == amrex::Real(1.0)) {
+                        // Fully covered or fully open: no shift.
+                        offset_dim(i, j, k) = 0.;
+                    } else {
+                        // Cut edge: ec is the uncovered-segment centroid offset.
+                        offset_dim(i, j, k) = ec;
+                    }
+                });
+            }
+        }
+    }
+}
+
+
+void
 web::ComputeFaceAreas (
     ablastr::fields::VectorField& face_areas,
     const amrex::EBFArrayBoxFactory& eb_fact)

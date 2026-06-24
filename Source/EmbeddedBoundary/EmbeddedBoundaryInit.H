@@ -145,6 +145,17 @@ namespace warpx::embedded_boundary
         ablastr::fields::VectorField& edge_lengths,
         const amrex::EBFArrayBoxFactory& eb_fact);
     /**
+    * \brief Compute the per-edge offset of the uncovered-segment centroid from the
+    *        edge center, in full-cell units (range [-0.5, 0.5]); 0 on uncut/covered
+    *        edges. Used by the conformal-ECT hybrid Faraday curvature correction.
+    *        Reads the same `eb_fact.getEdgeCent()` as ComputeEdgeLengths. NOTE: this
+    *        offset is a dimensionless cell fraction and must NOT be passed through
+    *        ScaleEdges (unlike edge_lengths).
+    */
+    void ComputeEdgeCentroidOffsets (
+        ablastr::fields::VectorField& edge_cent_offset,
+        const amrex::EBFArrayBoxFactory& eb_fact);
+    /**
     * \brief Compute the area of the mesh faces. Here the area is a value in [0, 1].
     *        An edge of area 0 is fully covered.
     */

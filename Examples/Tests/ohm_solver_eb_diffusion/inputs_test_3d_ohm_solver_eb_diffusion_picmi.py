@@ -114,6 +114,7 @@ def setup_simulation(
     eb_cyl_correction=False,
     b_curl_fill=False,
     resistive_only_partial=False,
+    ect_curvature=False,
 ):
     """Create the PICMI simulation object.
 
@@ -232,6 +233,7 @@ def setup_simulation(
         holmstrom_vacuum_region=True,
         use_conformal_eb=True if use_conformal_eb else None,
         conformal_b_curl_fill=True if b_curl_fill else None,
+        conformal_ect_curvature=True if ect_curvature else None,
         eb_resistive_only_partial=True if resistive_only_partial else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
     )
@@ -260,6 +262,17 @@ def setup_simulation(
             implicit_function="sqrt(x*x+z*z)-rcyl",
             rcyl=R_CYL,
         )
+        if use_conformal_eb:
+            # TEMP (edge-order validation): widen the covered-B mirror/gather fill
+            # band to 3 cells so the near-wall B-curl-fill gather never reaches into
+            # the zeroed deep interior ("empty cells"); this isolates the spatial
+            # order from a band-width artifact. The HybridPICModel comment recommends
+            # >= 3 to push the mirror's div(B) jump past any solution stencil. Scoped
+            # to the cylinder diagnostic (the registered square test is unchanged);
+            # tighten back toward 1 once the order is established.
+            from pywarpx import hybridpicmodel
+
+            hybridpicmodel.eb_b_fill_band_cells = 3
     else:
         sim.embedded_boundary = picmi.EmbeddedBoundary(
             implicit_function=(
@@ -502,6 +515,15 @@ def main():
         "wall band; staggered (Yee) grid only",
     )
     parser.add_argument(
+        "--ect-curvature",
+        action="store_true",
+        help="apply the along-edge curvature correction to the conformal-ECT "
+        "Faraday circulation (hybrid_pic_model.conformal_ect_curvature): shift "
+        "each cut edge's E to the uncovered-segment centroid before forming the "
+        "per-face EMF, lifting the curved-wall B push toward 2nd order; "
+        "staggered (Yee) grid only",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -524,6 +546,7 @@ def main():
         args.eb_cyl_correction,
         args.b_curl_fill,
         args.resistive_only_partial,
+        args.ect_curvature,
     )
     sim.step()
 

@@ -64,6 +64,7 @@ namespace warpx::fields
         B_external_particle_field, /**< Stores external particle fields provided by the user as  through an openPMD file */
         distance_to_eb, /**< Only used with embedded boundaries (EB). Stores the distance to the nearest EB */
         edge_lengths,   /**< Only used with the ECT solver. Indicates the length of the cell edge that is covered by the EB, in SI units */
+        edge_cent_offset, /**< Only used with the conformal-ECT hybrid curvature correction. Per-edge offset (in full-cell units, in [-0.5,0.5]) of the uncovered-segment centroid from the edge center; 0 on uncut/covered edges. */
         face_areas,     /**< Only used with the ECT solver. Indicates the area of the cell face that is covered by the EB, in SI units */
         area_mod,       /**< ECT solver: face area modified by the enlarged-cell borrowing (S_mod in the kernels: own area plus borrowed minus lent) */
         pml_E_fp,

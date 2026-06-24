@@ -82,7 +82,9 @@ class FiniteDifferenceSolver
                             ablastr::fields::VectorField const& edge_lengths,
                             ablastr::fields::VectorField const& face_areas,
                             ablastr::fields::VectorField const& ECTRhofield,
-                            int lev );
+                            int lev,
+                            ablastr::fields::VectorField const* edge_cent_offset = nullptr,
+                            bool apply_curvature = false );
 
         void ApplySilverMuellerBoundary (
             ablastr::fields::VectorField & Efield,
@@ -470,7 +472,9 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField const& Efield,
             ablastr::fields::VectorField const& edge_lengths,
             ablastr::fields::VectorField const& face_areas,
-            ablastr::fields::VectorField const& ECTRhofield, int lev);
+            ablastr::fields::VectorField const& ECTRhofield, int lev,
+            ablastr::fields::VectorField const* edge_cent_offset = nullptr,
+            bool apply_curvature = false);
 
         void EvolveBCartesianECT (
             ablastr::fields::VectorField const& Bfield,

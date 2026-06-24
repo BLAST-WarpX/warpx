@@ -2632,6 +2632,17 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 m_fields.alloc_init(FieldType::edge_lengths, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag),
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
+                //! EB: Per-edge offset of the uncovered-segment centroid from the
+                //! edge center (full-cell units), for the conformal-ECT hybrid
+                //! curvature correction. Same staggering as edge_lengths; init 0
+                //! (no shift) so it is inert until ComputeEdgeCentroidOffsets fills it.
+                m_fields.alloc_init(FieldType::edge_cent_offset, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::edge_cent_offset, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+                m_fields.alloc_init(FieldType::edge_cent_offset, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag),
+                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+
                 //! EB: Areas of the mesh faces
                 m_fields.alloc_init(FieldType::face_areas, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);

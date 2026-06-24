@@ -2194,6 +2194,17 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         neighbors to avoid time-step restrictions. Requires an embedded
         boundary and a 3D Cartesian staggered grid.
 
+    conformal_ect_curvature: bool, default=False
+        If True, apply the along-edge curvature correction to the conformal-ECT
+        Faraday circulation: each cut edge's electric field is Taylor-shifted
+        from the full-edge center to the centroid of its uncovered segment
+        before forming the per-face EMF. Without it the circulation is a
+        1st-order midpoint quadrature over the curved contour, which caps the
+        conformal B push at ~1st order at a curved wall even when ``curl(B)``
+        feeding the plasma current is already 2nd order
+        (``conformal_b_curl_fill``). Requires ``use_conformal_eb`` and a
+        staggered (Yee) grid; opt-in (default off is byte-identical).
+
     eb_resistive_only_partial: bool, default=False
         If True, the generalized Ohm's law is made resistive-only (E = eta*J) in
         partially-covered embedded-boundary cells: the stiff 1/n Hall and
@@ -2353,6 +2364,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
         conformal_b_curl_fill=None,
+        conformal_ect_curvature=None,
         eb_resistive_only_partial=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
@@ -2397,6 +2409,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.use_conformal_eb = use_conformal_eb
         self.conformal_b_curl_fill = conformal_b_curl_fill
+        self.conformal_ect_curvature = conformal_ect_curvature
         self.eb_resistive_only_partial = eb_resistive_only_partial
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
@@ -2465,6 +2478,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
         pywarpx.hybridpicmodel.conformal_b_curl_fill = self.conformal_b_curl_fill
+        pywarpx.hybridpicmodel.conformal_ect_curvature = self.conformal_ect_curvature
         pywarpx.hybridpicmodel.eb_resistive_only_partial = (
             self.eb_resistive_only_partial
         )

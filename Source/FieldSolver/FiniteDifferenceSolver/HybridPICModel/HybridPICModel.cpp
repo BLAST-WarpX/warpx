@@ -107,6 +107,17 @@ void HybridPICModel::ReadParameters ()
             "2nd-order covered-B gather is not yet robust).",
             ablastr::warn_manager::WarnPriority::medium);
     }
+    pp_hybrid.query("conformal_ect_curvature", m_conformal_ect_curvature);
+    if (m_conformal_ect_curvature
+        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.conformal_ect_curvature applies the ECT Faraday "
+            "circulation curvature correction, which is only defined on a staggered "
+            "(Yee) grid; it is ignored on a collocated grid (which uses the masked "
+            "nodal curl, not ECT circulations).",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
 
     // Resistive-only generalized Ohm's law in partially-covered EB cells (Lever 2 /
     // GOL masking): drops the stiff 1/n Hall + electron-pressure terms in the cut-cell
@@ -1409,8 +1420,20 @@ void HybridPICModel::FieldPush (
     CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
-    // Call FillBoundary if a collocated grid is used
-    if (Bz_IndexType[0] == Ez_IndexType[0]) {
+    // Refresh the E ghosts before the Faraday push reads them. This is always
+    // required on a collocated grid (the masked nodal curl reads ghost E). On a
+    // staggered grid with the conformal embedded boundary, the ECT circulation
+    // (EvolveECTRho below) — and its along-edge curvature correction when enabled —
+    // also reads cross-box ghost E edges, which the 1-ghost ECTRhofield
+    // FillBoundary only refreshes *after* each face's Rho is formed; fill the E
+    // ghosts here first so the per-face circulation is seam-consistent.
+    bool fill_E_pre_faraday = (Bz_IndexType[0] == Ez_IndexType[0]);
+#ifdef AMREX_USE_EB
+    fill_E_pre_faraday = fill_E_pre_faraday ||
+        (m_use_conformal_eb &&
+         WarpX::grid_type != ablastr::utils::enums::GridType::Collocated);
+#endif
+    if (fill_E_pre_faraday) {
         warpx.FillBoundaryE(ng, nodal_sync);
     }
 
@@ -1429,12 +1452,17 @@ void HybridPICModel::FieldPush (
     if (m_use_conformal_eb &&
         WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            // Opt-in along-edge curvature correction of the circulation: shift each
+            // cut edge's E to the uncovered-segment centroid (see EvolveECTRho).
+            auto edge_cent_offset = warpx.m_fields.get_alldirs(FieldType::edge_cent_offset, lev);
             warpx.get_pointer_fdtd_solver_fp(lev)->EvolveECTRho(
                 Efield[lev],
                 warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
                 warpx.m_fields.get_alldirs(FieldType::face_areas, lev),
                 warpx.m_fields.get_alldirs(FieldType::ECTRhofield, lev),
-                lev);
+                lev,
+                &edge_cent_offset,
+                m_conformal_ect_curvature);
         }
     }
 #endif

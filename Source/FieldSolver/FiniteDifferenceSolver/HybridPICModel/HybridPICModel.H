@@ -402,6 +402,16 @@ public:
      *  nodal/collocated quadratic gather is not yet robust and is skipped. Opt-in
      *  (default off -> byte-identical); intended for use_conformal_eb runs. */
     bool m_conformal_b_curl_fill = false;
+    /** If true, apply the along-edge curvature correction to the conformal-ECT
+     *  Faraday circulation: in EvolveECTRho each cut edge's E is Taylor-shifted
+     *  from the full-edge center to the centroid of its uncovered segment before
+     *  forming the per-face EMF. Without it the circulation is a 1st-order
+     *  midpoint quadrature over the curved contour, capping the conformal B push
+     *  at ~1st order at a curved wall even when curl(B)->J is already 2nd order
+     *  (conformal_b_curl_fill). Uses the edge_cent_offset geometry field. Staggered
+     *  (Yee) grid only; opt-in (default off -> byte-identical, since the shift is
+     *  zero on uncut/covered edges). */
+    bool m_conformal_ect_curvature = false;
     /** If true, skip the collocated conformal magnetic-field wall treatment
      *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
      *  This reproduces the pre-treatment baseline and isolates the wall fill as

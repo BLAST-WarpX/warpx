@@ -48,11 +48,28 @@ MARGIN = 0.15  # interior region r < R_CYL - MARGIN (fixed physical, like square
 MAX_STEPS = 200
 SQ_DECAY = ETA / mu_0 * (np.pi / 1.06) ** 2  # the deck's dt is set by the square rate
 
-# (label, conformal, grid_type, divb_clean, eb_cyl, b_curl)
+# (label, conformal, grid_type, divb_clean, eb_cyl, b_curl, ect_curv)
 CONFIGS = [
-    ("conformal ECT (staggered)", True, "staggered", False, False, False),
-    ("conformal ECT (staggered) + b-curl-fill", True, "staggered", False, False, True),
-    ("mirror (collocated), clean OFF", True, "collocated", False, False, False),
+    ("conformal ECT (staggered)", True, "staggered", False, False, False, False),
+    (
+        "conformal ECT (staggered) + b-curl-fill",
+        True,
+        "staggered",
+        False,
+        False,
+        True,
+        False,
+    ),
+    (
+        "conformal ECT (staggered) + b-curl-fill + ect-curvature",
+        True,
+        "staggered",
+        False,
+        False,
+        True,
+        True,
+    ),
+    ("mirror (collocated), clean OFF", True, "collocated", False, False, False, False),
 ]
 
 
@@ -89,11 +106,11 @@ def interior_err(plotfile):
     return float(err), float(dcell[0])
 
 
-def run_case(n, conformal, grid_type, divb_clean, eb_cyl, b_curl, outdir):
+def run_case(n, conformal, grid_type, divb_clean, eb_cyl, b_curl, ect_curv, outdir):
     tag = (
         f"{grid_type}_{'conf' if conformal else 'stair'}"
         f"{'_dc' if divb_clean else ''}{'_cyl' if eb_cyl else ''}"
-        f"{'_bcf' if b_curl else ''}_N{n}"
+        f"{'_bcf' if b_curl else ''}{'_ect' if ect_curv else ''}_N{n}"
     )
     rundir = os.path.join(outdir, tag)
     os.makedirs(rundir, exist_ok=True)
@@ -117,6 +134,8 @@ def run_case(n, conformal, grid_type, divb_clean, eb_cyl, b_curl, outdir):
         cmd += ["--eb-cyl-correction"]
     if b_curl:
         cmd += ["--b-curl-fill"]
+    if ect_curv:
+        cmd += ["--ect-curvature"]
     print(f"  running {tag} ...")
     with open(os.path.join(rundir, "run.log"), "w") as log:
         subprocess.run(
@@ -133,11 +152,11 @@ def main():
     args = ap.parse_args()
 
     print(f"\ncylinder edge-order (interior L2 vs Bessel mode): N={args.resolutions}\n")
-    for label, conf, gt, dc, ec, bc in CONFIGS:
+    for label, conf, gt, dc, ec, bc, cv in CONFIGS:
         print(f"[{label}]")
         errs, hs = [], []
         for n in args.resolutions:
-            e, h = run_case(n, conf, gt, dc, ec, bc, args.outdir)
+            e, h = run_case(n, conf, gt, dc, ec, bc, cv, args.outdir)
             errs.append(e)
             hs.append(h)
             print(f"    N={n}: interior L2 = {e:.4e}")
