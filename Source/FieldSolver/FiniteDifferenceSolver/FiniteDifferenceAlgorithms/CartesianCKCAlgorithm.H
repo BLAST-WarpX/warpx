@@ -121,8 +121,12 @@ struct CartesianCKCAlgorithm {
      * \brief Returns maximum number of guard cells required by the field-solve
      */
     static amrex::IntVect GetMaxGuardCell () {
-        // The ckc solver requires one guard cell in each dimension
-        return amrex::IntVect{AMREX_D_DECL(1,1,1)};
+        // On a Yee grid, nodal B at a box boundary is one index beyond
+        // the cell-centered box.  The UpwardD* stencil there reads E at
+        // two cells past the cell-centered valid region, requiring two
+        // guard cells.  Every direction has at least one nodal B
+        // component, so the per-direction maximum is 2 everywhere.
+        return amrex::IntVect{AMREX_D_DECL(2,2,2)};
     }
 
     /**
