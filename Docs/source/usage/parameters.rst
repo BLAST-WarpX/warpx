@@ -3038,15 +3038,16 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: ``strings`` separated by spaces
 
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``excitationX``, ``twoproduct_reaction`` and ``charge_exchange``
-    for ions and ``elastic``, ``excitationX`` and ``ionization`` for electrons.
-    Multiple excitation events can be included for electrons corresponding to
-    excitation to different levels, the ``X`` above can be changed to a unique
-    identifier for each excitation process. For each scattering process specified
+    included. Available options are ``elasticX``, ``excitationX``, ``twoproduct_reaction`` and ``charge_exchange``
+    for ions and ``elasticX``, ``excitationX`` and ``ionization`` for electrons.
+    Multiple elastic and excitation events can be included, corresponding e.g. to
+    excitation to different levels or to several elastic channels (with different
+    cross-sections and/or scattering angle models); the ``X`` above can be changed
+    to a unique identifier for each such process. For each scattering process specified
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
 
-    For ``elastic``, ``excitationX``, ``charge_exchange`` and ``twoproduct_reaction``, the
+    For ``elasticX``, ``excitationX``, ``charge_exchange`` and ``twoproduct_reaction``, the
     angular distribution is controlled by the per-process
     :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` argument.
 
@@ -3063,19 +3064,19 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: ``float``
 
     Only for ``dsmc`` and ``background_mcc``. The energy cost of the process, in eV. It is
-    required for ``excitationX`` and ``ionization``, and optional for the other processes
-    (e.g. an ``elastic`` channel or a ``twoproduct_reaction`` with a fixed energy loss),
-    in which case it defaults to 0.
+    required for ``excitationX`` and ``ionization``, optional for ``charge_exchange`` and
+    ``twoproduct_reaction`` (which may impose a fixed energy loss, defaulting to 0), and
+    ignored for ``elasticX`` processes (which have no energy cost).
 
 .. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
     :type: ``string``
     :optional:
 
-    Only for ``dsmc`` and ``background_mcc``, and only for ``elastic``, ``excitationX``,
+    Only for ``dsmc`` and ``background_mcc``, and only for ``elasticX``, ``excitationX``,
     ``charge_exchange`` and ``twoproduct_reaction``.
     The model used to determine the scattering angle of the products
     in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
-    The default is ``isotropic`` for ``elastic`` and ``excitationX``, and ``forward`` for
+    The default is ``isotropic`` for ``elasticX`` and ``excitationX``, and ``forward`` for
     ``charge_exchange`` and ``twoproduct_reaction``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction

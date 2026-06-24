@@ -120,16 +120,18 @@ namespace BinaryCollisionUtils{
             std::string cross_section_file;
             pp_collision_name.query(kw_cross_section, cross_section_file);
 
+            const auto process_type = ScatteringProcess::parseProcessType(scattering_process);
+
             // The energy cost (penalty) of the process, in eV. It is required for excitation
-            // and ionization, and optional otherwise (e.g. an elastic channel or a two-product
-            // reaction with a fixed energy loss).
+            // and ionization, optional for charge exchange and two-product reactions (which may
+            // impose a fixed energy loss), and not read for elastic processes.
             amrex::ParticleReal energy = 0._prt;
             const std::string kw_energy = scattering_process + "_energy";
-            if (scattering_process.find("excitation") != std::string::npos ||
-                scattering_process.find("ionization") != std::string::npos) {
+            if (process_type == ScatteringProcessType::EXCITATION ||
+                process_type == ScatteringProcessType::IONIZATION) {
                 utils::parser::getWithParser(
                     pp_collision_name, kw_energy.c_str(), energy);
-            } else {
+            } else if (process_type != ScatteringProcessType::ELASTIC) {
                 utils::parser::queryWithParser(
                     pp_collision_name, kw_energy.c_str(), energy);
             }
@@ -139,7 +141,6 @@ namespace BinaryCollisionUtils{
             // The default angle model depends on the process: product-producing processes
             // (charge exchange and two-product reactions) default to forward scattering, while
             // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
-            const auto process_type = ScatteringProcess::parseProcessType(scattering_process);
             auto scattering_angle_model =
                 (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
                  process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
