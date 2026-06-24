@@ -1515,6 +1515,24 @@ void ComputeExternalFieldOnGridUsingParser_template (
             }
         );
     }
+
+    // A user-provided parser expression can evaluate to a non-finite value
+    // (NaN or infinity) somewhere on the grid -- for instance a 1/r-type
+    // expression such as 1/sqrt(x**2+y**2) sampled exactly at x=y=0, which
+    // coincides with a grid node on a domain centered on the origin. Such a
+    // value would otherwise propagate silently through the field solver and
+    // make the simulation stall or produce meaningless results (see
+    // https://github.com/BLAST-WarpX/warpx/discussions/6863). Detect it here
+    // and abort early with an actionable message instead.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !mfx->contains_nan() && !mfy->contains_nan() && !mfz->contains_nan() &&
+        !mfx->contains_inf() && !mfy->contains_inf() && !mfz->contains_inf(),
+        "A non-finite value (NaN or infinity) was found in an externally "
+        "imposed field or current evaluated from a user-defined parser "
+        "expression. This usually comes from a singularity in the expression "
+        "(e.g. a division by zero such as 1/sqrt(x**2+y**2) evaluated at "
+        "x=y=0, which can coincide with a grid node). Please regularize the "
+        "expression so that it is finite everywhere on the grid.");
 }
 
 void WarpX::ComputeExternalFieldOnGridUsingParser (
