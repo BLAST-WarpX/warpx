@@ -128,15 +128,36 @@ assert species_names == ["electrons_1", "electrons_2"]
 if "geometry.dims" in input_dict:
     assert input_dict["geometry.dims"][0] == "2"
 
-# Read species parameters: beta = v_drift/c, theta = kT/(m_e c^2) (thermal spread).
-betas = np.array([float(input_dict[f"{species}.beta"][0]) for species in species_names])
+# Read species parameters. The input deck stores the drift as u = gamma * beta, where
+# gamma = 1 / sqrt(1 - beta**2), and the thermal spread as sqrt(theta).
+momentum_components = ("ux", "uy", "uz")
+u_means = np.array(
+    [
+        [
+            float(input_dict[f"{species}.{component}_mean"][0])
+            for component in momentum_components
+        ]
+        for species in species_names
+    ]
+)
+beta_means = u_means / np.sqrt(1.0 + u_means**2)
+betas = np.abs(beta_means[:, 1])
 densities = np.array(
     [float(input_dict[f"{species}.density"][0]) for species in species_names]
 )
-thetas = np.array(
-    [float(input_dict[f"{species}.theta"][0]) for species in species_names]
+u_stds = np.array(
+    [
+        [
+            float(input_dict[f"{species}.{component}_std"][0])
+            for component in momentum_components
+        ]
+        for species in species_names
+    ]
 )
-drift_dirs = [input_dict[f"{species}.bulk_vel_dir"][0] for species in species_names]
+np.testing.assert_allclose(u_stds[:, 1], u_stds[:, 0])
+np.testing.assert_allclose(u_stds[:, 2], u_stds[:, 0])
+thetas = u_stds[:, 0] ** 2
+drift_dirs = ["y" if beta_mean[1] > 0.0 else "-y" for beta_mean in beta_means]
 charges = [input_dict[f"{species}.charge"][0] for species in species_names]
 masses = [input_dict[f"{species}.mass"][0] for species in species_names]
 

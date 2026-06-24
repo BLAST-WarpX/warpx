@@ -1,35 +1,35 @@
 {
   "electrons_1": {
-    "particle_momentum_x": 8.10238289988496e-21,
-    "particle_momentum_y": 7.159688417853738e-19,
-    "particle_momentum_z": 8.095911049279298e-21,
-    "particle_position_x": 2.260987744209889,
+    "particle_momentum_x": 8.12098275795624e-21,
+    "particle_momentum_y": 7.15941495372184e-19,
+    "particle_momentum_z": 8.086296445084657e-21,
+    "particle_position_x": 2.260994237959525,
     "particle_position_y": 0.0,
-    "particle_position_z": 12.058332979166044,
+    "particle_position_z": 12.058434561193218,
     "particle_weight": 3.1740000000000004e+16
   },
   "electrons_2": {
-    "particle_momentum_x": 8.139992326593604e-21,
-    "particle_momentum_y": 7.159515315191291e-19,
-    "particle_momentum_z": 8.087981468570089e-21,
-    "particle_position_x": 2.2609983549910337,
+    "particle_momentum_x": 8.136761604270484e-21,
+    "particle_momentum_y": 7.159252866228452e-19,
+    "particle_momentum_z": 8.087752025794921e-21,
+    "particle_position_x": 2.260990030500225,
     "particle_position_y": 0.0,
-    "particle_position_z": 12.058823049482097,
+    "particle_position_z": 12.058629442574315,
     "particle_weight": 3.1740000000000004e+16
   },
   "lev=0": {
-    "Bx": 167.18141935632687,
-    "By": 65.22858195397562,
-    "Bz": 295.950817796734,
-    "Ex": 39668128695.895294,
-    "Ey": 14092411520.900654,
-    "Ez": 27044207622.74174,
-    "divE": 1.220238340709355e+17,
-    "jx": 69475878266194.4,
-    "jy": 662181223185970.0,
-    "jz": 79000265492877.81,
-    "rho": 52500123942.91199,
-    "rho_electrons_1": 26250061971.455997,
-    "rho_electrons_2": 26250061971.455994
+    "Bx": 168.90582912278717,
+    "By": 65.542595230452,
+    "Bz": 301.71424233347454,
+    "Ex": 39861755367.036316,
+    "Ey": 13683880544.6544,
+    "Ez": 26281168351.57861,
+    "divE": 1.2095779530524325e+17,
+    "jx": 69966344761084.51,
+    "jy": 666938003278481.5,
+    "jz": 77143986126559.8,
+    "rho": 52500123942.911995,
+    "rho_electrons_1": 26250061971.456,
+    "rho_electrons_2": 26250061971.455997
   }
 }
