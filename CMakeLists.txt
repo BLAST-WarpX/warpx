@@ -80,6 +80,7 @@ option(WarpX_SIMD          "CPU SIMD Acceleration"                      OFF)
 option(WarpX_OPENPMD       "openPMD I/O (HDF5, ADIOS)"                  ON)
 option(WarpX_FASTMATH      "Enable fast-math optimizations"             OFF)
 option(WarpX_FFT           "FFT-based solvers"                          OFF)
+option(WarpX_EM_TEY        "EM transverse electric mode"                OFF)
 option(WarpX_PYTHON        "Python bindings"                            OFF)
 option(WarpX_SENSEI        "SENSEI in situ diagnostics"                 OFF)
 option(WarpX_QED           "QED support (requires PICSAR)"              ON)
@@ -640,6 +641,10 @@ foreach(D IN LISTS WarpX_DIMS)
     if(ABLASTR_FFT)
         # We need to enable FFT support in ABLASTR for PSATD solver
         target_compile_definitions(ablastr_${SD} PUBLIC ABLASTR_USE_FFT)
+    endif()
+
+    if(WarpX_EM_TEY)
+        target_compile_definitions(ablastr_${SD} PUBLIC WARPX_EM_TEY)
     endif()
 
     if(WarpX_PYTHON AND pyWarpX_VERSION_INFO)

@@ -38,7 +38,7 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
     const amrex::ParticleReal E_keV = E_kin_star*joule_to_keV;
 
     // If kinetic energy is 0, return a 0 cross section and avoid later division by 0.
-    if (E_keV == 0._prt) {return 0._prt;}
+    if (E_keV < 0.5_prt) {return 0._prt;}
 
     // Compute the Gamow constant B_G (in keV^{1/2})
     // (See Eq. 3 in H.-S. Bosch and G.M. Hale 1992 Nucl. Fusion 32 611)

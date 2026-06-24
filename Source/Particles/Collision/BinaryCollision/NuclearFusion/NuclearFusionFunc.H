@@ -76,11 +76,13 @@ public:
         utils::parser::queryWithParser(
             pp_collision_name, "probability_target_value",
             m_probability_target_value);
+        pp_collision_name.query("diagnostic_only", m_diagnostic_only);
 
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
         m_exe.m_probability_threshold = m_probability_threshold;
         m_exe.m_probability_target_value = m_probability_target_value;
         m_exe.m_fusion_type = m_fusion_type;
+        m_exe.m_diagnostic_only = m_diagnostic_only;
         m_exe.m_isSameSpecies = m_isSameSpecies;
     }
 
@@ -192,7 +194,7 @@ public:
                         m_fusion_type, engine);
 
                     // Remove pair reaction weight from the colliding particles' weights
-                    if (p_mask[pair_index]) {
+                    if (p_mask[pair_index] && !m_diagnostic_only) {
                         BinaryCollisionUtils::remove_weight_from_colliding_particle(
                             w1[ I1[i1] ], idcpu1[ I1[i1] ], p_pair_reaction_weight[pair_index]);
                         BinaryCollisionUtils::remove_weight_from_colliding_particle(
@@ -216,6 +218,7 @@ public:
         bool m_computeSpeciesDensities = false;
         bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
+        bool m_diagnostic_only = false;
         bool m_isSameSpecies;
     };
 
@@ -236,6 +239,7 @@ private:
     amrex::ParticleReal m_probability_threshold;
     amrex::ParticleReal m_probability_target_value;
     NuclearFusionType m_fusion_type;
+    bool m_diagnostic_only = false;
     bool m_isSameSpecies;
 
     Executor m_exe;

@@ -52,8 +52,7 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
         m_theta>=0.5 && m_theta<=1.0,
         "theta parameter for theta implicit time solver must be between 0.5 and 1.0");
 
-    // Parse nonlinear solver parameters
-    parseNonlinearSolverParams( pp );
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -159,7 +158,67 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
 
+    // Apply blanking to electric field RHS vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) {
+                a_RHS.getArrayVec()[lev][dir]->setVal(0._rt);
+            }
+        }
+    }
+
+#if defined(WARPX_DIM_1D_Z)
+    // RHS += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+    Enforce1DESPeriodic(a_RHS, m_theta*m_dt);
+#endif
+
 }
+
+#if defined(WARPX_DIM_1D_Z)
+void ThetaImplicitEM::Enforce1DESPeriodic ( WarpXSolverVec&  a_RHS,
+                                      const amrex::Real      a_theta_dt )
+{
+    BL_PROFILE("ImplicitSolver::Enforce1DESPeriodic()");
+
+    // Subtract the average Jz from the RHS to enforce zero potential
+    // drop in 1D electrostatic with periodic BCs.
+
+    // Check if doing electrostatic
+    if (!m_blank_electric_field[0] || !m_blank_electric_field[1]) { return; }
+
+    // Check if using periodic BCs
+    auto const& fbc_lo = m_WarpX->GetFieldBoundaryLo();
+    auto const& fbc_hi = m_WarpX->GetFieldBoundaryHi();
+    if (fbc_lo[0] != FieldBoundaryType::Periodic ||
+        fbc_hi[0] != FieldBoundaryType::Periodic)
+    {
+        return;
+    }
+
+    const amrex::Real norm_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+
+    using warpx::fields::FieldType;
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const amrex::Geometry& geom = m_WarpX->Geom(lev);
+        amrex::Real const *dx = geom.CellSize();
+        const amrex::RealBox& prob_domain = geom.ProbDomain();
+        const amrex::Real Lz = prob_domain.hi(0) - prob_domain.lo(0);
+
+        // Compute the spatial average of Jz
+        const amrex::MultiFab& Jz = *m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
+        const bool local_sum = false;
+        const amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
+        const amrex::Real meanJz = sumJz_global*dx[0]/Lz;
+
+        // RHSz += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+        amrex::MultiFab& RHSz = *a_RHS.getArrayVec()[lev][2];
+        RHSz.plus(norm_factor*meanJz,0,RHSz.nComp());
+    }
+
+}
+#endif
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real start_time )
@@ -173,6 +232,14 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
     // Update Bfield_fp owned by WarpX
     ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt, start_time );
+
+    // Apply blanking to the electric field vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) { Efp[dir]->setVal(0._rt); }
+        }
+    }
 
 }
 
