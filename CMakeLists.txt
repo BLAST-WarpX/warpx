@@ -97,11 +97,13 @@ mark_as_advanced(WarpX_TEST_DEBUGGER)
 mark_as_advanced(WarpX_TEST_FPETRAP)
 
 # Advanced option to compile with the -g1 option for minimal debug symbols
-# (useful to see, e.g., line numbers in backtraces)
+# (useful to see, e.g., line numbers in backtraces).
+#   -g1 is appended AFTER any -g coming from CMAKE_BUILD_TYPE (e.g. RelWithDebInfo's -O2 -g -DNDEBUG)
+#   or env CXX variable / CMAKE_CXX_FLAGS , so it is effective when set.
 option(WarpX_BACKTRACE_INFO "Compile with -g1 for minimal debug symbols (currently used in CI tests)" OFF)
 mark_as_advanced(WarpX_BACKTRACE_INFO)
 if(WarpX_BACKTRACE_INFO)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g1")
+    add_compile_options(-g1)
 endif()
 
 set(WarpX_DIMS_VALUES 1 2 3 RZ RCYLINDER RSPHERE)
