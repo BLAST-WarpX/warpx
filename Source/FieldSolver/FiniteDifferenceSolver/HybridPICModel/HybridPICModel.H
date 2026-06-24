@@ -514,9 +514,15 @@ public:
      *  cache, which must stay at the one-cell band shared with the deposit
      *  fold. Only used when isotropic hyper-resistivity is enabled. */
     mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_Jplasma;
-    /** Mirror-fill band width (in cells) for the plasma-current EB fill:
+    /** Mirror-fill band width (in cells) for the plasma-current EB fill, and --
+     *  PINNED to it -- the electric-field (Efield_fp) EB fill. Value:
      *  sqrt(AMREX_SPACEDIM) when the isotropic hyper-resistivity Laplacian is
-     *  enabled (so its diagonal corners are filled, not zeroed), else 1. */
+     *  enabled (so its diagonal/corner cut edges are mirror-filled, not zeroed),
+     *  else 1. The E fill is tied to this same band because in the cut/covered
+     *  region E = eta*J: filling E in cells BEYOND where J is filled leaves E != 0
+     *  where J = 0, an inconsistent source that the curl(E)->B->curl(B)->J->E loop
+     *  amplifies into a non-finite blow-up. So the E fill band must not exceed the
+     *  J fill band; pinning them equal keeps E and J consistent at the wall. */
     amrex::Real m_eb_fill_band_cells = 1.0;
     /** Mirror-fill band width (in cells) for the magnetic-field (Bfield_fp) EB
      *  fill. The filled B couples back into the solution only through curl/B
@@ -526,15 +532,6 @@ public:
      *  deep interior, where it is causally inert). Runtime knob
      *  hybrid_pic_model.eb_b_fill_band_cells; default 1 (legacy behavior). */
     amrex::Real m_eb_b_fill_band_cells = 1.0;
-    /** Mirror-fill band width (in cells) for the electric-field (Efield_fp) EB
-     *  fill. A 1-cell band zeros any cut edge whose (staggered) node sits deeper
-     *  than h_max inside a curved wall -- i.e. the diagonal/corner edges between
-     *  h_max and sqrt(AMREX_SPACEDIM)*h_max -- and those zeroed covered-E edges
-     *  feed the ECT Faraday circulation (Rho) of adjacent UNCOVERED cells, so
-     *  they must stay solid. Widen to >= sqrt(AMREX_SPACEDIM) (~1.74 in 3D) so
-     *  the near-wall cut edges are mirror-filled, not zeroed. Runtime knob
-     *  hybrid_pic_model.eb_e_fill_band_cells; default 1 (legacy behavior). */
-    amrex::Real m_eb_e_fill_band_cells = 1.0;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

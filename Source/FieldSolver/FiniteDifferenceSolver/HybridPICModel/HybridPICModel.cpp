@@ -228,14 +228,6 @@ void HybridPICModel::ReadParameters ()
     // Default 1 = legacy behavior.
     utils::parser::queryWithParser(pp_hybrid, "eb_b_fill_band_cells", m_eb_b_fill_band_cells);
 
-    // Mirror-fill band width for the Efield_fp EB fill. A 1-cell band leaves
-    // curved-wall diagonal/corner cut edges (node between h_max and
-    // sqrt(SPACEDIM)*h_max inside the wall) in the zeroed deep region; those
-    // zeroed covered-E edges then corrupt the ECT Faraday circulation of
-    // adjacent uncovered cells. Widen to >= sqrt(SPACEDIM) for curved walls.
-    // Default 1 = legacy behavior.
-    utils::parser::queryWithParser(pp_hybrid, "eb_e_fill_band_cells", m_eb_e_fill_band_cells);
-
     // Optional Marder-like diffusive clean of the small curved-wall div(B) /
     // div(J_total) the pointwise mirror injects. Each alpha defaults to 0 (off).
     // The clean is a pure gradient correction, so it dissipates divergence
@@ -705,7 +697,11 @@ void HybridPICModel::HybridPICSolveE (
             warpx.Geom(lev),
             m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
-            &m_eb_bc_status_E[lev], m_eb_e_fill_band_cells,
+            // E fill band is PINNED to the J fill band: E = eta*J in the cut/
+            // covered region, so filling E beyond where J is filled leaves E != 0
+            // where J = 0 (an inconsistent source that blows up through the
+            // curl(E)->B->curl(B)->J->E loop). See m_eb_fill_band_cells.
+            &m_eb_bc_status_E[lev], m_eb_fill_band_cells,
             m_eb_cylindrical_correction, m_eb_cyl_axis);
     }
 }
