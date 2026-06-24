@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build import build
@@ -90,13 +91,18 @@ class CMakeBuild(build_ext):
         dims = r_dim.group(1).upper()
 
         pyv = sys.version_info
+        # cross-compiling (e.g. Pyodide)? host & target Python differ
+        emscripten = sysconfig.get_platform().startswith("emscripten")
         cmake_args = [
             # Python: use the calling interpreter in CMake
             # https://cmake.org/cmake/help/latest/module/FindPython.html#hints
             # https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-version-selection
+            #   cross builds (e.g. Pyodide) keep these host hints to resolve the
+            #   interpreter/library, but relax the exact-version match and
+            #   override the target headers (Python_INCLUDE_DIR) below
             f"-DPython_ROOT_DIR={sys.prefix}",
             f"-DPython_FIND_VERSION={pyv.major}.{pyv.minor}.{pyv.micro}",
-            "-DPython_FIND_VERSION_EXACT=TRUE",
+            "-DPython_FIND_VERSION_EXACT=" + ("FALSE" if emscripten else "TRUE"),
             "-DPython_FIND_STRATEGY=LOCATION",
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + os.path.join(extdir, "pywarpx"),
             "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=" + extdir,
@@ -130,6 +136,11 @@ class CMakeBuild(build_ext):
             # Windows: has no RPath concept, all `.dll`s must be in %PATH%
             #          or same dir as calling executable
         ]
+        if emscripten:
+            # Pyodide cross-compile: point at the target (WASM) Python headers
+            cmake_args.append(
+                "-DPython_INCLUDE_DIR=" + sysconfig.get_config_var("INCLUDEPY")
+            )
         if WARPX_QED.upper() in ["1", "ON", "TRUE", "YES"]:
             cmake_args.append("-DWarpX_picsar_internal=" + WARPX_PICSAR_INTERNAL)
         if WARPX_OPENPMD.upper() in ["1", "ON", "TRUE", "YES"]:
