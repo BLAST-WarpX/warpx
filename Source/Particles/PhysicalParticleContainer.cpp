@@ -441,7 +441,7 @@ PhysicalParticleContainer::BackwardCompatibility ()
     std::string backward_string;
     for (const std::string old_param : {"bulk_vel_dir", "beta_distribution_type",
                                         "beta_function(x,y,z)", "beta"}) {
-        if (pp_species_name.query(old_param.c_str(), backward_string)) {
+        if (pp_species_name.query(old_param, backward_string)) {
             std::string msg = "<species>.";
             msg += old_param;
             msg += " is no longer supported. ";
