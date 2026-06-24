@@ -111,8 +111,11 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
+        // A null eb_update_B (passed for the conformal external vacuum field, so
+        // it fills through the wall) leaves the update arrays null -> the cell
+        // skips below are no-ops and curl(A) is computed everywhere.
         amrex::Array4<int> update_Br_arr, update_Btheta_arr, update_Bz_arr;
-        if (EB::enabled()) {
+        if (EB::enabled() && eb_update_B[0]) {
             update_Br_arr = eb_update_B[0]->array(mfi);
             update_Btheta_arr = eb_update_B[1]->array(mfi);
             update_Bz_arr = eb_update_B[2]->array(mfi);
@@ -255,7 +258,7 @@ void FiniteDifferenceSolver::ComputeCurlASpherical (
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
         amrex::Array4<int> update_Br_arr, update_Btheta_arr, update_Bphi_arr;
-        if (EB::enabled()) {
+        if (EB::enabled() && eb_update_B[0]) {
             update_Br_arr = eb_update_B[0]->array(mfi);
             update_Btheta_arr = eb_update_B[1]->array(mfi);
             update_Bphi_arr = eb_update_B[2]->array(mfi);
@@ -353,7 +356,7 @@ void FiniteDifferenceSolver::ComputeCurlACartesian (
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
         amrex::Array4<int> update_Bx_arr, update_By_arr, update_Bz_arr;
-        if (EB::enabled()) {
+        if (EB::enabled() && eb_update_B[0]) {
             update_Bx_arr = eb_update_B[0]->array(mfi);
             update_By_arr = eb_update_B[1]->array(mfi);
             update_Bz_arr = eb_update_B[2]->array(mfi);

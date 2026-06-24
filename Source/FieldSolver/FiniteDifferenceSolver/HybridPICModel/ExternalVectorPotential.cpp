@@ -297,11 +297,18 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
     ablastr::fields::MultiLevelVectorField curlA_ext =
         warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
 
+    // Conformal EB: the external vacuum field must fill through the wall (a
+    // uniform external then stays uniform and satisfies the Neumann condition
+    // at the level set), so compute curl(A) everywhere by passing no EB update
+    // flags. The staircase update keeps the covered-cell exclusion mask.
+    static const std::array<std::unique_ptr<amrex::iMultiFab>, 3> no_eb_update{};
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        auto const& curl_eb_flag = WarpX::UseConformalEBSolve()
+            ? no_eb_update : warpx.GetEBUpdateBFlag()[lev];
         warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
             curlA_ext[lev],
             A_ext[lev],
-            warpx.GetEBUpdateBFlag()[lev],
+            curl_eb_flag,
             lev);
 
         for (int idir = 0; idir < 3; ++idir) {
@@ -317,7 +324,8 @@ ExternalVectorPotential::AddExternalFieldFromVectorPotential (
     ablastr::fields::VectorField const& dstField,
     amrex::Real scale_factor,
     ablastr::fields::VectorField const& srcField,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update)
+    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+    bool use_eb_flags)
 {
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -335,8 +343,12 @@ ExternalVectorPotential::AddExternalFieldFromVectorPotential (
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries.
+        // When use_eb_flags is false (conformal EB: the external vacuum field
+        // should fill through the wall, not be staircase-zeroed in covered
+        // cells), leave the update arrays null so the per-cell skip below is a
+        // no-op and the external field is written everywhere.
         amrex::Array4<int> update_Fx_arr, update_Fy_arr, update_Fz_arr;
-        if (EB::enabled()) {
+        if (use_eb_flags && EB::enabled()) {
             update_Fx_arr = eb_update[0]->array(mfi);
             update_Fy_arr = eb_update[1]->array(mfi);
             update_Fz_arr = eb_update[2]->array(mfi);
@@ -411,9 +423,17 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
         ablastr::fields::MultiLevelVectorField curlA_ext =
             warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
 
+        // Staircase EB excludes covered cells, so the external field is
+        // zeroed there. The conformal (ECT) EB instead treats the wall as a
+        // surface inside the cell, so the external vacuum field must fill
+        // through it (a uniform external then stays uniform -> satisfies the
+        // Neumann condition at the level set, consistent with A_ext, which is
+        // already evaluated everywhere). So apply the covered-cell EB mask to
+        // the external E/B only for the staircase update.
+        const bool ext_use_eb_flags = !WarpX::UseConformalEBSolve();
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            AddExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
-            AddExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
+            AddExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev], ext_use_eb_flags);
+            AddExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev], ext_use_eb_flags);
 
             for (int idir = 0; idir < 3; ++idir) {
                 E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());
