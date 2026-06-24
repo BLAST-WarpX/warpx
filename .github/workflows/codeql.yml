@@ -62,14 +62,14 @@ jobs:
           cmake -S . -B build -DWarpX_OPENPMD=ON
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           config-file: ./.github/codeql/warpx-codeql.yml
           languages: ${{ matrix.language }}
           queries: +security-and-quality
 
       - name: Build (py)
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
         if: ${{ matrix.language == 'python' }}
 
       - name: Build (C++)
@@ -91,7 +91,7 @@ jobs:
           cmake --build build -j 4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
           upload: False
@@ -112,6 +112,6 @@ jobs:
           output: sarif-results/${{ matrix.language }}.sarif
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif-results/${{ matrix.language }}.sarif
