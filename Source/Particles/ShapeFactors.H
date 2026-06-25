@@ -34,19 +34,19 @@ struct Compute_shape_factor
         T xmid) const
     {
         if constexpr (depos_order == 0){
-            const auto j = static_cast<int>(xmid + T(0.5));
+            const auto j = static_cast<int>(amrex::Math::floor(xmid + T(0.5)));
             sx[0] = T(1.0);
             return j;
         }
         else if constexpr (depos_order == 1){
-            const auto j = static_cast<int>(xmid);
+            const auto j = static_cast<int>(amrex::Math::floor(xmid));
             const T xint = xmid - T(j);
             sx[0] = T(1.0) - xint;
             sx[1] = xint;
             return j;
         }
         else if constexpr (depos_order == 2){
-            const auto j = static_cast<int>(xmid + T(0.5));
+            const auto j = static_cast<int>(amrex::Math::floor(xmid + T(0.5)));
             const T xint = xmid - T(j);
             sx[0] = T(0.5)*(T(0.5) - xint)*(T(0.5) - xint);
             sx[1] = T(0.75) - xint*xint;
@@ -55,7 +55,7 @@ struct Compute_shape_factor
             return j-1;
         }
         else if constexpr (depos_order == 3){
-            const auto j = static_cast<int>(xmid);
+            const auto j = static_cast<int>(amrex::Math::floor(xmid));
             const T xint = xmid - T(j);
             sx[0] = (T(1.0))/(T(6.0))*(T(1.0) - xint)*(T(1.0) - xint)*(T(1.0) - xint);
             sx[1] = (T(2.0))/(T(3.0)) - xint*xint*(T(1.0) - xint/(T(2.0)));
@@ -65,7 +65,7 @@ struct Compute_shape_factor
             return j-1;
         }
         else if constexpr (depos_order == 4){
-            const auto j = static_cast<int>(xmid + T(0.5));
+            const auto j = static_cast<int>(amrex::Math::floor(xmid + T(0.5)));
             const T xint = xmid - T(j);
             sx[0] = (T(1.0))/(T(24.0))*(T(0.5) - xint)*(T(0.5) - xint)*(T(0.5) - xint)*(T(0.5) - xint);
             sx[1] = (T(1.0))/(T(24.0))*(T(4.75) - T(11.0)*xint + T(4.0)*xint*xint*(T(1.5) + xint - xint*xint));
@@ -101,13 +101,13 @@ struct Compute_shifted_shape_factor
         const int i_new) const
     {
         if constexpr (depos_order == 0){
-            const auto i = static_cast<int>(std::floor(x_old + T(0.5)));
+            const auto i = static_cast<int>(amrex::Math::floor(x_old + T(0.5)));
             const int i_shift = i - i_new;
             sx[1+i_shift] = T(1.0);
             return i;
         }
         else if constexpr (depos_order == 1){
-            const auto i = static_cast<int>(std::floor(x_old));
+            const auto i = static_cast<int>(amrex::Math::floor(x_old));
             const int i_shift = i - i_new;
             const T xint = x_old - T(i);
             sx[1+i_shift] = T(1.0) - xint;
@@ -115,7 +115,7 @@ struct Compute_shifted_shape_factor
             return i;
         }
         else if constexpr (depos_order == 2){
-            const auto i = static_cast<int>(x_old + T(0.5));
+            const auto i = static_cast<int>(amrex::Math::floor(x_old + T(0.5)));
             const int i_shift = i - (i_new + 1);
             const T xint = x_old - T(i);
             sx[1+i_shift] = T(0.5)*(T(0.5) - xint)*(T(0.5) - xint);
@@ -125,7 +125,7 @@ struct Compute_shifted_shape_factor
             return i - 1;
         }
         else if constexpr (depos_order == 3){
-            const auto i = static_cast<int>(x_old);
+            const auto i = static_cast<int>(amrex::Math::floor(x_old));
             const int i_shift = i - (i_new + 1);
             const T xint = x_old - T(i);
             sx[1+i_shift] = (T(1.0))/(T(6.0))*(T(1.0) - xint)*(T(1.0) - xint)*(T(1.0) - xint);
@@ -136,7 +136,7 @@ struct Compute_shifted_shape_factor
             return i - 1;
         }
         else if constexpr (depos_order == 4){
-            const auto i = static_cast<int>(x_old + T(0.5));
+            const auto i = static_cast<int>(amrex::Math::floor(x_old + T(0.5)));
             const int i_shift = i - (i_new + 2);
             const T xint = x_old - T(i);
             sx[1+i_shift] = (T(1.0))/(T(24.0))*(T(0.5) - xint)*(T(0.5) - xint)*(T(0.5) - xint)*(T(0.5) - xint);
@@ -176,7 +176,7 @@ struct Compute_shape_factor_pair
     {
         const T xmid = T(0.5)*(xnew + xold);
         if constexpr (depos_order == 1){
-            const auto j = static_cast<int>(xmid);
+            const auto j = static_cast<int>(amrex::Math::floor(xmid));
             const T xint_old = xold - T(j);
             sx_old[0] = T(1.0) - xint_old;
             sx_old[1] = xint_old;
@@ -187,7 +187,7 @@ struct Compute_shape_factor_pair
             return j;
         }
         else if constexpr (depos_order == 2){
-            const auto j = static_cast<int>(xmid + T(0.5));
+            const auto j = static_cast<int>(amrex::Math::floor(xmid + T(0.5)));
             const T xint_old = xold - T(j);
             sx_old[0] = T(0.5)*(T(0.5) - xint_old)*(T(0.5) - xint_old);
             sx_old[1] = T(0.75) - xint_old*xint_old;
@@ -201,7 +201,7 @@ struct Compute_shape_factor_pair
             return j-1;
         }
         else if constexpr (depos_order == 3){
-            const auto j = static_cast<int>(xmid);
+            const auto j = static_cast<int>(amrex::Math::floor(xmid));
             const T xint_old = xold - T(j);
             sx_old[0] = T(1.0)/T(6.0)*(T(1.0) - xint_old)*(T(1.0) - xint_old)*(T(1.0) - xint_old);
             sx_old[1] = T(2.0)/T(3.0) - xint_old*xint_old*(T(1.0) - xint_old/(T(2.0)));
@@ -217,7 +217,7 @@ struct Compute_shape_factor_pair
             return j-1;
         }
         else if constexpr (depos_order == 4){
-            const auto j = static_cast<int>(xmid + T(0.5));
+            const auto j = static_cast<int>(amrex::Math::floor(xmid + T(0.5)));
             const T xint_old = xold - T(j);
             sx_old[0] = (T(1.0))/(T(24.0))*(T(0.5) - xint_old)*(T(0.5) - xint_old)*(T(0.5) - xint_old)*(T(0.5) - xint_old);
             sx_old[1] = (T(1.0))/(T(24.0))*(T(4.75) - T(11.0)*xint_old + T(4.0)*xint_old*xint_old*(T(1.5) + xint_old - xint_old*xint_old));
