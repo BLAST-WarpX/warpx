@@ -1,7 +1,7 @@
 .. _running-cpp-parameters:
 
-Inputs: Parameter List
-======================
+Raw Inputs
+==========
 
 This section describes the list of parameters that can be set in the WarpX inputs file.
 
