@@ -9,25 +9,28 @@
 
 #include "ProjectionDivCleaner.H"
 
-#include <AMReX_MLPoisson.H>
-#include <AMReX_MLNodeLaplacian.H>
-#include <AMReX_MultiFabUtil.H>
+#include "WarpX.H"
 
-#include <WarpX.H>
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H>
+    #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #elif defined(WARPX_DIM_RSPHERE)
-    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H>
+    #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
 #else
-    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H>
-    #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H>
+    #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
+    #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
-#include "Fields.H"
-#include <Initialization/ExternalField.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
+#include <AMReX_GpuContainers.H>
+#include <AMReX_IntVect.H>
+#include <AMReX_MLPoisson.H>
+#include <AMReX_MLNodeLaplacian.H>
+#include <AMReX_MultiFab.H>
+
 #include <map>
+#include <memory>
+
 
 using namespace amrex;
 
