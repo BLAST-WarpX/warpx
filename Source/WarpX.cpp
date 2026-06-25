@@ -2593,97 +2593,93 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         AllocInitMultiFab(m_eb_reduce_particle_shape[lev], amrex::convert(ba, IntVect::TheCellVector()), dm, ncomps,
             ngRho, lev, "m_eb_reduce_particle_shape");
 
-        // EB info are needed only at the finest level
-        if (lev == maxLevel()) {
+        if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
-            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+            AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]");
+            AllocInitMultiFab(m_eb_update_E[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]");
+            AllocInitMultiFab(m_eb_update_E[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]");
 
-                AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]");
-                AllocInitMultiFab(m_eb_update_E[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]");
-                AllocInitMultiFab(m_eb_update_E[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]");
+            AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]");
+            AllocInitMultiFab(m_eb_update_B[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]");
+            AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]");
+        }
+        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
-                AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]");
-                AllocInitMultiFab(m_eb_update_B[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]");
-                AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]");
-            }
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+            //! EB: Lengths of the mesh edges
+            m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::edge_lengths, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::edge_lengths, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
-                //! EB: Lengths of the mesh edges
-                m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::edge_lengths, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::edge_lengths, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            //! EB: Areas of the mesh faces
+            m_fields.alloc_init(FieldType::face_areas, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::face_areas, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::face_areas, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
-                //! EB: Areas of the mesh faces
-                m_fields.alloc_init(FieldType::face_areas, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::face_areas, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::face_areas, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            AllocInitMultiFab(m_flag_info_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
+            AllocInitMultiFab(m_flag_info_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_flag_info_face[y]");
+            AllocInitMultiFab(m_flag_info_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_flag_info_face[z]");
+            AllocInitMultiFab(m_flag_ext_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[x]");
+            AllocInitMultiFab(m_flag_ext_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
+            AllocInitMultiFab(m_flag_ext_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
+                                guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
 
-                AllocInitMultiFab(m_flag_info_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
-                AllocInitMultiFab(m_flag_info_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[y]");
-                AllocInitMultiFab(m_flag_info_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[z]");
-                AllocInitMultiFab(m_flag_ext_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[x]");
-                AllocInitMultiFab(m_flag_ext_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
-                AllocInitMultiFab(m_flag_ext_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
+            /** EB: area_mod contains the modified areas of the mesh faces, i.e. if a face is enlarged it
+            * contains the area of the enlarged face
+            * This is only used for the ECT solver.*/
+            m_fields.alloc_init(FieldType::area_mod, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::area_mod, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::area_mod, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
-                /** EB: area_mod contains the modified areas of the mesh faces, i.e. if a face is enlarged it
-                * contains the area of the enlarged face
-                * This is only used for the ECT solver.*/
-                m_fields.alloc_init(FieldType::area_mod, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::area_mod, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::area_mod, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_borrowing[lev][0] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
+                    amrex::convert(ba, Bx_nodal_flag), dm);
+            m_borrowing[lev][1] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
+                    amrex::convert(ba, By_nodal_flag), dm);
+            m_borrowing[lev][2] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
+                    amrex::convert(ba, Bz_nodal_flag), dm);
 
-                m_borrowing[lev][0] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
-                        amrex::convert(ba, Bx_nodal_flag), dm);
-                m_borrowing[lev][1] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
-                        amrex::convert(ba, By_nodal_flag), dm);
-                m_borrowing[lev][2] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(
-                        amrex::convert(ba, Bz_nodal_flag), dm);
+            /** Venl contains the electromotive force for every mesh face, i.e. every entry is
+            * the corresponding entry in ECTRhofield multiplied by the total area (possibly with enlargement)
+            * This is only used for the ECT solver.*/
+            m_fields.alloc_init(FieldType::Venl, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::Venl, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::Venl, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
-                /** Venl contains the electromotive force for every mesh face, i.e. every entry is
-                * the corresponding entry in ECTRhofield multiplied by the total area (possibly with enlargement)
-                * This is only used for the ECT solver.*/
-                m_fields.alloc_init(FieldType::Venl, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::Venl, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::Venl, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-
-                /** ECTRhofield is needed only by the ect
-                * solver and it contains the electromotive force density for every mesh face.
-                * The name ECTRhofield has been used to comply with the notation of the paper
-                * https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4463918 (page 9, equation 4
-                * and below).
-                * Although it's called rho it has nothing to do with the charge density!
-                * This is only used for the ECT solver.*/
-                m_fields.alloc_init(FieldType::ECTRhofield, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::ECTRhofield, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-                m_fields.alloc_init(FieldType::ECTRhofield, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
-                    dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-            }
+            /** ECTRhofield is needed only by the ect
+            * solver and it contains the electromotive force density for every mesh face.
+            * The name ECTRhofield has been used to comply with the notation of the paper
+            * https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4463918 (page 9, equation 4
+            * and below).
+            * Although it's called rho it has nothing to do with the charge density!
+            * This is only used for the ECT solver.*/
+            m_fields.alloc_init(FieldType::ECTRhofield, Direction{0}, lev, amrex::convert(ba, Bx_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::ECTRhofield, Direction{1}, lev, amrex::convert(ba, By_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
+            m_fields.alloc_init(FieldType::ECTRhofield, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
+                dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
         }
     }
 
