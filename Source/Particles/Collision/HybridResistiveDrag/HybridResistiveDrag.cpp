@@ -1,5 +1,5 @@
 /* Copyright 2026 The WarpX Community
- *
+ * Authors: Prabhat Kumar, Eric Clark (Helion Energy)
  * This file is part of WarpX.
  *
  * License: BSD-3-Clause-LBNL
@@ -35,26 +35,16 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     using namespace amrex::literals;
     using warpx::fields::FieldType;
 
-    // Drag-only operator: shifts each ion macroparticle toward the local
-    // electron fluid velocity V_e at the eta-derived rate
-    //     nu_{s,e} = Z_s * e^2 * eta(rho, |J|, t) * n_e / m_s
-    //
-    // Update:
-    //     v_p <- V_e + (v_p - V_e) * exp(-nu * dt)
-    //
-    // i.e. a uniform per-cell bulk shift (V_s - V_e)(1 - exp(-nu dt))
-    // applied identically to every particle in the cell -- preserves the
-    // thermal moment around V_s. The corresponding W_dot dissipation into
-    // T_e is NOT computed here; the Joule-heating source on T_e is the
-    // separate, gridded HybridPICModel::QDSMCAddJouleHeating call, which
-    // evaluates the same Σ_s n_s m_s ν |V_s - V_e|^2 expression per cell
-    // from the existing fields. Decoupling lets the user pick:
-    //   * register this drag operator -> ions feel the back-reaction to
-    //                                    qE_eta in Ohm's law
-    //                                    (anti-friction cancelled)
-    //   * don't register it            -> ions feel only qE
-    //                                    (Topanga convention)
-    // independently of include_joule_heating.
+    // Drag-only operator: relax the ion bulk velocity toward the electron
+    // fluid V_e at the eta-derived rate
+    //     nu_{s,e} = Z_s e^2 eta_s_eff n_e / m_s
+    // via a uniform per-cell shift, applied identically to every particle so
+    // the thermal spread (T_i) is preserved:
+    //     v_p -= (V_s - V_e)(1 - exp(-nu dt)).
+    // No heat is deposited here; the eta J^2 source on T_e is the separate
+    // gridded HybridPICModel::QDSMCAddJouleHeating call. Registering this
+    // operator gives ions the back-reaction to the eta*J term in Ohm's law
+    // (cancels the anti-friction), independently of include_joule_heating.
 
     auto & warpx = WarpX::GetInstance();
     auto & species = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -66,12 +56,10 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     auto const eta_func = hybrid_model->m_eta;
     auto const t_now    = warpx.gett_new(0);
 
-    // Per-species resistivity overlay parser (Topanga form, Belyaev 2024
-    // Eq. 10): if registered for this collision's species, it is added to
-    // the global eta inside the per-particle kernel so the drag rate uses
+    // Per-species resistivity overlay (Phys. Plasmas 31, 012902 (2024), Eq. 10):
+    // if registered, added to the global eta in the kernel so the drag uses
     //   eta_s_eff = eta_global + eta_s_per
-    // — the same per-species effective resistivity that Ohm's law (Phase 2)
-    // and QDSMCAddJouleHeating (Phase 3) see.
+    // (the same effective resistivity Ohm's law and QDSMCAddJouleHeating use).
     auto const eta_per_it     = hybrid_model->m_eta_per_species.find(m_species_names[0]);
     bool const has_eta_per    = (eta_per_it != hybrid_model->m_eta_per_species.end());
     amrex::ParserExecutor<7> eta_s_per{};
@@ -82,13 +70,9 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     amrex::Real const Z_e2_over_ms = Z_s * PhysConst::q_e * PhysConst::q_e / species_mass;
     amrex::Real const inv_qe       = 1.0_rt / PhysConst::q_e;
 
-    // Match the density floor used by Calculate{Ion,Electron}FluidVelocity
-    // and QDSMCAddJouleHeating[Kinetic]: skip particles in cells where rho
-    // is below the floor. In low-density cells eta ~ 1/sqrt(rho) blows up
-    // and the gridded V_s/V_e use a floored rho, so their gathered values
-    // can be noise rather than physical bulk velocities. Skipping keeps
-    // the drag honest at the same locations where the heat source is
-    // already gated off.
+    // Density floor (matches the fluid-velocity and Joule-heat paths): skip
+    // cells below the floor, where eta ~ 1/sqrt(rho) blows up and the gridded
+    // V_s/V_e are noise rather than physical bulk velocities.
     amrex::Real const rho_floor = PhysConst::q_e * hybrid_model->m_n_floor;
 
     int const nox = WarpX::nox;

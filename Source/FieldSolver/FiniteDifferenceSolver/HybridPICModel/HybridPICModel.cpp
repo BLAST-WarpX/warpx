@@ -4,6 +4,7 @@
  *
  * Authors: Roelof Groenewald (TAE Technologies)
  *          S. Eric Clark (Helion Energy)
+ *          Prabhat Kumar (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -21,6 +22,8 @@
 #include "Particles/MultiParticleContainer.H"
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
+
+#include <AMReX_Random.H>
 
 using namespace amrex;
 using warpx::fields::FieldType;
@@ -77,7 +80,7 @@ void HybridPICModel::ReadParameters ()
 
     // Master gate for the electron-energy equation. When enabled, K_e is
     // advected each step by fictitious Lagrangian particles moving with V_e
-    // (Belyaev et al. 2024, "Topanga"); T_e is recovered from K_e and n_e
+    // (see Phys. Plasmas 31, 012902 (2024)); T_e is recovered from K_e and n_e
     // via the polytropic relation; operator-split source terms are added;
     // Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. Default off
     // preserves the legacy algebraic adiabatic closure.
@@ -85,14 +88,28 @@ void HybridPICModel::ReadParameters ()
                     m_solve_electron_energy_equation);
     pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
 
-    // Topanga (Belyaev 2024 Eq. 12) resistive electron-heating source:
+    // Resistive electron-heating source (Phys. Plasmas 31, 012902 (2024), Eq. 12):
     //   S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2,  ν_{s,e} = Z_s e² η n_e / m_s
-    // added per cell to T_e. Evaluated from the gridded Vs_fp_<s>, Ve_fp,
-    // rho_fp(_s) fields by QDSMCAddJouleHeating. Reduces to η J^2 in single
-    // species; resolves inter-species drift-dispersion in multispecies.
+    // added per cell to T_e by QDSMCAddJouleHeating, using the e-i relative
+    // drift J_plasma/(e n_e) and rho_fp(_s). Reduces to η J^2 in single species.
     // Independent of whether HybridResistiveDrag is registered.
     // Default off; only consulted when solve_electron_energy_equation is on.
     pp_hybrid.query("include_joule_heating", m_include_joule_heating);
+
+    // Te-threshold Joule redirection: heat electrons where Te < threshold,
+    // deposit the Joule energy to ions where Te >= threshold (energy-conserving).
+    pp_hybrid.query("redirect_joule_to_ions", m_joule_redirect_to_ions);
+    utils::parser::queryWithParser(pp_hybrid, "joule_redirect_Te_threshold", m_joule_redirect_Te_eV);
+
+    // Electron-ion thermal equilibration (Q_ei) on T_e:
+    //   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),  applied per ion species weighted by
+    //   n_s/n_e, cooling T_e toward T_i. nu_ei[1/s] comes from the
+    //   electron_ion_relaxation_rate(rho,Te,Ti,t) parser (rho [C/m^3], Te,Ti [eV]).
+    //   The matching ion heating is deposited conservatively, so the exchange
+    //   conserves energy. Default off; only consulted when
+    //   solve_electron_energy_equation is on.
+    pp_hybrid.query("include_temperature_relaxation", m_include_temperature_relaxation);
+    pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -280,7 +297,12 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     const std::set<std::string> resistivity_symbols = m_resistivity_parser->symbols();
     m_resistivity_has_J_dependence += resistivity_symbols.count("J");
 
-    // --- Per-species resistivity overlay (Belyaev 2024 Eq. 10) -------------
+    // Electron-ion energy-equilibration rate nu_ei(rho,Te,Ti,t) for the Q_ei term.
+    m_nu_ei_parser = std::make_unique<amrex::Parser>(
+        utils::parser::makeParser(m_nu_ei_expression, {"rho","Te","Ti","t"}));
+    m_nu_ei = m_nu_ei_parser->compile<4>();
+
+    // --- Per-species resistivity overlay (Phys. Plasmas 31, 012902 (2024), Eq. 10) ---
     // Optional. For any charged species <spec> the user may supply
     //   hybrid_pic_model.plasma_resistivity_<spec>(rho_s,rho,Te,J,J_s,B,t)="..."
     // This parser overlays species-resolved physics on top of the global
@@ -1199,27 +1221,22 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
 }
 
 
-void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) const
+void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
+                                           amrex::MultiFab * const redirect_E) const
 {
     ABLASTR_PROFILE("HybridPICModel::QDSMCAddJouleHeating()");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Per-cell kinetic Joule-heating source. Belyaev 2024 "Topanga" Eq. 12:
+    // Per-cell resistive electron-heating source (Phys. Plasmas 31, 012902 (2024), Eq. 12).
+    // With the e-i relative drift V_s - V_e = J_plasma/(e n_e) and the
+    // eta-derived rate nu_{s,e} = Z_s e^2 eta n_e / m_s, the source is
     //
-    //   S_e = n_e m_e Σ_x ν_ex |v_e - v_x|^2
-    //       = Σ_s n_s m_s ν_{s,e} |V_s - V_e|^2     (Newton's 3rd: n_e m_e ν_ex = n_s m_s ν_{s,e})
+    //   S_e = e^2 eta n_e Sum_s Z_s n_s |J_plasma/(e n_e)|^2
     //
-    // with the eta-derived per-species rate ν_{s,e} = Z_s e² η n_e / m_s.
-    // After substitution the formula becomes
-    //
-    //   S_e = e² η n_e · Σ_s Z_s n_s |V_s - V_e|^2
-    //
-    // which collapses to η J² for single species and gives the
-    // Cauchy-Schwarz-larger multispecies result otherwise. Computed on the
-    // grid from existing fields (Vs_fp_<s>, Ve_fp, rho_fp, rho_fp_<s>) --
-    // no per-particle scatter, no accumulator, deterministic.
+    // which collapses to eta J^2 for a single species. Computed on the grid from
+    // rho_fp, rho_fp_<s> and the plasma current -- no per-particle scatter.
 
     auto & warpx = WarpX::GetInstance();
     amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
@@ -1228,13 +1245,6 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
     ablastr::fields::VectorField J_plasma =
         warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    // V_e on a NODAL grid, freshly written this step by QDSMCInitializeUe
-    // (V_e = -(J_plasma - J_i)/rho with the current-step J_plasma and J_i).
-    // Using this avoids the one-step staleness of the Yee-staggered Ve_fp
-    // (which is only updated at the end of HybridPICEvolveFields, i.e.
-    // AFTER this orchestrator call returns).
-    ablastr::fields::VectorField Ve_nodal =
-        warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
     // B field on Yee staggering; needed (as |B|) only when a per-species
     // resistivity parser is registered for a species visited in this loop.
     // The Yee->nodal interp is cheap; we always compute it inside the kernel
@@ -1256,7 +1266,15 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
     amrex::GpuArray<int, 3> const nodal     = {1, 1, 1};
     amrex::GpuArray<int, 3> const coarsen   = {1, 1, 1};
 
-    auto const & mypc = warpx.GetPartContainer();
+    // Te-threshold Joule redirection: in cells with Te >= threshold the Joule
+    // heat is written into redirect_E (per charged ion species, the m_i-independent
+    // energy E_s [J]) for QDSMCApplyIonHeating to deposit on the ions, rather than
+    // added to T_e.
+    bool const do_redirect = (redirect_E != nullptr);
+    auto const K_per_eV    = PhysConst::q_e / PhysConst::kb;        // T[eV]*this = T[K]
+    amrex::Real const Te_thresh_K = m_joule_redirect_Te_eV * K_per_eV;
+
+    auto & mypc = warpx.GetPartContainer();
 
     // Loop over every charged ion species and accumulate its per-cell
     // contribution to S_e into T_e directly. Each species contributes
@@ -1293,9 +1311,12 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
         amrex::MultiFab::Add(rhos_sum, rho_s, 0, 0, 1, rho.nGrowVect());
     }
 
+    // Charged-species component index for redirect_E (matches QDSMCApplyIonHeating).
+    int ion_comp = -1;
     for (auto const & spec_name : species_names) {
         auto & pc = mypc.GetParticleContainerFromName(spec_name);
         if (pc.getCharge() == 0._prt) { continue; }
+        ++ion_comp;
 
         amrex::Real const Z_s = pc.getCharge() / PhysConst::q_e;
 
@@ -1325,15 +1346,17 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
             amrex::Array4<amrex::Real const> const & Jpx        = J_plasma[0]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jpy        = J_plasma[1]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jpz        = J_plasma[2]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vex        = Ve_nodal[0]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vey        = Ve_nodal[1]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vez        = Ve_nodal[2]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jsx        = Js[0]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jsy        = Js[1]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jsz        = Js[2]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Bx_arr     = B_fp[0]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & By_arr     = B_fp[1]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Bz_arr     = B_fp[2]->const_array(mfi);
+
+            // Redirect output (default Array4 when redirect off -> never indexed
+            // because do_redirect gates the write).
+            amrex::Array4<amrex::Real> redirect_arr;
+            if (do_redirect) { redirect_arr = redirect_E->array(mfi); }
 
             amrex::Box const & tbox = mfi.tilebox();
             amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -1350,9 +1373,6 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
                 amrex::Real const rhos_sum_val  = std::max(rhosum_arr(i,j,k), rho_floor);
                 amrex::Real const f_s           = rhos_val_raw / rhos_sum_val;
                 amrex::Real const ns            = f_s * ne / Z_s;
-                // rhos_val (unscaled) is still used as the V_s = J_s/rho_s
-                // denominator below; the 2π·r factor cancels in that ratio.
-                amrex::Real const rhos_val = std::max(rhos_val_raw, rho_floor);
 
                 // |J| at the nodal grid (where Te lives). Used by the
                 // global η parser and forwarded to per-species parsers.
@@ -1366,30 +1386,25 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
                 // exactly in single species (when no per-species overlay).
                 amrex::Real eta_s_eff = eta(rho_val, Jmag, t_new);
 
-                // V_e: already nodal, no interp needed (just read).
-                amrex::Real const vex = Vex(i, j, k);
-                amrex::Real const vey = Vey(i, j, k);
-                amrex::Real const vez = Vez(i, j, k);
-
-                // V_s = J_s / rho_s, computed inline from THIS step's deposit.
-                // Interp J_s from Yee to nodal first, then divide by nodal rho_s.
-                auto const jsx_nodal = ablastr::coarsen::sample::Interp(Jsx, Jx_stag, nodal, coarsen, i, j, k, 0);
-                auto const jsy_nodal = ablastr::coarsen::sample::Interp(Jsy, Jy_stag, nodal, coarsen, i, j, k, 0);
-                auto const jsz_nodal = ablastr::coarsen::sample::Interp(Jsz, Jz_stag, nodal, coarsen, i, j, k, 0);
-                amrex::Real const vsx = jsx_nodal / rhos_val;
-                amrex::Real const vsy = jsy_nodal / rhos_val;
-                amrex::Real const vsz = jsz_nodal / rhos_val;
-
-                amrex::Real const dvx = vsx - vex;
-                amrex::Real const dvy = vsy - vey;
-                amrex::Real const dvz = vsz - vez;
+                // e-i relative drift = J_plasma/(e n_e), from the nodal plasma
+                // current and n_e. Energy-consistent with the eta*J dissipation
+                // in Ohm's law; reduces to eta*|J|^2 for a single species.
+                amrex::Real const inv_ene = 1.0_rt / (PhysConst::q_e * ne);
+                amrex::Real const dvx = jx * inv_ene;
+                amrex::Real const dvy = jy * inv_ene;
+                amrex::Real const dvz = jz * inv_ene;
                 amrex::Real const dv2 = dvx*dvx + dvy*dvy + dvz*dvz;
 
-                // η_per_species overlay (Topanga form). Only evaluated when
+                // η_per_species overlay (Phys. Plasmas 31, 012902 (2024)). Only evaluated when
                 // a per-species parser is registered for this species --
                 // for the other species we just see eta_s_eff = eta_global.
                 if (has_eta_per) {
                     amrex::Real const Te_K_val = Te_arr(i,j,k);
+                    // J_s interpolated to nodal -- only needed for the parser's
+                    // |J_s| argument.
+                    auto const jsx_nodal = ablastr::coarsen::sample::Interp(Jsx, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jsy_nodal = ablastr::coarsen::sample::Interp(Jsy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jsz_nodal = ablastr::coarsen::sample::Interp(Jsz, Jz_stag, nodal, coarsen, i, j, k, 0);
                     amrex::Real const Jsmag    = std::sqrt(
                         jsx_nodal*jsx_nodal + jsy_nodal*jsy_nodal + jsz_nodal*jsz_nodal);
                     auto const bx = ablastr::coarsen::sample::Interp(Bx_arr, Bx_stag, nodal, coarsen, i, j, k, 0);
@@ -1404,14 +1419,301 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt) 
                 //   ν_{s,e} n_s m_s |V_s - V_e|² = Z_s e² η_s_eff n_e n_s |dV|²
                 // Dividing by (n_e k_B) for the T_e update:
                 //   dT_e_s = dt (γ-1) · Z_s e² η_s_eff n_s |dV|² / k_B
-                Te_arr(i,j,k) += dt * gamma_minus_1
+                amrex::Real const dTe_s = dt * gamma_minus_1
                                * Z_s * PhysConst::q_e * PhysConst::q_e
                                * eta_s_eff * ns * dv2 / PhysConst::kb;
+                // Te-threshold redirection: below threshold heat electrons (the
+                // usual Joule deposit); at/above it write this species'
+                // m_i-independent redirected energy E_s = (2/3) n_e Z_s e^2 η
+                // |dV|^2 dt [J] into its component for the ion-heating step.
+                if (do_redirect && Te_arr(i,j,k) >= Te_thresh_K) {
+                    redirect_arr(i,j,k,ion_comp) = (2.0_rt/3.0_rt) * ne
+                        * Z_s * PhysConst::q_e * PhysConst::q_e * eta_s_eff * dv2 * dt;
+                } else {
+                    Te_arr(i,j,k) += dTe_s;
+                }
             });
         }
     }
 
     Te.FillBoundary(Te.nGrowVect(), period);
+}
+
+
+void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real const dt,
+    std::map<std::string, std::unique_ptr<amrex::MultiFab>> const & Ti_dep_by_species) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCAddTemperatureRelaxation()");
+
+    using warpx::fields::FieldType;
+
+    // Electron-ion thermal-equilibration sink, summed over ion species s:
+    //   Q_ei = Σ_s 3 n_s k_B nu_ei (T_e - T_i_s),    dU_e/dt += -Q_ei.
+    // With U_e = n_e k_B T_e/(γ-1), the per-cell T_e update is
+    //   dT_e = -dt (γ-1) 3 Σ_s (n_s/n_e) nu_ei (T_e - T_i_s),
+    // where n_s/n_e = f_s/Z_s, f_s = rho_fp_<s>/Σ_t rho_fp_<t>. T_e is stored in
+    // Kelvin; T_i (deposited per species, cell-centered, in eV) is interpolated
+    // to the nodal T_e grid and converted to K. This is the electron-side sink;
+    // QDSMCApplyIonHeating deposits the matching ion heating so the pair
+    // conserves energy.
+    auto & warpx = WarpX::GetInstance();
+    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
+
+    amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
+
+    auto const gamma_minus_1 = m_gamma - 1.0_rt;
+    auto const rho_floor     = PhysConst::q_e * m_n_floor;
+    auto const nu_ei         = m_nu_ei;
+    auto const t_new         = warpx.gett_new(0);
+    auto const K_per_eV      = PhysConst::q_e / PhysConst::kb;   // T[eV] * this = T[K]
+
+    amrex::GpuArray<int, 3> const nodal   = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+
+    auto & mypc = warpx.GetPartContainer();
+    auto const species_names = mypc.GetSpeciesNames();
+
+    // Σ_t rho_fp_<t> (unscaled per-species charge densities) -> species fraction.
+    amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
+    rhos_sum.setVal(0.0_rt);
+    for (auto const & spec_name : species_names) {
+        auto & pc = mypc.GetParticleContainerFromName(spec_name);
+        if (pc.getCharge() == 0._prt) { continue; }
+        amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+        amrex::MultiFab::Add(rhos_sum, rho_s, 0, 0, 1, rho.nGrowVect());
+    }
+
+    // Cell-centered field box array (for staging the deposited T_i with a guard
+    // cell so it can be interpolated to the nodal T_e grid).
+    amrex::BoxArray const cc_ba = amrex::convert(Te.boxArray(), amrex::IntVect::TheCellVector());
+
+    for (auto const & spec_name : species_names) {
+        auto & pc = mypc.GetParticleContainerFromName(spec_name);
+        if (pc.getCharge() == 0._prt) { continue; }
+        amrex::Real const Z_s = pc.getCharge() / PhysConst::q_e;
+
+        amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+
+        // Per-cell ion temperature [eV] (NGP velocity-variance deposit, done once
+        // by the caller and shared via Ti_dep_by_species), moved onto the field's
+        // cell-centered grid with one guard cell so the cc->nodal interpolation
+        // has its neighbours at box edges.
+        amrex::MultiFab const & Ti_dep = *Ti_dep_by_species.at(spec_name);
+        amrex::MultiFab Ti_cc(cc_ba, Te.DistributionMap(), 1, 1);
+        Ti_cc.setVal(0.0_rt);
+        Ti_cc.ParallelCopy(Ti_dep, 0, 0, 1, amrex::IntVect::TheZeroVector(),
+                           amrex::IntVect::TheZeroVector());
+        Ti_cc.FillBoundary(warpx.Geom(lev).periodicity());
+        // Ti_cc is cell-centered in the real dimensions; the unused (2D/1D)
+        // dimensions are set NODAL so they match the nodal destination grid in
+        // Interp (sf==sc there -> np=1, no out-of-bounds k=-1 read). Mirrors the
+        // unused-dimension handling for J/B/E above.
+        amrex::GpuArray<int, 3> cc_stag = {0, 0, 0};
+        for (int d = AMREX_SPACEDIM; d < 3; ++d) { cc_stag[d] = 1; }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real>       const & Te_arr     = Te.array(mfi);
+            amrex::Array4<amrex::Real const> const & rho_arr    = rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & rhos_arr   = rho_s.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & rhosum_arr = rhos_sum.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Ti_arr     = Ti_cc.const_array(mfi);
+
+            amrex::Box const & tbox = mfi.tilebox();
+            amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real const rho_val = rho_arr(i,j,k);
+                if (rho_val <= rho_floor) { return; }
+                amrex::Real const rhos_sum_val = std::max(rhosum_arr(i,j,k), rho_floor);
+                amrex::Real const f_s = rhos_arr(i,j,k) / rhos_sum_val;   // = Z_s n_s/n_e
+
+                amrex::Real const Ti_eV = ablastr::coarsen::sample::Interp(
+                    Ti_arr, cc_stag, nodal, coarsen, i, j, k, 0);
+                amrex::Real const Te_K  = Te_arr(i,j,k);
+                amrex::Real const Te_eV = Te_K / K_per_eV;
+                amrex::Real const Ti_K  = Ti_eV * K_per_eV;
+
+                amrex::Real const nu = nu_ei(rho_val, Te_eV, Ti_eV, t_new);
+                // n_s/n_e = f_s / Z_s.
+                Te_arr(i,j,k) -= dt * gamma_minus_1 * 3.0_rt
+                               * (f_s / Z_s) * nu * (Te_K - Ti_K);
+            });
+        }
+    }
+
+    Te.FillBoundary(Te.nGrowVect(), period);
+}
+
+
+void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
+                                           amrex::MultiFab const * const redirect_E,
+                                           std::map<std::string, std::unique_ptr<amrex::MultiFab>> const * const Ti_dep_by_species) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCApplyIonHeating()");
+
+    using warpx::fields::FieldType;
+
+    // Stochastic drag-diffusion ion-heating operator delivering both e-i energy channels:
+    //   dv_p = -nu_ei (v_p - u_e) dt + sqrt(2 D dt) R,   sig^2 = 2 D dt,
+    // with R a unit-variance Gaussian vector. Q_ei (when do_relax) supplies the
+    // drag toward the electron fluid u_e and the thermal diffusion
+    // D_qei = nu_ei k_B T_e / m_i (T_i -> T_e at rate 2 nu_ei). The Te-threshold
+    // redirect (when do_redir) adds a pure-diffusion heating sig_redir^2 = E_s/m_i,
+    // with the per-species redirected energy E_s [J] read from redirect_E. Both
+    // channels are per-species correct (own mass, own T_i, own redirect_E comp).
+    auto & warpx = WarpX::GetInstance();
+
+    bool const do_relax = m_include_temperature_relaxation;
+    bool const do_redir = (redirect_E != nullptr);
+    if (!do_relax && !do_redir) { return; }
+
+    amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
+    ablastr::fields::VectorField Ve =
+        warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
+
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+    auto const nu_ei     = m_nu_ei;
+    auto const t_new     = warpx.gett_new(0);
+    auto const K_per_eV  = PhysConst::q_e / PhysConst::kb;   // T[eV]*this = T[K]
+
+    // Nodal->cc interpolation staggers (unused dims set cc-like).
+    amrex::GpuArray<int, 3> nodal_src = {1, 1, 1};
+    for (int d = AMREX_SPACEDIM; d < 3; ++d) { nodal_src[d] = 0; }
+    amrex::GpuArray<int, 3> const cc_dst  = {0, 0, 0};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+
+    amrex::BoxArray const cc_ba = amrex::convert(Te.boxArray(), amrex::IntVect::TheCellVector());
+
+    auto & mypc = warpx.GetPartContainer();
+    auto const species_names = mypc.GetSpeciesNames();
+
+    // Charged-species component index for redirect_E (matches QDSMCAddJouleHeating:
+    // incremented for every charged species before the mass check).
+    int ion_comp = -1;
+    for (auto const & spec_name : species_names) {
+        auto & pc = mypc.GetParticleContainerFromName(spec_name);
+        if (pc.getCharge() == 0._prt) { continue; }
+        ++ion_comp;
+        auto const m_i = pc.getMass();
+        if (m_i <= 0._prt) { continue; }
+
+        // Ion temperature [eV] (NGP) -- only needed as the nu_ei parser argument
+        // (Q_ei drag/diffusion). Skipped when only the redirect is active. When
+        // relaxation is on, T_i was deposited once by the caller and is shared via
+        // Ti_dep_by_species (QDSMCAddTemperatureRelaxation ran just before with no
+        // intervening ion motion).
+        amrex::MultiFab Ti_cc(cc_ba, Te.DistributionMap(), 1, 0);
+        Ti_cc.setVal(0.0_rt);
+        if (do_relax) {
+            amrex::MultiFab const & Ti_dep = *(Ti_dep_by_species->at(spec_name));
+            Ti_cc.ParallelCopy(Ti_dep, 0, 0, 1, amrex::IntVect::TheZeroVector(),
+                               amrex::IntVect::TheZeroVector());
+        }
+
+        // Per-cell drag-diffusion coefficients on the cc field grid:
+        //   0 = nu_ei [1/s], 1-3 = u_e [m/s], 4 = T_e [K], 5 = redirected dTe [K].
+        // Defaults (0) leave inactive / below-floor cells as no-ops.
+        amrex::MultiFab coef(cc_ba, Te.DistributionMap(), 6, 0);
+        coef.setVal(0.0_rt);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(coef, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real>       const & coef_arr = coef.array(mfi);
+            amrex::Array4<amrex::Real const> const & rho_arr  = rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Te_arr   = Te.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Ti_arr   = Ti_cc.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Vex_arr  = Ve[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Vey_arr  = Ve[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Vez_arr  = Ve[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> redirect_arr;
+            if (do_redir) { redirect_arr = redirect_E->const_array(mfi); }
+
+            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real const rho_val = ablastr::coarsen::sample::Interp(
+                    rho_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                if (rho_val <= rho_floor) { return; }
+
+                amrex::Real const Te_K = ablastr::coarsen::sample::Interp(
+                    Te_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                coef_arr(i,j,k,4) = Te_K;
+
+                if (do_relax) {
+                    amrex::Real const Ti_eV = Ti_arr(i,j,k);
+                    coef_arr(i,j,k,0) = nu_ei(rho_val, Te_K / K_per_eV, Ti_eV, t_new);
+                    coef_arr(i,j,k,1) = ablastr::coarsen::sample::Interp(
+                        Vex_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                    coef_arr(i,j,k,2) = ablastr::coarsen::sample::Interp(
+                        Vey_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                    coef_arr(i,j,k,3) = ablastr::coarsen::sample::Interp(
+                        Vez_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                }
+                if (do_redir) {
+                    // E_s for this species = redirect_E component ion_comp.
+                    coef_arr(i,j,k,5) = ablastr::coarsen::sample::Interp(
+                        redirect_arr, nodal_src, cc_dst, coarsen, i, j, k, ion_comp);
+                }
+            });
+        }
+
+        // Stage the coefficients on the particle grid for NGP lookup.
+        auto const & pba = pc.ParticleBoxArray(lev);
+        auto const & pdm = pc.ParticleDistributionMap(lev);
+        amrex::MultiFab coef_p(pba, pdm, 6, 0);
+        coef_p.setVal(0.0_rt);
+        coef_p.ParallelCopy(coef, 0, 0, 6);
+
+        // Apply the drag-diffusion update to each ion (NGP cell lookup).
+        auto const plo = warpx.Geom(lev).ProbLoArray();
+        auto const dxi = warpx.Geom(lev).InvCellSizeArray();
+        auto const kb  = PhysConst::kb;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti)
+        {
+            long const np = pti.numParticles();
+            auto & tile = pti.GetParticleTile();
+            auto ptd = tile.getParticleTileData();
+            amrex::ParticleReal* AMREX_RESTRICT uxp = pti.GetAttribs(PIdx::ux).dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT uyp = pti.GetAttribs(PIdx::uy).dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+
+            amrex::Array4<amrex::Real const> const & coef_arr = coef_p.const_array(pti);
+
+            amrex::ParallelForRNG(np,
+                [=] AMREX_GPU_DEVICE (long ip, amrex::RandomEngine const& engine)
+            {
+                auto const p = WarpXParticleContainer::ParticleType(ptd, ip);
+                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
+                amrex::ParticleReal const nu   = coef_arr(ii,jj,kk,0);
+                amrex::ParticleReal const Te_K = coef_arr(ii,jj,kk,4);
+                amrex::ParticleReal const E_s  = coef_arr(ii,jj,kk,5);
+
+                // sig^2 = (2 k_B nu T_e dt + E_s)/m_i: Q_ei thermal diffusion
+                // (D_qei = nu k_B T_e/m_i) + redirected-Joule heating (E_s/m_i).
+                amrex::ParticleReal const drag = nu * dt;                        // nu dt (<<1)
+                amrex::ParticleReal const sig2 = (2._prt * kb * nu * Te_K * dt + E_s) / m_i;
+                if (drag <= 0._prt && sig2 <= 0._prt) { return; }
+
+                amrex::ParticleReal const uex = coef_arr(ii,jj,kk,1);
+                amrex::ParticleReal const uey = coef_arr(ii,jj,kk,2);
+                amrex::ParticleReal const uez = coef_arr(ii,jj,kk,3);
+                amrex::ParticleReal const sig = std::sqrt(amrex::max(0._prt, sig2));
+                uxp[ip] += -drag*(uxp[ip]-uex) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uyp[ip] += -drag*(uyp[ip]-uey) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uzp[ip] += -drag*(uzp[ip]-uez) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+            });
+        }
+    }
 }
 
 
@@ -1500,10 +1802,57 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt)
         // the updated n_e (from rho_fp = rho^{n+1}).
         QDSMCUpdateTe(lev);
 
-        // Step 6: Belyaev Eq. 12 Joule-heating source on T_e, per-cell from
-        // the gridded Vs_fp_<s>, Ve_fp, rho_fp(_s), and Ohm's-law η parser.
+        // Step 6: Joule-heating source on T_e (Phys. Plasmas 31, 012902 (2024), Eq. 12), per-cell from
+        // rho_fp(_s), the plasma current, and the Ohm's-law η parser. With the
+        // Te-threshold redirect on, the above-threshold heat is staged in
+        // ion_redirect_E (per-charged-species energy, J) for the ion-heating step.
+        bool redirect_active = m_include_joule_heating && m_joule_redirect_to_ions;
+        int n_ion_species = 0;
+        if (redirect_active) {
+            auto & mpc = warpx.GetPartContainer();
+            for (auto const & nm : mpc.GetSpeciesNames()) {
+                if (mpc.GetParticleContainerFromName(nm).getCharge() != 0._prt) { ++n_ion_species; }
+            }
+            if (n_ion_species == 0) { redirect_active = false; }
+        }
+        amrex::MultiFab ion_redirect_E;
+        if (redirect_active) {
+            amrex::MultiFab const & Te_mf =
+                *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+            ion_redirect_E.define(Te_mf.boxArray(), Te_mf.DistributionMap(), n_ion_species, 0);
+            ion_redirect_E.setVal(0.0_rt);
+        }
         if (m_include_joule_heating) {
-            QDSMCAddJouleHeating(lev, dt);
+            QDSMCAddJouleHeating(lev, dt, redirect_active ? &ion_redirect_E : nullptr);
+        }
+
+        // Steps 6b/6c both need each charged species' T_i when Q_ei relaxation is
+        // on. Deposit it ONCE here (the expensive per-particle NGP temperature
+        // reduction) and share it: the electron sink (6b) and the ion-heating
+        // operator (6c) run back-to-back with no intervening ion motion, so the
+        // deposited T_i is identical for both.
+        std::map<std::string, std::unique_ptr<amrex::MultiFab>> Ti_dep_by_species;
+        if (m_include_temperature_relaxation) {
+            auto & mpc_ti = warpx.GetPartContainer();
+            for (auto const & nm : mpc_ti.GetSpeciesNames()) {
+                auto & pc = mpc_ti.GetParticleContainerFromName(nm);
+                if (pc.getCharge() == 0._prt) { continue; }
+                Ti_dep_by_species[nm] = pc.GetAverageNGPTemperature(lev);
+            }
+        }
+
+        // Step 6b: electron-ion thermal-equilibration (Q_ei) sink on T_e
+        // (cools T_e toward each ion species' T_i).
+        if (m_include_temperature_relaxation) {
+            QDSMCAddTemperatureRelaxation(lev, dt, Ti_dep_by_species);
+        }
+
+        // Step 6c: stochastic drag-diffusion ion-heating operator -- delivers the Q_ei
+        // conjugate (when relaxation is on) and/or the redirected Joule energy
+        // (when the redirect is on), so the ions are heated by one mechanism.
+        if (m_include_temperature_relaxation || redirect_active) {
+            QDSMCApplyIonHeating(lev, dt, redirect_active ? &ion_redirect_E : nullptr,
+                                 m_include_temperature_relaxation ? &Ti_dep_by_species : nullptr);
         }
 
         // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law solve.
