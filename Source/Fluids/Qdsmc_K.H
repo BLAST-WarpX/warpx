@@ -214,7 +214,7 @@ void gather_vector_field_qdsmc (const amrex::ParticleReal xp,
  * never indexes that direction.
  *
  * The caller is responsible for the CFL constraint |v| * dt < dx_field
- * (one cell per step) — beyond that the deposit aliases.
+ * (one cell per step) -- beyond that the deposit aliases.
  */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void push_qdsmc_particle (const amrex::ParticleReal x0p,

@@ -592,11 +592,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
-    // Per-species resistive overlay added to Ohm's-law E alongside +η_global J.
+    // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
     // Only computed and added when at least one species has a per-species
     // resistivity parser registered. Otherwise the overlay is identically zero,
     // so the compute and the per-cell add are skipped (E += 0 is a no-op) --
-    // bit-identical to the single-η path, but avoids the per-substep field
+    // bit-identical to the single-eta path, but avoids the per-substep field
     // zeroing and the overlay read in the hot E-solve.
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
     MultiFab eta_overlay_r_mf(Jfield[0]->boxArray(), Jfield[0]->DistributionMap(),
@@ -1062,10 +1062,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
-    // Per-species resistive overlay added to Ohm's-law E alongside +η_global J.
+    // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
     // See HybridPICSolveECylindrical (RZ branch) for the design notes; when no
     // per-species parser is registered the overlay is identically zero, so the
-    // compute and per-cell add are skipped (bit-identical single-η path).
+    // compute and per-cell add are skipped (bit-identical single-eta path).
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
     MultiFab eta_overlay_x_mf(Jfield[0]->boxArray(), Jfield[0]->DistributionMap(),
                               1, Jfield[0]->nGrowVect());

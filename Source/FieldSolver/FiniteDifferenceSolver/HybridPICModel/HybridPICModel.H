@@ -253,13 +253,13 @@ public:
     /**
      * \brief Resistive electron-heating source (see Phys. Plasmas 31, 012902 (2024), Eq. 12).
      *        Adds, per cell and per charged ion species,
-     *           T_e += dt * (gamma-1) * Z_s e^2 η n_s |dV|^2 / k_B,
-     *        with the e-i relative drift dV = J_plasma/(e n_e) and η from the
+     *           T_e += dt * (gamma-1) * Z_s e^2 eta n_s |dV|^2 / k_B,
+     *        with the e-i relative drift dV = J_plasma/(e n_e) and eta from the
      *        Ohm's-law parser. Summed over species,
-     *           S_e = e^2 η n_e · Σ_s Z_s n_s |dV|^2,
-     *        which reduces to η J^2 for a single species. n_s is recovered from
-     *        the species charge fraction f_s = rho_fp_<s> / Σ_t rho_fp_<t>
-     *        = Z_s n_s/n_e (2π·r-cancelling) -> n_s = f_s n_e/Z_s, with n_e from
+     *           S_e = e^2 eta n_e * Sigma_s Z_s n_s |dV|^2,
+     *        which reduces to eta J^2 for a single species. n_s is recovered from
+     *        the species charge fraction f_s = rho_fp_<s> / Sigma_t rho_fp_<t>
+     *        = Z_s n_s/n_e (2pi*r-cancelling) -> n_s = f_s n_e/Z_s, with n_e from
      *        the total rho_fp. Deterministic, no per-particle scatter. Called
      *        when m_include_joule_heating is true. When the Te-threshold redirect
      *        is on (\c redirect_E non-null), the contribution from cells with
@@ -269,7 +269,7 @@ public:
      * \param redirect_E nodal output field for the redirected heat, one component
      *        per charged ion species (ordered as in GetSpeciesNames, charged
      *        species only). Component c holds the m_i-independent energy
-     *        E_s = (2/3) n_e Z_s e^2 η |dV|^2 dt [J] (so sig_redir^2 = E_s/m_i).
+     *        E_s = (2/3) n_e Z_s e^2 eta |dV|^2 dt [J] (so sig_redir^2 = E_s/m_i).
      *        nullptr when the Joule redirect is off.
      */
     void QDSMCAddJouleHeating (int lev, amrex::Real dt,
@@ -337,7 +337,7 @@ public:
      *   4. QDSMC particle SetV / SetK / PushX / DepositK / DepositField
      *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
      *   6. QDSMCAddJouleHeating (if m_include_joule_heating is on):
-     *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2 -> T_e
+     *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2 -> T_e
      *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)
      *   8. Reset QDSMC particles to home positions for the next step
      *
@@ -347,25 +347,25 @@ public:
 
     /**
      * \brief Compute the per-species resistive overlay vector field added to
-     *        Ohm's-law E alongside the existing +η_global · J term:
+     *        Ohm's-law E alongside the existing +eta_global * J term:
      *
-     *           overlay_d(i,j,k) = Σ_s [ η_s_per · ρ_s · ρ / ρ_sum
-     *                                       · (V_s_d − V_e_d) ]
+     *           overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
+     *                                       * (V_s_d - V_e_d) ]
      *
      *        summed over charged species that have a per-species
      *        resistivity parser registered. The total friction term that
      *        Ohm's law sees becomes
      *
-     *           E_friction = +η_global · J + overlay
-     *                      = +e · Σ_s Z_s · (η_global + η_s_per) · n_s
-     *                                       · (V_s − V_e)
+     *           E_friction = +eta_global * J + overlay
+     *                      = +e * Sigma_s Z_s * (eta_global + eta_s_per) * n_s
+     *                                       * (V_s - V_e)
      *
-     *        i.e. effectively η_s_eff = η_global + η_s_per per species.
+     *        i.e. effectively eta_s_eff = eta_global + eta_s_per per species.
      *
      *        Output multifabs are at the Jx/Jy/Jz staggering (== E
      *        component staggering). When m_has_per_species_eta is false
      *        the overlay is set to zero and the function returns early
-     *        (single-η behaviour is exactly recovered when callers add
+     *        (single-eta behaviour is exactly recovered when callers add
      *        a field of zeros to E).
      *
      *        Computed once per E-solve call. Caller passes pre-allocated
@@ -411,16 +411,16 @@ public:
      * relation, then the Joule-heating source (if enabled) is added,
      * then Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. When
      * false (default), Pe is computed from the algebraic adiabatic closure
-     * (FillElectronPressureMF) — no temperature evolution. */
+     * (FillElectronPressureMF) -- no temperature evolution. */
     bool m_solve_electron_energy_equation = false;
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as
-     *     S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2,
-     *         ν_{s,e} = Z_s e^2 η n_e / m_s,
+     *     S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,
+     *         nu_{s,e} = Z_s e^2 eta n_e / m_s,
      * from the gridded Vs_fp_<s>, Ve_fp, rho_fp(_s) fields and the
      * Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
-     * η J^2 in single species; resolves inter-species drift-dispersion
+     * eta J^2 in single species; resolves inter-species drift-dispersion
      * heating in multispecies. Orthogonal to whether HybridResistiveDrag
      * is registered on ions (that controls particle dynamics, not the
      * T_e source). Only consulted when m_solve_electron_energy_equation

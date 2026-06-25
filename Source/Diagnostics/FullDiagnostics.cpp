@@ -494,7 +494,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             // electron-energy equation (QDSMC) is solved. The MultiFab is
             // allocated unconditionally by HybridPICModel::AllocateLevelMFs,
             // so the get() below is safe even when the energy equation is
-            // off — the field is just zero in that case.
+            // off -- the field is just zero in that case.
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
                 warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev),
                 lev, m_crse_ratio, false, ncomp);
@@ -923,7 +923,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "F" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "Te" ){
-            // Electron temperature [K] — state variable for the hybrid-PIC
+            // Electron temperature [K] -- state variable for the hybrid-PIC
             // electron-energy equation. Unconditionally allocated; zero
             // when solve_electron_energy_equation is off.
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(

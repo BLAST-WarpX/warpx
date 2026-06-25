@@ -206,7 +206,7 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
                                            Jmag, Jsmag, Bmag, t_now);
                 }
 
-                // ν_{s,e} = Z_s * e^2 * eta_s_eff * n_e / m_s
+                // nu_{s,e} = Z_s * e^2 * eta_s_eff * n_e / m_s
                 amrex::Real const n_e = rho_val * inv_qe;
                 amrex::Real const nu  = Z_e2_over_ms * eta_s_eff * n_e;
 

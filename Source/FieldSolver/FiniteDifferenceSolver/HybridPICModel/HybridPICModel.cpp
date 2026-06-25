@@ -89,9 +89,9 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
 
     // Resistive electron-heating source (Phys. Plasmas 31, 012902 (2024), Eq. 12):
-    //   S_e = Σ_s ν_{s,e} n_s m_s |V_s - V_e|^2,  ν_{s,e} = Z_s e² η n_e / m_s
+    //   S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,  nu_{s,e} = Z_s e^2 eta n_e / m_s
     // added per cell to T_e by QDSMCAddJouleHeating, using the e-i relative
-    // drift J_plasma/(e n_e) and rho_fp(_s). Reduces to η J^2 in single species.
+    // drift J_plasma/(e n_e) and rho_fp(_s). Reduces to eta J^2 in single species.
     // Independent of whether HybridResistiveDrag is registered.
     // Default off; only consulted when solve_electron_energy_equation is on.
     pp_hybrid.query("include_joule_heating", m_include_joule_heating);
@@ -468,8 +468,8 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 
     // Seed T_e with the uniform value parsed from <hybrid>.elec_temp (in
     // Joules after ReadParameters, so dividing by k_B gives Kelvin). Done
-    // unconditionally so the iter-0 diag dump — which WarpX::InitData()
-    // flushes BEFORE the first call to HybridPICInitializeRhoJandB — sees
+    // unconditionally so the iter-0 diag dump -- which WarpX::InitData()
+    // flushes BEFORE the first call to HybridPICInitializeRhoJandB -- sees
     // a meaningful T_e rather than the zero-initialized allocation. With
     // the energy equation on, this is the starting K_e value the QDSMC
     // particles will read on the first step; with it off, the diagnostic
@@ -841,11 +841,11 @@ void HybridPICModel::ComputeResistiveOverlay (
     using warpx::fields::FieldType;
 
     // Result is the per-species friction contribution added to Ohm's-law E:
-    //   overlay_d(i,j,k) = Σ_s [ η_s_per · ρ_s · ρ / ρ_sum · (V_s_d − V_e_d) ]
+    //   overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum * (V_s_d - V_e_d) ]
     // summed over charged species with a registered per-species parser.
-    // η_s_per is evaluated at (ρ_s, ρ, T_e [K], |J|, |J_s|, |B|, t) per cell
+    // eta_s_per is evaluated at (rho_s, rho, T_e [K], |J|, |J_s|, |B|, t) per cell
     // at the d-component staggering. We always zero the output first; if
-    // no per-species parsers are registered we return immediately (single-η
+    // no per-species parsers are registered we return immediately (single-eta
     // path is then exactly recovered when the caller adds a field of zeros).
 
     overlay_x.setVal(0.0_rt);
@@ -872,9 +872,9 @@ void HybridPICModel::ComputeResistiveOverlay (
 
     auto const rho_floor = PhysConst::q_e * m_n_floor;
 
-    // Precompute ρ_sum = Σ_t ρ_fp_<t> over all charged species. This is
+    // Precompute rho_sum = Sigma_t rho_fp_<t> over all charged species. This is
     // the unscaled "raw deposit" sum, paired with rho_s_raw in the same
-    // form so the 2π·r RZ factor cancels in the species-fraction ratio.
+    // form so the 2pi*r RZ factor cancels in the species-fraction ratio.
     amrex::MultiFab rho_sum(rho_total.boxArray(), rho_total.DistributionMap(),
                             1, rho_total.nGrowVect());
     rho_sum.setVal(0.0_rt);
@@ -1278,27 +1278,27 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
 
     // Loop over every charged ion species and accumulate its per-cell
     // contribution to S_e into T_e directly. Each species contributes
-    //   dT_e_s = dt (γ-1) · Z_s e² η n_s |V_s - V_e|² / k_B
-    // (the n_e factor in ν_{s,e} cancels the 1/n_e from the T_e update).
+    //   dT_e_s = dt (gamma-1) * Z_s e^2 eta n_s |V_s - V_e|^2 / k_B
+    // (the n_e factor in nu_{s,e} cancels the 1/n_e from the T_e update).
     // V_s is computed inline from THIS STEP's current_fp_<s> / rho_fp_<s>;
     // these are both deposited WITHOUT RZ volume scaling (per
     // HybridPICDepositRhoAndJ -- apply_boundary_and_scale_volume=false),
-    // so their ratio V_s = J_s/rho_s gives correct m/s with the 2π·r
+    // so their ratio V_s = J_s/rho_s gives correct m/s with the 2pi*r
     // factors cancelling.
     //
     // n_s in the heating coefficient, however, must be a TRUE density
-    // (1/m³). Reading rho_fp_<s>/q_e directly gives (2π·r) × n_s_true
+    // (1/m^3). Reading rho_fp_<s>/q_e directly gives (2pi*r) x n_s_true
     // in RZ. We recover the correct n_s from the species charge fraction
     //
-    //   f_s = rho_fp_<s> / Σ_t rho_fp_<t>   =   Z_s n_s / n_e   (unitless,
-    //                                            2π·r factor cancels)
-    //   n_s = f_s · n_e / Z_s
+    //   f_s = rho_fp_<s> / Sigma_t rho_fp_<t>   =   Z_s n_s / n_e   (unitless,
+    //                                            2pi*r factor cancels)
+    //   n_s = f_s * n_e / Z_s
     //
     // where n_e comes from the volume-scaled total rho_fp. Works in
-    // any dimensionality (in Cartesian the 2π·r is just 1).
+    // any dimensionality (in Cartesian the 2pi*r is just 1).
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Build Σ_t rho_fp_<t> (unscaled per-species charge densities) so we
+    // Build Sigma_t rho_fp_<t> (unscaled per-species charge densities) so we
     // can compute the species fraction f_s = rho_fp_<s> / rhos_sum per
     // cell inside the species loop.
     amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
@@ -1365,24 +1365,24 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 if (rho_val <= rho_floor) { return; }
                 // n_e (m^-3) from the volume-scaled total rho_fp.
                 amrex::Real const ne = rho_val / PhysConst::q_e;
-                // Species charge fraction f_s = rho_fp_<s> / Σ_t rho_fp_<t>
-                // = Z_s n_s / n_e (unitless; RZ 2π·r factor cancels). Then
+                // Species charge fraction f_s = rho_fp_<s> / Sigma_t rho_fp_<t>
+                // = Z_s n_s / n_e (unitless; RZ 2pi*r factor cancels). Then
                 // the true per-species number density:
-                //   n_s = f_s · n_e / Z_s
+                //   n_s = f_s * n_e / Z_s
                 amrex::Real const rhos_val_raw  = rhos_arr(i,j,k);
                 amrex::Real const rhos_sum_val  = std::max(rhosum_arr(i,j,k), rho_floor);
                 amrex::Real const f_s           = rhos_val_raw / rhos_sum_val;
                 amrex::Real const ns            = f_s * ne / Z_s;
 
                 // |J| at the nodal grid (where Te lives). Used by the
-                // global η parser and forwarded to per-species parsers.
+                // global eta parser and forwarded to per-species parsers.
                 auto const jx = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
                 auto const jy = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
                 auto const jz = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
                 amrex::Real const Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
 
-                // η_global: same Ohm's-law parser the E-solve uses, evaluated
-                // per cell. This makes the per-cell heat reduce to η J²
+                // eta_global: same Ohm's-law parser the E-solve uses, evaluated
+                // per cell. This makes the per-cell heat reduce to eta J^2
                 // exactly in single species (when no per-species overlay).
                 amrex::Real eta_s_eff = eta(rho_val, Jmag, t_new);
 
@@ -1395,7 +1395,7 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 amrex::Real const dvz = jz * inv_ene;
                 amrex::Real const dv2 = dvx*dvx + dvy*dvy + dvz*dvz;
 
-                // η_per_species overlay (Phys. Plasmas 31, 012902 (2024)). Only evaluated when
+                // eta_per_species overlay (Phys. Plasmas 31, 012902 (2024)). Only evaluated when
                 // a per-species parser is registered for this species --
                 // for the other species we just see eta_s_eff = eta_global.
                 if (has_eta_per) {
@@ -1416,15 +1416,15 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 }
 
                 // Per-species contribution to S_e at this cell.
-                //   ν_{s,e} n_s m_s |V_s - V_e|² = Z_s e² η_s_eff n_e n_s |dV|²
+                //   nu_{s,e} n_s m_s |V_s - V_e|^2 = Z_s e^2 eta_s_eff n_e n_s |dV|^2
                 // Dividing by (n_e k_B) for the T_e update:
-                //   dT_e_s = dt (γ-1) · Z_s e² η_s_eff n_s |dV|² / k_B
+                //   dT_e_s = dt (gamma-1) * Z_s e^2 eta_s_eff n_s |dV|^2 / k_B
                 amrex::Real const dTe_s = dt * gamma_minus_1
                                * Z_s * PhysConst::q_e * PhysConst::q_e
                                * eta_s_eff * ns * dv2 / PhysConst::kb;
                 // Te-threshold redirection: below threshold heat electrons (the
                 // usual Joule deposit); at/above it write this species'
-                // m_i-independent redirected energy E_s = (2/3) n_e Z_s e^2 η
+                // m_i-independent redirected energy E_s = (2/3) n_e Z_s e^2 eta
                 // |dV|^2 dt [J] into its component for the ion-heating step.
                 if (do_redirect && Te_arr(i,j,k) >= Te_thresh_K) {
                     redirect_arr(i,j,k,ion_comp) = (2.0_rt/3.0_rt) * ne
@@ -1448,10 +1448,10 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     using warpx::fields::FieldType;
 
     // Electron-ion thermal-equilibration sink, summed over ion species s:
-    //   Q_ei = Σ_s 3 n_s k_B nu_ei (T_e - T_i_s),    dU_e/dt += -Q_ei.
-    // With U_e = n_e k_B T_e/(γ-1), the per-cell T_e update is
-    //   dT_e = -dt (γ-1) 3 Σ_s (n_s/n_e) nu_ei (T_e - T_i_s),
-    // where n_s/n_e = f_s/Z_s, f_s = rho_fp_<s>/Σ_t rho_fp_<t>. T_e is stored in
+    //   Q_ei = Sigma_s 3 n_s k_B nu_ei (T_e - T_i_s),    dU_e/dt += -Q_ei.
+    // With U_e = n_e k_B T_e/(gamma-1), the per-cell T_e update is
+    //   dT_e = -dt (gamma-1) 3 Sigma_s (n_s/n_e) nu_ei (T_e - T_i_s),
+    // where n_s/n_e = f_s/Z_s, f_s = rho_fp_<s>/Sigma_t rho_fp_<t>. T_e is stored in
     // Kelvin; T_i (deposited per species, cell-centered, in eV) is interpolated
     // to the nodal T_e grid and converted to K. This is the electron-side sink;
     // QDSMCApplyIonHeating deposits the matching ion heating so the pair
@@ -1474,7 +1474,7 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     auto & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Σ_t rho_fp_<t> (unscaled per-species charge densities) -> species fraction.
+    // Sigma_t rho_fp_<t> (unscaled per-species charge densities) -> species fraction.
     amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
     rhos_sum.setVal(0.0_rt);
     for (auto const & spec_name : species_names) {
@@ -1803,7 +1803,7 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt)
         QDSMCUpdateTe(lev);
 
         // Step 6: Joule-heating source on T_e (Phys. Plasmas 31, 012902 (2024), Eq. 12), per-cell from
-        // rho_fp(_s), the plasma current, and the Ohm's-law η parser. With the
+        // rho_fp(_s), the plasma current, and the Ohm's-law eta parser. With the
         // Te-threshold redirect on, the above-threshold heat is staged in
         // ion_redirect_E (per-charged-species energy, J) for the ion-heating step.
         bool redirect_active = m_include_joule_heating && m_joule_redirect_to_ions;

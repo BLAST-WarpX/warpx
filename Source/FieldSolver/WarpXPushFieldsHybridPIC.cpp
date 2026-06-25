@@ -63,7 +63,7 @@ void WarpX::HybridPICEvolveFields ()
     // Electron-pressure update. When solve_electron_energy_equation is on,
     // run the QDSMC entropy-transport step (which also emits Pe = n_e k_B T_e
     // at the end). Otherwise the legacy algebraic adiabatic closure is run
-    // below (at ~L213) — Pe is recomputed each step from rho with no
+    // below (at ~L213) -- Pe is recomputed each step from rho with no
     // temperature evolution.
     //
     // QDSMC needs rho_fp = rho^{n+1} and hybrid_rho_fp_temp = rho^{n}, which
