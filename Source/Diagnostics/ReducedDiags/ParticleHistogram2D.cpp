@@ -122,9 +122,12 @@ ParticleHistogram2D::ParticleHistogram2D (const std::string& rd_name)
     if (m_do_parser_value) {
         utils::parser::Store_parserString(
                 pp_rd_name,"value_function(t,x,y,z,ux,uy,uz,w)", value_string);
-        m_parser_value = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(value_string, {"t", "x", "y", "z", "ux", "uy", "uz", "w"}));
+    } else {
+        // default value function is particle weight
+        value_string = "w";
     }
+    m_parser_value = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(value_string,{"t","x","y","z","ux","uy","uz","w"}));
 }
 // end constructor
 
@@ -288,6 +291,7 @@ void ParticleHistogram2D::WriteToFile (int step) const
     f_mesh.setAttribute("function_abscissa", function_string_abs);
     f_mesh.setAttribute("function_ordinate", function_string_ord);
     f_mesh.setAttribute("filter", filter_string);
+    f_mesh.setAttribute("value_function", value_string); // records custom value function
 
     // record components
     auto data = f_mesh[io::RecordComponent::SCALAR];
