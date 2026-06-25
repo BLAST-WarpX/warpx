@@ -1713,6 +1713,7 @@ WarpX::LoadExternalFields (int const lev)
 
     if (lev == finestLevel()) {
         // Call Python callback which might write values to external field multifabs
+        // (possibly both external fields and particle fields)
         ExecutePythonCallback("loadExternalFields");
     }
 

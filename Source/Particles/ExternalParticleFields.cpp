@@ -56,7 +56,7 @@ ExternalParticleFields::ReadParameters () {
 
     std::string e_init;
     pp_particles.query("E_ext_particle_init_style", e_init);
-    if (e_init == "read_from_file") {
+    if ((e_init == "read_from_file") || (e_init == "load_from_python")) {
 
         // Read in E field names
         std::vector<std::string> E_names;
@@ -114,7 +114,7 @@ ExternalParticleFields::ReadParameters () {
 
     std::string b_init;
     pp_particles.query("B_ext_particle_init_style", b_init);
-    if (b_init == "read_from_file") {
+    if ((b_init == "read_from_file") || (b_init == "load_from_python")) {
 
         // Read in B field names
         std::vector<std::string> B_names;
@@ -125,7 +125,7 @@ ExternalParticleFields::ReadParameters () {
             m_B_field_metadata.emplace_back(read_named_spec(n, /*isE=*/false));
         }
 
-        // No E field names provided, initialize for single E field without name
+        // No B field names provided, initialize for single B field without name
         if (m_B_field_metadata.empty()) {
 
             // no B field names provided but read_from_file requested, force to
