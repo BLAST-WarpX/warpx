@@ -791,6 +791,12 @@ namespace ablastr::fields
             std::string const & internal_name
         );
 
+        void CapacityOfFabs (
+            amrex::LayoutData<std::size_t>& mem,
+            amrex::BoxArray const & ba,
+            amrex::DistributionMapping const & dm
+        ) const;
+
     private:
 
         [[nodiscard]] amrex::MultiFab const *
