@@ -1484,6 +1484,20 @@ Particle initialization
       Note that the other beam parameters (e.g. ``<species_name>.x/y/z_rms``, etc.) are used in the initialization process *before* performing the rotation.
       Therefore, the user should define the beam size, cuts, and focal distance for the beam pre-rotation, hence aligned to the Cartesian axes.
 
+      * ``<species_name>.do_gaussian_beam_crabwaist`` (`bool`, optional, default: ``false``) perform the crab waist transformation on the Gaussian bunch coordinates. This is specific to high luminosity lepton colliders. Given a rotation angle (half crossing angle) :math:`\varphi` and a crab waist strength :math:`k` the transformation is:
+
+      .. math::
+
+          \alpha &= -\frac{k}{\tan(2\varphi)},
+
+          p_{x,CW} &= p_x - \frac{1}{2}\alpha p_y^2,
+
+          y_{CW} &= y + \alpha x p_y.
+
+    It is applied on the :math:`y` and :math:`p_x` coordinates in the lab frame before the rotation. Currently supports vertical crab waist only. Rotation angle must be larger than 0 as this operation only makes sense with a nonzero crossing angle. See (:cite:t:`param-Zobov2010`) for more details.
+
+      * ``<species_name>.crabwaist_strength`` (`double`, optional) is the strength of the crab waist transformation. :math:`k\in [0, 1]`. A value of 0 is equivalent to no crab waist. A value of 1 is equivalent to the full crab sextupole strength. Optimal value is typically in between.
+
     * ``external_file``: Inject macroparticles with properties (mass, charge, position, and momentum - :math:`\gamma \beta m c`) read from an external openPMD file.
       With it users can specify the additional arguments:
 
