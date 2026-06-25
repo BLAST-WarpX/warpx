@@ -266,6 +266,8 @@ public:
      *        Te >= m_joule_redirect_Te_eV is written into \c redirect_E for
      *        QDSMCApplyIonHeating to deposit on the ions instead of T_e.
      *
+     * \param lev AMR refinement level.
+     * \param dt  PIC timestep [s].
      * \param redirect_E nodal output field for the redirected heat, one component
      *        per charged ion species (ordered as in GetSpeciesNames, charged
      *        species only). Component c holds the m_i-independent energy
@@ -285,6 +287,8 @@ public:
      * so the pair conserves energy. Called when m_include_temperature_relaxation
      * is true.
      *
+     * \param lev AMR refinement level.
+     * \param dt  PIC timestep [s].
      * \param Ti_dep_by_species per-charged-species ion temperature [eV], deposited
      *        once by the caller (AdvanceElectronEnergyQDSMC) and shared with
      *        QDSMCApplyIonHeating, which runs immediately after with no intervening
@@ -309,6 +313,8 @@ public:
      * channels may be active. Both are per-species correct (the redirect reads
      * each species' own component of \c redirect_E).
      *
+     * \param lev AMR refinement level.
+     * \param dt  PIC timestep [s].
      * \param redirect_E per-cell redirected energy [J], one component per charged
      *        ion species (ordered as in QDSMCAddJouleHeating); nullptr when off.
      * \param Ti_dep_by_species per-charged-species ion temperature [eV], deposited
