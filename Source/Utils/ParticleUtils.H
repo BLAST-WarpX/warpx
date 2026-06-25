@@ -368,16 +368,6 @@ namespace ParticleUtils {
         return cos_theta;
     }
 
-    AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    amrex::ParticleReal getRandomCosTheta (
-        amrex::RandomEngine const& engine,
-        ScatteringAngleModel scattering_angle_model)
-    {
-        return getRandomCosTheta(
-            engine, scattering_angle_model, ScatteringUtils::AnisotropicCoefficientTable{},
-            amrex::ParticleReal(0.0));
-    }
-
     /**
      * \brief Generate a random unit vector with isotropic or anisotropic distribution,
      * following the method described in equations (27)-(31) or (36)-(42) of
