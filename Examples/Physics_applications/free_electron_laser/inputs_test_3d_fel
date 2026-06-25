@@ -11,19 +11,19 @@ algo.particle_shape = 2
 algo.particle_pusher = vay
 
 # geometry
-geometry.dims = 1
-geometry.prob_hi = 0
-geometry.prob_lo = -192e-6
+geometry.dims = 3
+geometry.prob_hi =  400e-6  400e-6     0
+geometry.prob_lo = -400e-6 -400e-6  -192e-6
 
-amr.max_grid_size = 1024
 amr.max_level = 0
-amr.n_cell = 1024
+amr.n_cell = 16 16 1024
+amr.max_grid_size = 1024
 
 # boundary
-boundary.field_hi = absorbing_silver_mueller
-boundary.field_lo = absorbing_silver_mueller
-boundary.particle_hi = absorbing
-boundary.particle_lo = absorbing
+boundary.field_hi = pml pml pml
+boundary.field_lo = pml pml pml
+boundary.particle_hi = absorbing absorbing absorbing
+boundary.particle_lo = absorbing absorbing absorbing
 
 # diagnostics
 diagnostics.diags_names = diag_labframe diag_boostedframe
@@ -33,6 +33,7 @@ diagnostics.diags_names = diag_labframe diag_boostedframe
 diag_boostedframe.diag_type = Full
 diag_boostedframe.format = openpmd
 diag_boostedframe.intervals = 100
+diag_boostedframe.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_positrons
 
 # Diagnostic that show quantities
 # reconstructed in the lab frame
@@ -53,7 +54,7 @@ electrons.charge = -q_e
 electrons.injection_style = nuniformpercell
 electrons.mass = m_e
 electrons.momentum_distribution_type = constant
-electrons.num_particles_per_cell_each_dim = 8
+electrons.num_particles_per_cell_each_dim = 2 2 2
 electrons.profile = constant
 electrons.density = 2.7e19/2
 electrons.ux = 0.0
@@ -61,6 +62,10 @@ electrons.uy = 0.0
 electrons.uz = gamma_bunch
 electrons.zmax = -25e-6
 electrons.zmin = -125e-6
+electrons.xmax = 130e-6
+electrons.xmin = -130e-6
+electrons.ymax = 130e-6
+electrons.ymin = -130e-6
 electrons.zinject_plane=0.0
 electrons.rigid_advance = 0
 
@@ -68,7 +73,7 @@ positrons.charge = q_e
 positrons.injection_style = nuniformpercell
 positrons.mass = m_e
 positrons.momentum_distribution_type = constant
-positrons.num_particles_per_cell_each_dim = 8
+positrons.num_particles_per_cell_each_dim = 2 2 2
 positrons.profile = constant
 positrons.density = 2.7e19/2
 positrons.ux = 0.0
@@ -76,6 +81,10 @@ positrons.uy = 0.0
 positrons.uz = gamma_bunch
 positrons.zmax = -25e-6
 positrons.zmin = -125e-6
+positrons.xmax = 130e-6
+positrons.xmin = -130e-6
+positrons.ymax = 130e-6
+positrons.ymin = -130e-6
 positrons.zinject_plane=0.0
 positrons.rigid_advance = 0
 
