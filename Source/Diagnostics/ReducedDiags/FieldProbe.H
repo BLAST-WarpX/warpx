@@ -115,10 +115,6 @@ private:
      */
     void WriteToFile (int step) const override;
 
-    /** Check if the probe is in the simulation domain boundary
-     */
-    bool ProbeInDomain () const;
-
     /**
      * Simple utility function to normalize the components of a "vector"
      */
