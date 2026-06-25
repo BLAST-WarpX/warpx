@@ -225,9 +225,9 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, ngJ, 0.0_rt);
 
-    // Per-species ion fields - one set per charged species. current_fp_<s>
-    // and rho_fp_<s> are deposited from particles and accumulated into the
-    // global current_fp / rho_fp; Vs_fp_<s> is the bulk velocity J_s/rho_s,
+    // Per-species ion fields - one set per charged species. current_fp_s
+    // and rho_fp_s are deposited from particles and accumulated into the
+    // global current_fp / rho_fp; Vs_fp_s is the bulk velocity J_s/rho_s,
     // used by the resistive-drag operator to shift each species' particles
     // toward V_e without collapsing the thermal moment.
     auto const & mypc = WarpX::GetInstance().GetPartContainer();
@@ -303,8 +303,8 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     m_nu_ei = m_nu_ei_parser->compile<4>();
 
     // --- Per-species resistivity overlay (Phys. Plasmas 31, 012902 (2024), Eq. 10) ---
-    // Optional. For any charged species <spec> the user may supply
-    //   hybrid_pic_model.plasma_resistivity_<spec>(rho_s,rho,Te,J,J_s,B,t)="..."
+    // Optional. For any charged species {spec} the user may supply
+    //   hybrid_pic_model.plasma_resistivity_{spec}(rho_s,rho,Te,J,J_s,B,t)="..."
     // This parser overlays species-resolved physics on top of the global
     // m_eta parser; the total per-species effective resistivity used by
     // Ohm's law, the Joule-heating source, and the resistive-drag operator
@@ -872,7 +872,7 @@ void HybridPICModel::ComputeResistiveOverlay (
 
     auto const rho_floor = PhysConst::q_e * m_n_floor;
 
-    // Precompute rho_sum = Sigma_t rho_fp_<t> over all charged species. This is
+    // Precompute rho_sum = Sigma_t rho_fp_t over all charged species. This is
     // the unscaled "raw deposit" sum, paired with rho_s_raw in the same
     // form so the 2pi*r RZ factor cancels in the species-fraction ratio.
     amrex::MultiFab rho_sum(rho_total.boxArray(), rho_total.DistributionMap(),
@@ -1236,7 +1236,7 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     //   S_e = e^2 eta n_e Sum_s Z_s n_s |J_plasma/(e n_e)|^2
     //
     // which collapses to eta J^2 for a single species. Computed on the grid from
-    // rho_fp, rho_fp_<s> and the plasma current -- no per-particle scatter.
+    // rho_fp, rho_fp_s and the plasma current -- no per-particle scatter.
 
     auto & warpx = WarpX::GetInstance();
     amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
@@ -1280,17 +1280,17 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     // contribution to S_e into T_e directly. Each species contributes
     //   dT_e_s = dt (gamma-1) * Z_s e^2 eta n_s |V_s - V_e|^2 / k_B
     // (the n_e factor in nu_{s,e} cancels the 1/n_e from the T_e update).
-    // V_s is computed inline from THIS STEP's current_fp_<s> / rho_fp_<s>;
+    // V_s is computed inline from THIS STEP's current_fp_s / rho_fp_s;
     // these are both deposited WITHOUT RZ volume scaling (per
     // HybridPICDepositRhoAndJ -- apply_boundary_and_scale_volume=false),
     // so their ratio V_s = J_s/rho_s gives correct m/s with the 2pi*r
     // factors cancelling.
     //
     // n_s in the heating coefficient, however, must be a TRUE density
-    // (1/m^3). Reading rho_fp_<s>/q_e directly gives (2pi*r) x n_s_true
+    // (1/m^3). Reading rho_fp_s/q_e directly gives (2pi*r) x n_s_true
     // in RZ. We recover the correct n_s from the species charge fraction
     //
-    //   f_s = rho_fp_<s> / Sigma_t rho_fp_<t>   =   Z_s n_s / n_e   (unitless,
+    //   f_s = rho_fp_s / Sigma_t rho_fp_t   =   Z_s n_s / n_e   (unitless,
     //                                            2pi*r factor cancels)
     //   n_s = f_s * n_e / Z_s
     //
@@ -1298,8 +1298,8 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     // any dimensionality (in Cartesian the 2pi*r is just 1).
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Build Sigma_t rho_fp_<t> (unscaled per-species charge densities) so we
-    // can compute the species fraction f_s = rho_fp_<s> / rhos_sum per
+    // Build Sigma_t rho_fp_t (unscaled per-species charge densities) so we
+    // can compute the species fraction f_s = rho_fp_s / rhos_sum per
     // cell inside the species loop.
     amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
     rhos_sum.setVal(0.0_rt);
@@ -1365,7 +1365,7 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 if (rho_val <= rho_floor) { return; }
                 // n_e (m^-3) from the volume-scaled total rho_fp.
                 amrex::Real const ne = rho_val / PhysConst::q_e;
-                // Species charge fraction f_s = rho_fp_<s> / Sigma_t rho_fp_<t>
+                // Species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
                 // = Z_s n_s / n_e (unitless; RZ 2pi*r factor cancels). Then
                 // the true per-species number density:
                 //   n_s = f_s * n_e / Z_s
@@ -1451,7 +1451,7 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     //   Q_ei = Sigma_s 3 n_s k_B nu_ei (T_e - T_i_s),    dU_e/dt += -Q_ei.
     // With U_e = n_e k_B T_e/(gamma-1), the per-cell T_e update is
     //   dT_e = -dt (gamma-1) 3 Sigma_s (n_s/n_e) nu_ei (T_e - T_i_s),
-    // where n_s/n_e = f_s/Z_s, f_s = rho_fp_<s>/Sigma_t rho_fp_<t>. T_e is stored in
+    // where n_s/n_e = f_s/Z_s, f_s = rho_fp_s/Sigma_t rho_fp_t. T_e is stored in
     // Kelvin; T_i (deposited per species, cell-centered, in eV) is interpolated
     // to the nodal T_e grid and converted to K. This is the electron-side sink;
     // QDSMCApplyIonHeating deposits the matching ion heating so the pair
@@ -1474,7 +1474,7 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     auto & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Sigma_t rho_fp_<t> (unscaled per-species charge densities) -> species fraction.
+    // Sigma_t rho_fp_t (unscaled per-species charge densities) -> species fraction.
     amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
     rhos_sum.setVal(0.0_rt);
     for (auto const & spec_name : species_names) {

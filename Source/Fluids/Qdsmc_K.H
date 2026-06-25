@@ -52,7 +52,7 @@
  *        attributes used by the QDSMC entropy transport.
  *
  * At the start of the QDSMC step the particle sits at its home location
- * (cell center); compute_weights<NODE> with cell-centered home gives
+ * (cell center); compute_weights\<NODE\> with cell-centered home gives
  * shape factors W[d][0] = W[d][1] = 0.5 per dim, so the gather is a
  * proper linear interpolation between surrounding nodes.
  *

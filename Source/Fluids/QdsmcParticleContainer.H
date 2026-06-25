@@ -27,7 +27,7 @@
  * electron entropy K_e by the electron fluid velocity V_e over one PIC step
  * (see Belyaev et al., Phys. Plasmas 31, 012902 (2024), Sec. III.A).
  *
- * Layout: AMReX's `ParticleContainerPureSoA<NReal=nattribs, NInt=0>` treats the
+ * Layout: AMReX's `ParticleContainerPureSoA\<NReal=nattribs, NInt=0\>` treats the
  * first AMREX_SPACEDIM real attributes as the AMReX particle positions used
  * for tile-assignment and `Redistribute()`. The remaining attributes are
  * user data.
@@ -46,7 +46,7 @@
  * The home positions and velocities are always stored as 3 components even when
  * the field dimension is lower. In 2D the y-home is set to 0 at init; in 1D
  * both x-home and y-home are 0. The dim-agnostic kernels in Qdsmc_K.H consume
- * (x, y, z) as a 3-vector and the underlying compute_weights<NODE> routes them
+ * (x, y, z) as a 3-vector and the underlying compute_weights\<NODE\> routes them
  * to the right field axes per dim (e.g. r = sqrt(x^2 + y^2) for RZ).
  */
 struct QdsmcPIdx
@@ -120,7 +120,7 @@ public:
      *        home position into the particle's velocity attributes.
      *
      * The field staggering and dim are inferred from AMREX_SPACEDIM; the
-     * underlying kernel uses ablastr::particles::compute_weights<NODE>.
+     * underlying kernel uses ablastr::particles::compute_weights\<NODE\>.
      */
     void SetV (int lev,
                const amrex::MultiFab & Ux,

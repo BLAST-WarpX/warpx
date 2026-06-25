@@ -196,7 +196,7 @@ public:
 
     /**
      * \brief Compute the per-species ion bulk velocity Vs = Js/rhos on the
-     * grid for every charged species. Output is stored in Vs_fp_<species>
+     * grid for every charged species. Output is stored in Vs_fp_{species}
      * (face-staggered like J). Used by the resistive-drag operator to
      * apply a per-cell uniform shift (V_s - V_e)(1 - exp(-nu dt)) to every
      * particle, leaving the thermal moment intact.
@@ -258,7 +258,7 @@ public:
      *        Ohm's-law parser. Summed over species,
      *           S_e = e^2 eta n_e * Sigma_s Z_s n_s |dV|^2,
      *        which reduces to eta J^2 for a single species. n_s is recovered from
-     *        the species charge fraction f_s = rho_fp_<s> / Sigma_t rho_fp_<t>
+     *        the species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
      *        = Z_s n_s/n_e (2pi*r-cancelling) -> n_s = f_s n_e/Z_s, with n_e from
      *        the total rho_fp. Deterministic, no per-particle scatter. Called
      *        when m_include_joule_heating is true. When the Te-threshold redirect
@@ -418,7 +418,7 @@ public:
      * computed per cell as
      *     S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,
      *         nu_{s,e} = Z_s e^2 eta n_e / m_s,
-     * from the gridded Vs_fp_<s>, Ve_fp, rho_fp(_s) fields and the
+     * from the gridded Vs_fp_s, Ve_fp, rho_fp(_s) fields and the
      * Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
      * eta J^2 in single species; resolves inter-species drift-dispersion
      * heating in multispecies. Orthogonal to whether HybridResistiveDrag
@@ -468,9 +468,9 @@ public:
     bool m_resistivity_has_J_dependence = false;
 
     /** Per-species resistivity overlay (see Phys. Plasmas 31, 012902 (2024), Eq. 10).
-     *  Optional. For any charged species <spec> for which the user provides
+     *  Optional. For any charged species {spec} for which the user provides
      *
-     *      hybrid_pic_model.plasma_resistivity_<spec>(rho_s,rho,Te,J,J_s,B,t) = "..."
+     *      hybrid_pic_model.plasma_resistivity_{spec}(rho_s,rho,Te,J,J_s,B,t) = "..."
      *
      *  the parser is compiled and stored here. The total per-species
      *  effective resistivity used by Ohm's law, the Joule-heating source,
@@ -489,7 +489,7 @@ public:
      *    rho   : total plasma charge density       (C/m^3, volume-scaled)
      *    Te    : electron temperature              (Kelvin)
      *    J     : |J_plasma|                        (A/m^2)
-     *    J_s   : |J_<species>|                     (A/m^2, unscaled in RZ)
+     *    J_s   : |J_{species}|                     (A/m^2, unscaled in RZ)
      *    B     : |B|                               (Tesla)
      *    t     : time                              (seconds)
      */
