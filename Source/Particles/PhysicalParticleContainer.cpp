@@ -434,7 +434,10 @@ PhysicalParticleContainer::BackwardCompatibility ()
 
 void PhysicalParticleContainer::InitData ()
 {
-    AddParticles(0); // Note - add on level 0
+    for (int lev = 0; lev <= finestLevel(); lev++)
+    {
+        AddParticles(lev);
+    }
     Redistribute();  // We then redistribute
 }
 

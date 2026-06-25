@@ -952,6 +952,9 @@ public:
     //! This function is called in amrex::AmrCore::InitFromScratch.
     void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
+    //! This is used to check whether a location is covered by a finer level in AddPlasma
+    amrex::ParticleLocator<amrex::DenseBins<amrex::Box> > m_add_plasma_particle_locator;
+
 protected:
 
     /**
