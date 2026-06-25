@@ -56,6 +56,7 @@
 #include <array>
 #include <memory>
 #include <ostream>
+#include <string>
 #include <vector>
 
 using namespace amrex;
@@ -399,7 +400,14 @@ void WarpX::OneStep (
     // implicit solver
     if (m_implicit_solver) {
         // advance fields and particles by one time step
-        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+        const int exit_status = m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+        if (exit_status < 0) {
+            std::stringstream solverMsg;
+            solverMsg << "ImplicitSolver::OneStep() failed at step = " << a_step
+                      << " using dt = " << a_dt << ".\n"
+                      << "Nonlinear solver failed to converge: exit status = " << exit_status;
+            WARPX_ABORT_WITH_MESSAGE(solverMsg.str());
+        }
     }
     // explicit solver
     else {
@@ -1068,9 +1076,19 @@ WarpX::OneStep_sub1 (Real cur_time)
 
     // TODO: we could save some charge depositions
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(finest_level == 1, "Must have exactly two levels");
+    // check that MR has exactly two levels and a refinement ratio of 2 in all directions when subcycling is used
     const int fine_lev = 1;
     const int coarse_lev = 0;
+    const amrex::IntVect& crse_to_fine_ref_ratio = this->refRatio(coarse_lev);
+    const bool ref_ratio_is_uniform_two = (crse_to_fine_ref_ratio == amrex::IntVect(2));
+    if (finest_level != 1 || !ref_ratio_is_uniform_two) {
+        std::ostringstream msg;
+        msg << "MR with subcycling algorithm requires exactly two levels of MR "
+            << "and a refinement ratio of 2 in all directions. "
+            << "Found: finest_level = " << finest_level
+            << ", refRatio(" << coarse_lev << ") = " << crse_to_fine_ref_ratio;
+        WARPX_ABORT_WITH_MESSAGE(msg.str());
+    }
 
     using warpx::fields::FieldType;
 
