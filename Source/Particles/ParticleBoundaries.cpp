@@ -174,3 +174,9 @@ ParticleBoundaries::BuildReflectionModelParsers ()
         utils::parser::makeParser(reflection_model_zhi_str, {"v"}));
     data.reflection_model_zhi = reflection_model_zhi_parser->compile<1>();
 }
+
+void
+ParticleBoundaries::SetSEEvMag (amrex::Real E)
+{
+    data.vSEE = std::sqrt(2.0 * E * PhysConst::q_e / PhysConst::m_e);
+}

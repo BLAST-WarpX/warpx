@@ -2889,10 +2889,24 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
                     // Note that for RZ and RCYLINDER, (x, y, z) is actually (r, theta, z),
                     // and for RSPHERE (r, theta, phi).
 
+                    // Save the particle position before applying the boundary conditions
+                    ParticleReal xpos = x;
+                    ParticleReal ypos = y;
+                    ParticleReal zpos = z;
+
                     bool particle_lost = false;
+                    bool do_SEE_flag = false;
                     ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
                                                               ux[i], uy[i], uz[i], particle_lost,
+                                                              do_SEE_flag,
                                                               boundary_conditions, engine);
+
+                    if (boundary_conditions.SEE_probability > 0. && do_SEE_flag) {
+                        ApplyParticleBoundaries::do_SEE(xpos, ypos, zpos, gridmin, gridmax,
+                                                        boundary_conditions.SEE_probability,
+                                                        boundary_conditions.v_SEE,
+                                                        engine);
+                    }
 
                     if (particle_lost) {
                         pidw.make_invalid();

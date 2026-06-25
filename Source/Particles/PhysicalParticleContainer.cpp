@@ -345,6 +345,25 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("reflection_model_zhi(E)", m_boundary_conditions.reflection_model_zhi_str);
     m_boundary_conditions.BuildReflectionModelParsers();
 
+    if (WarpX::isAnyParticleBoundaryAbsorbing()) {
+        // Read SEE parameters for absorbing boundaries; SEE probability defaults to zero
+        pp_species_name.queryWithParser("SEE_probability", m_boundary_conditions.data.SEE_probability);
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (m_boundary_conditions.data.SEE_probability >= 0.),
+            "Secondary electron emission probability must be >= 0.");
+
+        if (m_boundary_conditions.data.max_SEE_probability > 0.0) {
+            // Read emission energy for SEE
+            amrex::Real SEE_emission_energy = 1.0;
+            pp_species_name.query("SEE_emission_energy", SEE_emission_energy);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                SEE_emission_energy > 0.,
+                "Secondary electron emission energy must be > 0.");
+            m_boundary_conditions.SetSEEvMag(SEE_emission_energy);
+        }
+    }
+
     const ParmParse pp_boundary("boundary");
     bool flag = false;
     pp_boundary.query("reflect_all_velocities", flag);
