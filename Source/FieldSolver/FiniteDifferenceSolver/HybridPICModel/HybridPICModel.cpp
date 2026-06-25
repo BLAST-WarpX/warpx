@@ -1441,7 +1441,7 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
 
 
 void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real const dt,
-    std::map<std::string, std::unique_ptr<amrex::MultiFab>> const & Ti_dep_by_species) const
+    std::map<std::string, amrex::MultiFab*> const & Ti_dep_by_species) const
 {
     ABLASTR_PROFILE("HybridPICModel::QDSMCAddTemperatureRelaxation()");
 
@@ -1551,7 +1551,7 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
 
 void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                                            amrex::MultiFab const * const redirect_E,
-                                           std::map<std::string, std::unique_ptr<amrex::MultiFab>> const * const Ti_dep_by_species) const
+                                           std::map<std::string, amrex::MultiFab*> const * const Ti_dep_by_species) const
 {
     ABLASTR_PROFILE("HybridPICModel::QDSMCApplyIonHeating()");
 
@@ -1831,13 +1831,14 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt)
         // reduction) and share it: the electron sink (6b) and the ion-heating
         // operator (6c) run back-to-back with no intervening ion motion, so the
         // deposited T_i is identical for both.
-        std::map<std::string, std::unique_ptr<amrex::MultiFab>> Ti_dep_by_species;
+        std::map<std::string, amrex::MultiFab*> Ti_dep_by_species;
         if (m_include_temperature_relaxation) {
             auto & mpc_ti = warpx.GetPartContainer();
             for (auto const & nm : mpc_ti.GetSpeciesNames()) {
                 auto & pc = mpc_ti.GetParticleContainerFromName(nm);
                 if (pc.getCharge() == 0._prt) { continue; }
-                Ti_dep_by_species[nm] = pc.GetAverageNGPTemperature(lev);
+                pc.DepositTotalNGPTemperature(lev);
+                Ti_dep_by_species[nm] = warpx.m_fields.get("T_" + nm, lev);
             }
         }
 

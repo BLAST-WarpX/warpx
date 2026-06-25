@@ -291,7 +291,7 @@ public:
      *        ion motion -- so the deposit is identical for both and is done only once.
      */
     void QDSMCAddTemperatureRelaxation (int lev, amrex::Real dt,
-        std::map<std::string, std::unique_ptr<amrex::MultiFab>> const & Ti_dep_by_species) const;
+        std::map<std::string, amrex::MultiFab*> const & Ti_dep_by_species) const;
 
     /**
      * \brief Ion-heating operator: a stochastic drag-diffusion applied to
@@ -317,7 +317,7 @@ public:
      */
     void QDSMCApplyIonHeating (int lev, amrex::Real dt,
                                amrex::MultiFab const * redirect_E = nullptr,
-                               std::map<std::string, std::unique_ptr<amrex::MultiFab>> const * Ti_dep_by_species = nullptr) const;
+                               std::map<std::string, amrex::MultiFab*> const * Ti_dep_by_species = nullptr) const;
 
     /**
      * \brief Fill hybrid_electron_pressure_fp from T_e and n_e using the
