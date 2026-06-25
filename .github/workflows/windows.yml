@@ -20,10 +20,8 @@ jobs:
   build_win_msvc:
     name: MSVC C++20 w/o MPI
     runs-on: windows-latest
-    # disabled due to issues in #5230
-    if: 0
-    #needs: check_changes
-    #if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v7
     - uses: actions/setup-python@v6
