@@ -730,8 +730,9 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
-    // Without mesh refinement, use local redistribute: particles cannot travel
-    // faster than c, so the number of cells crossed per step is bounded.
+    // Without mesh refinement, use local redistribute when the number of cells
+    // a particle can travel per step is small: particles cannot travel faster
+    // than c, so c * dt / min(dx) is a physical upper bound.
     if (finest_level == 0) {
         // Estimate the maximum number of cells a particle may have travelled.
         // Start from the moving-window grid shift, then take the max with a
@@ -749,7 +750,19 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         } else {
             max_cells_travelled += particle_max_grid_crossings;
         }
-        mypc->RedistributeLocal(max_cells_travelled);
+        // If max_cells_travelled reaches the domain size the local search is
+        // no longer more efficient than (and may crash in lieu of) a full
+        // redistribute, so fall back in that case.
+        const amrex::Box& domain = Geom(0).Domain();
+        int min_domain_cells = domain.length(0);
+        for (int i = 1; i < AMREX_SPACEDIM; ++i) {
+            min_domain_cells = std::min(min_domain_cells, domain.length(i));
+        }
+        if (max_cells_travelled < min_domain_cells) {
+            mypc->RedistributeLocal(max_cells_travelled);
+        } else {
+            mypc->Redistribute();
+        }
     }
     else {
         mypc->Redistribute();
