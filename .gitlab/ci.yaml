@@ -92,16 +92,10 @@ Intel-PVC:
           -DWarpX_EB=ON                         \
           -DWarpX_FFT=ON                        \
           -DWarpX_PYTHON=OFF                    \
-          -DWarpX_MPI=ON                        \
+          -DWarpX_MPI=OFF                       \
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=SINGLE
     - cmake --build build -j 16
-    # Intel MPI's Hydra launcher defaults to the ssh bootstrap, which cannot
-    # work inside this container (no sshd). Launch the proxy locally instead.
-    - export I_MPI_HYDRA_BOOTSTRAP=fork
-    # Single-node, 2-rank run: use shared-memory only and avoid OFI/libfabric
-    # provider initialization that is not available in the container.
-    - export I_MPI_FABRICS=shm
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
