@@ -226,7 +226,7 @@ namespace utils::parser
      * \param[in] str name of the parameter to read
      * \param[out] val where the value queried and parsed is stored
      */
-    void getWithParser (const amrex::ParmParse& a_pp, char const * const str, std::string& val);
+    void getWithParser (const amrex::ParmParse& a_pp, char const * str, std::string& val);
 
     /** Similar to amrex::ParmParse::query, but also supports replacement of bracketed names, similar
      * to how f-strings are processed in Python.
@@ -242,7 +242,7 @@ namespace utils::parser
      * \param[in] str name of the parameter to read
      * \param[out] val where the value queried and parsed is stored
      */
-    int queryWithParser (const amrex::ParmParse& a_pp, char const * const str, std::string& val);
+    int queryWithParser (const amrex::ParmParse& a_pp, char const * str, std::string& val);
 
 
     /** Similar to amrex::ParmParse::queryWithParser
