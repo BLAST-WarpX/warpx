@@ -533,11 +533,11 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         do_cropping[idim][0] = m_crop_on_PEC_boundary &&
                                 (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
-                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator));
         do_cropping[idim][1] = m_crop_on_PEC_boundary &&
                                 (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
-                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator));
 
         domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - tilebox.smallEnd(idim));
         domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - tilebox.smallEnd(idim));
@@ -1118,11 +1118,11 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
         do_cropping[idim][0] = m_crop_on_PEC_boundary &&
                                 (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
-                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator));
         do_cropping[idim][1] = m_crop_on_PEC_boundary &&
                                 (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
-                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator));
 
         domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - tilebox.smallEnd(idim));
         domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - tilebox.smallEnd(idim));
