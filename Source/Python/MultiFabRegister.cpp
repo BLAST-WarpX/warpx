@@ -19,6 +19,12 @@ void init_MultiFabRegister (py::module & m)
     pyDirection
         .def(py::init<int>())
         .def(py::init<std::string>())
+        .def("__str__", [](const ablastr::fields::Direction& d) {
+            return static_cast<std::string>(d);
+        })
+        .def("__repr__", [](const ablastr::fields::Direction& d) {
+            return "Direction('" + static_cast<std::string>(d) + "')";
+        })
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def_property_readonly_static("r", [](py::object /* self */) {
             return ablastr::fields::Direction::r;
@@ -116,7 +122,7 @@ void init_MultiFabRegister (py::module & m)
              py::arg("new_name"),
              py::arg("alias_name"),
              py::arg("level"),
-             py::arg("initial_value")
+             py::arg("initial_value") = py::none()
         )
 
         .def("alias_init",
@@ -132,7 +138,7 @@ void init_MultiFabRegister (py::module & m)
              py::arg("alias_name"),
              py::arg("dir"),
              py::arg("level"),
-             py::arg("initial_value")
+             py::arg("initial_value") = py::none()
         )
 
         .def("has",
@@ -153,6 +159,16 @@ void init_MultiFabRegister (py::module & m)
              py::arg("name"),
              py::arg("dir"),
              py::arg("level")
+        )
+
+        .def("has_vector",
+             py::overload_cast<
+                 std::string,
+                 int
+             >(&MultiFabRegister::has_vector<std::string>, py::const_),
+             py::arg("name"),
+             py::arg("level"),
+             "Return True if all components of a vector field exist at the given level"
         )
 
         .def("_get",
@@ -200,6 +216,38 @@ void init_MultiFabRegister (py::module & m)
              py::arg("name"),
              py::arg("dir"),
              py::arg("level")
+        )
+
+        .def("set_checkpoint",
+             py::overload_cast<
+                 std::string,
+                 int,
+                 bool
+             >(&MultiFabRegister::set_checkpoint<std::string>),
+             py::arg("name"),
+             py::arg("level"),
+             py::arg("checkpoint") = true,
+             "Mark a scalar field for inclusion in checkpoint files"
+        )
+
+        .def("set_checkpoint",
+             py::overload_cast<
+                 std::string,
+                 ablastr::fields::Direction,
+                 int,
+                 bool
+             >(&MultiFabRegister::set_checkpoint<std::string>),
+             py::arg("name"),
+             py::arg("dir"),
+             py::arg("level"),
+             py::arg("checkpoint") = true,
+             "Mark a vector field component for inclusion in checkpoint files"
+        )
+
+        .def("get_checkpoint_fields",
+             &MultiFabRegister::get_checkpoint_fields,
+             py::arg("level"),
+             "Get list of all fields marked for checkpointing at a given level"
         )
     ;
 }

@@ -14,6 +14,7 @@ Implementation Details
    accelerator_lattice
    initialization
    diagnostics
+   diagnostics_internal_fields
    moving_window
    portability
    warning_logger

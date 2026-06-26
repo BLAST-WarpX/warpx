@@ -162,6 +162,14 @@ WarpX::Evolve (int numsteps)
 
     static Real evolve_time = 0;
 
+    // Auto-restore custom fields from checkpoint at first step if restarting
+    // This happens after afterInitatRestart callback where fields are allocated
+    static bool custom_fields_restored = false;
+    if (!custom_fields_restored && !restart_chkfile.empty() && !m_custom_fields_to_restore.empty()) {
+        RestoreCustomFieldsFromCheckpoint();
+        custom_fields_restored = true;
+    }
+
     const int step_begin = istep[0];
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {

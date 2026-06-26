@@ -249,6 +249,9 @@ namespace ablastr::fields
         /** if m_mf is a non-owning alias, this string tracks the name of the owner */
         std::string m_owner;
 
+        /** Include this MultiFab in checkpoint files */
+        bool m_checkpoint = false;
+
         /** Is this part of a vector/tensor? */
         AMREX_INLINE
         bool
@@ -731,6 +734,54 @@ namespace ablastr::fields
             internal_erase(getExtractedName(name), dir, level);
         }
 
+        /** Mark a scalar field for inclusion in checkpoint files.
+         *
+         * @param name the name of the field
+         * @param level the MR level
+         * @param checkpoint whether to include in checkpoints (default: true)
+         */
+        template<typename T>
+        void
+        set_checkpoint (
+            T name,
+            int level,
+            bool checkpoint = true
+        )
+        {
+            internal_set_checkpoint(getExtractedName(name), level, checkpoint);
+        }
+
+        /** Mark a vector field component for inclusion in checkpoint files.
+         *
+         * @param name the name of the field
+         * @param dir the field component for vector fields ("direction" of the unit vector)
+         * @param level the MR level
+         * @param checkpoint whether to include in checkpoints (default: true)
+         */
+        template<typename T>
+        void
+        set_checkpoint (
+            T name,
+            Direction dir,
+            int level,
+            bool checkpoint = true
+        )
+        {
+            internal_set_checkpoint(getExtractedName(name), dir, level, checkpoint);
+        }
+
+        /** Get list of all fields marked for checkpointing at a given level.
+         *
+         * Returns pairs of (field_name, optional_direction) for all fields
+         * at the specified level that have m_checkpoint = true.
+         * Alias fields are excluded (only owners are checkpointed).
+         *
+         * @param level the MR level
+         * @return vector of (name, direction) pairs for checkpoint fields
+         */
+        [[nodiscard]] std::vector<std::pair<std::string, std::optional<Direction>>>
+        get_checkpoint_fields (int level) const;
+
         /** Erase all MultiFabs on a specific MR level.
          *
          * Calls @see erase for all MultiFabs on a specific level.
@@ -913,6 +964,20 @@ namespace ablastr::fields
             int finest_level,
             bool skip_level_0
         ) const;
+
+        void
+        internal_set_checkpoint (
+            std::string const & name,
+            int level,
+            bool checkpoint
+        );
+        void
+        internal_set_checkpoint (
+            std::string const & name,
+            Direction dir,
+            int level,
+            bool checkpoint
+        );
 
         void
         internal_erase (

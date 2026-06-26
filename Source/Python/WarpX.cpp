@@ -9,6 +9,7 @@
 // see WarpX.cpp - full includes for _fwd.H headers
 #include <BoundaryConditions/PEC_Insulator.H>
 #include <BoundaryConditions/PML.H>
+#include <Diagnostics/FullDiagnostics.H>
 #include <Diagnostics/MultiDiagnostics.H>
 #include <Diagnostics/ReducedDiags/MultiReducedDiags.H>
 #include <EmbeddedBoundary/WarpXFaceInfoBox.H>
@@ -285,6 +286,41 @@ void init_WarpX (py::module& m)
                 return wx.get_pointer_HybridPICModel()->m_n_floor;
             },
             "Gets the number of substeps to take in the hybrid solver."
+        )
+        .def("add_field_to_diagnostic",
+            [](WarpX& wx, const std::string& diag_name, const std::string& field_name, int lev) {
+                auto& multi_diags = wx.GetMultiDiags();
+                int ndiags = multi_diags.GetTotalDiags();
+
+                // Find the diagnostic by name
+                for (int idiag = 0; idiag < ndiags; ++idiag) {
+                    auto& diag = multi_diags.GetDiag(idiag);
+
+                    // Check if this diagnostic matches the requested name
+                    if (diag.GetDiagName() == diag_name) {
+                        // Check if it's a FullDiagnostics (only FullDiagnostics supports AddFieldToOutput)
+                        auto* full_diag = dynamic_cast<FullDiagnostics*>(&diag);
+                        if (full_diag) {
+                            full_diag->AddFieldToOutput(field_name, lev);
+                            return;
+                        } else {
+                            WARPX_ABORT_WITH_MESSAGE(
+                                "add_field_to_diagnostic: Diagnostic '" + diag_name +
+                                "' is not a FullDiagnostics (only field/field diagnostics support adding fields)");
+                        }
+                    }
+                }
+                WARPX_ABORT_WITH_MESSAGE(
+                    "add_field_to_diagnostic: Diagnostic '" + diag_name + "' not found");
+            },
+            py::arg("diag_name"),
+            py::arg("field_name"),
+            py::arg("lev") = 0,
+            "Dynamically add a field from MultiFabRegister to diagnostic output\n"
+            "Parameters:\n"
+            "  diag_name: name of the diagnostic\n"
+            "  field_name: name of the field in MultiFabRegister\n"
+            "  lev: refinement level (default: 0)"
         )
     ;
 
