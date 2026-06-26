@@ -205,6 +205,9 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
 
+    // Specularly reflect this species at the embedded boundary instead of absorbing.
+    pp_species_name.query("reflect_at_eb", m_reflect_at_eb);
+
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)

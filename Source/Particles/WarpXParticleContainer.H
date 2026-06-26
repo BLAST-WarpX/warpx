@@ -741,6 +741,11 @@ public:
     // By default this returns false, can be overridden in PysicalParticleContainer
     virtual bool getTemperatureDepositionFlag () const noexcept {return false;}
 
+    // If true, particles of this species are specularly REFLECTED at the embedded
+    // boundary instead of absorbed. By default false (absorb); overridden in
+    // PhysicalParticleContainer via the <species>.reflect_at_eb input flag.
+    virtual bool getReflectAtEBFlag () const noexcept {return false;}
+
 private:
     void particlePostLocate(ParticleType& p, const amrex::ParticleLocData& pld, int lev) override;
 

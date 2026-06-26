@@ -1242,7 +1242,12 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
     for (auto& pc : allcontainers) {
-        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        if (pc->getReflectAtEBFlag()) {
+            // conducting-for-fields / reflecting-for-particles EB
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Reflect());
+        } else {
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        }
     }
 }
 

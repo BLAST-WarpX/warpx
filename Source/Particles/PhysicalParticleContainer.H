@@ -441,6 +441,9 @@ public:
     // By default this returns false; overridden here to return runtime value
     bool getTemperatureDepositionFlag () const noexcept override {return m_do_temperature_deposition;}
 
+    // By default this returns false; overridden here to return runtime value
+    bool getReflectAtEBFlag () const noexcept override {return m_reflect_at_eb;}
+
     void AccumulateVelocitiesAndComputeTemperature (
         ablastr::fields::MultiLevelVectorField const & T_vf,
         amrex::Real relative_time) override;
@@ -497,6 +500,9 @@ protected:
 
     // Flag controlling whether or not variance and then temperatures are computed per species
     bool m_do_temperature_deposition = false;
+
+    // Flag: specularly reflect (true) vs absorb (false, default) at the EB surface
+    bool m_reflect_at_eb = false;
 
     std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
 
