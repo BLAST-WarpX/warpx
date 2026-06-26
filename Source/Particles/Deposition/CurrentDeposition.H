@@ -12,6 +12,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/ShapeFactors.H"
+#include "Utils/ParticleUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
@@ -320,7 +321,7 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
+    constexpr amrex::Real inv_c2 = PhysConst::inv_c2;
 
     amrex::Array4<amrex::Real> const& jx_arr = jx_fab.array();
     amrex::Array4<amrex::Real> const& jy_arr = jy_fab.array();
@@ -337,9 +338,9 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             GetPosition(ip, xp, yp, zp);
 
             // --- Get particle quantities
-            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
-                                                        + uyp[ip]*uyp[ip]*clightsq
-                                                        + uzp[ip]*uzp[ip]*clightsq);
+            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                        + uyp[ip]*uyp[ip]*inv_c2
+                                                        + uzp[ip]*uzp[ip]*inv_c2);
             const amrex::Real vx  = uxp[ip]*gaminv;
             const amrex::Real vy  = uyp[ip]*gaminv;
             const amrex::Real vz  = uzp[ip]*gaminv;
@@ -498,7 +499,8 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 {
     using namespace amrex::literals;
 
-#if defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
     using namespace amrex;
 
     auto permutation = a_bins.permutationPtr();
@@ -706,7 +708,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                              (1.0_rt/dt)*dinv.x*dinv.z,
                                              (1.0_rt/dt)*dinv.x*dinv.y};
 
-    Real constexpr clightsq = 1.0_rt / ( PhysConst::c * PhysConst::c );
+    Real constexpr inv_c2 = PhysConst::inv_c2;
 
 #if (AMREX_SPACEDIM > 1)
     Real constexpr one_third = 1.0_rt / 3.0_rt;
@@ -723,9 +725,9 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
         {reduce_shape_runtime_flag},
         np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
             // --- Get particle quantities
-            Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
-                                                 + uyp[ip]*uyp[ip]*clightsq
-                                                 + uzp[ip]*uzp[ip]*clightsq);
+            Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                 + uyp[ip]*uyp[ip]*inv_c2
+                                                 + uzp[ip]*uzp[ip]*inv_c2);
 
             Real wq = q*wp[ip];
             if (do_ionization){
@@ -1105,6 +1107,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param dt           Time step for particle level
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
+ * \param domain_double The domain boundary indicies cast to double values
+ * \param do_cropping   Whether to crop particle orbits at domain boundaries
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
@@ -1129,6 +1133,8 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                                  const amrex::Real dt,
                                                  const amrex::XDim3 & dinv,
                                                  const amrex::XDim3 & xyzmin,
+                                                 const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                                 const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                                  const amrex::Dim3 lo,
                                                  const amrex::Real q,
                                                  [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -1195,7 +1201,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             const amrex::Real costheta_mid = (rp_mid > 0._rt ? xp_mid/rp_mid : 1._rt);
             const amrex::Real sintheta_mid = (rp_mid > 0._rt ? yp_mid/rp_mid : 0._rt);
             // Keep these double to avoid bug in single precision
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            double x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #if defined(WARPX_DIM_RZ)
             const amrex::Real costheta_new = (rp_new > 0._rt ? xp_new/rp_new : 1._rt);
@@ -1227,23 +1233,23 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
             // Keep these double to avoid bug in single precision
-            double const x_new = (rp_new - xyzmin.x)*dinv.x;
+            double x_new = (rp_new - xyzmin.x)*dinv.x;
             double const x_old = (rp_old - xyzmin.x)*dinv.x;
 #else
 #if !defined(WARPX_DIM_1D_Z)
             // Keep these double to avoid bug in single precision
-            double const x_new = (xp_np1 - xyzmin.x)*dinv.x;
+            double x_new = (xp_np1 - xyzmin.x)*dinv.x;
             double const x_old = (xp_n[ip] - xyzmin.x)*dinv.x;
 #endif
 #endif
 #if defined(WARPX_DIM_3D)
             // Keep these double to avoid bug in single precision
-            double const y_new = (yp_np1 - xyzmin.y)*dinv.y;
+            double y_new = (yp_np1 - xyzmin.y)*dinv.y;
             double const y_old = (yp_n[ip] - xyzmin.y)*dinv.y;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // Keep these double to avoid bug in single precision
-            double const z_new = (zp_np1 - xyzmin.z)*dinv.z;
+            double z_new = (zp_np1 - xyzmin.z)*dinv.z;
             double const z_old = (zp_n[ip] - xyzmin.z)*dinv.z;
 #endif
 
@@ -1261,6 +1267,27 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
             // convert from Cartesian to spherical
             amrex::Real const vy = (-uxp_nph[ip]*sintheta_mid + uyp_nph[ip]*costheta_mid)*gaminv;
             amrex::Real const vz = (-uxp_nph[ip]*costheta_mid*sinphi_mid - uyp_nph[ip]*sintheta_mid*sinphi_mid + uzp_nph[ip]*cosphi_mid)*gaminv;
+#endif
+
+            // Crop the particles at the boundaries if it is absorbing.
+            // Calculate the change in the length of the trajectory
+            // so that the time step size can be appropriately scaled.
+#if defined(WARPX_DIM_3D)
+            ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
+                                            domain_double[0][0], domain_double[0][1], do_cropping[0]);
+            ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
+                                            domain_double[1][0], domain_double[1][1], do_cropping[1]);
+            ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
+                                            domain_double[2][0], domain_double[2][1], do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
+                                            domain_double[0][0], domain_double[0][1], do_cropping[0]);
+            ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
+                                            domain_double[1][0], domain_double[1][1], do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+            ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
             // --- Compute shape factors
@@ -1461,29 +1488,33 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
  * \param lo                    Index lower bounds of domain
  * \param invvol                One over cell volume
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
  */
 template <int depos_order>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const xp_old,
-                                       [[maybe_unused]]amrex::ParticleReal const yp_old,
-                                       [[maybe_unused]]amrex::ParticleReal const zp_old,
-                                       [[maybe_unused]]amrex::ParticleReal const xp_new,
-                                       [[maybe_unused]]amrex::ParticleReal const yp_new,
-                                       [[maybe_unused]]amrex::ParticleReal const zp_new,
+void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal const xp_old,
+                                       [[maybe_unused]] amrex::ParticleReal const yp_old,
+                                       [[maybe_unused]] amrex::ParticleReal const zp_old,
+                                       [[maybe_unused]] amrex::ParticleReal const xp_new,
+                                       [[maybe_unused]] amrex::ParticleReal const yp_new,
+                                       [[maybe_unused]] amrex::ParticleReal const zp_new,
                                        amrex::ParticleReal const wq,
-                                       [[maybe_unused]]amrex::ParticleReal const uxp_mid,
-                                       [[maybe_unused]]amrex::ParticleReal const uyp_mid,
-                                       [[maybe_unused]]amrex::ParticleReal const uzp_mid,
-                                       [[maybe_unused]]amrex::ParticleReal const gaminv,
+                                       [[maybe_unused]] amrex::ParticleReal const uxp_mid,
+                                       [[maybe_unused]] amrex::ParticleReal const uyp_mid,
+                                       [[maybe_unused]] amrex::ParticleReal const uzp_mid,
+                                       [[maybe_unused]] amrex::ParticleReal const gaminv,
                                        amrex::Array4<amrex::Real>const & Jx_arr,
                                        amrex::Array4<amrex::Real>const & Jy_arr,
                                        amrex::Array4<amrex::Real>const & Jz_arr,
                                        amrex::Real const dt,
                                        amrex::XDim3 const & dinv,
                                        amrex::XDim3 const & xyzmin,
+                                       const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                       const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                        amrex::Dim3 const lo,
                                        amrex::Real const invvol,
                                        [[maybe_unused]] int const n_rz_azimuthal_modes)
@@ -1510,7 +1541,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 #endif
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     amrex::Real const vy = (-uxp_mid*sintheta_mid + uyp_mid*costheta_mid)*gaminv;
@@ -1532,7 +1563,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     amrex::Real const sinphi_mid = (rp_mid > 0. ? zp_mid/rp_mid : 0._rt);
 
     // Keep these double to avoid bug in single precision
-    double const x_new = (rp_new - xyzmin.x)*dinv.x;
+    double x_new = (rp_new - xyzmin.x)*dinv.x;
     double const x_old = (rp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (rp_new - rp_old)/dt;
     // convert from Cartesian to spherical
@@ -1540,7 +1571,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     amrex::Real const vz = (-uxp_mid*costheta_mid*sinphi_mid - uyp_mid*sintheta_mid*sinphi_mid + uzp_mid*cosphi_mid)*gaminv;
 #elif defined(WARPX_DIM_XZ)
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
     amrex::Real const vx = (xp_new - xp_old)/dt;
     amrex::Real const vy = uyp_mid*gaminv;
@@ -1549,9 +1580,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     amrex::Real const vy = uyp_mid*gaminv;
 #elif defined(WARPX_DIM_3D)
     // Keep these double to avoid bug in single precision
-    double const x_new = (xp_new - xyzmin.x)*dinv.x;
+    double x_new = (xp_new - xyzmin.x)*dinv.x;
     double const x_old = (xp_old - xyzmin.x)*dinv.x;
-    double const y_new = (yp_new - xyzmin.y)*dinv.y;
+    double y_new = (yp_new - xyzmin.y)*dinv.y;
     double const y_old = (yp_old - xyzmin.y)*dinv.y;
     amrex::Real const vx = (xp_new - xp_old)/dt;
     amrex::Real const vy = (yp_new - yp_old)/dt;
@@ -1559,9 +1590,39 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
 
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     // Keep these double to avoid bug in single precision
-    double const z_new = (zp_new - xyzmin.z)*dinv.z;
+    double z_new = (zp_new - xyzmin.z)*dinv.z;
     double const z_old = (zp_old - xyzmin.z)*dinv.z;
     amrex::Real const vz = (zp_new - zp_old)/dt;
+#endif
+
+    // compute total change in particle position and the initial cell
+    // locations in each direction used to find the position at cell crossings.
+#if !defined(WARPX_DIM_1D_Z)
+    const double dxp = x_new - x_old;
+#endif
+#if defined(WARPX_DIM_3D)
+    const double dyp = y_new - y_old;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    const double dzp = z_new - z_old;
+#endif
+
+#if defined(WARPX_DIM_3D)
+    ParticleUtils::crop_at_boundary(x_old, y_old, z_old, x_new, y_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(y_old, z_old, x_old, y_new, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, y_old, z_new, x_new, y_new,
+                                    domain_double[2][0], domain_double[2][1], do_cropping[2]);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    ParticleUtils::crop_at_boundary(x_old, z_old, x_new, z_new,
+                                    domain_double[0][0], domain_double[0][1], do_cropping[0]);
+    ParticleUtils::crop_at_boundary(z_old, x_old, z_new, x_new,
+                                    domain_double[1][0], domain_double[1][1], do_cropping[1]);
+#elif defined(WARPX_DIM_1D_Z)
+    ParticleUtils::crop_at_boundary(z_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    ParticleUtils::crop_at_boundary(x_new, domain_double[0][0], domain_double[0][1], do_cropping[0]);
 #endif
 
     // Define velocity kernals to deposit
@@ -1603,11 +1664,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 7) ...
 
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
-    const double dxp = x_new - x_old;
-    const double dyp = y_new - y_old;
-    const double dzp = z_new - z_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -1788,10 +1845,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 5) ...
 
-    // compute total change in particle position and the initial cell
-    // locations in each direction used to find the position at cell crossings.
-    const double dxp = x_new - x_old;
-    const double dzp = z_new - z_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Xcell = 0., Zcell = 0.;
@@ -1955,8 +2009,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dzp and the initial cell location used to find the cell crossings.
-    double const dzp = z_new - z_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
 
@@ -2035,8 +2088,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
     // is within the range permitted by the number of guard cells
     // e.g., if (num_segments > 3) ...
 
-    // compute dxp and the initial cell location used to find the cell crossings.
-    double const dxp = x_new - x_old;
+    // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     double Xcell = static_cast<double>(i_old) + shift + 0.5*(1.-dirX_sign);
 
@@ -2127,6 +2179,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]]amrex::ParticleReal const
  * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
@@ -2146,6 +2200,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::Real relative_time,
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
+                                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -2163,7 +2219,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
-            constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+            constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
             const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
                                                                + uyp[ip]*uyp[ip]*inv_c2
                                                                + uzp[ip]*uzp[ip]*inv_c2);
@@ -2187,7 +2243,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
             VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
                                                           uxp[ip], uyp[ip], uzp[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+                                                          dt, dinv, xyzmin, domain_double, do_cropping,
+                                                          lo, invvol, n_rz_azimuthal_modes);
 
     });
 }
@@ -2214,6 +2271,8 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param dt                    Time step for particle level
  * \param dinv                  3D cell size inverse
  * \param xyzmin                Physical lower bounds of domain.
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether each boundary is absorbing
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
@@ -2238,6 +2297,8 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::Real dt,
                                            const amrex::XDim3 & dinv,
                                            const amrex::XDim3 & xyzmin,
+                                           const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                           const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
@@ -2285,10 +2346,12 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
 
+            //NOLINTNEXTLINE(readability-suspicious-call-argument)
             VillasenorDepositionShapeNKernel<depos_order>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq,
                                                           uxp_nph[ip], uyp_nph[ip], uzp_nph[ip], gaminv,
                                                           Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, lo, invvol, n_rz_azimuthal_modes);
+                                                          dt, dinv, xyzmin, domain_double, do_cropping,
+                                                          lo, invvol, n_rz_azimuthal_modes);
 
     });
 }
@@ -2375,9 +2438,6 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     temp_fab.setVal<amrex::RunOn::Device>(0._rt);
     amrex::Array4<amrex::Real> const& temp_arr = temp_fab.array();
 
-    // Inverse of light speed squared
-    const amrex::Real invcsq = 1._rt / (PhysConst::c * PhysConst::c);
-
     // Arrays where D will be stored
     amrex::Array4<amrex::Real> const& Dx_arr = Dx_fab.array();
     amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
@@ -2387,9 +2447,9 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::ParallelFor(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
     {
         // Inverse of Lorentz factor gamma
-        const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * invcsq
-                                                           + uyp[ip] * uyp[ip] * invcsq
-                                                           + uzp[ip] * uzp[ip] * invcsq);
+        const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * PhysConst::inv_c2
+                                                           + uyp[ip] * uyp[ip] * PhysConst::inv_c2
+                                                           + uzp[ip] * uzp[ip] * PhysConst::inv_c2);
         // Product of particle charges and weights
         amrex::Real wq = q * wp[ip];
         if (do_ionization) { wq *= ion_lev[ip]; }

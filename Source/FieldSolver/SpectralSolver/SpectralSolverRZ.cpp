@@ -9,9 +9,9 @@
 #include "SpectralAlgorithms/PsatdAlgorithmPmlRZ.H"
 #include "SpectralKSpaceRZ.H"
 #include "SpectralSolverRZ.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 /* \brief Initialize the spectral Maxwell solver
  *
  * This function selects the spectral algorithm to be used, allocates the
@@ -83,7 +83,7 @@ void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf, int const field_index,
                                     int const i_comp) {
-    WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev, field_mf, field_index, i_comp);
 }
 
@@ -94,7 +94,7 @@ void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf1, int const field_index1,
                                     amrex::MultiFab const & field_mf2, int const field_index2) {
-    WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev,
                                 field_mf1, field_index1,
                                 field_mf2, field_index2);
@@ -106,7 +106,7 @@ void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf, int const field_index,
                                      int const i_comp) {
-    WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev, field_mf, field_index, i_comp);
 }
 
@@ -116,7 +116,7 @@ void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf1, int const field_index1,
                                      amrex::MultiFab& field_mf2, int const field_index2) {
-    WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev,
                                  field_mf1, field_index1,
                                  field_mf2, field_index2);
@@ -125,7 +125,7 @@ SpectralSolverRZ::BackwardTransform (const int lev,
 /* \brief Update the fields in spectral space, over one timestep */
 void
 SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
-    WARPX_PROFILE("SpectralSolverRZ::pushSpectralFields");
+    ABLASTR_PROFILE("SpectralSolverRZ::pushSpectralFields");
     // Virtual function: the actual function used here depends
     // on the sub-class of `SpectralBaseAlgorithm` that was
     // initialized in the constructor of `SpectralSolverRZ`
@@ -134,6 +134,25 @@ SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
     } else {
         algorithm->pushSpectralFields(field_data);
     }
+}
+
+void SpectralSolverRZ::InitFilter (
+    amrex::IntVect const & filter_npass_each_dir,
+    bool const compensation)
+{
+    field_data.InitFilter(filter_npass_each_dir, compensation, k_space);
+}
+
+void SpectralSolverRZ::ApplyFilter (const int lev, int const field_index)
+{
+    field_data.ApplyFilter(lev, field_index);
+}
+
+void SpectralSolverRZ::ApplyFilter (
+    const int lev, int const field_index1,
+    int const field_index2, int const field_index3)
+{
+    field_data.ApplyFilter(lev, field_index1, field_index2, field_index3);
 }
 
 /**
@@ -165,4 +184,23 @@ void
 SpectralSolverRZ::VayDeposition ()
 {
     algorithm->VayDeposition(field_data);
+}
+
+
+void
+SpectralSolverRZ::CopySpectralDataComp (const int src_comp, const int dest_comp)
+{
+    field_data.CopySpectralDataComp(src_comp, dest_comp);
+}
+
+void
+SpectralSolverRZ::ZeroOutDataComp (const int icomp)
+{
+    field_data.ZeroOutDataComp(icomp);
+}
+
+void
+SpectralSolverRZ::ScaleDataComp (const int icomp, const amrex::Real scale_factor)
+{
+    field_data.ScaleDataComp(icomp, scale_factor);
 }

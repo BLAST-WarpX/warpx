@@ -24,10 +24,11 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/text/StreamUtils.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
@@ -97,7 +98,7 @@ WarpX::InitFromCheckpoint ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::InitFromCheckpoint()");
+    ABLASTR_PROFILE("WarpX::InitFromCheckpoint()");
 
     amrex::Print()<< Utils::TextMsg::Info(
         "restart from checkpoint " + restart_chkfile);
@@ -214,6 +215,8 @@ WarpX::InitFromCheckpoint ()
             AllocLevelData(lev, ba, dm);
         }
 
+        ExecutePythonCallback("allocdata");
+
         mypc->ReadHeader(is);
         const int n_species = mypc->nSpecies();
         for (int i=0; i<n_species; i++)
@@ -315,6 +318,15 @@ WarpX::InitFromCheckpoint ()
                 m_fields.get(FieldType::Efield_cp, Direction{i}, lev)->setVal(0.0);
                 m_fields.get(FieldType::Bfield_cp, Direction{i}, lev)->setVal(0.0);
             }
+        }
+
+        if (m_fields.has_vector(FieldType::E_old, lev)) {
+            VisMF::Read(*m_fields.get(FieldType::E_old, Direction{0}, lev),
+                        amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ex_old"));
+            VisMF::Read(*m_fields.get(FieldType::E_old, Direction{1}, lev),
+                        amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ey_old"));
+            VisMF::Read(*m_fields.get(FieldType::E_old, Direction{2}, lev),
+                        amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "Ez_old"));
         }
 
         VisMF::Read(*m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
@@ -425,8 +437,7 @@ WarpX::InitFromCheckpoint ()
     mypc->Restart(restart_chkfile);
 
     if (m_implicit_solver) {
-
-        m_implicit_solver->Define(this);
+        m_implicit_solver->Define(this, /*from_restart=*/true);
         m_implicit_solver->CreateParticleAttributes();
     }
 

@@ -53,7 +53,7 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
         rho_vec[0]->setVal(0.);
         warpx.ComputeDivE(*rho_vec[0], m_lev);
         // multiply divE by epsilon0 to get charge density
-        rho_vec[0]->mult(ablastr::constant::SI::ep0);
+        rho_vec[0]->mult(ablastr::constant::SI::epsilon_0);
 
         // Initialize MF to hold electrostatic potential
         phi_vec[0] = std::make_unique<amrex::MultiFab>(ba, warpx.DistributionMap(m_lev), /*ncomp=*/1, /*ngrow=*/1);
@@ -69,7 +69,7 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
             beta, es_solver.self_fields_required_precision,
             es_solver.self_fields_absolute_tolerance,
             es_solver.self_fields_max_iters, es_solver.self_fields_verbosity,
-            /*is_igf_2d=*/false
+            /*is_igf_2d_slices*/ false
         );
 
         InterpolateMFForDiag(

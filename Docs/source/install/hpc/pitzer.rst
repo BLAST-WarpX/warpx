@@ -139,7 +139,7 @@ On Pitzer, you can run either on GPU nodes with V100 GPUs or CPU nodes.
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
    .. tab-item:: V100 GPUs

@@ -47,12 +47,13 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "Utils/WarpXUtil.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
 #include <ablastr/math/FiniteDifference.H>
+#include <ablastr/math/RandomSeed.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -88,6 +89,7 @@
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_TagBox.H>
+#include <AMReX_VisMF.H>
 
 #include <algorithm>
 #include <cmath>
@@ -159,7 +161,7 @@ bool WarpX::use_filter_compensation = false;
 bool WarpX::serialize_initial_conditions = false;
 bool WarpX::refine_plasma     = false;
 
-utils::parser::IntervalsParser WarpX::sort_intervals;
+ablastr::utils::text::IntervalsParser WarpX::sort_intervals;
 amrex::IntVect WarpX::sort_bin_size(AMREX_D_DECL(1,1,1));
 
 bool WarpX::do_dynamic_scheduling = true;
@@ -273,7 +275,7 @@ void WarpX::MakeWarpX ()
 {
     warpx::initialization::check_dims();
 
-    ReadMovingWindowParameters(
+    warpx::initialization::read_moving_window_parameters(
         do_moving_window, start_moving_window_step, end_moving_window_step,
         moving_window_dir, moving_window_v);
 
@@ -319,6 +321,9 @@ WarpX::Finalize()
 
 WarpX::WarpX ()
 {
+    m_instance = this; // This guarantees that GetInstance() can be
+                       // indirectly used in WarpX constructor.
+
     warpx::initialization::initialize_warning_manager();
 
     ReadParameters();
@@ -519,6 +524,13 @@ WarpX::WarpX ()
             "The NCI corrector should only be used with Esirkepov deposition");
     }
 
+    if (m_implicit_solver) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            use_fdtd_nci_corr == 0,
+            "The NCI corrector cannot be used with the implicit solver");
+    }
+
+
     m_accelerator_lattice.resize(nlevs_max);
 
 }
@@ -549,7 +561,7 @@ WarpX::ReadParameters ()
 
     {
         const ParmParse pp_algo("algo");
-        pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
+        pp_algo.query_enum_case_insensitive("maxwell_solver", electromagnetic_solver_id);
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
@@ -583,7 +595,7 @@ WarpX::ReadParameters ()
         "PMC boundary not implemented for PSATD, yet!");
 
 
-        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
+        pp_algo.query_enum_case_insensitive("evolve_scheme", evolve_scheme);
     }
 
     {
@@ -662,25 +674,7 @@ WarpX::ReadParameters ()
         // set random seed
         std::string random_seed = "default";
         pp_warpx.query("random_seed", random_seed);
-        if ( random_seed != "default" ) {
-            const unsigned long myproc_1 = ParallelDescriptor::MyProc() + 1;
-            if ( random_seed == "random" ) {
-                std::random_device rd;
-                std::uniform_int_distribution<int> dist(2, INT_MAX);
-                const unsigned long cpu_seed = myproc_1 * dist(rd);
-                const unsigned long gpu_seed = myproc_1 * dist(rd);
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else if ( std::stoi(random_seed) > 0 ) {
-                const unsigned long nprocs = ParallelDescriptor::NProcs();
-                const unsigned long seed_long = std::stoul(random_seed);
-                const unsigned long cpu_seed = myproc_1 * seed_long;
-                const unsigned long gpu_seed = (myproc_1 + nprocs) * seed_long;
-                ResetRandomSeed(cpu_seed, gpu_seed);
-            } else {
-                WARPX_ABORT_WITH_MESSAGE(
-                    "warpx.random_seed must be \"default\", \"random\" or an integer > 0.");
-            }
-        }
+        ablastr::math::set_random_seed(random_seed);
 
         utils::parser::queryWithParser(pp_warpx, "cfl", cfl);
         pp_warpx.query("verbose", verbose);
@@ -692,7 +686,7 @@ WarpX::ReadParameters ()
         std::vector<std::string> override_sync_intervals_string_vec = {"1"};
         pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
-            utils::parser::IntervalsParser(override_sync_intervals_string_vec);
+            ablastr::utils::text::IntervalsParser(override_sync_intervals_string_vec);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_do_subcycling != 1 || max_level <= 1,
                                          "Subcycling method 1 only works for 2 levels.");
@@ -732,7 +726,8 @@ WarpX::ReadParameters ()
         maxlevel_extEMfield_init = maxLevel();
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
-        pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-_");
+        // query_enum_sloppy with "-" needed to map "labframe-electromagnetostatic" to "LabFrameElectroMagnetostatic"
+        pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-");
         // if an electrostatic solver is used, set the Maxwell solver to None
         if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
@@ -743,7 +738,7 @@ WarpX::ReadParameters ()
                   "Electrostatic solver not supported with 1D cylindrical and spherical");
 #endif
 
-        pp_warpx.query_enum_sloppy("poisson_solver", poisson_solver_id, "-_");
+        pp_warpx.query_enum_case_insensitive("poisson_solver", poisson_solver_id);
 #ifndef WARPX_DIM_3D
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
@@ -766,8 +761,17 @@ WarpX::ReadParameters ()
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
         "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
 #endif
+        // Read magnetostatic solver parameters
+        // First use self_fields_* as defaults for backward compatibility,
+        // then allow explicit magnetostatic_solver_* parameters to override
+        utils::parser::queryWithParser(pp_warpx, "self_fields_required_precision", magnetostatic_solver_required_precision);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_required_precision", magnetostatic_solver_required_precision);
+        utils::parser::queryWithParser(pp_warpx, "self_fields_absolute_tolerance", magnetostatic_solver_absolute_tolerance);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_absolute_tolerance", magnetostatic_solver_absolute_tolerance);
         utils::parser::queryWithParser(pp_warpx, "self_fields_max_iters", magnetostatic_solver_max_iters);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_max_iters", magnetostatic_solver_max_iters);
         utils::parser::queryWithParser(pp_warpx, "self_fields_verbosity", magnetostatic_solver_verbosity);
+        utils::parser::queryWithParser(pp_warpx, "magnetostatic_solver_verbosity", magnetostatic_solver_verbosity);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         (
@@ -793,9 +797,31 @@ WarpX::ReadParameters ()
         // Read timestepping options
         utils::parser::queryWithParser(pp_warpx, "const_dt", m_const_dt);
         utils::parser::queryWithParser(pp_warpx, "max_dt", m_max_dt);
+        utils::parser::queryWithParser(pp_warpx, "max_omegap_dt", m_max_omegap_dt);
+        utils::parser::queryWithParser(pp_warpx, "max_omegac_dt", m_max_omegac_dt);
         std::vector<std::string> dt_interval_vec = {"-1"};
         pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
-        m_dt_update_interval = utils::parser::IntervalsParser(dt_interval_vec);
+        m_dt_update_interval = ablastr::utils::text::IntervalsParser(dt_interval_vec);
+        if (m_dt_update_interval.isActivated()) {
+            pp_warpx.query("dt_update_diagnostic_file", m_dt_update_diagnostic_file);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_const_dt.has_value(),
+                "warpx.const_dt and warpx.dt_update_interval cannot be defined simultaneously."
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_max_omegap_dt.has_value() || m_max_omegap_dt > 0.,
+                "The max_omegap_dt must be greater than zero"
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_max_omegac_dt.has_value() || m_max_omegac_dt > 0.,
+                "The max_omegac_dt must be greater than zero"
+            );
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
+                 evolve_scheme == EvolveScheme::Theta_Implicit_EM),
+                "For electromagnetic solvers, warpx.dt_update_interval can only be used with algo.evolve_scheme = theta_implicit_em."
+            );
+        }
 
         // Filter defaults to true for the explicit scheme, and false for the implicit schemes
         if (evolve_scheme != EvolveScheme::Explicit) {
@@ -876,9 +902,13 @@ WarpX::ReadParameters ()
 #endif
         pp_warpx.query("do_shared_mem_charge_deposition", do_shared_mem_charge_deposition);
         pp_warpx.query("do_shared_mem_current_deposition", do_shared_mem_current_deposition);
-#if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA))
+#if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) || \
+    (defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_shared_mem_current_deposition,
-                "requested shared memory for current deposition, but shared memory is only available for CUDA or HIP");
+            "requested shared memory for current deposition,\
+            but shared memory is only available for CUDA or HIP,\
+            and for geometries other than 1D cylindrical and 1D spherical."
+        );
 #endif
         pp_warpx.query("shared_mem_current_tpb", shared_mem_current_tpb);
 
@@ -910,7 +940,7 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(pp_warpx, "quantum_xi", quantum_xi_tmp);
         if (quantum_xi_is_specified) {
             double const quantum_xi = quantum_xi_tmp;
-            m_quantum_xi_c2 = static_cast<amrex::Real>(quantum_xi * PhysConst::c * PhysConst::c);
+            m_quantum_xi_c2 = static_cast<amrex::Real>(quantum_xi * PhysConst::c2);
         }
 
         const auto at_least_one_boundary_is_pml =
@@ -923,10 +953,10 @@ WarpX::ReadParameters ()
 
         const auto at_least_one_boundary_is_silver_mueller =
             (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
-                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_SilverMueller;})
+                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             ||
             std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
-                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_SilverMueller;})
+                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             );
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -1020,13 +1050,6 @@ WarpX::ReadParameters ()
 
         {
             // Parameters below control all plotfile diagnostics
-            bool plotfile_min_max = true;
-            pp_warpx.query("plotfile_min_max", plotfile_min_max);
-            if (plotfile_min_max) {
-                plotfile_headerversion = amrex::VisMF::Header::Version_v1;
-            } else {
-                plotfile_headerversion = amrex::VisMF::Header::NoFabHeader_v1;
-            }
             pp_warpx.query("usesingleread", use_single_read);
             pp_warpx.query("usesinglewrite", use_single_write);
             ParmParse pp_vismf("vismf");
@@ -1072,7 +1095,7 @@ WarpX::ReadParameters ()
 
         // Integer that corresponds to the type of grid used in the simulation
         // (collocated, staggered, hybrid)
-        pp_warpx.query_enum_sloppy("grid_type", grid_type, "-_");
+        pp_warpx.query_enum_case_insensitive("grid_type", grid_type);
 
         // Use same shape factors in all directions, for gathering
         if (grid_type == GridType::Collocated) { galerkin_interpolation = false; }
@@ -1229,24 +1252,24 @@ WarpX::ReadParameters ()
             electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             current_deposition_algo = CurrentDepositionAlgo::Direct;
         }
-        pp_algo.query_enum_sloppy("current_deposition", current_deposition_algo, "-_");
-        pp_algo.query_enum_sloppy("charge_deposition", charge_deposition_algo, "-_");
-        pp_algo.query_enum_sloppy("particle_pusher", particle_pusher_algo, "-_");
+        pp_algo.query_enum_case_insensitive("current_deposition", current_deposition_algo);
+        pp_algo.query_enum_case_insensitive("charge_deposition", charge_deposition_algo);
+        pp_algo.query_enum_case_insensitive("particle_pusher", particle_pusher_algo);
 
         // check for implicit evolve scheme
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM) {
             m_implicit_solver = std::make_unique<SemiImplicitEM>();
         }
-        else if (evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+        else if (evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             m_implicit_solver = std::make_unique<ThetaImplicitEM>();
         }
-        else if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        else if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
 
         // implicit evolve schemes not setup to use mirrors
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
         }
@@ -1281,7 +1304,8 @@ WarpX::ReadParameters ()
 
         // Query algo.field_gathering from input, set field_gathering_algo to
         // "default" if not found (default defined in Utils/WarpXAlgorithmSelection.cpp)
-        pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-_");
+        // query_enum_sloppy with "-" needed to map e.g. "energy-conserving" to "EnergyConserving"
+        pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-");
 
         // Set default field gathering algorithm for hybrid grids (momentum-conserving)
         std::string tmp_algo;
@@ -1338,15 +1362,15 @@ WarpX::ReadParameters ()
                 " combined with mesh refinement is currently not implemented");
         }
 
-        pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
+        pp_algo.query_enum_case_insensitive("em_solver_medium", m_em_solver_medium);
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
-            pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      m_macroscopic_solver_algo, "-_");
+            pp_algo.query_enum_case_insensitive("macroscopic_sigma_method",
+                                                m_macroscopic_solver_algo);
         }
 
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -1369,7 +1393,7 @@ WarpX::ReadParameters ()
                 field_gathering_algo != GatheringAlgo::MomentumConserving,
                     "With implicit and semi-implicit schemes, the momentum conserving field gather is not supported as it would not conserve energy");
         }
-        if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
                 "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
@@ -1378,7 +1402,7 @@ WarpX::ReadParameters ()
         // Load balancing parameters
         std::vector<std::string> load_balance_intervals_string_vec = {"0"};
         pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
-        load_balance_intervals = utils::parser::IntervalsParser(
+        load_balance_intervals = ablastr::utils::text::IntervalsParser(
             load_balance_intervals_string_vec);
         pp_algo.query("load_balance_with_sfc", load_balance_with_sfc);
         // Knapsack factor only used with non-SFC strategy
@@ -1387,7 +1411,7 @@ WarpX::ReadParameters ()
         }
         utils::parser::queryWithParser(pp_algo, "load_balance_efficiency_ratio_threshold",
                         load_balance_efficiency_ratio_threshold);
-        pp_algo.query_enum_sloppy("load_balance_costs_update", load_balance_costs_update_algo, "-_");
+        pp_algo.query_enum_case_insensitive("load_balance_costs_update", load_balance_costs_update_algo);
         if (WarpX::load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Heuristic) {
             utils::parser::queryWithParser(
                 pp_algo, "costs_heuristic_cells_wt", costs_heuristic_cells_wt);
@@ -1446,8 +1470,8 @@ WarpX::ReadParameters ()
             }
 
             // These evolve schemes permit time steps that violate the CFL condition
-            if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+                evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
 
@@ -1461,7 +1485,7 @@ WarpX::ReadParameters ()
 
         const amrex::ParmParse pp_warpx("warpx");
         pp_warpx.queryarr("sort_intervals", sort_intervals_string_vec);
-        sort_intervals = utils::parser::IntervalsParser(sort_intervals_string_vec);
+        sort_intervals = ablastr::utils::text::IntervalsParser(sort_intervals_string_vec);
 
         Vector<int> vect_sort_bin_size(AMREX_SPACEDIM,1);
         const bool sort_bin_size_is_specified =
@@ -1570,7 +1594,8 @@ WarpX::ReadParameters ()
         // Integer that corresponds to the order of the PSATD solution
         // (whether the PSATD equations are derived from first-order or
         // second-order solution)
-        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-_");
+        // query_enum_sloppy with "-" needed to map "first-order" to "FirstOrder"
+        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-");
 
         std::string JRhom_input;
         pp_psatd.query("JRhom", JRhom_input);
@@ -1891,6 +1916,44 @@ WarpX::ReadParameters ()
             }
         }
     }
+
+    // Set the default value of m_collisions_split_momentum_push
+    m_collisions_split_momentum_push = false;
+    const amrex::ParmParse pp_collisions("collisions");
+    amrex::Vector<std::string> collision_names;
+    pp_collisions.queryarr("collision_names", collision_names);
+    if (!collision_names.empty()) {
+        if (evolve_scheme == EvolveScheme::Explicit) {
+            m_collisions_split_momentum_push = true;
+        }
+
+        // Override m_collisions_split_momentum_push if the corresponding input
+        // parameter collisions.split_momentum_push is set in the input file
+        pp_collisions.query("split_momentum_push", m_collisions_split_momentum_push);
+
+        // Warn the user if collisions with split momentum push are requested in
+        // combination with algorithms that are not compatible
+        if (m_collisions_split_momentum_push) {
+            if (evolve_scheme != EvolveScheme::Explicit) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "Collisions",
+                    "Collisions with split momentum push not implemented with implicit\
+                    evolve schemes, ignoring collisions.split_momentum_push.",
+                    ablastr::warn_manager::WarnPriority::low
+                );
+            }
+            if (particle_pusher_algo == ParticlePusherAlgo::HigueraCary) {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "Collisions: collisions.split_momentum_push is not yet implemented with Higuera-Cary momentum pusher.");
+            }
+        }
+    }
+}
+
+int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
+                                    const int  bdry_side ) const
+{
+    return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
 }
 
 void
@@ -2111,6 +2174,14 @@ WarpX::BackwardCompatibility ()
             ablastr::warn_manager::WarnPriority::low);
     }
 
+    if (pp_particles.contains("photon_species")){
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "particles.photon_species is deprecated and may be removed in the future. "
+            "It is recommended to initialize photon particles by setting their "
+            "'species_type' to 'photon', instead.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
+
     std::vector<std::string> backward_sp_names;
     pp_particles.queryarr("species_names", backward_sp_names);
     for(const std::string& speciesiter : backward_sp_names){
@@ -2118,6 +2189,15 @@ WarpX::BackwardCompatibility ()
         std::vector<amrex::Real> backward_vel;
         std::stringstream ssspecies;
 
+        std::string mom_dist_type;
+        if (pp_species.query("momentum_distribution_type", mom_dist_type)) {
+            if (mom_dist_type == "maxwell_boltzmann" || mom_dist_type == "gaussian_parse_momentum_function") {
+                WARPX_ABORT_WITH_MESSAGE (
+                    "The momentum distribution type '" + mom_dist_type + "' is not supported anymore. "
+                    "Please use the 'maxwellian' momentum distribution instead."
+                );
+            }
+        }
         ssspecies << "'" << speciesiter << ".multiple_particles_vel_<x,y,z>'";
         ssspecies << " are not supported anymore. ";
         ssspecies << "Please use the renamed variables ";
@@ -2419,6 +2499,24 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
     m_fields.alloc_init(FieldType::current_fp, Direction{0}, lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     m_fields.alloc_init(FieldType::current_fp, Direction{1}, lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     m_fields.alloc_init(FieldType::current_fp, Direction{2}, lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+
+    if (m_implicit_solver) {
+        // Current from suborbit particles are deposited to the standard current_fp container.
+        // Current from non-suborbit particles are deposited to current_fp_non_suborbit.
+        m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{0}, lev,
+                            amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{1}, lev,
+                            amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        m_fields.alloc_init(FieldType::current_fp_non_suborbit, Direction{2}, lev,
+                            amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+
+        m_fields.alloc_init(FieldType::E_old, Direction{0}, lev,
+                            amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_old, Direction{1}, lev,
+                            amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        m_fields.alloc_init(FieldType::E_old, Direction{2}, lev,
+                            amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+    }
 
     if (do_current_centering)
     {
@@ -2778,13 +2876,16 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         auto *Bfield_aux_levl_1 = m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
         auto *Bfield_aux_levl_2 = m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
-        // Same as Bfield_fp for reading external field data
+        // Number of components is taken directly from the extern field data
+        const int ncomp_ext_B = mypc->m_external_particle_fields_metadata.m_nBfields;
+
+        // Same as Bfield_fp for reading external field data, except for allocating as many components as external B fields are provided
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{0}, lev, amrex::convert(ba, Bfield_aux_levl_0->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{1}, lev, amrex::convert(ba, Bfield_aux_levl_1->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::B_external_particle_field, Direction{2}, lev, amrex::convert(ba, Bfield_aux_levl_2->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_B, ngEB, 0.0_rt);
     }
     if (m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::default_zero && m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::constant) {
         // These fields will be added directly to the grid, i.e. to fp, and need to match the index type
@@ -2801,13 +2902,16 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         auto *Efield_aux_levl_1 = m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
         auto *Efield_aux_levl_2 = m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
 
-        // Same as Efield_fp for reading external field data
+        // Number of components is taken directly from the extern field data
+        const int ncomp_ext_E = mypc->m_external_particle_fields_metadata.m_nEfields;
+
+        // Same as Efield_fp for reading external field data, except for allocating as many components as external E fields are provided
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{0}, lev, amrex::convert(ba, Efield_aux_levl_0->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{1}, lev, amrex::convert(ba, Efield_aux_levl_1->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::E_external_particle_field, Direction{2}, lev, amrex::convert(ba, Efield_aux_levl_2->ixType()),
-            dm, ncomps, ngEB, 0.0_rt);
+            dm, ncomp_ext_E, ngEB, 0.0_rt);
     }
 
     //
@@ -2996,7 +3100,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
-    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }
@@ -3055,13 +3159,12 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
-    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }
 
-    auto pss = std::make_unique<SpectralSolver>(lev,
-                                                realspace_ba,
+    auto pss = std::make_unique<SpectralSolver>(realspace_ba,
                                                 dm,
                                                 nox_fft,
                                                 noy_fft,
@@ -3478,8 +3581,10 @@ amrex::DistributionMapping
 WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
 {
     bool roundrobin_sfc = false;
+    bool split_high_density_boxes = false;
     const ParmParse pp("warpx");
     pp.query("roundrobin_sfc", roundrobin_sfc);
+    pp.query("split_high_density_boxes", split_high_density_boxes);
 
     // If this is true, AMReX's RRSFC strategy is used to make
     // DistributionMapping. Note that the DistributionMapping made by the
@@ -3495,6 +3600,15 @@ WarpX::MakeDistributionMap (int lev, amrex::BoxArray const& ba)
         amrex::DistributionMapping dm(ba);
         amrex::DistributionMapping::strategy(old_strategy);
         return dm;
+    } else if (split_high_density_boxes &&
+               amrex::DistributionMapping::strategy() == amrex::DistributionMapping::SFC) {
+        // By default, amrex uses box volumes as weights when distributing
+        // boxes. But this would somewhat defeat the purpose of splitting
+        // high density boxes until the next load balance is
+        // performed. Thus, we are going building SFC assuming every boxes
+        // have the same weight.
+        const amrex::Vector<amrex::Real> wgt(ba.size(), amrex::Real(1));
+        return amrex::DistributionMapping::makeSFC(wgt, ba, false);
     } else {
         return amrex::AmrCore::MakeDistributionMap(lev, ba);
     }

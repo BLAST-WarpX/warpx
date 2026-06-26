@@ -13,10 +13,10 @@
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 #include "OpenPMDHelpFunction.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/RelativeCellPosition.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -411,10 +411,10 @@ void WarpXOpenPMDPlot::seriesFlush (bool isBTD) const
 {
     openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
     if (isBTD) {
-        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()::BTD");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::SeriesFlush()::BTD");
         currIteration.seriesFlush("adios2.engine.preferred_flush_target = \"buffer\"");
     } else {
-        WARPX_PROFILE("WarpXOpenPMDPlot::SeriesFlush()()");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::SeriesFlush()()");
         currIteration.seriesFlush();
     }
 }
@@ -449,24 +449,13 @@ void WarpXOpenPMDPlot::SetStep (int ts, const std::string& dirPrefix, int file_m
     m_dirPrefix = dirPrefix;
     m_file_min_digits = file_min_digits;
 
-    if( ! isBTD ) {
-        if (m_CurrentStep >= ts) {
-            // note m_Series is reset in Init(), so using m_Series->iterations.contains(ts) is only able to check the
-            // last written step in m_Series's life time, but not other earlier written steps by other m_Series
-            ablastr::warn_manager::WMRecordWarning("Diagnostics",
-                    " Warning from openPMD writer: Already written iteration:"
-                    + std::to_string(ts)
-                );
-        }
-    }
-
     m_CurrentStep = ts;
     Init(openPMD::Access::CREATE, isBTD);
 }
 
 void WarpXOpenPMDPlot::CloseStep (bool isBTD, bool isLastBTDFlush)
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::CloseStep()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::CloseStep()");
     // default close is true
     bool callClose = true;
     // close BTD file only when isLastBTDFlush is true
@@ -547,20 +536,21 @@ WarpXOpenPMDPlot::WriteOpenPMDParticles (const amrex::Vector<ParticleDiag>& part
                   const bool isLastBTDFlush
 )
 {
-WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
+ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDParticles()");
 
 for (const auto & particle_diag : particle_diags) {
     WarpXParticleContainer* pc = particle_diag.getParticleContainer();
-    PinnedMemoryParticleContainer* pinned_pc = particle_diag.getPinnedParticleContainer();
+    WarpXParticleContainer::Base* pinned_pc = particle_diag.getPinnedParticleContainer();
     if (isBTD || use_pinned_pc) {
         if (!pinned_pc->isDefined()) {
             continue;  // Skip to the next particle container
         }
     }
 
-    PinnedMemoryParticleContainer tmp = (isBTD || use_pinned_pc) ?
-        pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
-        pc->make_alike<amrex::PinnedArenaAllocator>();
+    WarpXParticleContainer::Base tmp = (isBTD || use_pinned_pc) ?
+        pinned_pc->make_alike<>() :
+        pc->make_alike<>();
+    tmp.SetArena(amrex::The_Pinned_Arena());
 
     const auto mass = pc->AmIA<PhysicalSpecies::photon>() ? PhysConst::m_e : pc->getMass();
     RandomFilter const random_filter(particle_diag.m_do_random_filter,
@@ -607,6 +597,12 @@ for (const auto & particle_diag : particle_diags) {
     if ( particle_diag.m_plot_phi ) {
         storePhiOnParticles( tmp, WarpX::electrostatic_solver_id, !use_pinned_pc );
     }
+    if (particle_diag.m_plot_Ex || particle_diag.m_plot_Ey || particle_diag.m_plot_Ez ||
+        particle_diag.m_plot_Bx || particle_diag.m_plot_By || particle_diag.m_plot_Bz) {
+        storeFieldOnParticles(tmp, !use_pinned_pc,
+                              particle_diag.m_plot_Ex, particle_diag.m_plot_Ey, particle_diag.m_plot_Ez,
+                              particle_diag.m_plot_Bx, particle_diag.m_plot_By, particle_diag.m_plot_Bz);
+    }
 
     // names of amrex::ParticleReal and int particle attributes in SoA data
     auto const rn = tmp.GetRealSoANames();
@@ -644,8 +640,55 @@ for (const auto & particle_diag : particle_diags) {
         real_names[i] = ::detail::snakeToCamel(rn[i]);
     }
 
-    amrex::Vector<int> real_flags = particle_diag.m_plot_flags;
-    real_flags.resize(tmp.NumRealComps());
+    // The flags in `real_flags` index into `real_names` (openPMD-order),
+    // whereas `particle_diag.m_plot_flags` indexes into the WarpX SoA
+    // (PIdx-order). For Cartesian geometries (1D Z, 2D XZ, 3D) the two
+    // orderings coincide for the first PIdx::nattribs entries. For
+    // cylindrical and spherical geometries openPMD reports Cartesian
+    // (x, y, z) positions reconstructed from the SoA's (r, theta, [phi], z),
+    // so the position part of the flags has to be remapped here. Without
+    // this remap, downstream indexing (e.g. `getParticlePositionComponentLabels`
+    // and the position-reconstruction block in `SaveRealProperty`) would
+    // pick up unrelated flags such as the weighting or z flags, which can
+    // both produce wrong output and can cause out-of-bounds accesses in SoAs
+    // (the latter because the reconstruction buffer was sized by a flag that
+    // does not match the flag guarding the write).
+    amrex::Vector<int> real_flags(tmp.NumRealComps(), 0);
+#if defined(WARPX_DIM_RZ)
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::z];
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
+#elif defined(WARPX_DIM_RCYLINDER)
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    // note: z is unspecified (for specific values, can be assumed to be zero)
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uz];
+#elif defined(WARPX_DIM_RSPHERE)
+    real_flags[0] = particle_diag.m_plot_flags[PIdx::r];
+    real_flags[1] = particle_diag.m_plot_flags[PIdx::theta];
+    real_flags[2] = particle_diag.m_plot_flags[PIdx::phi];
+    // note: z can be determined from r, theta and phi
+    real_flags[3] = particle_diag.m_plot_flags[PIdx::w];
+    real_flags[4] = particle_diag.m_plot_flags[PIdx::ux];
+    real_flags[5] = particle_diag.m_plot_flags[PIdx::uy];
+    real_flags[6] = particle_diag.m_plot_flags[PIdx::uz];
+#else
+    for (int i = 0; i < static_cast<int>(PIdx::nattribs); ++i) {
+        real_flags[i] = particle_diag.m_plot_flags[i];
+    }
+    // note: For 2D Cartesian (xz), y is unspecified
+    //       (for specific values, can be assumed to be zero).
+    //       For 1D Cartesian (z), the same applies for x,y.
+#endif
+    // For extra runtime attributes (beyond PIdx::nattribs), the openPMD
+    // index coincides with the SoA index, so we forward the existing flag.
     for (size_t index = PIdx::nattribs; index < rn.size(); ++index) {
         real_flags[index] = tmp.h_redistribute_real_comp[index];
     }
@@ -675,13 +718,13 @@ for (const auto & particle_diag : particle_diags) {
 void
 WarpXOpenPMDPlot::FlushBTDToDisk()
 {
-    bool isBTD = true;
+    constexpr bool isBTD = true;
     auto hasOption = m_OpenPMDoptions.find("FlattenSteps");
     const bool flattenSteps = (m_Series->backend() == "ADIOS2") && (hasOption != std::string::npos);
 
     if (flattenSteps)
     {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::ForceFlush()");
         // Here for checkpointing purpose, we ask ADIOS to create to a new step, which
         // triggers writting both data and metadata.
         openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
@@ -689,7 +732,7 @@ WarpXOpenPMDPlot::FlushBTDToDisk()
     }
     else
       {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ForceFlush()::Disk()");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::ForceFlush()::Disk()");
         openPMD::Iteration currIteration = GetIteration(m_CurrentStep, isBTD);
         currIteration.seriesFlush(R"(adios2.engine.preferred_flush_target = "disk")");
       }
@@ -710,7 +753,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
                     const bool isLastBTDFlush
 )
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::DumpToFile()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::DumpToFile()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Series != nullptr, "openPMD: series must be initialized");
 
     AMREX_ALWAYS_ASSERT(write_real_comp.size() == pc->NumRealComps());
@@ -810,7 +853,7 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
     //   BP4 (ADIOS 2.8): last MPI rank's `Put` meta-data wins
     //   BP5 (ADIOS 2.8): everyone has to write an empty block
     if (is_resizing_flush && !contributed_particles && isBTD && m_Series->backend() == "ADIOS2") {
-        WARPX_PROFILE("WarpXOpenPMDPlot::ResizeInADIOS()");
+        ABLASTR_PROFILE("WarpXOpenPMDPlot::ResizeInADIOS()");
         for( auto & [record_name, record] : currSpecies ) {
             for( auto & [comp_name, comp] : record ) {
                 if (comp.constant()) { continue; }
@@ -821,6 +864,11 @@ WarpXOpenPMDPlot::DumpToFile (ParticleContainer* pc,
                         [[fallthrough]];
                     case openPMD::Datatype::DOUBLE : {
                         auto empty_data = std::make_shared<amrex::ParticleReal>();
+                        comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
+                        break;
+                    }
+                    case openPMD::Datatype::INT : {
+                        auto empty_data = std::make_shared<int>();
                         comp.storeChunk(empty_data, {uint64_t(0)}, {uint64_t(0)});
                         break;
                     }
@@ -964,6 +1012,11 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
     {
         auto const real_counter = std::min(write_real_comp.size(), real_comp_names.size());
 
+        // `write_real_comp` is the `real_flags` array built by
+        // `WriteOpenPMDParticles` and forwarded here through `DumpToFile`. Its
+        // order matches the openPMD record list (`real_names`) assembled there:
+        // position_x, position_y, position_z (each added only for geometries that
+        // have it), then weighting, momenta, ...
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // reconstruct Cartesian positions for cylindrical simulations
         // r,z,theta -> x,y,z
@@ -977,8 +1030,12 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
             [](amrex::ParticleReal const *p) { delete[] p; }
         );
 #if !defined(WARPX_DIM_RCYLINDER)
+        // write_real_comp [2] is the z position for RZ, RSPHERE and Cartesian
+        // (RZ stores z directly, RSPHERE rebuilds it from r, theta, phi).
+        // RCYLINDER omits position_z, so its [2] is already the following
+        // weighting flag. Omit here.
         std::shared_ptr<amrex::ParticleReal> const z(
-            new amrex::ParticleReal[(write_real_comp[1] ? numParticleOnTile : 0)],
+            new amrex::ParticleReal[(write_real_comp[2] ? numParticleOnTile : 0)],
             [](amrex::ParticleReal const *p) { delete[] p; }
         );
 #endif
@@ -992,7 +1049,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
             get_particle_position(p, xp, yp, zp);
             if (write_real_comp[0]) { x.get()[i] = xp; }
             if (write_real_comp[1]) { y.get()[i] = yp; }
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RCYLINDER)  // see above: omitted in reconstruction
             if (write_real_comp[2]) { z.get()[i] = zp; }
 #endif
         }
@@ -1002,7 +1059,7 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
         if (write_real_comp[1]) {
             getComponentRecord(real_comp_names[1]).storeChunk(y, {offset}, {numParticleOnTile64});
         }
-#if !defined(WARPX_DIM_RCYLINDER)
+#if !defined(WARPX_DIM_RCYLINDER)  // see above: omitted in reconstruction
         if (write_real_comp[2]) {
             getComponentRecord(real_comp_names[2]).storeChunk(z, {offset}, {numParticleOnTile64});
         }
@@ -1016,11 +1073,14 @@ WarpXOpenPMDPlot::SaveRealProperty (ParticleIter& pti,
         int const cartesian_attributes = AMREX_SPACEDIM + 4; // position + w + velocities
         int const extra_attributes = PIdx::nattribs - cartesian_attributes; // e.g. theta and phi
         for (auto idx=idx_start; idx<real_counter; idx++) {
-            // make names and write flags to SoA real array number
+            // `idx` indexes into `real_comp_names`/`write_real_comp` (openPMD-order),
+            // `soa_r_idx` indexes into the underlying SoA (PIdx-order). For cylindrical
+            // and spherical geometries the two differ by `extra_attributes` (theta, phi)
+            // which are folded into the reconstructed Cartesian positions written above.
             int const soa_r_idx = (idx < PIdx::nattribs) ?
                          idx - extra_attributes :
                          idx;
-            if (write_real_comp[soa_r_idx]) {
+            if (write_real_comp[idx]) {
                 getComponentRecord(real_comp_names[idx]).storeChunkRaw(
                     soa.GetRealData(soa_r_idx).data(), {offset}, {numParticleOnTile64});
             }
@@ -1415,7 +1475,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                       const amrex::Geometry& full_BTD_snapshot ) const
 {
     //This is AMReX's tiny profiler. Possibly will apply it later
-    WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_Series != nullptr, "openPMD series must be initialized");
 
@@ -1429,7 +1489,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
     // collective open
     series_iteration.open();
 
-    bool hasADIOS =  (m_Series->backend() == "ADIOS2");
+    const bool hasADIOS =  (m_Series->backend() == "ADIOS2");
 
     auto meshes = series_iteration.meshes;
     if (first_write_to_iteration) {
@@ -1530,7 +1590,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 if (fab.arena()->isManaged() || fab.arena()->isDevice()) {
                     if (hasADIOS)
                     {
-                        WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
+                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H_Span()");
                         auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
                              chunk_offset, chunk_size,
                              [&local_box](size_t /* size */) {
@@ -1542,7 +1602,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                         amrex::Gpu::dtoh_memcpy_async(span.data(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
                     } else
                     {
-                        WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H()");
+                        ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::D2H()");
                         amrex::BaseFab<amrex::Real> foo(local_box, 1, amrex::The_Pinned_Arena());
                         std::shared_ptr<amrex::Real> data_pinned(foo.release());
                         amrex::Gpu::dtoh_memcpy_async(data_pinned.get(), fab.dataPtr(icomp), local_box.numPts()*sizeof(amrex::Real));
@@ -1554,7 +1614,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                 { // CPU
                   if (hasADIOS)
                     {
-                      WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
+                      ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_span()");
                       auto dynamicMemoryView = mesh_comp.storeChunk<amrex::Real>(
                            chunk_offset, chunk_size,
                            [&local_box](size_t /* size */) {
@@ -1568,7 +1628,7 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                     }
                   else
                     {
-                       WARPX_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()");
+                       ABLASTR_PROFILE("WarpXOpenPMDPlot::WriteOpenPMDFields::CPU_mesh()");
                        amrex::Real const *local_data = fab.dataPtr(icomp);
                        mesh_comp.storeChunkRaw( local_data, chunk_offset, chunk_size);
                     }
@@ -1593,7 +1653,7 @@ WarpXParticleCounter::WarpXParticleCounter (ParticleContainer* pc):
     m_MPIRank{amrex::ParallelDescriptor::MyProc()},
     m_MPISize{amrex::ParallelDescriptor::NProcs()}
 {
-    WARPX_PROFILE("WarpXOpenPMDPlot::ParticleCounter()");
+    ABLASTR_PROFILE("WarpXOpenPMDPlot::ParticleCounter()");
     m_ParticleCounterByLevel.resize(pc->finestLevel()+1);
     m_ParticleOffsetAtRank.resize(pc->finestLevel()+1);
     m_ParticleSizeAtRank.resize(pc->finestLevel()+1);

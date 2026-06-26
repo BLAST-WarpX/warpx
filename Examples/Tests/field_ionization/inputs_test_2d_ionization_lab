@@ -52,6 +52,11 @@ laser1.profile_focal_distance = 0
 laser1.wavelength = 0.8e-6
 
 # Diagnostics
-diagnostics.diags_names = diag1
+diagnostics.diags_names = diag1 chk
+
 diag1.intervals = 10000
 diag1.diag_type = Full
+
+chk.intervals = 1000
+chk.diag_type = Full
+chk.format = checkpoint

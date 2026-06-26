@@ -19,11 +19,9 @@ concurrency:
 
 jobs:
   style:
-
     runs-on: ubuntu-24.04
-
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Non-ASCII characters
       run: .github/workflows/source/hasNonASCII
     - name: TABs
@@ -37,3 +35,12 @@ jobs:
         sudo apt update
         sudo apt install -y doxygen texlive-latex-base texlive-latex-extra ghostscript
         .github/workflows/source/doxygen
+
+  zenodo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate Zenodo Metadata
+        uses: vsoch/zenodo-validator@main
+        with:
+          path: '.zenodo.json'

@@ -8,14 +8,16 @@
 
 # This script tests initial distributions.
 # 1 denotes gaussian distribution.
-# 2 denotes maxwell-boltzmann distribution.
+# 2 denotes maxwellian distribution.
 # 3 denotes maxwell-juttner distribution.
 # 4 denotes gaussian position distribution.
 # 5 denotes maxwell-juttner distribution w/ spatially varying temperature
-# 6 denotes maxwell-boltzmann distribution w/ constant velocity
-# 7 denotes maxwell-boltzmann distribution w/ spatially-varying velocity
+# 6 denotes maxwellian distribution w/ constant velocity
+# 7 denotes maxwellian distribution w/ spatially-varying velocity
 # 8 denotes uniform distribution
-# 9 denotes gaussian_parser distribution w/ spatially-varying mean and thermal velocity
+# 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
+# 10 denotes maxwell-juttner distribution w/ low temperature (Gaussian fallback)
+# 11 denotes maxwell-juttner distribution w/ constant diagonal bulk drift
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import numpy as np
@@ -28,7 +30,7 @@ tolerance = 0.02
 print("Tolerance:", tolerance)
 
 # ===============================
-# gaussian and maxwell-boltzmann
+# gaussian and maxwellian
 # ===============================
 
 # load data
@@ -60,7 +62,7 @@ f_peak = np.amax(f)
 
 # compute error
 # note that parameters are chosen such that gaussian and
-# maxwell-boltzmann distributions are identical
+# maxwellian distributions are identical
 f1_error = (
     np.sum(np.abs(f - h1x) + np.abs(f - h1y) + np.abs(f - h1z))
     / bin_value.size
@@ -73,7 +75,7 @@ f2_error = (
 )
 
 print("Gaussian distribution difference:", f1_error)
-print("Maxwell-Boltzmann distribution difference:", f2_error)
+print("Maxwellian distribution difference:", f2_error)
 
 assert f1_error < tolerance
 assert f2_error < tolerance
@@ -237,8 +239,79 @@ print("Maxwell-Juttner parser temperature difference:", f5_error)
 
 assert f5_error < tolerance
 
+# =================================================
+# maxwell-juttner with a constant asymmetric bulk drift
+# =================================================
+# The species drifts with normalized momentum u_mean = (0.5, 0.3, 0.1), giving
+# gamma_bulk = sqrt(1.35). All three components are non-zero to verify that each
+# axis is read and applied correctly. The reduced diagnostic h11 histograms the
+# drift-frame Lorentz factor gamma' = gamma_bulk*gamma_lab - u_mean.u, which must
+# follow MJ(theta=1).
+
+# load data
+bin_value, bin_data_drift = read_reduced_diags_histogram("h11.txt")[2:]
+
+# parameters of theory (same MJ(theta=1) as the non-drifting case above)
+theta = 1.0
+K2 = scs.kn(2, 1.0 / theta)
+n = 1.0e21
+V = 8.0
+db = 0.22
+
+# compute the analytical solution
+f = (
+    n
+    * V
+    * db
+    * bin_value**2
+    * np.sqrt(1.0 - 1.0 / bin_value**2)
+    / (theta * K2)
+    * np.exp(-bin_value / theta)
+)
+f_peak = np.amax(f)
+
+# compute error
+f11_error = np.sum(np.abs(f - bin_data_drift)) / bin_value.size / f_peak
+
+print("Maxwell-Juttner drift-frame distribution difference:", f11_error)
+
+assert f11_error < tolerance
+
+# =======================================================
+# maxwell-juttner with low temperature (Gaussian fallback)
+# =======================================================
+
+# load data
+bin_value, bin_data = read_reduced_diags_histogram("h10.txt")[2:]
+
+# parameters of theory
+theta = 0.05
+K2 = scs.kn(2, 1.0 / theta)
+n = 1.0e21
+V = 8.0
+db = 0.01
+
+# compute the analytical solution
+f = (
+    n
+    * V
+    * db
+    * bin_value**2
+    * np.sqrt(1.0 - 1.0 / bin_value**2)
+    / (theta * K2)
+    * np.exp(-bin_value / theta)
+)
+f_peak = np.amax(f)
+
+# compute error
+f10_error = np.sum(np.abs(f - bin_data)) / bin_value.size / f_peak
+
+print("Maxwell-Juttner low-theta distribution difference:", f10_error)
+
+assert f10_error < tolerance
+
 # ==============================================
-# maxwell-boltzmann with constant bulk velocity
+# maxwellian with constant bulk velocity
 # ==============================================
 
 # load data
@@ -276,7 +349,7 @@ print("Maxwell-Boltzmann constant velocity difference:", f6_error)
 assert f6_error < tolerance
 
 # ============================================
-# maxwell-boltzmann with parser bulk velocity
+# maxwellian with parser bulk velocity
 # ============================================
 
 # load data
@@ -318,7 +391,7 @@ f7_error = (
     / f_peak
 )
 
-print("Maxwell-Boltzmann parser velocity difference:", f7_error)
+print("Maxwellian parser velocity difference:", f7_error)
 
 assert f7_error < tolerance
 
@@ -330,6 +403,15 @@ assert f7_error < tolerance
 bin_value_x, h8x = read_reduced_diags_histogram("h8x.txt")[2:]
 bin_value_y, h8y = read_reduced_diags_histogram("h8y.txt")[2:]
 bin_value_z, h8z = read_reduced_diags_histogram("h8z.txt")[2:]
+
+# With max_step = 0, reduced diagnostics write a single row,
+# which the parser squeezes into a 1D array. Reshape it to
+# a 2D array (with length 1 in the first axis), so that the
+# loop below works for both single-step and multi-step runs.
+if h8x.ndim == 1:
+    h8x = h8x.reshape(1, -1)
+    h8y = h8y.reshape(1, -1)
+    h8z = h8z.reshape(1, -1)
 
 # Analytical distribution
 ux_min = -0.2
@@ -402,7 +484,7 @@ def check_validity_uniform(bins, histogram, u_min, u_max, Ntrials=1000):
 
 # Test the distribution at every time step
 # (this assumes that no interaction is happening)
-for timestep in range(len(h8x)):
+for timestep in range(h8x.shape[0]):
     check_validity_uniform(bin_value_x, h8x[timestep] / N0, ux_min, ux_max)
     check_validity_uniform(bin_value_y, h8y[timestep] / N0, uy_min, uy_max)
     check_validity_uniform(bin_value_z, h8z[timestep] / N0, uz_min, uz_max)
@@ -439,6 +521,6 @@ f9_error = (
     / bin_value_ux.size
 )
 
-print("gaussian_parse_momentum_function velocity difference:", f9_error)
+print("maxwellian parser mean/std velocity difference:", f9_error)
 
 assert f9_error < tolerance

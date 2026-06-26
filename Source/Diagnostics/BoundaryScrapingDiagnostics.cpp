@@ -65,7 +65,7 @@ BoundaryScrapingDiagnostics::ReadParameters ()
     const amrex::ParmParse pp_diag_name(m_diag_name);
     std::vector<std::string> intervals_string_vec = {"0"};
     pp_diag_name.queryarr("intervals", intervals_string_vec);
-    m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
+    m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
 
 }
 
@@ -100,7 +100,7 @@ BoundaryScrapingDiagnostics::InitializeParticleBuffer (const MultiParticleContai
     for (int i_buffer = 0; i_buffer < m_num_buffers; ++i_buffer) {
         for (auto const& species_name : m_output_species_names){
             WarpXParticleContainer* pc = &mpc.GetParticleContainerFromName(species_name);
-            PinnedMemoryParticleContainer* bnd_buffer = particle_buffer.getParticleBufferPointer(species_name, i_buffer);
+            WarpXParticleContainer::Base* bnd_buffer = particle_buffer.getParticleBufferPointer(species_name, i_buffer);
             m_output_species[i_buffer].push_back(ParticleDiag(m_diag_name, species_name, pc, bnd_buffer));
         }
     }

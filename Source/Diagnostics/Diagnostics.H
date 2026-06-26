@@ -7,7 +7,6 @@
 #include "ComputeDiagFunctors/ComputeParticleDiagFunctor.H"
 #include "FlushFormats/FlushFormat_fwd.H"
 #include "Particles/WarpXParticleContainer.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
 
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
@@ -361,7 +360,7 @@ protected:
     /** Array of species indices that dump temperature per species */
     amrex::Vector<int> m_T_per_species_index;
     /** Vector of particle buffer vectors for each snapshot */
-    amrex::Vector< amrex::Vector<std::unique_ptr<PinnedMemoryParticleContainer> > > m_particles_buffer;
+    amrex::Vector< amrex::Vector<std::unique_ptr<WarpXParticleContainer::Base> > > m_particles_buffer;
     /** Vector of pointers to functors to compute particle output per species*/
     amrex::Vector< std::unique_ptr<ComputeParticleDiagFunctor> > m_all_particle_functors;
 

@@ -19,37 +19,42 @@
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
-#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 #include "Filter/NCIGodfreyFilter_fwd.H"
-#include "Initialization/ExternalField_fwd.H"
-#include "Particles/ParticleBoundaryBuffer_fwd.H"
-#include "Particles/MultiParticleContainer_fwd.H"
-#include "Particles/WarpXParticleContainer_fwd.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "Fluids/WarpXFluidContainer_fwd.H"
+#include "Initialization/ExternalField_fwd.H"
+#include "Particles/MultiParticleContainer_fwd.H"
+#include "Particles/ParticleBoundaryBuffer_fwd.H"
+#include "Particles/WarpXParticleContainer_fwd.H"
 
 #ifdef WARPX_USE_FFT
 #   ifdef WARPX_DIM_RZ
-#       include "FieldSolver/SpectralSolver/SpectralSolverRZ_fwd.H"
 #       include "BoundaryConditions/PML_RZ_fwd.H"
+#       include "FieldSolver/SpectralSolver/SpectralSolverRZ_fwd.H"
 #   else
 #       include "FieldSolver/SpectralSolver/SpectralSolver_fwd.H"
 #   endif
 #endif
+
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Fields.H"
 #include "FieldSolver/MagnetostaticSolver/MagnetostaticSolver.H"
-#include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Filter/BilinearFilter.H"
 #include "Parallelization/GuardCellManager.H"
-#include "Utils/Parser/IntervalsParser.H"
-#include "Utils/WarpXAlgorithmSelection.H"
+#include "Particles/ParticleThermalizer/ParticleThermalizer.H"
 #include "Utils/export.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
+#include <ablastr/utils/text/IntervalsParser.H>
+
+#include <AMReX_BaseFwd.H>
+#include <AMReX_AmrCoreFwd.H>
 
 #include <AMReX.H>
 #include <AMReX_AmrCore.H>
@@ -66,10 +71,6 @@
 #include <AMReX_RealBox.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_Vector.H>
-#include <AMReX_VisMF.H>
-
-#include <AMReX_BaseFwd.H>
-#include <AMReX_AmrCoreFwd.H>
 
 #include <array>
 #include <iostream>
@@ -123,6 +124,9 @@ public:
         return field_boundary_hi;
     }
 
+    [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
+                                               int  bdry_side ) const;
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
@@ -137,7 +141,7 @@ public:
     //
     void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
-    void FinishImplicitParticleUpdate ();
+    void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_thetadt, amrex::Real start_time );
@@ -147,6 +151,7 @@ public:
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
                                const ablastr::fields::MultiLevelVectorField& Field_n,
                                amrex::Real theta );
+    void DepositMassMatrices ();
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -324,7 +329,7 @@ public:
     static bool do_dynamic_scheduling;
     static bool refine_plasma;
 
-    static utils::parser::IntervalsParser sort_intervals;
+    static ablastr::utils::text::IntervalsParser sort_intervals;
     static amrex::IntVect sort_bin_size;
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
@@ -388,10 +393,6 @@ public:
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-    const PML_RZ* getPMLRZ() {return pml_rz[0].get();}
-#endif
-
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
 
@@ -421,10 +422,12 @@ public:
     void ComputeDt ();
 
     /**
-     * Determine the simulation timestep from the maximum speed of all particles
-     * Sets timestep so that a particle can only cross cfl*dx cells per timestep.
+     * Determine the simulation timestep from the time step limiters
      */
-    void UpdateDtFromParticleSpeeds ();
+    amrex::Real ParticleGridSpeedMax ();
+    amrex::Real GlobalPlasmaFrequencyMax ();
+    amrex::Real GlobalCyclotronFrequencyMax ();
+    void ApplyDtLimiters ();
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
@@ -451,24 +454,18 @@ public:
      */
     void ShiftGalileanBoundary ();
 
-    /**
-     * \brief Update injection position for continuous injection of
-     *        particles and lasers (loops over species and lasers).
-     */
-    void UpdateInjectionPosition (amrex::Real dt);
-
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
     void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
-    void EvolveF (         amrex::Real dt, int const rho_comp);
-    void EvolveF (int lev, amrex::Real dt, int const rho_comp);
+    void EvolveF (         amrex::Real dt, int rho_comp);
+    void EvolveF (int lev, amrex::Real dt, int rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
     void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
-    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int const rho_comp);
+    void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
 
     void MacroscopicEvolveE (         amrex::Real dt, amrex::Real start_time);
@@ -544,7 +541,7 @@ public:
 
     /** \brief returns the load balance interval
      */
-    [[nodiscard]] utils::parser::IntervalsParser get_load_balance_intervals () const
+    [[nodiscard]] ablastr::utils::text::IntervalsParser get_load_balance_intervals () const
     {
         return load_balance_intervals;
     }
@@ -570,13 +567,18 @@ public:
     void DampFieldsInGuards (int lev, amrex::MultiFab* mf);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    void ApplyInverseVolumeScalingToCurrentDensity(amrex::MultiFab* Jx,
-                                                   amrex::MultiFab* Jy,
-                                                   amrex::MultiFab* Jz,
-                                                   int lev) const;
+    void ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx,
+                                                    amrex::MultiFab* Jy,
+                                                    amrex::MultiFab* Jz,
+                                                    int lev) const;
 
-    void ApplyInverseVolumeScalingToChargeDensity(amrex::MultiFab* Rho,
-                                                  int lev) const;
+    void ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx,
+                                                    amrex::MultiFab* Syy,
+                                                    amrex::MultiFab* Szz,
+                                                    int lev) const;
+
+    void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
+                                                   int lev) const;
 #endif
 
     /**
@@ -641,9 +643,14 @@ public:
     void doQEDEvents ();
 #endif
 
-    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_current=false,
+    void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
-    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_current=false,
+
+    void PushParticlesandDeposit (amrex::Real cur_time, bool skip_deposition=false,
+                                  PositionPushType position_push_type=PositionPushType::Full,
+                                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                                   ImplicitOptions const * implicit_options = nullptr);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
@@ -801,6 +808,8 @@ public:
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
+    amrex::Real magnetostatic_solver_required_precision = amrex::Real(1.e-11);
+    amrex::Real magnetostatic_solver_absolute_tolerance = amrex::Real(0.0);
     int magnetostatic_solver_max_iters = 200;
     int magnetostatic_solver_verbosity = 2;
     void ComputeMagnetostaticField ();
@@ -853,7 +862,7 @@ public:
      */
     void ReadExternalFieldFromFile (
          const std::string& read_fields_from_path, amrex::MultiFab* mf,
-         const std::string& F_name, const std::string& F_component);
+         const std::string& F_name, const std::string& F_component, int dest_comp = 0);
 
     /**
      * \brief
@@ -920,14 +929,6 @@ public:
     *       extensions and, when this is not possible, it does eight-ways extensions.
     */
     void ComputeFaceExtensions();
-    /**
-    * \brief Initialize the memory for the FaceInfoBoxes
-    */
-    void InitBorrowing();
-    /**
-    * \brief Shrink the vectors in the FaceInfoBoxes
-    */
-    void ShrinkBorrowing();
     /**
     * \brief Do the one-way extension
     */
@@ -1047,7 +1048,12 @@ private:
         int a_step
     );
 
-    void OneStep_nosub (amrex::Real cur_time);
+    void OneStep_nosub (
+        amrex::Real a_cur_time,
+        amrex::Real a_dt,
+        int a_step
+    );
+
     void OneStep_sub1 (amrex::Real cur_time);
 
     /**
@@ -1164,13 +1170,18 @@ private:
     amrex::Vector<amrex::Real> t_new;
     amrex::Vector<amrex::Real> t_old;
     amrex::Vector<amrex::Real> dt;
-    utils::parser::IntervalsParser m_dt_update_interval = utils::parser::IntervalsParser{}; // How often to update the timestep when using adaptive timestepping
+    // How often to update the timestep when using adaptive timestepping
+    ablastr::utils::text::IntervalsParser m_dt_update_interval;
+    std::string m_dt_update_diagnostic_file;
 
     bool m_safe_guard_cells = false;
 
     // Particle container
     std::unique_ptr<MultiParticleContainer> mypc;
     std::unique_ptr<MultiDiagnostics> multi_diags;
+
+    // Particle thermalizer configuration (constructed from inputs)
+    ParticleThermalizer m_particle_thermalizer;
 
     //! Order of finite centering of currents (from nodal grid to staggered grid), along x
     int m_current_centering_nox  = 2;
@@ -1280,6 +1291,8 @@ private:
     // Timestepping parameters
     std::optional<amrex::Real> m_const_dt;
     std::optional<amrex::Real> m_max_dt;
+    std::optional<amrex::Real> m_max_omegap_dt;
+    std::optional<amrex::Real> m_max_omegac_dt;
 
     // whether to use subcycling
     bool m_do_subcycling = false;
@@ -1300,7 +1313,7 @@ private:
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file
      * for getting steps at which load balancing is performed */
-    utils::parser::IntervalsParser load_balance_intervals;
+    ablastr::utils::text::IntervalsParser load_balance_intervals;
     /** Collection of LayoutData to keep track of weights used in load balancing
      * routines. Contains timer-based or heuristic-based costs depending on input option */
     amrex::Vector<std::unique_ptr<amrex::LayoutData<amrex::Real> > > costs;
@@ -1333,7 +1346,7 @@ private:
     amrex::Real costs_heuristic_particles_wt = amrex::Real(0);
 
     // Determines timesteps for override sync
-    utils::parser::IntervalsParser override_sync_intervals;
+    ablastr::utils::text::IntervalsParser override_sync_intervals;
 
     // Other runtime parameters
     int verbose = 1;
@@ -1357,9 +1370,6 @@ private:
 
     /** When `true`, write the diagnostics after restart at the time of the restart. */
     bool write_diagnostics_on_restart = false;
-
-    amrex::VisMF::Header::Version plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
-    amrex::VisMF::Header::Version slice_plotfile_headerversion  = amrex::VisMF::Header::Version_v1;
 
     bool synchronize_velocity_for_diagnostics = true;
 
@@ -1605,6 +1615,13 @@ private:
     bool m_JRhom = false;
     int m_JRhom_subintervals;
 
+    /**
+     * \brief WarpX class attribute that controls whether collisions are placed
+     *        in the middle of the position push and after the momentum push,
+     *        or before both the position and momentum push. The default value
+     *        is set in WarpX::ReadParameters().
+     */
+    bool m_collisions_split_momentum_push;
 };
 
 #endif

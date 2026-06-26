@@ -18,7 +18,7 @@ class RelativisticExplicitES final : public ElectrostaticSolver
 {
 public:
 
-    RelativisticExplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
+    explicit RelativisticExplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
         ReadParameters();
     }
 

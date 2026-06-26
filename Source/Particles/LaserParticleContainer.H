@@ -56,7 +56,7 @@ public:
      * \brief Method to initialize runtime attributes. Does nothing for LaserParticleContainer.
      */
     void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PinnedArenaAllocator>::ParticleTileType& /*pinned_tile*/,
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& /*pinned_tile*/,
         int /*n_external_attr_real*/,
         int /*n_external_attr_int*/) final {}
 
@@ -69,6 +69,8 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) final;
 
     void PushP (int lev, amrex::Real dt,
@@ -77,7 +79,8 @@ public:
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
-                        const amrex::MultiFab& ) final;
+                        const amrex::MultiFab& ,
+                        MomentumPushType momentum_push_type = MomentumPushType::Full) final;
 
     void PostRestart () final;
 

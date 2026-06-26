@@ -48,7 +48,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
         );
 
 #else
-    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    if (WarpX::grid_type == GridType::Staggered)
     {
         CalculateCurrentAmpereCartesian <CartesianYeeAlgorithm> (
             Jfield, Bfield, eb_update_E, lev
@@ -86,11 +86,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
 {
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
-
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -134,10 +129,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCylindrical (
         int const nmodes = m_nmodes;
         Real const rmin = m_rmin;
 
-        // Extract tileboxes for which to loop
-        Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect());
-        Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect());
-        Box const& tjz  = mfi.tilebox(Jfield[2]->ixType().toIntVect());
+        // Extract tileboxes for which to loop with 1 guard cell included
+        Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
+        Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
+        Box const& tjz  = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
 
         Real const one_over_mu0 = 1._rt / PhysConst::mu0;
 
@@ -277,11 +272,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -308,10 +298,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereSpherical (
         Real const dr = m_dr;
         Real const rmin = m_rmin;
 
-        // Extract tileboxes for which to loop
-        Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect());
-        Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect());
-        Box const& tjphi  = mfi.tilebox(Jfield[2]->ixType().toIntVect());
+        // Extract tileboxes for which to loop with 1 guard cell included
+        Box const& tjr  = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
+        Box const& tjtheta  = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
+        Box const& tjphi  = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
 
         Real const one_over_mu0 = 1._rt / PhysConst::mu0;
 
@@ -379,11 +369,6 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
-    // reset Jfield
-    Jfield[0]->setVal(0);
-    Jfield[1]->setVal(0);
-    Jfield[2]->setVal(0);
-
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -422,10 +407,10 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
-        // Extract tileboxes for which to loop
-        Box const& tjx  = mfi.tilebox(Jfield[0]->ixType().toIntVect());
-        Box const& tjy  = mfi.tilebox(Jfield[1]->ixType().toIntVect());
-        Box const& tjz  = mfi.tilebox(Jfield[2]->ixType().toIntVect());
+        // Extract tileboxes for which to loop with 1 guard cell included
+        Box const& tjx = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
+        Box const& tjy = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
+        Box const& tjz = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
 
         Real const one_over_mu0 = 1._rt / PhysConst::mu0;
 
@@ -510,7 +495,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
         );
 
 #else
-    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    if (WarpX::grid_type == GridType::Staggered)
     {
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
             Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
@@ -566,6 +551,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
+    const amrex::Real t_new = warpx.gett_new(lev);
     ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
@@ -779,7 +765,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Er(i, j, 0) += eta(rho_val, jtot_val) * Jr(i, j, 0);
+                    Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -850,7 +836,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Etheta(i, j, 0) += eta(rho_val, jtot_val) * Jtheta(i, j, 0);
+                    Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -863,8 +849,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                             btot_val = std::sqrt(br_val*br_val + bt_val*bt_val + bz_val*bz_val);
                         }
 
-                        auto nabla2Jtheta = T_Algo::Dr_rDr_over_r(Jtheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
-                            + T_Algo::Dzz(Jtheta, coefs_z, n_coefs_z, i, j, 0, 0) - Jtheta(i, j, 0)/(r*r);
+                        // Special handling of the hyper-resistivity term on axis to avoid division by zero
+                        // and ensure that Etheta remains 0 on axis for m=0 mode
+                        auto nabla2Jtheta = 0.0_rt;
+                        if (r > 0.0_rt) {
+                            nabla2Jtheta = T_Algo::Dr_rDr_over_r(Jtheta, r, dr, coefs_r, n_coefs_r, i, j, 0, 0)
+                                + T_Algo::Dzz(Jtheta, coefs_z, n_coefs_z, i, j, 0, 0) - Jtheta(i, j, 0)/(r*r);
+                        }
 
                         Etheta(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jtheta;
                     }
@@ -913,7 +904,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Ez(i, j, 0) += eta(rho_val, jtot_val) * Jz(i, j, 0);
+                    Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -932,6 +923,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         auto nabla2Jz = T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, 0, 0);
                         if (r > 0.5_rt*dr) {
                             nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
+                        } else {
+                            // Special handling of the hyper-resistivity term on axis to avoid division by zero
+                            // and ensure that Jz remains well-behaved on axis for m=0 mode
+                            // This works since there is a symmetry condition on axis that cancels the geometric 1/r term
+                            nabla2Jz += T_Algo::Drr(Jz, coefs_r, n_coefs_r, i, j, 0, 0);
                         }
 
                         Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;
@@ -999,6 +995,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
 
     auto & warpx = WarpX::GetInstance();
+    const amrex::Real t_new = warpx.gett_new(lev);
     ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
@@ -1208,7 +1205,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ex(i, j, k) += eta(rho_val, jtot_val) * Jx(i, j, k);
+                Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1272,7 +1269,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ey(i, j, k) += eta(rho_val, jtot_val) * Jy(i, j, k);
+                Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1336,7 +1333,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ez(i, j, k) += eta(rho_val, jtot_val) * Jz(i, j, k);
+                Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 

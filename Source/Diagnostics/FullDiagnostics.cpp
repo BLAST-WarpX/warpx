@@ -120,7 +120,7 @@ FullDiagnostics::ReadParameters ()
         "<diag>.format must be plotfile or openpmd or checkpoint or ascent or catalyst or sensei");
     std::vector<std::string> intervals_string_vec = {"0"};
     pp_diag_name.getarr("intervals", intervals_string_vec);
-    m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
+    m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
     const bool plot_raw_fields_specified = pp_diag_name.query("plot_raw_fields", m_plot_raw_fields);
     const bool plot_raw_fields_guards_specified = pp_diag_name.query("plot_raw_fields_guards", m_plot_raw_fields_guards);
     const bool raw_specified = plot_raw_fields_specified || plot_raw_fields_guards_specified;
@@ -675,6 +675,14 @@ FullDiagnostics::AddRZModesToOutputNames (const std::string& field, int ncomp){
         m_varnames.push_back( field + "_" + std::to_string(ic) + "_real" );
         m_varnames.push_back( field + "_" + std::to_string(ic) + "_imag" );
     }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Radial-only geometries have no azimuthal modes (a single, real
+    // component per field), so the plain field name is added once. This
+    // mirrors the single functor created per field in
+    // `InitializeFieldFunctorsRZopenPMD` and keeps `m_varnames` in sync
+    // with the field functors.
+    amrex::ignore_unused(ncomp);
+    m_varnames.push_back(field);
 #else
     amrex::ignore_unused(field, ncomp);
 #endif
@@ -764,13 +772,17 @@ FullDiagnostics::InitializeBufferData (int i_buffer, int lev, bool restart ) {
         // Coarsen and refine so that the new BoxArray is coarsenable.
         ba.coarsen(m_crse_ratio).refine(m_crse_ratio);
 
+        // Box covering the extent of the user-defined diagnostic domain
+        amrex::Box domain = diag_box;
+        domain.coarsen(m_crse_ratio).refine(m_crse_ratio);
+
         // Update the physical co-ordinates m_lo and m_hi using the final index values
         // from the coarsenable, cell-centered BoxArray, ba.
         for ( int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             diag_dom.setLo( idim, warpx.Geom(lev).ProbLo(idim) +
-                ba.getCellCenteredBox(0).smallEnd(idim) * warpx.Geom(lev).CellSize(idim));
+                domain.smallEnd(idim) * warpx.Geom(lev).CellSize(idim));
             diag_dom.setHi( idim, warpx.Geom(lev).ProbLo(idim) +
-                (ba.getCellCenteredBox( static_cast<int>(ba.size())-1 ).bigEnd(idim) + 1) * warpx.Geom(lev).CellSize(idim));
+                (domain.bigEnd(idim) + 1) * warpx.Geom(lev).CellSize(idim));
         }
 
     }

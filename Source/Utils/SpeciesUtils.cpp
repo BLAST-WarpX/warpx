@@ -79,7 +79,8 @@ namespace SpeciesUtils {
     // InjectorPosition[Constant or Predefined or etc.].getDensity.
     void parseDensity (std::string const& species_name, std::string const& source_name,
         std::unique_ptr<InjectorDensity,InjectorDensityDeleter>& h_inj_rho,
-        std::unique_ptr<amrex::Parser>& density_parser)
+        std::unique_ptr<amrex::Parser>& density_parser,
+        amrex::Geometry const& geom)
     {
         const amrex::ParmParse pp_species(species_name);
 
@@ -93,9 +94,6 @@ namespace SpeciesUtils {
             utils::parser::getWithParser(pp_species, source_name, "density", density);
             // Construct InjectorDensity with InjectorDensityConstant.
             h_inj_rho.reset(new InjectorDensity((InjectorDensityConstant*)nullptr, density));
-        } else if (rho_prof_s == "predefined") {
-            // Construct InjectorDensity with InjectorDensityPredefined.
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityPredefined*)nullptr,species_name));
         } else if (rho_prof_s == "parse_density_function") {
             std::string str_density_function;
             utils::parser::Store_parserString(pp_species, source_name, "density_function(x,y,z)", str_density_function);
@@ -106,8 +104,10 @@ namespace SpeciesUtils {
                 density_parser->compile<3>()));
         } else if (rho_prof_s == "read_from_file") {
             std::string density_file;
+            bool distributed = true;
             utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
-            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file));
+            pp_species.query("read_density_distributed", distributed);
+            h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr, density_file, geom, distributed));
         } else {
             StringParseAbortMessage("Density profile type", rho_prof_s);
         }
@@ -118,12 +118,6 @@ namespace SpeciesUtils {
     // InjectorMomentum[Constant or Gaussian or etc.].getMomentum.
     void parseMomentum (std::string const& species_name, std::string const& source_name, const std::string& style,
         std::unique_ptr<InjectorMomentum,InjectorMomentumDeleter>& h_inj_mom,
-        std::unique_ptr<amrex::Parser>& ux_parser,
-        std::unique_ptr<amrex::Parser>& uy_parser,
-        std::unique_ptr<amrex::Parser>& uz_parser,
-        std::unique_ptr<amrex::Parser>& ux_th_parser,
-        std::unique_ptr<amrex::Parser>& uy_th_parser,
-        std::unique_ptr<amrex::Parser>& uz_th_parser,
         std::unique_ptr<TemperatureProperties>& h_mom_temp,
         std::unique_ptr<VelocityProperties>& h_mom_vel,
         int flux_normal_axis, int flux_direction)
@@ -205,83 +199,27 @@ namespace SpeciesUtils {
             // Construct InjectorMomentum with InjectorMomentumUniform.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
-        } else if (mom_dist_s == "maxwell_boltzmann"){
+        } else if (mom_dist_s == "maxwellian") {
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
-            const GetTemperature getTemp(*h_mom_temp);
+            const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
-            const GetVelocity getVel(*h_mom_vel);
-            // Construct InjectorMomentum with InjectorMomentumBoltzmann.
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumBoltzmann*)nullptr, getTemp, getVel));
+            const GetVelocityVector getVelVec(*h_mom_vel);
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperature getTemp(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
-            const GetVelocity getVel(*h_mom_vel);
+            const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));
-        } else if (mom_dist_s == "radial_expansion") {
-            amrex::Real u_over_r = 0._rt;
-            utils::parser::queryWithParser(pp_species, source_name, "u_over_r", u_over_r);
-            // Construct InjectorMomentum with InjectorMomentumRadialExpansion.
-            h_inj_mom.reset(new InjectorMomentum
-                            ((InjectorMomentumRadialExpansion*)nullptr, u_over_r));
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVelVec));
         } else if (mom_dist_s == "parse_momentum_function") {
-            std::string str_momentum_function_ux;
-            std::string str_momentum_function_uy;
-            std::string str_momentum_function_uz;
-            utils::parser::Store_parserString(pp_species, source_name, "momentum_function_ux(x,y,z)", str_momentum_function_ux);
-            utils::parser::Store_parserString(pp_species, source_name, "momentum_function_uy(x,y,z)", str_momentum_function_uy);
-            utils::parser::Store_parserString(pp_species, source_name, "momentum_function_uz(x,y,z)", str_momentum_function_uz);
+            // The momentum is defined by the parser functions ux_mean_function,
+            // uy_mean_function, uz_mean_function, stored in VelocityProperties and
+            // evaluated through GetVelocityVector (the parsers are owned by h_mom_vel).
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumParser.
-            ux_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_ux, {"x","y","z"}));
-            uy_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uy, {"x","y","z"}));
-            uz_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uz, {"x","y","z"}));
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumParser*)nullptr,
-                                                ux_parser->compile<3>(),
-                                                uy_parser->compile<3>(),
-                                                uz_parser->compile<3>()));
-        } else if (mom_dist_s == "gaussian_parse_momentum_function") {
-            std::string str_momentum_function_ux_m;
-            std::string str_momentum_function_uy_m;
-            std::string str_momentum_function_uz_m;
-            std::string str_momentum_function_ux_th;
-            std::string str_momentum_function_uy_th;
-            std::string str_momentum_function_uz_th;
-            utils::parser::Store_parserString(pp_species, source_name,
-                "momentum_function_ux_m(x,y,z)", str_momentum_function_ux_m);
-            utils::parser::Store_parserString(pp_species, source_name,
-                "momentum_function_uy_m(x,y,z)", str_momentum_function_uy_m);
-            utils::parser::Store_parserString(pp_species, source_name,
-                "momentum_function_uz_m(x,y,z)", str_momentum_function_uz_m);
-            utils::parser::Store_parserString(pp_species, source_name,
-                "momentum_function_ux_th(x,y,z)", str_momentum_function_ux_th);
-            utils::parser::Store_parserString(pp_species, source_name,
-                "momentum_function_uy_th(x,y,z)", str_momentum_function_uy_th);
-            utils::parser::Store_parserString(pp_species, source_name,
-                "momentum_function_uz_th(x,y,z)", str_momentum_function_uz_th);
-            // Construct InjectorMomentum with InjectorMomentumParser.
-            ux_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_ux_m, {"x","y","z"}));
-            uy_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uy_m, {"x","y","z"}));
-            uz_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uz_m, {"x","y","z"}));
-            ux_th_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_ux_th, {"x","y","z"}));
-            uy_th_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uy_th, {"x","y","z"}));
-            uz_th_parser = std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_momentum_function_uz_th, {"x","y","z"}));
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumGaussianParser*)nullptr,
-                                                ux_parser->compile<3>(),
-                                                uy_parser->compile<3>(),
-                                                uz_parser->compile<3>(),
-                                                ux_th_parser->compile<3>(),
-                                                uy_th_parser->compile<3>(),
-                                                uz_th_parser->compile<3>()));
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumParser*)nullptr, getVelVec));
         } else {
             StringParseAbortMessage("Momentum distribution type", mom_dist_s);
         }

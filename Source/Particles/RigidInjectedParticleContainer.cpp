@@ -21,9 +21,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
@@ -77,7 +77,7 @@ RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_cor
         } else if (raw == "false" || raw == "0") {
             rigid_advance_mode = RigidAdvanceMode::vz;
         } else {
-            pp_species_name.query_enum_sloppy("rigid_advance", rigid_advance_mode, "-_");
+            pp_species_name.query_enum_case_insensitive("rigid_advance", rigid_advance_mode);
         }
     }
 }
@@ -113,7 +113,7 @@ RigidInjectedParticleContainer::RemapParticles()
         const ParticleReal t_lab = 0._prt;
 
         const ParticleReal uz_boost = WarpX::gamma_boost*WarpX::beta_boost*PhysConst::c;
-        const ParticleReal csqi = 1._prt/(PhysConst::c*PhysConst::c);
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
         vzbeam_ave_boosted = meanParticleVelocity(false)[2];
 
@@ -146,14 +146,14 @@ RigidInjectedParticleContainer::RemapParticles()
                         ParticleReal xp, yp, zp;
                         GetPosition(i, xp, yp, zp);
 
-                        const ParticleReal gammapr = std::sqrt(1._prt + (uxp[i]*uxp[i] + uyp[i]*uyp[i] + uzp[i]*uzp[i])*csqi);
+                        const ParticleReal gammapr = std::sqrt(1._prt + (uxp[i]*uxp[i] + uyp[i]*uyp[i] + uzp[i]*uzp[i])*inv_c2);
                         const ParticleReal vzpr = uzp[i]/gammapr;
 
                         // Back out the value of z_lab
-                        const ParticleReal z_lab = (zp + uz_boost*t_lab + gamma_boost*t_lab*vzpr)/(gamma_boost + uz_boost*vzpr*csqi);
+                        const ParticleReal z_lab = (zp + uz_boost*t_lab + gamma_boost*t_lab*vzpr)/(gamma_boost + uz_boost*vzpr*inv_c2);
 
                         // Time of the particle in the boosted frame given its position in the lab frame at t=0.
-                        const ParticleReal tpr = gamma_boost*t_lab - uz_boost*z_lab*csqi;
+                        const ParticleReal tpr = gamma_boost*t_lab - uz_boost*z_lab*inv_c2;
 
                         // Adjust the position, taking away its motion from its own velocity and adding
                         // the motion from the average velocity
@@ -180,7 +180,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                         const long np_to_push,
                                         int lev, int gather_lev,
                                         amrex::Real dt, ScaleFields /*scaleFields*/,
-                                        SubcyclingHalf subcycling_half)
+                                        SubcyclingHalf subcycling_half,
+                                        PositionPushType position_push_type,
+                                        MomentumPushType momentum_push_type)
 {
     auto& attribs = pti.GetAttribs();
     auto& uxp = attribs[PIdx::ux];
@@ -224,7 +226,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
                                       ngEB, e_is_nodal, offset, np_to_push, lev, gather_lev, dt,
                                       ScaleFields(do_scale, dt, zinject_plane_lev_previous,
                                                   vzbeam_ave_boosted, v_boost),
-                                      subcycling_half);
+                                      subcycling_half,
+                                      position_push_type,
+                                      momentum_push_type);
 
     if (!done_injecting_lev) {
 
@@ -237,31 +241,33 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
         const amrex::ParticleReal z_plane_lev = zinject_plane_lev;
         const amrex::ParticleReal vz_ave_boosted = vzbeam_ave_boosted;
         const RigidAdvanceMode rigid = rigid_advance_mode;
-        constexpr amrex::ParticleReal inv_csq = 1._prt/(PhysConst::c*PhysConst::c);
-        amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
-            amrex::ParticleReal xp, yp, zp;
-            GetPosition(i, xp, yp, zp);
-            if (zp <= z_plane_lev) {
-                xp = x_save[i];
-                yp = y_save[i];
-                zp = z_save[i];
-                if (rigid == RigidAdvanceMode::vzbar) {
-                    zp += dt * vz_ave_boosted;
-                } else {
-                    const amrex::ParticleReal gi =
-                        1._prt /
-                        std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
-                                            uz[i] * uz[i]) *
-                                               inv_csq);
-                    zp += dt * uz[i] * gi;
-                    if (rigid == RigidAdvanceMode::v) {
-                        xp += dt * ux[i] * gi;
-                        yp += dt * uy[i] * gi;
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+        if (position_push_type == PositionPushType::Full) {
+            amrex::ParallelFor(np_to_push, [=] AMREX_GPU_DEVICE(long i) {
+                amrex::ParticleReal xp, yp, zp;
+                GetPosition(i, xp, yp, zp);
+                if (zp <= z_plane_lev) {
+                    xp = x_save[i];
+                    yp = y_save[i];
+                    zp = z_save[i];
+                    if (rigid == RigidAdvanceMode::vzbar) {
+                        zp += dt * vz_ave_boosted;
+                    } else {
+                        const amrex::ParticleReal gi =
+                            1._prt /
+                            std::sqrt(1._prt + (ux[i] * ux[i] + uy[i] * uy[i] +
+                                                uz[i] * uz[i]) *
+                                                inv_c2);
+                        zp += dt * uz[i] * gi;
+                        if (rigid == RigidAdvanceMode::v) {
+                            xp += dt * ux[i] * gi;
+                            yp += dt * uy[i] * gi;
+                        }
                     }
+                    SetPosition(i, xp, yp, zp);
                 }
-                SetPosition(i, xp, yp, zp);
-            }
-        });
+            });
+        }
     }
 }
 
@@ -270,6 +276,8 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
                                         int lev,
                                         const std::string& current_fp_string,
                                         Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                        PositionPushType position_push_type,
+                                        MomentumPushType momentum_push_type,
                                         ImplicitOptions const * /*implicit_options*/)
 {
 
@@ -292,18 +300,22 @@ RigidInjectedParticleContainer::Evolve (ablastr::fields::MultiFabRegister& field
     done_injecting_lev = ((zinject_plane_levels[lev] < plo[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c >= 0.) ||
                            (zinject_plane_levels[lev] > phi[zindex] && WarpX::moving_window_v + WarpX::beta_boost*PhysConst::c <= 0.));
 
-    PhysicalParticleContainer::Evolve (fields,
-                                       lev,
-                                       current_fp_string,
-                                       t, dt, subcycling_half, skip_deposition, nullptr);
+    PhysicalParticleContainer::Evolve(fields,
+                                      lev,
+                                      current_fp_string,
+                                      t, dt, subcycling_half, skip_deposition,
+                                      position_push_type,
+                                      momentum_push_type,
+                                      nullptr);
 }
 
 void
 RigidInjectedParticleContainer::PushP (int lev, Real dt,
                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                       const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz)
+                                       const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                       MomentumPushType momentum_push_type)
 {
-    WARPX_PROFILE("RigidInjectedParticleContainer::PushP");
+    ABLASTR_PROFILE("RigidInjectedParticleContainer::PushP");
 
     if (do_not_push) { return; }
 
@@ -381,8 +393,8 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uz_save = uzp_save.dataPtr();
 
             // Loop over the particles and update their momentum
-            const amrex::ParticleReal q = this->charge;
-            const amrex::ParticleReal m = this-> mass;
+            const amrex::ParticleReal q = this->m_charge;
+            const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;
             const auto do_crr = do_classical_radiation_reaction;
@@ -427,19 +439,19 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
                 if (do_crr) {
                     UpdateMomentumBorisWithRadiationReaction(uxpp[ip], uypp[ip], uzpp[ip],
                                                              Exp, Eyp, Ezp, Bxp,
-                                                             Byp, Bzp, qp, m, dt);
+                                                             Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Boris) {
                     UpdateMomentumBoris( uxpp[ip], uypp[ip], uzpp[ip],
                                          Exp, Eyp, Ezp, Bxp,
-                                         Byp, Bzp, qp, m, dt);
+                                         Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::Vay) {
                     UpdateMomentumVay( uxpp[ip], uypp[ip], uzpp[ip],
                                        Exp, Eyp, Ezp, Bxp,
-                                       Byp, Bzp, qp, m, dt);
+                                       Byp, Bzp, qp, mass, dt, momentum_push_type);
                 } else if (pusher_algo == ParticlePusherAlgo::HigueraCary) {
                     UpdateMomentumHigueraCary( uxpp[ip], uypp[ip], uzpp[ip],
                                                Exp, Eyp, Ezp, Bxp,
-                                               Byp, Bzp, qp, m, dt);
+                                               Byp, Bzp, qp, mass, dt);
                 } else {
                     amrex::Abort("Unknown particle pusher");
                 }

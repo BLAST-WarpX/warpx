@@ -24,19 +24,19 @@ jobs:
     # oneAPI 2022.2.0 hangs for -O2 and higher:
     #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
-      CXXFLAGS: "-Werror -Wno-error=pass-failed -Wno-tautological-constant-compare"
+      CXXFLAGS: "-Werror -Wno-deprecated -Wno-error=pass-failed -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -88,19 +88,19 @@ jobs:
     # oneAPI 2022.2.0 hangs for -O2 and higher:
     #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
-      CXXFLAGS: "-Werror -Wno-tautological-constant-compare"
+      CXXFLAGS: "-Werror -Wno-deprecated -Wno-tautological-constant-compare"
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

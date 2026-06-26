@@ -5,12 +5,14 @@
 #
 # License: BSD-3-Clause-LBNL
 
-import re
 import sys
 
 import numpy as np
 import scipy.constants as scc
 import yt
+
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
 
 ## This script performs various checks for the proton boron nuclear fusion module. The simulation
 ## that we check is made of 5 different tests, each with different proton, boron and alpha species.
@@ -62,11 +64,13 @@ default_tol = 1.0e-12  # Default relative tolerance
 keV_to_Joule = scc.e * 1e3
 MeV_to_Joule = scc.e * 1e6
 barn_to_square_meter = 1.0e-28
-m_p = 1.00782503223 * scc.m_u  # Proton mass
-m_b = 11.00930536 * scc.m_u  # Boron 11 mass
+m_p = scc.m_p  # Proton mass
+m_b = 11.00930536 * scc.m_u - 5 * scc.m_e  # Boron 11 mass
 m_reduced = m_p * m_b / (m_p + m_b)
-m_a = 4.00260325413 * scc.m_u  # Alpha (He4) mass
-m_be = (8.0053095729 + 0.00325283863) * scc.m_u  # Be8* mass (3.03 MeV ex. state)
+m_a = 4.00260325413 * scc.m_u - 2 * scc.m_e  # Alpha (He4) mass
+m_be = (
+    (8.0053095729 + 0.00325283863) * scc.m_u - 4 * scc.m_e
+)  # Be8* mass (3.03 MeV ex. state): subtract 4 electron masses to get nuclear mass
 Z_boron = 5.0
 Z_proton = 1.0
 E_Gamow = (
@@ -79,9 +83,8 @@ E_decay = 3.12600414 * MeV_to_Joule  # Energy released during Be* -> 2*alpha
 E_fusion_total = E_fusion + E_decay  # Energy released during p + B -> 3*alpha
 
 ## Checks whether this is the 2D or the 3D test
-with open("./warpx_used_inputs") as warpx_used_inputs:
-    is_2D = re.search(r"geometry.dims\s*=\s*2", warpx_used_inputs.read())
-warpx_used_inputs.close()
+input_dict = parse_input_file("./warpx_used_inputs")
+is_2D = input_has_value(input_dict, "geometry.dims", "2")
 
 ## Some numerical parameters for this test
 size_x = 8
@@ -584,13 +587,13 @@ def check_initial_energy1(data, E_com):
             np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=1.0e-2
         )
         assert is_close(
-            np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=3.218e-15
+            np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=5e-14
         )
         assert is_close(
             np.amax(energy_alpha3_simulation), max_energy_alpha23, rtol=1.0e-2
         )
         assert is_close(
-            np.amin(energy_alpha3_simulation), min_energy_alpha23, atol=3.218e-15
+            np.amin(energy_alpha3_simulation), min_energy_alpha23, atol=5e-14
         )
 
 
@@ -701,7 +704,7 @@ def check_initial_energy2(data):
             f"Check energy max: {np.amax(energy_alpha2_simulation)} {max_energy_alpha23} {(np.amax(energy_alpha2_simulation) - max_energy_alpha23) / max_energy_alpha23}"
         )
         assert is_close(
-            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=6.3e-2
+            np.amax(energy_alpha2_simulation), max_energy_alpha23, rtol=7.0e-2
         )
         assert is_close(
             np.amin(energy_alpha2_simulation), min_energy_alpha23, atol=3.218e-14

@@ -39,6 +39,10 @@ module_path = os.path.dirname(os.path.abspath(__file__))
 checksum_path = os.path.join(module_path, "../../Regression/Checksum")
 sys.path.insert(0, checksum_path)
 
+# Modify sys.path to use custom extension in _ext
+_ext_path = os.path.join(module_path, "_ext")
+sys.path.insert(0, _ext_path)
+
 
 def download_with_headers(url, filename):
     """Download a file with proper User-Agent header to avoid 403 errors."""
@@ -71,6 +75,7 @@ extensions = [
     "breathe",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
+    "parmparse",
 ]
 
 # Google Analytics
@@ -81,7 +86,7 @@ googleanalytics_enabled = True
 templates_path = ["_templates"]
 
 # Relative path to bibliography file, bibliography style
-bibtex_bibfiles = ["latex_theory/allbibs.bib", "refs.bib"]
+bibtex_bibfiles = ["refs.bib"]
 
 
 # An brief introduction to custom BibTex formatting can be found in the Sphinx documentation:

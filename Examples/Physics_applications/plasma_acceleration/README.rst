@@ -1,7 +1,7 @@
 .. _examples-pwfa:
 
-Beam-Driven Wakefield Acceleration of Electrons
-===============================================
+Beam-Driven Wakefield Acceleration of Electrons in a Boosted Frame
+==================================================================
 
 This example shows how to model a beam-driven plasma-wakefield accelerator (PWFA) :cite:p:`ex-TajimaDawson1982,ex-Esarey1996`.
 
@@ -44,7 +44,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
    .. tab-item:: Executable: Input File
 
       .. literalinclude:: inputs_base_3d
-         :language: ini
+         :language: none
          :caption: You can copy this file from ``Examples/Physics_applications/plasma_acceleration/inputs_base_3d``.
 
 Analyze

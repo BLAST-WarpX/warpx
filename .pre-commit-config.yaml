@@ -15,32 +15,35 @@
 # Do not check/format anything from third parties
 exclude: '^share/openPMD/thirdParty'
 
+ci:
+  autoupdate_schedule: monthly
+
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-    - id: trailing-whitespace
-      args: [--markdown-linebreak-ext=md]
-    - id: end-of-file-fixer
-      exclude: '.json$'
-    - id: mixed-line-ending
-    - id: check-json
-    - id: check-toml
-    - id: check-yaml
-    - id: check-added-large-files
-      args: ['--maxkb=40']
-    - id: requirements-txt-fixer
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: trailing-whitespace
+    args: [--markdown-linebreak-ext=md]
+  - id: end-of-file-fixer
+    exclude: '.json$'
+  - id: mixed-line-ending
+  - id: check-json
+  - id: check-toml
+  - id: check-yaml
+  - id: check-added-large-files
+    args: ['--maxkb=40']
+  - id: requirements-txt-fixer
 #  - id: fix-encoding-pragma
 #    exclude: ^noxfile.py$
 
 # documentation files: .rst
--   repo: https://github.com/pre-commit/pygrep-hooks
-    rev: v1.10.0
-    hooks:
-#    - id: rst-backticks
-    - id: rst-directive-colons
-    - id: rst-inline-touching-normal
+- repo: https://github.com/pre-commit/pygrep-hooks
+  rev: v1.10.0
+  hooks:
+#  - id: rst-backticks
+  - id: rst-directive-colons
+  - id: rst-inline-touching-normal
 
 #- repo: https://github.com/asottile/pyupgrade
 #  rev: v2.29.0
@@ -49,7 +52,7 @@ repos:
 
 # Changes tabs to spaces
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.5.5
+  rev: v1.5.6
   hooks:
   - id: remove-tabs
     exclude: 'Make.WarpX|Make.package|Makefile|GNUmake'
@@ -65,7 +68,7 @@ repos:
 
 # C++ formatting
 - repo: https://github.com/pre-commit/mirrors-clang-format
-  rev: v21.1.2
+  rev: v22.1.5
   hooks:
   - id: clang-format
     files: '^Source/main.cpp'
@@ -73,10 +76,10 @@ repos:
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.13.2
+  rev: v0.15.15
   hooks:
     # Run the linter
-    - id: ruff
+    - id: ruff-check
       args: [--fix, --exit-non-zero-on-fix]
     # Run the formatter
     - id: ruff-format
@@ -93,9 +96,15 @@ repos:
 
 # Checks the manifest for missing files (native support)
 - repo: https://github.com/mgedmin/check-manifest
-  rev: "0.50"
+  rev: "0.51"
   hooks:
   - id: check-manifest
     # This is a slow hook, so only run this if --hook-stage manual is passed
     stages: [manual]
     additional_dependencies: [cmake, ninja]
+
+# Scan for secret files that should not be committed
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.30.1
+  hooks:
+  - id: gitleaks

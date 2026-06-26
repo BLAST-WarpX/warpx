@@ -5,8 +5,9 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 
-from setuptools import Extension, setup
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build import build
 from setuptools.command.build_ext import build_ext
 
@@ -44,10 +45,14 @@ class CopyPreBuild(build):
                 "PYWARPX_LIB_DIR='{}'".format(PYWARPX_LIB_DIR)
             )
 
-        # copy external libs into collection of files in a temporary build dir
+        # copy Python module artifacts and sources
         dst_path = os.path.join(self.build_lib, "pywarpx")
-        for lib_path in libs_found:
-            shutil.copy(lib_path, dst_path)
+        shutil.copytree(
+            PYWARPX_LIB_DIR,
+            dst_path,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("diags", "diags.*"),
+        )
 
 
 class CMakeExtension(Extension):
@@ -86,13 +91,18 @@ class CMakeBuild(build_ext):
         dims = r_dim.group(1).upper()
 
         pyv = sys.version_info
+        # cross-compiling (e.g. Pyodide)? host & target Python differ
+        emscripten = sysconfig.get_platform().startswith("emscripten")
         cmake_args = [
             # Python: use the calling interpreter in CMake
             # https://cmake.org/cmake/help/latest/module/FindPython.html#hints
             # https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-version-selection
+            #   cross builds (e.g. Pyodide) keep these host hints to resolve the
+            #   interpreter/library, but relax the exact-version match and
+            #   override the target headers (Python_INCLUDE_DIR) below
             f"-DPython_ROOT_DIR={sys.prefix}",
             f"-DPython_FIND_VERSION={pyv.major}.{pyv.minor}.{pyv.micro}",
-            "-DPython_FIND_VERSION_EXACT=TRUE",
+            "-DPython_FIND_VERSION_EXACT=" + ("FALSE" if emscripten else "TRUE"),
             "-DPython_FIND_STRATEGY=LOCATION",
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + os.path.join(extdir, "pywarpx"),
             "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=" + extdir,
@@ -102,6 +112,7 @@ class CMakeBuild(build_ext):
             "-DWarpX_COMPUTE=" + WARPX_COMPUTE,
             "-DWarpX_MPI:BOOL=" + WARPX_MPI,
             "-DWarpX_EB:BOOL=" + WARPX_EB,
+            "-DWarpX_PETSC:BOOL=" + WARPX_PETSC,
             "-DWarpX_OPENPMD:BOOL=" + WARPX_OPENPMD,
             "-DWarpX_PRECISION=" + WARPX_PRECISION,
             "-DWarpX_PARTICLE_PRECISION=" + WARPX_PARTICLE_PRECISION,
@@ -125,6 +136,11 @@ class CMakeBuild(build_ext):
             # Windows: has no RPath concept, all `.dll`s must be in %PATH%
             #          or same dir as calling executable
         ]
+        if emscripten:
+            # Pyodide cross-compile: point at the target (WASM) Python headers
+            cmake_args.append(
+                "-DPython_INCLUDE_DIR=" + sysconfig.get_config_var("INCLUDEPY")
+            )
         if WARPX_QED.upper() in ["1", "ON", "TRUE", "YES"]:
             cmake_args.append("-DWarpX_picsar_internal=" + WARPX_PICSAR_INTERNAL)
         if WARPX_OPENPMD.upper() in ["1", "ON", "TRUE", "YES"]:
@@ -204,6 +220,7 @@ env = os.environ.copy()
 WARPX_COMPUTE = env.pop("WARPX_COMPUTE", "OMP")
 WARPX_MPI = env.pop("WARPX_MPI", "OFF")
 WARPX_EB = env.pop("WARPX_EB", "ON")
+WARPX_PETSC = env.pop("WARPX_PETSC", "OFF")
 WARPX_OPENPMD = env.pop("WARPX_OPENPMD", "ON")
 WARPX_PRECISION = env.pop("WARPX_PRECISION", "DOUBLE")
 WARPX_PARTICLE_PRECISION = env.pop("WARPX_PARTICLE_PRECISION", WARPX_PRECISION)
@@ -254,6 +271,12 @@ if WARPX_EB.upper() in ["1", "ON", "TRUE", "YES"]:
 else:
     WARPX_EB = "OFF"
 
+# PETSc linear/nonlinear solvers via AMReX
+if WARPX_PETSC.upper() in ["1", "ON", "TRUE", "YES"]:
+    WARPX_PETSC = "ON"
+else:
+    WARPX_PETSC = "OFF"
+
 
 # for CMake
 cxx_modules = []  # values: warpx_1d, warpx_2d, warpx_rz, warpx_3d
@@ -288,8 +311,8 @@ setup(
     name="pywarpx",
     # note PEP-440 syntax: x.y.zaN but x.y.z.devN
     version=warpx_version,
-    packages=["pywarpx"],
-    package_dir={"pywarpx": "Python/pywarpx"},
+    packages=find_packages(where="Python"),
+    package_dir={"": "Python"},
     author="Jean-Luc Vay, David P. Grote, Maxence Thévenet, Rémi Lehe, Andrew Myers, Weiqun Zhang, Axel Huebl, et al.",
     author_email="jlvay@lbl.gov, grote1@llnl.gov, maxence.thevenet@desy.de, rlehe@lbl.gov, atmyers@lbl.gov, WeiqunZhang@lbl.gov, axelhuebl@lbl.gov",
     maintainer="Axel Huebl, David P. Grote, Rémi Lehe",  # wheel/pypi packages
@@ -314,7 +337,7 @@ setup(
     cmdclass=cmdclass,
     # scripts=['warpx_1d', 'warpx_2d', 'warpx_rz', 'warpx_3d'],
     zip_safe=False,
-    python_requires=">=3.8",  # left for CI, truly ">=3.9"
+    python_requires=">=3.8",  # left for CI, truly ">=3.11"
     # tests_require=['pytest'],
     install_requires=install_requires,
     # see: src/bindings/python/cli
@@ -325,7 +348,7 @@ setup(
     # },
     extras_require={
         "all": [
-            "openPMD-api>=0.16.1",
+            "openPMD-api>=0.17.0",
             "openPMD-viewer~=1.1",
             "yt>=4.1.0",
             "matplotlib",
@@ -343,11 +366,10 @@ setup(
         "Topic :: Scientific/Engineering :: Physics",
         "Programming Language :: C++",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         (
             "License :: OSI Approved :: BSD License"
         ),  # TODO: use real SPDX: BSD-3-Clause-LBNL
