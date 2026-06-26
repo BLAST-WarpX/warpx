@@ -747,7 +747,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
             // Galilean algorithm: particles can move by up to one additional cell
             max_cells_travelled += static_cast<int>(std::ceil(std::min({AMREX_D_DECL(
                 m_v_galilean[0] * dt[0]/dx[0],
-                m_v_galilean[1] * dt[0]/dx[1], 
+                m_v_galilean[1] * dt[0]/dx[1],
                 m_v_galilean[2] * dt[0]/dx[2]}
             )));
         }
