@@ -158,6 +158,10 @@ class Species(picmistandard.PICMI_Species):
         Resampling will be done when the average number of
         particles per cell exceeds this number
 
+    warpx_resampling_algorithm_target_ratio: float, default=1.5
+        Roughly corresponds to the ratio between the number of particles before
+        and after resampling. Only used with the `leveling_thinning` algorithm.
+
     warpx_resampling_algorithm: str, default="leveling_thinning"
         Resampling algorithm to use.
 
@@ -287,6 +291,9 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_triggering_max_avg_ppc = kw.pop(
             "warpx_resampling_trigger_max_avg_ppc", None
         )
+        self.resampling_algorithm_target_ratio = kw.pop(
+            "warpx_resampling_algorithm_target_ratio", None
+        )
         self.resampling_algorithm_target_weight = kw.pop(
             "warpx_resampling_algorithm_target_weight", None
         )
@@ -364,6 +371,7 @@ class Species(picmistandard.PICMI_Species):
             resampling_min_ppc=self.resampling_min_ppc,
             resampling_trigger_intervals=self.resampling_trigger_intervals,
             resampling_trigger_max_avg_ppc=self.resampling_triggering_max_avg_ppc,
+            resampling_algorithm_target_ratio=self.resampling_algorithm_target_ratio,
             resampling_algorithm_target_weight=self.resampling_algorithm_target_weight,
             resampling_algorithm_velocity_grid_type=self.resampling_algorithm_velocity_grid_type,
             resampling_algorithm_delta_ur=self.resampling_algorithm_delta_ur,
