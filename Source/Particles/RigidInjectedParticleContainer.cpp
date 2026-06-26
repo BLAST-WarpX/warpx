@@ -77,7 +77,7 @@ RigidInjectedParticleContainer::RigidInjectedParticleContainer (AmrCore* amr_cor
         } else if (raw == "false" || raw == "0") {
             rigid_advance_mode = RigidAdvanceMode::vz;
         } else {
-            pp_species_name.query_enum_sloppy("rigid_advance", rigid_advance_mode, "-_");
+            pp_species_name.query_enum_case_insensitive("rigid_advance", rigid_advance_mode);
         }
     }
 }

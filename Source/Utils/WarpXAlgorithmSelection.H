@@ -31,9 +31,9 @@ AMREX_ENUM(MediumForEM,
   */
 AMREX_ENUM(EvolveScheme,
            Explicit,
-           ThetaImplicitEM,
-           SemiImplicitEM,
-           StrangImplicitSpectralEM,
+           Theta_Implicit_EM,
+           Semi_Implicit_EM,
+           Strang_Implicit_Spectral_EM,
            Default = Explicit);
 
 /**
@@ -129,14 +129,13 @@ AMREX_ENUM(FieldBoundaryType,
            Neumann = PMC, // For electrostatic, the normal E is set to zero
            Damped,   // Fields in the guard cells are damped for PSATD
                      //in the moving window direction
-           Absorbing_SilverMueller, // Silver-Mueller boundary condition
-           absorbingsilvermueller = Absorbing_SilverMueller,
+           Absorbing_Silver_Mueller, // Silver-Mueller boundary condition
            None,    // The fields values at the boundary are not updated. This is
                     // useful for RZ simulations, at r=0.
            Open,    // Used in the Integrated Green Function Poisson solver
                     // Note that the solver implicitely assumes open BCs:
                     // no need to enforce them separately
-           PECInsulator, // Mixed boundary with PEC and insulator
+           PEC_Insulator, // Mixed boundary with PEC and insulator
            Default = PML);
 
 /** Particle boundary conditions at the domain boundary
@@ -193,6 +192,7 @@ AMREX_ENUM(
 AMREX_ENUM(
     ScatteringAngleModel,
     Forward,    /**< Scattering angle is zero, i.e., products have the same direction as the incident particle in the center of mass frame */
+    Backward,   /**< Scattering angle is pi, i.e., products have the opposite direction of the incident particle in the center of mass frame */
     Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
     Default = Isotropic  /**< Isotropic */
 );
