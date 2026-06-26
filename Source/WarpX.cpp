@@ -561,7 +561,7 @@ WarpX::ReadParameters ()
 
     {
         const ParmParse pp_algo("algo");
-        pp_algo.query_enum_sloppy("maxwell_solver", electromagnetic_solver_id, "-_");
+        pp_algo.query_enum_case_insensitive("maxwell_solver", electromagnetic_solver_id);
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT && !EB::enabled()) {
             throw std::runtime_error("ECP Solver requires to enable embedded boundaries at runtime.");
         }
@@ -595,7 +595,7 @@ WarpX::ReadParameters ()
         "PMC boundary not implemented for PSATD, yet!");
 
 
-        pp_algo.query_enum_sloppy("evolve_scheme", evolve_scheme, "-_");
+        pp_algo.query_enum_case_insensitive("evolve_scheme", evolve_scheme);
     }
 
     {
@@ -726,7 +726,8 @@ WarpX::ReadParameters ()
         maxlevel_extEMfield_init = maxLevel();
         pp_warpx.query("maxlevel_extEMfield_init", maxlevel_extEMfield_init);
 
-        pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-_");
+        // query_enum_sloppy with "-" needed to map "labframe-electromagnetostatic" to "LabFrameElectroMagnetostatic"
+        pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-");
         // if an electrostatic solver is used, set the Maxwell solver to None
         if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
@@ -737,7 +738,7 @@ WarpX::ReadParameters ()
                   "Electrostatic solver not supported with 1D cylindrical and spherical");
 #endif
 
-        pp_warpx.query_enum_sloppy("poisson_solver", poisson_solver_id, "-_");
+        pp_warpx.query_enum_case_insensitive("poisson_solver", poisson_solver_id);
 #ifndef WARPX_DIM_3D
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
@@ -817,7 +818,7 @@ WarpX::ReadParameters ()
             );
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-                 evolve_scheme == EvolveScheme::ThetaImplicitEM),
+                 evolve_scheme == EvolveScheme::Theta_Implicit_EM),
                 "For electromagnetic solvers, warpx.dt_update_interval can only be used with algo.evolve_scheme = theta_implicit_em."
             );
         }
@@ -952,10 +953,10 @@ WarpX::ReadParameters ()
 
         const auto at_least_one_boundary_is_silver_mueller =
             (std::any_of(WarpX::field_boundary_lo.begin(), WarpX::field_boundary_lo.end(),
-                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_SilverMueller;})
+                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             ||
             std::any_of(WarpX::field_boundary_hi.begin(), WarpX::field_boundary_hi.end(),
-                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_SilverMueller;})
+                [](const auto& cc){return cc == FieldBoundaryType::Absorbing_Silver_Mueller;})
             );
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -1094,7 +1095,7 @@ WarpX::ReadParameters ()
 
         // Integer that corresponds to the type of grid used in the simulation
         // (collocated, staggered, hybrid)
-        pp_warpx.query_enum_sloppy("grid_type", grid_type, "-_");
+        pp_warpx.query_enum_case_insensitive("grid_type", grid_type);
 
         // Use same shape factors in all directions, for gathering
         if (grid_type == GridType::Collocated) { galerkin_interpolation = false; }
@@ -1251,24 +1252,24 @@ WarpX::ReadParameters ()
             electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
             current_deposition_algo = CurrentDepositionAlgo::Direct;
         }
-        pp_algo.query_enum_sloppy("current_deposition", current_deposition_algo, "-_");
-        pp_algo.query_enum_sloppy("charge_deposition", charge_deposition_algo, "-_");
-        pp_algo.query_enum_sloppy("particle_pusher", particle_pusher_algo, "-_");
+        pp_algo.query_enum_case_insensitive("current_deposition", current_deposition_algo);
+        pp_algo.query_enum_case_insensitive("charge_deposition", charge_deposition_algo);
+        pp_algo.query_enum_case_insensitive("particle_pusher", particle_pusher_algo);
 
         // check for implicit evolve scheme
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM) {
             m_implicit_solver = std::make_unique<SemiImplicitEM>();
         }
-        else if (evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+        else if (evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             m_implicit_solver = std::make_unique<ThetaImplicitEM>();
         }
-        else if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        else if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
 
         // implicit evolve schemes not setup to use mirrors
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
         }
@@ -1303,7 +1304,8 @@ WarpX::ReadParameters ()
 
         // Query algo.field_gathering from input, set field_gathering_algo to
         // "default" if not found (default defined in Utils/WarpXAlgorithmSelection.cpp)
-        pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-_");
+        // query_enum_sloppy with "-" needed to map e.g. "energy-conserving" to "EnergyConserving"
+        pp_algo.query_enum_sloppy("field_gathering", field_gathering_algo, "-");
 
         // Set default field gathering algorithm for hybrid grids (momentum-conserving)
         std::string tmp_algo;
@@ -1360,15 +1362,15 @@ WarpX::ReadParameters ()
                 " combined with mesh refinement is currently not implemented");
         }
 
-        pp_algo.query_enum_sloppy("em_solver_medium", m_em_solver_medium, "-_");
+        pp_algo.query_enum_case_insensitive("em_solver_medium", m_em_solver_medium);
         if (m_em_solver_medium == MediumForEM::Macroscopic ) {
-            pp_algo.query_enum_sloppy("macroscopic_sigma_method",
-                                      m_macroscopic_solver_algo, "-_");
+            pp_algo.query_enum_case_insensitive("macroscopic_sigma_method",
+                                                m_macroscopic_solver_algo);
         }
 
-        if (evolve_scheme == EvolveScheme::SemiImplicitEM ||
-            evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-            evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
@@ -1391,7 +1393,7 @@ WarpX::ReadParameters ()
                 field_gathering_algo != GatheringAlgo::MomentumConserving,
                     "With implicit and semi-implicit schemes, the momentum conserving field gather is not supported as it would not conserve energy");
         }
-        if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+        if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
                 "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
@@ -1409,7 +1411,7 @@ WarpX::ReadParameters ()
         }
         utils::parser::queryWithParser(pp_algo, "load_balance_efficiency_ratio_threshold",
                         load_balance_efficiency_ratio_threshold);
-        pp_algo.query_enum_sloppy("load_balance_costs_update", load_balance_costs_update_algo, "-_");
+        pp_algo.query_enum_case_insensitive("load_balance_costs_update", load_balance_costs_update_algo);
         if (WarpX::load_balance_costs_update_algo==LoadBalanceCostsUpdateAlgo::Heuristic) {
             utils::parser::queryWithParser(
                 pp_algo, "costs_heuristic_cells_wt", costs_heuristic_cells_wt);
@@ -1468,8 +1470,8 @@ WarpX::ReadParameters ()
             }
 
             // These evolve schemes permit time steps that violate the CFL condition
-            if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-                evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+            if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+                evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
 
@@ -1592,7 +1594,8 @@ WarpX::ReadParameters ()
         // Integer that corresponds to the order of the PSATD solution
         // (whether the PSATD equations are derived from first-order or
         // second-order solution)
-        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-_");
+        // query_enum_sloppy with "-" needed to map "first-order" to "FirstOrder"
+        pp_psatd.query_enum_sloppy("solution_type", m_psatd_solution_type, "-");
 
         std::string JRhom_input;
         pp_psatd.query("JRhom", JRhom_input);
@@ -3097,7 +3100,7 @@ void WarpX::AllocLevelSpectralSolverRZ (amrex::Vector<std::unique_ptr<SpectralSo
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
-    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }
@@ -3156,7 +3159,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
 
     amrex::Real solver_dt = dt[lev];
     if (WarpX::m_JRhom) { solver_dt /= static_cast<amrex::Real>(WarpX::m_JRhom_subintervals); }
-    if (evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // The step is Strang split into two half steps
         solver_dt /= 2.;
     }
