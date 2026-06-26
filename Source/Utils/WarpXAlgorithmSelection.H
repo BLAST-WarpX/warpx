@@ -188,6 +188,16 @@ AMREX_ENUM(
     Default = Full
 );
 
+/** \brief Particle shuffling method for binary collisions */
+AMREX_ENUM(
+    ParticleShufflingMethod,
+    None,
+    FisherYates,
+    Modulus,
+    Standard,
+    Default = FisherYates
+);
+
 /** \brief For binary collision algorithms, the strategy to determine
  *  the scattering angle in the center of mass frame */
 AMREX_ENUM(

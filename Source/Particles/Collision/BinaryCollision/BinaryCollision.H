@@ -15,7 +15,7 @@
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
-#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
+#include "Particles/Collision/BinaryCollision/ParticleShufflers.H"
 #include "Particles/Collision/CollisionBase.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartUtils.H"
@@ -105,13 +105,22 @@ public:
 
         m_use_global_debye_length = m_binary_collision_functor.use_global_debye_length();
 
+        const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
+        m_shuffling_method = ParticleShufflingMethod::Default;
+        pp_collisions.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+        pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+
+        if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+            m_modulus_rounds = 5;
+            pp_collisions.query("modulus_rounds", m_modulus_rounds);
+            pp_collision_name.query("modulus_rounds", m_modulus_rounds);
+        }
 
         if (collision_type == CollisionType::PairwiseCoulomb) {
             // Input parameter set for all pairwise Coulomb collisions
-            const amrex::ParmParse pp_collisions("collisions");
             pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
             pp_collisions.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
             pp_collisions.query("np_warning_threshold", m_np_warning_threshold);
@@ -617,20 +626,12 @@ public:
 
             // shuffle
             ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-                {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
+            if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
+            } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
+                FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
+            }
 
-                    // Do not shuffle if there is only one particle in the cell
-                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
-
-                    ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-                }
-            );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
@@ -1204,31 +1205,12 @@ public:
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
         ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelForRNG( 2*n_cells,
-                [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
-                {
-          const int i_cell = i < n_cells ? i : i - n_cells;
-
-          // The particles from species1 that are in the cell `i_cell` are
-          // given by the `indices_1[cell_start_1:cell_stop_1]`
-          index_type const cell_start_1 = cell_offsets_1[i_cell];
-          index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-          // Same for species 2
-          index_type const cell_start_2 = cell_offsets_2[i_cell];
-          index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-          // Do not collide if one species is missing in the cell
-          if ( cell_stop_1 - cell_start_1 < 1 ||
-               cell_stop_2 - cell_start_2 < 1 ) { return; }
-
-          if (i < n_cells) {
-            ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-          } else {
-            ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
-          }
-                }
-            );
+            if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
+            } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
+                FisherYatesShuffle(n_cells, cell_offsets_1, indices_1,
+                                            cell_offsets_2, indices_2);
+            }
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
 
         ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
@@ -1521,6 +1503,9 @@ private:
 
     bool m_isSameSpecies;
     bool m_have_product_species;
+
+    ParticleShufflingMethod m_shuffling_method;
+    int m_modulus_rounds;
 
     bool m_correct_energy_momentum = false;
     bool m_energy_correction_sort_by_weight = false;
