@@ -738,17 +738,18 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // Start from the moving-window grid shift, then take the max with a
         // speed-of-light upper bound: c * dt / min(dx).
         const auto& dx = CellSize(0);
-        amrex::Real min_dx = dx[0];
-        for (int i = 1; i < AMREX_SPACEDIM; ++i) {
-            min_dx = std::min(min_dx, dx[i]);
-        }
-        const int cells_from_c = static_cast<int>(std::ceil(PhysConst::c * dt[0] / min_dx));
-        int max_cells_travelled = std::max(num_moved, cells_from_c);
+        const amrex::Real min_dx = std::min({AMREX_D_DECL(dx[0], dx[1], dx[2])});
+        const int effective_max_grid_crossings = (particle_max_grid_crossings == 1)
+            ? static_cast<int>(std::ceil(PhysConst::c * dt[0] / min_dx));
+            : particle_max_grid_crossings;
+        int max_cells_travelled = num_moved + effective_max_grid_crossings;
         if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
             // Galilean algorithm: particles can move by up to one additional cell
-            max_cells_travelled += particle_max_grid_crossings + 1;
-        } else {
-            max_cells_travelled += particle_max_grid_crossings;
+            max_cells_travelled += static_cast<int>(std::ceil(std::min({AMREX_D_DECL(
+                m_v_galilean[0] * dt[0]/dx[0],
+                m_v_galilean[1] * dt[0]/dx[1], 
+                m_v_galilean[2] * dt[0]/dx[2]}
+            )));
         }
         // If max_cells_travelled reaches the domain size the local search is
         // no longer more efficient than (and may crash in lieu of) a full
