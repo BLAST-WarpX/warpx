@@ -1016,16 +1016,17 @@ FullDiagnostics::MovingWindowAndGalileanDomainShift (int step)
         const amrex::Real* cur_lo = m_geom_output[0][0].ProbLo();
         const amrex::Real* cur_hi = m_geom_output[0][0].ProbHi();
         const amrex::Real* geom_dx = m_geom_output[0][0].CellSize();
-        const auto num_shift_base = static_cast<int>((moving_window_x - cur_lo[moving_dir])
-                                              / geom_dx[moving_dir]);
+        // Use the unified helper function to calculate physical shift aligned to cell boundaries
+        const amrex::Real physical_shift_raw = moving_window_x - cur_lo[moving_dir];
+        const amrex::Real physical_shift = WarpX::CalculateMovingWindowAlignedShift(physical_shift_raw, geom_dx[moving_dir]);
         // Update the diagnostic geom domain. Note that this is done only for the
         // base level 0 because m_geom_output[0][lev] share the same static RealBox
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             new_lo[idim] = cur_lo[idim];
             new_hi[idim] = cur_hi[idim];
         }
-        new_lo[moving_dir] = cur_lo[moving_dir] + num_shift_base*geom_dx[moving_dir];
-        new_hi[moving_dir] = cur_hi[moving_dir] + num_shift_base*geom_dx[moving_dir];
+        new_lo[moving_dir] = cur_lo[moving_dir] + physical_shift;
+        new_hi[moving_dir] = cur_hi[moving_dir] + physical_shift;
         // Update RealBox of geometry with shifted domain geometry for moving-window
         for (int lev = 0; lev < nmax_lev; ++lev) {
             // Note that Full diagnostics has only one snapshot, m_num_buffers = 1

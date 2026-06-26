@@ -769,6 +769,41 @@ public:
         bool const step_after_start = (step >= start_moving_window_step);
         return do_moving_window && step_before_end && step_after_start;
     }
+    /** Calculate the shift per step for the moving window
+     *
+     * This function calculates how much the moving window shifts in one timestep.
+     * This is the same calculation used in MoveWindow.
+     *
+     * @param dt Timestep size
+     * @return Shift per step in physical units
+     */
+    static amrex::Real CalculateMovingWindowShiftPerStep (amrex::Real dt);
+
+    /** Calculate physical shift aligned to cell boundaries for the moving window direction
+     *
+     * This function takes a total physical shift and returns the physical shift amount
+     * aligned to cell boundaries. It converts the shift to cell-based units and back
+     * to physical units, ensuring the result is aligned to cell boundaries.
+     *
+     * @param total_shift Total shift amount in physical units
+     * @param cell_size Cell size in the moving window direction
+     * @return Physical shift amount aligned to cell boundaries
+     */
+    static amrex::Real CalculateMovingWindowAlignedShift (amrex::Real total_shift, amrex::Real cell_size);
+
+    /** Calculate the total shift for the moving window based on active steps
+     *
+     * This function calculates how many steps the moving window was active
+     * between start_step (inclusive) and end_step (inclusive), accounting for
+     * start_moving_window_step and end_moving_window_step, and returns the
+     * total shift that would occur over those active steps.
+     *
+     * @param start_step First step to consider (inclusive)
+     * @param end_step Last step to consider (inclusive)
+     * @param dt Timestep size
+     * @return Total shift in physical units
+     */
+    static amrex::Real CalculateMovingWindowShift (int start_step, int end_step, amrex::Real dt);
     static int moving_window_dir;
     static amrex::Real moving_window_v;
     static bool fft_do_time_averaging;

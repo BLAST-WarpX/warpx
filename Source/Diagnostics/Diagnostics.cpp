@@ -518,15 +518,24 @@ Diagnostics::InitBaseData ()
     m_all_field_functors.resize( nmax_lev );
 
     // For restart, move the m_lo and m_hi of the diag consistent with the
-    // current moving_window location
-    if (WarpX::do_moving_window) {
+    // current moving_window location. Account for start_moving_window_step and
+    // end_moving_window_step to only shift based on steps where the window was active.
+    if (WarpX::do_moving_window && warpx.getistep(0) > 0) {
         const int moving_dir = WarpX::moving_window_dir;
-        const amrex::Real displacement =
-            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
-        const int shift_num_base = static_cast<int>
-            (displacement / warpx.Geom(0).CellSize(moving_dir));
-        m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-        m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
+        const int current_step = warpx.getistep(0);
+
+        // Note: current_step is the checkpoint step, but the replay loop goes from 0 to current_step - 1
+        // So we need to calculate the shift for steps 0 to current_step - 1
+        const int last_replayed_step = current_step - 1;
+        const amrex::Real total_shift = WarpX::CalculateMovingWindowShift(0, last_replayed_step, warpx.getdt(0));
+
+        if (total_shift > 0.0_rt) {
+            // Use the unified helper function to calculate physical shift aligned to cell boundaries
+            const amrex::Real physical_shift = WarpX::CalculateMovingWindowAlignedShift(
+                total_shift, warpx.Geom(0).CellSize(moving_dir));
+            m_lo[moving_dir] += physical_shift;
+            m_hi[moving_dir] += physical_shift;
+        }
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){

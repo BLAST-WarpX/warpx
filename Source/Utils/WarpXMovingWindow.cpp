@@ -353,6 +353,55 @@ namespace
 
 }
 
+amrex::Real
+WarpX::CalculateMovingWindowShiftPerStep (amrex::Real dt)
+{
+    // Calculate the shift per step (same formula as used in MoveWindow)
+    return (moving_window_v - beta_boost * PhysConst::c)
+         / (1._rt - moving_window_v * beta_boost / PhysConst::c)
+         * dt;
+}
+
+amrex::Real
+WarpX::CalculateMovingWindowAlignedShift (amrex::Real total_shift, amrex::Real cell_size)
+{
+    // Convert physical shift to cell-based shift, then back to physical units
+    // This ensures the result is aligned to cell boundaries
+    const int cell_shift = static_cast<int>(total_shift / cell_size);
+    return cell_shift * cell_size;
+}
+
+amrex::Real
+WarpX::CalculateMovingWindowShift (int start_step, int end_step, amrex::Real dt)
+{
+    if (!do_moving_window || start_step > end_step) {
+        return 0.0_rt;
+    }
+
+    // Calculate how many steps the moving window was active between start_step and end_step
+    int active_steps = 0;
+    const int window_start = start_moving_window_step;
+    const int window_end = (end_moving_window_step < 0) ?
+        end_step : std::min(end_moving_window_step, end_step);
+
+    if (window_end >= window_start && end_step >= window_start) {
+        // Count steps from max(window_start, start_step) to min(window_end, end_step)
+        const int effective_start = std::max(window_start, start_step);
+        const int effective_end = std::min(window_end, end_step);
+        if (effective_end >= effective_start) {
+            active_steps = effective_end - effective_start + 1;
+        }
+    }
+
+    if (active_steps > 0) {
+        // Use the unified shift-per-step calculation
+        const amrex::Real shift_per_step = CalculateMovingWindowShiftPerStep(dt);
+        return active_steps * shift_per_step;
+    }
+
+    return 0.0_rt;
+}
+
 int
 WarpX::MoveWindow (const int step, bool move_j)
 {
@@ -363,17 +412,24 @@ WarpX::MoveWindow (const int step, bool move_j)
 
     bool const skip_lev0_coarse_patch = true;
 
+    // All logic for determining if the moving window should be active is centralized here.
+    // This includes checking start_moving_window_step, end_moving_window_step, and do_moving_window.
+    // Callers should not need to check these externally - just call MoveWindow and it will
+    // return 0 if the window is not active for this step.
+    if (!moving_window_active(step)) { return 0; }
+
+    // Print messages when starting/stopping the moving window
     if (step == start_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Starting moving window");
     }
     if (step == end_moving_window_step) {
         amrex::Print() << Utils::TextMsg::Info("Stopping moving window");
     }
-    if (!moving_window_active(step)) { return 0; }
 
     // Update the continuous position of the moving window,
     // and of the plasma injection
-    moving_window_x += (moving_window_v - WarpX::beta_boost * PhysConst::c)/(1 - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt[0];
+    // Use the unified shift-per-step calculation
+    moving_window_x += CalculateMovingWindowShiftPerStep(dt[0]);
     const int dir = moving_window_dir;
 
     // Update current injection position for all containers
@@ -389,9 +445,14 @@ WarpX::MoveWindow (const int step, bool move_j)
     const amrex::Real* current_lo = geom[0].ProbLo();
     const amrex::Real* current_hi = geom[0].ProbHi();
     const amrex::Real* cdx = geom[0].CellSize();
-    const int num_shift_base = static_cast<int>((moving_window_x - current_lo[dir]) / cdx[dir]);
+    // Use the unified helper function to calculate physical shift aligned to cell boundaries
+    const amrex::Real physical_shift_raw = moving_window_x - current_lo[dir];
+    const amrex::Real physical_shift = CalculateMovingWindowAlignedShift(physical_shift_raw, cdx[dir]);
 
-    if (num_shift_base == 0) { return 0; }
+    if (physical_shift == 0.0_rt) { return 0; }
+
+    // Calculate the cell-based shift for mesh field operations
+    const int num_shift_base = static_cast<int>(physical_shift_raw / cdx[dir]);
 
     // update the problem domain. Note the we only do this on the base level because
     // amrex::Geometry objects share the same, static RealBox.
@@ -399,8 +460,8 @@ WarpX::MoveWindow (const int step, bool move_j)
         new_lo[i] = current_lo[i];
         new_hi[i] = current_hi[i];
     }
-    new_lo[dir] = current_lo[dir] + num_shift_base * cdx[dir];
-    new_hi[dir] = current_hi[dir] + num_shift_base * cdx[dir];
+    new_lo[dir] = current_lo[dir] + physical_shift;
+    new_hi[dir] = current_hi[dir] + physical_shift;
 
     ResetProbDomain(amrex::RealBox(new_lo, new_hi));
 
@@ -416,10 +477,11 @@ WarpX::MoveWindow (const int step, bool move_j)
             new_slice_lo[i] = current_slice_lo[i];
             new_slice_hi[i] = current_slice_hi[i];
         }
-        const int num_shift_base_slice = static_cast<int> ((moving_window_x -
-                                   current_slice_lo[dir]) / cdx[dir]);
-        new_slice_lo[dir] = current_slice_lo[dir] + num_shift_base_slice*cdx[dir];
-        new_slice_hi[dir] = current_slice_hi[dir] + num_shift_base_slice*cdx[dir];
+        // Use the unified helper function to calculate physical shift aligned to cell boundaries
+        const amrex::Real physical_shift_slice_raw = moving_window_x - current_slice_lo[dir];
+        const amrex::Real physical_shift_slice = CalculateMovingWindowAlignedShift(physical_shift_slice_raw, cdx[dir]);
+        new_slice_lo[dir] = current_slice_lo[dir] + physical_shift_slice;
+        new_slice_hi[dir] = current_slice_hi[dir] + physical_shift_slice;
         slice_realbox.setLo(new_slice_lo);
         slice_realbox.setHi(new_slice_hi);
     }
