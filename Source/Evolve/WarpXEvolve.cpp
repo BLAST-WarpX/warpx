@@ -53,6 +53,7 @@
 #include <AMReX_Vector.H>
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <memory>
 #include <ostream>
@@ -729,31 +730,29 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
-    // Non-Maxwell solver: particles can move by an arbitrary number of cells
-    if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
-    {
-        mypc->Redistribute();
+    // Without mesh refinement, use local redistribute: particles cannot travel
+    // faster than c, so the number of cells crossed per step is bounded.
+    if (finest_level == 0) {
+        // Estimate the maximum number of cells a particle may have travelled.
+        // Start from the moving-window grid shift, then take the max with a
+        // speed-of-light upper bound: c * dt / min(dx).
+        const auto& dx = CellSize(0);
+        amrex::Real min_dx = dx[0];
+        for (int i = 1; i < AMREX_SPACEDIM; ++i) {
+            min_dx = std::min(min_dx, dx[i]);
+        }
+        const int cells_from_c = static_cast<int>(std::ceil(PhysConst::c * dt[0] / min_dx));
+        int max_cells_travelled = std::max(num_moved, cells_from_c);
+        if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
+            // Galilean algorithm: particles can move by up to one additional cell
+            max_cells_travelled += particle_max_grid_crossings + 1;
+        } else {
+            max_cells_travelled += particle_max_grid_crossings;
+        }
+        mypc->RedistributeLocal(max_cells_travelled);
     }
-    else
-    {
-        // Electromagnetic solver: due to CFL condition, particles can
-        // only move by one or two cells per time step
-        // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
-        if (finest_level == 0) {
-            int max_cells_travelled = num_moved;
-            if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-                // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
-                max_cells_travelled += particle_max_grid_crossings + 1;
-            } else {
-                // Standard algorithm ; particles can move by up to the max number
-                max_cells_travelled += particle_max_grid_crossings;
-            }
-            mypc->RedistributeLocal(max_cells_travelled);
-        }
-        else {
-            mypc->Redistribute();
-        }
+    else {
+        mypc->Redistribute();
     }
 
     // interact the particles with EB walls (if present)
