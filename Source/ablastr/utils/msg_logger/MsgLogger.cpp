@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <numeric>
+#include <ranges>
 
 namespace abl_msg_logger = ablastr::utils::msg_logger;
 namespace abl_ser = ablastr::utils::serialization;
@@ -337,7 +338,7 @@ std::pair<int,int> Logger::find_gather_rank_and_its_msgs(int how_many_msgs) cons
 
     const auto m_am_i_io = (m_rank == m_io_rank);
     if (m_am_i_io){
-        const auto it_max = std::max_element(num_msg.begin(), num_msg.end());
+        const auto it_max = std::ranges::max_element(num_msg);
         max_items = *it_max;
 
         //In case of an "ex aequo" the I/O rank should be the gather rank
@@ -460,7 +461,7 @@ Logger::compute_msgs_with_counter_and_ranks(
 
     // Sort affected ranks lists
     for(auto& el : msgs_with_counter_and_ranks){
-        std::sort(el.ranks.begin(), el.ranks.end());
+        std::ranges::sort(el.ranks);
     }
 
     return msgs_with_counter_and_ranks;
@@ -613,9 +614,9 @@ gather_all_data(
         std::partial_sum(package_lengths.begin(), package_lengths.end(),
             displacements.begin());
         const auto total_sum = displacements.back();
-        std::rotate(displacements.rbegin(),
-            displacements.rbegin()+1,
-            displacements.rend());
+        std::ranges::rotate(
+            std::ranges::reverse_view(displacements),
+            displacements.rbegin()+1);
         displacements[0] = 0;
 
         all_data.resize(total_sum);

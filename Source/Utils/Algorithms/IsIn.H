@@ -9,7 +9,7 @@
 #ifndef WARPX_UTILS_ALGORITHMS_ISIN_H_
 #define WARPX_UTILS_ALGORITHMS_ISIN_H_
 
-#include <algorithm>
+#include <ranges>
 #include <vector>
 
 namespace utils::algorithms
@@ -30,7 +30,7 @@ namespace utils::algorithms
     bool is_in(const std::vector<TV>& vect,
                const TE& elem)
     {
-        return (std::find(vect.begin(), vect.end(), elem) != vect.end());
+        return (std::ranges::find(vect, elem) != vect.end());
     }
 
 
@@ -50,7 +50,7 @@ namespace utils::algorithms
     bool any_of_is_in(const std::vector<TV>& vect,
                const std::vector<TE>& elems)
     {
-        return std::any_of(elems.begin(), elems.end(),
+        return std::ranges::any_of(elems,
             [&](const auto& elem){return is_in(vect, elem);});
     }
 }

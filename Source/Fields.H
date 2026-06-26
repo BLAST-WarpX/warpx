@@ -12,8 +12,8 @@
 
 #include <AMReX_Enum.H>
 
-#include <algorithm>
 #include <iterator>
+#include <ranges>
 
 
 namespace warpx::fields
@@ -150,7 +150,7 @@ namespace warpx::fields
     inline bool
     isFieldArray (const FieldType field_type)
     {
-        return std::any_of( std::begin(ArrayFieldTypes), std::end(ArrayFieldTypes),
+        return std::ranges::any_of(ArrayFieldTypes,
             [field_type](const FieldType& f) { return f == field_type; });
     }
 

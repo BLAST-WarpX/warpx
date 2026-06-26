@@ -13,8 +13,8 @@
 
 #include <AMReX_ParmParse.H>
 
-#include <algorithm>
 #include <cmath>
+#include <ranges>
 
 
 namespace ablastr::utils::text
@@ -116,8 +116,7 @@ IntervalsParser::IntervalsParser (const std::vector<std::string>& instr_vec)
 
 bool IntervalsParser::contains (const int n) const
 {
-    return std::any_of(m_slices.begin(), m_slices.end(),
-        [&](const auto& slice){return slice.contains(n);});
+    return std::ranges::any_of(m_slices, [&](const auto& slice){return slice.contains(n);});
 }
 
 

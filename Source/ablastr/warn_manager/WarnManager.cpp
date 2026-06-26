@@ -16,7 +16,7 @@
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>
 
-#include <algorithm>
+#include <ranges>
 #include <sstream>
 #include <vector>
 
@@ -108,7 +108,7 @@ void WarnManager::RecordWarning(
 std::string WarnManager::PrintLocalWarnings(const std::string& when) const
 {
     auto all_warnings = m_p_logger->get_msgs_with_counter();
-    std::sort(all_warnings.begin(), all_warnings.end(),
+    std::ranges::sort(all_warnings,
         [](const auto& a, const auto& b){return a.msg < b.msg;});
 
     std::stringstream ss;
@@ -139,7 +139,7 @@ std::string WarnManager::PrintGlobalWarnings(const std::string& when) const
         return "[see I/O rank message]";
     }
 
-    std::sort(all_warnings.begin(), all_warnings.end(),
+    std::ranges::sort(all_warnings,
         [](const auto& a, const auto& b){
             return a.msg_with_counter.msg < b.msg_with_counter.msg;});
 
@@ -209,7 +209,7 @@ void WarnManager::debug_read_warnings_from_input(const amrex::ParmParse& params)
         else{
             std::vector<int> who_involved;
             pp_warn.queryarr("who_involved", who_involved);
-            if(std::find (who_involved.begin(), who_involved.end(), m_rank)
+            if(std::ranges::find (who_involved, m_rank)
                 != who_involved.end()){
                 this->RecordWarning(topic, msg, wpriority);
             }
