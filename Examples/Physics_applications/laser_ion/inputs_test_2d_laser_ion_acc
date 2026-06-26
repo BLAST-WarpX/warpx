@@ -257,7 +257,7 @@ openPMDbw.hydrogen.plot_filter_function(t,x,y,z,ux,uy,uz) = (uz<0)
 # histograms with 2.0 degree acceptance angle in fw direction
 # 2 deg * pi / 180 : 0.03490658503 rad
 # half-angle +/-   : 0.017453292515 rad
-warpx.reduced_diags_names                   = histuH histue histuzAll FieldProbe_Z FieldProbe_ScatPoint FieldProbe_ScatLine LBC PhaseSpaceIons PhaseSpaceElectrons
+warpx.reduced_diags_names                   = histuH histue histuzAll FieldProbe_Z FieldProbe_ScatPoint FieldProbe_ScatLine LBC MPR PhaseSpaceIons PhaseSpaceElectrons
 
 histuH.type                                 = ParticleHistogram
 histuH.intervals                            = 100
@@ -317,6 +317,13 @@ FieldProbe_ScatLine.resolution = 201
 # check computational load per box
 LBC.type = LoadBalanceCosts
 LBC.intervals = 100
+
+# check memory usage per rank
+# NOTE: use sparingly for large-scale runs as it produces a text file per rank
+MPR.type = MemoryPerRank
+MPR.intervals = 100
+MPR.path = "diags/reducedfiles/MemoryPerRank/"
+MPR.file_prefix = "MPR"
 
 PhaseSpaceIons.type                                 = ParticleHistogram2D
 PhaseSpaceIons.intervals                            = 100

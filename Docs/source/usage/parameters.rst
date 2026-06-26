@@ -4925,6 +4925,101 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         at earliest, the load balance efficiency can be output starting at step
         ``2``, since costs are not recorded until step ``1``.
 
+    * ``MemoryPerRank``
+        This diagnostic writes detailed memory usage information for each MPI rank
+        as a YAML file. Each participating rank produces one file named
+        ``<path>/<file_prefix>.<zero-padded MPI rank>.yaml``, and every entry in it
+        is a self-contained YAML document (separated by ``---``), so readers can
+        stream them with e.g. ``yaml.safe_load_all()`` in Python.
+
+        Per rank and per interval, each YAML document records:
+
+        * Simulation ``step`` and ``time`` (s)
+        * ``mpi.rank`` and ``mpi.size``
+        * ``host.name`` (MPI processor name or the Linux hostname)
+        * ``gpu.device_id`` and total/free global memory in MB (when built with a GPU backend)
+        * ``arenas.{main, device, managed, pinned, comms}`` allocated and used MB, for the
+          AMReX ``Arena`` memory pools. ``device``/``managed``/``comms`` are only emitted
+          when they are distinct allocators from ``main``/``device``/``pinned`` respectively
+          (e.g. the ``comms`` arena is typically a separate block only on GPU-aware MPI builds).
+        * ``process.{vm_peak, vm_size, vm_hwm, vm_rss}_mb`` read from ``/proc/self/status`` on
+          Linux, capturing the total resident set and high-water mark of the process — including
+          allocations that AMReX arenas do not track (MPI buffers, I/O libraries, Python,
+          plugin libraries, ...). This is often the first thing that matters when chasing
+          out-of-memory (OOM) crashes.
+
+        All memory values in the YAML are reported in **MB as floating-point numbers with
+        3-decimal precision**, regardless of the underlying source unit (bytes from AMReX,
+        kB from ``/proc/self/status``).
+
+        This is primarily useful for debugging OOM crashes on large, multi-GPU runs. A
+        typical workflow is to restart from a checkpoint and enable this diagnostic without
+        otherwise changing the input file, so the crash signature is preserved while
+        detailed per-rank memory information is captured right up until the failure.
+
+        * ``<reduced_diags_name>.file_prefix`` (`string`)
+            The basename of the per-rank YAML files, to which ``.<zero-padded MPI rank>.yaml``
+            is appended. The default is ``"<reduced_diags_name>"``. The rank is padded to a
+            constant width per run (minimum 4 digits) so that filenames sort lexicographically
+            in rank order.
+
+        * ``<reduced_diags_name>.rank_stride`` (`int`, default ``1``)
+            Only every ``rank_stride``-th MPI rank writes a file (i.e. ranks for which
+            ``MyProc() % rank_stride == 0``). The default ``1`` writes one file per rank;
+            on very large runs a larger stride can be used to reduce the number of files
+            created on the shared filesystem.
+
+        Example output (``MPR.0000.yaml``):
+
+        .. code-block:: yaml
+
+            ---
+            step: 0
+            time: 0.00000000000000e+00
+            mpi:
+              rank: 0
+              size: 4
+            host:
+              name: 'nid002112'
+            gpu:
+              device_id: 0
+              total_mb: 40441.438
+              free_mb: 9058.688
+            arenas:
+              main:
+                allocated_mb: 30330.500
+                used_mb: 51.125
+              managed:
+                allocated_mb: 8.000
+                used_mb: 0.250
+              pinned:
+                allocated_mb: 8.000
+                used_mb: 0.000
+              comms:
+                allocated_mb: 8.000
+                used_mb: 0.000
+            process:
+              vm_peak_mb: 73430.281
+              vm_size_mb: 73430.281
+              vm_hwm_mb: 419.633
+              vm_rss_mb: 419.633
+            ---
+            step: 100
+            time: 1.08306469330691e-14
+            ...
+
+        See :ref:`MemoryPerRank reading and plotting <memoryperrank-plotting>` for a
+        small Python helper that loads these files into a ``pandas.DataFrame`` and a plotting
+        example showing total arena usage and host-process memory per rank over time.
+
+        .. note::
+
+            Use sparingly on larger production runs.
+            The diagnostic produces one YAML file per (participating) rank and appends one
+            YAML document to it at each timestep in ``<reduced_diags_name>.intervals``.
+            For very large rank counts, combine with ``rank_stride`` and/or point
+            ``<reduced_diags_name>.path`` to a filesystem with good small-file performance.
+
     * ``ParticleHistogram``
         This type computes a user defined particle histogram.
 
