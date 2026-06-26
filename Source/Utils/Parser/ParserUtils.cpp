@@ -28,10 +28,10 @@ void utils::parser::getWithParser (const amrex::ParmParse& a_pp, char const * co
         const auto i2 = val.find('}', i1);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(i2 != std::string::npos,
                                          "Bad format for input paramter " + std::string(str) + ", unclosed brace");
-        std::string var = val.substr(i1+1, i2-i1-1);
+        const std::string var = val.substr(i1+1, i2-i1-1);
         const amrex::ParmParse pp_my_constants("my_constants");
         std::string replacer;
-        pp_my_constants.get(var.c_str(), replacer);
+        pp_my_constants.get(var, replacer);
         val.replace(i1, i2-i1+1, replacer);
     }
 }
