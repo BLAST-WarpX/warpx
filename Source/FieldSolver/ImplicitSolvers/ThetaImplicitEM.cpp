@@ -9,6 +9,8 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -126,6 +128,10 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
             exit_status = m_nlsolver->GetExitStatus();
             if (exit_status < 0) {
                 nsubsteps *= 2;
+                ablastr::warn_manager::WMRecordWarning("ThetaImplicitEM",
+                    "Notice: solver diverged at step " + std::to_string(a_step) + ". " +
+                    "Attempting subcycling with " + std::to_string(nsubsteps) + " substeps.",
+                    ablastr::warn_manager::WarnPriority::low);
                 if (nsubsteps > max_substeps) {
                     // Give up and just return the bad exit status
                     return exit_status;
