@@ -22,6 +22,8 @@ public:
 
     explicit CollisionBase (const std::string& collision_name);
 
+    virtual void AllocData () {}
+
     virtual void doCollisions (amrex::Real /*cur_time*/, amrex::Real /*dt*/, MultiParticleContainer* /*mypc*/ ){}
 
     CollisionBase(CollisionBase const &) = delete;

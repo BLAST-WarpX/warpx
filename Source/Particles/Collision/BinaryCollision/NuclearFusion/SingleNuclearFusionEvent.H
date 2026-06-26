@@ -48,6 +48,9 @@
  * to determine by how much the fusion multiplier is reduced
  * @param[in] fusion_type the physical fusion process to model
  * @param[in] engine the random engine.
+ * @param[in] create_products flags whether or not to create particles
+ * @param[in] i_cell the grid cell where the collision is taking place
+ * @param[in] particle_production the pointer to where the particle production result is to be added
  */
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -64,7 +67,10 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
                                const amrex::ParticleReal& probability_threshold,
                                const amrex::ParticleReal& probability_target_value,
                                const NuclearFusionType& fusion_type,
-                               const amrex::RandomEngine& engine)
+                               const amrex::RandomEngine& engine,
+                               const bool create_products,
+                               const int i_cell,
+                               amrex::Real * particle_production)
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
@@ -114,14 +120,23 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     // std::expm1 is used since it maintains correctness for small exponent.
     const amrex::ParticleReal probability = -std::expm1(-probability_estimate);
 
+    const amrex::Real w_new = w_min/fusion_multiplier_eff;
+
+    // Save the particle production density if requested
+    if (particle_production) {
+        const amrex::Real new_products = probability*w_new/dV;
+        amrex::Gpu::Atomic::AddNoRet(particle_production + i_cell, new_products);
+
+    }
+
     // Get a random number
     const amrex::ParticleReal random_number = amrex::Random(engine);
 
-    // If we have a fusion event, set the mask the true and fill the product weight array
-    if (random_number < probability)
+    // If we have a fusion event and are creating products, set the mask the true and fill the product weight array
+    if (random_number < probability && create_products)
     {
         p_mask[pair_index] = true;
-        p_pair_reaction_weight[pair_index] = w_min/fusion_multiplier_eff;
+        p_pair_reaction_weight[pair_index] = w_new;
     }
     else
     {

@@ -8,6 +8,7 @@
 #ifndef WARPX_PAIRWISE_COULOMB_COLLISION_FUNC_H_
 #define WARPX_PAIRWISE_COULOMB_COLLISION_FUNC_H_
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "ElasticCollisionPerez.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -24,6 +25,7 @@
  *        ElasticCollisionPerez. It also reads and contains the Coulomb logarithm.
  */
 class PairWiseCoulombCollisionFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -120,7 +122,8 @@ public:
             amrex::ParticleReal const  q1, amrex::ParticleReal const  q2,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const /*cell_start_pair*/, index_type* /*p_mask*/,
+            index_type const /*cell_start_pair*/, int const /*i_cell*/,
+            index_type* /*p_mask*/,
             index_type* /*p_pair_indices_1*/, index_type* /*p_pair_indices_2*/,
             amrex::ParticleReal* /*p_pair_reaction_weight*/,
             amrex::ParticleReal* /*p_product_data*/,
@@ -144,7 +147,7 @@ public:
         bool m_isSameSpecies;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 

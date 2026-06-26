@@ -434,6 +434,8 @@ MultiParticleContainer::AllocData ()
     for (auto& pc : allcontainers) {
         pc->AllocData();
     }
+
+    collisionhandler->AllocData();
 }
 
 void

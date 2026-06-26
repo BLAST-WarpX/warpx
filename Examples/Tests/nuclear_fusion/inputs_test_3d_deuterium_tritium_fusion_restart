@@ -1,0 +1,4 @@
+# This tests the particle_production diagnostic after restart
+FILE = inputs_test_3d_deuterium_tritium_fusion
+
+amr.restart = "../test_3d_deuterium_tritium_fusion/diags/checkpoint000001"
