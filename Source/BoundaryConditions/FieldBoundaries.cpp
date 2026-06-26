@@ -71,8 +71,8 @@ namespace warpx::boundary_conditions
         detail::check_periodicity_consistency(field_boundary_lo, field_boundary_hi);
 
         auto is_field_boundary_periodic = amrex::Array<bool, AMREX_SPACEDIM>{};
-        std::transform (
-            field_boundary_lo.begin(), field_boundary_lo.end(),
+        std::ranges::transform (
+            field_boundary_lo,
             is_field_boundary_periodic.begin(),
             [](const auto& fb){return (fb == FieldBoundaryType::Periodic);});
 

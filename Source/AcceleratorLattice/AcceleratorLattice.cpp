@@ -14,7 +14,7 @@
 
 #include <AMReX_REAL.H>
 
-#include <algorithm>
+#include <ranges>
 
 
 AcceleratorLattice::AcceleratorLattice ()
@@ -50,7 +50,7 @@ AcceleratorLattice::ReadLattice (std::string const & root_name, amrex::ParticleR
     pp_lattice.queryAdd("reverse", reverse);
 
     if (reverse) {
-        std::reverse(lattice_elements.begin(), lattice_elements.end());
+        std::ranges::reverse(lattice_elements);
     }
 
     // Loop through lattice elements

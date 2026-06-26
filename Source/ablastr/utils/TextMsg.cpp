@@ -11,7 +11,6 @@
 
 #include <AMReX.H>
 
-#include <algorithm>
 #include <iterator>
 #include <sstream>
 #include <vector>
@@ -37,16 +36,13 @@ namespace
             return msg_prefix + msg + "\n";
         }
 
-        const auto wrapped_text = ablastr::utils::text::automatic_text_wrap(
-            msg, msg_line_length);
 
         std::stringstream ss_out;
-
-        std::for_each(std::begin(wrapped_text), std::end(wrapped_text),
-            [&,ln=0](const auto& line) mutable {
-                ss_out << ((ln++ == 0) ? msg_prefix : msg_line_prefix);
-                ss_out << line << "\n";
-            });
+        int ln = 0;
+        for(const auto& line : ablastr::utils::text::automatic_text_wrap(msg, msg_line_length)){
+            ss_out << ((ln++ == 0) ? msg_prefix : msg_line_prefix);
+            ss_out << line << "\n";
+        }
 
         return ss_out.str();
     }
