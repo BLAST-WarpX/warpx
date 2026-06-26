@@ -251,6 +251,8 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
+    void CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src);
+
     void SaveEoldMultifab ();
 
     /**

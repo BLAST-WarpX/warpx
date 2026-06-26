@@ -519,6 +519,18 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 
 }
 
+void ImplicitSolver::CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src)
+{
+    // Copy the MultiFabs in a VectorField
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const ablastr::fields::VectorField src_vec = m_WarpX->m_fields.get_alldirs(src, lev);
+        ablastr::fields::VectorField dst_vec = m_WarpX->m_fields.get_alldirs(dst, lev);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*dst_vec[n], *src_vec[n], 0, 0, dst_vec[n]->nComp(), dst_vec[n]->nGrowVect());
+        }
+    }
+}
+
 void ImplicitSolver::SaveEoldMultifab ()
 {
     using warpx::fields::FieldType;
