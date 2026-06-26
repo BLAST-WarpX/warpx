@@ -6,9 +6,12 @@
  */
 #include "SpectralBaseAlgorithmRZ.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
+
 #include <cmath>
 
 using namespace amrex;
+using namespace amrex::literals;
 
 /**
  * \brief Compute spectral divergence of E
@@ -17,7 +20,7 @@ void
 SpectralBaseAlgorithmRZ::ComputeSpectralDivE (
     const int lev,
     SpectralFieldDataRZ& field_data,
-    const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
+    ablastr::fields::VectorField const & Efield,
     amrex::MultiFab& divE )
 {
     using amrex::operator""_rt;
@@ -37,7 +40,7 @@ SpectralBaseAlgorithmRZ::ComputeSpectralDivE (
         Box const & bx = field_data.fields[mfi].box();
 
         // Extract arrays for the fields to be updated
-        Array4<Complex> fields = field_data.fields[mfi].array();
+        const Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
         Real const * kr_arr = field_data.getKrArray(mfi).dataPtr();

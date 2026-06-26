@@ -2,6 +2,9 @@ function(find_openpmd)
     if(WarpX_openpmd_src)
         message(STATUS "Compiling local openPMD-api ...")
         message(STATUS "openPMD-api source path: ${WarpX_openpmd_src}")
+        if(NOT IS_DIRECTORY ${WarpX_openpmd_src})
+            message(FATAL_ERROR "Specified directory WarpX_openpmd_src='${WarpX_openpmd_src}' does not exist!")
+        endif()
     elseif(WarpX_openpmd_internal)
         message(STATUS "Downloading openPMD-api ...")
         message(STATUS "openPMD-api repository: ${WarpX_openpmd_repo} (${WarpX_openpmd_branch})")
@@ -10,7 +13,7 @@ function(find_openpmd)
     if(WarpX_openpmd_internal OR WarpX_openpmd_src)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-        # see https://openpmd-api.readthedocs.io/en/0.15.1/dev/buildoptions.html
+        # see https://openpmd-api.readthedocs.io/en/0.17.0/dev/buildoptions.html
         set(openPMD_USE_ADIOS1      OFF           CACHE INTERNAL "")
         set(openPMD_USE_MPI         ${WarpX_MPI}  CACHE INTERNAL "")
         set(openPMD_USE_PYTHON      OFF           CACHE INTERNAL "")
@@ -29,12 +32,7 @@ function(find_openpmd)
                 GIT_TAG        ${WarpX_openpmd_branch}
                 BUILD_IN_SOURCE 0
             )
-            FetchContent_GetProperties(fetchedopenpmd)
-
-            if(NOT fetchedopenpmd_POPULATED)
-                FetchContent_Populate(fetchedopenpmd)
-                add_subdirectory(${fetchedopenpmd_SOURCE_DIR} ${fetchedopenpmd_BINARY_DIR})
-            endif()
+            FetchContent_MakeAvailable(fetchedopenpmd)
 
             # advanced fetch options
             mark_as_advanced(FETCHCONTENT_BASE_DIR)
@@ -73,7 +71,7 @@ function(find_openpmd)
         else()
             set(COMPONENT_WMPI NOMPI)
         endif()
-        find_package(openPMD 0.15.1 CONFIG REQUIRED COMPONENTS ${COMPONENT_WMPI})
+        find_package(openPMD 0.17.0 CONFIG REQUIRED COMPONENTS ${COMPONENT_WMPI})
         message(STATUS "openPMD-api: Found version '${openPMD_VERSION}'")
     endif()
 endfunction()
@@ -89,7 +87,7 @@ if(WarpX_OPENPMD)
     set(WarpX_openpmd_repo "https://github.com/openPMD/openPMD-api.git"
         CACHE STRING
         "Repository URI to pull and build openPMD-api from if(WarpX_openpmd_internal)")
-    set(WarpX_openpmd_branch "0.15.1"
+    set(WarpX_openpmd_branch "0.17.0"
         CACHE STRING
         "Repository branch for WarpX_openpmd_repo if(WarpX_openpmd_internal)")
 

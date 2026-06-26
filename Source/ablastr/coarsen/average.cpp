@@ -9,15 +9,14 @@
 #include "ablastr/utils/TextMsg.H"
 
 #include <AMReX_BLProfiler.H>
-#include <AMReX_BLassert.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuLaunch.H>
+#include <AMReX_IndexType.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
-
 
 namespace ablastr::coarsen::average
 {

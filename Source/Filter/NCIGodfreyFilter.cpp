@@ -23,39 +23,36 @@
 
 using namespace amrex;
 
-NCIGodfreyFilter::NCIGodfreyFilter(godfrey_coeff_set coeff_set, amrex::Real cdtodz, bool nodal_gather){
-    // Store parameters into class data members
-    m_coeff_set = coeff_set;
-    m_cdtodz = cdtodz;
-    m_nodal_gather = nodal_gather;
+//NCIGodfreyFilter not implemented in 1D
+#if (AMREX_SPACEDIM >= 2)
 
+NCIGodfreyFilter::NCIGodfreyFilter(godfrey_coeff_set coeff_set, amrex::Real cdtodz, bool nodal_gather):
+    m_coeff_set{coeff_set}, // Store parameters into class data members
+    m_cdtodz{cdtodz},
+    m_nodal_gather{nodal_gather}
+{
     // NCI Godfrey filter has fixed size, and is applied along z only.
-#if defined(WARPX_DIM_3D)
+# if defined(WARPX_DIM_3D)
     stencil_length_each_dir = {1,1,5};
     slen = {1,1,5};
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+# else
     stencil_length_each_dir = {1,5};
     slen = {1,5,1};
-#else
-    amrex::ignore_unused(coeff_set, cdtodz, nodal_gather);
-    WARPX_ABORT_WITH_MESSAGE(
-        "NCIGodfreyFilter not implemented in 1D!");
-#endif
+# endif
 }
 
-void NCIGodfreyFilter::ComputeStencils(){
-
-#if (AMREX_SPACEDIM >= 2)
+void NCIGodfreyFilter::ComputeStencils()
+{
     using namespace warpx::nci_godfrey;
 
-    // Sanity checks: filter length shoulz be 5 in z
-#if  defined(WARPX_DIM_3D)
+    // Sanity checks: filter length should be 5 in z
+#  if  defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         slen.z==5,"ERROR: NCI filter requires 5 points in z");
-#else
+#  else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         slen.y==5,"ERROR: NCI filter requires 5 points in z");
-#endif
+#  endif
     // Interpolate coefficients from the table, and store into prestencil.
     auto index = static_cast<int>(tab_length*m_cdtodz);
     index = min(index, tab_length-2);
@@ -111,33 +108,47 @@ void NCIGodfreyFilter::ComputeStencils(){
     // so only 1 coeff, equal to 1)
     Vector<Real> h_stencil_x(1);
     h_stencil_x[0] = 1._rt;
-#if defined(WARPX_DIM_3D)
+#  if defined(WARPX_DIM_3D)
     Vector<Real> h_stencil_y(1);
     h_stencil_y[0] = 1._rt;
-#endif
+#  endif
 
     // Due to the way Filter::DoFilter() is written,
     // coefficient 0 has to be /2
     h_stencil_x[0] /= 2._rt;
-#if defined(WARPX_DIM_3D)
+#  if defined(WARPX_DIM_3D)
     h_stencil_y[0] /= 2._rt;
-#endif
+#  endif
     h_stencil_z[0] /= 2._rt;
 
-    stencil_x.resize(h_stencil_x.size());
-#if defined(WARPX_DIM_3D)
-    stencil_y.resize(h_stencil_y.size());
-#endif
-    stencil_z.resize(h_stencil_z.size());
-
-    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_x.begin(),h_stencil_x.end(),stencil_x.begin());
-#if defined(WARPX_DIM_3D)
-    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_y.begin(),h_stencil_y.end(),stencil_y.begin());
-#endif
-    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_z.begin(),h_stencil_z.end(),stencil_z.begin());
+    m_stencil_0.resize(h_stencil_x.size());
+    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_x.begin(),h_stencil_x.end(),m_stencil_0.begin());
+#  if defined(WARPX_DIM_3D)
+    m_stencil_1.resize(h_stencil_y.size());
+    m_stencil_2.resize(h_stencil_z.size());
+    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_y.begin(),h_stencil_y.end(),m_stencil_1.begin());
+    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_z.begin(),h_stencil_z.end(),m_stencil_2.begin());
+#  elif (AMREX_SPACEDIM == 2)
+    // In 2D, the filter applies stencil_1 to the 2nd dimension
+    m_stencil_1.resize(h_stencil_z.size());
+    Gpu::copyAsync(Gpu::hostToDevice,h_stencil_z.begin(),h_stencil_z.end(),m_stencil_1.begin());
+#  endif
 
     Gpu::synchronize();
-#else
-    WARPX_ABORT_WITH_MESSAGE("NCIGodfreyFilter not implemented in 1D!");
-#endif
 }
+
+#else
+
+NCIGodfreyFilter::NCIGodfreyFilter(godfrey_coeff_set, amrex::Real, bool)
+{
+    WARPX_ABORT_WITH_MESSAGE(
+        "NCIGodfreyFilter not implemented in 1D!");
+}
+
+void NCIGodfreyFilter::ComputeStencils()
+{
+    WARPX_ABORT_WITH_MESSAGE(
+        "NCIGodfreyFilter not implemented in 1D!");
+}
+
+#endif

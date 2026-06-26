@@ -1,0 +1,27 @@
+{
+  "lev=0": {
+    "rho_electrons": 0.004433022541071424,
+    "rho_he_ions": 0.005199005817669999
+  },
+  "neutrals": {
+    "particle_momentum_x": 1.408433344062299e-19,
+    "particle_momentum_y": 1.4049724336327412e-19,
+    "particle_momentum_z": 1.4135515316620349e-19,
+    "particle_position_x": 1124.8452839463175,
+    "particle_weight": 6.458799996388281e+19
+  },
+  "electrons": {
+    "particle_momentum_x": 3.4780787330466407e-20,
+    "particle_momentum_y": 3.4912733818194897e-20,
+    "particle_momentum_z": 1.2630516859306126e-19,
+    "particle_position_x": 2139.031410018173,
+    "particle_weight": 14573808593750.002
+  },
+  "he_ions": {
+    "particle_momentum_x": 2.7696446830257567e-19,
+    "particle_momentum_y": 2.758427040479056e-19,
+    "particle_momentum_z": 3.6234828842014624e-19,
+    "particle_position_x": 2200.148348224893,
+    "particle_weight": 17186023437500.004
+  }
+}

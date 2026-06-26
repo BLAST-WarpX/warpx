@@ -11,7 +11,8 @@
 #include "SpectralFieldData.H"
 #include "SpectralHankelTransform/SpectralHankelTransformer.H"
 #include "SpectralKSpaceRZ.H"
-#include "FieldSolver/SpectralSolver/AnyFFT.H"
+
+#include <ablastr/math/fft/AnyFFT.H>
 
 #include <AMReX_MultiFab.H>
 
@@ -26,39 +27,48 @@ class SpectralFieldDataRZ
         // Define the FFTplans type, which holds one fft plan per box
         // (plans are only initialized for the boxes that are owned by
         // the local MPI rank)
-        using FFTplans = amrex::LayoutData<AnyFFT::VendorFFTPlan>;
+        using FFTplans = amrex::LayoutData<ablastr::math::anyfft::VendorFFTPlan>;
 
         // Similarly, define the Hankel transformers and filter for each box.
         using MultiSpectralHankelTransformer = amrex::LayoutData<SpectralHankelTransformer>;
 
         using BinomialFilter = amrex::LayoutData<SpectralBinomialFilter>;
 
-        SpectralFieldDataRZ (const int lev,
+        SpectralFieldDataRZ (int lev,
                              const amrex::BoxArray& realspace_ba,
                              const SpectralKSpaceRZ& k_space,
                              const amrex::DistributionMapping& dm,
-                             const int n_field_required,
-                             const int n_modes);
+                             int n_field_required,
+                             int n_modes);
         SpectralFieldDataRZ () = default; // Default constructor
-        SpectralFieldDataRZ& operator=(SpectralFieldDataRZ&& field_data) = default;
         ~SpectralFieldDataRZ ();
 
-        void ForwardTransform (const int lev, const amrex::MultiFab& mf, const int field_index,
-                               const int i_comp=0);
-        void ForwardTransform (const int lev, const amrex::MultiFab& mf_r, const int field_index_r,
-                               const amrex::MultiFab& mf_t, const int field_index_t);
-        void BackwardTransform (const int lev, amrex::MultiFab& mf, const int field_index,
-                                const int i_comp=0);
-        void BackwardTransform (const int lev, amrex::MultiFab& mf_r, const int field_index_r,
-                                amrex::MultiFab& mf_t, const int field_index_t);
+        /** Delete Copy constructor */
+        SpectralFieldDataRZ ( SpectralFieldDataRZ const &) = delete;
+        /** Delete Copy operator */
+        SpectralFieldDataRZ& operator= ( SpectralFieldDataRZ const & ) = delete;
+        /** Default Move constructor */
+        SpectralFieldDataRZ ( SpectralFieldDataRZ&& ) = default;
+        /** Default Move operator */
+        SpectralFieldDataRZ& operator=(SpectralFieldDataRZ&& field_data) = default;
+
+
+        void ForwardTransform (int lev, const amrex::MultiFab& mf, int field_index,
+                               int i_comp=0);
+        void ForwardTransform (int lev, const amrex::MultiFab& mf_r, int field_index_r,
+                               const amrex::MultiFab& mf_t, int field_index_t);
+        void BackwardTransform (int lev, amrex::MultiFab& mf, int field_index,
+                                int i_comp=0);
+        void BackwardTransform (int lev, amrex::MultiFab& mf_r, int field_index_r,
+                                amrex::MultiFab& mf_t, int field_index_t);
 
         void FABZForwardTransform (amrex::MFIter const & mfi, amrex::Box const & realspace_bx,
                                    amrex::MultiFab const & tempHTransformedSplit,
-                                   int field_index, const bool is_nodal_z);
+                                   int field_index, bool is_nodal_z);
         void FABZBackwardTransform (amrex::MFIter const & mfi, amrex::Box const & realspace_bx,
-                                    const int field_index,
+                                    int field_index,
                                     amrex::MultiFab & tempHTransformedSplit,
-                                    const bool is_nodal_z);
+                                    bool is_nodal_z);
 
         /**
          * \brief Copy spectral data from component \c src_comp to component \c dest_comp
@@ -67,39 +77,14 @@ class SpectralFieldDataRZ
          * \param[in] src_comp  component of the source FabArray from which the data are copied
          * \param[in] dest_comp component of the destination FabArray where the data are copied
          */
-        void CopySpectralDataComp (const int src_comp, const int dest_comp)
-        {
-            // In spectral space fields of each mode are grouped together, so that the index
-            // of a field for a specific mode is given by field_index + mode*n_fields.
-            // That’s why, looping over all azimuthal modes, we need to take into account corresponding
-            // shift, given by imode * m_n_fields.
-            for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
-            {
-                const int shift_comp = imode * m_n_fields;
-                // The last two arguments represent the number of components and
-                // the number of ghost cells to perform this operation
-                Copy(fields, fields, src_comp + shift_comp, dest_comp + shift_comp, 1, 0);
-            }
-        }
+        void CopySpectralDataComp (int src_comp, int dest_comp);
 
         /**
          * \brief Set to zero the data on component \c icomp of \c fields
          *
          * \param[in] icomp component of the FabArray where the data are set to zero
          */
-        void ZeroOutDataComp(const int icomp)
-        {
-            // In spectral space fields of each mode are grouped together, so that the index
-            // of a field for a specific mode is given by field_index + mode*n_fields.
-            // That’s why, looping over all azimuthal modes, we need to take into account corresponding
-            // shift, given by imode * m_n_fields.
-            for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
-            {
-                const int shift_comp = imode * m_n_fields;
-                // The last argument represents the number of components to perform this operation
-                fields.setVal(0., icomp + shift_comp, 1);
-            }
-        }
+        void ZeroOutDataComp(int icomp);
 
         /**
          * \brief Scale the data on component \c icomp of \c fields by a given scale factor
@@ -107,26 +92,14 @@ class SpectralFieldDataRZ
          * \param[in] icomp component of the FabArray where the data are scaled
          * \param[in] scale_factor scale factor to use for scaling
          */
-        void ScaleDataComp(const int icomp, const amrex::Real scale_factor)
-        {
-            // In spectral space fields of each mode are grouped together, so that the index
-            // of a field for a specific mode is given by field_index + mode*n_fields.
-            // That’s why, looping over all azimuthal modes, we need to take into account corresponding
-            // shift, given by imode * m_n_fields.
-            for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
-            {
-                const int shift_comp = imode * m_n_fields;
-                // The last argument represents the number of components to perform this operation
-                fields.mult(scale_factor, icomp + shift_comp, 1);
-            }
-        }
+        void ScaleDataComp(int icomp, amrex::Real scale_factor);
 
-        void InitFilter (amrex::IntVect const & filter_npass_each_dir, bool const compensation,
+        void InitFilter (amrex::IntVect const & filter_npass_each_dir, bool compensation,
                          SpectralKSpaceRZ const & k_space);
 
-        void ApplyFilter (const int lev, int const field_index);
-        void ApplyFilter (const int lev, int const field_index1,
-                          int const field_index2, int const field_index3);
+        void ApplyFilter (int lev, int field_index);
+        void ApplyFilter (int lev, int field_index1,
+                          int field_index2, int field_index3);
 
         // Returns an array that holds the kr for all of the modes
         HankelTransform::RealVector const & getKrArray (amrex::MFIter const & mfi) const {

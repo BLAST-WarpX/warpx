@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+warpx.abort_on_warning_threshold = medium

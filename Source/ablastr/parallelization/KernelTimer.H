@@ -57,19 +57,31 @@ public:
     }
 
     //! Destructor.
-    AMREX_GPU_DEVICE
-    ~KernelTimer () {
 #if (defined AMREX_USE_GPU)
-        if (m_do_timing && m_cost) {
 #   if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
-            m_wt = clock64() - m_wt;
-            amrex::Gpu::Atomic::Add( m_cost, amrex::Real(m_wt));
-#   elif defined(AMREX_USE_DPCPP)
-            // To be updated
-#   endif
+        AMREX_GPU_DEVICE
+        ~KernelTimer ()
+        {
+            if (m_do_timing && m_cost) {
+                m_wt = clock64() - m_wt;
+                amrex::Gpu::Atomic::Add( m_cost, amrex::Real(m_wt));
+            }
         }
+#   elif defined(AMREX_USE_DPCPP)
+        // To be updated
+        AMREX_GPU_DEVICE
+        ~KernelTimer () = default;
+#   endif
+
+#else
+~KernelTimer () = default;
 #endif //AMREX_USE_GPU
-    }
+
+
+    KernelTimer ( KernelTimer const &)             = default;
+    KernelTimer& operator= ( KernelTimer const & ) = default;
+    KernelTimer ( KernelTimer&& )                  = default;
+    KernelTimer& operator= ( KernelTimer&& )       = default;
 
 #if (defined AMREX_USE_GPU)
 private:

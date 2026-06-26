@@ -6,8 +6,9 @@
 
 from .Bucket import Bucket
 
-lasers = Bucket('lasers', names=[])
+lasers = Bucket("lasers", names=[])
 lasers_list = []
+
 
 def newlaser(name):
     result = Bucket(name)

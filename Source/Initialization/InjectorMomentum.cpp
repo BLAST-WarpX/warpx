@@ -9,7 +9,7 @@
 
 using namespace amrex;
 
-void InjectorMomentum::clear ()
+void InjectorMomentum::clear () // NOLINT(readability-make-member-function-const)
 {
     switch (type)
     {
@@ -17,10 +17,9 @@ void InjectorMomentum::clear ()
     case Type::gaussian:
     case Type::gaussianflux:
     case Type::uniform:
-    case Type::boltzmann:
+    case Type::maxwellian:
     case Type::juttner:
     case Type::constant:
-    case Type::radial_expansion:
     {
         break;
     }

@@ -14,13 +14,14 @@
 
 #include <vector>
 
-ResamplingTrigger::ResamplingTrigger (const std::string species_name)
+ResamplingTrigger::ResamplingTrigger (const std::string& species_name)
 {
     const amrex::ParmParse pp_species_name(species_name);
 
     std::vector<std::string> resampling_trigger_int_string_vec = {"0"};
     pp_species_name.queryarr("resampling_trigger_intervals", resampling_trigger_int_string_vec);
-    m_resampling_intervals = utils::parser::IntervalsParser(resampling_trigger_int_string_vec);
+    m_resampling_intervals =
+        ablastr::utils::text::IntervalsParser(resampling_trigger_int_string_vec);
 
     utils::parser::queryWithParser(
         pp_species_name, "resampling_trigger_max_avg_ppc", m_max_avg_ppc);

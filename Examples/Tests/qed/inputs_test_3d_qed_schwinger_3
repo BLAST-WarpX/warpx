@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_base_3d_schwinger
+
+# test input parameters
+warpx.E_external_grid = 0 1.090934525450495e+17 0

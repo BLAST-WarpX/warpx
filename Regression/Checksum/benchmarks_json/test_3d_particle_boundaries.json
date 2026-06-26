@@ -1,0 +1,32 @@
+{
+  "lev=0": {
+    "Ex": 0.0
+  },
+  "absorbing_particles": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
+    "particle_weight": 1.0
+  },
+  "periodic_particles": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 5.161447370120421e-22,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 1.3169173348265344,
+    "particle_weight": 2.0
+  },
+  "reflecting_particles": {
+    "particle_momentum_x": 4.942973407364002e-22,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 1.415192721917265,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
+    "particle_weight": 2.0
+  }
+}

@@ -7,6 +7,7 @@
 
 #include "FieldProbe.H"
 #include "FieldProbeParticleContainer.H"
+#include "Fields.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
@@ -16,6 +17,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array.H>
@@ -44,10 +46,11 @@
 #include <vector>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
 // constructor
 
-FieldProbe::FieldProbe (std::string rd_name)
+FieldProbe::FieldProbe (const std::string& rd_name)
 : ReducedDiags{rd_name}, m_probe(&WarpX::GetInstance())
 {
 
@@ -88,8 +91,10 @@ FieldProbe::FieldProbe (std::string rd_name)
         utils::parser::getWithParser(
             pp_rd_name, "y_probe", y_probe);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         utils::parser::getWithParser(
             pp_rd_name, "z_probe", z_probe);
+#endif
     }
     else if (m_probe_geometry_str == "Line")
     {
@@ -102,13 +107,15 @@ FieldProbe::FieldProbe (std::string rd_name)
         utils::parser::queryWithParser(pp_rd_name, "y_probe", y_probe);
         utils::parser::queryWithParser(pp_rd_name, "y1_probe", y1_probe);
 #endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         utils::parser::getWithParser(pp_rd_name, "z_probe", z_probe);
         utils::parser::getWithParser(pp_rd_name, "z1_probe", z1_probe);
+#endif
         utils::parser::getWithParser(pp_rd_name, "resolution", m_resolution);
     }
     else if (m_probe_geometry_str == "Plane")
     {
-#if defined(WARPX_DIM_1D_Z)
+#if (AMREX_SPACEDIM == 1)
         WARPX_ABORT_WITH_MESSAGE(
             "Plane probe should be used in a 2D or 3D simulation only");
 #endif
@@ -135,9 +142,14 @@ FieldProbe::FieldProbe (std::string rd_name)
         );
     }
     pp_rd_name.query("integrate", m_field_probe_integrate);
-    pp_rd_name.query("raw_fields", raw_fields);
     utils::parser::queryWithParser(pp_rd_name, "interp_order", interp_order);
     pp_rd_name.query("do_moving_window_FP", do_moving_window_FP);
+
+    bool raw_fields;
+    const bool raw_fields_specified = pp_rd_name.query("raw_fields", raw_fields);
+    if (raw_fields_specified) {
+        WARPX_ABORT_WITH_MESSAGE("The field probe raw_fields options is obsolete. To get the equivalent, set interp_order = 0");
+    }
 
     if (WarpX::gamma_boost > 1.0_rt)
     {
@@ -147,7 +159,12 @@ FieldProbe::FieldProbe (std::string rd_name)
             ablastr::warn_manager::WarnPriority::low);
     }
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(interp_order <= WarpX::nox ,
+    // ensure assumption holds: we read the fields in the interpolation kernel as they are,
+    // without further communication of guard/ghost/halo regions
+    int particle_shape = 0;
+    const ParmParse pp_algo("algo");
+    utils::parser::getWithParser(pp_algo, "particle_shape", particle_shape);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(interp_order <= particle_shape ,
                                      "Field probe interp_order should be less than or equal to algo.particle_shape");
     if (ParallelDescriptor::IOProcessor())
     {
@@ -213,7 +230,7 @@ FieldProbe::FieldProbe (std::string rd_name)
                 ofs << m_sep;
                 ofs << "[" << c++ << "]part_S_lev" + std::to_string(lev) + u_map[FieldProbePIdx::S];
             }
-            ofs << std::endl;
+            ofs << "\n";
 
             // close file
             ofs.close();
@@ -335,8 +352,8 @@ bool FieldProbe::ProbeInDomain () const
     auto & warpx = WarpX::GetInstance();
     int const lev = 0;
     const amrex::Geometry& gm = warpx.Geom(lev);
-    const auto prob_lo = gm.ProbLo();
-    const auto prob_hi = gm.ProbHi();
+    const auto *const prob_lo = gm.ProbLo();
+    const auto *const prob_hi = gm.ProbHi();
 
     /*
      * Determine if probe exists within simulation boundaries. During 2D simulations,
@@ -346,6 +363,8 @@ bool FieldProbe::ProbeInDomain () const
      */
 #if defined(WARPX_DIM_1D_Z)
     return z_probe >= prob_lo[0] && z_probe < prob_hi[0];
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    return x_probe >= prob_lo[0] && x_probe < prob_hi[0];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     return x_probe >= prob_lo[0] && x_probe < prob_hi[0] &&
            z_probe >= prob_lo[1] && z_probe < prob_hi[1];
@@ -369,31 +388,31 @@ void FieldProbe::ComputeDiags (int step)
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
-        const amrex::Geometry& gm = warpx.Geom(lev);
-        const auto prob_lo = gm.ProbLo();
         amrex::Real const dt = WarpX::GetInstance().getdt(lev);
         // Calculates particle movement in moving window sims
         amrex::Real move_dist = 0.0;
         bool const update_particles_moving_window =
             do_moving_window_FP &&
-            step > warpx.start_moving_window_step &&
-            step <= warpx.end_moving_window_step;
+            step > WarpX::start_moving_window_step &&
+            step <= WarpX::end_moving_window_step;
         if (update_particles_moving_window)
         {
             const int step_diff = step - m_last_compute_step;
-            move_dist = dt*warpx.moving_window_v*step_diff;
+            move_dist = dt*WarpX::moving_window_v*step_diff;
         }
 
         // get MultiFab data at lev
-        const amrex::MultiFab &Ex = warpx.getEfield(lev, 0);
-        const amrex::MultiFab &Ey = warpx.getEfield(lev, 1);
-        const amrex::MultiFab &Ez = warpx.getEfield(lev, 2);
-        const amrex::MultiFab &Bx = warpx.getBfield(lev, 0);
-        const amrex::MultiFab &By = warpx.getBfield(lev, 1);
-        const amrex::MultiFab &Bz = warpx.getBfield(lev, 2);
+        const amrex::MultiFab &Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab &Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab &Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab &By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab &Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         /*
          * Prepare interpolation of field components to probe_position
@@ -426,15 +445,13 @@ void FieldProbe::ComputeDiags (int step)
 
         for (MyParIter pti(m_probe, lev); pti.isValid(); ++pti)
         {
-            const auto getPosition = GetParticlePosition(pti);
-            auto setPosition = SetParticlePosition(pti);
-            const auto& aos = pti.GetArrayOfStructs();
-            const auto* AMREX_RESTRICT m_structs = aos().dataPtr();
+            const auto getPosition = GetParticlePosition<FieldProbePIdx>(pti);
+            auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
 
             auto const np = pti.numParticles();
             if (update_particles_moving_window)
             {
-                const auto temp_warpx_moving_window = warpx.moving_window_dir;
+                const auto temp_warpx_moving_window = WarpX::moving_window_dir;
                 amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
                 {
                     amrex::ParticleReal xp, yp, zp;
@@ -447,26 +464,16 @@ void FieldProbe::ComputeDiags (int step)
                     {
                         setPosition(ip, xp, yp+move_dist, zp);
                     }
+#if defined(WARPX_ZINDEX)
                     if (temp_warpx_moving_window == WARPX_ZINDEX)
                     {
                         setPosition(ip, xp, yp, zp+move_dist);
                     }
+#endif
                 });
             }
             if( ProbeInDomain() )
             {
-                const auto cell_size = gm.CellSizeArray();
-                const int i_probe = static_cast<int>(amrex::Math::floor((x_probe - prob_lo[0]) / cell_size[0]));
-#if defined(WARPX_DIM_1D_Z)
-                const int j_probe = 0;
-                const int k_probe = 0;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                const int j_probe = static_cast<int>(amrex::Math::floor((z_probe - prob_lo[1]) / cell_size[1]));
-                const int k_probe = 0;
-#elif defined(WARPX_DIM_3D)
-                const int j_probe = static_cast<int>(amrex::Math::floor((y_probe - prob_lo[1]) / cell_size[1]));
-                const int k_probe = static_cast<int>(amrex::Math::floor((z_probe - prob_lo[2]) / cell_size[2]));
-#endif
                 const auto &arrEx = Ex[pti].array();
                 const auto &arrEy = Ey[pti].array();
                 const auto &arrEz = Ez[pti].array();
@@ -491,17 +498,15 @@ void FieldProbe::ComputeDiags (int step)
                 ParticleReal* const AMREX_RESTRICT part_Bz = attribs[FieldProbePIdx::Bz].dataPtr();
                 ParticleReal* const AMREX_RESTRICT part_S = attribs[FieldProbePIdx::S].dataPtr();
 
-                const auto &xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
-                const std::array<Real, 3> &dx = WarpX::CellSize(lev);
+                auto * const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
 
-                const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-                const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
+                const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+                const amrex::XDim3 dinv = WarpX::InvCellSize(lev);
                 const Dim3 lo = lbound(box);
 
                 // Temporarily defining modes and interp outside ParallelFor to avoid GPU compilation errors.
                 const int temp_modes = WarpX::n_rz_azimuthal_modes;
                 const int temp_interp_order = interp_order;
-                const bool temp_raw_fields = raw_fields;
                 const bool temp_field_probe_integrate = m_field_probe_integrate;
 
                 // Interpolating to the probe positions for each particle
@@ -514,20 +519,10 @@ void FieldProbe::ComputeDiags (int step)
                     amrex::ParticleReal Bxp = 0._prt, Byp = 0._prt, Bzp = 0._prt;
 
                     // first gather E and B to the particle positions
-                    if (temp_raw_fields)
-                    {
-                        Exp = arrEx(i_probe, j_probe, k_probe);
-                        Eyp = arrEy(i_probe, j_probe, k_probe);
-                        Ezp = arrEz(i_probe, j_probe, k_probe);
-                        Bxp = arrBx(i_probe, j_probe, k_probe);
-                        Byp = arrBy(i_probe, j_probe, k_probe);
-                        Bzp = arrBz(i_probe, j_probe, k_probe);
-                    }
-                    else
-                        doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                    doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                    arrEx, arrEy, arrEz, arrBx, arrBy, arrBz,
                                    Extype, Eytype, Eztype, Bxtype, Bytype, Bztype,
-                                   dx_arr, xyzmin_arr, lo, temp_modes,
+                                   dinv, xyzmin, lo, temp_modes,
                                    temp_interp_order, false);
 
                     //Calculate the Poynting Vector S
@@ -576,7 +571,7 @@ void FieldProbe::ComputeDiags (int step)
                         amrex::ParticleReal xp, yp, zp;
                         getPosition(ip, xp, yp, zp);
                         long idx = ip*noutputs;
-                        dvp[idx++] = m_structs[ip].id();
+                        dvp[idx++] = amrex::ParticleIDWrapper{idcpu[ip]};  // all particles created on IO cpu
                         dvp[idx++] = xp;
                         dvp[idx++] = yp;
                         dvp[idx++] = zp;
@@ -611,7 +606,7 @@ void FieldProbe::ComputeDiags (int step)
             if (amrex::ParallelDescriptor::IOProcessor()) {
                 length_vector.resize(mpisize, 0);
             }
-            localsize.resize(1, m_data.size());
+            localsize.resize(1, static_cast<int>(m_data.size()));
 
             // gather size of m_data from each processor
             amrex::ParallelDescriptor::Gather(localsize.data(), 1,
@@ -620,7 +615,7 @@ void FieldProbe::ComputeDiags (int step)
 
             // IO processor sums values from length_array to get size of total output array.
             /* displs records the size of each m_data as well as previous displs. This array
-             * tells Gatherv where in the m_data_out array allocation to write incomming data. */
+             * tells Gatherv where in the m_data_out array allocation to write incoming data. */
             long total_data_size = 0;
             amrex::Vector<int> displs_vector;
             if (amrex::ParallelDescriptor::IOProcessor()) {
@@ -648,14 +643,15 @@ void FieldProbe::ComputeDiags (int step)
 
 void FieldProbe::WriteToFile (int step) const
 {
-    if (!(ProbeInDomain() && amrex::ParallelDescriptor::IOProcessor())) return;
+    if (!(ProbeInDomain() && amrex::ParallelDescriptor::IOProcessor())) { return; }
 
     // loop over num valid particles to find the lowest particle ID for later sorting
-    long int first_id = static_cast<long int>(m_data_out[0]);
+    auto first_id = static_cast<long int>(m_data_out[0]);
     for (long int i = 0; i < m_valid_particles; i++)
     {
-        if (m_data_out[i*noutputs] < first_id)
+        if (m_data_out[i*noutputs] < first_id) {
             first_id = static_cast<long int>(m_data_out[i*noutputs]);
+        }
     }
 
     // Create a new array to store probe data ordered by id, which will be printed to file.
@@ -693,7 +689,7 @@ void FieldProbe::WriteToFile (int step) const
             ofs << m_sep;
             ofs << sorted_data[i * noutputs + k];
         }
-        ofs << std::endl;
+        ofs << "\n";
     } // end loop over data size
     // close file
     ofs.close();

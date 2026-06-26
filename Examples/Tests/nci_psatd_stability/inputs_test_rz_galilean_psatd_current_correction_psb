@@ -1,0 +1,8 @@
+# base input parameters
+FILE = inputs_base_rz
+
+# test input paramters
+electrons.random_theta = 0
+ions.random_theta = 0
+psatd.current_correction = 1
+psatd.periodic_single_box_fft = 1

@@ -31,7 +31,7 @@ Inputs File Configuration
 
 Once WarpX has been compiled with Ascent support, it will need to be enabled and configured at runtime.
 This is done using our usual inputs file (read with ``amrex::ParmParse``).
-The supported parameters are part of the :ref:`FullDiagnostics <running-cpp-parameters-diagnostics>` with ``<diag_name>.format`` parameter set to ``ascent``.
+The supported parameters are part of the :ref:`FullDiagnostics <running-cpp-parameters-diagnostics>` with :pp:param:`<diag_name>.format` parameter set to ``ascent``.
 
 
 Visualization/Analysis Pipeline Configuration
@@ -274,7 +274,7 @@ Example Actions
 A visualization of the electric field component :math:`E_x` (variable: ``Ex``) with a contour plot and with added particles can be obtained with the following Ascent Action.
 This action can be used both in replay as well as in situ runs.
 
-.. literalinclude:: examples/Physics_applications/laser_acceleration/ascent_actions.yaml
+.. literalinclude:: ../../../Examples/Physics_applications/laser_acceleration/ascent_actions.yaml
    :language: yaml
 
 There are more `Ascent Actions examples available <https://ascent.readthedocs.io/en/latest/Actions/Examples.html#yaml-examples>`_ for you to play.

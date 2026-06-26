@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_2d_pml_x_yee
+
+# test input parameters
+amr.restart = "../test_2d_pml_x_yee/diags/chk000150"

@@ -23,17 +23,17 @@ class SpectralHankelTransformer
 {
     public:
 
-        SpectralHankelTransformer () {}
+        SpectralHankelTransformer () = default;
 
-        SpectralHankelTransformer (const int nr,
-                                   const int n_rz_azimuthal_modes,
-                                   const amrex::Real rmax);
+        SpectralHankelTransformer (int nr,
+                                   int n_rz_azimuthal_modes,
+                                   amrex::Real rmax);
 
         void
         ExtractKrArray ();
 
         // Returns an array that holds the kr for all of the modes
-        HankelTransform::RealVector const & getKrArray () const {return m_kr;}
+        [[nodiscard]] HankelTransform::RealVector const & getKrArray () const {return m_kr;}
 
         // Converts a scalar field from the physical to the spectral space
         void

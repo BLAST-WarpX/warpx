@@ -1,0 +1,15 @@
+ifeq ($(USE_FFT),TRUE)
+  ifeq ($(USE_CUDA),TRUE)
+    CEXE_sources += WrapCuFFT.cpp
+  else ifeq ($(USE_HIP),TRUE)
+    CEXE_sources += WrapRocFFT.cpp
+  else ifeq ($(USE_SYCL),TRUE)
+    CEXE_sources += WrapMklFFT.cpp
+  else
+    CEXE_sources += WrapFFTW.cpp
+  endif
+else
+  CEXE_sources += WrapNoFFT.cpp
+endif
+
+VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr/math/fft

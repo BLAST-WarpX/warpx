@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+amr.max_level = 0
+particles.use_fdtd_nci_corr = 1

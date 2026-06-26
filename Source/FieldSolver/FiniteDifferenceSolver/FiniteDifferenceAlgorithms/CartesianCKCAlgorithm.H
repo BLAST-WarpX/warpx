@@ -26,7 +26,7 @@
 struct CartesianCKCAlgorithm {
 
     static void InitializeStencilCoefficients (
-        std::array<amrex::Real,3>& cell_size,
+        std::array<amrex::Real, 3>& cell_size,
         amrex::Vector<amrex::Real>& stencil_coefs_x,
         amrex::Vector<amrex::Real>& stencil_coefs_y,
         amrex::Vector<amrex::Real>& stencil_coefs_z ) {
@@ -112,7 +112,7 @@ struct CartesianCKCAlgorithm {
             amrex::Real const delta_t = std::min( dx[0], dx[1] )/PhysConst::c;
 #else
             // - In Cartesian 3D geometry: determined by the minimum cell size in all direction
-            amrex::Real const delta_t = std::min( dx[0], std::min( dx[1], dx[2] ) ) / PhysConst::c;
+            amrex::Real const delta_t = std::min({dx[0], dx[1], dx[2]}) / PhysConst::c;
 #endif
         return delta_t;
     }
@@ -122,14 +122,14 @@ struct CartesianCKCAlgorithm {
      */
     static amrex::IntVect GetMaxGuardCell () {
         // The ckc solver requires one guard cell in each dimension
-        return (amrex::IntVect(AMREX_D_DECL(1,1,1)));
+        return amrex::IntVect{AMREX_D_DECL(1,1,1)};
     }
 
     /**
      * Perform derivative along x on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDx (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -186,7 +186,7 @@ struct CartesianCKCAlgorithm {
      * Perform derivative along y on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDy (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_y, int const n_coefs_y,
         int const i, int const j, int const k, int const ncomp=0 ) {
 
@@ -244,7 +244,7 @@ struct CartesianCKCAlgorithm {
      * Perform derivative along z on a cell-centered grid, from a nodal field `F` */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real UpwardDz (
-        amrex::Array4<amrex::Real> const& F,
+        amrex::Array4<amrex::Real const> const& F,
         amrex::Real const * const coefs_z, int const n_coefs_z,
         int const i, int const j, int const k, int const ncomp=0 ) {
 

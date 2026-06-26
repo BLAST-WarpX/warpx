@@ -1,18 +1,33 @@
 macro(find_amrex)
+    # if pyAMReX is external, AMReX must be as well
+    if(DEFINED WarpX_pyamrex_internal AND NOT WarpX_pyamrex_internal)
+        set(WarpX_amrex_internal OFF CACHE BOOL
+            "Download & build AMReX" FORCE)
+    endif()
+
     if(WarpX_amrex_src)
         message(STATUS "Compiling local AMReX ...")
         message(STATUS "AMReX source path: ${WarpX_amrex_src}")
+        if(NOT IS_DIRECTORY ${WarpX_amrex_src})
+            message(FATAL_ERROR "Specified directory WarpX_amrex_src='${WarpX_amrex_src}' does not exist!")
+        endif()
     elseif(WarpX_amrex_internal)
         message(STATUS "Downloading AMReX ...")
         message(STATUS "AMReX repository: ${WarpX_amrex_repo} (${WarpX_amrex_branch})")
         include(FetchContent)
     endif()
+
     if(WarpX_amrex_internal OR WarpX_amrex_src)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
         # see https://amrex-codes.github.io/amrex/docs_html/BuildingAMReX.html#customization-options
         if(WarpX_ASCENT)
             set(AMReX_ASCENT ON CACHE INTERNAL "")
+            set(AMReX_CONDUIT ON CACHE INTERNAL "")
+        endif()
+
+        if(WarpX_CATALYST)
+            set(AMReX_CATALYST ON CACHE INTERNAL "")
             set(AMReX_CONDUIT ON CACHE INTERNAL "")
         endif()
 
@@ -36,10 +51,35 @@ macro(find_amrex)
             set(AMReX_OMP          OFF    CACHE INTERNAL "")
         endif()
 
+        set(AMReX_SIMD "${WarpX_SIMD}" CACHE INTERNAL "")
+
+        if(WarpX_FASTMATH OR ABLASTR_FASTMATH)
+            set(AMReX_FASTMATH ON CACHE INTERNAL "")
+            # TODO: set consistently (default: ON)
+            # set(AMReX_CUDA_FASTMATH ON CACHE INTERNAL "")
+        else()
+            # TODO: set consistently (default: ON)
+            # set(AMReX_CUDA_FASTMATH ON CACHE INTERNAL "")
+            set(AMReX_FASTMATH OFF CACHE INTERNAL "")
+        endif()
+
+        if(WarpX_FFT OR ABLASTR_FFT)
+            set(AMReX_FFT ON CACHE INTERNAL "")
+        else()
+            set(AMReX_FFT OFF CACHE INTERNAL "")
+        endif()
+
         if(WarpX_EB)
             set(AMReX_EB ON CACHE INTERNAL "")
         else()
             set(AMReX_EB OFF CACHE INTERNAL "")
+        endif()
+
+        # PETSc support in AMReX
+        if(WarpX_PETSC)
+            set(AMReX_PETSC ON CACHE INTERNAL "")
+        else()
+            set(AMReX_PETSC OFF CACHE INTERNAL "")
         endif()
 
         if(WarpX_MPI)
@@ -69,11 +109,6 @@ macro(find_amrex)
             set(AMReX_SENSEI ON CACHE INTERNAL "")
         endif()
 
-        if(DEFINED AMReX_BUILD_SHARED_LIBS)
-            set(AMReX_INSTALL ${AMReX_BUILD_SHARED_LIBS} CACHE INTERNAL "")
-        else()
-            set(AMReX_INSTALL ${BUILD_SHARED_LIBS} CACHE INTERNAL "")
-        endif()
         set(AMReX_AMRLEVEL OFF CACHE INTERNAL "")
         set(AMReX_ENABLE_TESTS OFF CACHE INTERNAL "")
         set(AMReX_FORTRAN OFF CACHE INTERNAL "")
@@ -82,6 +117,8 @@ macro(find_amrex)
         set(AMReX_PARTICLES ON CACHE INTERNAL "")
         set(AMReX_PROBINIT OFF CACHE INTERNAL "")
         set(AMReX_TINY_PROFILE ON CACHE BOOL "")
+        set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
+        set(AMReX_LINEAR_SOLVERS_INCFLO ON CACHE INTERNAL "")
 
         if(WarpX_ASCENT OR WarpX_SENSEI)
             set(AMReX_GPU_RDC ON CACHE BOOL "")
@@ -92,9 +129,19 @@ macro(find_amrex)
         endif()
 
         # shared libs, i.e. for Python bindings, need relocatable code
-        #   openPMD: currently triggers shared libs (TODO)
-        if(WarpX_LIB OR ABLASTR_POSITION_INDEPENDENT_CODE OR BUILD_SHARED_LIBS OR WarpX_OPENPMD)
-            set(AMReX_PIC ON CACHE INTERNAL "")
+        if(WarpX_PYTHON OR
+           ABLASTR_POSITION_INDEPENDENT_CODE OR
+           (WarpX_LIB AND BUILD_SHARED_LIBS))
+            set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
+        endif()
+        if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
+            set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
+
+            # WE NEED AMReX AS SHARED LIB, OTHERWISE WE CANNOT SHARE ITS GLOBALS
+            # BETWEEN MULTIPLE PYTHON MODULES
+            # TODO this is likely an export/symbol hiding issue that we could
+            #      alleviate later on
+            set(AMReX_BUILD_SHARED_LIBS ON CACHE BOOL "Build AMReX shared library" FORCE)
         endif()
 
         # IPO/LTO
@@ -105,9 +152,17 @@ macro(find_amrex)
             endif()
         endif()
 
+        if(DEFINED AMReX_BUILD_SHARED_LIBS)
+            set(AMReX_INSTALL ${AMReX_BUILD_SHARED_LIBS} CACHE INTERNAL "Generate Install Targets" FORCE)
+        else()
+            set(AMReX_INSTALL ${BUILD_SHARED_LIBS} CACHE INTERNAL "Generate Install Targets" FORCE)
+        endif()
+
         # RZ is AMReX 2D
         set(WarpX_amrex_dim ${WarpX_DIMS})
         list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
         list(REMOVE_DUPLICATES WarpX_amrex_dim)
         set(AMReX_SPACEDIM ${WarpX_amrex_dim} CACHE INTERNAL "")
 
@@ -119,22 +174,17 @@ macro(find_amrex)
             endif()
             add_subdirectory(${WarpX_amrex_src} _deps/localamrex-build/)
         else()
+            if(WarpX_COMPUTE STREQUAL CUDA)
+                enable_language(CUDA)
+                # AMReX 21.06+ supports CUDA_ARCHITECTURES
+            endif()
             FetchContent_Declare(fetchedamrex
                 GIT_REPOSITORY ${WarpX_amrex_repo}
                 GIT_TAG        ${WarpX_amrex_branch}
                 BUILD_IN_SOURCE 0
             )
-            FetchContent_GetProperties(fetchedamrex)
-
-            if(NOT fetchedamrex_POPULATED)
-                FetchContent_Populate(fetchedamrex)
-                list(APPEND CMAKE_MODULE_PATH "${fetchedamrex_SOURCE_DIR}/Tools/CMake")
-                if(WarpX_COMPUTE STREQUAL CUDA)
-                    enable_language(CUDA)
-                    # AMReX 21.06+ supports CUDA_ARCHITECTURES
-                endif()
-                add_subdirectory(${fetchedamrex_SOURCE_DIR} ${fetchedamrex_BINARY_DIR})
-            endif()
+            FetchContent_MakeAvailable(fetchedamrex)
+            list(APPEND CMAKE_MODULE_PATH "${fetchedamrex_SOURCE_DIR}/Tools/CMake")
 
             # advanced fetch options
             mark_as_advanced(FETCHCONTENT_BASE_DIR)
@@ -179,9 +229,12 @@ macro(find_amrex)
         mark_as_advanced(AMReX_HYPRE)
         mark_as_advanced(AMReX_IPO)
         mark_as_advanced(AMReX_LINEAR_SOLVERS)
+        mark_as_advanced(AMReX_LINEAR_SOLVERS_INCFLO)
+        mark_as_advanced(AMReX_LINEAR_SOLVERS_EM)
         mark_as_advanced(AMReX_MEM_PROFILE)
         mark_as_advanced(AMReX_MPI)
         mark_as_advanced(AMReX_MPI_THREAD_MULTIPLE)
+        mark_as_advanced(AMReX_SIMD)
         mark_as_advanced(AMReX_OMP)
         mark_as_advanced(AMReX_PROBINIT)
         mark_as_advanced(AMReX_PETSC)
@@ -205,17 +258,41 @@ macro(find_amrex)
             set(COMPONENT_ASCENT)
         endif()
 
-        set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
+        if(WarpX_CATALYST)
+            set(COMPONENT_CATALYST CATALYST CONDUIT)
+        else()
+            set(COMPONENT_CATALYST)
+        endif()
+
+        if(WarpX_SIMD)
+            set(COMPONENT_SIMD SIMD)
+        else()
+            set(COMPONENT_SIMD)
+        endif()
+
+        set(WarpX_amrex_dim ${WarpX_DIMS})
         list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
         list(REMOVE_DUPLICATES WarpX_amrex_dim)
         set(COMPONENT_DIMS)
         foreach(D IN LISTS WarpX_amrex_dim)
             set(COMPONENT_DIMS ${COMPONENT_DIMS} ${D}D)
         endforeach()
+        if(WarpX_FFT)
+            set(COMPONENT_FFT FFT)
+        else()
+            set(COMPONENT_FFT)
+        endif()
         if(WarpX_EB)
             set(COMPONENT_EB EB)
         else()
             set(COMPONENT_EB)
+        endif()
+        if(WarpX_PETSC)
+            set(COMPONENT_PETSC PETSC)
+        else()
+            set(COMPONENT_PETSC)
         endif()
         if(WarpX_LIB)
             set(COMPONENT_PIC PIC)
@@ -229,8 +306,17 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX 23.06 CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_DIMS} ${COMPONENT_EB} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} TINYP LSOLVERS)
+        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PETSC} ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
+        # note: TINYP skipped because user-configured and optional
+
+        # AMReX CMake helper scripts
+        list(APPEND CMAKE_MODULE_PATH "${AMReX_DIR}/AMReXCMakeModules")
+
         message(STATUS "AMReX: Found version '${AMReX_VERSION}'")
+
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            enable_language(CUDA)
+        endif()
     endif()
 endmacro()
 
@@ -243,7 +329,13 @@ set(WarpX_amrex_src ""
 set(WarpX_amrex_repo "https://github.com/AMReX-Codes/amrex.git"
     CACHE STRING
     "Repository URI to pull and build AMReX from if(WarpX_amrex_internal)")
-set(WarpX_amrex_branch "0236a3732cc8e399e01eacd0253a782da40ce1f7"
+
+# Parse AMReX version and commit information
+file(READ "${WarpX_SOURCE_DIR}/dependencies.json" dependencies_data)
+string(JSON amrex_version GET "${dependencies_data}" version_amrex)
+string(JSON amrex_commit GET "${dependencies_data}" commit_amrex)
+
+set(WarpX_amrex_branch ${amrex_commit}
     CACHE STRING
     "Repository branch for WarpX_amrex_repo if(WarpX_amrex_internal)")
 

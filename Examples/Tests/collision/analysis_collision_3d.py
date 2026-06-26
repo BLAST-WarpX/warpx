@@ -10,86 +10,116 @@
 # using electron-ion temperature relaxation in 3D.
 # Initially, electrons and ions are both in equilibrium
 # (gaussian) distributions, but have different temperatures.
-# Relaxation occurs to bring the two temperatures to be
-# a final same temperature through collisions.
-# The code was tested to be valid, more detailed results
-# were used to obtain an exponential fit with
-# coefficients a and b.
+# The electrons additionally have a drift speed in the x-direction
+# equal to their thermal speed.
+# Relaxation occurs to bring the velocity and temperature of each
+# species to common values through collisions.
+# The code was tested to be valid and an exponential fit with
+# coefficients a and b to the temperature difference during the
+# relaxation was obtained using a converged simulation with a
+# 50X smaller time step than is used for this CI test.
 # This automated test compares the results with the fit.
 # Unrelated to the collision module, we also test the plotfile particle filter function in this
 # analysis script.
 
-# Possible errors:
-# tolerance: 0.001
 # Possible running time: ~ 30.0 s
 
 import glob
-import math
-import os
-import re
 import sys
 
 import numpy
 import post_processing_utils
 import yt
-
-sys.path.insert(1, '../../../../warpx/Regression/Checksum/')
-import checksumAPI
-
-tolerance = 0.001
+from scipy.constants import e, m_e
 
 ng = 512
 ne = ng * 200
 ni = ng * 200
 np = ne + ni
 
-c  = 299792458.0
-me = 9.10938356e-31
-mi = me * 5.0
+mi = m_e * 5.0
 
 ## In the first part of the test we verify that the output data is consistent with the exponential
 ## fit.
 
-# exponential fit coefficients
-a =  0.041817463099883
-b = -0.083851393560288
+a_tolerance = 0.01
+b_tolerance = 0.1
+
+a_fit = 6.980918134261288
+b_fit = -6.944721119341786e05
 
 last_fn = sys.argv[1]
-# Remove trailing '/' from file name, if necessary
-last_fn.rstrip('/')
-# Find last iteration in file name, such as 'test_name_plt000001' (last_it = '000001')
-last_it = re.search('\d+', last_fn).group()
-# Find output prefix in file name, such as 'test_name_plt000001' (prefix = 'test_name_plt')
-prefix = last_fn[:-len(last_it)]
-# Collect all output files in fn_list (names match pattern prefix + arbitrary number)
-fn_list = glob.glob(prefix + '*[0-9]')
+if last_fn[-1] == "/":
+    last_fn = last_fn[:-1]
+last_it = last_fn[-6:]  # i.e., 000100
+prefix = last_fn[:-6]  # i.e., diags/diag1
 
-error = 0.0
-nt = 0
+# Collect all output files in fn_list (names match pattern prefix + arbitrary number)
+fn_list = glob.glob(prefix + "*[0-9]")
+fn_list.sort(key=lambda fn: int(fn[-6:]))
+
+time_arr = []
+Te_arr = []
+Ti_arr = []
+
 for fn in fn_list:
     # load file
-    ds  = yt.load( fn )
-    ad  = ds.all_data()
-    pxe  = ad['electron', 'particle_momentum_x'].to_ndarray()
-    pxi  = ad['ion', 'particle_momentum_x'].to_ndarray()
-    # get time index j
-    j = int(fn[-5:])
-    # compute error
-    vxe = numpy.mean(pxe)/me/c
-    vxi = numpy.mean(pxi)/mi/c
-    vxd = vxe - vxi
-    fit = a*math.exp(b*j)
-    error = error + abs(fit-vxd)
-    nt = nt + 1
+    ds = yt.load(fn)
+    time = ds.current_time.to_value()
+    ad = ds.all_data()
+    pxe = ad["electron", "particle_momentum_x"].to_ndarray()
+    pye = ad["electron", "particle_momentum_y"].to_ndarray()
+    pze = ad["electron", "particle_momentum_z"].to_ndarray()
+    pxi = ad["ion", "particle_momentum_x"].to_ndarray()
+    pyi = ad["ion", "particle_momentum_y"].to_ndarray()
+    pzi = ad["ion", "particle_momentum_z"].to_ndarray()
 
-error = error / nt
+    # compute mean drift velocity
+    vxe = numpy.mean(pxe) / m_e
+    vye = numpy.mean(pye) / m_e
+    vze = numpy.mean(pze) / m_e
+    vxi = numpy.mean(pxi) / mi
+    vyi = numpy.mean(pyi) / mi
+    vzi = numpy.mean(pzi) / mi
 
-print('error = ', error)
-print('tolerance = ', tolerance)
-assert(error < tolerance)
+    # compute thermal velocity
+    vtesq = numpy.mean((pxe / m_e - vxe) ** 2)
+    vtesq += numpy.mean((pye / m_e - vye) ** 2)
+    vtesq += numpy.mean((pze / m_e - vze) ** 2)
+    vtisq = numpy.mean((pxi / mi - vxi) ** 2)
+    vtisq += numpy.mean((pyi / mi - vyi) ** 2)
+    vtisq += numpy.mean((pzi / mi - vzi) ** 2)
 
+    Te_eV = m_e / e * vtesq / 3.0
+    Ti_eV = mi / e * vtisq / 3.0
 
-## In the second past of the test, we verify that the diagnostic particle filter function works as
+    time_arr.append(time)
+    Te_arr.append(Te_eV)
+    Ti_arr.append(Ti_eV)
+
+time_arr = numpy.array(time_arr)
+Te_arr = numpy.array(Te_arr)
+Ti_arr = numpy.array(Ti_arr)
+
+# Compute fit in time window where temerature difference
+# displays exponential decay
+deltaT = Te_arr - Ti_arr
+mask = (time_arr > 1.0e-6) & (time_arr < 4.0e-6)
+logTdiff = numpy.log(deltaT[mask])
+tfit = time_arr[mask]
+b, a = numpy.polyfit(tfit, logTdiff, 1)
+
+a_error = numpy.abs((a - a_fit) / a_fit)
+b_error = numpy.abs((b - b_fit) / b_fit)
+
+print("a_error = ", a_error)
+print("a_tolerance = ", a_tolerance)
+print("b_error = ", b_error)
+print("b_tolerance = ", b_tolerance)
+assert a_error < a_tolerance
+assert b_error < b_tolerance
+
+## In the second part of the test, we verify that the diagnostic particle filter function works as
 ## expected. For this, we only use the last simulation timestep.
 
 dim = "3d"
@@ -97,18 +127,18 @@ species_name = "electron"
 
 parser_filter_fn = "diags/diag_parser_filter" + last_it
 parser_filter_expression = "(px*py*pz < 0) * (np.sqrt(x**2+y**2+z**2)<100)"
-post_processing_utils.check_particle_filter(last_fn, parser_filter_fn, parser_filter_expression,
-                                            dim, species_name)
+post_processing_utils.check_particle_filter(
+    last_fn, parser_filter_fn, parser_filter_expression, dim, species_name
+)
 
 uniform_filter_fn = "diags/diag_uniform_filter" + last_it
 uniform_filter_expression = "ids%11 == 0"
-post_processing_utils.check_particle_filter(last_fn, uniform_filter_fn, uniform_filter_expression,
-                                            dim, species_name)
+post_processing_utils.check_particle_filter(
+    last_fn, uniform_filter_fn, uniform_filter_expression, dim, species_name
+)
 
 random_filter_fn = "diags/diag_random_filter" + last_it
 random_fraction = 0.88
-post_processing_utils.check_random_filter(last_fn, random_filter_fn, random_fraction,
-                                          dim, species_name)
-
-test_name = os.path.split(os.getcwd())[1]
-checksumAPI.evaluate_checksum(test_name, fn, do_particles=False)
+post_processing_utils.check_random_filter(
+    last_fn, random_filter_fn, random_fraction, dim, species_name
+)

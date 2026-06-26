@@ -1,0 +1,10 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input paramters
+amr.blocking_factor = 64
+amr.max_grid_size = 64
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho divE
+psatd.current_correction = 1
+psatd.periodic_single_box_fft = 0
+psatd.update_with_rho = 0

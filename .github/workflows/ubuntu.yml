@@ -1,111 +1,135 @@
 name: 🐧 OpenMP
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-ubuntu
   cancel-in-progress: true
 
 jobs:
+
+  check_changes:
+    name: Analyze
+    uses: ./.github/workflows/check_changes.yml
+
   build_cxxminimal:
     name: GCC Minimal w/o MPI
-    runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc.sh
+        .github/workflows/dependencies/gcc_minimal.sh
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v6
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-openmp-cxxminimal-${{ hashFiles('.github/workflows/ubuntu.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-openmp-cxxminimal-${{ hashFiles('.github/workflows/ubuntu.yml') }}-
-          ccache-openmp-cxxminimal-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_DIMS="RZ;3"          \
           -DWarpX_EB=OFF               \
           -DWarpX_MPI=OFF              \
           -DWarpX_QED=OFF
-        cmake --build build -j 2
-        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_3d
-        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_rz
+        cmake --build build -j 4
+        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
+        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
+
+        ccache -s
+        du -hs ~/.cache/ccache
 
   build_1D_2D:
-    name: GCC 1D & 2D w/ MPI
-    runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    name: GCC 1D & 2D w/ MPI, QED tools
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
-      CXX: "g++-12"
-      CC: "gcc-12"
+      CXX: "g++-13"
+      CC: "gcc-13"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc12.sh
+        .github/workflows/dependencies/gcc.sh 13
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v6
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-openmp-1D-2D-${{ hashFiles('.github/workflows/ubuntu.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-openmp-1D-2D-${{ hashFiles('.github/workflows/ubuntu.yml') }}-
-          ccache-openmp-1D-2D-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
         cmake -S . -B build            \
           -GNinja                      \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_DIMS="1;2"           \
           -DWarpX_EB=OFF               \
-          -DWarpX_PSATD=ON             \
-          -DWarpX_QED_TABLE_GEN=ON
-        cmake --build build -j 2
-        ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_1d
-        ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_2d
+          -DWarpX_FFT=ON               \
+          -DWarpX_QED_TABLE_GEN=ON     \
+          -DWarpX_QED_TOOLS=ON
+
+        cmake --build build -j 4
+        ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
+        ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
+
+        ccache -s
+        du -hs ~/.cache/ccache
+
+    - name: run QED table tools
+      run: |
+        .github/workflows/scripts/checkQEDTableGenerator.sh
 
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
-    runs-on: ubuntu-22.04
-    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
-      CXX: "g++-12"
-      CC: "gcc-12"
+      CXX: "g++-13"
+      CC: "gcc-13"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc12_blaspp_lapackpp.sh
+        .github/workflows/dependencies/gcc_blaspp_lapackpp.sh 13
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v6
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-openmp-3D-RZ-SP-${{ hashFiles('.github/workflows/ubuntu.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-openmp-3D-RZ-SP-${{ hashFiles('.github/workflows/ubuntu.yml') }}-
-          ccache-openmp-3D-RZ-SP-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=200M
+        ccache -z
 
         # we need to define this *after* having installed the dependencies,
         # because the compilation of blaspp raises warnings.
@@ -116,89 +140,100 @@ jobs:
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="RZ;3"               \
           -DWarpX_EB=OFF                    \
-          -DWarpX_PSATD=ON                  \
+          -DWarpX_FFT=ON                    \
           -DWarpX_PRECISION=SINGLE          \
           -DWarpX_PARTICLE_PRECISION=SINGLE \
           -DWarpX_QED_TABLE_GEN=ON
 
-        cmake --build build -j 2
-        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_3d
-        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_rz
+        cmake --build build -j 4
+        ./build/bin/warpx.3d Examples/Physics_applications/laser_acceleration/inputs_base_3d
+        ./build/bin/warpx.rz Examples/Physics_applications/laser_acceleration/inputs_base_rz
+
+        ccache -s
+        du -hs ~/.cache/ccache
 
   build_gcc_ablastr:
     name: GCC ABLASTR w/o MPI
-    runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc.sh
+        .github/workflows/dependencies/gcc_minimal.sh
         sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v6
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-openmp-gccablastr-${{ hashFiles('.github/workflows/ubuntu.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-openmp-gccablastr-${{ hashFiles('.github/workflows/ubuntu.yml') }}-
-          ccache-openmp-gccablastr-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       run: |
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
         cmake -S . -B build            \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_APP=OFF              \
           -DWarpX_LIB=OFF
-        cmake --build build -j 2
+        cmake --build build -j 4
+
+        ccache -s
+        du -hs ~/.cache/ccache
 
   build_pyfull:
     name: Clang pywarpx
-    runs-on: ubuntu-20.04
-    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
+      CC: clang
+      CXX: clang++
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
-      # setuptools/mp4py work-around, see
-      #   https://github.com/mpi4py/mpi4py/pull/159
-      #   https://github.com/mpi4py/mpi4py/issues/157#issuecomment-1001022274
-      SETUPTOOLS_USE_DISTUTILS: stdlib
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
         .github/workflows/dependencies/pyfull.sh
     - name: CCache Cache
-      uses: actions/cache@v3
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      uses: actions/cache@v6
       with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-openmp-pyfull-${{ hashFiles('.github/workflows/ubuntu.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        path: ~/.cache/ccache
+        key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
         restore-keys: |
-          ccache-openmp-pyfull-${{ hashFiles('.github/workflows/ubuntu.yml') }}-
-          ccache-openmp-pyfull-
+             ccache-${{ github.workflow }}-${{ github.job }}-git-
     - name: build WarpX
       run: |
-        python3 -m pip install --upgrade pip setuptools wheel
-        export WARPX_MPI=ON
-        export WARPX_OPENPMD=ON
-        export WARPX_PSATD=ON
-        export WARPX_QED_TABLE_GEN=ON
-        export CC=$(which clang)
-        export CXX=$(which clang++)
+        export CCACHE_COMPRESS=1
+        export CCACHE_COMPRESSLEVEL=10
+        export CCACHE_MAXSIZE=100M
+        ccache -z
+
+        python3 -m pip install --upgrade pip
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
+
         export CXXFLAGS="-Werror -Wno-error=pass-failed"
-        python3 -m pip install -v .
+
+        cmake -S . -B build            \
+          -DCMAKE_VERBOSE_MAKEFILE=ON  \
+          -DWarpX_FFT=ON               \
+          -DWarpX_PYTHON=ON            \
+          -DWarpX_QED_TABLE_GEN=ON
+        cmake --build build -j 4 --target pip_install
+
+        ccache -s
+        du -hs ~/.cache/ccache
 
     - name: run pywarpx
       run: |
         export OMP_NUM_THREADS=1
-        mpirun -n 2 Examples/Physics_applications/laser_acceleration/PICMI_inputs_3d.py
+        mpirun -n 2 Examples/Physics_applications/laser_acceleration/inputs_test_3d_laser_acceleration_picmi.py

@@ -10,10 +10,37 @@ Git workflow
 ------------
 
 The WarpX project uses `git <https://git-scm.com>`_ for version control.
-If you are new to git, you can follow one of these tutorials:
+If you are new to git, you can follow `this tutorial <https://swcarpentry.github.io/git-novice/>`__.
 
-- `Learn git with bitbucket <https://www.atlassian.com/git/tutorials/learn-git-with-bitbucket-cloud>`_
-- `git - the simple guide <http://rogerdudler.github.io/git-guide/>`_
+
+What to do when
+^^^^^^^^^^^^^^^
+
+Issues
+""""""
+
+`Issues <https://github.com/BLAST-WarpX/warpx/issues>`__ are used to track tasks that the contributors and/or maintainers can work on.
+Use issues for reporting bugs or installation problems and for requesting new features.
+
+If you've found a bug and wish to report it, first search the open issues and `pull requests <https://github.com/BLAST-WarpX/warpx/pulls>`__ to see if someone else has already reported the same thing.
+If it's something new, open an issue using a template.
+We'll use the issue to address the problem you've encountered.
+
+Discussions
+"""""""""""
+
+`Discussions <https://github.com/BLAST-WarpX/warpx/discussions>`__ are for open-ended conversations, general questions, brainstorming ideas.
+Please, use discussions if you want to ask us something that is not technically a bug or a feature.
+Feel free to ping us there!
+
+Pull Requests (PRs)
+"""""""""""""""""""
+
+Open a `pull request <https://github.com/BLAST-WarpX/warpx/pulls>`__ if you want to add a new feature yourself.
+Follow the guide below for more details.
+
+
+Thank you for contributing! 🥰
 
 Configure your GitHub Account & Development Machine
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -31,7 +58,7 @@ First, let's setup your Git environment and GitHub account.
 Make your own fork
 ^^^^^^^^^^^^^^^^^^
 
-First, fork the WarpX `"mainline" repo on GitHub <https://github.com/ECP-WarpX/WarpX>`__ by pressing the *Fork* button on the top right of the page.
+First, fork the WarpX `"mainline" repo on GitHub <https://github.com/BLAST-WarpX/warpx>`__ by pressing the *Fork* button on the top right of the page.
 A fork is a copy of WarpX on GitHub, which is under your full control.
 
 Then, we create local copies, for development:
@@ -40,7 +67,7 @@ Then, we create local copies, for development:
 
    # Clone the mainline WarpX source code to your local computer.
    # You cannot write to this repository, but you can read from it.
-   git clone git@github.com:ECP-WarpX/WarpX.git
+   git clone git@github.com:BLAST-WarpX/warpx.git
    cd WarpX
 
    # rename what we just cloned: call it "mainline"
@@ -117,7 +144,7 @@ A typical format is:
 
    This is a short, 40-character title
 
-   After a newline, you can write arbitray paragraphs. You
+   After a newline, you can write arbitrary paragraphs. You
    usually limit the lines to 70 characters, but if you don't, then
    nothing bad will happen.
 
@@ -212,12 +239,34 @@ Style and conventions
 
 - Space before and after assignment operator (``=``)
 
-- To define a function , for e.g., ``myfunction()`` use a space between the name of the function and the paranthesis - ``myfunction ()``.
-  To call the function, the space is not required, i.e., just use ``myfunction()``.
+- To define a function, use a space between the name of the function and the paranthesis, e.g., ``myfunction ()``.
+  When calling a function, no space should be used, i.e., just use ``myfunction()``.
+  The reason this is beneficial is that when we do a ``git grep`` to search for ``myfunction ()``, we can clearly see the locations where ``myfunction ()`` is defined and where ``myfunction()`` is called.
+  Also, using ``git grep "myfunction ()"`` searches for files only in the git repo, which is more efficient compared to the ``grep "myfunction ()"`` command that searches through all the files in a directory, including plotfiles for example.
 
-- The reason this is beneficial is that when we do a ``git grep`` to search for ``myfunction ()``, we can clearly see the locations where ``myfunction ()`` is defined and where ``myfunction()`` is called.
+- To define a class, use ``class`` on the same line as the name of the class, e.g., ``class MyClass``.
+  The reason this is beneficial is that when we do a ``git grep`` to search for ``class MyClass``, we can clearly see the locations where ``class MyClass`` is defined and where ``MyClass`` is called.
 
-- Also, using ``git grep "myfunction ()"`` searches for files only in the git repo, which is more efficient compared to the ``grep "myfunction ()"`` command that searches through all the files in a directory, including plotfiles for example.
+- When defining a function or class, make sure the starting ``{`` token appears on a new line.
+
+- Use curly braces for single statement blocks. For example:
+
+  .. code-block:: cpp
+
+     for (int n = 0; n < 10; ++n) {
+         amrex::Print() << "Like this!";
+     }
+
+     for (int n = 0; n < 10; ++n) { amrex::Print() << "Or like this!"; }
+
+  but not
+
+  .. code-block:: cpp
+
+     for (int n = 0; n < 10; ++n)
+         amrex::Print() << "Not like this.";
+
+     for (int n = 0; n < 10; ++n) amrex::Print() << "Nor like this.";
 
 - It is recommended that style changes are not included in the PR where new code is added.
   This is to avoid any errors that may be introduced in a PR just to do style change.

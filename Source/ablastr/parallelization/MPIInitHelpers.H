@@ -15,7 +15,7 @@ namespace ablastr::parallelization
      *
      * @return the MPI_THREAD_* level required for MPI_Init_thread
      */
-    int
+    constexpr int
     mpi_thread_required ();
 
     /** Initialize MPI

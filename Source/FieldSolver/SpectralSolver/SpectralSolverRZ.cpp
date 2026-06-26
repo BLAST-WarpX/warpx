@@ -9,9 +9,9 @@
 #include "SpectralAlgorithms/PsatdAlgorithmPmlRZ.H"
 #include "SpectralKSpaceRZ.H"
 #include "SpectralSolverRZ.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 /* \brief Initialize the spectral Maxwell solver
  *
  * This function selects the spectral algorithm to be used, allocates the
@@ -29,17 +29,18 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
                                     amrex::BoxArray const & realspace_ba,
                                     amrex::DistributionMapping const & dm,
                                     int const n_rz_azimuthal_modes,
-                                    int const norder_z, short const grid_type,
+                                    int const norder_z,
+                                    ablastr::utils::enums::GridType grid_type,
                                     const amrex::Vector<amrex::Real>& v_galilean,
                                     amrex::RealVect const dx, amrex::Real const dt,
                                     bool const with_pml,
                                     bool const update_with_rho,
                                     const bool fft_do_time_averaging,
-                                    const int J_in_time,
-                                    const int rho_in_time,
+                                    const TimeDependencyJ time_dependency_J,
+                                    const TimeDependencyRho time_dependency_rho,
                                     const bool dive_cleaning,
                                     const bool divb_cleaning)
-    : k_space(realspace_ba, dm, dx)
+    : m_dt(dt), k_space(realspace_ba, dm, dx)
 {
     // Initialize all structures using the same distribution mapping dm
 
@@ -49,7 +50,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
 
     const bool is_pml = false;
     m_spectral_index = SpectralFieldIndex(
-        update_with_rho, fft_do_time_averaging, J_in_time, rho_in_time,
+        update_with_rho, fft_do_time_averaging, time_dependency_J, time_dependency_rho,
         dive_cleaning, divb_cleaning, is_pml, with_pml);
 
     // - Select the algorithm depending on the input parameters
@@ -62,7 +63,7 @@ SpectralSolverRZ::SpectralSolverRZ (const int lev,
          // v_galilean is 0: use standard PSATD algorithm
         algorithm = std::make_unique<PsatdAlgorithmRZ>(
             k_space, dm, m_spectral_index, n_rz_azimuthal_modes, norder_z, grid_type, dt,
-            update_with_rho, fft_do_time_averaging, J_in_time, rho_in_time, dive_cleaning, divb_cleaning);
+            update_with_rho, fft_do_time_averaging, time_dependency_J, time_dependency_rho, dive_cleaning, divb_cleaning);
     } else {
         // Otherwise: use the Galilean algorithm
         algorithm = std::make_unique<PsatdAlgorithmGalileanRZ>(
@@ -82,7 +83,7 @@ void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf, int const field_index,
                                     int const i_comp) {
-    WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev, field_mf, field_index, i_comp);
 }
 
@@ -93,7 +94,7 @@ void
 SpectralSolverRZ::ForwardTransform (const int lev,
                                     amrex::MultiFab const & field_mf1, int const field_index1,
                                     amrex::MultiFab const & field_mf2, int const field_index2) {
-    WARPX_PROFILE("SpectralSolverRZ::ForwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::ForwardTransform");
     field_data.ForwardTransform(lev,
                                 field_mf1, field_index1,
                                 field_mf2, field_index2);
@@ -105,7 +106,7 @@ void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf, int const field_index,
                                      int const i_comp) {
-    WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev, field_mf, field_index, i_comp);
 }
 
@@ -115,7 +116,7 @@ void
 SpectralSolverRZ::BackwardTransform (const int lev,
                                      amrex::MultiFab& field_mf1, int const field_index1,
                                      amrex::MultiFab& field_mf2, int const field_index2) {
-    WARPX_PROFILE("SpectralSolverRZ::BackwardTransform");
+    ABLASTR_PROFILE("SpectralSolverRZ::BackwardTransform");
     field_data.BackwardTransform(lev,
                                  field_mf1, field_index1,
                                  field_mf2, field_index2);
@@ -124,7 +125,7 @@ SpectralSolverRZ::BackwardTransform (const int lev,
 /* \brief Update the fields in spectral space, over one timestep */
 void
 SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
-    WARPX_PROFILE("SpectralSolverRZ::pushSpectralFields");
+    ABLASTR_PROFILE("SpectralSolverRZ::pushSpectralFields");
     // Virtual function: the actual function used here depends
     // on the sub-class of `SpectralBaseAlgorithm` that was
     // initialized in the constructor of `SpectralSolverRZ`
@@ -135,14 +136,35 @@ SpectralSolverRZ::pushSpectralFields (const bool doing_pml) {
     }
 }
 
+void SpectralSolverRZ::InitFilter (
+    amrex::IntVect const & filter_npass_each_dir,
+    bool const compensation)
+{
+    field_data.InitFilter(filter_npass_each_dir, compensation, k_space);
+}
+
+void SpectralSolverRZ::ApplyFilter (const int lev, int const field_index)
+{
+    field_data.ApplyFilter(lev, field_index);
+}
+
+void SpectralSolverRZ::ApplyFilter (
+    const int lev, int const field_index1,
+    int const field_index2, int const field_index3)
+{
+    field_data.ApplyFilter(lev, field_index1, field_index2, field_index3);
+}
+
 /**
   * \brief Public interface to call the member function ComputeSpectralDivE
   * of the base class SpectralBaseAlgorithmRZ from objects of class SpectralSolverRZ
   */
 void
 SpectralSolverRZ::ComputeSpectralDivE (const int lev,
-                                       const std::array<std::unique_ptr<amrex::MultiFab>,3>& Efield,
-                                       amrex::MultiFab& divE) {
+                                       ablastr::fields::VectorField const & Efield,
+                                       amrex::MultiFab& divE
+)
+{
     algorithm->ComputeSpectralDivE(lev, field_data, Efield, divE);
 }
 
@@ -162,4 +184,23 @@ void
 SpectralSolverRZ::VayDeposition ()
 {
     algorithm->VayDeposition(field_data);
+}
+
+
+void
+SpectralSolverRZ::CopySpectralDataComp (const int src_comp, const int dest_comp)
+{
+    field_data.CopySpectralDataComp(src_comp, dest_comp);
+}
+
+void
+SpectralSolverRZ::ZeroOutDataComp (const int icomp)
+{
+    field_data.ZeroOutDataComp(icomp);
+}
+
+void
+SpectralSolverRZ::ScaleDataComp (const int icomp, const amrex::Real scale_factor)
+{
+    field_data.ScaleDataComp(icomp, scale_factor);
 }

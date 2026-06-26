@@ -5,8 +5,10 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef FILTER_COPY_TRANSFORM_H_
-#define FILTER_COPY_TRANSFORM_H_
+#ifndef WARPX_FILTER_COPY_TRANSFORM_H_
+#define WARPX_FILTER_COPY_TRANSFORM_H_
+
+#include "Particles/ParticleCreation/DefaultInitialization.H"
 
 #include <AMReX_GpuContainers.H>
 #include <AMReX_TypeTraits.H>
@@ -30,6 +32,7 @@
  * \tparam TransFunc the transform function type
  * \tparam CopyFunc the copy function type
  *
+ * \param pc  the destination particle container
  * \param dst the destination tile
  * \param src the source tile
  * \param mask pointer to the mask: 1 means copy, 0 means don't copy
@@ -47,23 +50,26 @@
  *
  * \return num_added the number of particles that were written to dst.
  */
-template <int N, typename DstTile, typename SrcTile, typename Index,
+template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename TransFunc, typename CopyFunc,
-          amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
-Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index* mask, Index dst_index,
+          amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
+Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src,
+                                    Index* mask, Index dst_index,
                                     CopyFunc&& copy, TransFunc&& transform) noexcept
 {
     using namespace amrex;
 
     const auto np = src.numParticles();
-    if (np == 0) return 0;
+    if (np == 0) { return 0; }
 
     Gpu::DeviceVector<Index> offsets(np);
     auto total = amrex::Scan::ExclusiveSum(np, mask, offsets.data());
     const Index num_added = N * total;
-    dst.resize(std::max(dst_index + num_added, dst.numParticles()));
+    auto old_np = dst.size();
+    auto new_np = std::max(dst_index + num_added, dst.numParticles());
+    dst.resize(new_np);
 
-    const auto p_offsets = offsets.dataPtr();
+    auto *const p_offsets = offsets.dataPtr();
 
     const auto src_data = src.getParticleTileData();
     const auto dst_data = dst.getParticleTileData();
@@ -79,6 +85,8 @@ Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index* mask, Ind
             transform(dst_data, src_data, i, N*p_offsets[i] + dst_index, engine);
         }
     });
+
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst, pc, old_np, new_np);
 
     Gpu::synchronize();
     return num_added;
@@ -104,6 +112,7 @@ Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index* mask, Ind
  * \tparam TransFunc the transform function type
  * \tparam CopyFunc the copy function type
  *
+ * \param pc  the destination particle container
  * \param dst the destination tile
  * \param src the source tile
  * \param dst_index the location at which to starting writing the result to dst
@@ -121,19 +130,19 @@ Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index* mask, Ind
  *
  * \return num_added the number of particles that were written to dst.
  */
-template <int N, typename DstTile, typename SrcTile, typename Index,
+template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename PredFunc, typename TransFunc, typename CopyFunc>
-Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index dst_index,
+Index filterCopyTransformParticles (DstPC& pc, DstTile& dst, SrcTile& src, Index dst_index,
                                     PredFunc&& filter, CopyFunc&& copy, TransFunc&& transform) noexcept
 {
     using namespace amrex;
 
     const auto np = src.numParticles();
-    if (np == 0) return 0;
+    if (np == 0) { return 0; }
 
     Gpu::DeviceVector<Index> mask(np);
 
-    auto p_mask = mask.dataPtr();
+    auto *p_mask = mask.dataPtr();
     const auto src_data = src.getParticleTileData();
 
     amrex::ParallelForRNG(np,
@@ -142,9 +151,9 @@ Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index dst_index,
         p_mask[i] = filter(src_data, i, engine);
     });
 
-    return filterCopyTransformParticles<N>(dst, src, mask.dataPtr(), dst_index,
-                                                      std::forward<CopyFunc>(copy),
-                                                      std::forward<TransFunc>(transform));
+    return filterCopyTransformParticles<N>(pc, dst, src, mask.dataPtr(), dst_index,
+                                           std::forward<CopyFunc>(copy),
+                                           std::forward<TransFunc>(transform));
 }
 
 /**
@@ -168,6 +177,8 @@ Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index dst_index,
  * \tparam CopyFunc1 the copy function type for src-->dst1
  * \tparam CopyFunc2 the copy function type for src-->dst2
  *
+ * \param pc1  the first destination particle container
+ * \param pc2  the second destination particle container
  * \param dst1 the destination tile
  * \param dst2 the destination tile
  * \param src the source tile
@@ -188,10 +199,10 @@ Index filterCopyTransformParticles (DstTile& dst, SrcTile& src, Index dst_index,
  *
  * \return num_added the number of particles that were written to dst.
  */
-template <int N, typename DstTile, typename SrcTile, typename Index,
+template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename TransFunc, typename CopyFunc1, typename CopyFunc2,
-          amrex::EnableIf_t<std::is_integral<Index>::value, int> foo = 0>
-Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src, Index* mask,
+          amrex::EnableIf_t<std::is_integral_v<Index>, int> foo = 0>
+Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTile& dst2, SrcTile& src, Index* mask,
                                     Index dst1_index, Index dst2_index,
                                     CopyFunc1&& copy1, CopyFunc2&& copy2,
                                     TransFunc&& transform) noexcept
@@ -199,15 +210,20 @@ Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src, 
     using namespace amrex;
 
     auto np = src.numParticles();
-    if (np == 0) return 0;
+    if (np == 0) { return 0; }
 
     Gpu::DeviceVector<Index> offsets(np);
     auto total = amrex::Scan::ExclusiveSum(np, mask, offsets.data());
     const Index num_added = N * total;
-    dst1.resize(std::max(dst1_index + num_added, dst1.numParticles()));
-    dst2.resize(std::max(dst2_index + num_added, dst2.numParticles()));
+    auto old_np1 = dst1.size();
+    auto new_np1 = std::max(dst1_index + num_added, dst1.numParticles());
+    dst1.resize(new_np1);
 
-    auto p_offsets = offsets.dataPtr();
+    auto old_np2 = dst2.size();
+    auto new_np2 = std::max(dst2_index + num_added, dst2.numParticles());
+    dst2.resize(new_np2);
+
+    auto *p_offsets = offsets.dataPtr();
 
     const auto src_data  =  src.getParticleTileData();
     const auto dst1_data = dst1.getParticleTileData();
@@ -229,6 +245,10 @@ Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src, 
                       engine);
         }
     });
+
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst1, pc1, old_np1, new_np1);
+
+    ParticleCreation::DefaultInitializeRuntimeAttributes(dst2, pc2, old_np2, new_np2);
 
     Gpu::synchronize();
     return num_added;
@@ -256,6 +276,8 @@ Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src, 
  * \tparam CopyFunc1 the copy function type for src-->dst1
  * \tparam CopyFunc2 the copy function type for src-->dst2
  *
+ * \param pc1  the first destination particle container
+ * \param pc2  the second destination particle container
  * \param dst1 the destination tile
  * \param dst2 the destination tile
  * \param src the source tile
@@ -276,9 +298,9 @@ Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src, 
  *
  * \return num_added the number of particles that were written to dst.
  */
-template <int N, typename DstTile, typename SrcTile, typename Index,
+template <int N, typename DstPC, typename DstTile, typename SrcTile, typename Index,
           typename PredFunc, typename TransFunc, typename CopyFunc1, typename CopyFunc2>
-Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src,
+Index filterCopyTransformParticles (DstPC& pc1, DstPC& pc2, DstTile& dst1, DstTile& dst2, SrcTile& src,
                                     Index dst1_index, Index dst2_index,
                                     PredFunc&& filter, CopyFunc1&& copy1, CopyFunc2&& copy2,
                                     TransFunc&& transform) noexcept
@@ -286,11 +308,11 @@ Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src,
     using namespace amrex;
 
     auto np = src.numParticles();
-    if (np == 0) return 0;
+    if (np == 0) { return 0; }
 
     Gpu::DeviceVector<Index> mask(np);
 
-    auto p_mask = mask.dataPtr();
+    auto *p_mask = mask.dataPtr();
     const auto src_data = src.getParticleTileData();
 
     amrex::ParallelForRNG(np,
@@ -299,11 +321,11 @@ Index filterCopyTransformParticles (DstTile& dst1, DstTile& dst2, SrcTile& src,
         p_mask[i] = filter(src_data, i, engine);
     });
 
-    return filterCopyTransformParticles<N>(dst1, dst2, src, mask.dataPtr(),
+    return filterCopyTransformParticles<N>(pc1, pc2, dst1, dst2, src, mask.dataPtr(),
                                         dst1_index, dst2_index,
                                         std::forward<CopyFunc1>(copy1),
                                         std::forward<CopyFunc2>(copy2),
                                         std::forward<TransFunc>(transform));
 }
 
-#endif
+#endif //WARPX_FILTER_COPY_TRANSFORM_H_

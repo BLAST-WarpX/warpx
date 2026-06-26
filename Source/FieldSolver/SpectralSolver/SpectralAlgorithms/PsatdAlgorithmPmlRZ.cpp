@@ -8,30 +8,29 @@
 #include "FieldSolver/SpectralSolver/SpectralHankelTransform/HankelTransform.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <cmath>
 
-using amrex::operator""_rt;
-
+using namespace amrex::literals;
 
 /* \brief Initialize coefficients for the update equation */
 PsatdAlgorithmPmlRZ::PsatdAlgorithmPmlRZ (SpectralKSpaceRZ const & spectral_kspace,
                                           amrex::DistributionMapping const & dm,
                                           const SpectralFieldIndex& spectral_index,
-                                          int const n_rz_azimuthal_modes, int const norder_z,
-                                          short const grid_type, amrex::Real const dt)
-     // Initialize members of base class
-     : SpectralBaseAlgorithmRZ(spectral_kspace, dm, spectral_index, norder_z, grid_type),
-       m_dt(dt)
+                                          int const n_rz_azimuthal_modes,
+                                          int const norder_z,
+                                          ablastr::utils::enums::GridType grid_type,
+                                          amrex::Real const dt):
+    // Initialize members of base class and member variables
+    SpectralBaseAlgorithmRZ{spectral_kspace, dm, spectral_index, norder_z, grid_type},
+    m_dt{dt}
 {
     // Allocate the arrays of coefficients
     amrex::BoxArray const & ba = spectral_kspace.spectralspace_ba;
     C_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
     S_ck_coef = SpectralRealCoefficients(ba, dm, n_rz_azimuthal_modes, 0);
-
-    coefficients_initialized = false;
 }
 
 /* Advance the E and B field in spectral space (stored in `f`)
@@ -93,7 +92,7 @@ PsatdAlgorithmPmlRZ::pushSpectralFields (SpectralFieldDataRZ & f)
             int const ir = i + nr*mode;
             amrex::Real const kr = kr_arr[ir];
 
-            constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
+            constexpr amrex::Real c2 = PhysConst::c2;
             Complex const I = Complex{0._rt,1._rt};
             amrex::Real const C = C_arr(i,j,k,mode);
             amrex::Real const S_ck = S_ck_arr(i,j,k,mode);

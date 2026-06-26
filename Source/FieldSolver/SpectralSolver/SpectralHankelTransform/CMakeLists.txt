@@ -1,5 +1,6 @@
-target_sources(WarpX_rz
+target_sources(lib_rz
   PRIVATE
+    BesselRoots.cpp
     SpectralHankelTransformer.cpp
     HankelTransform.cpp
 )

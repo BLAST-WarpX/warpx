@@ -7,10 +7,12 @@
 
 #include "FieldMomentum.H"
 
+#include "Fields.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/sample.H>
 
 #include <AMReX_Array.H>
@@ -37,14 +39,15 @@
 #include <vector>
 
 using namespace amrex;
+using warpx::fields::FieldType;
 
-FieldMomentum::FieldMomentum (std::string rd_name)
+FieldMomentum::FieldMomentum (const std::string& rd_name)
     : ReducedDiags{rd_name}
 {
     // RZ coordinate is not working
-#if (defined WARPX_DIM_RZ)
+#if (defined WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         WARPX_ABORT_WITH_MESSAGE(
-            "FieldMomentum reduced diagnostics not implemented in RZ geometry");
+            "FieldMomentum reduced diagnostics not implemented in cylindrical or spherical geometry");
 #endif
 
     // Read number of levels
@@ -85,7 +88,7 @@ FieldMomentum::FieldMomentum (std::string rd_name)
                 ofs << "momentum_z_lev" << lev << "(kg*m/s)";
             }
 
-            ofs << std::endl;
+            ofs << "\n";
             ofs.close();
         }
     }
@@ -94,10 +97,7 @@ FieldMomentum::FieldMomentum (std::string rd_name)
 void FieldMomentum::ComputeDiags (int step)
 {
     // Check if the diags should be done
-    if (m_intervals.contains(step+1) == false)
-    {
-        return;
-    }
+    if (!m_intervals.contains(step+1)) { return; }
 
     // Get a reference to WarpX instance
     auto & warpx = WarpX::GetInstance();
@@ -105,16 +105,18 @@ void FieldMomentum::ComputeDiags (int step)
     // Get number of refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
 
+    using ablastr::fields::Direction;
+
     // Loop over refinement levels
     for (int lev = 0; lev < nLevel; ++lev)
     {
         // Get MultiFab data at given refinement level
-        const amrex::MultiFab & Ex = warpx.getEfield(lev, 0);
-        const amrex::MultiFab & Ey = warpx.getEfield(lev, 1);
-        const amrex::MultiFab & Ez = warpx.getEfield(lev, 2);
-        const amrex::MultiFab & Bx = warpx.getBfield(lev, 0);
-        const amrex::MultiFab & By = warpx.getBfield(lev, 1);
-        const amrex::MultiFab & Bz = warpx.getBfield(lev, 2);
+        const amrex::MultiFab & Ex = *warpx.m_fields.get(FieldType::Efield_aux, Direction{0}, lev);
+        const amrex::MultiFab & Ey = *warpx.m_fields.get(FieldType::Efield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Ez = *warpx.m_fields.get(FieldType::Efield_aux, Direction{2}, lev);
+        const amrex::MultiFab & Bx = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{0}, lev);
+        const amrex::MultiFab & By = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{1}, lev);
+        const amrex::MultiFab & Bz = *warpx.m_fields.get(FieldType::Bfield_aux, Direction{2}, lev);
 
         // Cell-centered index type
         const amrex::GpuArray<int,3> cc{0,0,0};
@@ -182,24 +184,16 @@ void FieldMomentum::ComputeDiags (int step)
         amrex::Real ExB_x = amrex::get<0>(r);
         amrex::Real ExB_y = amrex::get<1>(r);
         amrex::Real ExB_z = amrex::get<2>(r);
-        amrex::ParallelDescriptor::ReduceRealSum(ExB_x);
-        amrex::ParallelDescriptor::ReduceRealSum(ExB_y);
-        amrex::ParallelDescriptor::ReduceRealSum(ExB_z);
+        amrex::ParallelDescriptor::ReduceRealSum({ExB_x,ExB_y,ExB_z});
 
-        // Get cell size
-        amrex::Geometry const & geom = warpx.Geom(lev);
-#if   defined(WARPX_DIM_1D_Z)
-        auto dV = geom.CellSize(0);
-#elif   defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        auto dV = geom.CellSize(0) * geom.CellSize(1);
-#elif defined(WARPX_DIM_3D)
-        auto dV = geom.CellSize(0) * geom.CellSize(1) * geom.CellSize(2);
-#endif
+        // Get cell volume
+        const std::array<Real, 3> &dx = WarpX::CellSize(lev);
+        const amrex::Real dV = dx[0]*dx[1]*dx[2];
 
         // Save data (offset: 3 values for each refinement level)
         const int offset = lev*3;
-        m_data[offset+0] = PhysConst::ep0 * ExB_x * dV;
-        m_data[offset+1] = PhysConst::ep0 * ExB_y * dV;
-        m_data[offset+2] = PhysConst::ep0 * ExB_z * dV;
+        m_data[offset+0] = PhysConst::epsilon_0 * ExB_x * dV;
+        m_data[offset+1] = PhysConst::epsilon_0 * ExB_y * dV;
+        m_data[offset+2] = PhysConst::epsilon_0 * ExB_z * dV;
     }
 }

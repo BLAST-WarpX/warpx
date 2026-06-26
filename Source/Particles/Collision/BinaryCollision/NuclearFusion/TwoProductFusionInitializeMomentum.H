@@ -5,11 +5,12 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
-#define TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
+#ifndef WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
+#define WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
 
-#include "TwoProductFusionUtil.H"
+#include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
@@ -24,7 +25,9 @@ namespace {
     // Define shortcuts for frequently-used type names
     using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
     using ParticleType = WarpXParticleContainer::ParticleType;
-    using ParticleBins = amrex::DenseBins<ParticleType>;
+    using ParticleTileType = WarpXParticleContainer::ParticleTileType;
+    using ParticleTileDataType = ParticleTileType::ParticleTileDataType;
+    using ParticleBins = amrex::DenseBins<ParticleTileDataType>;
     using index_type = ParticleBins::index_type;
 
     /**
@@ -47,6 +50,7 @@ namespace {
      * @param[in] m1_out mass of first product species
      * @param[in] m2_out mass of second product species
      * @param[in] E_fusion energy released in the fusion reaction
+     * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -58,6 +62,7 @@ namespace {
                             const amrex::ParticleReal& m1_in, const amrex::ParticleReal& m2_in,
                             const amrex::ParticleReal& m1_out, const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_fusion,
+                            ScatteringAngleModel const scattering_angle_model,
                             const amrex::RandomEngine& engine)
     {
         using namespace amrex::literals;
@@ -65,7 +70,7 @@ namespace {
         amrex::ParticleReal ux1_out = 0.0_prt, uy1_out = 0.0_prt, uz1_out = 0.0_prt;
         amrex::ParticleReal ux2_out = 0.0_prt, uy2_out = 0.0_prt, uz2_out = 0.0_prt;
 
-        TwoProductFusionComputeProductMomenta(
+        TwoProductComputeProductMomenta(
             soa1_in.m_rdata[PIdx::ux][idx1_in],
             soa1_in.m_rdata[PIdx::uy][idx1_in],
             soa1_in.m_rdata[PIdx::uz][idx1_in], m1_in,
@@ -75,6 +80,7 @@ namespace {
             ux1_out, uy1_out, uz1_out, m1_out,
             ux2_out, uy2_out, uz2_out, m2_out,
             E_fusion,
+            scattering_angle_model,
             engine);
 
         // Fill momentum of product species (note that we actually
@@ -94,4 +100,4 @@ namespace {
     }
 }
 
-#endif // TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H
+#endif // WARPX_TWO_PRODUCT_FUSION_INITIALIZE_MOMENTUM_H

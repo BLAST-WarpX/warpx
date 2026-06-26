@@ -12,8 +12,7 @@
 /**
  * \brief Functor to calculate per-cell averages of particle properties.
  */
-class
-ParticleReductionFunctor final : public ComputeDiagFunctor
+class ParticleReductionFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
@@ -30,11 +29,11 @@ public:
      * \param[in] filter_str Parser string for filter function to apply before averaging
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
-    ParticleReductionFunctor(const amrex::MultiFab * const mf_src, const int lev,
-                       const amrex::IntVect crse_ratio, const std::string fn_str,
-                       const int ispec, const bool do_average,
-                       const bool do_filter, const std::string filter_str,
-                       const int ncomp=1);
+    ParticleReductionFunctor(const amrex::MultiFab * mf_src, int lev,
+                       amrex::IntVect crse_ratio, const std::string& fn_str,
+                       int ispec, bool do_average,
+                       bool do_filter, const std::string& filter_str,
+                       int ncomp=1);
 
     /** \brief Compute the average of the function m_map_fn over each grid cell.
      *
@@ -42,12 +41,12 @@ public:
      * \param[in] dcomp first component of mf_dst in which cell-centered
      *            data is stored
      */
-    virtual void operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer=0*/) const override;
+    void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
-    int const m_lev; /**< level on which mf_src is defined */
-    int const m_ispec; /**< index of species to average over */
-    bool const m_do_average; /**< Whether to calculate the average of the data */
-    bool const m_do_filter; /**< whether to apply #m_filter_fn */
+    int m_lev; /**< level on which mf_src is defined */
+    int m_ispec; /**< index of species to average over */
+    bool m_do_average; /**< Whether to calculate the average of the data */
+    bool m_do_filter; /**< whether to apply #m_filter_fn */
     /** Parser function to be averaged by the functor. Arguments: x, y, z, ux, uy, uz */
     std::unique_ptr<amrex::Parser> m_map_fn_parser;
     /** Parser function to filter particles before pass to map. Arguments: x, y, z, ux, uy, uz */

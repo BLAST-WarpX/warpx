@@ -4,8 +4,8 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef INJECTOR_FLUX_H_
-#define INJECTOR_FLUX_H_
+#ifndef WARPX_INJECTOR_FLUX_H_
+#define WARPX_INJECTOR_FLUX_H_
 
 #include "Utils/WarpXConst.H"
 
@@ -22,8 +22,9 @@
 // struct whose getFlux returns constant flux.
 struct InjectorFluxConstant
 {
-    InjectorFluxConstant (amrex::Real a_flux) noexcept : m_flux(a_flux) {}
+    explicit InjectorFluxConstant (amrex::Real a_flux) noexcept : m_flux(a_flux) {}
 
+    [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
     amrex::Real
     getFlux (amrex::Real, amrex::Real, amrex::Real, amrex::Real) const noexcept
@@ -38,9 +39,10 @@ private:
 // struct whose getFlux returns local flux computed from parser.
 struct InjectorFluxParser
 {
-    InjectorFluxParser (amrex::ParserExecutor<4> const& a_parser) noexcept
+    explicit InjectorFluxParser (amrex::ParserExecutor<4> const& a_parser) noexcept
         : m_parser(a_parser) {}
 
+    [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
     amrex::Real
     getFlux (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real t) const noexcept
@@ -79,6 +81,9 @@ struct InjectorFlux
     void operator= (InjectorFlux const&) = delete;
     void operator= (InjectorFlux &&) = delete;
 
+    // Default destructor
+    ~InjectorFlux () = default;
+
     void clear ()
     {
         switch (type)
@@ -93,6 +98,7 @@ struct InjectorFlux
 
     // call getFlux from the object stored in the union
     // (the union is called Object, and the instance is called object).
+    [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
     amrex::Real
     getFlux (amrex::Real x, amrex::Real y, amrex::Real z, amrex::Real t) const noexcept
@@ -143,4 +149,4 @@ struct InjectorFluxDeleter {
     }
 };
 
-#endif
+#endif //WARPX_INJECTOR_FLUX_H_

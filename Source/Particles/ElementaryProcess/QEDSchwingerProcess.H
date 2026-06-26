@@ -5,8 +5,8 @@
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef QED_SCHWINGER_PROCESS_H_
-#define QED_SCHWINGER_PROCESS_H_
+#ifndef WARPX_QED_SCHWINGER_PROCESS_H_
+#define WARPX_QED_SCHWINGER_PROCESS_H_
 
 #include "Particles/ElementaryProcess/QEDInternals/SchwingerProcessWrapper.H"
 #include "Utils/TextMsg.H"
@@ -17,9 +17,9 @@
  */
 struct SchwingerFilterFunc
 {
-    const int m_threshold_poisson_gaussian;
-    const amrex::Real m_dV;
-    const amrex::Real m_dt;
+    int m_threshold_poisson_gaussian;
+    amrex::Real m_dV;
+    amrex::Real m_dt;
 
     /** Get the number of created pairs in a given cell at a given timestep.
      *
@@ -59,8 +59,8 @@ struct SchwingerFilterFunc
  */
 struct SchwingerTransformFunc
 {
-    const amrex::Real m_y_size;
-    const int m_weight_index;
+    amrex::Real m_y_size;
+    int m_weight_index;
 
     /** Assign a weight to particles created via the Schwinger process.
      *
@@ -81,9 +81,9 @@ struct SchwingerTransformFunc
                         const amrex::Real total_weight) const noexcept
     {
         for (int n = 0; n < N; ++n){
-#if defined(WARPX_DIM_1D_Z)
-        amrex::ignore_unused(dst1, dst2, i_dst1, i_dst2, N, total_weight);
-        amrex::Abort("SchwingerTransformFunc not implemented in 1D");
+#if AMREX_SPACEDIM == 1
+            amrex::ignore_unused(dst1, dst2, i_dst1, i_dst2, N, total_weight);
+            amrex::Abort("SchwingerTransformFunc not implemented in 1D");
 #elif defined(WARPX_DIM_3D)
             dst1.m_rdata[m_weight_index][i_dst1+n] = total_weight/N;
             dst2.m_rdata[m_weight_index][i_dst2+n] = total_weight/N;
@@ -95,4 +95,4 @@ struct SchwingerTransformFunc
     }
 };
 
-#endif // QED_SCHWINGER_PROCESS_H_
+#endif // WARPX_QED_SCHWINGER_PROCESS_H_

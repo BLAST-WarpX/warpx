@@ -1,0 +1,22 @@
+{
+  "lev=0": {
+    "Br": 0.6186180732060078,
+    "Bt": 0.0,
+    "Bz": 4.653062062890106,
+    "Er": 0.0,
+    "Et": 0.0,
+    "Ez": 0.0,
+    "jr": 0.0,
+    "jt": 0.0,
+    "jz": 0.0
+  },
+  "proton": {
+    "particle_momentum_x": 1.2945373278931472e-23,
+    "particle_momentum_y": 7.901629666057964e-23,
+    "particle_momentum_z": 2.0004592619529083e-23,
+    "particle_position_x": 0.12402004564203346,
+    "particle_position_y": 4.363249201869692,
+    "particle_theta": 0.2220079423547823,
+    "particle_weight": 1.0
+  }
+}

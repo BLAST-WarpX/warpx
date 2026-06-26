@@ -1,0 +1,9 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+amr.max_level = 1
+amr.n_cell = 64 64
+particles.use_fdtd_nci_corr = 1
+warpx.fine_tag_hi =  20.e-6  20.e-6
+warpx.fine_tag_lo = -20.e-6 -20.e-6

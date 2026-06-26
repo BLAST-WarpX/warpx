@@ -14,16 +14,19 @@ echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
 
 # Ref.: https://github.com/rscohn2/oneapi-ci
 # intel-basekit intel-hpckit are too large in size
-wget -q -O - https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB \
-  | sudo apt-key add -
-echo "deb https://apt.repos.intel.com/oneapi all main" \
-  | sudo tee /etc/apt/sources.list.d/oneAPI.list
+
+# download the key to system keyring
+wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+| gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
+
+# add signed entry to apt sources and configure the APT client to use Intel repository:
+echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
 
 sudo apt-get update
 
 df -h
 # Install and reduce disk space
-# https://github.com/ECP-WarpX/WarpX/pull/1566#issuecomment-790934878
+# https://github.com/BLAST-WarpX/warpx/pull/1566#issuecomment-790934878
 
 # try apt install up to five times, to avoid connection splits
 status=1
@@ -31,9 +34,11 @@ for itry in {1..5}
 do
     sudo apt-get install -y --no-install-recommends \
         build-essential \
-        ccache          \
         cmake           \
-        intel-oneapi-dpcpp-cpp-compiler intel-oneapi-mkl-devel \
+        intel-oneapi-compiler-dpcpp-cpp \
+        intel-oneapi-mkl-devel \
+        intel-ocloc \
+        libigc-dev  \
         g++ gfortran    \
         libopenmpi-dev  \
         openmpi-bin     \
@@ -55,3 +60,6 @@ sudo rm -rf /opt/intel/oneapi/mkl/latest/lib/intel64/*.a           \
 du -sh /opt/intel/oneapi/
 du -sh /opt/intel/oneapi/*/*
 df -h
+
+# ccache
+$(dirname "$0")/ccache.sh

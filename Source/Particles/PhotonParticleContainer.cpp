@@ -15,7 +15,7 @@
 #include "Particles/PhysicalParticleContainer.H"
 #include "Particles/Pusher/CopyParticleAttribs.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-#include "Particles/Pusher/UpdatePositionPhoton.H"
+#include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
@@ -65,7 +65,7 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
         pp_species_name.query("do_qed_quantum_sync", test_quantum_sync);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         test_quantum_sync == 0,
-        "ERROR: do_qed_quantum_sync can be 1 for species NOT listed in particles.photon_species only!");
+        "ERROR: do_qed_quantum_sync can't be enabled for photon particles!");
         //_________________________________________________________
 #endif
 
@@ -91,10 +91,17 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  const long offset,
                                  const long np_to_push,
                                  int lev, int gather_lev,
-                                 amrex::Real dt, ScaleFields /*scaleFields*/, DtType a_dt_type)
+                                 amrex::Real dt, ScaleFields /*scaleFields*/, SubcyclingHalf subcycling_half,
+                                 PositionPushType position_push_type,
+                                 MomentumPushType momentum_push_type)
 {
-    // Get cell size on gather_lev
-    const std::array<Real,3>& dx = WarpX::CellSize(std::max(gather_lev,0));
+    amrex::ignore_unused(momentum_push_type);
+    // Photons are massless and neutral (q=0), so the Lorentz force equation
+    // is not applicable. They are not advanced using a particle pusher.
+    // That's why this argument MomentumPushType /momentum_push_type/ is ignored.
+
+    // Get inverse cell size on gather_lev
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
 
     // Get box from which field is gathered.
     // If not gathering from the finest level, the box is coarsened.
@@ -119,32 +126,41 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #ifdef WARPX_QED
     BreitWheelerEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_BW = nullptr;
+    const amrex::Real qed_dt =
+        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
     const bool local_has_breit_wheeler = has_breit_wheeler();
     if (local_has_breit_wheeler) {
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
-        p_optical_depth_BW = pti.GetAttribs(particle_comps["opticalDepthBW"]).dataPtr() + offset;
+        p_optical_depth_BW = pti.GetAttribs("opticalDepthBW").dataPtr() + offset;
     }
 #endif
 
-    auto copyAttribs = CopyParticleAttribs(pti, tmp_particle_data, offset);
-    const int do_copy = (m_do_back_transformed_particles && (a_dt_type!=DtType::SecondHalf) );
+    const int do_copy = (m_do_back_transformed_particles && (subcycling_half!=SubcyclingHalf::SecondHalf) );
+    CopyParticleAttribs copyAttribs;
+    if (do_copy) {
+        copyAttribs = CopyParticleAttribs(*this, pti, offset);
+    }
 
-    const auto GetPosition = GetParticlePosition(pti, offset);
-    auto SetPosition = SetParticlePosition(pti, offset);
+    const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
+    auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
 
     const auto getExternalEB = GetExternalEBField(pti, offset);
 
+    const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
+    const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
+    const amrex::ParticleReal Ez_external_particle = m_E_external_particle[2];
+    const amrex::ParticleReal Bx_external_particle = m_B_external_particle[0];
+    const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
+    const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
+
     // Lower corner of tile box physical domain (take into account Galilean shift)
-    const std::array<amrex::Real, 3>& xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, gather_lev, 0._rt);
 
     const Dim3 lo = lbound(box);
 
     const bool galerkin_interpolation = WarpX::galerkin_interpolation;
     const int nox = WarpX::nox;
     const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
-
-    const amrex::GpuArray<amrex::Real, 3> dx_arr = {dx[0], dx[1], dx[2]};
-    const amrex::GpuArray<amrex::Real, 3> xyzmin_arr = {xyzmin[0], xyzmin[1], xyzmin[2]};
 
     amrex::Array4<const amrex::Real> const& ex_arr = exfab->array();
     amrex::Array4<const amrex::Real> const& ey_arr = eyfab->array();
@@ -172,75 +188,100 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
     const int qed_runtime_flag = no_qed;
 #endif
 
+    // local copy for device lambda capture
+    amrex::ParticleReal const mass = m_mass;
+
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
                        {exteb_runtime_flag, qed_runtime_flag},
                        np_to_push,
                        [=] AMREX_GPU_DEVICE (long i, auto exteb_control,
                                              auto qed_control) {
-            if (do_copy) copyAttribs(i);
+            if (do_copy) { copyAttribs(i); }
             ParticleReal x, y, z;
             GetPosition(i, x, y, z);
 
-            amrex::ParticleReal Exp=0, Eyp=0, Ezp=0;
-            amrex::ParticleReal Bxp=0, Byp=0, Bzp=0;
+            amrex::ParticleReal Exp = Ex_external_particle;
+            amrex::ParticleReal Eyp = Ey_external_particle;
+            amrex::ParticleReal Ezp = Ez_external_particle;
+            amrex::ParticleReal Bxp = Bx_external_particle;
+            amrex::ParticleReal Byp = By_external_particle;
+            amrex::ParticleReal Bzp = Bz_external_particle;
 
             if(!t_do_not_gather){
                 // first gather E and B to the particle positions
                 doGatherShapeN(x, y, z, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
                                ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                               dx_arr, xyzmin_arr, lo, n_rz_azimuthal_modes,
+                               dinv, xyzmin, lo, n_rz_azimuthal_modes,
                                nox, galerkin_interpolation);
             }
 
-            [[maybe_unused]] auto& getExternalEB_tmp = getExternalEB; // workaround for nvcc
+            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB; // workaround for nvcc
             if constexpr (exteb_control == has_exteb) {
                 getExternalEB(i, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
             }
 
 #ifdef WARPX_QED
-            [[maybe_unused]] auto& evolve_opt_tmp = evolve_opt;
-            [[maybe_unused]] auto p_optical_depth_BW_tmp = p_optical_depth_BW;
-            [[maybe_unused]] auto ux_tmp = ux; // for nvhpc
-            [[maybe_unused]] auto uy_tmp = uy;
-            [[maybe_unused]] auto uz_tmp = uz;
+            [[maybe_unused]] const auto& evolve_opt_tmp = evolve_opt;
+            [[maybe_unused]] auto *p_optical_depth_BW_tmp = p_optical_depth_BW;
+            [[maybe_unused]] auto *ux_tmp = ux; // for nvhpc
+            [[maybe_unused]] auto *uy_tmp = uy;
+            [[maybe_unused]] auto *uz_tmp = uz;
             [[maybe_unused]] auto dt_tmp = dt;
+            [[maybe_unused]] auto qed_dt_tmp = qed_dt;
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                           dt, p_optical_depth_BW[i]);
+                           qed_dt, p_optical_depth_BW[i]);
             }
 #else
             amrex::ignore_unused(qed_control);
 #endif
 
-            UpdatePositionPhoton( x, y, z, ux[i], uy[i], uz[i], dt );
-            SetPosition(i, x, y, z);
+            if (position_push_type == PositionPushType::Full) {
+                UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
+                SetPosition(i, x, y, z);
+            }
         }
     );
 }
 
 void
-PhotonParticleContainer::Evolve (int lev,
-                                 const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
-                                 const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                 MultiFab& jx, MultiFab& jy, MultiFab& jz,
-                                 MultiFab* cjx, MultiFab* cjy, MultiFab* cjz,
-                                 MultiFab* rho, MultiFab* crho,
-                                 const MultiFab* cEx, const MultiFab* cEy, const MultiFab* cEz,
-                                 const MultiFab* cBx, const MultiFab* cBy, const MultiFab* cBz,
-                                 Real t, Real dt, DtType a_dt_type, bool skip_deposition)
+PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
+                                 int lev,
+                                 const std::string& current_fp_string,
+                                 Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
+                                 PositionPushType position_push_type,
+                                 MomentumPushType momentum_push_type,
+                                 ImplicitOptions const * implicit_options)
 {
-    // This does gather, push and depose.
-    // Push and depose have been re-written for photons
-    PhysicalParticleContainer::Evolve (lev,
-                                       Ex, Ey, Ez,
-                                       Bx, By, Bz,
-                                       jx, jy, jz,
-                                       cjx, cjy, cjz,
-                                       rho, crho,
-                                       cEx, cEy, cEz,
-                                       cBx, cBy, cBz,
-                                       t, dt, a_dt_type, skip_deposition);
+    // This does gather, push and deposit.
+    // Push and deposit have been re-written for photons.
+    // Photons do not participate in the implicit solver. When called
+    // from the implicit solver during the iteration, we skip the push entirely;
+    // photons are instead advanced once at the end of the step via
+    // FinishImplicitParticleUpdate below.
+    if (implicit_options) { return; }
+    PhysicalParticleContainer::Evolve(fields,
+                                      lev,
+                                      current_fp_string,
+                                      t, dt, subcycling_half, skip_deposition,
+                                      position_push_type,
+                                      momentum_push_type,
+                                      /*implicit_options=*/nullptr);
+}
 
+void
+PhotonParticleContainer::FinishImplicitParticleUpdate (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev, amrex::Real t, amrex::Real dt)
+{
+    // We perform a single full explicit push over [t-dt, t] here.
+    // Deposition is skipped because photons carry no charge and
+    // therefore contribute no current. We pass implicit_options=nullptr
+    // so that the early-return guard in PhotonParticleContainer::Evolve()
+    // does not fire: we do want the push this time.
+    Evolve(fields, lev, /*current_fp_string=*/"current_fp", t, dt,
+           SubcyclingHalf::None, /*skip_deposition=*/true,
+           PositionPushType::Full, MomentumPushType::Full, /*implicit_options=*/nullptr);
 }

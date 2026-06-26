@@ -3,7 +3,7 @@
 LUMI (CSC)
 ==========
 
-The `LUMI cluster <https://www.lumi-supercomputer.eu>`_ is located at CSC (Finland).
+The `LUMI cluster <https://www.lumi-supercomputer.eu>`__ is located at CSC (Finland).
 Each node contains 4 AMD MI250X GPUs, each with 2 Graphics Compute Dies (GCDs) for a total of 8 GCDs per node.
 You can think of the 8 GCDs as 8 separate GPUs, each having 64 GB of high-bandwidth memory (HBM2E).
 
@@ -12,8 +12,11 @@ Introduction
 
 If you are new to this system, **please see the following resources**:
 
-* `Lumi user guide <https://docs.lumi-supercomputer.eu>`_
-* Batch system: `Slurm <https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/slurm-quickstart/>`_
+* `Lumi user guide <https://docs.lumi-supercomputer.eu>`__
+
+  * `Project Maintainance <https://my.lumi-supercomputer.eu>`__ and `SSH Key management <https://mms.myaccessid.org>`__
+  * `Quotas and projects <https://docs.lumi-supercomputer.eu/runjobs/lumi_env/dailymanagement/>`__
+* Batch system: `Slurm <https://docs.lumi-supercomputer.eu/runjobs/scheduled-jobs/slurm-quickstart/>`__
 * `Data analytics and visualization <https://docs.lumi-supercomputer.eu/hardware/lumid/>`__
 * `Production directories <https://docs.lumi-supercomputer.eu/storage/>`__:
 
@@ -22,62 +25,122 @@ If you are new to this system, **please see the following resources**:
   * ``/scratch/$proj``: temporary storage, main storage to be used for disk I/O needs when running simulations on LUMI, purged every 90 days (50TB default quota)
 
 
-Installation
-------------
+.. _building-lumi-preparation:
 
-Use the following commands to download the WarpX source code and switch to the correct branch:
+Preparation
+-----------
 
-.. code-block:: bash
-
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
-
-We use the following modules and environments on the system (``$HOME/lumi_warpx.profile``).
-
-.. literalinclude:: ../../../../Tools/machines/lumi-csc/lumi_warpx.profile.example
-   :language: bash
-   :caption: You can copy this file from ``Tools/machines/lumi-csc/lumi_warpx.profile.example``.
-
-
-We recommend to store the above lines in a file, such as ``$HOME/lumi_warpx.profile``, and load it into your shell after a login:
+Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   source $HOME/lumi_warpx.profile
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
-And since LUMI does not yet provide a module for them, install c-blosc and ADIOS2:
+We use system software modules, add environment hints and further dependencies via the file ``$HOME/lumi_warpx.profile``.
+Create it now:
 
 .. code-block:: bash
 
-   export CMAKE_PREFIX_PATH=${HOME}/sw/lumi/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
-   export CMAKE_PREFIX_PATH=${HOME}/sw/lumi/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
+   cp $HOME/src/warpx/Tools/machines/lumi-csc/lumi_warpx.profile.example $HOME/lumi_warpx.profile
 
-   # c-blosc (I/O compression)
-   git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git src/c-blosc
-   rm -rf src/c-blosc-build
-   cmake -S src/c-blosc -B src/c-blosc-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${HOME}/sw/lumi/gpu/c-blosc-1.21.1
-   cmake --build src/c-blosc-build --target install --parallel 16
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
 
-   # ADIOS2
-   git clone -b v2.8.3 https://github.com/ornladios/ADIOS2.git src/adios2
-   rm -rf src/adios2-build
-   cmake -S src/adios2 -B src/adios2-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${HOME}/sw/lumi/gpu//adios2-2.8.3
-   cmake --build src/adios2-build --target install -j 16
+   .. literalinclude:: ../../../../Tools/machines/lumi-csc/lumi_warpx.profile.example
+      :language: bash
 
-Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following commands to compile:
+Edit the 2nd line of this script, which sets the ``export proj="project_..."`` variable using a text editor
+such as ``nano``, ``emacs``, or ``vim`` (all available by default on LUMI login nodes).
+You can find out your project name by running ``lumi-ldap-userinfo`` on LUMI.
+For example, if you are member of the project ``project_465000559``, then run ``nano $HOME/lumi_impactx.profile`` and edit line 2 to read:
+
+.. code-block:: bash
+
+   export proj="project_465000559"
+
+Exit the ``nano`` editor with ``Ctrl`` + ``O`` (save) and then ``Ctrl`` + ``X`` (exit).
+
+.. important::
+
+   Now, and as the first step on future logins to LUMI, activate these environment settings:
+
+   .. code-block:: bash
+
+      source $HOME/lumi_warpx.profile
+
+Finally, since LUMI does not yet provide software modules for some of our dependencies, install them once:
+
+.. code-block:: bash
+
+   bash $HOME/src/warpx/Tools/machines/lumi-csc/install_dependencies.sh
+   source $HOME/sw/lumi/gpu/venvs/warpx-lumi/bin/activate
+
+.. dropdown:: Script Details
+   :color: light
+   :icon: info
+   :animate: fade-in-slide-down
+
+   .. literalinclude:: ../../../../Tools/machines/lumi-csc/install_dependencies.sh
+      :language: bash
+
+
+.. _building-lumi-compilation:
+
+Compilation
+-----------
+
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
-   rm -rf build
+   rm -rf build_lumi
 
-   cmake -S . -B build -DWarpX_DIMS="1;2;3" -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON
-   cmake --build build -j 16
+   cmake -S . -B build_lumi -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_QED_TABLES_GEN_OMP=OFF -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_lumi -j 16
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+The WarpX application executables are now in ``$HOME/src/warpx/build_lumi/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
 
-**That's it!**
-WarpX executables are now in ``build/bin/`` and :ref:`can be run <running-cpp-lumi>` with matching :ref:`example inputs files <usage-examples>`.
-Most people execute the binary directly or copy it out to a location in ``/scratch/<project>``.
+.. code-block:: bash
+
+   rm -rf build_lumi_py
+
+   cmake -S . -B build_lumi_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_QED_TABLES_GEN_OMP=OFF -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_lumi_py -j 16 --target pip_install
+
+
+.. _building-lumi-update:
+
+Update WarpX & Dependencies
+---------------------------
+
+If you already installed WarpX in the past and want to update it, start by getting the latest source code:
+
+.. code-block:: bash
+
+   cd $HOME/src/warpx
+
+   # read the output of this command - does it look ok?
+   git status
+
+   # get the latest WarpX source code
+   git fetch
+   git pull
+
+   # read the output of these commands - do they look ok?
+   git status
+   git log     # press q to exit
+
+And, if needed,
+
+- :ref:`update the lumi_warpx.profile file <building-lumi-preparation>`,
+- log out and into the system, activate the now updated environment profile as usual,
+- :ref:`execute the dependency install scripts <building-lumi-preparation>`.
+
+As a last step, clean the build directory ``rm -rf $HOME/src/warpx/build_lumi`` and rebuild WarpX.
 
 
 .. _running-cpp-lumi:
@@ -90,11 +153,27 @@ Running
 MI250X GPUs (2x64 GB)
 ^^^^^^^^^^^^^^^^^^^^^
 
-In non-interactive runs:
+The GPU partition on the supercomputer LUMI at CSC has up to `2978 nodes <https://docs.lumi-supercomputer.eu/hardware/lumig/>`__, each with 8 Graphics Compute Dies (GCDs).
+WarpX runs one MPI rank per Graphics Compute Die.
 
-.. literalinclude:: ../../../../Tools/machines/lumi-csc/submit.sh
+For interactive runs, simply use the aliases ``getNode`` or ``runNode ...``.
+
+The batch script below can be used to run a WarpX simulation on multiple nodes (change ``-N`` accordingly).
+Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<project id>`` or the concete inputs file.
+Copy the executable or point to it via ``EXE`` and adjust the path for the ``INPUTS`` variable accordingly.
+
+.. literalinclude:: ../../../../Tools/machines/lumi-csc/lumi.sbatch
    :language: bash
-   :caption: You can copy this file from ``Tools/machines/lumi-csc/submit.sh``.
+   :caption: You can copy this file from ``Tools/machines/lumi-csc/lumi.sbatch``.
+
+To run a simulation, copy the lines above to a file ``lumi.sbatch`` and run
+
+.. code-block:: bash
+
+   sbatch lumi.sbatch
+
+to submit the job.
+
 
 .. _post-processing-lumi:
 
@@ -104,6 +183,9 @@ Post-Processing
 .. note::
 
    TODO: Document any Jupyter or data services.
+
+
+.. _known-lumi-issues:
 
 Known System Issues
 -------------------

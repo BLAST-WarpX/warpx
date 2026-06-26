@@ -13,14 +13,28 @@
 #SBATCH -A <proj>
 #SBATCH -q regular
 #SBATCH -C cpu
+# 8 cores per chiplet, 2x SMP
+#SBATCH --cpus-per-task=16
 #SBATCH --ntasks-per-node=16
 #SBATCH --exclusive
 #SBATCH -o WarpX.o%j
 #SBATCH -e WarpX.e%j
 
-# executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs_small
+# python interpreter & script here
+EXE=python3
+INPUTS=run_script.py
+# or executable & inputs file
+#EXE=./warpx
+#INPUTS=inputs_small
+
+# environment setup
+if [[ -z "${MY_PROFILE}" ]]; then
+    echo "WARNING: FORGOT TO"
+    echo "   source $HOME/perlmutter_cpu_warpx.profile"
+    echo "before submission. Doing that now."
+
+    source $HOME/perlmutter_cpu_warpx.profile
+fi
 
 # each CPU node on Perlmutter (NERSC) has 64 hardware cores with
 # 2x Hyperthreading/SMP
@@ -30,9 +44,9 @@ INPUTS=inputs_small
 # This will be our MPI rank assignment (2x8 is 16 ranks/node).
 
 # threads for OpenMP and threaded compressors per MPI rank
-export SRUN_CPUS_PER_TASK=16  # 8 cores per chiplet, 2x SMP
 export OMP_PLACES=threads
 export OMP_PROC_BIND=spread
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 
 srun --cpu-bind=cores \
   ${EXE} ${INPUTS} \

@@ -1,7 +1,6 @@
-/* Copyright 2020 Axel Huebl
+/* This file is part of ABLASTR.
  *
- * This file is part of ABLASTR.
- *
+ * Authors: Axel Huebl
  * License: BSD-3-Clause-LBNL
  */
 #include "MPIInitHelpers.H"
@@ -10,38 +9,56 @@
 
 #include <AMReX_Config.H>
 #include <AMReX_ParallelDescriptor.H>
-#include <AMReX_Print.H>
 
 #if defined(AMREX_USE_MPI)
 #   include <mpi.h>
 #endif
 
+// OLCFDEV-1655: Segfault during MPI_Init & in PMI_Allgather
+// https://docs.olcf.ornl.gov/systems/crusher_quick_start_guide.html#olcfdev-1655-occasional-seg-fault-during-mpi-init
+#if defined(AMREX_USE_HIP)
+#include <hip/hip_runtime.h>
+#endif
+
+#include <iostream>
 #include <string>
 #include <utility>
+#include <stdexcept>
 #include <sstream>
+
 
 namespace ablastr::parallelization
 {
-    int
+    constexpr int
     mpi_thread_required ()
     {
-        int thread_required = -1;
 #ifdef AMREX_USE_MPI
-        thread_required = MPI_THREAD_SINGLE;  // equiv. to MPI_Init
-#   ifdef AMREX_USE_OMP
-        thread_required = MPI_THREAD_FUNNELED;
-#   endif
 #   ifdef AMREX_MPI_THREAD_MULTIPLE  // i.e. for async_io
-        thread_required = MPI_THREAD_MULTIPLE;
+        return MPI_THREAD_MULTIPLE;
+#   elif defined(AMREX_USE_OMP)
+        return MPI_THREAD_FUNNELED;
+#   else
+        return MPI_THREAD_SINGLE; // equiv. to MPI_Init
 #   endif
+#else
+        return -1;
 #endif
-        return thread_required;
     }
 
     std::pair< int, int >
     mpi_init (int argc, char* argv[])
     {
-        const int thread_required = mpi_thread_required();
+        // OLCFDEV-1655: Segfault during MPI_Init & in PMI_Allgather
+        // https://docs.olcf.ornl.gov/systems/crusher_quick_start_guide.html#olcfdev-1655-occasional-seg-fault-during-mpi-init
+#if defined(AMREX_USE_HIP) && defined(AMREX_USE_MPI)
+        hipError_t hip_ok = hipInit(0);
+        if (hip_ok != hipSuccess) {
+            std::cerr << "hipInit failed with error code " << hip_ok << "! Aborting now.\n";
+            throw std::runtime_error("hipInit failed. Did not proceeding with MPI_Init_thread.");
+        }
+#endif
+
+        constexpr int thread_required = mpi_thread_required();
 #ifdef AMREX_USE_MPI
         int thread_provided = -1;
         MPI_Init_thread(&argc, &argv, thread_required, &thread_provided);
@@ -65,7 +82,7 @@ namespace ablastr::parallelization
     check_mpi_thread_level ()
     {
 #ifdef AMREX_USE_MPI
-        const int thread_required = mpi_thread_required();
+        constexpr int thread_required = mpi_thread_required();
         int thread_provided = -1;
         MPI_Query_thread(&thread_provided);
         auto mtn = amrex::ParallelDescriptor::mpi_level_to_string;

@@ -1,3 +1,5 @@
+CEXE_sources += IntervalsParser.cpp
+CEXE_sources += StreamUtils.cpp
 CEXE_sources += StringUtils.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/ablastr/utils/text

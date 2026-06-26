@@ -6,40 +6,53 @@ export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE
 if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
 
 # required dependencies
-module load cmake/3.22.0
+module load gpu
+module load PrgEnv-gnu
+module load craype
+module load craype-x86-milan
+module load craype-accel-nvidia80
+module load cudatoolkit
+module load gcc-native/13.2  # default gcc-native/14 breaks pybind11 builds with NVCC 12.9.41
+module load cmake/3.30.2
+
+# missing modules installed here
+export SW_DIR=${PSCRATCH}/storage/sw/warpx/perlmutter/gpu
 
 # optional: for QED support with detailed tables
-export BOOST_ROOT=/global/common/software/spackecp/perlmutter/e4s-22.05/78535/spack/opt/spack/cray-sles15-zen3/gcc-11.2.0/boost-1.79.0-lmdngktoeuwdi6ty55noznunah2mvk5w
+export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/boost-1.82.0/lib:${LD_LIBRARY_PATH}
 
 # optional: for openPMD and PSATD+RZ support
-module load cray-hdf5-parallel/1.12.2.1
-export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/c-blosc-1.21.1:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-master:$CMAKE_PREFIX_PATH
-export CMAKE_PREFIX_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-master:$CMAKE_PREFIX_PATH
+module load cray-hdf5-parallel/1.12.2.9
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:${CMAKE_PREFIX_PATH}
 
-export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/c-blosc-1.21.1/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/adios2-2.8.3/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/blaspp-master/lib64:$LD_LIBRARY_PATH
-export LD_LIBRARY_PATH=${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/lapackpp-master/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-1.21.1/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:${LD_LIBRARY_PATH}
+
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 
 # optional: CCache
-export PATH=/global/common/software/spackecp/perlmutter/e4s-22.05/78535/spack/opt/spack/cray-sles15-zen3/gcc-11.2.0/ccache-4.5.1-ybl7xefvggn6hov4dsdxxnztji74tolj/bin:$PATH
+export PATH=${SW_DIR}/ccache-4.10.2:$PATH
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.9.13.1
+module load cray-python/3.11.5
 
-if [ -d "${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx" ]
+if [ -d "${SW_DIR}/venvs/warpx-gpu" ]
 then
-  source ${CFS}/${proj%_g}/${USER}/sw/perlmutter/gpu/venvs/warpx/bin/activate
+  source ${SW_DIR}/venvs/warpx-gpu/bin/activate
 fi
 
 # an alias to request an interactive batch node for one hour
 #   for parallel execution, start on the batch node: srun <command>
-alias getNode="salloc -N 1 --ntasks-per-node=4 -t 1:00:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 4 -A $proj"
+alias getNode="salloc -N 1 --ntasks-per-node=4 -t 1:00:00 -q interactive -C gpu --gpu-bind=none -c 32 -G 4 -A $proj"
 # an alias to run a command on a batch node for up to 30min
 #   usage: runNode <command>
-alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00 -q interactive -C gpu --gpu-bind=single:1 -c 32 -G 4 -A $proj"
+alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00 -q interactive -C gpu --gpu-bind=none -c 32 -G 4 -A $proj"
 
 # necessary to use CUDA-Aware MPI and run a job
 export CRAY_ACCEL_TARGET=nvidia80

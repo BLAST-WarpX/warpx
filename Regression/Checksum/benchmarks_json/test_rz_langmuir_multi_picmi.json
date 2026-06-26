@@ -1,0 +1,19 @@
+{
+  "lev=0": {
+    "Bt": 2.496097617890775,
+    "Er": 879037494869.3962,
+    "Ez": 1707659989339.4216,
+    "jr": 210208683134074.84,
+    "jz": 407196104085840.7,
+    "part_per_cell": 1472000.0
+  },
+  "electrons": {
+    "particle_momentum_x": 2.102411238454224e-20,
+    "particle_momentum_y": 2.3457116611378788e-20,
+    "particle_momentum_z": 3.1009667761215844e-20,
+    "particle_position_x": 6.61250119096384,
+    "particle_position_y": 14.72,
+    "particle_theta": 1156106.3669672809,
+    "particle_weight": 81147583679.15042
+  }
+}

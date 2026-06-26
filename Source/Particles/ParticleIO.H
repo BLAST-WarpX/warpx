@@ -4,10 +4,13 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef PARTICLEIO_H_
-#define PARTICLEIO_H_
+#ifndef WARPX_PARTICLEIO_H_
+#define WARPX_PARTICLEIO_H_
 
 #include "Particles/WarpXParticleContainer.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
+
+#include <ablastr/particles/NodalFieldGather.H>
 
 #include <AMReX_AmrParticles.H>
 #include <AMReX_ParIter.H>
@@ -59,7 +62,7 @@ particlesConvertUnits (ConvertDirection convert_direction, T_ParticleContainer* 
             // - momenta are stored as a struct of array, in `attribs`
             // The GetStructOfArrays is called directly since the convenience routine GetAttribs
             // is only available in WarpXParIter. ParIter is used here since the pc passed in
-            // will sometimes be a PinnedMemoryParticleContainer (not derived from a WarpXParticleContainer).
+            // will sometimes be a WarpXParticleContainer (not derived from a WarpXParticleContainer).
             auto& attribs = pti.GetStructOfArrays().GetRealData();
             ParticleReal* AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
             ParticleReal* AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
@@ -77,4 +80,32 @@ particlesConvertUnits (ConvertDirection convert_direction, T_ParticleContainer* 
     }
 }
 
-#endif /* PARTICLEIO_H_ */
+/** Gathers phi (electrostatic potential) from a MultiFab to the macroparticles.
+ * Adds a runtime component of the particle container to store it.
+ *
+ * @param tmp the particle container on which to store the gathered field
+ * @param electrostatic_solver_id the type of electrostatic solver used
+ * @param is_full_diagnostic whether this diagnostic is a full diagnostic
+ */
+void
+storePhiOnParticles ( WarpXParticleContainer::Base& tmp,
+    ElectrostaticSolverAlgo electrostatic_solver_id, bool is_full_diagnostic );
+
+/** \brief Gathers fields from a MultiFab to the macroparticles.
+ *         Adds a runtime component of the particle container to store it.
+ *
+ * \param tmp The particle container on which to store the gathered field
+ * \param is_full_diagnostic Whether this diagnostic is a full diagnostic
+ * \param save_Ex Whether the Ex field is saved
+ * \param save_Ey Whether the Ex field is saved
+ * \param save_Ez Whether the Ex field is saved
+ * \param save_Bx Whether the Ex field is saved
+ * \param save_By Whether the Ex field is saved
+ * \param save_Bz Whether the Ex field is saved
+ */
+void
+storeFieldOnParticles (WarpXParticleContainer::Base& tmp, bool is_full_diagnostic,
+                       bool save_Ex, bool save_Ey, bool save_Ez,
+                       bool save_Bx, bool save_By, bool save_Bz);
+
+#endif /* WARPX_PARTICLEIO_H_ */

@@ -6,4 +6,4 @@
 
 from .Bucket import Bucket
 
-psatd = Bucket('psatd')
+psatd = Bucket("psatd")

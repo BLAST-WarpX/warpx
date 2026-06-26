@@ -14,8 +14,6 @@ struct SigmaBox;
 class SigmaBoxFactory;
 class MultiSigmaBox;
 
-enum struct PatchType;
-
 class PML;
 
 #endif /* WARPX_PML_FWD_H */

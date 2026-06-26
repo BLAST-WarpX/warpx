@@ -6,12 +6,10 @@
  */
 #include "FiniteDifferenceSolver.H"
 
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -42,18 +40,19 @@
 #include <memory>
 
 using namespace amrex;
+using namespace ablastr::fields;
 
 /**
  * \brief Update the B field, over one timestep
  */
 void FiniteDifferenceSolver::EvolveECTRho (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield,
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& edge_lengths,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& ECTRhofield,
     const int lev) {
 
-#if !defined(WARPX_DIM_RZ) and defined(AMREX_USE_EB)
+#if !defined(WARPX_DIM_RZ) and !defined(WARPX_DIM_RCYLINDER) and !defined(WARPX_DIM_RSPHERE) and defined(AMREX_USE_EB)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
 
         EvolveRhoCartesianECT(Efield, edge_lengths, face_areas, ECTRhofield, lev);
@@ -65,12 +64,12 @@ void FiniteDifferenceSolver::EvolveECTRho (
 }
 
 // If we implement ECT in 1D we will need to take care of this #ifndef differently
-#ifndef WARPX_DIM_RZ
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 void FiniteDifferenceSolver::EvolveRhoCartesianECT (
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& Efield,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& edge_lengths,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 > const& face_areas,
-    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& ECTRhofield, const int lev ) {
+    ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& edge_lengths,
+    ablastr::fields::VectorField const& face_areas,
+    ablastr::fields::VectorField const& ECTRhofield, const int lev ) {
 #ifdef AMREX_USE_EB
 
 #if !(defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ))
@@ -88,7 +87,7 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
             amrex::Gpu::synchronize();
         }
-        amrex::Real wt = amrex::second();
+        auto wt = static_cast<amrex::Real>(amrex::second());
 
         // Extract field data for this grid/tile
         amrex::Array4<amrex::Real> const &Ex = Efield[0]->array(mfi);
@@ -112,7 +111,7 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
         amrex::ParallelFor(trhox, trhoy, trhoz,
 
             [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-                if (Sx(i, j, k) <= 0) return;
+                if (Sx(i, j, k) <= 0) { return; }
 
 // If we implement ECT in 1D we will need to take care of this #ifndef differently
 #ifndef WARPX_DIM_XZ
@@ -122,7 +121,7 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
             },
 
             [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-                if (Sy(i, j, k) <= 0) return;
+                if (Sy(i, j, k) <= 0) { return; }
 
 #ifdef WARPX_DIM_XZ
                 Rhoy(i, j, k) = (Ez(i, j, k) * lz(i, j, k) - Ez(i + 1, j, k) * lz(i + 1, j, k) +
@@ -136,7 +135,7 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
             },
 
             [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-                if (Sz(i, j, k) <= 0) return;
+                if (Sz(i, j, k) <= 0) { return; }
 
 // If we implement ECT in 1D we will need to take care of this #ifndef differently
 #ifndef WARPX_DIM_XZ
@@ -149,7 +148,7 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             amrex::Gpu::synchronize();
-            wt = amrex::second() - wt;
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
 #ifdef WARPX_DIM_XZ

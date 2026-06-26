@@ -17,11 +17,13 @@ sudo apt-get -qqq update
 sudo apt-get install -y \
   build-essential \
   ca-certificates \
-  ccache          \
   cmake           \
   gnupg           \
   pkg-config      \
   wget
+
+# ccache
+$(dirname "$0")/ccache.sh
 
 # Ref.: https://github.com/rscohn2/oneapi-ci
 sudo wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB
@@ -56,7 +58,7 @@ export CEI_TMP="/tmp/cei"
 CXX=$(which icpc) CC=$(which icc) \
   cmake-easyinstall               \
   --prefix=/usr/local             \
-  git+https://github.com/openPMD/openPMD-api.git@0.15.1 \
+  git+https://github.com/openPMD/openPMD-api.git@0.17.0 \
   -DopenPMD_USE_PYTHON=OFF \
   -DBUILD_TESTING=OFF      \
   -DBUILD_EXAMPLES=OFF     \

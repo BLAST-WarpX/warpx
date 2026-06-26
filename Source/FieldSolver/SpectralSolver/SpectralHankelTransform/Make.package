@@ -1,3 +1,4 @@
+CEXE_sources += BesselRoots.cpp
 CEXE_sources += SpectralHankelTransformer.cpp
 CEXE_sources += HankelTransform.cpp
 

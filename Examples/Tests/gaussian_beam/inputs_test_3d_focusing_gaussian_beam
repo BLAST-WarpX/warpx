@@ -1,0 +1,120 @@
+#################################
+########## MY CONSTANTS #########
+#################################
+my_constants.mc2 = m_e*clight*clight
+my_constants.nano = 1.0e-9
+my_constants.micro = 1.e-6
+my_constants.GeV = q_e*1.e9
+
+# BEAMS
+my_constants.energy = 125.*GeV
+my_constants.gamma = energy/mc2
+my_constants.npart = 2.e10
+my_constants.nmacropart = 1000000
+my_constants.charge = q_e * npart
+
+my_constants.sigmax = 516.0*nano
+my_constants.sigmay = 7.7*nano
+my_constants.sigmaz = 300.*micro
+
+my_constants.mux = 0.0
+my_constants.muy = 0.0
+my_constants.muz = 0.0
+
+my_constants.ux = 0.0
+my_constants.uy = 0.0
+my_constants.uz = gamma
+
+my_constants.emitx = 50*micro
+my_constants.emity = 20*nano
+my_constants.emitz = 0.
+
+my_constants.dux = emitx / sigmax
+my_constants.duy = emity / sigmay
+my_constants.duz = emitz / sigmaz
+
+my_constants.focal_distance = 4*sigmaz
+
+# BOX
+my_constants.Lx = 20*sigmax
+my_constants.Ly = 20*sigmay
+my_constants.Lz = 20*sigmaz
+my_constants.nx = 256
+my_constants.ny = 256
+my_constants.nz = 256
+
+
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 0
+amr.n_cell = nx ny nz
+amr.max_grid_size = 256
+amr.blocking_factor = 2
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo = -0.5*Lx -0.5*Ly -0.5*Lz
+geometry.prob_hi =  0.5*Lx  0.5*Ly  0.5*Lz
+
+#################################
+######## BOUNDARY CONDITION #####
+#################################
+boundary.field_lo = PEC PEC PEC
+boundary.field_hi = PEC PEC PEC
+boundary.particle_lo = Absorbing Absorbing Absorbing
+boundary.particle_hi = Absorbing Absorbing Absorbing
+
+#################################
+############ NUMERICS ###########
+#################################
+algo.particle_shape = 3
+
+#################################
+########### PARTICLES ###########
+#################################
+particles.species_names = beam1
+
+beam1.species_type = electron
+beam1.injection_style = gaussian_beam
+beam1.x_rms = sigmax
+beam1.y_rms = sigmay
+beam1.z_rms = sigmaz
+beam1.x_m = muy
+beam1.y_m = mux
+beam1.z_m = muz
+beam1.focal_distance = focal_distance
+beam1.npart = nmacropart
+beam1.q_tot = -charge
+
+beam1.momentum_distribution_type = gaussian
+beam1.ux_m = ux
+beam1.uy_m = uy
+beam1.uz_m = uz
+beam1.ux_th = dux
+beam1.uy_th = duy
+beam1.uz_th = duz
+
+#################################
+######### DIAGNOSTICS ###########
+#################################
+# FULL
+diagnostics.diags_names =  diag1 openpmd
+
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.write_species = 1
+diag1.species = beam1
+diag1.fields_to_plot = rho_beam1
+diag1.format = plotfile
+diag1.dump_last_timestep = 1
+
+
+openpmd.intervals = 1
+openpmd.diag_type = Full
+openpmd.write_species = 1
+openpmd.species = beam1
+openpmd.beam1.variables = w x y z
+openpmd.fields_to_plot = none
+openpmd.format = openpmd
+openpmd.dump_last_timestep = 1

@@ -1,0 +1,11 @@
+# base input parameters
+FILE = inputs_base
+
+geometry.dims = 2
+amr.n_cell = 32 32
+geometry.prob_lo     = -10 -10
+geometry.prob_hi     =  10  10
+boundary.field_lo = pec absorbing_silver_mueller
+boundary.field_hi = pec absorbing_silver_mueller
+
+algo.particle_shape = 3

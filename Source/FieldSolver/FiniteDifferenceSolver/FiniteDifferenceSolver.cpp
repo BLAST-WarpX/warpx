@@ -6,16 +6,18 @@
  */
 #include "FiniteDifferenceSolver.H"
 
-#ifndef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
+#elif defined(WARPX_DIM_RSPHERE)
+#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
+#else
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianCKCAlgorithm.H"
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
-#else
-#   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
 #endif
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 #   include "WarpX.H"
 #endif
 
@@ -28,22 +30,22 @@
 
 /* This function initializes the stencil coefficients for the chosen finite-difference algorithm */
 FiniteDifferenceSolver::FiniteDifferenceSolver (
-    int const fdtd_algo,
+    ElectromagneticSolverAlgo const fdtd_algo,
     std::array<amrex::Real,3> cell_size,
-    short grid_type) {
-
+    ablastr::utils::enums::GridType grid_type):
     // Register the type of finite-difference algorithm
-    m_fdtd_algo = fdtd_algo;
-    m_grid_type = grid_type;
-
+    m_fdtd_algo{fdtd_algo},
+    m_grid_type{grid_type}
+{
     // return if not FDTD
-    if (fdtd_algo == ElectromagneticSolverAlgo::None || fdtd_algo == ElectromagneticSolverAlgo::PSATD)
+    if (fdtd_algo == ElectromagneticSolverAlgo::None || fdtd_algo == ElectromagneticSolverAlgo::PSATD) {
         return;
+    }
 
     // Calculate coefficients of finite-difference stencil
-#ifdef WARPX_DIM_RZ
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     m_dr = cell_size[0];
-    m_nmodes = WarpX::GetInstance().n_rz_azimuthal_modes;
+    m_nmodes = WarpX::n_rz_azimuthal_modes;
     m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
     if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
         fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
@@ -62,8 +64,23 @@ FiniteDifferenceSolver::FiniteDifferenceSolver (
         WARPX_ABORT_WITH_MESSAGE(
             "FiniteDifferenceSolver: Unknown algorithm");
     }
+#elif defined(WARPX_DIM_RSPHERE)
+    m_dr = cell_size[0];
+    m_rmin = WarpX::GetInstance().Geom(0).ProbLo(0);
+    if (fdtd_algo == ElectromagneticSolverAlgo::Yee ||
+        fdtd_algo == ElectromagneticSolverAlgo::HybridPIC ) {
+        SphericalYeeAlgorithm::InitializeStencilCoefficients(cell_size, m_h_stencil_coefs_r);
+        m_stencil_coefs_r.resize(m_h_stencil_coefs_r.size());
+        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+                              m_h_stencil_coefs_r.begin(), m_h_stencil_coefs_r.end(),
+                              m_stencil_coefs_r.begin());
+        amrex::Gpu::synchronize();
+    } else {
+        WARPX_ABORT_WITH_MESSAGE(
+            "FiniteDifferenceSolver: Unknown algorithm");
+    }
 #else
-    if (grid_type == GridType::Collocated) {
+    if (grid_type == ablastr::utils::enums::GridType::Collocated) {
 
         CartesianNodalAlgorithm::InitializeStencilCoefficients( cell_size,
             m_h_stencil_coefs_x, m_h_stencil_coefs_y, m_h_stencil_coefs_z );

@@ -36,7 +36,7 @@ Use the following commands to download the WarpX source code:
 
 .. code-block:: bash
 
-   git clone https://github.com/ECP-WarpX/WarpX.git $HOME/src/warpx
+   git clone https://github.com/BLAST-WarpX/warpx.git $HOME/src/warpx
 
 We use system software modules, add environment hints and further dependencies via the file ``$HOME/frontier_warpx.profile``.
 Create it now:
@@ -92,19 +92,25 @@ Finally, since Frontier does not yet provide software modules for some of our de
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
    cd $HOME/src/warpx
    rm -rf build_frontier
 
-   cmake -S . -B build_frontier -DWarpX_COMPUTE=HIP -DWarpX_PSATD=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_LIB=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake -S . -B build_frontier -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_DIMS="1;2;RZ;3"
    cmake --build build_frontier -j 16
-   cmake --build build_frontier -j 16 --target pip_install
 
-**That's it!**
-The WarpX application executables are now in ``$HOME/src/warpx/build_frontier/bin/`` and we installed the ``pywarpx`` Python module.
+The WarpX application executables are now in ``$HOME/src/warpx/build_frontier/bin/``.
+Additionally, the following commands will install WarpX as a Python module:
+
+.. code-block:: bash
+
+   rm -rf build_frontier_py
+
+   cmake -S . -B build_frontier_py -DWarpX_COMPUTE=HIP -DWarpX_FFT=ON -DWarpX_QED_TABLE_GEN=ON -DWarpX_APP=OFF -DWarpX_PYTHON=ON -DWarpX_DIMS="1;2;RZ;3"
+   cmake --build build_frontier_py -j 16 --target pip_install
 
 Now, you can :ref:`submit Frontier compute jobs <running-cpp-frontier>` for WarpX :ref:`Python (PICMI) scripts <usage-picmi>` (:ref:`example scripts <usage-examples>`).
 Or, you can use the WarpX executables to submit Frontier jobs (:ref:`example inputs <usage-examples>`).
@@ -172,7 +178,22 @@ Post-Processing
 
 For post-processing, most users use Python via OLCFs's `Jupyter service <https://jupyter.olcf.ornl.gov>`__ (`Docs <https://docs.olcf.ornl.gov/services_and_applications/jupyter/index.html>`__).
 
-Please follow the same guidance as for :ref:`OLCF Summit post-processing <post-processing-summit>`.
+We usually just install our software on-the-fly on Frontier.
+When starting up a post-processing session, run this in your first cells:
+
+.. note::
+
+   The following software packages are installed only into a temporary directory.
+
+.. code-block:: bash
+
+   # work-around for OLCFHELP-4242
+   !jupyter serverextension enable --py --sys-prefix dask_labextension
+
+   # next Jupyter cell: the software you want
+   !mamba install --quiet -c conda-forge -y openpmd-api openpmd-viewer ipympl ipywidgets fast-histogram yt
+
+   # restart notebook
 
 .. _known-frontier-issues:
 
@@ -214,10 +235,36 @@ Known System Issues
 
 .. warning::
 
-   Checkpoints and I/O at scale seem to be slow with the default Lustre filesystem configuration.
+   August, 2023 (OLCFDEV-1597, OLCFHELP-12850, OLCFHELP-14253):
+   With runs above 500 nodes, we observed issues in ``MPI_Waitall`` calls of the kind ``OFI Poll Failed UNDELIVERABLE``.
+   According to the system known issues entry `OLCFDEV-1597 <https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#olcfdev-1597-ofi-poll-failed-undeliverable-errors>`__, we work around this by setting this environment variable in job scripts:
+
+   .. code-block:: bash
+
+      export MPICH_SMP_SINGLE_COPY_MODE=NONE
+      export FI_CXI_RX_MATCH_MODE=software
+
+.. warning::
+
+   Checkpoints and AMReX plotfile I/O at scale is very slow with the default Lustre filesystem configuration.
+   Using openPMD with ADIOS2 is the best performing output for regular diagnostics.
+
+   For checkpoint-restart, you have no choice and need to use AMReX plotfiles.
    Please test checkpointing and I/O with short ``#SBATCH -q debug`` runs before running the full simulation.
+   Set `the following options for performance of plotfiles/checkpoints <https://github.com/AMReX-Codes/amrex/pull/4426>`__:
+
+   .. code-block:: ini
+
+      warpx.field_io_nfiles = <1-per-node>
+      warpx.particle_io_nfiles = <1-per-node>
+
+      # These parameters are for a workaround needed for simulations on FRONTIER
+      # and enable checkpointing
+      vismf.noflushafterwrite = true
+      vismf.barrierafterlevel = true
+
    Execute ``lfs getstripe -d <dir>`` to show the default progressive file layout.
-   Consider using ``lfs setstripe`` to change the `striping <https://wiki.lustre.org/Configuring_Lustre_File_Striping>`__ for new files **before** you submit the run.
+   For further tuning, consider using ``lfs setstripe`` to change the `striping <https://wiki.lustre.org/Configuring_Lustre_File_Striping>`__ for new files **before** you submit the run.
 
    .. code-block:: bash
 
@@ -227,4 +274,4 @@ Known System Issues
       mkdir diags
       # change striping for new files before you submit the simulation
       #   this is an example, striping 10 MB blocks onto 32 nodes
-      lfs setstripe -S 10M -c 32 diags
+      lfs setstripe -S 16M -c 1 $SLURM_SUBMIT_DIR  # or diags only or checkpoints only
