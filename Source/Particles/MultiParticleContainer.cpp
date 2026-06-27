@@ -74,7 +74,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <format>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -326,7 +325,7 @@ MultiParticleContainer::ReadParameters ()
                     const auto physical_species = species::from_string(type_string);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         physical_species.has_value(),
-                        std::format("'{}' is not a valid species_type", type_string));
+                        "'" + type_string + "' is not a valid species_type");
                     species_type_is_photon =
                         (physical_species.value() == PhysicalSpecies::photon);
                 }
