@@ -733,23 +733,33 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     // Without mesh refinement, use local redistribute when the number of cells
     // a particle can travel per step is small: particles cannot travel faster
     // than c, so c * dt / min(dx) is a physical upper bound.
-    if (finest_level == 0) {
+    // The QED beam-size effect is excluded because it can create virtual photons
+    // far from their parent particle, which breaks the locality assumption.
+    if (finest_level == 0 && !mypc->has_virtual_photons_beam_size_effect()) {
         // Estimate the maximum number of cells a particle may have travelled.
         // Start from the moving-window grid shift, then take the max with a
         // speed-of-light upper bound: c * dt / min(dx).
-        const auto& dx = CellSize(0);
-        const amrex::Real min_dx = std::min({AMREX_D_DECL(dx[0], dx[1], dx[2])});
+        // Use the physical cell sizes of the actual simulation dimensions.
+        // (Geom().CellSizeArray() is indexed by active dimension 0..SPACEDIM-1,
+        // unlike WarpX::CellSize() which uses fixed x/y/z slots with placeholders.)
+        const auto dx = Geom(0).CellSizeArray();
+        amrex::Real min_dx = dx[0];
+        for (int i = 1; i < AMREX_SPACEDIM; ++i) { min_dx = std::min(min_dx, dx[i]); }
         const int effective_max_grid_crossings = (particle_max_grid_crossings == 1)
             ? static_cast<int>(std::ceil(PhysConst::c * dt[0] / min_dx))
             : particle_max_grid_crossings;
         int max_cells_travelled = num_moved + effective_max_grid_crossings;
         if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-            // Galilean algorithm: particles can move by up to one additional cell
-            max_cells_travelled += static_cast<int>(std::ceil(std::min({AMREX_D_DECL(
-                m_v_galilean[0] * dt[0]/dx[0],
-                m_v_galilean[1] * dt[0]/dx[1],
-                m_v_galilean[2] * dt[0]/dx[2])}
-            )));
+            // Galilean algorithm: account for the extra grid shift due to the
+            // moving Galilean frame. m_v_galilean is indexed by x/y/z, so pair it
+            // with the x/y/z-slotted cell sizes (placeholder 1.0 for inactive dims).
+            const auto dx_xyz = CellSize(0);
+            amrex::Real galilean_cells = 0.0;
+            for (int d = 0; d < 3; ++d) {
+                galilean_cells = std::max(galilean_cells,
+                    std::abs(m_v_galilean[d]) * dt[0] / dx_xyz[d]);
+            }
+            max_cells_travelled += static_cast<int>(std::ceil(galilean_cells));
         }
         // If max_cells_travelled reaches the domain size the local search is
         // no longer more efficient than (and may crash in lieu of) a full

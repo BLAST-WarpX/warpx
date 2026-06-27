@@ -910,6 +910,13 @@ MultiParticleContainer::RedistributeLocal (const int max_cells_travelled)
     }
 }
 
+bool
+MultiParticleContainer::has_virtual_photons_beam_size_effect () const
+{
+    return std::any_of(allcontainers.begin(), allcontainers.end(),
+        [](const auto& pc){ return pc->has_virtual_photons_beam_size_effect(); });
+}
+
 void
 MultiParticleContainer::ApplyBoundaryConditions ()
 {
