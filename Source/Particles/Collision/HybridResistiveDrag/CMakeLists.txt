@@ -2,8 +2,6 @@ foreach(D IN LISTS WarpX_DIMS)
     warpx_set_suffix_dims(SD ${D})
     target_sources(lib_${SD}
       PRIVATE
-        MultiFluidContainer.cpp
-        QdsmcParticleContainer.cpp
-        WarpXFluidContainer.cpp
+        HybridResistiveDrag.cpp
     )
 endforeach()
