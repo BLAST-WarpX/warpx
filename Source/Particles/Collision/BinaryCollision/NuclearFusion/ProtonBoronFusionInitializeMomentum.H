@@ -56,6 +56,7 @@ namespace {
      * @param[in] m1 mass of first colliding species
      * @param[in] m2 mass of second colliding species
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -66,6 +67,7 @@ namespace {
                             const index_type& idx_alpha_start,
                             const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
                             ScatteringAngleModel const scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
                             const amrex::RandomEngine& engine)
     {
         // General notations in this function:
@@ -110,6 +112,7 @@ namespace {
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
             E_fusion,
             scattering_angle_model,
+            anisotropic_coefficients,
             engine);
 
         // Compute momentum of beryllium in lab frame
@@ -125,7 +128,7 @@ namespace {
 
         // Compute momentum of second alpha in Beryllium rest frame, assuming isotropic distribution
         amrex::ParticleReal px_Bestar, py_Bestar, pz_Bestar;
-        ParticleUtils::RandomizeVelocity(px_Bestar, py_Bestar, pz_Bestar, p_Bestar, engine);
+        ParticleUtils::RandomizeVelocity(px_Bestar, py_Bestar, pz_Bestar, p_Bestar, engine, ScatteringAngleModel::Isotropic);
 
         // Next step is to convert momentum of second alpha to lab frame
         amrex::ParticleReal px_alpha2, py_alpha2, pz_alpha2;

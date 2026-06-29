@@ -9,6 +9,7 @@
 
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/WarpXConst.H"
+#include "ablastr/warn_manager/WarnManager.H"
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_Geometry.H>
@@ -16,6 +17,162 @@
 #include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
+
+#include <cmath>
+
+namespace ScatteringUtils {
+
+    struct AnisotropicCoefficientTable
+    {
+        amrex::ParticleReal const* m_energies = nullptr;     ///< Sorted center-of-mass energy grid [MeV]
+        amrex::ParticleReal const* m_coefficients = nullptr; ///< Row-major coefficients: row i holds m_num_coefficients values for energy i
+        int m_num_energies = 0;      ///< Number of rows (energy points) in the table
+        int m_num_coefficients = 0;  ///< Number of coefficients per energy row
+
+        [[nodiscard]]
+        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        bool isValid () const
+        {
+            return (m_energies != nullptr) && (m_coefficients != nullptr)
+                && (m_num_energies > 0) && (m_num_coefficients > 0);
+        }
+
+        /**
+         * \brief Return a linearly interpolated coefficient for the given energy.
+         *
+         * When \p energy_MeV is below the minimum or above the maximum table energy,
+         * the coefficient at the nearest endpoint row is returned unchanged (constant
+         * extrapolation / clamping). This is a deliberate, conservative choice that
+         * keeps the angular distribution physical, but it silently discards any
+         * energy dependence outside the table range. A warning is emitted (once, on
+         * the host) the first time an out-of-range energy is encountered so that
+         * users can detect tables that do not cover their simulated energy regime.
+         *
+         * @param[in] energy_MeV centre-of-mass energy in MeV
+         * @param[in] coefficient_index column index into the coefficient table
+         * @return interpolated (or clamped) coefficient value
+         */
+        [[nodiscard]]
+        AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        amrex::ParticleReal getCoefficient (
+            amrex::ParticleReal const energy_MeV,
+            int const coefficient_index) const
+        {
+            using namespace amrex::literals;
+
+            if (energy_MeV <= m_energies[0]) {
+                AMREX_IF_ON_HOST((
+                    ablastr::warn_manager::WMRecordWarning(
+                        "FusionAngularDistributionTable",
+                        "A particle energy is below the minimum energy in the "
+                        "fusion_angular_distribution_coefficients table. "
+                        "Endpoint angular distribution coefficients will be used. "
+                        "Verify that the table covers the simulated energy regime.",
+                        ablastr::warn_manager::WarnPriority::medium);
+                ))
+                return m_coefficients[coefficient_index];
+            }
+            if (energy_MeV >= m_energies[m_num_energies - 1]) {
+                AMREX_IF_ON_HOST((
+                    ablastr::warn_manager::WMRecordWarning(
+                        "FusionAngularDistributionTable",
+                        "A particle energy is above the maximum energy in the "
+                        "fusion_angular_distribution_coefficients table. "
+                        "Endpoint angular distribution coefficients will be used. "
+                        "Verify that the table covers the simulated energy regime.",
+                        ablastr::warn_manager::WarnPriority::medium);
+                ))
+                return m_coefficients[(m_num_energies - 1) * m_num_coefficients
+                                      + coefficient_index];
+            }
+
+            // Linear scan to find the bracketing interval [lo, hi]
+            // TODO: replace with a binary search (O(log N)) since m_energies is sorted
+            int hi = 1;
+            while ((hi < m_num_energies - 1) && (energy_MeV > m_energies[hi])) {
+                ++hi;
+            }
+            int const lo = hi - 1;
+
+            amrex::ParticleReal const energy_lo = m_energies[lo];
+            amrex::ParticleReal const energy_hi = m_energies[hi];
+            amrex::ParticleReal const coeff_lo = m_coefficients[lo * m_num_coefficients + coefficient_index];
+            amrex::ParticleReal const coeff_hi = m_coefficients[hi * m_num_coefficients + coefficient_index];
+            amrex::ParticleReal const interp = (energy_MeV - energy_lo) / (energy_hi - energy_lo); // normalised distance in [0,1]
+
+            return coeff_lo + (coeff_hi - coeff_lo) * interp; // linear interpolation
+        }
+    };
+
+    /**
+     * \brief Sample the cosine of the fusion scattering angle from a coefficient
+     * table, linearly interpolating the coefficients in energy.
+     *
+     * @param[in] a_An table of anisotropic polynomial coefficients
+     * @param[in] a_energy_MeV center-of-mass kinetic energy in MeV
+     * @param[in] a_U uniform random number in [0,1]
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosThetaAnisotropic (
+        AnisotropicCoefficientTable const& a_An,
+        amrex::ParticleReal const a_energy_MeV,
+        amrex::ParticleReal const a_U)
+    {
+        using namespace amrex::literals;
+
+        amrex::ParticleReal x = 0.0_prt;
+        amrex::ParticleReal f, dfdx, sum_f, sum_dfdx;
+        constexpr amrex::ParticleReal rel_tol = 1.0e-8_prt;
+        constexpr int iter_max = 100;
+
+        // Precompute normalisation sums over even/odd-index coefficients:
+        // alpha_even = sum_{i even} A_i/(i+1), alpha_odd = sum_{i odd} A_i/(i+1)
+        // These define the CDF normalisation (cf. Higginson eq. 36-42).
+        amrex::ParticleReal alpha_even = 0.0_prt;
+        amrex::ParticleReal alpha_odd = 0.0_prt;
+        for (int i = 0; i < a_An.m_num_coefficients; ++i) {
+            auto const coeff = a_An.getCoefficient(a_energy_MeV, i);
+            auto const denom = static_cast<amrex::ParticleReal>(i + 1);
+            if (i % 2 == 0) {
+                alpha_even += coeff / denom;
+            } else {
+                alpha_odd += coeff / denom;
+            }
+        }
+
+        // Newton–Raphson iteration to invert the CDF: find x in (-1,1) such that CDF(x) = a_U
+        amrex::ParticleReal rel_diff = 1.0_prt;
+        int iter = 0;
+        while (rel_diff > rel_tol && iter < iter_max) {
+            sum_f = 0.0_prt;    // accumulates CDF numerator polynomial evaluated at x
+            sum_dfdx = 0.0_prt; // accumulates its derivative (= the PDF numerator)
+
+            amrex::ParticleReal x_power_f = x;         // x^(i+1) term for the CDF sum
+            amrex::ParticleReal x_power_dfdx = 1.0_prt; // x^i term for the PDF sum
+            for (int i = 0; i < a_An.m_num_coefficients; ++i) {
+                auto const coeff = a_An.getCoefficient(a_energy_MeV, i);
+                sum_f += coeff / static_cast<amrex::ParticleReal>(i + 1) * x_power_f;
+                sum_dfdx += coeff * x_power_dfdx;
+                x_power_f *= x;
+                x_power_dfdx *= x;
+            }
+
+            f = a_U - 0.5_prt * (1.0_prt + alpha_odd / alpha_even) + 0.5_prt * sum_f / alpha_even; // residual: CDF(x) - a_U
+            dfdx = 0.5_prt * sum_dfdx / alpha_even; // derivative of residual (PDF)
+            if (std::abs(dfdx) <= rel_tol) {
+                break; // flat PDF: no useful Newton step
+            }
+
+            amrex::ParticleReal const delta = f / dfdx; // Newton step
+            x -= delta;
+            x = amrex::max(-1.0_prt + rel_tol, amrex::min(1.0_prt - rel_tol, x)); // clamp to open interval
+            rel_diff = std::abs(delta);
+            ++iter;
+        }
+
+        return x;
+    }
+}
 
 namespace ParticleUtils {
 
@@ -182,27 +339,75 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate a random unit vector with isotropic distribution,
-     * following the method described in equations (27)-(31) of
+     * \brief Generate a random angle with isotropic or anisotropic distribution,
+     * following the method described in equations (27)-(31) or (36)-(42) of
+     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
+     *
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy_MeV center-of-mass collision energy in MeV
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosTheta (
+        amrex::RandomEngine const& engine,
+        ScatteringAngleModel scattering_angle_model,
+        ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+        amrex::ParticleReal const collision_energy_MeV)
+    {
+        using namespace amrex::literals;
+        amrex::ParticleReal cos_theta = 1.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
+            cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Anisotropic) {
+            cos_theta = -ScatteringUtils::getRandomCosThetaAnisotropic(
+                anisotropic_coefficients, collision_energy_MeV, amrex::Random(engine));
+        }
+        return cos_theta;
+    }
+
+    /**
+     * \brief Generate a random unit vector with isotropic or anisotropic distribution,
+     * following the method described in equations (27)-(31) or (36)-(42) of
      * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
      *
      * @param[out] x x-component of the random unit vector
      * @param[out] y y-component of the random unit vector
      * @param[out] z z-component of the random unit vector
-     * @param[in] engine the random-engine
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy_MeV center-of-mass collision energy in MeV
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
-                           amrex::ParticleReal& z, amrex::RandomEngine const& engine )
+                           amrex::ParticleReal& z, amrex::RandomEngine const& engine,
+                           ScatteringAngleModel scattering_angle_model,
+                           ScatteringUtils::AnisotropicCoefficientTable const&
+                               anisotropic_coefficients,
+                           amrex::ParticleReal const collision_energy_MeV)
     {
         using namespace amrex::literals;
 
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const cos_theta = getRandomCosTheta(
+            engine, scattering_angle_model, anisotropic_coefficients, collision_energy_MeV);
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
         x = sin_theta * std::cos(phi);
         y = sin_theta * std::sin(phi);
         z = cos_theta;
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
+                           amrex::ParticleReal& z, amrex::RandomEngine const& engine,
+                           ScatteringAngleModel scattering_angle_model)
+    {
+        getRandomVector(
+            x, y, z, engine, scattering_angle_model,
+            ScatteringUtils::AnisotropicCoefficientTable{}, amrex::ParticleReal(0.0));
     }
 
 
@@ -213,21 +418,42 @@ namespace ParticleUtils {
      * @param[in,out] ux, uy, uz colliding particle's velocity
      * @param[in] vp velocity magnitude of the colliding particle after collision.
      * @param[in] engine the random-engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy_MeV center-of-mass collision energy in MeV
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void RandomizeVelocity ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
                              amrex::ParticleReal& uz,
                              const amrex::ParticleReal vp,
-                             amrex::RandomEngine const& engine )
+                             amrex::RandomEngine const& engine,
+                             ScatteringAngleModel scattering_angle_model,
+                             ScatteringUtils::AnisotropicCoefficientTable const&
+                                 anisotropic_coefficients,
+                             amrex::ParticleReal const collision_energy_MeV)
     {
         amrex::ParticleReal x, y, z;
         // generate random unit vector for the new velocity direction
-        getRandomVector(x, y, z, engine);
+        getRandomVector(
+            x, y, z, engine, scattering_angle_model, anisotropic_coefficients,
+            collision_energy_MeV);
 
         // scale new vector to have the desired magnitude
         ux = x * vp;
         uy = y * vp;
         uz = z * vp;
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void RandomizeVelocity ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
+                             amrex::ParticleReal& uz,
+                             const amrex::ParticleReal vp,
+                             amrex::RandomEngine const& engine,
+                             ScatteringAngleModel scattering_angle_model)
+    {
+        RandomizeVelocity(
+            ux, uy, uz, vp, engine, scattering_angle_model,
+            ScatteringUtils::AnisotropicCoefficientTable{}, amrex::ParticleReal(0.0));
     }
 
     /* \brief Determines whether the point is within the tilebox, inclusive of the boundaries.

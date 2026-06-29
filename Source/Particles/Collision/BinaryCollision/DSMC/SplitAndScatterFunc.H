@@ -283,7 +283,7 @@ public:
                 if (mask[i] == int(ScatteringProcessType::ELASTIC)) {
                     // randomly rotate the velocity vector for the first particle
                     ParticleUtils::RandomizeVelocity(
-                        ux0, uy0, uz0, std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0), engine
+                        ux0, uy0, uz0, std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0), engine, ScatteringAngleModel::Isotropic
                     );
                     // set the second particles velocity so that the total momentum
                     // is zero
@@ -379,6 +379,7 @@ public:
                     ScatteringAngleModel::Forward,
                     // no angular scattering: the products' momenta have the same direction
                     // as that of the reactant particle, in the center-of-mass frame
+                    ScatteringUtils::AnisotropicCoefficientTable{},
                     engine);
             }
             else if (mask[i] == int(ScatteringProcessType::IONIZATION))
@@ -519,8 +520,8 @@ public:
                     // they will be multiplied by the right magnitude p_e further down.
                     amrex::ParticleReal scaled_ux0, scaled_uy0, scaled_uz0;
                     amrex::ParticleReal scaled_ux_new, scaled_uy_new, scaled_uz_new;
-                    ParticleUtils::getRandomVector(scaled_ux0, scaled_uy0, scaled_uz0, engine);
-                    ParticleUtils::getRandomVector(scaled_ux_new, scaled_uy_new, scaled_uz_new, engine);
+                    ParticleUtils::getRandomVector(scaled_ux0, scaled_uy0, scaled_uz0, engine, ScatteringAngleModel::Isotropic);
+                    ParticleUtils::getRandomVector(scaled_ux_new, scaled_uy_new, scaled_uz_new, engine, ScatteringAngleModel::Isotropic);
 
                     // Sum of the two electron directions; the ion momentum is
                     // proportional to its opposite (conservation of momentum in COM).

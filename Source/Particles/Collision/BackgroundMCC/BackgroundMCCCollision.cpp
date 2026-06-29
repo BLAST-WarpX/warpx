@@ -13,6 +13,7 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
@@ -447,7 +448,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   if ((scattering_process.m_type == ScatteringProcessType::ELASTIC)
                                       || (scattering_process.m_type == ScatteringProcessType::EXCITATION)) {
                                       ParticleUtils::RandomizeVelocity(
-                                          vx, vy, vz, sqrt(vx*vx + vy*vy + vz*vz), engine
+                                          vx, vy, vz, sqrt(vx*vx + vy*vy + vz*vz), engine, ScatteringAngleModel::Isotropic
                                       );
                                   }
                                   else if (scattering_process.m_type == ScatteringProcessType::BACK) {

@@ -44,6 +44,7 @@ namespace {
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -66,6 +67,7 @@ namespace {
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
                             ScatteringAngleModel scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -112,6 +114,13 @@ namespace {
         // total kinetic energy.
         const amrex::ParticleReal E_star_f_sq = powi<2>(std::sqrt(E_star_sq)
                                                          - E_rest_in + E_rest_out + E_reaction);
+        // Total kinetic energy in the COM frame and converted to MeV to look up
+        // the energy-dependent coefficients when anisotropic scattering is used.
+        // The kinetic energy is clamped to zero to avoid small negative numbers
+        // due to machine precision errors, for low-energy particles.
+        const amrex::ParticleReal E_kin_star = std::sqrt(E_star_sq) - E_rest_in;
+        constexpr amrex::ParticleReal joule_to_MeV = 1.e-6_prt / PhysConst::q_e;
+        const amrex::ParticleReal E_kin_star_MeV = ((E_kin_star > 0._prt) ? E_kin_star : 0._prt) * joule_to_MeV;
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -133,13 +142,8 @@ namespace {
         amrex::ParticleReal px_star_out = 0.0_prt;
         amrex::ParticleReal py_star_out = 0.0_prt;
         amrex::ParticleReal pz_star_out = 0.0_prt;
-        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
-            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
-            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
-                                             engine);
-        }
-        else if (scattering_angle_model == ScatteringAngleModel::Forward ||
-                 scattering_angle_model == ScatteringAngleModel::Backward) {
+        if (scattering_angle_model == ScatteringAngleModel::Forward ||
+            scattering_angle_model == ScatteringAngleModel::Backward) {
             // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
             // Backward scattering: the products have the opposite direction of the incident particle in the center of mass frame
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
@@ -171,6 +175,13 @@ namespace {
             px_star_out = p1x_star_in * scaling;
             py_star_out = p1y_star_in * scaling;
             pz_star_out = p1z_star_in * scaling;
+        }
+        else {
+            // Isotropic or anisotropic scattering: the angle of emission of the products
+            // in the center of mass frame is random or determined by an anisotropic model.
+            ParticleUtils::RandomizeVelocity(
+                px_star_out, py_star_out, pz_star_out, std::sqrt(p_star_f_sq),
+                engine, scattering_angle_model, anisotropic_coefficients, E_kin_star_MeV);
         }
 
         // Next step is to convert momenta to lab frame
