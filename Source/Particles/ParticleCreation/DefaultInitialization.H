@@ -38,25 +38,28 @@
  */
 enum struct InitializationPolicy {Zero=0, One, RandomExp};
 
-/**
- * \brief This map sets the initialization policy for each particle component
- * used in WarpX.
- */
-static std::map<std::string, InitializationPolicy> initialization_policies = {
-    {"w",     InitializationPolicy::Zero },
-    {"ux",    InitializationPolicy::Zero },
-    {"uy",    InitializationPolicy::Zero },
-    {"uz",    InitializationPolicy::Zero },
+namespace
+{
+    /**
+    * \brief This map sets the initialization policy for each particle component
+    * used in WarpX.
+    */
+    std::map<std::string, InitializationPolicy> initialization_policies = {
+        {"w",     InitializationPolicy::Zero },
+        {"ux",    InitializationPolicy::Zero },
+        {"uy",    InitializationPolicy::Zero },
+        {"uz",    InitializationPolicy::Zero },
 #ifdef WARPX_DIM_RZ
-    {"theta", InitializationPolicy::Zero},
+        {"theta", InitializationPolicy::Zero},
 #endif
 
 #ifdef WARPX_QED
-    {"opticalDepthBW",   InitializationPolicy::RandomExp},
-    {"opticalDepthQSR",   InitializationPolicy::RandomExp}
+        {"opticalDepthBW",   InitializationPolicy::RandomExp},
+        {"opticalDepthQSR",   InitializationPolicy::RandomExp}
 #endif
 
-};
+    };
+}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::ParticleReal initializeRealValue (const InitializationPolicy policy, amrex::RandomEngine const& engine) noexcept

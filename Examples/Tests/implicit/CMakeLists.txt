@@ -87,8 +87,8 @@ if(AMReX_PETSC)
         RZ  # dims
         2  # nprocs
         inputs_test_rz_theta_implicit_dynamic_pinch  # inputs
-        "analysis_pinch.py diags/diag1000020"  # analysis
-        "analysis_default_regression.py --path diags/diag1000020"  # checksum
+        "analysis_pinch.py diags/diag1000010"  # analysis
+        "analysis_default_regression.py --path diags/diag1000010"  # checksum
         OFF  # dependency
     )
 endif()

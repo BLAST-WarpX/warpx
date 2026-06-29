@@ -393,7 +393,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uz_save = uzp_save.dataPtr();
 
             // Loop over the particles and update their momentum
-            const amrex::ParticleReal q = this->charge;
+            const amrex::ParticleReal q = this->m_charge;
             const amrex::ParticleReal mass = this->m_mass;
 
             const auto pusher_algo = WarpX::particle_pusher_algo;

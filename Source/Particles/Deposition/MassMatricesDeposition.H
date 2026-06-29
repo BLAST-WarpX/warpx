@@ -12,6 +12,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/Gather/FieldGather.H"
+#include "Particles/Gather/GetExternalFields.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -249,12 +250,12 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
     }
 
     // Set the index shift parameter
-    if (j_node==j_cell) { shift[0] = 1; }
+    if (j_node == j_cell) { shift[0] = 1; }
 
     amrex::Real sx_jx[depos_order + 1] = {0._rt};
     amrex::Real sx_jy[depos_order + 1] = {0._rt};
     amrex::Real sx_jz[depos_order + 1] = {0._rt};
-    for (int ix=0; ix<=depos_order; ix++)
+    for (int ix = 0; ix <= depos_order; ix++)
     {
         sx_jx[ix] = ((jx_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
         sx_jy[ix] = ((jy_type[0] == NODE) ? amrex::Real(sx_node[ix]) : amrex::Real(sx_cell[ix]));
@@ -282,12 +283,12 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
     }
 
     // Set the index shift parameter
-    if (k_node==k_cell) { shift[1] = 1; }
+    if (k_node == k_cell) { shift[1] = 1; }
 
     amrex::Real sy_jx[depos_order + 1] = {0._rt};
     amrex::Real sy_jy[depos_order + 1] = {0._rt};
     amrex::Real sy_jz[depos_order + 1] = {0._rt};
-    for (int iy=0; iy<=depos_order; iy++)
+    for (int iy = 0; iy <= depos_order; iy++)
     {
         sy_jx[iy] = ((jx_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
         sy_jy[iy] = ((jy_type[1] == NODE) ? amrex::Real(sy_node[iy]) : amrex::Real(sy_cell[iy]));
@@ -441,7 +442,7 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
 
     for (int iz = 0; iz <= depos_order; iz++){
 
-        for (int ix=0; ix<=depos_order; ix++){
+        for (int ix = 0; ix <= depos_order; ix++){
 
             const amrex::Real weight_Jx = sx_jx[ix]*sz_jx[iz];
             const amrex::Real weight_Jy = sx_jy[ix]*sz_jy[iz];
@@ -582,6 +583,8 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
  * \param jx_type,jy_type,jz_type  The j (and S) grid types along each direction, either NODE or CELL
+ * \param getExternalEB            Functor for assigning external fields on particles
+ * \param Bx_ext,By_ext,Bz_ext     Constant external magnetic field
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
  * \param np_to_deposit            Number of particles for which current is deposited.
@@ -614,6 +617,10 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
                               const amrex::IntVect& jx_type,
                               const amrex::IntVect& jy_type,
                               const amrex::IntVect& jz_type,
+                              GetExternalEBField const & getExternalEB,
+                              const amrex::ParticleReal Bx_ext,
+                              const amrex::ParticleReal By_ext,
+                              const amrex::ParticleReal Bz_ext,
                               const amrex::Array4<amrex::Real const>& Bx_arr,
                               const amrex::Array4<amrex::Real const>& By_arr,
                               const amrex::Array4<amrex::Real const>& Bz_arr,
@@ -632,10 +639,15 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
+    enum exteb_flags : int { no_exteb, has_exteb };
+    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+
     // Loop over particles and deposit mass matrices
     amrex::ParallelFor(
-            np_to_deposit,
-            [=] AMREX_GPU_DEVICE (long ip) {
+        amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
+        {exteb_runtime_flag},
+        np_to_deposit,
+        [=] AMREX_GPU_DEVICE (long const ip, auto exteb_control) {
 
             // Skip mass matrix deposition for particles with suborbits.
             if (nsuborbits && nsuborbits[ip] > 1) { return; }
@@ -643,10 +655,21 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
             amrex::ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
 
-            // Compute magnetic field on particle
-            amrex::ParticleReal Bxp = 0.0;
-            amrex::ParticleReal Byp = 0.0;
-            amrex::ParticleReal Bzp = 0.0;
+            // Initialize B on particle to uniform external B
+            amrex::ParticleReal Bxp = Bx_ext;
+            amrex::ParticleReal Byp = By_ext;
+            amrex::ParticleReal Bzp = Bz_ext;
+
+            // Increment with externally applied B-field with time and spatial variation
+            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
+            if constexpr (exteb_control == has_exteb) {
+                amrex::ParticleReal Exp = 0._prt;
+                amrex::ParticleReal Eyp = 0._prt;
+                amrex::ParticleReal Ezp = 0._prt;
+                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+            }
+
+            // Gather magnetic field from the grid
             doDirectGatherVectorField</*depos_order_perp=*/depos_order,/*depos_order_para=*/depos_order>(
                                     xp_nph, yp_nph, zp_nph,
                                     Bxp, Byp, Bzp,
@@ -934,7 +957,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     double y0_old = y_old;
     double z0_old = z_old;
 
-    for (int ns=0; ns<num_segments; ns++) {
+    for (int ns = 0; ns < num_segments; ns++) {
 
         if (ns == num_segments-1) { // final segment
 
@@ -1009,7 +1032,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
             const int j0_cell_2 = compute_shape_factors_cell( sy_old_cell, sy_new_cell, y0_old-0.5, y0_new-0.5 );
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
             amrex::ignore_unused(i0_cell_2, j0_cell_2, k0_cell_2);
-            for (int m=0; m<depos_order; m++) {
+            for (int m = 0; m < depos_order; m++) {
                 sx_cell[m] = (4.0*sx_cell[m] + sx_old_cell[m] + sx_new_cell[m])/6.0;
                 sy_cell[m] = (4.0*sy_cell[m] + sy_old_cell[m] + sy_new_cell[m])/6.0;
                 sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
@@ -1460,7 +1483,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     const auto i_mid = static_cast<int>(0.5*(x_new+x_old)-shift);
     int SegNum[num_segments_max];
 
-    for (int ns=0; ns<num_segments; ns++) {
+    for (int ns = 0; ns < num_segments; ns++) {
 
         if (ns == num_segments-1) { // final segment
             x0_new = x_new;
@@ -1576,7 +1599,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
 
             const int i_J = lo.x + i0_node[ns] + i;
             const amrex::Real weight_J = weight_node[ns][i];
-            for (int ms=0; ms<num_segments; ms++) {
+            for (int ms = 0; ms < num_segments; ms++) {
                 const int SegShift = max_crossings + SegNum[ms] - SegNum[ns];
                 for (int iE = 0; iE <= depos_order; iE++) {
                     const amrex::Real weight_E = weight_node[ms][iE];
@@ -1668,7 +1691,7 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
             double sz_new_cell[depos_order] = {0.};
             const int k0_cell_2 = compute_shape_factors_cell( sz_old_cell, sz_new_cell, z0_old-0.5, z0_new-0.5 );
             amrex::ignore_unused(k0_cell_2);
-            for (int m=0; m<depos_order; m++) {
+            for (int m = 0; m < depos_order; m++) {
                 sz_cell[m] = (4.0*sz_cell[m] + sz_old_cell[m] + sz_new_cell[m])/6.0;
             }
         }
@@ -1795,6 +1818,8 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
  * \param Sxx_arr,Sxy_arr,Sxz_arr  Array4 of mass matrices for Jx, either full array or tile.
  * \param Syx_arr,Syy_arr,Syz_arr  Array4 of mass matrices for Jy, either full array or tile.
  * \param Szx_arr,Szy_arr,Szz_arr  Array4 of mass matrices for Jz, either full array or tile.
+ * \param getExternalEB            Functor for assigning external fields on particles
+ * \param Bx_ext,By_ext,Bz_ext     Constant external magnetic field
  * \param Bx_arr,By_arr,Bz_arr     Array4 of the magnetic field, either full array or tile.
  * \param Bx_type,By_type,Bz_type  IndexType of the magnetic field
  * \param np_to_deposit            Number of particles for which current is deposited.
@@ -1830,6 +1855,10 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
                                   amrex::Array4<amrex::Real> const& Szx_arr,
                                   amrex::Array4<amrex::Real> const& Szy_arr,
                                   amrex::Array4<amrex::Real> const& Szz_arr,
+                                  GetExternalEBField const & getExternalEB,
+                                  const amrex::ParticleReal Bx_ext,
+                                  const amrex::ParticleReal By_ext,
+                                  const amrex::ParticleReal Bz_ext,
                                   const amrex::Array4<amrex::Real const>& Bx_arr,
                                   const amrex::Array4<amrex::Real const>& By_arr,
                                   const amrex::Array4<amrex::Real const>& Bz_arr,
@@ -1850,10 +1879,15 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
+    enum exteb_flags : int { no_exteb, has_exteb };
+    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+
     // Loop over particles and deposit mass matrices
     amrex::ParallelFor(
+        amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
+        {exteb_runtime_flag},
         np_to_deposit,
-        [=] AMREX_GPU_DEVICE (long const ip) {
+        [=] AMREX_GPU_DEVICE (long const ip, auto exteb_control) {
 
             // Skip mass matrix deposition for particles with suborbits.
             if (nsuborbits && nsuborbits[ip] > 1) { return; }
@@ -1871,33 +1905,71 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-            amrex::Real const rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
-                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n));
-            amrex::Real const costh = (rp_mid > 0._rt ? xp_nph/rp_mid : 1._rt);
-            amrex::Real const sinth = (rp_mid > 0._rt ? yp_nph/rp_mid : 0._rt);
+            amrex::ParticleReal const rp_mid = 0.5_prt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
+                                             +          std::sqrt(xp_n*xp_n + yp_n*yp_n));
+            amrex::ParticleReal const costh = (rp_mid > 0._prt ? xp_nph/rp_mid : 1._prt);
+            amrex::ParticleReal const sinth = (rp_mid > 0._prt ? yp_nph/rp_mid : 0._prt);
 #elif defined(WARPX_DIM_RSPHERE)
-            amrex::Real const rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1)
-                                             + std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n));
+            amrex::ParticleReal const rp_mid = 0.5_prt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1)
+                                             +          std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n));
+            amrex::ParticleReal const rpxy_mid = std::sqrt(xp_nph*xp_nph + yp_nph*yp_nph);
+            amrex::ParticleReal const costh = (rpxy_mid > 0._prt ? xp_nph/rpxy_mid : 1._prt);
+            amrex::ParticleReal const sinth = (rpxy_mid > 0._prt ? yp_nph/rpxy_mid : 0._prt);
+            amrex::ParticleReal const cosph = (rp_mid > 0._prt ? rpxy_mid/rp_mid : 1._prt);
+            amrex::ParticleReal const sinph = (rp_mid > 0._prt ? zp_nph/rp_mid : 0._prt);
 #endif
 
-            // Compute magnetic field on particle
-            amrex::ParticleReal Bxp = 0.0;
-            amrex::ParticleReal Byp = 0.0;
-            amrex::ParticleReal Bzp = 0.0;
+            // Initialize B on particle to uniform external B
+            amrex::ParticleReal Bxp = Bx_ext;
+            amrex::ParticleReal Byp = By_ext;
+            amrex::ParticleReal Bzp = Bz_ext;
+
+            // Increment with externally applied B-field with time and spatial variation
+            [[maybe_unused]] const auto& getExternalEB_tmp = getExternalEB;
+            if constexpr (exteb_control == has_exteb) {
+                amrex::ParticleReal Exp = 0._prt;
+                amrex::ParticleReal Eyp = 0._prt;
+                amrex::ParticleReal Ezp = 0._prt;
+                getExternalEB(ip, Exp, Eyp, Ezp, Bxp, Byp, Bzp);
+            }
+
+            // Gather magnetic field from the grid
             const int depos_order_perp = 1;
             const int depos_order_para = 1;
+            amrex::ParticleReal B1p = 0._prt;
+            amrex::ParticleReal B2p = 0._prt;
+            amrex::ParticleReal B3p = 0._prt;
             doDirectGatherVectorField<depos_order_perp,depos_order_para>(
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                                    rp_mid, 0.0_prt, 0.0_prt,
+                                    rp_mid, 0._prt, 0._prt,
 #elif defined(WARPX_DIM_RZ)
-                                    rp_mid, 0.0_prt, zp_nph,
+                                    rp_mid, 0._prt, zp_nph,
 #else
                                     xp_nph, yp_nph, zp_nph,
 #endif
-                                    Bxp, Byp, Bzp,
+                                    B1p, B2p, B3p,
                                     Bx_arr, By_arr, Bz_arr,
                                     Bx_type, By_type, Bz_type,
                                     dinv, xyzmin, lo, /*n_rz_azimuthal_modes=*/0 );
+
+            // Because we pass rp_mid and 0. instead of xp_nph and yp_nph above for
+            // axisymmetric geometries, the returned fields on the particle are in mapped space.
+            // Need to convert them to Cartesian before passing to setMassMatricesKerenels().
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+            // Convert B1p = Brp and B2p = Bthp to Bxp and Byp
+            Bxp += costh*B1p - sinth*B2p;
+            Byp += costh*B2p + sinth*B1p;
+            Bzp += B3p;
+#elif defined(WARPX_DIM_RSPHERE)
+            // Convert B1p = Brp, B2p = Bthp, and B3p = Bphp to Bxp, Byp, and Bzp
+            Bxp += costh*cosph*B1p - sinth*B2p - costh*sinph*B3p;
+            Byp += sinth*cosph*B1p + costh*B2p - sinth*sinph*B3p;
+            Bzp += sinph*B1p + cosph*B3p;
+#else
+            Bxp += B1p;
+            Byp += B2p;
+            Bzp += B3p;
+#endif
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],

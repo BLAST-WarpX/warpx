@@ -1465,7 +1465,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
             // to the cells above the axis.
             // If Jr is node centered, Jr[0] is located on the boundary.
             // If Jr is cell centered, Jr[0] is at 1/2 dr.
-            if (rmin == 0. && 1-ishift_r <= i && i < ngJ[0]-ishift_r) {
+            if (rmin == 0. && 1-ishift_r <= i && i <= ngJ[0]-ishift_r) {
                 Jr_arr(i,j,0,0) -= Jr_arr(-ishift_r-i,j,0,0);
             }
             // Apply the inverse volume scaling
@@ -1487,7 +1487,7 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
             for (int imode=1 ; imode < nmodes ; imode++) {
                 // Wrap the current density deposited in the guard cells around
                 // to the cells above the axis.
-                if (rmin == 0._rt && 1-ishift_r <= i && i < ngJ[0]-ishift_r) {
+                if (rmin == 0._rt && 1-ishift_r <= i && i <= ngJ[0]-ishift_r) {
                     Jr_arr(i,j,0,2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode-1));
                     Jr_arr(i,j,0,2*imode) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode));
                 }
@@ -1609,11 +1609,11 @@ WarpX::ApplyInverseVolumeScalingToCurrentDensity (amrex::MultiFab* Jx, amrex::Mu
 // It is faster to apply this on the grid than to do it particle by particle.
 // It is put here since there isn't another nice place for it.
 void
-WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, MultiFab* Szz, int lev) const
+WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::MultiFab* Syy, amrex::MultiFab* Szz, int lev) const
 {
     const amrex::IntVect ngS = Sxx->nGrowVect();
-    const std::array<Real,3>& dx = CellSize(lev);
-    const Real dr = dx[0];
+    const std::array<amrex::Real,3>& dx = CellSize(lev);
+    const amrex::Real dr = dx[0];
 
     constexpr int NODE = amrex::IndexType::NODE;
 
@@ -1622,17 +1622,17 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, 
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1._rt/3._rt : 1._rt/4._rt);
 #endif
 
-    for ( MFIter mfi(*Sxx, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+    for ( amrex::MFIter mfi(*Sxx, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi )
     {
 
-        Array4<Real> const& Srr_arr = Sxx->array(mfi);
-        Array4<Real> const& Stt_arr = Syy->array(mfi);
-        Array4<Real> const& Szz_arr = Szz->array(mfi);
+        amrex::Array4<amrex::Real> const& Srr_arr = Sxx->array(mfi);
+        amrex::Array4<amrex::Real> const& Stt_arr = Syy->array(mfi);
+        amrex::Array4<amrex::Real> const& Szz_arr = Szz->array(mfi);
 
-        Box const & tilebox = mfi.tilebox();
-        Box tbr = convert( tilebox, Sxx->ixType().toIntVect() );
-        Box tbt = convert( tilebox, Syy->ixType().toIntVect() );
-        Box tbz = convert( tilebox, Szz->ixType().toIntVect() );
+        amrex::Box const & tilebox = mfi.tilebox();
+        amrex::Box tbr = convert( tilebox, Sxx->ixType().toIntVect() );
+        amrex::Box tbt = convert( tilebox, Syy->ixType().toIntVect() );
+        amrex::Box tbz = convert( tilebox, Szz->ixType().toIntVect() );
 
         int const ncomp_rr = Sxx->nComp();
         int const ncomp_tt = Syy->nComp();
@@ -1642,11 +1642,11 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, 
         // Note that this is done before the tilebox.grow so that
         // these do not include the guard cells.
         const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, lev, 0._rt);
-        const Real rmin  = xyzmin.x;
-        const Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const Dim3 lo = lbound(tilebox);
+        const amrex::Real rmin  = xyzmin.x;
+        const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
+        const amrex::Dim3 lo = lbound(tilebox);
         const int irmin = lo.x;
 
         // For ishift, 1 means cell centered, 0 means node centered
@@ -1679,7 +1679,7 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (MultiFab* Sxx, MultiFab* Syy, 
             // to the cells above the axis.
             // If Srr is node centered, Srr[0] is located on the boundary.
             // If Srr is cell centered, Srr[0] is at 1/2 dr.
-            if (rmin == 0. && 1-ishift_r <= i && i < ngS[0]-ishift_r) {
+            if (rmin == 0. && 1-ishift_r <= i && i <= ngS[0]-ishift_r) {
                 Srr_arr(i,j,0,icomp) += Srr_arr(-ishift_r-i,j,0,icomp);
             }
             // Apply the inverse volume scaling

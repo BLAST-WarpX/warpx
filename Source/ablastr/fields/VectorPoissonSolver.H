@@ -99,7 +99,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
                             std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
                             [[maybe_unused]] T_PostACalculationFunctor post_A_calculation = std::nullopt,
                             [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-                            [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
+                            [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
 )
 {
     using namespace amrex::literals;
@@ -197,6 +197,12 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
 #ifdef WARPX_DIM_RZ
             linop[adim]->setRZ(true);
+            if (adim < 2) {
+                // In cylindrical coordinates (with azimuthal symmetry), the vector Laplacian
+                // along r and theta has an extra `-1/r^2` term (not present for Az).
+                // The alpha term below adds the 1/r^2 part.
+                linop[adim]->setAlpha(1._rt);
+            }
 #endif
 
             linop[adim]->setDomainBC( boundary_handler.lobc[adim], boundary_handler.hibc[adim] );

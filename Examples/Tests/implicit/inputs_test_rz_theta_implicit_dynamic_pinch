@@ -24,13 +24,13 @@ my_constants.rise_time = t0/20.0  # current rise time [s]
 my_constants.dt = 1.0e-3*1.0e-9   # time step [s]
 my_constants.Nppc_r = 200         # particles per cell in r
 my_constants.Nppc_t = 1           # particles per cell in theta
-my_constants.Nppc_z = 2           # particles per cell in z
+my_constants.Nppc_z = 1           # particles per cell in z
 
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
 stop_time = tsim
-max_step = 20
+max_step = 10
 amr.n_cell =  224 8
 amr.max_grid_size = 8
 amr.max_level = 0
@@ -139,7 +139,7 @@ deuterium.uz_th = sqrt(T0*q_e/mD)/clight
 
 ###   Diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 20
+diag1.intervals = 10
 diag1.diag_type = Full
 diag1.fields_to_plot = Er Et Ez Br Bt Bz rho divE
 diag1.electrons.variables = x z theta w ux uy uz
@@ -174,3 +174,6 @@ collision3.species = electrons deuterium
 collision1.CoulombLog = 10.0
 collision2.CoulombLog = 10.0
 collision3.CoulombLog = 10.0
+collision1.cumulative_scattering_angle_model = BOBYLEV
+collision2.cumulative_scattering_angle_model = BOBYLEV
+collision3.cumulative_scattering_angle_model = BOBYLEV

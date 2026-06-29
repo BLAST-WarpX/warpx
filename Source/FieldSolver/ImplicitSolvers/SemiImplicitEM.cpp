@@ -57,9 +57,9 @@ void SemiImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-void SemiImplicitEM::OneStep ( amrex::Real  start_time,
-                               amrex::Real  a_dt,
-                               int          a_step )
+int SemiImplicitEM::OneStep (amrex::Real  start_time,
+                             amrex::Real  a_dt,
+                             int          a_step)
 {
     BL_PROFILE("SemiImplicitEM::OneStep()");
 
@@ -92,23 +92,28 @@ void SemiImplicitEM::OneStep ( amrex::Real  start_time,
     // Particles will be advanced to t_{n+1/2}
     m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) { return exit_status; }
+
     // Update WarpX owned Efield_fp to t_{n+1/2}
     m_WarpX->SetElectricFieldAndApplyBCs(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    const amrex::Real new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance Eg from time n+1/2 to time n+1
     // Eg^{n+1} = 2.0*Eg^{n+1/2} - Eg^n
     m_E.linComb(2._rt, m_E, -1._rt, m_Eold);
-    const amrex::Real new_time = start_time + m_dt;
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
 
     // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}
     m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::SecondHalf, half_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
+    return exit_status;
 }
 
 void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,

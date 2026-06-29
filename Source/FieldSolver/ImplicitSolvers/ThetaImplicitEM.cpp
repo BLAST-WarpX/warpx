@@ -83,9 +83,9 @@ void ThetaImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
-                                const amrex::Real  a_dt,
-                                const int          a_step )
+int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
+                              const amrex::Real  a_dt,
+                              const int          a_step)
 {
     BL_PROFILE("ThetaImplicitEM::OneStep()");
 
@@ -121,17 +121,22 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     // Particles will be advanced to t_{n+1/2}
     m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) { return exit_status; }
+
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
     UpdateWarpXFields(m_E, start_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    const amrex::Real new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance Eg and Bg from time n+theta to time n+1
-    const amrex::Real end_time = start_time + m_dt;
-    FinishFieldUpdate(end_time);
+    FinishFieldUpdate(new_time);
 
+    return exit_status;
 }
 
 void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,

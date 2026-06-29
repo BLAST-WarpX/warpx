@@ -781,11 +781,11 @@ bool SNES_impl::usePC() const
     return dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->usePreconditioner();
 }
 
-void SNES_impl::solve(  VecType& a_U,
-                        const VecType& a_B,
-                        amrex::Real a_time,
-                        amrex::Real a_dt,
-                        int a_step ) const
+void SNES_impl::solve (VecType& a_U,
+                       const VecType& a_B,
+                       amrex::Real a_time,
+                       amrex::Real a_dt,
+                       int a_step) const
 {
     BL_PROFILE("SNES_impl::solve()");
     AMREX_ALWAYS_ASSERT(isDefined());
@@ -808,11 +808,12 @@ void SNES_impl::solve(  VecType& a_U,
 
     SNESConvergedReason reason;
     SNESGetConvergedReason( m_snes->obj, &reason );
-    m_status = (int) reason;
+    m_status = (int)reason;
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
 
     const char* conv_reason;
     SNESGetConvergedReasonString(m_snes->obj, &conv_reason);
+    // see https://petsc.org/release/docs/manualpages/SNES/SNESConvergedReason/
     if (m_verbose) {
         amrex::Print() << "Newton (PETSc SNES): exited due to \""
                        << conv_reason << "\" "

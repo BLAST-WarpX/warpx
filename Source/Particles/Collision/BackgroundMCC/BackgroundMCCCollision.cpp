@@ -206,10 +206,7 @@ BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_p
               * std::sqrt(2.0_prt / m_mass1 * PhysConst::q_e)
               * sigma_E * std::sqrt(E)
               );
-        if (nu > nu_max) {
-            nu_max = nu;
-        }
-
+        nu_max = std::max(nu_max, nu);
         E+=E_step;
     }
     return nu_max;

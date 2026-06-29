@@ -128,21 +128,41 @@ public:
         int lev, PatchType patch_type, bool solve_for_Faraday,
         bool solve_for_implicit = false) const;
 
-    void BfieldEvolveRK (
+    void BfieldEvolve (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt, SubcyclingHalf subcycling_half,
+        amrex::Real dt_half, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
-    void BfieldEvolveRK (
+    void BfieldEvolve (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+        amrex::IntVect ng, std::optional<bool> nodal_sync);
+
+    void BfieldEvolveRK4 (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        std::array<amrex::MultiFab, 3>& B_old,
+        amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
+        amrex::IntVect ng, std::optional<bool> nodal_sync);
+
+    amrex::Real BfieldEvolveRKF45 (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        std::array<amrex::MultiFab, 3>& B_old,
         amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
@@ -192,8 +212,22 @@ public:
     ) const;
 
     // Declare variables to hold hybrid-PIC model parameters
-    /** Number of substeps to take when evolving B */
+    /** Number of substeps to take when evolving B (also used as initial substep
+     *  count guess when RKF45 adaptive stepping is active) */
     int m_substeps = 10;
+
+    /** Relative tolerance for RKF45 adaptive substep error control */
+    amrex::Real m_substep_rtol = 1.e-4;
+    /** Absolute tolerance for RKF45 adaptive substep error control */
+    amrex::Real m_substep_atol = 1.e-8;
+    /** Safety factor for RKF45 step-size adjustment */
+    amrex::Real m_substep_safety = 0.9;
+    /** Maximum step-size growth factor per accepted step */
+    amrex::Real m_substep_max_growth = 5.0;
+    /** Maximum number of substep attempts (accepted + rejected) before abort */
+    int m_max_substep_attempts = 250;
+    /** If true, use the adaptive RKF45 integrator; if false, use fixed-step RK4 */
+    bool m_use_rkf45 = false;
 
     bool m_holmstrom_vacuum_region = false;
 

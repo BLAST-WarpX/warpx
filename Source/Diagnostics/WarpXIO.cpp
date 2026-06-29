@@ -24,6 +24,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -213,6 +214,8 @@ WarpX::InitFromCheckpoint ()
             SetDistributionMap(lev, dm);
             AllocLevelData(lev, ba, dm);
         }
+
+        ExecutePythonCallback("allocdata");
 
         mypc->ReadHeader(is);
         const int n_species = mypc->nSpecies();
@@ -421,7 +424,7 @@ WarpX::InitFromCheckpoint ()
     mypc->Restart(restart_chkfile);
 
     if (m_implicit_solver) {
-        m_implicit_solver->Define(this, restart_chkfile.empty());
+        m_implicit_solver->Define(this, /*from_restart=*/true);
         m_implicit_solver->CreateParticleAttributes();
     }
 

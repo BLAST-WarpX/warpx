@@ -55,9 +55,9 @@ void StrangImplicitSpectralEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
-                                         amrex::Real a_dt,
-                                         int a_step )
+int StrangImplicitSpectralEM::OneStep (amrex::Real start_time,
+                                       amrex::Real a_dt,
+                                       int a_step)
 {
     amrex::ignore_unused(a_step);
 
@@ -87,20 +87,25 @@ void StrangImplicitSpectralEM::OneStep ( amrex::Real start_time,
     // Particles will be advanced to t_{n+1/2}
     m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
 
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) { return exit_status; }
+
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    amrex::Real const new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance E and B fields from time n+1/2 to time n+1
-    amrex::Real const new_time = start_time + m_dt;
     FinishFieldUpdate(new_time);
 
     // Advance the fields to time n+1 source free
     m_WarpX->SpectralSourceFreeFieldAdvance(half_time);
 
+    return exit_status;
 }
 
 void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,

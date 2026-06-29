@@ -422,6 +422,13 @@ MultiParticleContainer::maxParticleVelocity() {
 }
 
 void
+MultiParticleContainer::TransformMomentumToCurvilinear (bool forward) {
+    for (const auto &pc : allcontainers) {
+        pc->TransformMomentumToCurvilinear(forward);
+    }
+}
+
+void
 MultiParticleContainer::AllocData ()
 {
     for (auto& pc : allcontainers) {
@@ -693,6 +700,47 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
     return rho;
 }
 
+std::unique_ptr<amrex::MultiFab>
+MultiParticleContainer::GetGlobalPlasmaFrequency (int lev)
+{
+    const WarpX & warpx = WarpX::GetInstance();
+
+    amrex::BoxArray const & ba = warpx.boxArray(lev);
+    amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+    int const ncomps = 1;
+    const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+    auto global_plasma_frequency = std::make_unique<amrex::MultiFab>(ba, dmap, ncomps, ng);
+    global_plasma_frequency->setVal(amrex::Real(0.0));
+
+    for (auto& pc : allcontainers) {
+
+        if (pc->getMass() == 0. || pc->getCharge() == 0.) {
+            continue;
+        }
+
+        std::unique_ptr<amrex::MultiFab> plasma_frequency = pc->GetPlasmaFrequency(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*global_plasma_frequency, TilingIfNotGPU()); mfi.isValid(); ++mfi )
+        {
+            const amrex::Box box = mfi.tilebox();
+
+            amrex::Array4<amrex::Real> const& omegap_array = plasma_frequency->array(mfi);
+            amrex::Array4<amrex::Real> const& global_omegap_array = global_plasma_frequency->array(mfi);
+
+            amrex::ParallelFor(box,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    amrex::Real const omegap = omegap_array(i,j,k);
+                    amrex::Real const global_omegap = global_omegap_array(i,j,k);
+                    global_omegap_array(i,j,k) = std::sqrt(global_omegap*global_omegap + omegap*omegap);
+                });
+        }
+    }
+    return global_plasma_frequency;
+}
+
 void
 MultiParticleContainer::GenerateGlobalDebyeLength ()
 {
@@ -764,6 +812,47 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                         global_debye_array(i,j,k) = std::sqrt(1.0_rt/invLDe_sq);
                     }
                 });
+        }
+    }
+}
+
+void
+MultiParticleContainer::CalculateNuei (std::string const & electron_species_name)
+{
+    WarpX & warpx = WarpX::GetInstance();
+
+    if (allcontainers.empty()) { return; }
+
+    auto& electron_species = GetParticleContainerFromName(electron_species_name);
+
+    // Is there a nicer way to get the number of levels?
+    // This grabs it from the first species.
+    int const finest_level = allcontainers[0]->finestLevel();
+
+    for (int lev = 0 ; lev <= finest_level ; lev++) {
+
+        std::string const field_name = "nuei_" + electron_species_name;
+        if (!warpx.m_fields.has(field_name, lev)) {
+            amrex::BoxArray const & ba = warpx.boxArray(lev);
+            amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+            const int ncomps = 1;
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            const bool remake = true;
+            const bool redistribute_on_remake = false;
+            warpx.m_fields.alloc_init(field_name, lev, ba, dmap, ncomps, ng, 0.,
+                                      remake, redistribute_on_remake);
+        }
+
+        amrex::MultiFab & species_nuei = *warpx.m_fields.get(field_name, lev);
+        species_nuei.setVal(amrex::Real(0.0));
+
+        for (auto& pc : allcontainers) {
+            // Only include interactions with ion species
+            if (pc->species_name == electron_species_name ||
+                pc->getCharge() <= 0. || pc->getMass() == 0.) {
+                continue;
+            }
+            pc->CalculateNuei(species_nuei, electron_species, lev);
         }
     }
 }
@@ -1807,7 +1896,7 @@ void MultiParticleContainer::doQedQuantumSync (int lev,
 
             auto Transform = PhotonEmissionTransformFunc(
                   m_shr_p_qs_engine->build_optical_depth_functor(),
-                  pc_source->GetRealCompIndex("opticalDepthQSR") - pc_source->NArrayReal,
+                  pc_source->GetRealCompIndex("opticalDepthQSR") - WarpXParticleContainer::NArrayReal,
                   m_shr_p_qs_engine->build_phot_em_functor(),
                   pti, lev, Ex.nGrowVect(),
                   Ex[pti], Ey[pti], Ez[pti],

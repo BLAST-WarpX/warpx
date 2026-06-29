@@ -1,6 +1,9 @@
 stop_time = 60e-6
 warpx.cfl = 0.2
 warpx.dt_update_interval = 10
+warpx.dt_update_diagnostic_file = diags/reducedfiles/dt_updates.txt
+warpx.max_omegap_dt = 0.2
+warpx.max_omegac_dt = 0.2
 warpx.max_dt = 1.5e-6
 amr.n_cell = 64 64 64
 amr.max_level = 0

@@ -31,6 +31,13 @@ namespace ablastr::constant
         //! https://tauday.com/tau-manifesto
         constexpr auto tau = tau_v<amrex::Real>;
 
+        //! convert degree to radian (variable template)
+        template<typename T>
+        constexpr auto degree2rad_v = pi_v<T> / static_cast<T>(180);
+
+        //! convert degree to radian
+        constexpr auto degree2rad = degree2rad_v<amrex::Real>;
+
     } // namespace math
 
     /** Physical constants
