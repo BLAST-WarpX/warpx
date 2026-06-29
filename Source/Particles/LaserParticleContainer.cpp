@@ -306,8 +306,8 @@ LaserParticleContainer::ContinuousInjection (const RealBox& injection_box)
     // the case for the R coordinate of the laser antenna in RZ (since
     // that equals 0 and thus coincides with the low end of the injection
     // box along R, which also equals 0).
-    const bool is_contained = (injection_box.lo(1) < p_pos[1] &&
-                               p_pos[1] < injection_box.hi(1));
+    const bool is_contained = (injection_box.lo(1) <= p_pos[1] &&
+                               p_pos[1] <= injection_box.hi(1));
 #else
     const bool is_contained = injection_box.contains(p_pos);
 #endif
