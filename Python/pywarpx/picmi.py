@@ -1769,6 +1769,8 @@ class CurlCurlMLMGPreconditioner(PreconditionerBase):
         self.absolute_tolerance = absolute_tolerance
 
     def preconditioner_type_initialize_inputs(self):
+        jacobian = pywarpx.warpx.get_bucket("jacobian")
+        jacobian.pc_type = "pc_curl_curl_mlmg"
         pc_curl_curl_mlmg = pywarpx.warpx.get_bucket("pc_curl_curl_mlmg")
         pc_curl_curl_mlmg.verbose = self.verbose
         pc_curl_curl_mlmg.bottom_verbose = self.bottom_verbose
@@ -1812,6 +1814,8 @@ class JacobiPreconditioner(PreconditionerBase):
         self.absolute_tolerance = absolute_tolerance
 
     def preconditioner_type_initialize_inputs(self):
+        jacobian = pywarpx.warpx.get_bucket("jacobian")
+        jacobian.pc_type = "pc_jacobi"
         pc_jacobi = pywarpx.warpx.get_bucket("pc_jacobi")
         pc_jacobi.verbose = self.verbose
         pc_jacobi.max_iter = self.max_iter
@@ -1861,6 +1865,8 @@ class PETScPreconditioner(PreconditionerBase):
         self.euclid_factor_levels = euclid_factor_levels
 
     def preconditioner_type_initialize_inputs(self):
+        jacobian = pywarpx.warpx.get_bucket("jacobian")
+        jacobian.pc_type = "pc_petsc"
         pc_petsc = pywarpx.warpx.get_bucket("pc_petsc")
         pc_petsc.type = self.type
         pc_petsc.asm_overlap = self.asm_overlap
