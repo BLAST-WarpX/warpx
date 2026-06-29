@@ -9,6 +9,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/ExternalVectorPotential.H"
+#include "Particles/MultiParticleContainer.H"
 #include "WarpX.H"
 #include <ablastr/utils/Communication.H>
 #include <ablastr/coarsen/sample.H>
@@ -112,6 +113,15 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // Save particle state at t^n
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
+    // QDSMC electron-energy equation (operator-split): capture rho^n now, while
+    // the particles are still at t^n, into hybrid_rho_fp_temp. The end-of-step
+    // AdvanceElectronEnergyQDSMC reads it as the start-of-step density.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_WarpX->GetPartContainer().DepositCharge(
+            m_WarpX->m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, m_num_amr_levels - 1),
+            0._rt);
+    }
+
     // Save E^n (or E_T^n if Darwin split)
     m_Eold.Copy(FieldType::Efield_fp);
 
@@ -150,6 +160,20 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // Advance fields from t^{n+θ} to t^{n+1}
     FinishFieldUpdate( start_time + m_dt );
 
+    // QDSMC electron-energy equation (operator-split): particles and fields are
+    // now at t^{n+1}. Deposit rho^{n+1}, then advance T_e^n -> T_e^{n+1}, which
+    // refills hybrid_electron_pressure_fp = n_e k_B T_e for the next step's
+    // Ohm's-law E-solve. The JFNK residual reads that field directly (the
+    // per-iteration adiabatic CalculateElectronPressure is skipped in ComputeRHS
+    // when m_solve_electron_energy_equation is true), so Pe is lagged one step --
+    // the standard operator split for the kinetic electron-energy closure.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_WarpX->GetPartContainer().DepositCharge(
+            m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1),
+            0._rt);
+        m_hybrid_pic_model->AdvanceElectronEnergyQDSMC( m_dt );
+    }
+
     return exit_status;
 }
 
@@ -176,7 +200,11 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     // --- Compute resistivity-free E for particle push ---
     m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
-    m_hybrid_pic_model->CalculateElectronPressure();
+    // QDSMC on: Pe is set once per step by AdvanceElectronEnergyQDSMC -- do not
+    // overwrite it here with the adiabatic closure.
+    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    }
 
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
@@ -202,7 +230,11 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     // --- Compute full Ohm's law E for Faraday update ---
     // J_plasma unchanged (same B), but Pe depends on newly deposited ρ
-    m_hybrid_pic_model->CalculateElectronPressure();
+    // QDSMC on: Pe is set once per step by AdvanceElectronEnergyQDSMC -- do not
+    // overwrite it here with the adiabatic closure.
+    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    }
 
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
