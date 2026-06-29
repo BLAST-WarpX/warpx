@@ -2426,7 +2426,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
-        eb_analytic_cylinder_radius=None,
         eb_deposit_fold=None,
         eb_rho_dirichlet=None,
         marder_alpha=None,
@@ -2476,7 +2475,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
-        self.eb_analytic_cylinder_radius = eb_analytic_cylinder_radius
         self.eb_deposit_fold = eb_deposit_fold
         self.eb_rho_dirichlet = eb_rho_dirichlet
         self.marder_alpha = marder_alpha
@@ -2560,9 +2558,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
-        pywarpx.hybridpicmodel.eb_analytic_cylinder_radius = (
-            self.eb_analytic_cylinder_radius
-        )
         pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
         pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
         pywarpx.hybridpicmodel.marder_alpha = self.marder_alpha

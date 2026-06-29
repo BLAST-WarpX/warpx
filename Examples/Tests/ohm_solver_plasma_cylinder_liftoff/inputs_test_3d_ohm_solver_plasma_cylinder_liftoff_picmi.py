@@ -576,15 +576,6 @@ def main():
         default=10,
         help="Marder max iterations per sweep (with --marder).",
     )
-    parser.add_argument(
-        "--analytic-cylinder",
-        action="store_true",
-        help="DIAGNOSTIC A/B: overwrite the discrete EB level set (distance_to_eb, "
-        "from amrex::FillSignedDistance) with the EXACT analytic distance to the "
-        "R_WALL cylinder (hybrid_pic_model.eb_analytic_cylinder_radius=R_WALL). "
-        "Isolates whether the discrete-levelset faceting / normal error feeds the "
-        "grid m=4. Default off = byte-identical discrete level set.",
-    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -652,12 +643,6 @@ def main():
             hybridpicmodel.divj_clean_alpha = args.div_clean
         if args.eb_b_normal_weight != -1e30:
             hybridpicmodel.eb_b_fill_normal_weight = args.eb_b_normal_weight
-
-    # DIAGNOSTIC A/B: swap the discrete EB level set for the exact analytic
-    # R_WALL-cylinder distance (set on the solver so PICMI's solver_initialize_
-    # inputs flushes it to hybrid_pic_model.eb_analytic_cylinder_radius).
-    if args.analytic_cylinder:
-        sim.solver.eb_analytic_cylinder_radius = R_WALL
 
     sim.step()
 

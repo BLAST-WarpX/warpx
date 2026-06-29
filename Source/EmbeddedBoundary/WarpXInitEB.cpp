@@ -27,7 +27,6 @@
 #   include <AMReX_REAL.H>
 #   include <AMReX_SPACE.H>
 
-#  include <cmath>
 #  include <cstdlib>
 #  include <string>
 
@@ -128,53 +127,6 @@ WarpX::ComputeDistanceToEB ()
         auto const eb_fact = fieldEBFactory(lev);
         auto * const distance_to_eb = m_fields.get(FieldType::distance_to_eb, lev);
         amrex::FillSignedDistance(*distance_to_eb, eb_level, eb_fact, 1);
-
-        // TODO(PR#6994 review): diagnostic A/B only -- flagged for removal once the
-        // discrete-vs-analytic level-set difference is settled. The res-128 liftoff
-        // A/B showed the difference converges away (it is the discrete FillSignedDistance
-        // O(dx^2) wall-position error); tightening the level-set / distance tolerance
-        // is the candidate path to close the gap before this is removed.
-        // EXPERIMENT (opt-in, diagnostic): overwrite the discrete signed distance
-        // with the EXACT analytic distance to a cylinder of radius R centred on
-        // the z-axis, phi = R - sqrt(x^2+y^2) (fluid positive), clamped to the SAME
-        // band [min,max] = +/- ls_roof that FillSignedDistance produced. This lets
-        // us A/B whether the discrete-levelset faceting / normal error (the small
-        // m=4/m=8 azimuthal signature) feeds the solution. Enable by setting
-        //   hybrid_pic_model.eb_analytic_cylinder_radius = R  (<=0 disables;
-        // byte-identical). Read from the hybrid_pic_model namespace so the PICMI
-        // HybridPICSolver kwarg (eb_analytic_cylinder_radius) flushes it reliably.
-        {
-            using namespace amrex::literals;
-            amrex::Real R_cyl = -1.0_rt;
-            amrex::ParmParse const pp_hybrid("hybrid_pic_model");
-            pp_hybrid.query("eb_analytic_cylinder_radius", R_cyl);
-            if (R_cyl > 0.0_rt) {
-                amrex::Real const lo = distance_to_eb->min(0);  // -ls_roof clamp
-                amrex::Real const hi = distance_to_eb->max(0);  // +ls_roof clamp
-                auto const problo = Geom(lev).ProbLoArray();
-                auto const dx = Geom(lev).CellSizeArray();
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (amrex::MFIter mfi(*distance_to_eb, amrex::TilingIfNotGPU());
-                     mfi.isValid(); ++mfi)
-                {
-                    amrex::Box const gbx = mfi.growntilebox();
-                    amrex::Array4<amrex::Real> const fab = distance_to_eb->array(mfi);
-                    amrex::ParallelFor(gbx,
-                        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                    {
-                        // distance_to_eb is NODAL: node (i,j,k) sits at problo + i*dx
-                        amrex::Real const x = problo[0] + amrex::Real(i) * dx[0];
-                        amrex::Real const y = problo[1] + amrex::Real(j) * dx[1];
-                        amrex::Real const rr = std::sqrt(x * x + y * y);
-                        amrex::Real phi = R_cyl - rr;  // fluid (r<R) positive
-                        phi = amrex::min(hi, amrex::max(lo, phi));
-                        fab(i, j, k) = phi;
-                    });
-                }
-            }
-        }
 
         // distance_to_eb is nodal and FillSignedDistance computes each box's
         // values (valid + ghosts) independently from that box's local facet
