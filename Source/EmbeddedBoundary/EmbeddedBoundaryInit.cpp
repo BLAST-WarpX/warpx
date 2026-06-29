@@ -14,6 +14,8 @@
 #include "Fields.H"
 #include "Utils/TextMsg.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include <AMReX.H>
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
@@ -28,6 +30,8 @@
 #include <AMReX_Math.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiCutFab.H>
+
+#include <limits>
 
 namespace web = warpx::embedded_boundary;
 
@@ -230,7 +234,9 @@ web::MarkUpdateECellsECT (
     // Full (uncut) edge lengths in SI meters (edge_lengths have been scaled by
     // ScaleEdges). An edge with 0 < length < full is partially covered (state 2).
     // A small relative margin keeps numerically-full edges classified as regular.
-    const amrex::Real partial_eps = 1.e-8_rt;
+    // Keep this as close to machine precision as possible: a few epsilons of slack
+    // absorb round-off in the scaled edge lengths without misclassifying real cuts.
+    const amrex::Real partial_eps = 4._rt * std::numeric_limits<amrex::Real>::epsilon();
     const amrex::Real full_lx = cell_size[0];
     const amrex::Real full_lz = cell_size[2];
 #if defined(WARPX_DIM_3D)
@@ -390,8 +396,9 @@ web::MarkUpdateCellsNodalLevelSet (
             });
 
         }
-        // Populate guard cells
-        eb_update[idim]->FillBoundary(periodicity);
+        // Populate guard cells. This mask is fully nodal, so go through the ablastr
+        // FillBoundary wrapper so a nodal seam sync is performed where required.
+        ablastr::utils::communication::FillBoundary(*eb_update[idim], periodicity);
     }
 }
 

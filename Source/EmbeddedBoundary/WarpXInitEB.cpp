@@ -129,6 +129,11 @@ WarpX::ComputeDistanceToEB ()
         auto * const distance_to_eb = m_fields.get(FieldType::distance_to_eb, lev);
         amrex::FillSignedDistance(*distance_to_eb, eb_level, eb_fact, 1);
 
+        // TODO(PR#6994 review): diagnostic A/B only -- flagged for removal once the
+        // discrete-vs-analytic level-set difference is settled. The res-128 liftoff
+        // A/B showed the difference converges away (it is the discrete FillSignedDistance
+        // O(dx^2) wall-position error); tightening the level-set / distance tolerance
+        // is the candidate path to close the gap before this is removed.
         // EXPERIMENT (opt-in, diagnostic): overwrite the discrete signed distance
         // with the EXACT analytic distance to a cylinder of radius R centred on
         // the z-axis, phi = R - sqrt(x^2+y^2) (fluid positive), clamped to the SAME

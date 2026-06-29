@@ -37,7 +37,18 @@ namespace
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     /** Trilinear (bilinear in 2D) gather of component n of a staggered field
      *  at an arbitrary position (physical coordinates), clamping the stencil
-     *  to the array bounds (constant extrapolation past the available ghosts). */
+     *  to the array bounds (constant extrapolation past the available ghosts).
+     *
+     *  TODO(PR#6994): replace with a library interp (ablastr) call. The existing
+     *  ablastr::particles::compute_weights / interp_field_nodal pair only supports
+     *  a single NODE or CELL centering (one half-cell offset applied to every
+     *  direction) and does no bounds clamping, so it cannot express a general
+     *  Yee-staggered field (per-direction stag[d]) gathered with the
+     *  ghost-clamped, constant-extrapolation behavior this helper requires.
+     *  ablastr::math::{bi,tri}linear_interp are pure value kernels that would
+     *  still leave the staggered indexing and the clamp hand-rolled here. Adding
+     *  a staggered, arbitrary-position, ghost-clamped gather to ablastr is a
+     *  follow-up; until then the hand-rolled stencil below stays. */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     amrex::Real gather_staggered (
         amrex::Array4<amrex::Real const> const& a,
@@ -1838,6 +1849,13 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 #endif
 }
 
+// NOTE: This folder is collocated/nodal-specific by design: it assumes a fully
+// nodal scalar (asserted below), uses zero staggering (stag0) and NODE-centered
+// interpolation weights, and samples node coordinates without a half-cell
+// offset. It is NOT Yee/staggered-aware. The staggered (Yee) deposit is folded
+// by the separate FoldEBDepositToField, which carries a per-component staggering
+// vector. A Yee-specific scalar folder is a follow-up if a staggered scalar
+// deposit ever needs this treatment.
 void warpx::hybrid::FoldEBDepositToNodalScalar (
     amrex::MultiFab& field,
     amrex::MultiFab const& distance_to_eb,

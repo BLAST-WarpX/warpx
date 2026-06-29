@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 #
+# Copyright 2026 S. Eric Clark
+#
+# This file is part of WarpX.
+#
+# License: BSD-3-Clause-LBNL
+#
 # --- Analysis script for the 2D embedded-boundary convergence chain. The
 # --- rotated-square PEC cavity holds the TM (m,p) = (0,1) mode
 # ---     By = mu0*cos(pi*(zr - L/2)/L)*cos(pi*c*t/L),

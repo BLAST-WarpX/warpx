@@ -22,6 +22,8 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -407,7 +409,9 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
     if (seam_sync) {
         const auto& period = warpx.Geom(lev).periodicity();
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-            Venl[idim]->SumBoundary(0, 1, amrex::IntVect(1), amrex::IntVect(0), period);
+            ablastr::utils::communication::SumBoundary(
+                *Venl[idim], 0, 1, amrex::IntVect(1), amrex::IntVect(0),
+                WarpX::do_single_precision_comms, period);
             Venl[idim]->OverrideSync(period);
         }
     }

@@ -16,6 +16,8 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -272,7 +274,11 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
     if (warpx.ECTNeedsSeamSync()) {
         const auto& period = warpx.Geom(lev).periodicity();
         for (int idim = 0; idim < 3; ++idim) {
-            ECTRhofield[idim]->FillBoundary(0, 1, amrex::IntVect(1), period);
+            // ECTRho components are face-centered (B staggering), so no
+            // nodal-seam reconciliation is needed: leave nodal_sync default.
+            ablastr::utils::communication::FillBoundary(
+                *ECTRhofield[idim], amrex::IntVect(1),
+                WarpX::do_single_precision_comms, period);
         }
     }
 #else

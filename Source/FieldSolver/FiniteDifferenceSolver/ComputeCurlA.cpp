@@ -115,7 +115,11 @@ void FiniteDifferenceSolver::ComputeCurlACylindrical (
         // it fills through the wall) leaves the update arrays null -> the cell
         // skips below are no-ops and curl(A) is computed everywhere.
         amrex::Array4<int> update_Br_arr, update_Btheta_arr, update_Bz_arr;
-        if (EB::enabled() && eb_update_B[0]) {
+        // Guard against null EB update arrays: eb_update_B is null when filling the
+        // conformal external vacuum field (fill through the wall), so the cell-skip
+        // arrays stay null and curl(A) is computed everywhere.
+        const bool eb_enabled = (eb_update_B[0] != nullptr);
+        if (EB::enabled() && eb_enabled) {
             update_Br_arr = eb_update_B[0]->array(mfi);
             update_Btheta_arr = eb_update_B[1]->array(mfi);
             update_Bz_arr = eb_update_B[2]->array(mfi);

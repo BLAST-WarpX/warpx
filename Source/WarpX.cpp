@@ -2622,7 +2622,11 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]", 1);
             }
-            if (WarpX::UseConformalEBSolve()) {
+            // The conformal (enlarged-cell technique) EB MultiFabs below are only
+            // meaningful for the ECT Maxwell solver and the hybrid-PIC solver.
+            if (WarpX::UseConformalEBSolve() &&
+                ((WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) ||
+                 (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC))) {
 
                 //! EB: Lengths of the mesh edges
                 m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),

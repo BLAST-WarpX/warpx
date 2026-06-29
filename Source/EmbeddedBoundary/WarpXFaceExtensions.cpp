@@ -11,8 +11,9 @@
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Communication.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Functional.H>
 #include <AMReX_GpuAtomic.H>
@@ -654,10 +655,16 @@ WarpX::ComputeFaceExtensions ()
                     if (mk(i, j, k) > 0 && info(i, j, k) == 1) { info(i, j, k) = 2; }
                 });
             }
+            // These are integer flag fields (iMultiFab); the shared-seam
+            // reconciliation between owners is done by OverrideSync above, so
+            // the ablastr comms Fill interface only needs to propagate ghosts.
+            // The iMultiFab overload has no nodal_sync option (no
+            // FillBoundaryAndSync for integers), hence the period-only call.
             info_mf->OverrideSync(period);
-            info_mf->FillBoundary(period);
+            ablastr::utils::communication::FillBoundary(*info_mf, period);
             m_flag_ext_face[maxLevel()][idim]->OverrideSync(period);
-            m_flag_ext_face[maxLevel()][idim]->FillBoundary(period);
+            ablastr::utils::communication::FillBoundary(
+                *m_flag_ext_face[maxLevel()][idim], period);
         }
     }
 
