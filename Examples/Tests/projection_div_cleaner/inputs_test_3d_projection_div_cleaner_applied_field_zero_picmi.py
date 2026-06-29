@@ -50,7 +50,6 @@ def write_zero_b_field(filename):
         rc.reset_dataset(io.Dataset(data.dtype, data.shape))
         rc.store_chunk(np.ascontiguousarray(data))
     series.flush()
-    del series
 
 
 if comm.rank == 0:

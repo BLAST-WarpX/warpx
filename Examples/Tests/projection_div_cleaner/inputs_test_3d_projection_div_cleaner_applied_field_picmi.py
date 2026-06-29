@@ -76,7 +76,6 @@ def write_divergent_b_field(filename):
         rc.reset_dataset(io.Dataset(data.dtype, data.shape))
         rc.store_chunk(data)
     series.flush()
-    del series
 
 
 # Single rank writes the field map, then everyone waits for it to be on disk.
