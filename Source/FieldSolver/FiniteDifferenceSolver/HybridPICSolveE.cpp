@@ -761,7 +761,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // the embedded-boundary Dirichlet mirror of rho is
                     // negative inside the conductor: keep the resistivity
                     // parsers on their physical domain
-                    const Real rho_val_eta = std::max(rho_val, 0._rt);
+                    // |rho|: eta on the covered/mirror side uses the reflected
+                    // plasma density and is never driven negative (see 3D notes).
+                    const Real rho_val_eta = std::abs(rho_val);
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -836,7 +838,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // the embedded-boundary Dirichlet mirror of rho is
                     // negative inside the conductor: keep the resistivity
                     // parsers on their physical domain
-                    const Real rho_val_eta = std::max(rho_val, 0._rt);
+                    // |rho|: eta on the covered/mirror side uses the reflected
+                    // plasma density and is never driven negative (see 3D notes).
+                    const Real rho_val_eta = std::abs(rho_val);
                     Real jtot_val = 0._rt;
                     if(resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -908,7 +912,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // the embedded-boundary Dirichlet mirror of rho is
                     // negative inside the conductor: keep the resistivity
                     // parsers on their physical domain
-                    const Real rho_val_eta = std::max(rho_val, 0._rt);
+                    // |rho|: eta on the covered/mirror side uses the reflected
+                    // plasma density and is never driven negative (see 3D notes).
+                    const Real rho_val_eta = std::abs(rho_val);
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -1524,10 +1530,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Add resistivity only if E field value is used to update B
             if (solve_for_Faraday) {
-                // the embedded-boundary Dirichlet mirror of rho is negative
-                // inside the conductor: keep the resistivity parsers on
-                // their physical domain
-                const Real rho_val_eta = std::max(rho_val, 0._rt);
+                // The EB Dirichlet mirror of rho is negative inside the conductor.
+                // Feed |rho| (not max(rho,0)) to the resistivity parser so eta is
+                // evaluated at the reflected PLASMA density on the covered side --
+                // the physically correct eta for E = eta*J in the mirror region --
+                // and eta is never driven negative (which would invert the resistive
+                // term and pump energy into the wall).
+                const Real rho_val_eta = std::abs(rho_val);
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1636,10 +1645,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Add resistivity only if E field value is used to update B
             if (solve_for_Faraday) {
-                // the embedded-boundary Dirichlet mirror of rho is negative
-                // inside the conductor: keep the resistivity parsers on
-                // their physical domain
-                const Real rho_val_eta = std::max(rho_val, 0._rt);
+                // The EB Dirichlet mirror of rho is negative inside the conductor.
+                // Feed |rho| (not max(rho,0)) to the resistivity parser so eta is
+                // evaluated at the reflected PLASMA density on the covered side --
+                // the physically correct eta for E = eta*J in the mirror region --
+                // and eta is never driven negative (which would invert the resistive
+                // term and pump energy into the wall).
+                const Real rho_val_eta = std::abs(rho_val);
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1733,10 +1745,13 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Add resistivity only if E field value is used to update B
             if (solve_for_Faraday) {
-                // the embedded-boundary Dirichlet mirror of rho is negative
-                // inside the conductor: keep the resistivity parsers on
-                // their physical domain
-                const Real rho_val_eta = std::max(rho_val, 0._rt);
+                // The EB Dirichlet mirror of rho is negative inside the conductor.
+                // Feed |rho| (not max(rho,0)) to the resistivity parser so eta is
+                // evaluated at the reflected PLASMA density on the covered side --
+                // the physically correct eta for E = eta*J in the mirror region --
+                // and eta is never driven negative (which would invert the resistive
+                // term and pump energy into the wall).
+                const Real rho_val_eta = std::abs(rho_val);
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field

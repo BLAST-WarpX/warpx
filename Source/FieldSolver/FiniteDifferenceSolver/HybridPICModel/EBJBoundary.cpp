@@ -26,6 +26,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 
 using namespace amrex;
@@ -176,25 +178,86 @@ namespace
     constexpr int QUAD_NB = 6;
 #endif
 
+    // Reciprocal-condition gate for the quadratic moving-least-squares solve
+    // (the "Phoenix corner-trim"). At a Cartesian staircase cut of a curved
+    // wall the surviving fluid taps in the +/-2 window can be nearly collinear,
+    // so the normal-equations matrix M = sum p p^T is strictly SPD (it passes
+    // the Cholesky positivity test) yet cond(M) >> 1e6. The resulting fit has
+    // huge oscillatory tap weights that overshoot the covered-B value and feed
+    // an enormous curl(B) -> J -> E, which crashes the stiff RKF45 substepper at
+    // step 1. We reject the solve when the Cholesky pivot ratio (dmin/dmax)^2 --
+    // a cheap proxy for 1/cond(M) (the true reciprocal condition number of M is
+    // bounded by this ratio for an SPD matrix) -- drops below rcond_min, so the
+    // caller demotes the degenerate cut-cell to its bounded linear gather. This
+    // is the load-bearing fix; the ridge below is only a secondary regularizer.
+    // Tighter (smaller) rcond_min trims fewer cells; looser (larger) trims more.
+    constexpr amrex::Real rcond_min = 1.e-6_rt;
+
     /** In-place Cholesky solve of a small symmetric positive-definite system
-     *  M x = b (result returned in b). Returns false if M is not SPD (caller
-     *  falls back). Fixed size, no allocation -> GPU friendly. */
+     *  M x = b (result returned in b). Returns false if M is not SPD, OR if M is
+     *  too ill-conditioned (reciprocal-condition proxy below rcond_min); in
+     *  either case the caller falls back to the bounded linear gather. A small
+     *  ridge (added to the diagonal AFTER the conditioning gate) keeps the solve
+     *  of the accepted, well-conditioned systems numerically clean -- it is a
+     *  secondary regularizer; the rcond gate is the load-bearing corner-trim.
+     *  Fixed size, no allocation -> GPU friendly.
+     *
+     *  IMPORTANT: the gate must see the RAW (un-ridged) matrix. A ridge added
+     *  before factoring inflates the smallest Cholesky pivot toward sqrt(ridge),
+     *  which masks the true ill-conditioning of a collinear-tap corner and lets
+     *  it slip past the gate -- so the ridge is applied here, internally, only
+     *  after the raw conditioning has been measured and accepted. */
     template <int N>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
-    bool solve_spd (amrex::Real M[N][N], amrex::Real b[N]) noexcept
+    bool solve_spd (amrex::Real M[N][N], amrex::Real b[N], amrex::Real ridge = 0._rt) noexcept
     {
         using namespace amrex::literals;
         amrex::Real L[N][N];
         for (int i = 0; i < N; ++i) { for (int j = 0; j < N; ++j) { L[i][j] = 0._rt; } }
+        // Track the extreme Cholesky pivots so we can gate on conditioning. For
+        // an SPD M the pivots L[i][i] are real and positive, and (dmin/dmax)^2
+        // lower-bounds 1/cond(M); rejecting on it costs no extra work. This first
+        // factorization is of the RAW matrix so the gate is not fooled by the
+        // ridge. (N is tiny -- 6 in 2D, 10 in 3D -- so the second, ridged
+        // factorization below for the accepted systems is negligible.)
+        amrex::Real dmin =  std::numeric_limits<amrex::Real>::max();
+        amrex::Real dmax = -std::numeric_limits<amrex::Real>::max();
         for (int i = 0; i < N; ++i) {
             for (int j = 0; j <= i; ++j) {
                 amrex::Real sum = M[i][j];
                 for (int k = 0; k < j; ++k) { sum -= L[i][k]*L[j][k]; }
                 if (i == j) {
                     if (!(sum > 0._rt)) { return false; }
-                    L[i][j] = std::sqrt(sum);
+                    amrex::Real const d = std::sqrt(sum);
+                    L[i][j] = d;
+                    dmin = amrex::min(dmin, d);
+                    dmax = amrex::max(dmax, d);
                 } else {
                     L[i][j] = sum / L[j][j];
+                }
+            }
+        }
+        // Phoenix corner-trim: reject ill-conditioned (near-degenerate) systems
+        // so collinear-tap cut-cells take the bounded linear fallback instead of
+        // producing oscillatory, overshooting quadratic weights.
+        if (!(dmin*dmin >= rcond_min * dmax*dmax)) { return false; }
+
+        // Accepted system: refactor with the secondary ridge on the diagonal for
+        // a numerically clean solve (no-op when ridge == 0).
+        if (ridge != 0._rt) {
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j < N; ++j) { L[i][j] = 0._rt; }
+            }
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j <= i; ++j) {
+                    amrex::Real sum = M[i][j] + ((i == j) ? ridge : 0._rt);
+                    for (int k = 0; k < j; ++k) { sum -= L[i][k]*L[j][k]; }
+                    if (i == j) {
+                        if (!(sum > 0._rt)) { return false; }
+                        L[i][j] = std::sqrt(sum);
+                    } else {
+                        L[i][j] = sum / L[j][j];
+                    }
                 }
             }
         }
@@ -306,16 +369,17 @@ namespace
         if (use_cached) {
             for (int r = 0; r < QUAD_NB; ++r) { g[r] = g_io[r]; }
         } else {
-            // symmetrize and add a small ridge so an under-determined one-sided
-            // stencil regularizes toward its lower-order fit instead of
-            // overshooting; then solve M g = e0 (g = M^{-1} e0).
+            // symmetrize, then solve M g = e0 (g = M^{-1} e0). solve_spd gates on
+            // the conditioning of the RAW matrix (Phoenix corner-trim) and only
+            // then applies the small ridge as a secondary regularizer -- passing
+            // the ridge in (rather than pre-adding it here) keeps the gate from
+            // being fooled into accepting a near-collinear corner stencil.
             amrex::Real const ridge = 1.e-6_rt * M[0][0];
             for (int r = 0; r < QUAD_NB; ++r) {
                 for (int c = r+1; c < QUAD_NB; ++c) { M[r][c] = M[c][r]; }
-                M[r][r] += ridge;
                 g[r] = (r == 0) ? 1._rt : 0._rt;
             }
-            if (!solve_spd<QUAD_NB>(M, g)) { return {0._rt, 0._rt}; }
+            if (!solve_spd<QUAD_NB>(M, g, ridge)) { return {0._rt, 0._rt}; }
             if (g_io != nullptr) { for (int r = 0; r < QUAD_NB; ++r) { g_io[r] = g[r]; } }
         }
         amrex::Real value = 0._rt;
@@ -456,6 +520,26 @@ namespace
     constexpr int S_RESOLVED = 4;  //!< well-posed target written and locked during this call
     constexpr int S_JUSTDONE = 5;  //!< pending target written in the current cascade sweep
     constexpr int S_RESOLVED_P = 6; //!< pending target written and locked during this call
+    constexpr int S_CORNER   = 7;  //!< re-entrant corner: covered-B replaced by the diagonal-cut chamfer
+
+    // Concave re-entrant-corner detector thresholds (corner CHAMFER, opt-in).
+    // Clause (i): the level-set normal must bend by more than this against a
+    // +/-1-cell wall neighbour to count as a surface bend (dot below cos 30deg).
+    constexpr amrex::Real S_CORNER_COS_BEND = 0.866_rt;  // cos(30 degrees)
+    // Clause (ii), LOAD-BEARING: the discrete Laplacian of the signed distance,
+    // made dimensionless as |lap(phi)| * h_max, must exceed this. WarpX feeds a
+    // UNIT-GRADIENT signed distance (amrex::FillSignedDistance, |grad phi| ~ 1):
+    // there lap(phi) = -kappa (minus the surface curvature) away from the medial
+    // axis, so a SMOOTH cylinder gives a small bounded |lap*h| ~ 2 h / R (~0.08
+    // at the test resolutions), while a re-entrant CORNER puts the medial-axis
+    // kink (a delta-like ridge) right in the covered band and |lap*h| spikes to
+    // O(1) (measured 0.6 at the 90th pct, ~2 at the 99th on the stepdown).
+    // 0.30 separates them with zero smooth-wall false positives across radius /
+    // resolution / orientation (prototype_corner_detector.py). This REPLACES the
+    // old "phi_nbr - phi_cell > 1.5 h" radius-jump test, which is UNSATISFIABLE
+    // on a 1-Lipschitz signed distance (one-cell |dphi| <= h always) and fired
+    // n_corner = 0 on the real stepdown.
+    constexpr amrex::Real S_CORNER_LAP = 0.30_rt;
 
     // A fill target is well-posed when at least this fraction of every
     // component's image-interpolation weight lies in the solution domain
@@ -541,6 +625,42 @@ namespace
         return g;
     }
 
+    /** Unit boundary normal (toward the plasma) of the level set at an arbitrary
+     *  physical position \c xq. Returns the zero vector if the gradient is
+     *  degenerate. Used by the sharp-corner detector to compare the wall normal
+     *  at the fill cell against the normal in the region its mirror image lands
+     *  in: at a smooth wall they agree; at a sharp concave corner the image
+     *  crosses to the other facet and the two normals disagree. */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::RealVect normal_at (
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& xq,
+        amrex::Array4<amrex::Real const> const& phi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi) noexcept
+    {
+        using namespace amrex::literals;
+#if defined(WARPX_DIM_3D)
+        amrex::Real const yq = xq[1];
+        amrex::Real const zq = xq[2];
+#else
+        amrex::Real const yq = 0._rt;
+        amrex::Real const zq = xq[1];
+#endif
+        int ii, jj, kk;
+        amrex::Real W[AMREX_SPACEDIM][2];
+        ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+            xq[0], yq, zq, plo, dxi, ii, jj, kk, W);
+        int ic, jc, kc;
+        amrex::Real Wc[AMREX_SPACEDIM][2];
+        ablastr::particles::compute_weights<amrex::IndexType::CELL>(
+            xq[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
+        amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+        amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
+        if (!(nv2 > 0._rt) || !std::isfinite(nv2)) { return amrex::RealVect{AMREX_D_DECL(0._rt, 0._rt, 0._rt)}; }
+        DistanceToEB::normalize(nv);
+        return nv;
+    }
+
     /** Radial metric Jacobian lambda = r_image / r_fill for a wall that is a
      *  surface of revolution about axis \c cyl_ax (the cylinder is centered on
      *  the transverse origin). Returns 1 in 2D / for a flat wall. */
@@ -618,7 +738,7 @@ namespace
         amrex::Geometry const& geom,
         std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> const& stag,
         amrex::Real d_band, amrex::Real d_img_min, amrex::Real h_max,
-        bool fill_covered_centers)
+        bool fill_covered_centers, bool corner_skip)
     {
         using namespace amrex::literals;
 
@@ -658,6 +778,119 @@ namespace
                 });
             }
             st.status[c]->FillBoundary(geom.periodicity());
+        }
+
+        // Corner sweep (corner CHAMFER, opt-in): flag the re-entrant-corner fill
+        // targets so the direct pass replaces their sharp-facet covered-B mirror
+        // with a DIAGONAL-CUT (chamfer) value -- the smooth fluid-side B carried
+        // across the corner -- which removes the cross-wall B jump whose Ampere
+        // curl (1/(mu0 h) x dB) crashes the substepper. Runs AFTER the
+        // S_FILL/S_DEEP split and BEFORE the well-posedness pass, so a flagged
+        // cell is no longer S_FILL and is never reclassified S_PENDING (its
+        // pointwise-mirror cascade is exactly the spike-injecting path we must
+        // avoid). A cell is S_CORNER only if BOTH geometry clauses hold:
+        //   (i)   the level-set normal bends > 30 deg vs a +/-1-cell wall
+        //         neighbour's normal (corroborates a surface bend);
+        //   (ii)  LOAD-BEARING Laplacian spike: |lap(phi)| * h_max > S_CORNER_LAP.
+        //         On the unit-gradient signed distance this is the corner kink
+        //         (medial-axis ridge); a smooth wall stays well below the gate.
+        //         This REPLACES the old radius-jump test that was unsatisfiable on
+        //         a 1-Lipschitz signed distance (n_corner = 0 on the real stepdown).
+        // Clause (iii) mirror-reach is folded into (ii): the kink ridge only
+        // reaches the covered band within ~2 cells of the corner edge.
+        if (corner_skip) {
+            amrex::ReduceOps<amrex::ReduceOpSum> creduce_op;
+            amrex::ReduceData<int> creduce_data(creduce_op);
+            using CornerTuple = typename decltype(creduce_data)::Type;
+
+            for (int c = 0; c < 3; ++c) {
+                auto const stag_own = stag[c];
+                for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                    amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+                    auto const& stat = st.status[c]->array(mfi);
+                    auto const& phi = distance_to_eb.const_array(mfi);
+
+                    creduce_op.eval(tb, creduce_data,
+                        [=] AMREX_GPU_DEVICE (int i, int j, int k) -> CornerTuple
+                    {
+                        if (stat(i, j, k) != S_FILL) { return {0}; }
+
+                        auto const g = ::mirror_geom(i, j, k, stag_own, phi,
+                            plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                        if (!g.band) { return {0}; }
+
+                        // Clause (i): wall-normal bend > 30 deg vs a +/-1-cell
+                        // wall neighbour. nmin is the min dot of nv(xe) against
+                        // the wall normal at each valid neighbour (smooth wall
+                        // ~1; a sharp facet-change corner << 1).
+                        amrex::Real nmin = 2._rt;
+                        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) {
+                            for (int sgn = -1; sgn <= 1; sgn += 2) {
+                                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xq = g.xe;
+                                xq[dd] += sgn*dx_arr[dd];
+                                amrex::RealVect const nn = ::normal_at(xq, phi, plo, dxi);
+                                amrex::Real nn2 = 0._rt;
+                                amrex::Real dt = 0._rt;
+                                for (int e = 0; e < AMREX_SPACEDIM; ++e) {
+                                    nn2 += nn[e]*nn[e];
+                                    dt  += g.nv[e]*nn[e];
+                                }
+                                if (nn2 > 0.5_rt) { nmin = amrex::min(nmin, dt); }
+                            }
+                        }
+                        bool const fiducial = (nmin < S_CORNER_COS_BEND);
+                        if (!fiducial) { return {0}; }
+
+                        // Clause (ii): LOAD-BEARING Laplacian spike. Build the
+                        // discrete Laplacian of the (unit-gradient) signed
+                        // distance at the staggered point xe by a centered 2nd
+                        // difference of the nodally-interpolated phi at
+                        // xe +/- h_max e_d. On a true signed distance lap(phi) =
+                        // -kappa away from the medial axis (bounded ~1/R for a
+                        // smooth cylinder); at a re-entrant corner the medial-axis
+                        // kink makes |lap(phi)| spike to O(1/h). The dimensionless
+                        // |lap(phi)| * h_max therefore separates the corner band
+                        // (O(1)) from the smooth wall (~2 h / R << 1) with zero
+                        // smooth-wall false positives (prototype-validated).
+                        amrex::Real lap = 0._rt;
+                        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) {
+                            amrex::Real phi_pm[2];
+                            for (int sgn = -1, si = 0; sgn <= 1; sgn += 2, ++si) {
+                                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xq = g.xe;
+                                xq[dd] += sgn*h_max;
+#if defined(WARPX_DIM_3D)
+                                amrex::Real const yq = xq[1];
+                                amrex::Real const zq = xq[2];
+#else
+                                amrex::Real const yq = 0._rt;
+                                amrex::Real const zq = xq[1];
+#endif
+                                int iq, jq, kq;
+                                amrex::Real Wq[AMREX_SPACEDIM][2];
+                                ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                                    xq[0], yq, zq, plo, dxi, iq, jq, kq, Wq);
+                                phi_pm[si] =
+                                    ablastr::particles::interp_field_nodal(iq, jq, kq, Wq, phi);
+                            }
+                            lap += (phi_pm[0] + phi_pm[1] - 2._rt*g.s) / (h_max*h_max);
+                        }
+                        bool const laplacian_spike =
+                            (std::abs(lap) * h_max > S_CORNER_LAP);
+                        if (!laplacian_spike) { return {0}; }
+
+                        stat(i, j, k) = S_CORNER;
+                        return {1};
+                    });
+                }
+                st.status[c]->FillBoundary(geom.periodicity());
+            }
+
+            auto const cresult = creduce_data.value(creduce_op);
+            int n_corner = amrex::get<0>(cresult);
+            amrex::ParallelDescriptor::ReduceIntSum(n_corner);
+            st.n_corner = n_corner;
+            amrex::Print() << "[EBJBoundary] S_CORNER detector: n_corner = "
+                           << n_corner << " cells flagged (diagonal-cut chamfer)\n";
         }
 
         // Second pass: a fill target is well-posed only if every component
@@ -737,12 +970,66 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     amrex::Real band_cells,
     bool eb_cyl,
     int eb_cyl_axis,
-    bool quadratic_gather)
+    bool quadratic_gather,
+    amrex::Real normal_weight_floor,
+    amrex::Real cut_blend,
+    amrex::Real cut_clamp,
+    bool corner_skip)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
 
     ABLASTR_PROFILE("warpx::hybrid::ApplyPECBoundaryToField()");
+
+    // Near-wall stability blend toward the conformal-ECT cut-face B (only the
+    // covered-B quadratic_gather fill consumes it). Clamp to [0,1]; cut_blend=0
+    // is the byte-identical full-mirror behavior.
+    amrex::Real const cut_blend_w =
+        quadratic_gather ? amrex::min(amrex::max(cut_blend, 0._rt), 1._rt) : 0._rt;
+    // Cut-face overshoot clamp (relative cap on |B_mirror - B_ECT|); 0 = off.
+    amrex::Real const cut_clamp_rel =
+        quadratic_gather ? amrex::max(cut_clamp, 0._rt) : 0._rt;
+    // Re-entrant-corner CHAMFER: where the two-clause geometric detector (see
+    // build_fill_status: a wall-normal bend AND a Laplacian-of-signed-distance
+    // spike) flags an S_CORNER cell, the sharp-facet covered-B mirror is replaced
+    // by a diagonal-cut value (the smooth fluid-side B carried across the corner)
+    // in the post-cascade chamfer pass. This removes the cross-wall B jump whose
+    // Ampere curl crashes the substepper. Only the covered-B quadratic_gather fill
+    // reaches the covered-center write, so the chamfer is wired through the fill
+    // classification and is a no-op otherwise. corner_skip=false is byte-identical
+    // (the detector sweep and the chamfer pass are both skipped).
+    bool const corner_skip_on = quadratic_gather && corner_skip;
+
+    // DIAGNOSTIC ONLY (Step-1 face-class A/B): WARPX_BCURL_DIAG_SCOPE selects
+    // which face class the quadratic_gather mirror writes; the other class keeps
+    // its pre-fill value (the conformal-ECT value at cut faces, the previous
+    // value at fully-covered faces). 0/unset = both (production). 1 = covered
+    // only (cut faces keep ECT). 2 = cut only (covered faces keep prev). Read
+    // once per call from the environment so a quick A/B needs no rebuild.
+    int diag_scope = 0;
+    if (quadratic_gather) {
+        if (char const* e = std::getenv("WARPX_BCURL_DIAG_SCOPE")) {
+            diag_scope = std::atoi(e);
+        }
+    }
+    // DIAGNOSTIC ONLY (Step-1 corner probe): WARPX_BCURL_DIAG_CORNER=1 dumps, on
+    // the quadratic_gather covered-B fill, the geometry (signed distance, normal,
+    // image point), the fluid tap count and the mirror value at every S_FILL cell
+    // whose image point lands near the concave step-down corner ring (r~R2, z~Z0).
+    // Zero cost in production (unset).
+    int diag_corner = 0;
+    if (quadratic_gather) {
+        if (char const* e = std::getenv("WARPX_BCURL_DIAG_CORNER")) {
+            diag_corner = std::atoi(e);
+        }
+    }
+    // Full cut-face blend (cut_blend >= 1) is the validated stable configuration:
+    // route it through the covered-only path (diag_scope = 1), which SKIPS the
+    // cut-face mirror write so each cut face keeps its conformal-ECT value
+    // untouched. (Empirically a per-cell self-assign Jc = Jc_prefill at the cut
+    // face does NOT reproduce this stability -- the skip is load-bearing -- so the
+    // full blend reuses the skip path rather than writing the blended value.)
+    if (cut_blend_w >= 1._rt && diag_scope == 0) { diag_scope = 1; }
 
     if (!eb_update[0]) { return; }
 
@@ -782,7 +1069,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
         warpx::hybrid::EBFillStatus& st = status_cache ? *status_cache : local_status;
         if (st.empty()) {
             ::build_fill_status(st, field, eb_update, distance_to_eb, geom, stag,
-                                d_band, d_img_min, h_max, fill_covered_centers);
+                                d_band, d_img_min, h_max, fill_covered_centers,
+                                corner_skip_on);
         }
 
         for (int c = 0; c < 3; ++c) {
@@ -913,6 +1201,16 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 auto const& phi = distance_to_eb.const_array(mfi);
                 amrex::Array4<int const> const slotarr =
                     cache_weights ? st.gslot[c]->const_array(mfi) : amrex::Array4<int const>{};
+                // Update mask: nonzero on a cut/fluid face (the conformal-ECT B
+                // push computed a value there). Used by the near-wall cut_blend
+                // to keep part of that stabler ECT B instead of the full mirror,
+                // and by the Step-1 A/B diagnostic scope.
+                auto const& mask = eb_update[c]->const_array(mfi);
+                amrex::Real const blend_w = cut_blend_w;
+                amrex::Real const clamp_rel = cut_clamp_rel;
+                int const dscope = diag_scope;
+                int const dcorner = diag_corner;
+                int const c_diag = c;
 
                 amrex::ParallelFor(tb, ncomp,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
@@ -971,6 +1269,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     }
 
                     amrex::Real Jx_im, Jy_im, Jz_im;
+                    // Step-1 corner diagnostic: per-component fluid tap counts of
+                    // the quadratic gather (-1 = not the quadratic build path).
+                    amrex::Real cnt_x = -1._rt, cnt_y = -1._rt, cnt_z = -1._rt;
                     if (quadratic_gather && use_cached_weights) {
                         // Apply: collapsed sparse dot per gathered component from
                         // the prebuilt per-tap (offset, weight) cache; no matrix
@@ -1026,6 +1327,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                         Jx_im = (cx > 0._rt) ? vx : amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
                         Jy_im = (cy > 0._rt) ? vy : amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
                         Jz_im = (cz > 0._rt) ? vz : amrex::get<0>(gather_staggered_pred(Jz_l, in_sol_z, xim, stag_z, plo, dxi, n));
+                        cnt_x = cx; cnt_y = cy; cnt_z = cz;
                     } else {
                         Jx_im = amrex::get<0>(gather_staggered_pred(Jx_l, in_sol_x, xim, stag_x, plo, dxi, n));
                         Jy_im = amrex::get<0>(gather_staggered_pred(Jy_l, in_sol_y, xim, stag_y, plo, dxi, n));
@@ -1033,14 +1335,135 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     }
 
                     // edge fields (E, J): normal even / tangential odd;
-                    // magnetic field: normal odd / tangential even
-                    amrex::Real const w_n = normal_odd ? g.s/d_im : 1._rt;
+                    // magnetic field: normal odd / tangential even. The
+                    // magnetic normal weight is optionally clamped from below
+                    // (default -1e30 = no clamp): a floor of 0 drives the
+                    // covered B_normal toward 0 (PEC B_normal -> 0) instead of
+                    // an odd sign reversal; the tangential weight is untouched.
+                    amrex::Real const w_n = normal_odd
+                        ? amrex::max(g.s/d_im, normal_weight_floor) : 1._rt;
                     amrex::Real const w_t = normal_odd ? 1._rt : g.s/d_im;
                     // optional surface-of-revolution radial metric Jacobian
                     amrex::Real const lambda =
                         eb_cyl ? ::cyl_lambda(g.xe, xim, eb_cyl_axis) : 1._rt;
-                    Jc(i, j, k, n) = ::mirror_combine(c, Jx_im, Jy_im, Jz_im, g.nv,
+                    amrex::Real const b_mirror = ::mirror_combine(
+                        c, Jx_im, Jy_im, Jz_im, g.nv,
                         w_n, w_t, eb_cyl, eb_cyl_axis, lambda);
+
+                    // Step-1 corner diagnostic (WARPX_BCURL_DIAG_CORNER=1): dump
+                    // the geometry, the fluid tap count and the mirror value at
+                    // every covered-B fill cell near the concave step-down corner
+                    // ring (test geometry: r ~ R2 = 0.5, z ~ Z0 = 1.0). Reads the
+                    // fill cell position g.xe; gated so it is zero-cost otherwise.
+                    if (dcorner != 0 && n == 0) {
+#if defined(WARPX_DIM_3D)
+                        amrex::Real const r_xe = std::sqrt(g.xe[0]*g.xe[0] + g.xe[1]*g.xe[1]);
+                        amrex::Real const z_xe = g.xe[2];
+                        amrex::Real const r_im = std::sqrt(xim[0]*xim[0] + xim[1]*xim[1]);
+                        amrex::Real const z_im = xim[2];
+                        if (std::abs(r_xe - 0.5_rt) < 0.12_rt && std::abs(z_xe - 1.0_rt) < 0.12_rt) {
+                            amrex::Real const b_im_mag = std::sqrt(
+                                Jx_im*Jx_im + Jy_im*Jy_im + Jz_im*Jz_im);
+                            // sharp-corner detector signal: normal at the image
+                            // region vs at the fill cell (1 = smooth, <~0.5 = the
+                            // image crossed to the other facet of a sharp corner)
+                            amrex::RealVect const nv_im = ::normal_at(xim, phi, plo, dxi);
+                            amrex::Real const ndot =
+                                g.nv[0]*nv_im[0] + g.nv[1]*nv_im[1] + g.nv[2]*nv_im[2];
+                            // neighbor-normal disagreement: min dot of nv(xe) against
+                            // the wall normal at the +/-1-cell face neighbors (smooth
+                            // wall ~1, sharp facet-change corner << 1)
+                            amrex::Real nmin = 2._rt;
+                            for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) {
+                                for (int sgn = -1; sgn <= 1; sgn += 2) {
+                                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xq = g.xe;
+                                    xq[dd] += sgn*dx_arr[dd];
+                                    amrex::RealVect const nn = ::normal_at(xq, phi, plo, dxi);
+                                    amrex::Real const nn2 = nn[0]*nn[0] + nn[1]*nn[1] + nn[2]*nn[2];
+                                    if (nn2 > 0.5_rt) {
+                                        amrex::Real const dt =
+                                            g.nv[0]*nn[0] + g.nv[1]*nn[1] + g.nv[2]*nn[2];
+                                        nmin = amrex::min(nmin, dt);
+                                    }
+                                }
+                            }
+                            std::printf(
+                                "[BCURL c=%d i=%d j=%d k=%d] r_xe=%.4f z_xe=%.4f s=%.5f "
+                                "nv=(%.3f,%.3f,%.3f) r_im=%.4f z_im=%.4f ndot=%.3f nmin=%.3f taps=(%.0f,%.0f,%.0f) "
+                                "Jim=(%.3e,%.3e,%.3e) |Jim|=%.3e w_n=%.3f w_t=%.3f "
+                                "b_mirror=%.4e cut=%d\n",
+                                c_diag, i, j, k, r_xe, z_xe, g.s,
+                                g.nv[0], g.nv[1], g.nv[2], r_im, z_im, ndot, nmin,
+                                cnt_x, cnt_y, cnt_z, Jx_im, Jy_im, Jz_im, b_im_mag,
+                                w_n, w_t, b_mirror, int(mask(i, j, k) != 0));
+                        }
+#endif
+                    }
+
+                    // Step-1 A/B face-class diagnostic: skip the mirror write at
+                    // the deselected class so it keeps its pre-fill value (cut
+                    // faces -> the conformal-ECT B; fully-covered faces -> their
+                    // previous value). dscope 1 = covered only, 2 = cut only.
+                    bool const is_cut = (mask(i, j, k) != 0);
+                    if ((dscope == 1 && is_cut) || (dscope == 2 && !is_cut)) {
+                        return;  // leave Jc at its pre-fill value
+                    }
+
+                    // Near-wall stability blend toward the conformal-ECT cut-face
+                    // B. The face-class A/B diagnostic (WARPX_BCURL_DIAG_SCOPE)
+                    // shows the stiffness driver is the CUT faces (mask != 0): the
+                    // mirror discards the stabler ECT B the masked Faraday push
+                    // computed there and writes a steeper near-wall extrapolation
+                    // (which can overshoot wildly -- the quadratic fluid gather has
+                    // oscillatory tap weights) that collapses the RKF45 substep on
+                    // the dense-shell liftoff. The fully-covered faces' mirror is
+                    // harmless, so the blend is applied ONLY at cut faces, where the
+                    // pre-fill Jc is the true ECT value. The blend keeps the ECT
+                    // value and adds back only the (1-blend) fraction of the mirror
+                    // CORRECTION (b_mirror - b_ect), so at blend = 1 the cut face is
+                    // exactly the ECT value (the mirror -- and any overshoot in it --
+                    // is fully discarded, identical to the stable diagnostic scope),
+                    // and at blend = 0 it is exactly the full mirror (byte-identical).
+                    // Writing it as b_ect + (1-blend)*(b_mirror - b_ect) rather than
+                    // (1-blend)*b_mirror + blend*b_ect avoids a 0*overshoot residual
+                    // at blend = 1. The gentle regime (eb_diffusion) runs at blend =
+                    // 0, so its full 2nd-order mirror is preserved.
+                    if (blend_w >= 1._rt && is_cut) {
+                        // Full blend: keep the ECT cut-face value untouched (skip
+                        // the mirror write entirely), bit-identical to leaving Jc
+                        // at its pre-fill value -- the stable configuration.
+                        return;
+                    }
+                    if (is_cut && (blend_w > 0._rt || clamp_rel > 0._rt)) {
+                        amrex::Real const b_ect = Jc(i, j, k, n);
+                        // Optional cut-face overshoot CLAMP: the quadratic mirror
+                        // can overshoot the ECT value wildly on the stiff dense
+                        // shell (oscillatory gather weights) while staying close to
+                        // it in the gentle regime. clamp_rel > 0 caps the mirror's
+                        // deviation from the ECT value to clamp_rel times the local
+                        // reference magnitude, so the gentle 2nd-order correction
+                        // passes unclamped while the stiff overshoot is bounded.
+                        amrex::Real b_use = b_mirror;
+                        if (clamp_rel > 0._rt) {
+                            amrex::Real const b_im = std::sqrt(
+                                Jx_im*Jx_im + Jy_im*Jy_im + Jz_im*Jz_im);
+                            amrex::Real const cap =
+                                clamp_rel * amrex::max(std::abs(b_ect), b_im);
+                            amrex::Real const dev = b_mirror - b_ect;
+                            b_use = b_ect + amrex::min(amrex::max(dev, -cap), cap);
+                        }
+                        Jc(i, j, k, n) = b_ect + (1._rt - blend_w)*(b_use - b_ect);
+                    } else {
+                        // Fully-covered center (and any cut face whose blend/clamp
+                        // are off): the full mirror is the only write this branch
+                        // reaches. The re-entrant-corner CHAMFER is handled
+                        // separately: conformal_b_curl_fill_corner_skip flags those
+                        // cells S_CORNER in the classification, so they never reach
+                        // this kernel as S_FILL; the post-cascade chamfer pass then
+                        // overwrites them with the diagonal-cut fluid-side B (see
+                        // build_fill_status and the S_CORNER detector / chamfer pass).
+                        Jc(i, j, k, n) = b_mirror;
+                    }
                 });
             }
         }
@@ -1134,7 +1557,8 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                                 auto const [Jy_im, wy_im] = gather_staggered_pred(Jy_l, locked_y, g.xim, stag_y, plo, dxi, n);
                                 auto const [Jz_im, wz_im] = gather_staggered_pred(Jz_l, locked_z, g.xim, stag_z, plo, dxi, n);
                                 amrex::ignore_unused(wx_im, wy_im, wz_im);
-                                amrex::Real const w_n = normal_odd ? g.s/g.d_im : 1._rt;
+                                amrex::Real const w_n = normal_odd
+                                    ? amrex::max(g.s/g.d_im, normal_weight_floor) : 1._rt;
                                 amrex::Real const w_t = normal_odd ? 1._rt : g.s/g.d_im;
                                 amrex::Real const lambda =
                                     eb_cyl ? ::cyl_lambda(g.xe, g.xim, eb_cyl_axis) : 1._rt;
@@ -1195,6 +1619,55 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     {
                         if (stat(i, j, k) == S_RESOLVED) { stat(i, j, k) = S_FILL; }
                         else if (stat(i, j, k) == S_RESOLVED_P) { stat(i, j, k) = S_PENDING; }
+                    });
+                }
+            }
+        }
+
+        // CHAMFER pass (opt-in): at each S_CORNER cell, replace the (skipped)
+        // sharp-facet mirror with a DIAGONAL-CUT value -- the smooth fluid-side B
+        // carried across the corner. The verified abort is a one-cell cross-wall
+        // B jump (covered tangential B on one side, fluid B = 0 across the step)
+        // that the Ampere curl amplifies by 1/(mu0 h). Setting the covered corner
+        // B to the average of its in-component FLUID (S_SOLUTION) +/-1
+        // curl-neighbours makes dB ~ 0 across the step (a 45-degree chamfer of the
+        // 90-degree facet) so curl(B) stays bounded. The field has been
+        // FillBoundary'd by the cascade (or by the FillBoundary above), so the
+        // fluid neighbour values are current. Runs only where corner_skip flagged
+        // S_CORNER cells (none when the flag is off => byte-identical).
+        if (corner_skip_on) {
+            for (int c = 0; c < 3; ++c) {
+                field[c]->FillBoundary(geom.periodicity());
+            }
+            for (int c = 0; c < 3; ++c) {
+                for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                    amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+                    int const ncomp = field[c]->nComp();
+                    auto const& Jc = field[c]->array(mfi);
+                    auto const& stat = st.status[c]->const_array(mfi);
+                    amrex::ParallelFor(tb, ncomp,
+                        [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+                    {
+                        if (stat(i, j, k) != S_CORNER) { return; }
+                        // Diagonal-cut value: average the in-component B over the
+                        // fluid (S_SOLUTION) +/-1 curl-difference neighbours, so
+                        // the covered corner B equals the smooth fluid B carried
+                        // across the step (no cross-wall jump). Falls back to the
+                        // stable pre-fill / OFF value if no fluid neighbour exists.
+                        amrex::Real acc = 0._rt;
+                        int cnt = 0;
+                        for (int dd = 0; dd < AMREX_SPACEDIM; ++dd) {
+                            int di = (dd == 0) ? 1 : 0;
+                            int dj = (dd == 1) ? 1 : 0;
+                            int dk = (dd == 2) ? 1 : 0;
+                            if (stat(i+di, j+dj, k+dk) == S_SOLUTION) {
+                                acc += Jc(i+di, j+dj, k+dk, n); ++cnt;
+                            }
+                            if (stat(i-di, j-dj, k-dk) == S_SOLUTION) {
+                                acc += Jc(i-di, j-dj, k-dk, n); ++cnt;
+                            }
+                        }
+                        if (cnt > 0) { Jc(i, j, k, n) = acc / amrex::Real(cnt); }
                     });
                 }
             }
@@ -1316,8 +1789,11 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                     amrex::Real const Jz_im = gather_staggered(Jz_o, xim, stag_z, plo, dxi, n);
 
                     // edge fields (E, J): normal even / tangential odd;
-                    // magnetic field: normal odd / tangential even
-                    amrex::Real const w_n = normal_odd ? s/d_im : 1._rt;
+                    // magnetic field: normal odd / tangential even. The
+                    // magnetic normal weight is optionally clamped from below
+                    // (default -1e30 = no clamp); see the direct-fill path.
+                    amrex::Real const w_n = normal_odd
+                        ? amrex::max(s/d_im, normal_weight_floor) : 1._rt;
                     amrex::Real const w_t = normal_odd ? 1._rt : s/d_im;
                     amrex::Real const lambda =
                         eb_cyl ? ::cyl_lambda(xe, xim, eb_cyl_axis) : 1._rt;
@@ -1527,7 +2003,8 @@ void warpx::hybrid::FoldEBDepositToField (
     if (st.empty()) {
         ::build_fill_status(st, field, eb_update, distance_to_eb, geom, stag,
                             d_band, d_img_min, h_max,
-                            /*fill_covered_centers=*/true);
+                            /*fill_covered_centers=*/true,
+                            /*corner_skip=*/false);
     }
 
     for (int c = 0; c < 3; ++c) {

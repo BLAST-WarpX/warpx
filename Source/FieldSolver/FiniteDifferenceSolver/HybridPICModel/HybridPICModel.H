@@ -110,6 +110,20 @@ public:
 
     /**
      * \brief
+     * Take the once-per-half-step snapshot of the frozen covered/band B for
+     * conformal_b_curl_fill_freeze: run the b-curl-fill on the supplied step-entry
+     * B^n and snapshot the result into m_eb_b_curl_freeze_buf, so each later RKF45
+     * substage can re-stamp the (static) covered values instead of re-evaluating
+     * the nonsmooth fill from the live substage B. No-op unless the freeze flag is
+     * on (and a staggered conformal-EB run). Called once per RKF45 half-step.
+     */
+    void SnapshotConformalBCurlFreeze (
+        ablastr::fields::VectorField const& Bfield,
+        int lev
+    ) const;
+
+    /**
+     * \brief
      * Function to update the E-field using Ohm's law (hybrid-PIC model).
      */
     void HybridPICSolveE (
@@ -402,6 +416,17 @@ public:
      *  nodal/collocated quadratic gather is not yet robust and is skipped. Opt-in
      *  (default off -> byte-identical); intended for use_conformal_eb runs. */
     bool m_conformal_b_curl_fill = false;
+    /** If true, compute the covered-B curl fill (conformal_b_curl_fill) ONCE per
+     *  RKF45 half-step from the step-entry B^n and HOLD those covered/band values
+     *  fixed across all RKF45 substages, instead of re-evaluating the nonsmooth
+     *  curved-wall extrapolation from the live substage B at every substage. The
+     *  per-substage re-evaluation injects a near-wall radial-B feedback that grows
+     *  with a building reversal field and collapses the adaptive substep, while a
+     *  frozen (static) near-wall covered B integrates cleanly: this pulls the
+     *  nonsmooth fill out of the stiff inner integrator. Requires
+     *  conformal_b_curl_fill; opt-in (default off -> byte-identical, the fill is
+     *  recomputed every substage as before). */
+    bool m_conformal_b_curl_fill_freeze = false;
     /** If true, apply the along-edge curvature correction to the conformal-ECT
      *  Faraday circulation: in EvolveECTRho each cut edge's E is Taylor-shifted
      *  from the full-edge center to the centroid of its uncovered segment before
@@ -506,6 +531,17 @@ public:
     /** Cached embedded-boundary fill classification for the recovered
      *  magnetic field, one entry per level; reset on regrid */
     mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_B;
+    /** Frozen covered/band B-field snapshot for conformal_b_curl_fill_freeze,
+     *  one (x,y,z) MultiFab triple per level. Filled once per RKF45 half-step
+     *  from the step-entry B^n (the b-curl-fill output on B^n); on every later
+     *  substage the cells the fill controls (status != S_SOLUTION) are re-stamped
+     *  from this buffer instead of recomputing the fill from the live substage B.
+     *  Mutable: (re)written inside const solver calls. */
+    mutable amrex::Vector<std::array<amrex::MultiFab, 3>> m_eb_b_curl_freeze_buf;
+    /** True while the frozen covered-B snapshot is valid and should be re-stamped
+     *  on the current RKF45 substage's CalculatePlasmaCurrent (set at the half-step
+     *  entry by SnapshotConformalBCurlFreeze, after the entry fill is taken). */
+    mutable bool m_eb_b_curl_freeze_valid = false;
     /** Cached EB fill classification for the Ampere plasma current, one entry
      *  per level; reset on regrid. Separate from m_eb_bc_status_E because the
      *  isotropic hyper-resistivity Laplacian reads the plasma current at its
@@ -532,6 +568,65 @@ public:
      *  deep interior, where it is causally inert). Runtime knob
      *  hybrid_pic_model.eb_b_fill_band_cells; default 1 (legacy behavior). */
     amrex::Real m_eb_b_fill_band_cells = 1.0;
+
+    /** Lower clamp (floor) on the wall-NORMAL reflection weight of the
+     *  covered-B mirror fill (the b-curl-fill, normal-odd magnetic parity).
+     *  The unclamped normal weight is g.s/d_im, which for the quadratic gather
+     *  is -1: the masked covered B_normal (0) is replaced by -B_normal, a full
+     *  sign reversal across one cell. curl(B) then sees a ~2x steeper near-wall
+     *  gradient -> ~2x near-wall J wherever there is a near-wall RADIAL B (the
+     *  liftoff's dense shell + reversal), which stalls the RKF45 Faraday solve.
+     *  Clamping the normal weight to >= 0 (floor = 0) drives the covered
+     *  B_normal toward 0 (the physical PEC condition B_normal -> 0 at the wall)
+     *  instead of reversing it; the tangential even reflection (the desired
+     *  m=4-killing smoothing) is untouched. Runtime knob
+     *  hybrid_pic_model.eb_b_fill_normal_weight; default -1e30 = disabled /
+     *  no clamp = byte-identical legacy behavior (g.s/d_im). */
+    amrex::Real m_eb_b_fill_normal_weight = -1.e30;
+
+    /** Near-wall stability blend for the covered-B b-curl-fill, applied only at
+     *  CUT faces (B update mask != 0: faces with a positive area fraction for
+     *  which the conformal ECT B push already computed a value). At a cut face
+     *  the quadratic mirror DISCARDS that stabler ECT-solved B and writes a
+     *  steeper near-wall extrapolation; on a dense plasma shell pinned against a
+     *  smooth wall (the liftoff) this injects a near-wall radial-B feature that
+     *  grows super-exponentially and collapses the RKF45 substep. With this knob
+     *  in (0,1] the cut face is instead written as
+     *  (1-blend)*B_mirror + blend*B_ECT (B_ECT = the value EvolveB already wrote
+     *  at the fill point): blend=1 keeps the pure ECT cut-face B (the stable
+     *  staircase-equivalent), blend=0 keeps the pure mirror. Fully-covered faces
+     *  (mask == 0, no ECT value) always take the full mirror, so the gentle
+     *  regime (eb_diffusion) keeps the full 2nd-order mirror there. Runtime knob
+     *  hybrid_pic_model.conformal_b_curl_fill_blend; default 0 = full mirror =
+     *  byte-identical. No effect without conformal_b_curl_fill. */
+    amrex::Real m_conformal_b_curl_fill_blend = 0.0;
+
+    /** Relative cap on the cut-face covered-B mirror's deviation from the
+     *  conformal-ECT value. The quadratic fluid gather can overshoot the ECT
+     *  value wildly on a stiff dense shell (oscillatory tap weights) while
+     *  staying close to it in the gentle regime; this clamps the deviation to
+     *  conformal_b_curl_fill_clamp * max(|B_ECT|, |B_image|) so the gentle
+     *  2nd-order correction passes unclamped while the stiff overshoot is
+     *  bounded. Runtime knob hybrid_pic_model.conformal_b_curl_fill_clamp;
+     *  default 0 = no clamp = byte-identical. No effect without
+     *  conformal_b_curl_fill. */
+    amrex::Real m_conformal_b_curl_fill_clamp = 0.0;
+
+    /** Option-2 concave re-entrant-corner skip for the covered-B mirror. The
+     *  b-curl-fill mirror is benign on a smooth wall but, at a concave step-down
+     *  corner ring, writes a sub-bias covered tangential B across the step plane
+     *  while the fluid neighbour is 0; the one-cell cross-wall B jump the Ampere
+     *  curl J = curl(B)/mu0 amplifies into a ~1e6 A/m^2 spike that crashes the
+     *  RKF45 substepper. A magnitude clamp cannot bound a gradient, so instead a
+     *  validated three-clause detector (a wall-normal bend > 30 deg, a
+     *  load-bearing level-set radius jump to a fluid curl-difference neighbour
+     *  across an opposite-sign phi, and the mirror image within reach) flags those
+     *  measure-zero cells S_CORNER in the fill classification, and the fill SKIPS
+     *  them so they keep their stable pre-fill / OFF value (reverting the Ampere
+     *  curl there to the stable b-curl-fill-OFF behaviour). Runtime knob
+     *  hybrid_pic_model.conformal_b_curl_fill_corner_skip; default false = no skip
+     *  = byte-identical. No effect without conformal_b_curl_fill. */
+    bool m_conformal_b_curl_fill_corner_skip = false;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

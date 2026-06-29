@@ -122,6 +122,11 @@ def setup_simulation(
     nz=NZ,
     grid_type="collocated",
     eb_resistive_only_partial=False,
+    conformal_b_curl_fill=False,
+    conformal_b_curl_fill_freeze=False,
+    conformal_b_curl_fill_blend=0.0,
+    conformal_b_curl_fill_clamp=0.0,
+    marder_max_iterations=10,
 ):
     """Create the PICMI simulation object.
 
@@ -211,7 +216,7 @@ def setup_simulation(
         marder_alpha=marder_alpha if marder else None,
         marder_target=marder_target if marder else None,
         marder_correction_level=marder_level if marder else None,
-        marder_max_iterations=10 if marder else None,
+        marder_max_iterations=marder_max_iterations if marder else None,
         marder_rtol=1.0e-3 if marder else None,
         marder_substep_interval=marder_interval if marder else None,
         isotropic_resistivity=isotropic_resistivity,
@@ -222,6 +227,14 @@ def setup_simulation(
         max_substep_attempts=1000,
         use_conformal_eb=True,
         eb_resistive_only_partial=True if eb_resistive_only_partial else None,
+        conformal_b_curl_fill=True if conformal_b_curl_fill else None,
+        conformal_b_curl_fill_freeze=(True if conformal_b_curl_fill_freeze else None),
+        conformal_b_curl_fill_blend=(
+            conformal_b_curl_fill_blend if conformal_b_curl_fill_blend else None
+        ),
+        conformal_b_curl_fill_clamp=(
+            conformal_b_curl_fill_clamp if conformal_b_curl_fill_clamp else None
+        ),
         A_external=A_ext,
         **power_law_resistivity(
             ETA_PLASMA,
@@ -499,6 +512,79 @@ def main():
         "drop the stiff 1/n Hall+pressure and hyper/corner terms at the cut wall "
         "band. Staggered (Yee) grid only (GOL masking, Lever 2).",
     )
+    parser.add_argument(
+        "--b-curl-fill",
+        action="store_true",
+        help="enable hybrid_pic_model.conformal_b_curl_fill: 2nd-order quadratic "
+        "covered-B gather feeding the Ampere curl (replaces the staircased covered "
+        "B that drives the grid m=4/m=8 curl(B) near-wall runaway). Staggered only.",
+    )
+    parser.add_argument(
+        "--b-curl-fill-freeze",
+        action="store_true",
+        help="enable hybrid_pic_model.conformal_b_curl_fill_freeze: compute the "
+        "covered-B curl fill ONCE per RKF45 half-step from the step-entry B^n and "
+        "hold it fixed across all substages, instead of re-evaluating the nonsmooth "
+        "curved-wall extrapolation from the live substage B every substage (which "
+        "injects a stiff near-wall radial-B feedback that collapses the adaptive "
+        "substep as a reversal field builds). Requires --b-curl-fill.",
+    )
+    parser.add_argument(
+        "--b-curl-fill-blend",
+        type=float,
+        default=0.0,
+        help="near-wall stability blend of the covered-B b-curl-fill toward the "
+        "conformal-ECT cut-face B (hybrid_pic_model.conformal_b_curl_fill_blend), "
+        "in [0,1]. At a cut face the quadratic mirror discards the stabler "
+        "ECT-solved B and writes a steeper near-wall extrapolation that stiffens "
+        "the dense-shell liftoff; with blend in (0,1] the cut face is written as "
+        "(1-blend)*B_mirror + blend*B_ECT instead (blend=1 keeps the pure ECT "
+        "value, blend=0 the pure mirror). Fully-covered faces always take the "
+        "mirror. Requires --b-curl-fill. Default 0 = full mirror (byte-identical).",
+    )
+    parser.add_argument(
+        "--b-curl-fill-clamp",
+        type=float,
+        default=0.0,
+        help="relative cap on the cut-face covered-B mirror's deviation from the "
+        "conformal-ECT value (hybrid_pic_model.conformal_b_curl_fill_clamp): the "
+        "cut face is written as B_ECT + clamp(B_mirror - B_ECT, +/- clamp*"
+        "max(|B_ECT|,|B_image|)), bounding the stiff overshoot while passing a "
+        "gentle mirror correction. Requires --b-curl-fill. Default 0 = no clamp.",
+    )
+    parser.add_argument(
+        "--div-clean",
+        type=float,
+        default=0.0,
+        help="EB Marder div(B) and div(J) cleaning coefficient "
+        "(hybrid_pic_model.divb_clean_alpha = divj_clean_alpha = this). 0 disables.",
+    )
+    parser.add_argument(
+        "--eb-b-normal-weight",
+        type=float,
+        default=-1e30,
+        help="lower clamp on the wall-normal reflection weight of the covered-B "
+        "b-curl-fill (hybrid_pic_model.eb_b_fill_normal_weight). The unclamped "
+        "weight (-1) reverses the covered B_normal across one cell, doubling the "
+        "near-wall curl(B)->J wherever there is a near-wall radial B (the liftoff "
+        "shell+reversal). Set to 0 to drive the covered B_normal toward 0 (PEC "
+        "B_normal->0) instead. Default -1e30 = disabled (byte-identical).",
+    )
+    parser.add_argument(
+        "--marder-iters",
+        type=int,
+        default=10,
+        help="Marder max iterations per sweep (with --marder).",
+    )
+    parser.add_argument(
+        "--analytic-cylinder",
+        action="store_true",
+        help="DIAGNOSTIC A/B: overwrite the discrete EB level set (distance_to_eb, "
+        "from amrex::FillSignedDistance) with the EXACT analytic distance to the "
+        "R_WALL cylinder (hybrid_pic_model.eb_analytic_cylinder_radius=R_WALL). "
+        "Isolates whether the discrete-levelset faceting / normal error feeds the "
+        "grid m=4. Default off = byte-identical discrete level set.",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -548,7 +634,30 @@ def main():
         args.nz,
         grid_type=args.grid_type,
         eb_resistive_only_partial=args.resistive_only_partial,
+        conformal_b_curl_fill=args.b_curl_fill,
+        conformal_b_curl_fill_freeze=args.b_curl_fill_freeze,
+        conformal_b_curl_fill_blend=args.b_curl_fill_blend,
+        conformal_b_curl_fill_clamp=args.b_curl_fill_clamp,
+        marder_max_iterations=args.marder_iters,
     )
+
+    # conformal_b_curl_fill_blend is wired through the PICMI HybridPICSolver
+    # kwarg (in setup_simulation); div_clean and eb_b_normal_weight are not PICMI
+    # kwargs, so they are set on the hybrid_pic_model bucket directly here.
+    if args.div_clean > 0 or args.eb_b_normal_weight != -1e30:
+        from pywarpx import hybridpicmodel
+
+        if args.div_clean > 0:
+            hybridpicmodel.divb_clean_alpha = args.div_clean
+            hybridpicmodel.divj_clean_alpha = args.div_clean
+        if args.eb_b_normal_weight != -1e30:
+            hybridpicmodel.eb_b_fill_normal_weight = args.eb_b_normal_weight
+
+    # DIAGNOSTIC A/B: swap the discrete EB level set for the exact analytic
+    # R_WALL-cylinder distance (set on the solver so PICMI's solver_initialize_
+    # inputs flushes it to hybrid_pic_model.eb_analytic_cylinder_radius).
+    if args.analytic_cylinder:
+        sim.solver.eb_analytic_cylinder_radius = R_WALL
 
     sim.step()
 

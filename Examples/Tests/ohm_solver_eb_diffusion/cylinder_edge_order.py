@@ -106,7 +106,18 @@ def interior_err(plotfile):
     return float(err), float(dcell[0])
 
 
-def run_case(n, conformal, grid_type, divb_clean, eb_cyl, b_curl, ect_curv, outdir):
+def run_case(
+    n,
+    conformal,
+    grid_type,
+    divb_clean,
+    eb_cyl,
+    b_curl,
+    ect_curv,
+    outdir,
+    blend=0.0,
+    corner_trim=0.0,
+):
     tag = (
         f"{grid_type}_{'conf' if conformal else 'stair'}"
         f"{'_dc' if divb_clean else ''}{'_cyl' if eb_cyl else ''}"
@@ -134,6 +145,10 @@ def run_case(n, conformal, grid_type, divb_clean, eb_cyl, b_curl, ect_curv, outd
         cmd += ["--eb-cyl-correction"]
     if b_curl:
         cmd += ["--b-curl-fill"]
+        if blend != 0.0:
+            cmd += ["--b-curl-fill-blend", str(blend)]
+        if corner_trim != 0.0:
+            cmd += ["--b-curl-fill-corner-trim", str(corner_trim)]
     if ect_curv:
         cmd += ["--ect-curvature"]
     print(f"  running {tag} ...")
@@ -149,6 +164,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-N", "--resolutions", type=int, nargs="+", default=[48, 96])
     ap.add_argument("-o", "--outdir", default="cyl_edge_runs")
+    ap.add_argument(
+        "--blend",
+        type=float,
+        default=0.0,
+        help="conformal_b_curl_fill_blend strength [0,1] for the b-curl-fill "
+        "configs (near-wall blend toward the ECT cut-face B); 0 = full mirror.",
+    )
     args = ap.parse_args()
 
     print(f"\ncylinder edge-order (interior L2 vs Bessel mode): N={args.resolutions}\n")
@@ -156,7 +178,7 @@ def main():
         print(f"[{label}]")
         errs, hs = [], []
         for n in args.resolutions:
-            e, h = run_case(n, conf, gt, dc, ec, bc, cv, args.outdir)
+            e, h = run_case(n, conf, gt, dc, ec, bc, cv, args.outdir, args.blend)
             errs.append(e)
             hs.append(h)
             print(f"    N={n}: interior L2 = {e:.4e}")

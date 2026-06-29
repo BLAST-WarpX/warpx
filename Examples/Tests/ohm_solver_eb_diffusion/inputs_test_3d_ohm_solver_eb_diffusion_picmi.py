@@ -113,6 +113,10 @@ def setup_simulation(
     geometry="square",
     eb_cyl_correction=False,
     b_curl_fill=False,
+    b_curl_fill_freeze=False,
+    b_curl_fill_blend=0.0,
+    b_curl_fill_clamp=0.0,
+    b_curl_fill_corner_skip=False,
     resistive_only_partial=False,
     ect_curvature=False,
 ):
@@ -233,6 +237,10 @@ def setup_simulation(
         holmstrom_vacuum_region=True,
         use_conformal_eb=True if use_conformal_eb else None,
         conformal_b_curl_fill=True if b_curl_fill else None,
+        conformal_b_curl_fill_freeze=True if b_curl_fill_freeze else None,
+        conformal_b_curl_fill_blend=(b_curl_fill_blend if b_curl_fill_blend else None),
+        conformal_b_curl_fill_clamp=(b_curl_fill_clamp if b_curl_fill_clamp else None),
+        conformal_b_curl_fill_corner_skip=(True if b_curl_fill_corner_skip else None),
         conformal_ect_curvature=True if ect_curvature else None,
         eb_resistive_only_partial=True if resistive_only_partial else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
@@ -507,6 +515,43 @@ def main():
         "current is 2nd order on a curved wall; staggered (Yee) grid only",
     )
     parser.add_argument(
+        "--b-curl-fill-freeze",
+        action="store_true",
+        help="compute the covered-B curl fill once per RKF45 half-step from the "
+        "step-entry B^n and hold it fixed across substages "
+        "(hybrid_pic_model.conformal_b_curl_fill_freeze); requires --b-curl-fill",
+    )
+    parser.add_argument(
+        "--b-curl-fill-blend",
+        type=float,
+        default=0.0,
+        help="near-wall stability blend of the covered-B b-curl-fill toward the "
+        "conformal-ECT cut-face B (hybrid_pic_model.conformal_b_curl_fill_blend), "
+        "in [0,1]: cut faces written as (1-blend)*B_mirror + blend*B_ECT "
+        "(blend=1 keeps the pure ECT value, 0 the pure mirror); fully-covered "
+        "faces always take the mirror. Requires --b-curl-fill. Default 0.",
+    )
+    parser.add_argument(
+        "--b-curl-fill-clamp",
+        type=float,
+        default=0.0,
+        help="relative cap on the cut-face covered-B mirror's deviation from the "
+        "conformal-ECT value (hybrid_pic_model.conformal_b_curl_fill_clamp): "
+        "B_ECT + clamp(B_mirror - B_ECT, +/- clamp*max(|B_ECT|,|B_image|)). "
+        "Requires --b-curl-fill. Default 0 = no clamp.",
+    )
+    parser.add_argument(
+        "--b-curl-fill-corner-skip",
+        action="store_true",
+        help="Option-2 concave re-entrant-corner skip of the covered-B mirror "
+        "(hybrid_pic_model.conformal_b_curl_fill_corner_skip): a three-clause "
+        "detector (wall-normal bend > 30 deg, a load-bearing level-set radius "
+        "jump to a fluid curl-difference neighbour across an opposite-sign phi, "
+        "and the mirror image within reach) flags the destabilizing corner-ring "
+        "cells and the fill skips them, keeping their stable pre-fill / OFF "
+        "value. Requires --b-curl-fill. Default off = byte-identical.",
+    )
+    parser.add_argument(
         "--resistive-only-partial",
         action="store_true",
         help="make the generalized Ohm's law resistive-only (E=eta*J) in "
@@ -545,6 +590,10 @@ def main():
         args.geometry,
         args.eb_cyl_correction,
         args.b_curl_fill,
+        args.b_curl_fill_freeze,
+        args.b_curl_fill_blend,
+        args.b_curl_fill_clamp,
+        args.b_curl_fill_corner_skip,
         args.resistive_only_partial,
         args.ect_curvature,
     )

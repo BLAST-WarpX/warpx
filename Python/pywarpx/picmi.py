@@ -2205,6 +2205,59 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         (``conformal_b_curl_fill``). Requires ``use_conformal_eb`` and a
         staggered (Yee) grid; opt-in (default off is byte-identical).
 
+    conformal_b_curl_fill_freeze: bool, default=False
+        If True, compute the covered-B curl fill (``conformal_b_curl_fill``)
+        once per RKF45 half-step from the step-entry ``B^n`` and hold those
+        covered/band values fixed across all RKF45 substages, instead of
+        re-evaluating the nonsmooth curved-wall extrapolation from the live
+        substage ``B`` at every substage. The per-substage re-evaluation injects
+        a near-wall radial-``B`` feedback that grows with a building reversal
+        field and collapses the adaptive substep; a frozen (static) near-wall
+        covered ``B`` integrates cleanly. Requires ``conformal_b_curl_fill``;
+        opt-in (default off is byte-identical, the fill is recomputed every
+        substage as before).
+
+    conformal_b_curl_fill_blend: float, default=0
+        Near-wall stability blend of the covered-B curl fill toward the
+        conformal-ECT cut-face ``B`` (``conformal_b_curl_fill_blend``), in
+        [0, 1]. At a CUT face (positive area fraction, for which the ECT B push
+        already computed a value) the quadratic mirror discards that stabler
+        ECT-solved ``B`` and writes a steeper near-wall extrapolation; on a dense
+        plasma shell pinned against a smooth wall this injects a near-wall
+        radial-``B`` feature that collapses the adaptive RKF45 substep. With this
+        knob in (0, 1] the cut face is written as
+        ``(1-blend)*B_mirror + blend*B_ECT`` instead: ``blend=1`` keeps the pure
+        ECT cut-face value (the stable staircase-equivalent), ``blend=0`` keeps
+        the pure mirror. Fully-covered faces (no ECT value) always take the full
+        mirror, so the gentle regime keeps the full 2nd-order mirror there.
+        Requires ``conformal_b_curl_fill``; default 0 = full mirror =
+        byte-identical.
+
+    conformal_b_curl_fill_clamp: float, default=0
+        Relative cap on the cut-face covered-B mirror's deviation from the
+        conformal-ECT value (``conformal_b_curl_fill_clamp``). The quadratic
+        fluid gather can overshoot the ECT value wildly on a stiff dense shell
+        while staying close to it in the gentle regime; with this knob > 0 the
+        cut face is written as ``B_ECT + clamp(B_mirror - B_ECT, +/- cap)`` with
+        ``cap = clamp * max(|B_ECT|, |B_image|)``, so a gentle (small) mirror
+        correction passes unclamped (2nd order preserved) while a stiff
+        overshoot is bounded. Composes with ``conformal_b_curl_fill_blend``.
+        Requires ``conformal_b_curl_fill``; default 0 = no clamp = byte-identical.
+
+    conformal_b_curl_fill_corner_skip: bool, default=False
+        Option-2 concave re-entrant-corner skip of the covered-B mirror
+        (``conformal_b_curl_fill_corner_skip``). On a smooth wall the b-curl-fill
+        mirror is benign, but at a concave step-down corner ring it writes a
+        sub-bias covered tangential ``B`` across the step plane while the fluid
+        neighbour is 0; the one-cell cross-wall ``B`` jump the Ampere curl
+        ``J = curl(B)/mu0`` amplifies into a ~1e6 A/m^2 spike that crashes the
+        RKF45 substepper. With this flag a validated three-clause detector (a
+        wall-normal bend > 30 deg, a load-bearing level-set radius jump to a fluid
+        curl-difference neighbour across an opposite-sign ``phi``, and the mirror
+        image within reach) flags those measure-zero cells and the fill skips
+        them, so they keep their stable pre-fill / OFF value. Requires
+        ``conformal_b_curl_fill``; default False = no skip = byte-identical.
+
     eb_resistive_only_partial: bool, default=False
         If True, the generalized Ohm's law is made resistive-only (E = eta*J) in
         partially-covered embedded-boundary cells: the stiff 1/n Hall and
@@ -2364,11 +2417,16 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
         conformal_b_curl_fill=None,
+        conformal_b_curl_fill_freeze=None,
+        conformal_b_curl_fill_blend=None,
+        conformal_b_curl_fill_clamp=None,
+        conformal_b_curl_fill_corner_skip=None,
         conformal_ect_curvature=None,
         eb_resistive_only_partial=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
+        eb_analytic_cylinder_radius=None,
         eb_deposit_fold=None,
         eb_rho_dirichlet=None,
         marder_alpha=None,
@@ -2409,11 +2467,16 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.use_conformal_eb = use_conformal_eb
         self.conformal_b_curl_fill = conformal_b_curl_fill
+        self.conformal_b_curl_fill_freeze = conformal_b_curl_fill_freeze
+        self.conformal_b_curl_fill_blend = conformal_b_curl_fill_blend
+        self.conformal_b_curl_fill_clamp = conformal_b_curl_fill_clamp
+        self.conformal_b_curl_fill_corner_skip = conformal_b_curl_fill_corner_skip
         self.conformal_ect_curvature = conformal_ect_curvature
         self.eb_resistive_only_partial = eb_resistive_only_partial
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
+        self.eb_analytic_cylinder_radius = eb_analytic_cylinder_radius
         self.eb_deposit_fold = eb_deposit_fold
         self.eb_rho_dirichlet = eb_rho_dirichlet
         self.marder_alpha = marder_alpha
@@ -2478,6 +2541,18 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
         pywarpx.hybridpicmodel.conformal_b_curl_fill = self.conformal_b_curl_fill
+        pywarpx.hybridpicmodel.conformal_b_curl_fill_freeze = (
+            self.conformal_b_curl_fill_freeze
+        )
+        pywarpx.hybridpicmodel.conformal_b_curl_fill_blend = (
+            self.conformal_b_curl_fill_blend
+        )
+        pywarpx.hybridpicmodel.conformal_b_curl_fill_clamp = (
+            self.conformal_b_curl_fill_clamp
+        )
+        pywarpx.hybridpicmodel.conformal_b_curl_fill_corner_skip = (
+            self.conformal_b_curl_fill_corner_skip
+        )
         pywarpx.hybridpicmodel.conformal_ect_curvature = self.conformal_ect_curvature
         pywarpx.hybridpicmodel.eb_resistive_only_partial = (
             self.eb_resistive_only_partial
@@ -2485,6 +2560,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
+        pywarpx.hybridpicmodel.eb_analytic_cylinder_radius = (
+            self.eb_analytic_cylinder_radius
+        )
         pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
         pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
         pywarpx.hybridpicmodel.marder_alpha = self.marder_alpha
