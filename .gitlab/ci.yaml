@@ -98,4 +98,4 @@ Intel-PVC:
           -DWarpX_PARTICLE_PRECISION=SINGLE
     - cmake --build build -j 16
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
-    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+    - ctest --test-dir build -R test_3d_collision_xyz.run --output-on-failure --no-tests=error
