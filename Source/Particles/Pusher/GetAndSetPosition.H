@@ -70,10 +70,10 @@ void get_particle_position (const WarpXParticleContainer::SuperParticleType& p,
  *
  * \tparam T_PIdx particle index enumerator
 */
-template<typename T_PIdx = PIdx>
+template<typename T_PIdx = PIdx, class T_RType = amrex::ParticleReal>
 struct GetParticlePosition
 {
-    using RType = amrex::ParticleReal;
+    using RType = T_RType;
 
     const RType* AMREX_RESTRICT m_x = nullptr;
     const RType* AMREX_RESTRICT m_y = nullptr;
@@ -209,10 +209,10 @@ struct GetParticlePosition
  * \param a_pti iterator to the tile being modified
  * \param a_offset offset to apply to the particle indices
 */
-template<typename T_PIdx = PIdx>
+template<typename T_PIdx = PIdx, class T_RType = amrex::ParticleReal>
 struct SetParticlePosition
 {
-    using RType = amrex::ParticleReal;
+    using RType = T_RType;
 
 #if defined(WARPX_DIM_3D)
     RType* AMREX_RESTRICT m_x;
