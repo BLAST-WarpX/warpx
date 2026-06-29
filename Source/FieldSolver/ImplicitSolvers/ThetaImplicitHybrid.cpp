@@ -93,7 +93,7 @@ void ThetaImplicitHybrid::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-void ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
+int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
                                     const amrex::Real  a_dt,
                                     const int          a_step )
 {
@@ -137,15 +137,20 @@ void ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // Solve nonlinear system for E^{n+θ} (and eventually Pe^{n+θ})
     m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) { return exit_status; }
+
     // Update WarpX fields to t^{n+θ}
     UpdateWarpXFields( m_E, start_time );
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
     // Advance particles from t^{n+1/2} to t^{n+1}
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate( start_time + m_dt );
 
     // Advance fields from t^{n+θ} to t^{n+1}
     FinishFieldUpdate( start_time + m_dt );
+
+    return exit_status;
 }
 
 void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
