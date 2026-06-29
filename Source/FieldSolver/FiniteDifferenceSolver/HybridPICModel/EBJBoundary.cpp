@@ -1852,10 +1852,22 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 // NOTE: This folder is collocated/nodal-specific by design: it assumes a fully
 // nodal scalar (asserted below), uses zero staggering (stag0) and NODE-centered
 // interpolation weights, and samples node coordinates without a half-cell
-// offset. It is NOT Yee/staggered-aware. The staggered (Yee) deposit is folded
-// by the separate FoldEBDepositToField, which carries a per-component staggering
-// vector. A Yee-specific scalar folder is a follow-up if a staggered scalar
-// deposit ever needs this treatment.
+// offset. It is NOT Yee/staggered-aware -- using it on a staggered scalar would
+// drop the half-cell offset and mis-place the deposit, which is wrong.
+//
+// TODO(PR#6994): implement Yee/staggered scalar folding properly and UNIFY with
+// FoldEBDepositToField instead of keeping this nodal-only path (which is a trap
+// the moment a staggered scalar needs folding). No new gather code is required:
+// the low-level gather (gather_staggered / gather_staggered_pred) and MirrorGeom
+// are already parametrized by a per-direction `stag` vector. Generalize by
+// deriving the per-component stagger from the field's index type at runtime
+// (stag[d] = field.ixType().cellCentered(d) ? 0.5 : 0.0, exactly as
+// FoldEBDepositToField already does) and looping over nComp; the nodal scalar is
+// then just the stag = 0, nComp = 1 special case. A single runtime
+// staggering-aware folder subsumes both this function and FoldEBDepositToField
+// (a stagger vector passed/derived per call -- no template needed); then remove
+// FoldEBDepositToNodalScalar and route its callers (RhoFunctor,
+// WarpXPushFieldsHybridPIC) through the unified folder.
 void warpx::hybrid::FoldEBDepositToNodalScalar (
     amrex::MultiFab& field,
     amrex::MultiFab const& distance_to_eb,
