@@ -1,3 +1,5 @@
+.. _plot_distribution_mapping:
+
 Visualizing a distribution mapping
 ==================================
 
