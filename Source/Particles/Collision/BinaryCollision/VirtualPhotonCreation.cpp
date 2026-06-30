@@ -285,6 +285,17 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                 });
             } // mfi
         } // lev
+
+#if defined (WARPX_DIM_3D)
+        if (do_beam_size_effect) {
+            // The beam-size effect displaces virtual photons away from the cell
+            // of their parent particle, so they need a Redistribute to be placed
+            // in the correct box/tile. This must happen before they are used in
+            // collisions (see CollisionHandler::doCollisions) since the collision
+            // kernel assumes that particles are already in the correct box/tile.
+            vphotons.Redistribute();
+        }
+#endif
     } // species
 
 #else
