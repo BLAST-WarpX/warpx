@@ -9,6 +9,8 @@
 #ifndef WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 #define WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 
+#include "Utils/WarpXAlgorithmSelection.H"
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Math.H>
 #include <AMReX_REAL.H>
@@ -20,12 +22,10 @@
 enum class ScatteringProcessType {
     INVALID,
     ELASTIC,
-    BACK,
     TWOPRODUCT_REACTION,
     CHARGE_EXCHANGE,
     EXCITATION,
     IONIZATION,
-    FORWARD,
 };
 
 class ScatteringProcess
@@ -34,7 +34,8 @@ public:
     ScatteringProcess (
                 const std::string& scattering_process,
                 const std::string& cross_section_file,
-                amrex::ParticleReal energy
+                amrex::ParticleReal energy,
+                ScatteringAngleModel scattering_angle_model
                 );
 
     template <typename InputVector>
@@ -42,7 +43,8 @@ public:
                 const std::string& scattering_process,
                 const InputVector&& energies,
                 const InputVector&& sigmas,
-                amrex::ParticleReal energy
+                amrex::ParticleReal energy,
+                ScatteringAngleModel scattering_angle_model
                 );
 
     ~ScatteringProcess() = default;
@@ -107,6 +109,7 @@ public:
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
+        ScatteringAngleModel m_scattering_angle_model;
     };
 
     [[nodiscard]]
@@ -130,12 +133,13 @@ public:
 
     [[nodiscard]] ScatteringProcessType type () const { return m_exe_h.m_type; }
 
-private:
-
     static
     ScatteringProcessType parseProcessType(const std::string& process);
 
-    void init (const std::string& scattering_process, amrex::ParticleReal energy);
+private:
+
+    void init (const std::string& scattering_process, amrex::ParticleReal energy,
+               ScatteringAngleModel scattering_angle_model);
 
     amrex::Vector<amrex::ParticleReal> m_energies;
 

@@ -320,7 +320,10 @@ class CapacitiveDischargeExample(object):
 
         ion_scattering_processes = {
             "elastic": {"cross_section": cross_sec_direc + "ion_scattering.dat"},
-            "back": {"cross_section": cross_sec_direc + "ion_back_scatter.dat"},
+            "elastic_back": {
+                "cross_section": cross_sec_direc + "ion_back_scatter.dat",
+                "scattering_angle_model": "backward",
+            },
             # 'charge_exchange': {'cross_section': cross_sec_direc+'charge_exchange.dat'}
         }
         if self.dsmc:
