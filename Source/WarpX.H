@@ -647,13 +647,13 @@ public:
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
                                   PositionPushType position_push_type=PositionPushType::Full,
                                   MomentumPushType momentum_push_type=MomentumPushType::Full,
-                                  amrex::Real dt_scale=static_cast<amres::Real>(1.),
+                                  amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
 
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_deposition=false,
                                   PositionPushType position_push_type=PositionPushType::Full,
                                   MomentumPushType momentum_push_type=MomentumPushType::Full,
-                                  amrex::Real dt_scale=static_cast<amres::Real>(1.),
+                                  amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
 
     /** Perform essential particle house keeping at boundaries
