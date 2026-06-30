@@ -237,12 +237,28 @@ namespace ParticleUtils {
      * \result true if the point with within the boundary, otherwise false
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool containsInclusive (amrex::RealBox const& tilebox, amrex::XDim3 const point) {
+    bool containsInclusive (amrex::RealBox const& tilebox,
+                            [[maybe_unused]]amrex::Real x,
+                            [[maybe_unused]]amrex::Real y,
+                            [[maybe_unused]]amrex::Real z) {
+        using namespace amrex::literals;
         const auto *const xlo = tilebox.lo();
         const auto *const xhi = tilebox.hi();
-        return  AMREX_D_TERM((xlo[0] <= point.x) && (point.x <= xhi[0]),
-                          && (xlo[1] <= point.y) && (point.y <= xhi[1]),
-                          && (xlo[2] <= point.z) && (point.z <= xhi[2]));
+#if defined(WARPX_DIM_3D)
+        const amrex::Real px = x;
+        const amrex::Real py = y;
+        const amrex::Real pz = z;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const amrex::Real px = x;
+        const amrex::Real py = z;
+#elif defined(WARPX_DIM_1D_Z)
+        const amrex::Real px = z;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::Real px = x;
+#endif
+        return  AMREX_D_TERM((xlo[0] <= px) && (px <= xhi[0]),
+                          && (xlo[1] <= py) && (py <= xhi[1]),
+                          && (xlo[2] <= pz) && (pz <= xhi[2]));
     }
 
     /* \brief Crops the position at the specified boundary if do_cropping is true, 1D version

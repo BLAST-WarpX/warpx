@@ -1450,6 +1450,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         amrex::ParallelForRNG(overlap_box,
         [=] AMREX_GPU_DEVICE (int i, int j, int k, amrex::RandomEngine const& engine) noexcept
         {
+            amrex::ignore_unused(j,k);
             const amrex::IntVect iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
             amrex::ignore_unused(j,k);
             const auto index = overlap_box.index(iv);
@@ -1507,13 +1508,12 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                         flux_pos->getPositionUnitBox(i_part, amrex::IntVect::TheUnitVector(), engine);
                     pos = getCellCoords(overlap_corner, dx, r, iv);
                 }
-                auto ppos = PDim3(pos);
 
                 // inj_mom would typically be InjectorMomentumGaussianFlux
-                XDim3 u;
-                u = inj_mom->getMomentum(pos.x, pos.y, pos.z, engine);
-                auto pu = PDim3(u);
+                XDim3 gamma_beta;
+                gamma_beta = inj_mom->getMomentum(pos.x, pos.y, pos.z, engine);
 
+                auto pu = XDim3(gamma_beta);
                 pu.x *= PhysConst::c;
                 pu.y *= PhysConst::c;
                 pu.z *= PhysConst::c;
@@ -1521,34 +1521,15 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // The containsInclusive is used to allow the case of the flux surface
                 // being on the boundary of the domain. After the UpdatePosition below,
                 // the particles will be within the domain.
-#if defined(WARPX_DIM_3D)
-                if (!ParticleUtils::containsInclusive(tile_realbox, XDim3{ppos.x,ppos.y,ppos.z})) {
+                if (!ParticleUtils::containsInclusive(tile_realbox, pos.x, pos.y, pos.z)) {
                     pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
                     continue;
                 }
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                amrex::ignore_unused(k);
-                if (!ParticleUtils::containsInclusive(tile_realbox, XDim3{ppos.x,ppos.z,0.0_prt})) {
-                    pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
-                    continue;
-                }
-#elif defined(WARPX_DIM_1D_Z)
-                amrex::ignore_unused(j,k);
-                if (!ParticleUtils::containsInclusive(tile_realbox, XDim3{ppos.z,0.0_prt,0.0_prt})) {
-                    pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
-                    continue;
-                }
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                amrex::ignore_unused(j,k);
-                if (!ParticleUtils::containsInclusive(tile_realbox, XDim3{ppos.x,0.0_prt,0.0_prt})) {
-                    pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
-                    continue;
-                }
-#endif
+
                 // Lab-frame simulation
                 // If the particle's initial position is not within or on the species's
                 // xmin, xmax, ymin, ymax, zmin, zmax, go to the next generated particle.
-                if (!flux_pos->insideBoundsInclusive(ppos.x, ppos.y, ppos.z)) {
+                if (!flux_pos->insideBoundsInclusive(pos.x, pos.y, pos.z)) {
                     pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
                     continue;
                 }
@@ -1576,7 +1557,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // but this is Ok since particles will be redistributed afterwards.
                 // The containsInclusive check above ensures
                 // that the "logical" space is uniformly filled.
-                amrex::Real const xu = (ppos.x - rmin)/(rmax - rmin);
+                amrex::Real const xu = (pos.x - rmin)/(rmax - rmin);
                 amrex::Real const rc = std::pow(rmax, 1._rt + radial_numpercell_power)
                                      - std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
@@ -1585,8 +1566,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Conversion from cylindrical to Cartesian coordinates
                 amrex::Real const cos_theta = std::cos(theta);
                 amrex::Real const sin_theta = std::sin(theta);
-                ppos.x = radial_position*cos_theta;
-                ppos.y = radial_position*sin_theta;
+                pos.x = radial_position*cos_theta;
+                pos.y = radial_position*sin_theta;
                 if ((loc_flux_normal_axis != 2)
 #ifdef AMREX_USE_EB
                     || (inject_from_eb)
@@ -1608,7 +1589,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // but this is Ok since particles will be redistributed afterwards.
                 // The containsInclusive check above ensures
                 // that the "logical" space is uniformly filled.
-                amrex::Real const xu = (ppos.x - rmin)/(rmax - rmin);
+                amrex::Real const xu = (pos.x - rmin)/(rmax - rmin);
                 amrex::Real const rc = std::pow(rmax, 1._rt + radial_numpercell_power)
                                      - std::pow(rmin, 1._rt + radial_numpercell_power);
                 amrex::Real const rminp = std::pow(rmin, 1._rt + radial_numpercell_power);
@@ -1636,7 +1617,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 pu.y = cos_phi*sin_theta*ur + cos_theta*ut - sin_phi*sin_theta*up;
                 pu.z = sin_phi*ur + cos_phi*up;
 #endif
-                const amrex::Real flux = inj_flux->getFlux(ppos.x, ppos.y, ppos.z, t);
+                const amrex::Real flux = inj_flux->getFlux(pos.x, pos.y, pos.z, t);
                 // Remove particle if flux is negative or 0
                 if (flux <= 0) {
                     pa_idcpu[ip] = amrex::ParticleIdCpus::Invalid;
@@ -1659,11 +1640,11 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // Initialize user-defined integers with user-defined parser
                 for (int ia = 0; ia < n_user_int_attribs; ++ia) {
-                    pa_user_int_data[ia][ip] = static_cast<int>(user_int_parserexec_data[ia](pos.x, pos.y, pos.z, u.x, u.y, u.z, t));
+                    pa_user_int_data[ia][ip] = static_cast<int>(user_int_parserexec_data[ia](pos.x, pos.y, pos.z, gamma_beta.x, gamma_beta.y, gamma_beta.z, t));
                 }
                 // Initialize user-defined real attributes with user-defined parser
                 for (int ia = 0; ia < n_user_real_attribs; ++ia) {
-                    pa_user_real_data[ia][ip] = user_real_parserexec_data[ia](pos.x, pos.y, pos.z, u.x, u.y, u.z, t);
+                    pa_user_real_data[ia][ip] = user_real_parserexec_data[ia](pos.x, pos.y, pos.z, gamma_beta.x, gamma_beta.y, gamma_beta.z, t);
                 }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -1712,19 +1693,22 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Update particle position by a random `t_fract`
                 // so as to produce a continuous-looking flow of particles
                 const amrex::Real t_fract = amrex::Random(engine)*dt;
-                UpdatePosition(ppos.x, ppos.y, ppos.z, pu.x, pu.y, pu.z, t_fract, mass);
+                amrex::ParticleReal pposx = pos.x;
+                amrex::ParticleReal pposy = pos.y;
+                amrex::ParticleReal pposz = pos.z;
+                UpdatePosition(pposx, pposy, pposz, pu.x, pu.y, pu.z, t_fract, mass);
 
 #if defined(WARPX_DIM_3D)
-                pa[PIdx::x][ip] = ppos.x;
-                pa[PIdx::y][ip] = ppos.y;
-                pa[PIdx::z][ip] = ppos.z;
+                pa[PIdx::x][ip] = pposx;
+                pa[PIdx::y][ip] = pposy;
+                pa[PIdx::z][ip] = pposz;
 #elif defined(WARPX_DIM_RZ)
-                pa[PIdx::theta][ip] = std::atan2(ppos.y, ppos.x);
-                pa[PIdx::r][ip] = std::sqrt(ppos.x*ppos.x + ppos.y*ppos.y);
-                pa[PIdx::z][ip] = ppos.z;
+                pa[PIdx::theta][ip] = std::atan2(pposy, pposx);
+                pa[PIdx::r][ip] = std::sqrt(pposx*pposx + pposy*pposy);
+                pa[PIdx::z][ip] = pposz;
 #elif defined(WARPX_DIM_XZ)
-                pa[PIdx::x][ip] = ppos.x;
-                pa[PIdx::z][ip] = ppos.z;
+                pa[PIdx::x][ip] = pposx;
+                pa[PIdx::z][ip] = pposz;
 #elif defined(WARPX_DIM_RCYLINDER)
                 pa[PIdx::theta][ip] = theta;
                 pa[PIdx::r][ip] = radial_position;
@@ -1733,7 +1717,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 pa[PIdx::phi][ip] = phi;
                 pa[PIdx::r][ip] = radial_position;
 #elif defined(WARPX_DIM_1D_Z)
-                pa[PIdx::z][ip] = ppos.z;
+                pa[PIdx::z][ip] = pposz;
 #endif
             }
         });
