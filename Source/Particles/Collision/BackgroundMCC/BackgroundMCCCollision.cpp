@@ -90,7 +90,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     // Parse the list of scattering processes (these could be elastic,
     // excitation, charge_exchange, etc.) and create a vector of
     // ScatteringProcess objects from each scattering process name.
-    auto scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
+    amrex::Vector<ScatteringProcess> scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
 
     for (auto& process : scattering_processes) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
