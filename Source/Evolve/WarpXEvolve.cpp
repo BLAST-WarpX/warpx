@@ -49,6 +49,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 #include <AMReX_REAL.H>
+#include <AMReX_RealVect.H>
 #include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
 
@@ -730,44 +731,57 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
-    // Without mesh refinement, use local redistribute when the number of cells
-    // a particle can travel per step is small: particles cannot travel faster
-    // than c, so c * dt / min(dx) is a physical upper bound.
+    // Without mesh refinement, use a local redistribute when particles can only
+    // have moved by a small number of cells; otherwise fall back to a global one.
     if (finest_level == 0) {
-        // Estimate the maximum number of cells a particle may have travelled.
-        // Start from the moving-window grid shift, then take the max with a
-        // speed-of-light upper bound: c * dt / min(dx).
-        // Use the physical cell sizes of the actual simulation dimensions.
-        // (Geom().CellSizeArray() is indexed by active dimension 0..SPACEDIM-1,
-        // unlike WarpX::CellSize() which uses fixed x/y/z slots with placeholders.)
-        const auto dx = Geom(0).CellSizeArray();
-        amrex::Real min_dx = dx[0];
-        for (int i = 1; i < AMREX_SPACEDIM; ++i) { min_dx = std::min(min_dx, dx[i]); }
-        const int effective_max_grid_crossings = (particle_max_grid_crossings == 1)
-            ? static_cast<int>(std::ceil(PhysConst::c * dt[0] / min_dx))
-            : particle_max_grid_crossings;
-        int max_cells_travelled = num_moved + effective_max_grid_crossings;
-        if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-            // Galilean algorithm: account for the extra grid shift due to the
-            // moving Galilean frame. m_v_galilean is indexed by x/y/z, so pair it
-            // with the x/y/z-slotted cell sizes (placeholder 1.0 for inactive dims).
-            const auto dx_xyz = CellSize(0);
-            amrex::Real galilean_cells = 0.0;
-            for (int d = 0; d < 3; ++d) {
-                galilean_cells = std::max(galilean_cells,
-                    std::abs(m_v_galilean[d]) * dt[0] / dx_xyz[d]);
-            }
-            max_cells_travelled += static_cast<int>(std::ceil(galilean_cells));
+        // Estimate, per direction, the maximum distance a particle may have
+        // travelled during this step, expressed in number of cells.
+        // (Geom().CellSizeArray() is indexed by active dimension 0..SPACEDIM-1.)
+        const amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> dx = Geom(0).CellSizeArray();
+
+        // Particles cannot travel faster than the speed of light, so c * dt / dx
+        // is a physical upper bound on the number of cells crossed per direction.
+        amrex::RealVect max_distance_relative_to_grid;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            max_distance_relative_to_grid[d] = PhysConst::c * dt[0] / dx[d];
         }
+
+        // Moving window: particles can additionally move by the number of cells
+        // that the window was shifted, along the moving-window direction.
+        if (moving_window_dir >= 0) {
+            max_distance_relative_to_grid[moving_window_dir] += static_cast<amrex::Real>(num_moved);
+        }
+
+
+        // Galilean algorithm: account for the extra grid shift due to the moving
+        // Galilean frame. m_v_galilean is indexed by x/y/z, so map its components
+        // onto the active simulation dimensions.
+#if defined(WARPX_DIM_3D)
+        const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[1], m_v_galilean[2]};
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[2]};
+#elif defined(WARPX_DIM_1D_Z)
+        const amrex::RealVect v_galilean = {m_v_galilean[2]};
+#else // WARPX_DIM_RCYLINDER, WARPX_DIM_RSPHERE: no Galilean shift
+        const amrex::RealVect v_galilean = amrex::RealVect::TheZeroVector();
+#endif
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            max_distance_relative_to_grid[d] += std::abs(v_galilean[d]) * dt[0] / dx[d];
+        }
+
+        // Convert to an integer number of cells (rounding up) and take the largest
+        // value over all directions.
+        amrex::IntVect max_cells_travelled_vect;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            max_cells_travelled_vect[d] =
+                static_cast<int>(std::ceil(max_distance_relative_to_grid[d]));
+        }
+        const int max_cells_travelled = max_cells_travelled_vect.max();
+
         // If max_cells_travelled reaches the domain size the local search is
         // no longer more efficient than (and may crash in lieu of) a full
         // redistribute, so fall back in that case.
-        const amrex::Box& domain = Geom(0).Domain();
-        int min_domain_cells = domain.length(0);
-        for (int i = 1; i < AMREX_SPACEDIM; ++i) {
-            min_domain_cells = std::min(min_domain_cells, domain.length(i));
-        }
-        if (max_cells_travelled < min_domain_cells) {
+        if (max_cells_travelled < Geom(0).Domain().length().min()) {
             mypc->RedistributeLocal(max_cells_travelled);
         } else {
             mypc->Redistribute();
