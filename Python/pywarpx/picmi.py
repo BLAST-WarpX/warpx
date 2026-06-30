@@ -2845,7 +2845,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        If True, run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based divergence cleaner on the loaded B field
+        after loading, scrubbing any spurious divergence from the applied-field map(s).
+        This is opt-in (it is not enabled automatically for applied particle fields) and
+        is supported for the electromagnetic, electrostatic (labframe) and magnetostatic
+        (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+        When several applied B-field maps are stacked, each map is cleaned independently.
         (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
