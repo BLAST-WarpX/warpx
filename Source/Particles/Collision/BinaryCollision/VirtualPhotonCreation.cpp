@@ -287,6 +287,15 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
         } // lev
     } // species
 
+    if (do_beam_size_effect) {
+        // The beam-size effect displaces virtual photons away from the cell
+        // of their parent particle, so they need a Redistribute to be placed 
+        // in the correct box/tile. This must happen before they are used in 
+        // collisions (see CollisionHandler::doCollisions) since the collision
+        // kernel assumes that particles are already in the correct box/tile.
+        vphotons.Redistribute();
+    }
+
 #else
 
     WARPX_ABORT_WITH_MESSAGE("Compiling WarpX with QED support is required to call GenerateVirtualPhotons");
