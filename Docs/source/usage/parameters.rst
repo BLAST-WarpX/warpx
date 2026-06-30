@@ -1623,7 +1623,8 @@ Particle initialization
     * ``read_from_file``: load the density profile from an openPMD file.
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
-      file must contain a field named ``density``. See
+      file must contain a field with the name given by ``<species_name>.density_mesh_name``
+      (default ``density``). See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
       for an example of how to prepare the openPMD data file. There is
       another optional parameter,
