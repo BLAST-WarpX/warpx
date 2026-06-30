@@ -44,7 +44,6 @@ Checks: '
         -modernize-use-std-numbers,
         -modernize-use-ranges,
         -modernize-use-integer-sign-comparison,
-        -modernize-use-starts-ends-with,
         -modernize-use-std-format,
     mpi-*,
     performance-*,
@@ -90,7 +89,6 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # -modernize-use-std-numbers
 # -modernize-use-ranges
 # -modernize-use-integer-sign-comparison
-# -modernize-use-starts-ends-with
 # -modernize-use-std-format
 # -readability-container-contains
 
