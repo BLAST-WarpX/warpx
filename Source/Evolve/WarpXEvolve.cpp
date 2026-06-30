@@ -761,7 +761,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[2]};
 #elif defined(WARPX_DIM_1D_Z)
-        const amrex::RealVect v_galilean = {m_v_galilean[2]};
+        const amrex::RealVect v_galilean(m_v_galilean[2]);
 #else // WARPX_DIM_RCYLINDER, WARPX_DIM_RSPHERE: no Galilean shift
         const amrex::RealVect v_galilean = amrex::RealVect::TheZeroVector();
 #endif
