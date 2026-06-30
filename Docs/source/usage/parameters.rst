@@ -471,6 +471,16 @@ Overall simulation parameters
     verbose output. When using ``labframe-electromagnetostatic``, this value
     is also used as the default for ``magnetostatic_solver_verbosity``.
 
+.. pp:param:: warpx.self_fields_num_sweeps
+    :type: ``integer``
+
+    Number of relaxation (smoothing) sweeps performed during each pre- and post-smoothing
+    stage of the multigrid solve. Increasing this value can improve MLMG convergence.
+    Also see: `/amrex/Src/LinearSolvers/MLMG/AMReX_MLMG.H`.
+    If set, the final smoothing (when smoother is used as bottom solver) is calculated as four times this value.
+    If omitted, AMReX defaults are used (pre/post: 2, final: 8 ).
+    Must be greater than zero.
+
 .. pp:param:: warpx.magnetostatic_solver_required_precision
     :type: ``float``
     :default: value of ``self_fields_required_precision``

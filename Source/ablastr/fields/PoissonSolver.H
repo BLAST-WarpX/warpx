@@ -183,6 +183,7 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
+ * \param[in] num_sweeps if set, MLMG pre/post smooth sweeps and final smooth (4x) sweeps; if unset, AMReX defaults apply
  * \param[in] post_phi_calculation perform a calculation per level directly after phi was calculated; required for embedded boundaries (default: none)
  * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] current_time the current time; required for embedded boundaries (default: none)
@@ -211,6 +212,7 @@ computePhi (
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
+    std::optional<int> num_sweeps = std::nullopt,
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
     [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
@@ -403,6 +405,12 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
+        if (num_sweeps.has_value()) {
+            const int n = num_sweeps.value();
+            mlmg.setPreSmooth(n);
+            mlmg.setPostSmooth(n);
+            mlmg.setFinalSmooth(4 * n);
+        }
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
 
