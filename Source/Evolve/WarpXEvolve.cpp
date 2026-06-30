@@ -400,7 +400,14 @@ void WarpX::OneStep (
     // implicit solver
     if (m_implicit_solver) {
         // advance fields and particles by one time step
-        m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+        const int exit_status = m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+        if (exit_status < 0) {
+            std::stringstream solverMsg;
+            solverMsg << "ImplicitSolver::OneStep() failed at step = " << a_step
+                      << " using dt = " << a_dt << ".\n"
+                      << "Nonlinear solver failed to converge: exit status = " << exit_status;
+            WARPX_ABORT_WITH_MESSAGE(solverMsg.str());
+        }
     }
     // explicit solver
     else {

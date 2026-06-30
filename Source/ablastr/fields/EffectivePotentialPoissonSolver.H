@@ -189,9 +189,6 @@ computeEffectivePotentialPhi (
         }
         else if (is_rz)
         {
-            amrex::Abort("The effective potential ES solver is not supported in RZ without EBs.");
-            // The above assert can be removed once AMReX::MLEBNodeFDLaplacian
-            // is extended to support a sigma MF when not compiled with EB support.
             auto linop_nodelap = std::make_unique<amrex::MLEBNodeFDLaplacian>();
             linop_nodelap->define(
                 amrex::Vector<amrex::Geometry>{geom[lev]},

@@ -430,6 +430,25 @@ PhysicalParticleContainer::BackwardCompatibility ()
             "<species>.momentum_distribution_type = radial_expansion is not supported anymore. "
             "Please use momentum_distribution_type = parse_momentum_function instead.");
     }
+
+    const std::string juttner_drift_msg =
+        "The Maxwell-Juttner bulk drift is now set with the normalized momentum "
+        "<species>.ux_mean/uy_mean/uz_mean (gamma*v/c), optionally selecting between a "
+        "constant and a parser value with "
+        "<species>.maxwell_juttner_u_mean_distribution_type = constant (default) or parser "
+        "(in which case provide <species>.ux_mean_function(x,y,z), uy_mean_function(x,y,z), "
+        "uz_mean_function(x,y,z)).";
+    std::string backward_string;
+    for (const std::string old_param : {"bulk_vel_dir", "beta_distribution_type",
+                                        "beta_function(x,y,z)", "beta"}) {
+        if (pp_species_name.query(old_param, backward_string)) {
+            std::string msg = "<species>.";
+            msg += old_param;
+            msg += " is no longer supported. ";
+            msg += juttner_drift_msg;
+            WARPX_ABORT_WITH_MESSAGE(msg);
+        }
+    }
 }
 
 void PhysicalParticleContainer::InitData ()

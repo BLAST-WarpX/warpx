@@ -153,13 +153,13 @@ class KSP_impl : public PETScSolver_impl
         //! Set verbosity
         void setVerbose(int);
 
-        //! Get number of iterations for recentmost solve
+        //! Get number of iterations for recent most solve
         inline int getNumIters() const { return m_niters; }
 
-        //! Get status for recentmost solve
+        //! Get status for recent most linear solve
         inline int getStatus() const { return m_status; }
 
-        //! Get relative norm for recentmost solve
+        //! Get relative norm for recent most solve
         inline amrex::Real getResidualNorm() const { return m_norm; }
 
         //! Check if object is defined
@@ -182,11 +182,11 @@ class KSP_impl : public PETScSolver_impl
         //! verbosity
         int m_verbose = 1;
 
-        //! number of iterations for recentmost solve
+        //! number of iterations for recent most solve
         int m_niters = -1;
-        //! status for recentmost solve
+        //! status for recent most solve
         int m_status = -1;
-        //! residual norm (relative) for recentmost solve
+        //! residual norm (relative) for recent most solve
         amrex::Real m_norm = DBL_MAX;
 
         //! Solver object
@@ -274,6 +274,9 @@ class SNES_impl : public PETScSolver_impl
         AMREX_FORCE_INLINE
         auto normLinResidual() const { return m_norm_lin; }
 
+        //! Get status for recent most nonlinear solve
+        inline int getStatus() const { return m_status; }
+
         //! Using SNES FD?
         bool m_fd_jac_comput = false;
 
@@ -302,15 +305,15 @@ class SNES_impl : public PETScSolver_impl
         //! maximum iterations
         int m_maxits_l = 1000;
 
-        //! number of iterations for recentmost solve
+        //! number of iterations for recent most solve
         mutable int m_niters = -1;
-        //! number of linear solver iterations for recentmost solve
+        //! number of linear solver iterations for recent most solve
         mutable int m_niters_l = -1;
-        //! status for recentmost solve
+        //! status for recent most solve
         mutable int m_status = -1;
-        //! residual norm (relative) for recentmost solve
+        //! residual norm (relative) for recent most solve
         mutable amrex::Real m_norm = DBL_MAX;
-        //! residual norm (relative) for recentmost linear solve
+        //! residual norm (relative) for recent most linear solve
         mutable amrex::Real m_norm_lin = DBL_MAX;
 
         //! Simulation time
