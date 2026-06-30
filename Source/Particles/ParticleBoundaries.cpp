@@ -77,8 +77,8 @@ namespace warpx::particles
         }
         else{
             for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-                pp_boundary.query_enum_sloppy("particle_lo", particle_boundary_lo[idim], "-_", idim);
-                pp_boundary.query_enum_sloppy("particle_hi", particle_boundary_hi[idim], "-_", idim);
+                pp_boundary.query_enum_case_insensitive("particle_lo", particle_boundary_lo[idim], idim);
+                pp_boundary.query_enum_case_insensitive("particle_hi", particle_boundary_hi[idim], idim);
             }
 
             detail::check_consistency(

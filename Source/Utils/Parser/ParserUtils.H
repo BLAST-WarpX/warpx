@@ -173,7 +173,10 @@ namespace utils::parser
     {
         int const is_specified = queryArrWithParser(a_pp, str, val);
         if (is_specified == 0) {
-            throw std::runtime_error("utils::parser::getArrWithParser failed");
+            throw std::runtime_error(
+                "utils::parser::getArrWithParser: must specify the parameter '" +
+                a_pp.prefixedName(str) + "' in the inputs"
+            );
         }
     }
 
@@ -199,7 +202,10 @@ namespace utils::parser
     {
         int const is_specified = queryArrWithParser(a_pp, str, val, start_ix, num_val);
         if (is_specified == 0) {
-            throw std::runtime_error("utils::parser::getArrWithParser failed");
+            throw std::runtime_error(
+                "utils::parser::getArrWithParser: must specify the parameter '" +
+                a_pp.prefixedName(str) + "' in the inputs"
+            );
         }
     }
 

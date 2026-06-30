@@ -12,33 +12,72 @@
 #include "Utils/TextMsg.H"
 
 #include <cmath>
+
+namespace {
+    /** Parse the bulk drift momentum vector (ux_mean, uy_mean, uz_mean) shared by the
+     * `maxwellian` and `maxwell_juttner` momentum distributions.
+     *
+     * The bulk drift is the normalized momentum u_mean = gamma*v/c. Its components are
+     * either constant or given by spatially-dependent parser functions, selected by the
+     * input parameter `<dist_type_param>` (`constant` by default, or `parser`).
+     */
+    void ParseVelocityVector (const amrex::ParmParse& pp, std::string const& source_name,
+                              std::string const& dist_type_param, VelocityProperties& vel)
+    {
+        std::string u_mean_dist_s = "constant";
+        utils::parser::query(pp, source_name, dist_type_param.c_str(), u_mean_dist_s);
+        if (u_mean_dist_s == "constant") {
+            utils::parser::queryWithParser(pp, source_name, "ux_mean", vel.m_ux_mean);
+            utils::parser::queryWithParser(pp, source_name, "uy_mean", vel.m_uy_mean);
+            utils::parser::queryWithParser(pp, source_name, "uz_mean", vel.m_uz_mean);
+            vel.m_type = VelConstantVector;
+        } else if (u_mean_dist_s == "parser") {
+            std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
+            utils::parser::Store_parserString(pp, source_name, "ux_mean_function(x,y,z)", str_ux_mean_function);
+            utils::parser::Store_parserString(pp, source_name, "uy_mean_function(x,y,z)", str_uy_mean_function);
+            utils::parser::Store_parserString(pp, source_name, "uz_mean_function(x,y,z)", str_uz_mean_function);
+            vel.m_ptr_ux_mean_parser =
+                std::make_unique<amrex::Parser>(
+                    utils::parser::makeParser(str_ux_mean_function,{"x","y","z"}));
+            vel.m_ptr_uy_mean_parser =
+                std::make_unique<amrex::Parser>(
+                    utils::parser::makeParser(str_uy_mean_function,{"x","y","z"}));
+            vel.m_ptr_uz_mean_parser =
+                std::make_unique<amrex::Parser>(
+                    utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
+            vel.m_type = VelParserFunctionVector;
+        }
+        else {
+            WARPX_ABORT_WITH_MESSAGE(
+                "Mean velocity distribution type '" + u_mean_dist_s + "' not recognized.");
+        }
+    }
+}
+
 /**
 * Construct VelocityProperties from the passed particle source parameters.
 * Parse the momentum distribution type and initialize the corresponding
 * velocity parameters: `ux_mean`, `uy_mean`, and `uz_mean` (or the parser
 * functions `ux_mean_function`, `uy_mean_function`, `uz_mean_function`) for
-* the `maxwellian` distribution; the parser functions `momentum_function_ux`,
-* `momentum_function_uy`, `momentum_function_uz` for `parse_momentum_function`;
-* or `bulk_vel_dir` and `beta` for `maxwell_juttner`.
+* the `maxwellian` and `maxwell_juttner` distributions; or the parser functions
+* `momentum_function_ux`, `momentum_function_uy`, `momentum_function_uz` for
+* `parse_momentum_function`.
 */
 VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
 {
 
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
-
-    // Read the three component-wise mean parser functions from the input
-    // parameters with the given names and set the type to VelParserFunctionVector.
-    // Shared by the "maxwellian" (parser) distribution, which uses the
-    // `u{x,y,z}_mean_function` names, and the "parse_momentum_function"
-    // distribution, which uses the `momentum_function_u{x,y,z}` names.
-    auto read_mean_parsers = [&] (std::string const& ux_name,
-                                  std::string const& uy_name,
-                                  std::string const& uz_name) {
+    if (mom_dist_s == "maxwell_juttner") {
+        ParseVelocityVector(pp, source_name, "maxwell_juttner_u_mean_distribution_type", *this);
+    } else if (mom_dist_s == "maxwellian") {
+        ParseVelocityVector(pp, source_name, "maxwellian_u_mean_distribution_type", *this);
+    }
+    else if (mom_dist_s == "parse_momentum_function") {
         std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
-        utils::parser::Store_parserString(pp, source_name, ux_name, str_ux_mean_function);
-        utils::parser::Store_parserString(pp, source_name, uy_name, str_uy_mean_function);
-        utils::parser::Store_parserString(pp, source_name, uz_name, str_uz_mean_function);
+        utils::parser::Store_parserString(pp, source_name, "momentum_function_ux(x,y,z)", str_ux_mean_function);
+        utils::parser::Store_parserString(pp, source_name, "momentum_function_uy(x,y,z)", str_uy_mean_function);
+        utils::parser::Store_parserString(pp, source_name, "momentum_function_uz(x,y,z)", str_uz_mean_function);
         m_ptr_ux_mean_parser =
             std::make_unique<amrex::Parser>(
                 utils::parser::makeParser(str_ux_mean_function,{"x","y","z"}));
@@ -49,86 +88,6 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
             std::make_unique<amrex::Parser>(
                 utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
         m_type = VelParserFunctionVector;
-    };
-
-    if (mom_dist_s == "maxwell_juttner") {
-        // Set defaults
-        std::string vel_dist_s = "constant";
-        std::string vel_dir_s = "x";
-
-        utils::parser::query(pp, source_name, "bulk_vel_dir", vel_dir_s);
-
-        if(vel_dir_s.empty()){
-            WARPX_ABORT_WITH_MESSAGE("'<s_name>.bulk_vel_dir input ' can't be empty.");
-        }
-
-        m_sign_dir = (vel_dir_s[0] == '-') ? -1 : 1;
-
-        const auto dir = std::tolower(vel_dir_s.back());
-
-        if (dir == 'x'){
-            m_dir = 0;
-        }
-        else if (dir == 'y'){
-            m_dir = 1;
-        }
-        else if (dir == 'z'){
-            m_dir = 2;
-        }
-        else{
-            WARPX_ABORT_WITH_MESSAGE(
-                "Cannot interpret <s_name>.bulk_vel_dir input '" + vel_dir_s +
-                "'. Please enter +/- x, y, or z with no whitespace between the sign and"+
-                " other character.");
-        }
-
-        utils::parser::query(pp, source_name, "beta_distribution_type", vel_dist_s);
-        if (vel_dist_s == "constant") {
-            utils::parser::queryWithParser(pp, source_name, "beta", m_velocity);
-            m_type = VelConstantValue;
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                m_velocity > -1 && m_velocity < 1,
-                "Magnitude of velocity beta = " + std::to_string(m_velocity) +
-                " is greater than or equal to 1"
-            );
-        }
-        else if (vel_dist_s == "parser") {
-            std::string str_beta_function;
-            utils::parser::Store_parserString(pp, source_name, "beta_function(x,y,z)", str_beta_function);
-            m_ptr_velocity_parser =
-                std::make_unique<amrex::Parser>(
-                    utils::parser::makeParser(str_beta_function,{"x","y","z"}));
-            m_type = VelParserFunction;
-        }
-        else {
-            WARPX_ABORT_WITH_MESSAGE(
-                "Velocity distribution type '" + vel_dist_s + "' not recognized.");
-        }
-    } else if (mom_dist_s == "maxwellian") {
-        std::string u_mean_dist_s = "constant";
-        utils::parser::query(pp, source_name, "maxwellian_u_mean_distribution_type", u_mean_dist_s);
-        if (u_mean_dist_s == "constant") {
-            utils::parser::queryWithParser(pp, source_name, "ux_mean", m_ux_mean);
-            utils::parser::queryWithParser(pp, source_name, "uy_mean", m_uy_mean);
-            utils::parser::queryWithParser(pp, source_name, "uz_mean", m_uz_mean);
-            m_type = VelConstantVector;
-        } else if (u_mean_dist_s == "parser") {
-            read_mean_parsers("ux_mean_function(x,y,z)",
-                              "uy_mean_function(x,y,z)",
-                              "uz_mean_function(x,y,z)");
-        }
-        else {
-            std::stringstream stringstream;
-            std::string string;
-            stringstream << "Maxwellian velocity mean distribution type '" << u_mean_dist_s << "' not recognized.";
-            string = stringstream.str();
-            WARPX_ABORT_WITH_MESSAGE(string);
-        }
-    }
-    else if (mom_dist_s == "parse_momentum_function") {
-        read_mean_parsers("momentum_function_ux(x,y,z)",
-                          "momentum_function_uy(x,y,z)",
-                          "momentum_function_uz(x,y,z)");
     }
     else {
         WARPX_ABORT_WITH_MESSAGE(

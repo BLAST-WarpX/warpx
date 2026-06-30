@@ -49,17 +49,16 @@ namespace BinaryCollisionUtils{
                                       MultiParticleContainer const * mypc);
 
     /**
-     * \brief Parse the `scattering_processes` of a DSMC collision and build the
-     * corresponding ScatteringProcess objects (in the same order as the input list).
+     * \brief Parse the list of scattering processes of a ``dsmc`` or ``background_mcc``
+     * collision and build the corresponding ``ScatteringProcess`` objects.
      *
-     * This centralizes the per-process parsing that must be shared between the
-     * collision functor (which evaluates cross-sections) and the split-and-scatter
-     * functor (which performs the post-collision kinematics), so that both agree on
-     * the process ordering, type, energy penalty and scattering angle model.
+     * For each name in ``<collision_name>.scattering_processes``, this reads the
+     * associated cross-section file (``<process>_cross_section``) and energy cost
+     * (``<process>_energy``). The energy is required for ``excitation`` and ``ionization``
+     * processes, and optional (defaulting to 0) for all other processes.
      *
-     * It also parses the per-process `<process>_scattering_angle_model` argument and
-     * translates the legacy process names `back` and `forward` into `elastic` with the
-     * `backward` and `forward` angle models respectively (with a deprecation warning).
+     * @param[in] collision_name the name of the collision
+     * @return a vector of the parsed ``ScatteringProcess`` objects
      */
     amrex::Vector<ScatteringProcess>
     parse_scattering_processes (const std::string& collision_name);

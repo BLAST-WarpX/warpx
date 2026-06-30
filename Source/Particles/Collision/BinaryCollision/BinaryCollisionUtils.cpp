@@ -114,6 +114,8 @@ namespace BinaryCollisionUtils{
         amrex::Vector<std::string> scattering_process_names;
         pp_collision_name.queryarr("scattering_processes", scattering_process_names);
 
+        // create a vector of ScatteringProcess objects from each scattering
+        // process name
         amrex::Vector<ScatteringProcess> scattering_processes;
         for (const auto& scattering_process : scattering_process_names) {
             const std::string kw_cross_section = scattering_process + "_cross_section";

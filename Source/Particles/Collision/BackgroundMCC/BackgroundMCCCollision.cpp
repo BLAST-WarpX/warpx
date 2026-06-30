@@ -88,10 +88,10 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
     utils::parser::queryWithParser(
         pp_collision_name, "background_mass", m_background_mass);
 
-    // Parse the list of collision processes (these could be elastic, excitation,
-    // charge_exchange, etc.) into ScatteringProcess objects. This shared helper reads the
-    // per-process cross-section, energy and scattering angle model.
-    auto scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
+    // Parse the list of scattering processes (these could be elastic,
+    // excitation, charge_exchange, etc.) and create a vector of
+    // ScatteringProcess objects from each scattering process name.
+    amrex::Vector<ScatteringProcess> scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
 
     for (auto& process : scattering_processes) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,

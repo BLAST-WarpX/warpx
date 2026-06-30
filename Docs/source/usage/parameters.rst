@@ -1758,24 +1758,29 @@ Particle initialization
         p(\mathbf{u}) \propto \exp(-\gamma(\mathbf{u})mc^2/k_B T) = \exp(-\gamma (\mathbf{u})/\theta)
 
       (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
-      **drifting Lorentz frame** that is moving with a bulk velocity :math:`\beta = v_{drift}/c`.
+      **drifting Lorentz frame** that is moving with a bulk velocity specified by the normalized momentum
+      :math:`\boldsymbol{u}_{\rm mean} = (u_{x,{\rm mean}}, u_{y,{\rm mean}}, u_{z,{\rm mean}}) = \gamma \boldsymbol{v}/c` (see below).
       Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
       in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
 
       It requires the following arguments:
 
-      * ``<species_name>.beta_distribution_type`` (`string`, default ``constant``):
-        Specifies the distribution type for the bulk velocity :math:`\beta`.
-        The magnitude must satisfy :math:`|\beta| < 1`.
+      * ``<species_name>.maxwell_juttner_u_mean_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``.
+        Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
+        representing the normalized momentum, defined as
+        :math:`\boldsymbol{u}_\mathrm{mean} = \gamma \boldsymbol{\beta}`, where
+        :math:`\boldsymbol{\beta} = \boldsymbol{v}/c` and :math:`\gamma = 1/\sqrt{1-|\boldsymbol{\beta}|^2}`.
+        The distribution is boosted from the drift frame to the simulation frame along the
+        direction of :math:`\boldsymbol{u}_\mathrm{mean}`; the bulk velocity :math:`|\boldsymbol{\beta}|` derived from
+        :math:`\boldsymbol{u}_\mathrm{mean}` is therefore always in the physical range :math:`|\boldsymbol{\beta}| < 1`.
 
-        * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
-        * If ``parser``, the following is required: ``<species_name>.beta_function(x,y,z)``.
-
-      * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
-        Specifies the direction of the bulk velocity :math:`\beta`.
-        The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
-        Please leave no whitespace between the sign and the character on input. A direction without a sign will be treated as positive.
-        The signed bulk velocity is ``beta`` times the direction given here.
+        * If ``constant``, the following are required: ``<species_name>.ux_mean``,
+          ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``).
+        * If ``parser``, the following are required:
+          ``<species_name>.ux_mean_function(x,y,z)``,
+          ``<species_name>.uy_mean_function(x,y,z)``,
+          ``<species_name>.uz_mean_function(x,y,z)``.
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.
@@ -3919,8 +3924,15 @@ Additional parameters
     :type: ``0`` or ``1``
     :default: 0
 
-    Whether to use projection method to scrub A/B field divergence in externally
-    loaded fields. This is automatically turned on if external/initial B or time varying A fields are loaded.
+    Whether to use a projection method to scrub A/B field divergence in externally
+    loaded fields. This applies to both externally loaded grid fields
+    (``warpx.B_ext_grid_init_style``) and externally applied particle fields
+    (``particles.B_ext_particle_init_style = read_from_file``); when several applied
+    field maps are stacked, each map is cleaned independently. It is supported for the
+    electromagnetic (Yee, hybrid-PIC), electrostatic (labframe) and magnetostatic
+    (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+    This is automatically turned on if external/initial grid B or time varying A fields
+    are loaded; for applied particle fields it must be enabled explicitly (opt-in).
 
 .. pp:param:: warpx.projection_div_cleaner.rtol
     :type: ``float``

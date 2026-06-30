@@ -29,6 +29,7 @@ Functions can be called at the following times:
 * ``beforeInitEsolve``: before the initial solve for the E fields (i.e. before the PIC loop starts)
 * ``afterInitEsolve``: after the initial solve for the E fields (i.e. before the PIC loop starts)
 * ``afterinit``: immediately after the init is complete
+* ``allocdata``: during initialization (from scratch and from restart), when new MultiFabs should be allocated
 * ``beforeEsolve``: before the solve for E fields (not called during init E solve, use beforeInitEsolve to apply to first solve)
 * ``poissonsolver``: In place of the computePhi call but only in an electrostatic simulation
 * ``afterEsolve``: after the solve for E fields (not called after init E solve, use afterInitEsolve to apply to first solve)
@@ -282,6 +283,7 @@ callback_instances = {
     "afterInitEsolve": {},
     "afterInitatRestart": {},
     "afterinit": {},
+    "allocdata": {},
     "beforecollisions": {},
     "aftercollisions": {},
     "beforeEsolve": {},
@@ -425,6 +427,16 @@ def callfromafterinit(f):
 
 def installafterinit(f):
     installcallback("afterinit", f)
+
+
+# ----------------------------------------------------------------------------
+def callfromallocdata(f):
+    installcallback("allocdata", f)
+    return f
+
+
+def installallocdata(f):
+    installcallback("allocdata", f)
 
 
 # ----------------------------------------------------------------------------

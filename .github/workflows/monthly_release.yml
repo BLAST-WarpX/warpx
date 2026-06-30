@@ -20,7 +20,7 @@ jobs:
         run: |
           echo "DATE=$(date +'%y.%m')" >> $GITHUB_ENV
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
