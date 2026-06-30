@@ -4,6 +4,7 @@
  *
  * Authors: Roelof Groenewald (TAE Technologies)
  *          S. Eric Clark (Helion Energy)
+ *          Prabhat Kumar (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -14,6 +15,7 @@
 #include "HybridPICModel_fwd.H"
 
 #include "Fields.H"
+#include "Fluids/QdsmcParticleContainer_fwd.H"
 
 #include "ExternalVectorPotential.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -31,6 +33,8 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_DistributionMapping.H>
 
+#include <map>
+#include <memory>
 #include <optional>
 
 /**
@@ -41,6 +45,9 @@ class HybridPICModel
 {
 public:
     HybridPICModel ();
+    // Defined out-of-line in the .cpp so the unique_ptr<QdsmcParticleContainer>
+    // member can destroy a forward-declared particle container.
+    ~HybridPICModel ();
 
     /** Read user-defined model parameters. Called in constructor. */
     void ReadParameters ();
@@ -180,6 +187,24 @@ public:
     void CalculateElectronPressure (int lev) const;
 
     /**
+     * \brief Compute the electron fluid velocity V_e on the grid from the
+     * deposited ion current and the plasma current: V_e = (J_i - J_plasma)/rho,
+     * with rho floored at m_n_floor * q_e. Used by the resistive-drag operator.
+     */
+    void CalculateElectronFluidVelocity () const;
+    void CalculateElectronFluidVelocity (int lev) const;
+
+    /**
+     * \brief Compute the per-species ion bulk velocity Vs = Js/rhos on the
+     * grid for every charged species. Output is stored in Vs_fp_{species}
+     * (face-staggered like J). Used by the resistive-drag operator to
+     * apply a per-cell uniform shift (V_s - V_e)(1 - exp(-nu dt)) to every
+     * particle, leaving the thermal moment intact.
+     */
+    void CalculateIonFluidVelocity () const;
+    void CalculateIonFluidVelocity (int lev) const;
+
+    /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
      * specified electron equation of state.
@@ -190,6 +215,174 @@ public:
     void FillElectronPressureMF (
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
+
+    /**
+     * \brief Fill the nodal V_e = -(J_plasma - J_i) / (q_e n_e) MultiFabs by
+     *        interpolating the Yee-staggered total plasma current and ion
+     *        current to the nodal grid (using ablastr::coarsen::sample::Interp)
+     *        and dividing by rho. Cells with rho <= rho_floor are left at 0.
+     *
+     *        Reads hybrid_current_fp_plasma (J_plasma), hybrid_current_fp_temp
+     *        (J_i at n+1/2), hybrid_rho_fp_temp (rho at n+1/2). Writes
+     *        hybrid_electron_velocity_fp (3 directions, nodal).
+     */
+    void QDSMCInitializeUe (int lev) const;
+
+    /**
+     * \brief Fill the nodal K_e = T_e * n_e^(1-gamma) * (k_B / q_e) MultiFab
+     *        from the current T_e and rho_fp_temp (= rho at n+1/2). Cells with
+     *        rho <= rho_floor are left at 0.
+     *
+     *        Reads hybrid_electron_temperature_fp (T_e in K) and
+     *        hybrid_rho_fp_temp; writes hybrid_entropy_fp.
+     */
+    void QDSMCInitializeKe (int lev) const;
+
+    /**
+     * \brief After the QDSMC scatter, recover T_e^{n+1} from
+     *           T_e = (deposited K*N) / (deposited N) / n_e^(1-gamma)
+     *                 / (k_B / q_e)
+     *        using rho at n+1 (rho_fp), the deposited entropy field
+     *        (hybrid_entropy_fp), and the deposited weight field
+     *        (hybrid_qdsmc_weights_fp).
+     *
+     *        Writes hybrid_electron_temperature_fp.
+     */
+    void QDSMCUpdateTe (int lev) const;
+
+    /**
+     * \brief Resistive electron-heating source (see Phys. Plasmas 31, 012902 (2024), Eq. 12).
+     *        Adds, per cell and per charged ion species,
+     *           T_e += dt * (gamma-1) * Z_s e^2 eta n_s |dV|^2 / k_B,
+     *        with the e-i relative drift dV = J_plasma/(e n_e) and eta from the
+     *        Ohm's-law parser. Summed over species,
+     *           S_e = e^2 eta n_e * Sigma_s Z_s n_s |dV|^2,
+     *        which reduces to eta J^2 for a single species. n_s is recovered from
+     *        the species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
+     *        = Z_s n_s/n_e (2pi*r-cancelling) -> n_s = f_s n_e/Z_s, with n_e from
+     *        the total rho_fp. Deterministic, no per-particle scatter. Called
+     *        when m_include_joule_heating is true. When the Te-threshold redirect
+     *        is on (\c redirect_E non-null), the contribution from cells with
+     *        Te >= m_joule_redirect_Te_eV is written into \c redirect_E for
+     *        QDSMCApplyIonHeating to deposit on the ions instead of T_e.
+     *
+     * \param lev AMR refinement level.
+     * \param dt  PIC timestep [s].
+     * \param redirect_E nodal output field for the redirected heat, one component
+     *        per charged ion species (ordered as in GetSpeciesNames, charged
+     *        species only). Component c holds the m_i-independent energy
+     *        E_s = (2/3) n_e Z_s e^2 eta |dV|^2 dt [J] (so sig_redir^2 = E_s/m_i).
+     *        nullptr when the Joule redirect is off.
+     */
+    void QDSMCAddJouleHeating (int lev, amrex::Real dt,
+                               amrex::MultiFab * redirect_E = nullptr) const;
+
+    /**
+     * \brief Add the electron-ion thermal-equilibration sink Q_ei to T_e.
+     *
+     * Per ion species, cools T_e toward that species' (deposited) T_i:
+     *   dT_e = -dt (gamma-1) * 3 * (n_s/n_e) * nu_ei * (T_e - T_i_s),
+     * with nu_ei from the electron_ion_relaxation_rate parser. This is the
+     * ELECTRON-SIDE sink; QDSMCApplyIonHeating deposits the conjugate ion gain
+     * so the pair conserves energy. Called when m_include_temperature_relaxation
+     * is true.
+     *
+     * \param lev AMR refinement level.
+     * \param dt  PIC timestep [s].
+     * \param Ti_dep_by_species per-charged-species ion temperature [eV], deposited
+     *        once by the caller (AdvanceElectronEnergyQDSMC) and shared with
+     *        QDSMCApplyIonHeating, which runs immediately after with no intervening
+     *        ion motion -- so the deposit is identical for both and is done only once.
+     */
+    void QDSMCAddTemperatureRelaxation (int lev, amrex::Real dt,
+        std::map<std::string, amrex::MultiFab*> const & Ti_dep_by_species) const;
+
+    /**
+     * \brief Ion-heating operator: a stochastic drag-diffusion applied to
+     *        every ion. It delivers both electron-ion energy channels:
+     *
+     *   dv_p = -nu_ei (v_p - u_e) dt + sqrt(2 D dt) R,   D = D_qei + D_redir,
+     *
+     * with R a unit-variance Gaussian vector. The Q_ei conjugate (when
+     * m_include_temperature_relaxation) supplies the drag toward the electron
+     * fluid u_e and the thermal diffusion D_qei = nu_ei k_B T_e / m_i, relaxing
+     * the ions toward a Maxwellian at T_e (T_i -> T_e at rate 2 nu_ei). The
+     * Te-threshold Joule redirection (when \c redirect_E is non-null) supplies
+     * an additional pure-diffusion heating sig_redir^2 = E_s/m_i that injects,
+     * in expectation, the redirected electron energy per cell. Either or both
+     * channels may be active. Both are per-species correct (the redirect reads
+     * each species' own component of \c redirect_E).
+     *
+     * \param lev AMR refinement level.
+     * \param dt  PIC timestep [s].
+     * \param redirect_E per-cell redirected energy [J], one component per charged
+     *        ion species (ordered as in QDSMCAddJouleHeating); nullptr when off.
+     * \param Ti_dep_by_species per-charged-species ion temperature [eV], deposited
+     *        once by the caller and shared with QDSMCAddTemperatureRelaxation
+     *        (see that method); nullptr when the Q_ei relaxation channel is off.
+     */
+    void QDSMCApplyIonHeating (int lev, amrex::Real dt,
+                               amrex::MultiFab const * redirect_E = nullptr,
+                               std::map<std::string, amrex::MultiFab*> const * Ti_dep_by_species = nullptr) const;
+
+    /**
+     * \brief Fill hybrid_electron_pressure_fp from T_e and n_e using the
+     *        ideal-gas relation Pe = n_e * k_B * T_e. Called at the end of
+     *        each QDSMC step so the existing Ohm's-law E-solver consumes
+     *        the QDSMC-updated pressure without modification.
+     */
+    void QDSMCFillElectronPressureFromTe (int lev) const;
+
+    /**
+     * \brief Top-level orchestrator for the QDSMC electron-energy step.
+     *
+     * Performs the full entropy transport over one PIC step (see Phys. Plasmas 31, 012902 (2024)):
+     *   1. CalculatePlasmaCurrent so J_plasma is current
+     *   2. QDSMCInitializeUe  (V_e from J_plasma and J_i)
+     *   3. QDSMCInitializeKe  (K_e from T_e^n and rho^n)
+     *   4. QDSMC particle SetV / SetK / PushX / DepositK / DepositField
+     *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
+     *   6. QDSMCAddJouleHeating (if m_include_joule_heating is on):
+     *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2 -> T_e
+     *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)
+     *   8. Reset QDSMC particles to home positions for the next step
+     *
+     * Called from HybridPICEvolveFields when m_solve_electron_energy_equation is true.
+     */
+    void AdvanceElectronEnergyQDSMC (amrex::Real dt);
+
+    /**
+     * \brief Compute the per-species resistive overlay vector field added to
+     *        Ohm's-law E alongside the existing +eta_global * J term:
+     *
+     *           overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
+     *                                       * (V_s_d - V_e_d) ]
+     *
+     *        summed over charged species that have a per-species
+     *        resistivity parser registered. The total friction term that
+     *        Ohm's law sees becomes
+     *
+     *           E_friction = +eta_global * J + overlay
+     *                      = +e * Sigma_s Z_s * (eta_global + eta_s_per) * n_s
+     *                                       * (V_s - V_e)
+     *
+     *        i.e. effectively eta_s_eff = eta_global + eta_s_per per species.
+     *
+     *        Output multifabs are at the Jx/Jy/Jz staggering (== E
+     *        component staggering). When m_has_per_species_eta is false
+     *        the overlay is set to zero and the function returns early
+     *        (single-eta behaviour is exactly recovered when callers add
+     *        a field of zeros to E).
+     *
+     *        Computed once per E-solve call. Caller passes pre-allocated
+     *        Yee-staggered MultiFabs (one per direction) sized to match
+     *        Jx/Jy/Jz at this level.
+     */
+    void ComputeResistiveOverlay (
+        int lev,
+        amrex::MultiFab & overlay_x,
+        amrex::MultiFab & overlay_y,
+        amrex::MultiFab & overlay_z) const;
 
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
@@ -218,6 +411,59 @@ public:
     /** Electron pressure scaling exponent */
     amrex::Real m_gamma = 5.0/3.0;
 
+    /** Master gate for the electron-energy equation. When true, K_e is
+     * transported each step by QDSMC fictitious particles advecting with
+     * V_e, then T_e is recovered from K_e and n_e via the polytropic
+     * relation, then the Joule-heating source (if enabled) is added,
+     * then Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. When
+     * false (default), Pe is computed from the algebraic adiabatic closure
+     * (FillElectronPressureMF) -- no temperature evolution. */
+    bool m_solve_electron_energy_equation = false;
+
+    /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
+     * computed per cell as
+     *     S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,
+     *         nu_{s,e} = Z_s e^2 eta n_e / m_s,
+     * from the gridded Vs_fp_s, Ve_fp, rho_fp(_s) fields and the
+     * Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
+     * eta J^2 in single species; resolves inter-species drift-dispersion
+     * heating in multispecies. Orthogonal to whether HybridResistiveDrag
+     * is registered on ions (that controls particle dynamics, not the
+     * T_e source). Only consulted when m_solve_electron_energy_equation
+     * is also true. */
+    bool m_include_joule_heating = false;
+
+    /** Te-threshold Joule redirection. When true, the eta*J^2 Joule source in
+     * QDSMCAddJouleHeating heats electrons in cells where Te < m_joule_redirect_Te_eV
+     * and is instead deposited to the ions (as stochastic pure-diffusion heating in
+     * QDSMCApplyIonHeating) where Te >= m_joule_redirect_Te_eV. This caps electron
+     * heating at the threshold and routes the rest to the ions, so Ti can exceed Te.
+     * The redirected energy is bookkept per charged ion species. Requires
+     * m_include_joule_heating. Default off. */
+    bool m_joule_redirect_to_ions = false;
+    amrex::Real m_joule_redirect_Te_eV = 100.0;   // threshold [eV]
+
+    /** Electron-ion thermal equilibration (Q_ei) on T_e:
+     *   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),   dU_e/dt += -Q_ei,
+     * cooling T_e toward each ion species' T_i at the rate given by the
+     * electron_ion_relaxation_rate(rho,Te,Ti,t) parser, with the matching ion
+     * heating deposited conservatively (QDSMCApplyIonHeating) so the exchange
+     * conserves energy. Default off; only consulted when
+     * m_solve_electron_energy_equation is on. */
+    bool m_include_temperature_relaxation = false;
+
+    /** Electron-ion energy-equilibration rate nu_ei(rho,Te,Ti,t) [1/s] used by
+     * the Q_ei term (rho = charge density [C/m^3]; Te, Ti in eV; t in s). */
+    std::string m_nu_ei_expression = "0.0";
+    std::unique_ptr<amrex::Parser> m_nu_ei_parser;
+    amrex::ParserExecutor<4> m_nu_ei;
+
+    /** Density floor used when dividing by the deposited QDSMC weight to
+     * recover K_e^{n+1} from (K*N) / N. Avoids divide-by-zero in cells
+     * that no QDSMC particle reached during the push. Defaults to the
+     * same floor as the rest of the hybrid solver. */
+    amrex::Real m_qdsmc_n_floor = 1.0;
+
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;
 
@@ -226,6 +472,40 @@ public:
     std::unique_ptr<amrex::Parser> m_resistivity_parser;
     amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
+
+    /** Per-species resistivity overlay (see Phys. Plasmas 31, 012902 (2024), Eq. 10).
+     *  Optional. For any charged species {spec} for which the user provides
+     *
+     *      hybrid_pic_model.plasma_resistivity_{spec}(rho_s,rho,Te,J,J_s,B,t) = "..."
+     *
+     *  the parser is compiled and stored here. The total per-species
+     *  effective resistivity used by Ohm's law, the Joule-heating source,
+     *  and the resistive-drag operator is
+     *
+     *      eta_s_eff = eta_global(rho, |J|, t)              [the global m_eta]
+     *                + eta_per_species_s(rho_s, rho, Te,    [this map]
+     *                                    |J|, |J_s|, |B|, t)
+     *
+     *  so the global parser remains the shared anomalous (e.g. Chodura)
+     *  layer and the per-species parser overlays species-resolved physics
+     *  (e.g. classical Spitzer with Z^2 scaling). Species without a
+     *  per-species parser registered fall back to the global parser only.
+     *  Parser variables, in order, are:
+     *    rho_s : per-species charge density        (C/m^3, unscaled in RZ)
+     *    rho   : total plasma charge density       (C/m^3, volume-scaled)
+     *    Te    : electron temperature              (Kelvin)
+     *    J     : |J_plasma|                        (A/m^2)
+     *    J_s   : |J_{species}|                     (A/m^2, unscaled in RZ)
+     *    B     : |B|                               (Tesla)
+     *    t     : time                              (seconds)
+     */
+    std::map<std::string, std::unique_ptr<amrex::Parser>> m_per_species_resistivity_parser;
+    std::map<std::string, amrex::ParserExecutor<7>>       m_eta_per_species;
+    /** Fast-path flag: true if at least one charged species has a
+     *  registered per-species resistivity parser. When false the
+     *  per-species code paths short-circuit to the global parser only,
+     *  preserving the existing single-eta behaviour with zero overhead. */
+    bool m_has_per_species_eta = false;
 
     /** Plasma hyper-resisitivity */
     std::string m_eta_h_expression = "0.0";
@@ -265,6 +545,14 @@ public:
     amrex::GpuArray<int, 3> Ey_IndexType;
     /** Gpu Vector with index type of the Ez multifab */
     amrex::GpuArray<int, 3> Ez_IndexType;
+
+    /** QDSMC fictitious-particle container used to transport the electron
+     *  entropy K_e by V_e over one PIC step. Lazily constructed in InitData
+     *  when m_solve_electron_energy_equation is true; otherwise nullptr.
+     *  Owned by HybridPICModel
+     *  because its lifetime is tied to the electron-energy equation that
+     *  the hybrid model is responsible for. */
+    std::unique_ptr<QdsmcParticleContainer> m_qdsmc_pc;
 };
 
 /**

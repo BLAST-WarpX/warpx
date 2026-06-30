@@ -60,6 +60,18 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
+    // Electron-pressure update. When solve_electron_energy_equation is on,
+    // run the QDSMC entropy-transport step (which also emits Pe = n_e k_B T_e
+    // at the end). Otherwise the legacy algebraic adiabatic closure is run
+    // below (at ~L213) -- Pe is recomputed each step from rho with no
+    // temperature evolution.
+    //
+    // QDSMC needs rho_fp = rho^{n+1} and hybrid_rho_fp_temp = rho^{n}, which
+    // the deposit just above has established.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->AdvanceElectronEnergyQDSMC(dt[0]);
+    }
+
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
 
@@ -160,8 +172,12 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
-    // Calculate the electron pressure at t=n+1
-    m_hybrid_pic_model->CalculateElectronPressure();
+    // Calculate the electron pressure at t=n+1. When QDSMC is enabled, Pe was
+    // already emitted earlier in this function by AdvanceElectronEnergyQDSMC,
+    // so the legacy algebraic adiabatic closure must NOT overwrite it here.
+    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    }
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculatePlasmaCurrent(
@@ -174,6 +190,11 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
         m_eb_update_E, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+
+    // Update Ve_fp and per-species Vs_fp at t=n+1 for the next step's
+    // particle-level drag operator.
+    m_hybrid_pic_model->CalculateElectronFluidVelocity();
+    m_hybrid_pic_model->CalculateIonFluidVelocity();
 
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
@@ -228,8 +249,42 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Perform charge deposition in component 0 of rho_fp at current time.
     mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
-    // Perform current deposition at t_{n-1/2}.
-    mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), dt[0], -0.5_rt * dt[0]);
+
+    // Per-species current deposition at t_{n-1/2}: each charged species
+    // deposits into its own MultiFab and the totals are accumulated into
+    // current_fp. The per-species fields are kept on the grid for downstream
+    // coupling (e.g. resistive-drag collision operator).
+    auto current_fp = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
+    for (auto const & J_lev : current_fp) {
+        for (int idim = 0; idim < 3; ++idim) { J_lev[idim]->setVal(0._rt); }
+    }
+    for (auto const & spec : mypc->GetSpeciesNames()) {
+        auto & pc = mypc->GetParticleContainerFromName(spec);
+        if (pc.getCharge() == 0._prt) { continue; }
+        auto J_spec = m_fields.get_mr_levels_alldirs("current_fp_" + spec, finest_level);
+        for (auto const & J_lev : J_spec) {
+            for (int idim = 0; idim < 3; ++idim) { J_lev[idim]->setVal(0._rt); }
+        }
+        pc.DepositCurrent(J_spec, dt[0], -0.5_rt * dt[0]);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            for (int idim = 0; idim < 3; ++idim) {
+                MultiFab::Add(*current_fp[lev][idim], *J_spec[lev][idim],
+                              0, 0, 1, current_fp[lev][idim]->nGrowVect());
+            }
+        }
+        // Per-species charge density (used to recover the species bulk
+        // velocity Vs = Js/rhos in CalculateIonFluidVelocity).
+        pc.DepositCharge(m_fields.get_mr_levels("rho_fp_" + spec, finest_level),
+                         /*local*/false, /*reset*/true,
+                         /*apply_boundary_and_scale_volume*/false,
+                         /*interpolate_across_levels*/false);
+    }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyInverseVolumeScalingToCurrentDensity(
+            current_fp[lev][0], current_fp[lev][1], current_fp[lev][2], lev);
+    }
+#endif
 
     // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
     // Perform Temperature Deposition at time t_{n}
@@ -288,6 +343,14 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // This is not a restart, so the rho_fp and current_fp multifabs are
         // still empty.
         HybridPICDepositRhoAndJ();
+
+        // Seed the electron pressure from the adiabatic closure using the
+        // freshly deposited rho. When solve_electron_energy_equation is off,
+        // this is also recomputed every step inside HybridPICEvolveFields
+        // and is harmless. When on, this provides Pe^0 for the first QDSMC
+        // step (which will overwrite it via QDSMCFillElectronPressureFromTe
+        // after the first entropy transport).
+        m_hybrid_pic_model->CalculateElectronPressure();
 
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {

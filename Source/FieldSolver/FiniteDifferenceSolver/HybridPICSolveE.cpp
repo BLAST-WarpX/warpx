@@ -4,6 +4,7 @@
  *
  * Authors: Roelof Groenewald (TAE Technologies)
  *          S. Eric Clark (Helion Energy)
+ *          Prabhat Kumar (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -591,6 +592,24 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
+    // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
+    // Only computed and added when at least one species has a per-species
+    // resistivity parser registered. Otherwise the overlay is identically zero,
+    // so the compute and the per-cell add are skipped (E += 0 is a no-op) --
+    // bit-identical to the single-eta path, but avoids the per-substep field
+    // zeroing and the overlay read in the hot E-solve.
+    const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
+    MultiFab eta_overlay_r_mf(Jfield[0]->boxArray(), Jfield[0]->DistributionMap(),
+                              1, Jfield[0]->nGrowVect());
+    MultiFab eta_overlay_t_mf(Jfield[1]->boxArray(), Jfield[1]->DistributionMap(),
+                              1, Jfield[1]->nGrowVect());
+    MultiFab eta_overlay_z_mf(Jfield[2]->boxArray(), Jfield[2]->DistributionMap(),
+                              1, Jfield[2]->nGrowVect());
+    if (has_eta_overlay) {
+        hybrid_model->ComputeResistiveOverlay(
+            lev, eta_overlay_r_mf, eta_overlay_t_mf, eta_overlay_z_mf);
+    }
+
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
 #ifdef AMREX_USE_OMP
@@ -693,6 +712,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        Array4<Real const> const& eta_overlay_r = eta_overlay_r_mf.const_array(mfi);
+        Array4<Real const> const& eta_overlay_t = eta_overlay_t_mf.const_array(mfi);
+        Array4<Real const> const& eta_overlay_z = eta_overlay_z_mf.const_array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -766,6 +788,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
+                    // Per-species resistive overlay (Phys. Plasmas 31, 012902 (2024)); zero
+                    // when no per-species eta is registered.
+                    if (has_eta_overlay) { Er(i, j, 0) += eta_overlay_r(i, j, 0); }
 
                     if (include_hyper_resistivity_term) {
 
@@ -837,6 +862,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
+                    if (has_eta_overlay) { Etheta(i, j, 0) += eta_overlay_t(i, j, 0); }
 
                     if (include_hyper_resistivity_term) {
 
@@ -905,6 +931,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
+                    if (has_eta_overlay) { Ez(i, j, 0) += eta_overlay_z(i, j, 0); }
 
                     if (include_hyper_resistivity_term) {
 
@@ -1035,6 +1062,22 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
+    // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
+    // See HybridPICSolveECylindrical (RZ branch) for the design notes; when no
+    // per-species parser is registered the overlay is identically zero, so the
+    // compute and per-cell add are skipped (bit-identical single-eta path).
+    const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
+    MultiFab eta_overlay_x_mf(Jfield[0]->boxArray(), Jfield[0]->DistributionMap(),
+                              1, Jfield[0]->nGrowVect());
+    MultiFab eta_overlay_y_mf(Jfield[1]->boxArray(), Jfield[1]->DistributionMap(),
+                              1, Jfield[1]->nGrowVect());
+    MultiFab eta_overlay_z_mf(Jfield[2]->boxArray(), Jfield[2]->DistributionMap(),
+                              1, Jfield[2]->nGrowVect());
+    if (has_eta_overlay) {
+        hybrid_model->ComputeResistiveOverlay(
+            lev, eta_overlay_x_mf, eta_overlay_y_mf, eta_overlay_z_mf);
+    }
+
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
 #ifdef AMREX_USE_OMP
@@ -1137,6 +1180,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Bx = Bfield[0]->array(mfi);
         Array4<Real> const& By = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        Array4<Real const> const& eta_overlay_x = eta_overlay_x_mf.const_array(mfi);
+        Array4<Real const> const& eta_overlay_y = eta_overlay_y_mf.const_array(mfi);
+        Array4<Real const> const& eta_overlay_z = eta_overlay_z_mf.const_array(mfi);
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -1206,6 +1252,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
+                if (has_eta_overlay) { Ex(i, j, k) += eta_overlay_x(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
 
@@ -1270,6 +1317,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
+                if (has_eta_overlay) { Ey(i, j, k) += eta_overlay_y(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
 
@@ -1334,6 +1382,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
+                if (has_eta_overlay) { Ez(i, j, k) += eta_overlay_z(i, j, k); }
 
                 if (include_hyper_resistivity_term) {
 
