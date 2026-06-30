@@ -120,6 +120,18 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         m_WarpX->GetPartContainer().DepositCharge(
             m_WarpX->m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, m_num_amr_levels - 1),
             0._rt);
+        // DepositCharge does NOT sync boundaries; fold guard-cell deposits into
+        // the valid (incl. periodic) nodes, else n_e is biased at the domain
+        // edges and QDSMC T_e shows a systematic dip there.
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            amrex::MultiFab* rt = m_WarpX->m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
+            ablastr::utils::communication::SumBoundary(
+                *rt, 0, rt->nComp(), rt->nGrowVect(), rt->nGrowVect(),
+                WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
+            ablastr::utils::communication::FillBoundary(
+                *rt, rt->nGrowVect(), WarpX::do_single_precision_comms,
+                m_WarpX->Geom(lev).periodicity(), true);
+        }
     }
 
     // Save E^n (or E_T^n if Darwin split)
@@ -177,6 +189,17 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         m_WarpX->GetPartContainer().DepositCharge(
             m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1),
             0._rt);
+        // Sync rho^{n+1} (DepositCharge does not): fold guard-cell deposits into
+        // the valid (incl. periodic) nodes so n_e is unbiased at the boundaries.
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            amrex::MultiFab* rf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+            ablastr::utils::communication::SumBoundary(
+                *rf, 0, rf->nComp(), rf->nGrowVect(), rf->nGrowVect(),
+                WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
+            ablastr::utils::communication::FillBoundary(
+                *rf, rf->nGrowVect(), WarpX::do_single_precision_comms,
+                m_WarpX->Geom(lev).periodicity(), true);
+        }
         // Provide J_i (ion current) in hybrid_current_fp_temp, which
         // QDSMCInitializeUe needs for V_e = -(J_plasma - J_i)/(q_e n_e).
         // current_fp holds the ion current from the converged solve. Without
