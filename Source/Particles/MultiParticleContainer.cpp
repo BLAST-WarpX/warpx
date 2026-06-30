@@ -910,18 +910,6 @@ MultiParticleContainer::RedistributeLocal (const int max_cells_travelled)
     }
 }
 
-bool
-MultiParticleContainer::has_virtual_photons_beam_size_effect () const
-{
-#ifdef WARPX_QED
-    // The per-species accessor only exists when QED is compiled in.
-    return std::any_of(allcontainers.begin(), allcontainers.end(),
-        [](const auto& pc){ return pc->has_virtual_photons_beam_size_effect(); });
-#else
-    return false;
-#endif
-}
-
 void
 MultiParticleContainer::ApplyBoundaryConditions ()
 {

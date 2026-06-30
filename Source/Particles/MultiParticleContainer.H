@@ -260,11 +260,6 @@ public:
 
     void RedistributeLocal (int max_cells_travelled);
 
-    /** \brief Returns true if any species creates QED virtual photons with the
-     * beam-size effect enabled. In that case particles can be created far from
-     * their parent, so a local redistribute cannot be used. */
-    [[nodiscard]] bool has_virtual_photons_beam_size_effect () const;
-
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */
     void ApplyBoundaryConditions ();

@@ -733,9 +733,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     // Without mesh refinement, use local redistribute when the number of cells
     // a particle can travel per step is small: particles cannot travel faster
     // than c, so c * dt / min(dx) is a physical upper bound.
-    // The QED beam-size effect is excluded because it can create virtual photons
-    // far from their parent particle, which breaks the locality assumption.
-    if (finest_level == 0 && !mypc->has_virtual_photons_beam_size_effect()) {
+    if (finest_level == 0) {
         // Estimate the maximum number of cells a particle may have travelled.
         // Start from the moving-window grid shift, then take the max with a
         // speed-of-light upper bound: c * dt / min(dx).
