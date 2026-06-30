@@ -22,7 +22,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
         amrex::Vector<std::string> scattering_processes;
         pp_collision_name.queryarr("scattering_processes", scattering_processes);
         const bool reaction_produces_new_species = std::any_of(scattering_processes.begin(), scattering_processes.end(), [](const std::string& process) {
-            return process == "ionization" || process == "charge_exchange" || process == "two_product_reaction";
+            return process == "ionization" || process == "charge_exchange" || process == "two_product_reaction" || process == "dissociation";
         });
 
         if (reaction_produces_new_species) {
@@ -55,6 +55,23 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
                 // get the reaction energy, assuming zero energy for charge exchange
                 pp_collision_name.query("two_product_reaction_energy", m_reaction_energy);
+            }
+
+            // For dissociation (e.g. e- + H2 -> e- + H + H):
+            if (std::find(scattering_processes.begin(), scattering_processes.end(), "dissociation") != scattering_processes.end()) {
+                m_num_product_species = 4;
+                m_num_products_host.push_back(1); // slot 0: incident (non-target) species, e.g. the electron; survives the collision
+                m_num_products_host.push_back(0); // slot 1: target species (the molecule); consumed by the reaction
+                m_num_products_host.push_back(1); // slot 2: first neutral fragment
+                m_num_products_host.push_back(1); // slot 3: second neutral fragment
+
+                // Energy (eV) the incident particle loses to break up the molecule (the impact
+                // threshold, e.g. ~8.5 eV for the H2 b3Sigma_u+ channel). The cross-section must
+                // be 0 at this energy (enforced in ScatteringProcess::init).
+                pp_collision_name.get("dissociation_energy", m_reaction_energy);
+                // Optional Franck-Condon kinetic-energy release (eV) shared back-to-back by the two
+                // fragments (e.g. ~4 eV = threshold - bond energy for H2). Defaults to 0.
+                pp_collision_name.query("dissociation_fragment_energy", m_fragment_energy);
             }
 
         } else {

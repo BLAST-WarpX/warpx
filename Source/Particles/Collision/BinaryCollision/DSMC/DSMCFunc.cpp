@@ -45,6 +45,7 @@ DSMCFunc::DSMCFunc (
         amrex::ParticleReal energy = 0._prt;
         if (scattering_process.find("excitation") != std::string::npos ||
             scattering_process.find("ionization") != std::string::npos ||
+            scattering_process.find("dissociation") != std::string::npos ||
             scattering_process.find("forward") != std::string::npos ||
             scattering_process.find("two_product_reaction") != std::string::npos ) {
             const std::string kw_energy = scattering_process + "_energy";
@@ -61,9 +62,10 @@ DSMCFunc::DSMCFunc (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
-        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::TWOPRODUCT_REACTION) {
-            // Only one ionization process is currently supported as part of a given
-            // collision set.
+        if (process.type() == ScatteringProcessType::IONIZATION || process.type() == ScatteringProcessType::TWOPRODUCT_REACTION
+            || process.type() == ScatteringProcessType::DISSOCIATION) {
+            // Only one reaction that produces new species is currently supported as part of a
+            // given collision set.
             if (reaction_produces_new_species) {
                 amrex::Abort("Multiple reactions that produce new species were specified in " + collision_name +
                 ".scattering_processes, but DSMC only supports a single reaction that produces new species.");

@@ -145,7 +145,8 @@ public:
                 return ((mask[i] > 0) &&
                         (mask[i] != int(ScatteringProcessType::IONIZATION)) &&
                         (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) &&
-                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
+                        (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)) &&
+                        (mask[i] != int(ScatteringProcessType::DISSOCIATION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -171,7 +172,8 @@ public:
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
                         (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION)) |
-                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE))) ? 1 : 0;
+                        (mask[i] == int(ScatteringProcessType::CHARGE_EXCHANGE)) |
+                        (mask[i] == int(ScatteringProcessType::DISSOCIATION))) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -227,6 +229,7 @@ public:
 
         const int num_product_species = m_num_product_species;
         const auto reaction_energy = m_reaction_energy;
+        const auto fragment_energy = m_fragment_energy;
 
         // Grab the masses of the true product species (slots 2 and 3)
         amrex::ParticleReal mass_slot2 = 0;
@@ -240,7 +243,7 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) && (mask[i] != int(ScatteringProcessType::IONIZATION)) && (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) && (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)))
+            if ((mask[i] > 0) && (mask[i] != int(ScatteringProcessType::IONIZATION)) && (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)) && (mask[i] != int(ScatteringProcessType::CHARGE_EXCHANGE)) && (mask[i] != int(ScatteringProcessType::DISSOCIATION)))
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
@@ -580,6 +583,119 @@ public:
                 uy0 = ux0buf_new*std::sin(-theta) + uy0*std::cos(-theta);
 #endif
             }
+            else if (mask[i] == int(ScatteringProcessType::DISSOCIATION))
+            {
+                // Dissociation of a molecule by impact of a (lighter) incident particle,
+                // e.g. e- + H2 -> e- + H + H. The incident species (slot 0) survives the
+                // collision, the target molecule (slot 1) is consumed, and two neutral
+                // fragments are created (slots 2 and 3). The incident particle loses
+                // `reaction_energy` (the impact-dissociation threshold); the two fragments
+                // additionally share `fragment_energy` (the Franck-Condon kinetic-energy
+                // release) back-to-back. Because no charge is created, this reaction cannot
+                // drive a charge-multiplication / field runaway.
+
+                // Surviving incident particle (slot 0): placed after the non-product copies,
+                // exactly as for ionization.
+                const auto slot0_idx = products_np_data[0] + no_product_total + with_product_offsets_data[i];
+                copy_species0[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_0[i]),
+                               static_cast<int>(slot0_idx), engine);
+                soa_products_data[0].m_rdata[PIdx::w][slot0_idx] = p_pair_reaction_weight[i];
+
+                // Two fragments (slots 2 and 3), both copied from the target molecule (slot 1).
+                const auto slot2_idx = products_np_data[2] + with_product_offsets_data[i];
+                copy_species1[2](soa_products_data[2], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                                static_cast<int>(slot2_idx), engine);
+                soa_products_data[2].m_rdata[PIdx::w][slot2_idx] = p_pair_reaction_weight[i];
+
+                const auto slot3_idx = products_np_data[3] + with_product_offsets_data[i];
+                copy_species1[3](soa_products_data[3], soa_1, static_cast<int>(p_pair_indices_1[i]),
+                                static_cast<int>(slot3_idx), engine);
+                soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
+
+                auto& ux0 = soa_products_data[0].m_rdata[PIdx::ux][slot0_idx];
+                auto& uy0 = soa_products_data[0].m_rdata[PIdx::uy][slot0_idx];
+                auto& uz0 = soa_products_data[0].m_rdata[PIdx::uz][slot0_idx];
+                auto& ux2 = soa_products_data[2].m_rdata[PIdx::ux][slot2_idx];
+                auto& uy2 = soa_products_data[2].m_rdata[PIdx::uy][slot2_idx];
+                auto& uz2 = soa_products_data[2].m_rdata[PIdx::uz][slot2_idx];
+                auto& ux3 = soa_products_data[3].m_rdata[PIdx::ux][slot3_idx];
+                auto& uy3 = soa_products_data[3].m_rdata[PIdx::uy][slot3_idx];
+                auto& uz3 = soa_products_data[3].m_rdata[PIdx::uz][slot3_idx];
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                /* See the equivalent block in the ionization branch: rotate the incident
+                 * particle's transverse momentum into the (cylindrical) frame of the target. */
+                amrex::ParticleReal const theta = (
+                    soa_products_data[2].m_rdata[PIdx::theta][slot2_idx]
+                    - soa_products_data[0].m_rdata[PIdx::theta][slot0_idx]
+                );
+                amrex::ParticleReal const ux0buf = ux0;
+                ux0 = ux0buf*std::cos(theta) - uy0*std::sin(theta);
+                uy0 = ux0buf*std::sin(theta) + uy0*std::cos(theta);
+#endif
+
+                // The two fragments currently both carry the target molecule's velocity.
+                const amrex::ParticleReal vmolx = ux2;
+                const amrex::ParticleReal vmoly = uy2;
+                const amrex::ParticleReal vmolz = uz2;
+
+                // Non-relativistic center-of-momentum velocity of incident (m0) + molecule (m1).
+                auto const uCOM_x = (m0 * ux0 + m1 * vmolx) / (m0 + m1);
+                auto const uCOM_y = (m0 * uy0 + m1 * vmoly) / (m0 + m1);
+                auto const uCOM_z = (m0 * uz0 + m1 * vmolz) / (m0 + m1);
+
+                // Incident particle momentum in the COM frame, and the collision energy.
+                ux0 -= uCOM_x;
+                uy0 -= uCOM_y;
+                uz0 -= uCOM_z;
+                const amrex::ParticleReal p_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
+                const amrex::ParticleReal E_coll = 0.5_prt * p_in * p_in * (1.0_prt/m0 + 1.0_prt/m1);
+                // Energy left for the incident + molecule-COM relative motion after paying the
+                // dissociation threshold (converted from eV to J). Clamped for numerical safety;
+                // the cross-section is 0 below threshold so this is >= 0 whenever this branch runs.
+                const amrex::ParticleReal E_out = amrex::max(0._prt, E_coll - reaction_energy * PhysConst::q_e);
+
+                // Step A: incident particle and the molecule's center of mass recoil back-to-back
+                // and isotropically in the COM frame, sharing E_out (collinear-momentum model).
+                const amrex::ParticleReal m_frag_tot = mass_slot2 + mass_slot3; // = m1 by mass conservation
+                const amrex::ParticleReal p_A = std::sqrt( 2.0_prt * E_out / (1.0_prt/m0 + 1.0_prt/m_frag_tot) );
+                amrex::ParticleReal na_x, na_y, na_z;
+                ParticleUtils::getRandomVector(na_x, na_y, na_z, engine);
+                ux0 = (p_A/m0) * na_x;
+                uy0 = (p_A/m0) * na_y;
+                uz0 = (p_A/m0) * na_z;
+                // Molecule center-of-mass velocity in the COM frame (momentum balance).
+                const amrex::ParticleReal vmcom_x = -(p_A/m_frag_tot) * na_x;
+                const amrex::ParticleReal vmcom_y = -(p_A/m_frag_tot) * na_y;
+                const amrex::ParticleReal vmcom_z = -(p_A/m_frag_tot) * na_z;
+
+                // Step B: the molecule splits into two fragments that recoil back-to-back and
+                // isotropically about the molecule's center of mass, with relative kinetic
+                // energy `fragment_energy` (two-body kinematics, valid for unequal masses).
+                const amrex::ParticleReal E_frag = fragment_energy * PhysConst::q_e;
+                const amrex::ParticleReal m_red  = mass_slot2 * mass_slot3 / m_frag_tot;
+                const amrex::ParticleReal v_rel  = std::sqrt( 2.0_prt * E_frag / m_red );
+                amrex::ParticleReal nb_x, nb_y, nb_z;
+                ParticleUtils::getRandomVector(nb_x, nb_y, nb_z, engine);
+                ux2 = vmcom_x + (mass_slot3/m_frag_tot) * v_rel * nb_x;
+                uy2 = vmcom_y + (mass_slot3/m_frag_tot) * v_rel * nb_y;
+                uz2 = vmcom_z + (mass_slot3/m_frag_tot) * v_rel * nb_z;
+                ux3 = vmcom_x - (mass_slot2/m_frag_tot) * v_rel * nb_x;
+                uy3 = vmcom_y - (mass_slot2/m_frag_tot) * v_rel * nb_y;
+                uz3 = vmcom_z - (mass_slot2/m_frag_tot) * v_rel * nb_z;
+
+                // Transform all products back to the lab frame.
+                ux0 += uCOM_x; uy0 += uCOM_y; uz0 += uCOM_z;
+                ux2 += uCOM_x; uy2 += uCOM_y; uz2 += uCOM_z;
+                ux3 += uCOM_x; uy3 += uCOM_y; uz3 += uCOM_z;
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                /* Undo the earlier velocity rotation for the surviving incident particle. */
+                amrex::ParticleReal const ux0buf2 = ux0;
+                ux0 = ux0buf2*std::cos(-theta) - uy0*std::sin(-theta);
+                uy0 = ux0buf2*std::sin(-theta) + uy0*std::cos(-theta);
+#endif
+            }
         });
 
         // Initialize the user runtime components
@@ -598,8 +714,10 @@ public:
 private:
     // How many different type of species the collision produces
     int m_num_product_species;
-    // If ionization collisions are included, what is the energy cost
+    // If ionization or dissociation collisions are included, what is the energy cost
     amrex::ParticleReal m_reaction_energy = 0.0;
+    // For dissociation: kinetic energy (in eV) released to the fragments (Franck-Condon energy).
+    amrex::ParticleReal m_fragment_energy = 0.0;
     // Vector of size m_num_product_species: for each product slot, the number of new particles
     // created per *reaction* event (ionization, two-product reaction, charge exchange).
     // Weight-split particles added to slots 0 and 1 during non-reaction events are NOT counted
