@@ -98,13 +98,12 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
     m_dt = a_dt;
 
     // Setup variables to handle substepping in case it is needed
-    int nsubsteps = 1;
     int isubstep = 0;
     int const max_substeps = 8;
     amrex::Real substep_start_time = start_time;
     int exit_status;
 
-    while (isubstep < nsubsteps) {
+    while (isubstep < m_nsubsteps) {
 
         // Save up and xp at the start of the time step
         // Copy x to x_n etc
@@ -127,17 +126,21 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
 
             exit_status = m_nlsolver->GetExitStatus();
             if (exit_status < 0) {
-                nsubsteps *= 2;
+                m_nsubsteps *= 2;
                 ablastr::warn_manager::WMRecordWarning("ThetaImplicitEM",
-                    "Notice: solver diverged at step " + std::to_string(a_step) + ". " +
-                    "Attempting subcycling with " + std::to_string(nsubsteps) + " substeps.",
+                    "Notice: solver failed at step " + std::to_string(a_step) + ". " +
+                    "Attempting subcycling step " + std::to_string(isubstep) +
+                    " of " + std::to_string(m_nsubsteps) +
+                    " substeps, with exit status " + std::to_string(exit_status) + ".",
                     ablastr::warn_manager::WarnPriority::low);
-                if (nsubsteps > max_substeps) {
+                if (m_nsubsteps > max_substeps) {
                     // Give up and just return the bad exit status
+                    m_nsubsteps = 1;
                     return exit_status;
                 }
                 // FieldType::E_old still holds E at n-1, m_Eold E at n
-                m_E.linComb(1.0_rt - m_theta, FieldType::E_old, FieldType::None, m_theta, m_Eold);
+                m_E.linComb(1.0_rt - m_theta, FieldType::E_old, FieldType::None, m_theta, m_Eold, true);
+                m_WarpX->ResetImplicitParticleData();
                 m_dt /= 2._rt;
                 isubstep *= 2;
             } else {
@@ -162,7 +165,12 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
 
         substep_start_time = new_time;
 
+        m_WarpX->HandleParticlesAtBoundaries(-1, new_time, 0);
+
     }
+
+    // Reset for next time step
+    m_nsubsteps = 1;
 
     return exit_status;
 }
