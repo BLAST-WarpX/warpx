@@ -991,7 +991,21 @@ WarpX::AddExternalFields (int const lev)
 
 void
 WarpX::InitDiagnostics () {
-    multi_diags->InitData(*mypc);
+
+    // Parameters used to initialize diagnostics
+    auto init_diag_params =
+        InitDiagnosticsParameters{finestLevel(), maxLevel(), std::nullopt};
+    if (do_moving_window){
+        init_diag_params.moving_window =
+            InitDiagnosticsMovingWindowParameters{
+                moving_window_dir, moving_window_x,
+                Geom(0).CellSize(moving_window_dir),
+                Geom(0).ProbLo(moving_window_dir)};
+    }
+
+    auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
+
+    multi_diags->InitData(init_diag_params, *mypc, p_warpx_mesh);
     reduced_diags->InitData();
 }
 

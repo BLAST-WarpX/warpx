@@ -236,13 +236,26 @@ WarpX::InitFromCheckpoint ()
         is >> time_of_last_gal_shift;
         ablastr::utils::text::goto_next_line(is);
 
+        // Parameters used to initialize diagnostics
+        auto init_diag_params =
+            InitDiagnosticsParameters{finestLevel(), maxLevel(), std::nullopt};
+        if (do_moving_window){
+            init_diag_params.moving_window =
+                InitDiagnosticsMovingWindowParameters{
+                    moving_window_dir, moving_window_x,
+                    Geom(0).CellSize(moving_window_dir),
+                    Geom(0).ProbLo(moving_window_dir)};
+        }
+
+        auto* p_warpx_mesh = dynamic_cast<amrex::AmrMesh*>(this);
+
         for (int idiag = 0; idiag < multi_diags->GetTotalDiags(); ++idiag)
         {
             if( multi_diags->diagstypes(idiag) == DiagTypes::BackTransformed )
             {
                 auto& diag = multi_diags->GetDiag(idiag);
                 if (diag.getnumbuffers() > 0) {
-                    diag.InitDataBeforeRestart();
+                    diag.InitDataBeforeRestart(init_diag_params, p_warpx_mesh);
                     for (int i_buffer=0; i_buffer<diag.getnumbuffers(); ++i_buffer){
                         amrex::Real tlab;
                         is >> tlab;
@@ -277,10 +290,10 @@ WarpX::InitFromCheckpoint ()
                     }
                     diag.InitDataAfterRestart(*mypc);
                 } else {
-                    diag.InitData(*mypc);
+                    diag.InitData(init_diag_params, *mypc, p_warpx_mesh);
                 }
             } else {
-                multi_diags->GetDiag(idiag).InitData(*mypc);
+                multi_diags->GetDiag(idiag).InitData(init_diag_params, *mypc, p_warpx_mesh);
             }
         }
     }

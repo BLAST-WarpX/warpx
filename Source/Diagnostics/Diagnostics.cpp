@@ -347,10 +347,10 @@ Diagnostics::BaseReadParameters ()
 
 
 void
-Diagnostics::InitDataBeforeRestart ()
+Diagnostics::InitDataBeforeRestart (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh)
 {
     // initialize member variables and arrays in base class::Diagnostics
-    InitBaseData();
+    InitBaseData(params, p_warpx_mesh);
     // initialize member variables and arrays specific to each derived class
     // (FullDiagnostics, BTDiagnostics, etc.)
     DerivedInitData();
@@ -426,15 +426,13 @@ Diagnostics::InitDataAfterRestart (const MultiParticleContainer& mpc)
 
 
 void
-Diagnostics::InitData (const MultiParticleContainer& mpc)
+Diagnostics::InitData (
+    const InitDiagnosticsParameters& params,
+    const MultiParticleContainer& mpc,
+    amrex::AmrMesh* p_warpx_mesh)
 {
-    auto& warpx = WarpX::GetInstance();
-
-    // Get current finest level available
-    const int finest_level = warpx.finestLevel();
-
     // initialize member variables and arrays in base class::Diagnostics
-    InitBaseData();
+    InitBaseData(params, p_warpx_mesh);
     // initialize member variables and arrays specific to each derived class
     // (FullDiagnostics, BTDiagnostics, etc.)
     DerivedInitData();
@@ -443,7 +441,7 @@ Diagnostics::InitData (const MultiParticleContainer& mpc)
         // This includes full diagnostics and BTD as well as cell-center functors for BTD.
         // Note that the cell-centered data for BTD is computed for all levels and hence
         // the corresponding functor is also initialized for all the levels
-        for (int lev = 0; lev <= finest_level; ++lev) {
+        for (int lev = 0; lev <= params.finest_level; ++lev) {
             // allocate and initialize m_all_field_functors depending on diag type
             InitializeFieldFunctors(lev);
         }
@@ -506,27 +504,28 @@ Diagnostics::InitData (const MultiParticleContainer& mpc)
 
 
 void
-Diagnostics::InitBaseData ()
+Diagnostics::InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unused]] amrex::AmrMesh* p_warpx_mesh)
 {
-    auto & warpx = WarpX::GetInstance();
     // Number of levels in the simulation at the current timestep
-    nlev = warpx.finestLevel() + 1;
+    nlev = params.finest_level.value() + 1;
     // default number of levels to be output = nlev
     nlev_output = nlev;
     // Maximum number of levels that will be allocated in the simulation
-    nmax_lev = warpx.maxLevel() + 1;
+    nmax_lev = params.max_level.value() + 1;
     m_all_field_functors.resize( nmax_lev );
 
     // For restart, move the m_lo and m_hi of the diag consistent with the
     // current moving_window location
-    if (WarpX::do_moving_window) {
-        const int moving_dir = WarpX::moving_window_dir;
+    if (params.moving_window) {
+        const auto mw_params = params.moving_window.value();
+        const int moving_dir = mw_params.dir.value();
         const amrex::Real displacement =
-            warpx.getmoving_window_x() - warpx.Geom(0).ProbLo(moving_dir);
-        const int shift_num_base = static_cast<int>
-            (displacement / warpx.Geom(0).CellSize(moving_dir));
-        m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-        m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
+            mw_params.x.value() - mw_params.prob_lo_lev0.value();
+        const amrex::Real cell_size_lev0_mwdir = mw_params.cell_size_lev0.value();
+        const int shift_num_base =
+            static_cast<int>(displacement / cell_size_lev0_mwdir);
+        m_lo[moving_dir] += shift_num_base * cell_size_lev0_mwdir;
+        m_hi[moving_dir] += shift_num_base * cell_size_lev0_mwdir;
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){
@@ -540,9 +539,7 @@ Diagnostics::InitBaseData ()
         m_flush_format = std::make_unique<FlushFormatCatalyst>();
     } else if (m_format == "sensei") {
 #ifdef AMREX_USE_SENSEI_INSITU
-        m_flush_format = std::make_unique<FlushFormatSensei>(
-            dynamic_cast<amrex::AmrMesh*>(const_cast<WarpX*>(&warpx)),
-            m_diag_name);
+        m_flush_format = std::make_unique<FlushFormatSensei>(p_warpx_mesh, m_diag_name);
 #else
         WARPX_ABORT_WITH_MESSAGE(
             "To use SENSEI in situ, compile with USE_SENSEI=TRUE");
