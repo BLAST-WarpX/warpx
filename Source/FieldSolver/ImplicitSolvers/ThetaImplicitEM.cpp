@@ -356,11 +356,11 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     val0 = 1.0_rt;
                     val1 = 2.0_rt;
                 }
-                if (bc_type == FieldBoundaryType::Absorbing_SilverMueller) {
+                if (bc_type == FieldBoundaryType::Absorbing_Silver_Mueller) {
                     val0 = 0.5_rt;
                     val1 = 1.0_rt;
                 }
-                if (bc_type == FieldBoundaryType::PECInsulator) {
+                if (bc_type == FieldBoundaryType::PEC_Insulator) {
                     const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                     if (voltage_driven) { // Dirichlet boundary for E
                         val0 = 0.0_rt;
@@ -380,7 +380,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 #endif
 
                 // Need to overwrite BC masks for certain BCs in this geometry
-                if (bc_type == FieldBoundaryType::PECInsulator &&
+                if (bc_type == FieldBoundaryType::PEC_Insulator &&
                    !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                     const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
                                                                    : static_cast<amrex::Real>(domain_hi[bdry_dir]));
@@ -484,7 +484,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         val1 = 2.0_rt;
                         val2 = 2.0_rt;
                     }
-                    if (bc_type == FieldBoundaryType::PECInsulator) {
+                    if (bc_type == FieldBoundaryType::PEC_Insulator) {
                         const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                         if (voltage_driven) { // Dirichlet boundary for E
                             val0 = 0.0_rt;
@@ -501,7 +501,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 #if defined(WARPX_DIM_RZ)
                     // Need to overwrite BC masks for certain BCs in this geometry
                     if (bdry_dir == 0) {
-                        if (bc_type == FieldBoundaryType::PECInsulator &&
+                        if (bc_type == FieldBoundaryType::PEC_Insulator &&
                            !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                             const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
                                                                            : static_cast<amrex::Real>(domain_hi[bdry_dir]));
