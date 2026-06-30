@@ -168,9 +168,30 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // when m_solve_electron_energy_equation is true), so Pe is lagged one step --
     // the standard operator split for the kinetic electron-energy closure.
     if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        // FinishImplicitParticleUpdate moved particles to t^{n+1} but did not
+        // Redistribute them into their valid cells. QDSMCApplyIonHeating does a
+        // per-ion NGP lookup into a zero-guard coefficient MultiFab, so ions left
+        // in guard cells would read out of bounds. Redistribute first, matching
+        // the explicit path's precondition (it redistributes before the QDSMC step).
+        m_WarpX->GetPartContainer().Redistribute();
         m_WarpX->GetPartContainer().DepositCharge(
             m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1),
             0._rt);
+        // Provide J_i (ion current) in hybrid_current_fp_temp, which
+        // QDSMCInitializeUe needs for V_e = -(J_plasma - J_i)/(q_e n_e).
+        // current_fp holds the ion current from the converged solve. Without
+        // this, J_i = 0 makes V_e the full plasma drift (far too large) and the
+        // QDSMC entropy carriers overshoot the grid (out-of-bounds deposit).
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            ablastr::fields::VectorField Ji_src =
+                m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
+            ablastr::fields::VectorField Ji_dst =
+                m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
+            for (int n = 0; n < 3; ++n) {
+                amrex::MultiFab::Copy(*Ji_dst[n], *Ji_src[n], 0, 0,
+                                      Ji_dst[n]->nComp(), Ji_dst[n]->nGrowVect());
+            }
+        }
         m_hybrid_pic_model->AdvanceElectronEnergyQDSMC( m_dt );
     }
 
