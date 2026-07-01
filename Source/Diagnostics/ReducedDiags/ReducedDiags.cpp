@@ -33,12 +33,12 @@ m_rd_name{rd_name}
     const ParmParse pp_rd_name(m_rd_name);
 
     // read path
-    pp_rd.query("path", m_path);
-    pp_rd_name.query("path", m_path);
+    utils::parser::queryWithParser(pp_rd, "path", m_path);
+    utils::parser::queryWithParser(pp_rd_name, "path", m_path);
 
     // read extension
-    pp_rd.query("extension", m_extension);
-    pp_rd_name.query("extension", m_extension);
+    utils::parser::queryWithParser(pp_rd, "extension", m_extension);
+    utils::parser::queryWithParser(pp_rd_name, "extension", m_extension);
 
     // check if it is a restart run
     std::string restart_chkfile;

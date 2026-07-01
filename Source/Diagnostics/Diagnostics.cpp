@@ -52,7 +52,7 @@ Diagnostics::BaseReadParameters ()
 
     const amrex::ParmParse pp_diag_name(m_diag_name);
     m_file_prefix = "diags/" + m_diag_name;
-    pp_diag_name.query("file_prefix", m_file_prefix);
+    utils::parser::queryWithParser(pp_diag_name, "file_prefix", m_file_prefix);
     utils::parser::queryWithParser(
         pp_diag_name, "file_min_digits", m_file_min_digits);
     pp_diag_name.query("format", m_format);

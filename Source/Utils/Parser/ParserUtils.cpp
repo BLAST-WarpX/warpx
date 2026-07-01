@@ -18,6 +18,33 @@
 #include <map>
 #include <set>
 
+void utils::parser::getWithParser (const amrex::ParmParse& a_pp, char const * const str, std::string& val)
+{
+    // Get the value of the input parameter
+    a_pp.get(str, val);
+
+    while (val.find('{') != std::string::npos) {
+        const auto i1 = val.rfind('{');
+        const auto i2 = val.find('}', i1);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(i2 != std::string::npos,
+                                         "Bad format for input paramter " + std::string(str) + ", unclosed brace");
+        const std::string var = val.substr(i1+1, i2-i1-1);
+        const amrex::ParmParse pp_my_constants("my_constants");
+        std::string replacer;
+        pp_my_constants.get(var, replacer);
+        val.replace(i1, i2-i1+1, replacer);
+    }
+}
+
+int utils::parser::queryWithParser (const amrex::ParmParse& a_pp, char const * const str, std::string& val)
+{
+    const bool is_specified = a_pp.query(str, val);
+    if (is_specified) {
+        getWithParser (a_pp, str, val);
+    }
+    return is_specified;
+}
+
 void utils::parser::Store_parserString(
     amrex::ParmParse const& pp,
     std::string const& query_string,

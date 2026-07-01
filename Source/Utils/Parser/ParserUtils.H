@@ -9,6 +9,8 @@
 #ifndef WARPX_UTILS_PARSER_PARSERUTILS_H_
 #define WARPX_UTILS_PARSER_PARSERUTILS_H_
 
+#include "Utils/TextMsg.H"
+
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
 #include <AMReX_REAL.H>
@@ -208,6 +210,39 @@ namespace utils::parser
             );
         }
     }
+
+
+    /** Similar to amrex::ParmParse::get, but also supports replacement of bracketed names, similar
+     * to how f-strings are processed in Python.
+     *
+     * amrex::ParmParse::get reads a name and a value from the input file. This function does the
+     * same, and applies string replacements to names within curly braces with values from my_constants.
+     * For example, with:
+     * my_constants.nz = 40
+     * diag1.file_prefix = grid{nz}
+     * The file_prefix will be read in as "grid40".
+     *
+     * \param[in] a_pp amrex::ParmParse object
+     * \param[in] str name of the parameter to read
+     * \param[out] val where the value queried and parsed is stored
+     */
+    void getWithParser (const amrex::ParmParse& a_pp, char const * str, std::string& val);
+
+    /** Similar to amrex::ParmParse::query, but also supports replacement of bracketed names, similar
+     * to how f-strings are processed in Python.
+     *
+     * amrex::ParmParse::query reads a name and a value from the input file. This function does the
+     * same, and applies string replacements to names within curly braces with values from my_constants.
+     * For example, with:
+     * my_constants.nz = 40
+     * diag1.file_prefix = grid{nz}
+     * The file_prefix will be read in as "grid40".
+     *
+     * \param[in] a_pp amrex::ParmParse object
+     * \param[in] str name of the parameter to read
+     * \param[out] val where the value queried and parsed is stored
+     */
+    int queryWithParser (const amrex::ParmParse& a_pp, char const * str, std::string& val);
 
 
     /** Similar to amrex::ParmParse::queryWithParser
