@@ -43,9 +43,11 @@ T_I0 = 5.0  # ion temperature (eV)
 T_E0 = 5.0  # electron temperature (eV): no electron pressure
 
 # Annular column (radii in m) and low-density interior fill
-R_INNER = 0.7
+R_INNER = 0.5
 R_OUTER = 0.8
-R_PART = 0.6  # the annulus carries the inventory of a full column of this radius
+R_PART = 0.385  # the annulus carries the inventory of a full column of this radius;
+# with R_INNER=0.5 and r_outer tied to the 3-cell standoff (~0.753 at n=128) this puts
+# the annulus number density at ~7e19 m^-3 (~0.47 N_I), a physical loading density.
 R_WALL = 0.8  # conducting wall radius (embedded boundary)
 
 # External field ramp: Hermite smoothstep from the bias field to the
@@ -121,6 +123,7 @@ def setup_simulation(
     bz_bias=BZ_BIAS,
     nz=NZ,
     grid_type="collocated",
+    use_conformal_eb=True,
     equilibrium_b=False,
     conformal_ect_lsq=False,
     eb_resistive_only_partial=False,
@@ -227,7 +230,7 @@ def setup_simulation(
         substep_rtol=substep_rtol,
         substep_atol=1.0e-8,
         max_substep_attempts=1000,
-        use_conformal_eb=True,
+        use_conformal_eb=use_conformal_eb,
         eb_resistive_only_partial=True if eb_resistive_only_partial else None,
         conformal_b_curl_fill=True if conformal_b_curl_fill else None,
         conformal_b_curl_fill_freeze=(True if conformal_b_curl_fill_freeze else None),
@@ -531,6 +534,15 @@ def main():
         default="collocated",
     )
     parser.add_argument(
+        "--no-conformal-eb",
+        dest="conformal_eb",
+        action="store_false",
+        default=True,
+        help="disable the conformal (ECT/level-set) EB wall solve "
+        "(hybrid_pic_model.use_conformal_eb=0); falls back to the standard "
+        "masked/staircase EB. Baseline for the 'cost of conformal walls' comparison.",
+    )
+    parser.add_argument(
         "--resistive-only-partial",
         action="store_true",
         help="make the generalized Ohm's law resistive-only (E=eta*J) in "
@@ -617,6 +629,15 @@ def main():
         help="seed a self-consistent MHD (theta-pinch) equilibrium B (diamagnetic radial "
         "force balance with the total ion+electron pressure) instead of the uniform bias.",
     )
+    parser.add_argument(
+        "--standoff-cells",
+        type=float,
+        default=0.0,
+        dest="standoff_cells",
+        help="dielectric standoff: hold the plasma this many cells off the (metal) field "
+        "wall by scraping particles at warpx.eb_particle_scrape_offset = N*dx. Models a "
+        "quartz liner so the plasma never contacts the PEC. 0 = plain wall scrape.",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -638,6 +659,17 @@ def main():
             args.diag_steps if args.diag_steps is not None else max(max_steps // 100, 1)
         )
 
+    # Tie the annulus outer radius to the dielectric standoff so the plasma is loaded
+    # exactly up to the standoff radius: nothing is scraped at t=0, and the total ion
+    # inventory (= N_I*R_PART^2, independent of r_outer via the n_annulus formula) is
+    # identical across standoff values -- a fair comparison. Without this, a larger
+    # standoff scrapes away more of a fixed 0.7-0.8 annulus and the runs no longer
+    # carry the same plasma.
+    if args.standoff_cells > 0.0:
+        r_outer_eff = R_WALL - args.standoff_cells * (2.0 / resolution)
+    else:
+        r_outer_eff = args.r_outer
+
     sim = setup_simulation(
         resolution,
         nppc,
@@ -648,7 +680,7 @@ def main():
         args.eta_power,
         args.eta_ntrans,
         args.f_tci,
-        args.r_outer,
+        r_outer_eff,
         args.wall_supported,
         args.marder,
         args.marder_alpha,
@@ -665,6 +697,7 @@ def main():
         args.bz_bias,
         args.nz,
         grid_type=args.grid_type,
+        use_conformal_eb=args.conformal_eb,
         equilibrium_b=args.equilibrium_b,
         conformal_ect_lsq=args.conformal_ect_lsq,
         eb_resistive_only_partial=args.resistive_only_partial,
@@ -686,6 +719,15 @@ def main():
             hybridpicmodel.divj_clean_alpha = args.div_clean
         if args.eb_b_normal_weight != -1e30:
             hybridpicmodel.eb_b_fill_normal_weight = args.eb_b_normal_weight
+
+    # Dielectric standoff: hold the plasma args.standoff_cells cells off the field wall
+    # (warpx.eb_particle_scrape_offset is a ParmParse warpx.* param, not a PICMI kwarg).
+    if args.standoff_cells > 0.0:
+        from pywarpx import warpx as _warpx_bucket
+
+        _warpx_bucket.eb_particle_scrape_offset = args.standoff_cells * (
+            2.0 / resolution
+        )
 
     sim.step()
 

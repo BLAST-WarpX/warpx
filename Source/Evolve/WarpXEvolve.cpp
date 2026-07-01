@@ -752,7 +752,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     // interact the particles with EB walls (if present)
     if (EB::enabled()) {
         using warpx::fields::FieldType;
-        mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
+        mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level),
+                                  m_eb_particle_scrape_offset);
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
         // Remove particles that have been flagged to be scraped

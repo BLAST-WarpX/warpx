@@ -198,6 +198,10 @@ public:
     static inline auto electromagnetic_solver_id = ElectromagneticSolverAlgo::Default;
     //! Whether the conformal (enlarged-cell technique) embedded-boundary field update is active
     static inline bool m_eb_use_conformal_solve = false;
+    //! Dielectric standoff: scrape particles within this signed distance of the field EB
+    //! on the fluid side (0 = plain EB scrape at the wall). A positive value (N*dx) holds
+    //! the plasma off the metal wall, modelling a quartz liner. warpx.eb_particle_scrape_offset.
+    static inline amrex::Real m_eb_particle_scrape_offset = amrex::Real(0.0);
     //! Integer that corresponds to the evolve scheme (explicit, semi_implicit_em, theta_implicit_em)
     EvolveScheme evolve_scheme = EvolveScheme::Default;
     /** Records a number corresponding to the load balance cost update strategy

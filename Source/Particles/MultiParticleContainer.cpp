@@ -1237,10 +1237,10 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 }
 
 void MultiParticleContainer::ScrapeParticlesAtEB (
-    ablastr::fields::MultiLevelScalarField const& distance_to_eb)
+    ablastr::fields::MultiLevelScalarField const& distance_to_eb, amrex::Real offset)
 {
     for (auto& pc : allcontainers) {
-        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb(), offset);
     }
 }
 

@@ -205,6 +205,33 @@ int lsq_centroid_weights (int k, Real const* sloc, Real const* wmask,
     return 0;
 }
 
+/** Robust wall-normal fallback for sliver / tightly-cut edges where the full 3D LSQ is
+ *  ill-conditioned (one-sided fluid taps -> spurious tangential slopes -> the wall-current
+ *  spikes that seed the Ohm->Faraday growth). A weighted 1D linear fit of the samples
+ *  \p samp against the wall-normal coordinate s_n = sloc[3t+0], evaluated at the target
+ *  centroid s_n = 0: value = a0, where samp ~ a0 + a1*s_n. a0 is the "average of the
+ *  surrounding fluid cells" and a1*s_n is the "delta correction off the wall". Always
+ *  well-conditioned because the fluid taps span the inward normal. Degenerate normal
+ *  spread falls back to the plain weighted mean. */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+Real normal_linear_value (int k, Real const* sloc, Real const* wmask, Real const* samp)
+{
+    Real sw = 0.0_rt, swx = 0.0_rt, swx2 = 0.0_rt, swy = 0.0_rt, swxy = 0.0_rt;
+    for (int t = 0; t < k; ++t) {
+        Real const w = wmask[t];
+        if (w <= 0.0_rt) { continue; }
+        Real const x = sloc[3*t+0];        // wall-normal coordinate
+        Real const y = samp[t];
+        sw += w; swx += w*x; swx2 += w*x*x; swy += w*y; swxy += w*x*y;
+    }
+    if (sw <= 0.0_rt) { return 0.0_rt; }
+    Real const det = sw*swx2 - swx*swx;
+    if (amrex::Math::abs(det) <= 1.e-30_rt * (sw*swx2 + 1.e-300_rt)) {
+        return swy / sw;                   // no normal spread -> weighted mean
+    }
+    return (swx2*swy - swx*swxy) / det;    // a0 = value at s_n = 0
+}
+
 /** Build a right-handed orthonormal frame R (row-major 3x3) whose first row is the
  *  unit wall normal n and whose other two rows span the tangent plane. The LSQ fit is
  *  invariant to the choice/sign of tangent axes, so any consistent frame works. */
@@ -321,6 +348,9 @@ void HybridPICModel::ApplyConformalLSQOverwrite (
     const Real d_lo = 0.05_rt * hmax;   // exclude the immediate wall layer
     const Real d_hi = 2.0_rt * hmax;    // wall band outer edge
     const Real inv_2sig2 = 1.0_rt / (2.0_rt * sigma * sigma);
+    // sliver gate: below this genuine-fluid fraction of the stencil, use the robust
+    // wall-normal fallback instead of the ill-conditioned full 3D LSQ (see kernel).
+    const Real sliver_frac = m_conformal_lsq_sliver_frac;
 
     amrex::MultiFab const* phi_mf = warpx.m_fields.get(FieldType::distance_to_eb, lev);
     auto eco = warpx.m_fields.get_alldirs(FieldType::edge_cent_offset, lev);
@@ -416,10 +446,23 @@ void HybridPICModel::ApplyConformalLSQOverwrite (
                     samp[t] = Js(ni,nj,nk);
                 }}}
 
-                Real w0[ntap];
-                clsq::lsq_centroid_weights(ntap, sloc, wmask, deg, w0);
-                Real acc = 0.0_rt;
-                for (int tt = 0; tt < ntap; ++tt) { acc += w0[tt] * samp[tt]; }
+                // Sliver gate: a small genuine-fluid fraction in the stencil means a
+                // tightly-cut / one-sided edge where the full 3D deg-2 LSQ is
+                // ill-conditioned and produces the spurious wall-current spikes that seed
+                // the Ohm->Faraday growth. For those, fall back to the robust wall-normal
+                // linear reconstruction (average + off-wall delta); use the full LSQ
+                // everywhere else.
+                int n_fluid = 0;
+                for (int tt = 0; tt < ntap; ++tt) { if (wmask[tt] > 0.0_rt) { ++n_fluid; } }
+                Real acc;
+                if (static_cast<Real>(n_fluid) < sliver_frac * ntap) {
+                    acc = clsq::normal_linear_value(ntap, sloc, wmask, samp);
+                } else {
+                    Real w0[ntap];
+                    clsq::lsq_centroid_weights(ntap, sloc, wmask, deg, w0);
+                    acc = 0.0_rt;
+                    for (int tt = 0; tt < ntap; ++tt) { acc += w0[tt] * samp[tt]; }
+                }
                 J(i,j,k) = acc;
             });
         }

@@ -509,6 +509,17 @@ public:
     /** Number of points per axis when sub-sampling distance_to_eb for the Phase-2b
      *  node-dual open-facet area fractions (M x M per facet). */
     int m_conformal_divclean_subsample = 16;
+    /** conformal_ect_lsq sliver gate: at a wall-band edge whose stencil has fewer than
+     *  this fraction of genuine-fluid taps, the full 3D least-squares fit is
+     *  ill-conditioned (one-sided taps) and produces spurious wall-current spikes that
+     *  seed an Ohm->Faraday growth. Such edges fall back to a robust wall-normal linear
+     *  reconstruction (average + off-wall delta) instead. */
+    amrex::Real m_conformal_lsq_sliver_frac = 0.4;
+    /** If true (default), the hybrid Hall term's nodal J x B interpolation excludes
+     *  covered edges/faces (EB-aware, mask-renormalized) so covered-cell field values do
+     *  not pollute the near-wall J x B. Set false to recover the plain (polluting)
+     *  averaging for A/B. Only affects conformal-EB staggered runs. */
+    bool m_eb_hall_mask = true;
     /** Diagnostic/experimental: if nonzero, the Phase-2b clean targets the plain
      *  Cartesian (Yee) divergence (binary fluid-area operator, 1 in fluid / 0 covered)
      *  instead of the cut-metric flux-balance divergence. The Yee divergence is what the

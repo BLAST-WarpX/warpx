@@ -31,6 +31,45 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
+namespace {
+    /** EB-aware staggered->nodal interpolation for the hybrid Hall term.
+     *
+     * The plain ablastr::coarsen::Interp (coarsening ratio 1) averages the source
+     * edge/face values around a node with equal weights. At the embedded boundary that
+     * pulls COVERED-cell field values into the nodal J x B, polluting the near-wall Hall
+     * term (a covered edge/face carries no physical current/field, but the average reads
+     * it anyway). This variant averages only the UNCOVERED neighbours -- those whose
+     * update mask (same staggering as the source) is nonzero -- and renormalizes by the
+     * number kept, so covered edges/faces never enter the interpolation. Returns 0 only
+     * if every neighbour is covered. Mirrors Interp's stencil for coarsening ratio 1. */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real InterpMasked (
+        amrex::Array4<amrex::Real const> const& arr,
+        amrex::Array4<int const> const& mask,
+        amrex::GpuArray<int,3> const& sf,
+        amrex::GpuArray<int,3> const& sc,
+        int i, int j, int k, int comp)
+    {
+        using namespace amrex::literals;
+        int const ic[3] = {i, j, k};
+        int np[3], idx_min[3];
+        for (int l = 0; l < 3; ++l) {
+            np[l] = 1 + amrex::Math::abs(sf[l]-sc[l]);
+            idx_min[l] = ic[l] - sc[l]*(1-sf[l]);
+        }
+        amrex::Real c = 0.0_rt, w = 0.0_rt;
+        for (int kr = 0; kr < np[2]; ++kr) {
+        for (int jr = 0; jr < np[1]; ++jr) {
+        for (int ir = 0; ir < np[0]; ++ir) {
+            int const ii = idx_min[0]+ir, jj = idx_min[1]+jr, kk = idx_min[2]+kr;
+            amrex::Real const ww = (mask(ii,jj,kk) != 0) ? 1.0_rt : 0.0_rt;
+            c += ww * arr(ii,jj,kk,comp);
+            w += ww;
+        }}}
+        return (w > 0.0_rt) ? (c / w) : 0.0_rt;
+    }
+}
+
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
     ablastr::fields::VectorField & Jfield,
     ablastr::fields::VectorField const& Bfield,
@@ -1305,23 +1344,48 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             Bz_ext = Bfield_external[2]->array(mfi);
         }
 
+        // EB-aware nodal interpolation of the Hall J x B: exclude covered edges/faces
+        // (update mask == 0) so covered-cell J/B values do not pollute the near-wall
+        // nodal J x B (see InterpMasked). eb_update_E masks the currents (edge), the
+        // B-update flags mask the self magnetic field (face).
+        const bool hall_eb = EB::enabled() && hybrid_model->m_eb_hall_mask;
+        amrex::Array4<int const> jxm, jym, jzm, bxm, bym, bzm;
+        if (hall_eb) {
+            jxm = eb_update_E[0]->const_array(mfi);
+            jym = eb_update_E[1]->const_array(mfi);
+            jzm = eb_update_E[2]->const_array(mfi);
+            auto const& eb_update_B = WarpX::GetInstance().GetEBUpdateBFlag()[lev];
+            bxm = eb_update_B[0]->const_array(mfi);
+            bym = eb_update_B[1]->const_array(mfi);
+            bzm = eb_update_B[2]->const_array(mfi);
+        }
+
         // Loop over the cells and update the nodal E field
         amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
             // interpolate the total plasma current to a nodal grid
-            auto const jx_interp = Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
-            auto const jy_interp = Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
-            auto const jz_interp = Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
+            auto const jx_interp = hall_eb ? InterpMasked(Jx, jxm, Jx_stag, nodal, i, j, k, 0)
+                                           : Interp(Jx, Jx_stag, nodal, coarsen, i, j, k, 0);
+            auto const jy_interp = hall_eb ? InterpMasked(Jy, jym, Jy_stag, nodal, i, j, k, 0)
+                                           : Interp(Jy, Jy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jz_interp = hall_eb ? InterpMasked(Jz, jzm, Jz_stag, nodal, i, j, k, 0)
+                                           : Interp(Jz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
             // interpolate the ion current to a nodal grid
-            auto const jix_interp = Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
-            auto const jiy_interp = Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
-            auto const jiz_interp = Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
+            auto const jix_interp = hall_eb ? InterpMasked(Jix, jxm, Jx_stag, nodal, i, j, k, 0)
+                                            : Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
+            auto const jiy_interp = hall_eb ? InterpMasked(Jiy, jym, Jy_stag, nodal, i, j, k, 0)
+                                            : Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jiz_interp = hall_eb ? InterpMasked(Jiz, jzm, Jz_stag, nodal, i, j, k, 0)
+                                            : Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
 
-            // interpolate the B field to a nodal grid
-            auto Bx_interp = Interp(Bx, Bx_stag, nodal, coarsen, i, j, k, 0);
-            auto By_interp = Interp(By, By_stag, nodal, coarsen, i, j, k, 0);
-            auto Bz_interp = Interp(Bz, Bz_stag, nodal, coarsen, i, j, k, 0);
+            // interpolate the (self) B field to a nodal grid
+            auto Bx_interp = hall_eb ? InterpMasked(Bx, bxm, Bx_stag, nodal, i, j, k, 0)
+                                     : Interp(Bx, Bx_stag, nodal, coarsen, i, j, k, 0);
+            auto By_interp = hall_eb ? InterpMasked(By, bym, By_stag, nodal, i, j, k, 0)
+                                     : Interp(By, By_stag, nodal, coarsen, i, j, k, 0);
+            auto Bz_interp = hall_eb ? InterpMasked(Bz, bzm, Bz_stag, nodal, i, j, k, 0)
+                                     : Interp(Bz, Bz_stag, nodal, coarsen, i, j, k, 0);
 
             if (include_external_fields) {
                 Bx_interp += Interp(Bx_ext, Bx_stag, nodal, coarsen, i, j, k, 0);

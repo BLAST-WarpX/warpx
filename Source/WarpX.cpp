@@ -802,6 +802,9 @@ WarpX::ReadParameters ()
 
         // Read timestepping options
         utils::parser::queryWithParser(pp_warpx, "const_dt", m_const_dt);
+        // Dielectric particle standoff: scrape particles this distance (m) inside the
+        // field EB on the fluid side, holding the plasma off the metal wall.
+        utils::parser::queryWithParser(pp_warpx, "eb_particle_scrape_offset", m_eb_particle_scrape_offset);
         utils::parser::queryWithParser(pp_warpx, "max_dt", m_max_dt);
         utils::parser::queryWithParser(pp_warpx, "max_omegap_dt", m_max_omegap_dt);
         utils::parser::queryWithParser(pp_warpx, "max_omegac_dt", m_max_omegac_dt);

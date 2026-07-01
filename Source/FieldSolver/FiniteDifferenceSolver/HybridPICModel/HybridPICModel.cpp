@@ -179,6 +179,8 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("conformal_divclean_rtol", m_conformal_divclean_rtol);
     pp_hybrid.query("conformal_divclean_subsample", m_conformal_divclean_subsample);
     pp_hybrid.query("conformal_divclean_cartesian", m_conformal_divclean_cartesian);
+    pp_hybrid.query("conformal_lsq_sliver_frac", m_conformal_lsq_sliver_frac);
+    pp_hybrid.query("eb_hall_mask", m_eb_hall_mask);
 
     // Resistive-only generalized Ohm's law in partially-covered EB cells (Lever 2 /
     // GOL masking): drops the stiff 1/n Hall + electron-pressure terms in the cut-cell
