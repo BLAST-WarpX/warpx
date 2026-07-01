@@ -245,7 +245,7 @@ public:
      * @param[in] plasma_injector the PlasmaInjector instance holding the input parameters
      * @param[in] dt time step size, used to partially advance the particles
     */
-    void AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt);
+    void AddPlasmaFlux (PlasmaInjector& plasma_injector, amrex::Real dt);
 
     void MapParticletoBoostedFrame (amrex::ParticleReal& x, amrex::ParticleReal& y, amrex::ParticleReal& z,
                                     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,

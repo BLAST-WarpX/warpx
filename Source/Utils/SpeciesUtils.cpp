@@ -120,6 +120,7 @@ namespace SpeciesUtils {
         std::unique_ptr<InjectorMomentum,InjectorMomentumDeleter>& h_inj_mom,
         std::unique_ptr<TemperatureProperties>& h_mom_temp,
         std::unique_ptr<VelocityProperties>& h_mom_vel,
+        amrex::Geometry const& geom,
         int flux_normal_axis, int flux_direction)
     {
         using namespace amrex::literals;
@@ -200,15 +201,15 @@ namespace SpeciesUtils {
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
         } else if (mom_dist_s == "maxwellian") {
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperature getTemp(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVelVec));
@@ -216,7 +217,7 @@ namespace SpeciesUtils {
             // The momentum is defined by the parser functions ux_mean_function,
             // uy_mean_function, uz_mean_function, stored in VelocityProperties and
             // evaluated through GetVelocityVector (the parsers are owned by h_mom_vel).
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
             const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumParser.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumParser*)nullptr, getVelVec));

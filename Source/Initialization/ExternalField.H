@@ -14,6 +14,7 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_BaseFab.H>
+#include <AMReX_Dim3.H>
 #include <AMReX_FabArray.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuContainers.H>
@@ -261,5 +262,65 @@ private:
     amrex::BaseFab<double> m_fab; //! data container for loaded data
     amrex::FabArray<amrex::BaseFab<double>> m_mf; //! non-owning container for communication purpose
 };
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+/**
+ * Adapter for vector records with x, y, z components.
+ *
+ * This reuses one ExternalFieldReader per component and combines the resulting
+ * scalar views into an amrex::XDim3.
+ */
+struct ExternalFieldVectorFromFile
+{
+    ExternalFieldVectorFromFile () = default;
+
+    ExternalFieldVectorFromFile (std::string const& file_name,
+                                 std::string const& field_name,
+                                 amrex::Geometry const& geom,
+                                 bool distributed,
+                                 bool active);
+
+    void clear ();
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab = nullptr);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab = nullptr);
+
+    void prepare (int li);
+
+    [[nodiscard]] bool distributed () const;
+
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE
+    amrex::XDim3
+    getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
+    {
+#if (AMREX_SPACEDIM < 3)
+        amrex::ignore_unused(x, y, z);
+#endif
+#if (AMREX_SPACEDIM == 1)
+        amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_XZ)
+        amrex::RealVect const pos{x, z};
+#else
+        amrex::RealVect const pos{x, y, z};
+#endif
+        return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};
+    }
+
+private:
+    ExternalFieldView m_x_view;
+    ExternalFieldView m_y_view;
+    ExternalFieldView m_z_view;
+    ExternalFieldReader* m_x_reader = nullptr;
+    ExternalFieldReader* m_y_reader = nullptr;
+    ExternalFieldReader* m_z_reader = nullptr;
+};
+#endif
 
 #endif //WARPX_EXTERNAL_FIELD_H_
