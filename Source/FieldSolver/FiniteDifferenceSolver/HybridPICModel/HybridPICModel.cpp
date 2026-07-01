@@ -45,12 +45,15 @@ void HybridPICModel::ReadParameters ()
         m_substeps += 1;
     }
 
+    // read rkf45 intervals
+    std::vector<std::string> rkf45_intervals_string_vec = {"0"};
+    pp_hybrid.queryarr("use_rkf45", rkf45_intervals_string_vec);
+    m_rkf45_intervals = ablastr::utils::text::IntervalsParser(rkf45_intervals_string_vec);
     utils::parser::queryWithParser(pp_hybrid, "substep_rtol", m_substep_rtol);
     utils::parser::queryWithParser(pp_hybrid, "substep_atol", m_substep_atol);
     utils::parser::queryWithParser(pp_hybrid, "substep_safety", m_substep_safety);
     utils::parser::queryWithParser(pp_hybrid, "substep_max_growth", m_substep_max_growth);
     pp_hybrid.query("max_substep_attempts", m_max_substep_attempts);
-    pp_hybrid.query("use_rkf45", m_use_rkf45);
 
     utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
 
@@ -470,7 +473,7 @@ void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt_half, SubcyclingHalf subcycling_half,
+    int step, amrex::Real dt_half, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
     auto& warpx = WarpX::GetInstance();
@@ -478,7 +481,7 @@ void HybridPICModel::BfieldEvolve (
     {
         BfieldEvolve(
             Bfield, Efield, Jfield, rhofield, eb_update_E,
-            dt_half, lev, subcycling_half, ng, nodal_sync
+            step, dt_half, lev, subcycling_half, ng, nodal_sync
         );
     }
 }
@@ -489,20 +492,24 @@ void HybridPICModel::BfieldEvolve (
     ablastr::fields::MultiLevelVectorField const& Jfield,
     ablastr::fields::MultiLevelScalarField const& rhofield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-    amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+    int step, amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
     IntVect ng, std::optional<bool> nodal_sync )
 {
-    const bool use_rkf45 = m_use_rkf45;
+    bool use_rkf45 = DoRKF45(step);
     // Make copies of the current B-field multifabs (at t = n) since the
-    // starting B-field is needed for the integration logic
+    // starting B-field is needed for the integration logic.
+    // We also store the initial B-field from the start of this integration step
+    // (i.e., a static copy) in case we need to fully reset the Bfield (needed
+    // for RK4).
     std::array< MultiFab, 3 > B_old;
     for (int ii = 0; ii < 3; ii++)
     {
         B_old[ii] = MultiFab(
-            Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 1,
-            Bfield[lev][ii]->nGrowVect()
+            Bfield[lev][ii]->boxArray(), Bfield[lev][ii]->DistributionMap(), 2, ng
         );
         MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 0, 1, ng);
+        // the values at index 1 will be kept static through the integration steps
+        MultiFab::Copy(B_old[ii], *Bfield[lev][ii], 0, 1, 1, ng);
     }
 
     amrex::Real dt_sub = dt_half / (m_substeps / 2._rt);
@@ -518,8 +525,8 @@ void HybridPICModel::BfieldEvolve (
     {
         // Adjust size of the last substep, so as to land exactly at t+dt_half.
         if (t + dt_sub > dt_half) { dt_sub = dt_half - t; }
-        bool step_succeeded;
-        amrex::Real step_change_factor;
+        bool step_succeeded = true;
+        amrex::Real step_change_factor = 1.0_rt;
 
         if (use_rkf45) {
             const amrex::Real error = BfieldEvolveRKF45(
@@ -536,9 +543,21 @@ void HybridPICModel::BfieldEvolve (
                 dt_sub, lev, subcycling_half, ng, nodal_sync
             );
 
-            // TODO: check to make sure B-field doesn't have any NaN values
-            step_succeeded = true;
-            step_change_factor = 1.0_rt; // do not adjust substep size
+            // Check that the B-field does not have nan or inf values
+            for (int idim = 0; idim < 3; ++idim) {
+                step_succeeded = step_succeeded && Bfield[lev][idim]->is_finite();
+            }
+
+            if (!step_succeeded) {
+                // restart this full step and this time use RKF45
+                t = 0._rt;
+                n_accepted = 0;
+                // reset B_old to original one
+                for (int ii = 0; ii < 3; ii++) {
+                    MultiFab::Copy(B_old[ii], B_old[ii], 1, 0, 1, ng);
+                }
+                use_rkf45 = true;
+            }
         }
 
         if (step_succeeded) {
@@ -558,15 +577,18 @@ void HybridPICModel::BfieldEvolve (
             dt_sub *= std::max(0.1_rt, step_change_factor);
         }
 
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            ++n_attempts <= m_max_substep_attempts,
-            "BfieldEvolve: exceeded max substep attempts."
-        );
+        if (++n_attempts > m_max_substep_attempts) { break; }
     }
 
-    // Set the number of substeps such that dt_sub on the next step will be similar
-    // to what was found to work in this step
-    m_substeps = 2*n_accepted;
+    // Adjust the number of substeps. This affects both the next RKF45 or RK4 step.
+    // The adjustment is made to jump to more required substeps or slowly decrease
+    // if m_substeps is too large (using 95% of the current m_substeps value and
+    // 5% of the lower, new value).
+    if (m_substeps < 2*n_attempts) {
+        m_substeps = 2*n_attempts;
+    } else {
+        m_substeps = 2 * int(std::ceil(0.475 * m_substeps + 0.05 * n_attempts));
+    }
 
     if (WarpX::GetInstance().Verbose()) {
         amrex::Print() << "B-field update "
@@ -575,6 +597,11 @@ void HybridPICModel::BfieldEvolve (
             << (n_attempts - n_accepted) << " rejected substeps"
             << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
     }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        n_attempts <= m_max_substep_attempts,
+        "BfieldEvolve: exceeded max substep attempts;"
+        "consider relaxing hybrid_pic_model.substep_rtol/substep_atol."
+    );
 }
 
 void HybridPICModel::BfieldEvolveRK4 (
