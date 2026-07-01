@@ -18,8 +18,9 @@ namespace {
      * `maxwellian` and `maxwell_juttner` momentum distributions.
      *
      * The bulk drift is the normalized momentum u_mean = gamma*v/c. Its components are
-     * either constant or given by spatially-dependent parser functions, selected by the
-     * input parameter `<dist_type_param>` (`constant` by default, or `parser`).
+     * either constant, given by spatially-dependent parser functions, or read from
+     * openPMD data, selected by the input parameter `<dist_type_param>` (`constant`
+     * by default, `parser`, or `read_from_file`).
      */
     void ParseVelocityVector (const amrex::ParmParse& pp, std::string const& source_name,
                               std::string const& dist_type_param, VelocityProperties& vel)
@@ -46,6 +47,32 @@ namespace {
                 std::make_unique<amrex::Parser>(
                     utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
             vel.m_type = VelParserFunctionVector;
+        } else if (u_mean_dist_s == "read_from_file") {
+            if (dist_type_param != "maxwellian_u_mean_distribution_type") {
+                WARPX_ABORT_WITH_MESSAGE(
+                    dist_type_param + " = read_from_file is only supported for "
+                    "maxwellian momentum distributions.");
+            }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            utils::parser::get(pp, source_name, "read_u_mean_from_path",
+                               vel.m_read_u_mean_path);
+            {
+                std::string const key_with_src =
+                    source_name.empty() ? std::string("read_u_mean_distributed")
+                                        : source_name + ".read_u_mean_distributed";
+                if (pp.contains(key_with_src)) {
+                    pp.query(key_with_src.c_str(), vel.m_read_u_mean_distributed);
+                } else {
+                    pp.query("read_u_mean_distributed", vel.m_read_u_mean_distributed);
+                }
+            }
+            vel.m_type = VelFromFileVector;
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                dist_type_param + " = read_from_file requires WarpX built with "
+                "openPMD support and is not supported in RZ/RCYLINDER/RSPHERE geometries.");
+#endif
         }
         else {
             WARPX_ABORT_WITH_MESSAGE(
@@ -63,9 +90,10 @@ namespace {
 * `momentum_function_ux`, `momentum_function_uy`, `momentum_function_uz` for
 * `parse_momentum_function`.
 */
-VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name)
+VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                        amrex::Geometry const& geom)
+    : m_geom(geom)
 {
-
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
     if (mom_dist_s == "maxwell_juttner") {

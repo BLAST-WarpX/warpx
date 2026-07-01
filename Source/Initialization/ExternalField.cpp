@@ -577,3 +577,101 @@ ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& 
     }
     return view;
 }
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+ExternalFieldVectorFromFile::ExternalFieldVectorFromFile (
+    std::string const& file_name,
+    std::string const& field_name,
+    amrex::Geometry const& geom,
+    bool distributed,
+    bool active)
+{
+    if (!active) {
+        return;
+    }
+
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo = geom.ProbLoArray();
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dx = geom.CellSizeArray();
+    amrex::Box const dombox = amrex::convert(geom.Domain(), amrex::IntVect(1));
+
+    m_x_reader = new ExternalFieldReader(file_name, field_name, "x", problo, dx,
+                                         dombox, distributed);
+    m_y_reader = new ExternalFieldReader(file_name, field_name, "y", problo, dx,
+                                         dombox, distributed);
+    m_z_reader = new ExternalFieldReader(file_name, field_name, "z", problo, dx,
+                                         dombox, distributed);
+}
+
+void ExternalFieldVectorFromFile::clear ()
+{
+    delete m_x_reader;
+    m_x_reader = nullptr;
+    delete m_y_reader;
+    m_y_reader = nullptr;
+    delete m_z_reader;
+    m_z_reader = nullptr;
+}
+
+void ExternalFieldVectorFromFile::prepare (
+    amrex::BoxArray const& grids,
+    amrex::DistributionMapping const& dmap,
+    amrex::IntVect const& ngrow,
+    std::function<amrex::Real(amrex::Real)> const& get_zlab)
+{
+    if (m_x_reader) {
+        m_x_reader->prepare(grids, dmap, ngrow, get_zlab);
+        m_x_view = m_x_reader->getView();
+    }
+    if (m_y_reader) {
+        m_y_reader->prepare(grids, dmap, ngrow, get_zlab);
+        m_y_view = m_y_reader->getView();
+    }
+    if (m_z_reader) {
+        m_z_reader->prepare(grids, dmap, ngrow, get_zlab);
+        m_z_view = m_z_reader->getView();
+    }
+}
+
+void ExternalFieldVectorFromFile::prepare (
+    amrex::RealBox const& pbox,
+    int moving_dir,
+    int moving_sign,
+    std::function<amrex::Real(amrex::Real)> const& get_zlab)
+{
+    if (m_x_reader) {
+        m_x_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
+        m_x_view = m_x_reader->getView();
+    }
+    if (m_y_reader) {
+        m_y_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
+        m_y_view = m_y_reader->getView();
+    }
+    if (m_z_reader) {
+        m_z_reader->prepare(pbox, moving_dir, moving_sign, get_zlab);
+        m_z_view = m_z_reader->getView();
+    }
+}
+
+void ExternalFieldVectorFromFile::prepare (int li)
+{
+    if (m_x_reader) {
+        m_x_view = m_x_reader->getView(li);
+    }
+    if (m_y_reader) {
+        m_y_view = m_y_reader->getView(li);
+    }
+    if (m_z_reader) {
+        m_z_view = m_z_reader->getView(li);
+    }
+}
+
+bool ExternalFieldVectorFromFile::distributed () const
+{
+    if (m_x_reader) {
+        return m_x_reader->distributed();
+    } else {
+        return false;
+    }
+}
+#endif

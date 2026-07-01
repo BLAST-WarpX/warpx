@@ -17,7 +17,9 @@
  *  temperature parameters: thermal spread `ux_std`, `uy_std`, `uz_std`
  *  for `maxwellian` distribution, and `theta` for `maxwell_juttner`.
  */
-TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name)
+TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                              amrex::Geometry const& geom)
+    : m_geom(geom)
 {
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
@@ -78,6 +80,28 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_ptr_uz_std_parser =
                 std::make_unique<amrex::Parser>(utils::parser::makeParser(sz, {"x", "y", "z"}));
             m_type = TempParserFunctionVector;
+        }
+        else if (u_std_dist_s == "read_from_file") {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            utils::parser::get(pp, source_name, "read_u_std_from_path", m_read_u_std_path);
+            {
+                std::string const key_with_src =
+                    source_name.empty() ? std::string("read_u_std_distributed")
+                                        : source_name + ".read_u_std_distributed";
+                if (pp.contains(key_with_src)) {
+                    pp.query(key_with_src.c_str(), m_read_u_std_distributed);
+                } else {
+                    pp.query("read_u_std_distributed", m_read_u_std_distributed);
+                }
+            }
+            m_type = TempFromFileVector;
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "maxwellian_u_std_distribution_type = read_from_file requires "
+                "WarpX built with openPMD support and is not supported in "
+                "RZ/RCYLINDER/RSPHERE geometries.");
+#endif
         }
         else {
             std::stringstream ss;

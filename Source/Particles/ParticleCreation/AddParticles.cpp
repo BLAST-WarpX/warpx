@@ -81,6 +81,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <map>
 #include <random>
@@ -775,7 +776,6 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
     const bool refine_injection = findRefinedInjectionBox(fine_injection_box, rrfac);
 
     InjectorPosition* inj_pos = plasma_injector.getInjectorPosition();
-    InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     InjectorMomentum* h_inj_mom = plasma_injector.getInjectorMomentumHost();
     const amrex::Real gamma_boost = WarpX::gamma_boost;
     const amrex::Real beta_boost = WarpX::beta_boost;
@@ -794,11 +794,18 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
 
-    auto get_zlab = [=] (amrex::Real z) -> amrex::Real
-    {
-        return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
-                                        gamma_boost, beta_boost, t);
-    };
+    // Provide a ballistic-correction callback only when the lab-coordinate
+    // transform is not the identity. This avoids accessing distributed,
+    // read from file u_mean during prepare(), before its tile-local views
+    // are available.
+    std::function<amrex::Real(amrex::Real)> get_zlab = nullptr;
+    if (beta_boost != 0._rt || t != 0._rt) {
+        get_zlab = [=] (amrex::Real z) -> amrex::Real
+        {
+            return applyBallisticCorrection(amrex::XDim3{0._rt, 0._rt, z}, h_inj_mom,
+                                            gamma_boost, beta_boost, t);
+        };
+    }
 
     if (initial_injection) {
         // Initial particle injection
@@ -842,6 +849,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         }
 
         auto* inj_rho = plasma_injector.getInjectorDensity(mfi.LocalIndex());
+        InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentum(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
@@ -1228,7 +1236,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 }
 
 void
-PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector, amrex::Real dt)
+PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector& plasma_injector, amrex::Real dt)
 {
     ABLASTR_PROFILE("PhysicalParticleContainer::AddPlasmaFlux()");
 
@@ -1271,7 +1279,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
     InjectorPosition* flux_pos = plasma_injector.getInjectorFluxPosition();
     InjectorFlux*  inj_flux = plasma_injector.getInjectorFlux();
-    InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentumDevice();
     constexpr int level_zero = 0;
     const amrex::Real t = WarpX::GetInstance().gett_new(level_zero);
 
@@ -1285,6 +1292,10 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                                                      m_user_real_attribs.size(),
                                                      m_user_int_attrib_parser,
                                                      m_user_real_attrib_parser);
+
+    plasma_injector.prepare(this->ParticleBoxArray(0),
+                            this->ParticleDistributionMap(0), IntVect(0),
+                            nullptr);
 
     MFItInfo info;
     if (do_tiling && amrex::Gpu::notInLaunchRegion()) {
@@ -1325,6 +1336,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             const bool no_overlap = find_overlap_flux(tile_realbox, part_realbox, dx, problo, plasma_injector, overlap_realbox, overlap_box, shifted);
             if (no_overlap) { continue; } // Go to the next tile
         }
+
+        InjectorMomentum* inj_mom = plasma_injector.getInjectorMomentum(mfi.LocalIndex());
 
         const int grid_id = mfi.index();
         const int tile_id = mfi.LocalTileIndex();
