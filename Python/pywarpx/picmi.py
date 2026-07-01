@@ -2216,32 +2216,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         (Yee) embedded-boundary grid; opt-in (default off is byte-identical, the
         standard masked Yee curl is used).
 
-    conformal_ect_lsq: bool, default=False
-        If True, compute the Ampere plasma current ``J = curl(B) / mu0`` with the
-        accurate conformal-EB scheme ("Path 1"): the PEC covered-B fill (already
-        correct: normal odd -> ``B_n = 0``, tangential even -> Neumann) feeds the
-        standard Yee curl, then the near-wall (cut-band) ``J`` edges are overwritten
-        by a noise-free weighted-least-squares centroid reconstruction of that curl
-        in the local wall-normal frame, and the matched cut-metric divergence clean
-        (``grad := -D^T`` of the centroid-aware cut divergence) enforces
-        divergence-consistency. Unlike ``conformal_ect_j`` (divergence-free but
-        O(1)-inaccurate at the wall), this is accurate AND divergence-consistent.
-        Requires a staggered (Yee) embedded-boundary grid, 3D Cartesian; opt-in
-        (default off is byte-identical). Mutually exclusive with ``conformal_ect_j``.
-
-    conformal_divclean_iters: int, default=400
-        Maximum Jacobi-preconditioned CG iterations for the ``conformal_ect_lsq``
-        Phase-2b matched cut-metric divergence clean of the plasma current. Set to 0
-        to skip the clean (leaving the accurate but divergence-inconsistent Phase-1
-        current; for A/B testing).
-
-    conformal_divclean_rtol: float, default=1e-6
-        Relative residual tolerance for the Phase-2b divergence-clean CG solve.
-
-    conformal_divclean_subsample: int, default=16
-        Points per axis (M x M per facet) when sub-sampling ``distance_to_eb`` for the
-        Phase-2b node-dual open-facet area fractions.
-
     conformal_b_curl_fill_freeze: bool, default=False
         If True, compute the covered-B curl fill (``conformal_b_curl_fill``)
         once per RKF45 half-step from the step-entry ``B^n`` and hold those
@@ -2341,46 +2315,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         relaxation controlled by ``eb_bc_rtol`` and ``eb_bc_max_iters``
         instead.
 
-    marder_alpha: float, default=0.
-        Dimensionless damping factor of the transitional Marder divergence
-        cleaning of the Ohm's-law E field; 0 (the default) disables the
-        correction. The applied factor is ``marder_alpha * min(dx)**2``
-        (the discrete grad(div) update is CFL-limited; values above 0.1 are
-        rejected). The correction iteratively applies
-        ``E += alpha*min(dx)**2 * grad(div(E) - div_target)`` restricted to
-        the low-density transition band ``0 < rho <= n_floor*q_e``; dense
-        plasma and true vacuum are never modified.
-
-    marder_target: str, default='ohm'
-        Divergence target of the Marder correction: 'ohm' drives div(E)
-        toward the divergence of the bare Hall/pressure Ohm's-law field
-        ``(J x B - grad(Pe))/(n e)``; 'grad_pe_only' uses the pressure term
-        only ``-grad(Pe)/(n e)`` (dropping J x B, a natural companion to
-        ``holmstrom_vacuum_region`` which drops the Hall term in the band);
-        'zero' smooths div(E) toward zero.
-
-    marder_correction_level: str, default='all_substeps'
-        Where the correction is applied: 'all_substeps' corrects the
-        substep E inside every RK/RKF45 stage before the Faraday curl (most
-        effective, runs per stage; moderate cost mitigated by
-        ``marder_substep_interval``); 'half_steps' corrects E once after
-        each half B push; 'full_steps' corrects only the final E used for
-        the particle push.
-
-    marder_max_iterations: int, default=50
-        Maximum number of fixed-point iterations per Marder application.
-
-    marder_rtol: float, default=1e-3
-        Relative tolerance on the masked divergence-error L2 norm (against
-        the first-iteration residual).
-
-    marder_atol: float, default=1e-30
-        Absolute tolerance on the masked divergence-error L2 norm.
-
-    marder_substep_interval: int, default=1
-        Apply the correction only every N substep E evaluations (only at
-        ``marder_correction_level='all_substeps'``).
-
     isotropic_hyper_resistivity: bool, default=True
         Evaluate the hyper-resistivity Laplacian with the isotropic
         Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of the
@@ -2460,23 +2394,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         conformal_b_curl_fill_corner_skip=None,
         conformal_ect_curvature=None,
         conformal_ect_j=None,
-        conformal_ect_lsq=None,
-        conformal_divclean_iters=None,
-        conformal_divclean_rtol=None,
-        conformal_divclean_subsample=None,
         eb_resistive_only_partial=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
         eb_deposit_fold=None,
         eb_rho_dirichlet=None,
-        marder_alpha=None,
-        marder_target=None,
-        marder_correction_level=None,
-        marder_max_iterations=None,
-        marder_rtol=None,
-        marder_atol=None,
-        marder_substep_interval=None,
         isotropic_hyper_resistivity=None,
         isotropic_resistivity=None,
         Jx_external_function=None,
@@ -2514,23 +2437,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.conformal_b_curl_fill_corner_skip = conformal_b_curl_fill_corner_skip
         self.conformal_ect_curvature = conformal_ect_curvature
         self.conformal_ect_j = conformal_ect_j
-        self.conformal_ect_lsq = conformal_ect_lsq
-        self.conformal_divclean_iters = conformal_divclean_iters
-        self.conformal_divclean_rtol = conformal_divclean_rtol
-        self.conformal_divclean_subsample = conformal_divclean_subsample
         self.eb_resistive_only_partial = eb_resistive_only_partial
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
         self.eb_deposit_fold = eb_deposit_fold
         self.eb_rho_dirichlet = eb_rho_dirichlet
-        self.marder_alpha = marder_alpha
-        self.marder_target = marder_target
-        self.marder_correction_level = marder_correction_level
-        self.marder_max_iterations = marder_max_iterations
-        self.marder_rtol = marder_rtol
-        self.marder_atol = marder_atol
-        self.marder_substep_interval = marder_substep_interval
         self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
         self.isotropic_resistivity = isotropic_resistivity
 
@@ -2600,12 +2512,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         )
         pywarpx.hybridpicmodel.conformal_ect_curvature = self.conformal_ect_curvature
         pywarpx.hybridpicmodel.conformal_ect_j = self.conformal_ect_j
-        pywarpx.hybridpicmodel.conformal_ect_lsq = self.conformal_ect_lsq
-        pywarpx.hybridpicmodel.conformal_divclean_iters = self.conformal_divclean_iters
-        pywarpx.hybridpicmodel.conformal_divclean_rtol = self.conformal_divclean_rtol
-        pywarpx.hybridpicmodel.conformal_divclean_subsample = (
-            self.conformal_divclean_subsample
-        )
         pywarpx.hybridpicmodel.eb_resistive_only_partial = (
             self.eb_resistive_only_partial
         )
@@ -2614,13 +2520,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
         pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
         pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
-        pywarpx.hybridpicmodel.marder_alpha = self.marder_alpha
-        pywarpx.hybridpicmodel.marder_target = self.marder_target
-        pywarpx.hybridpicmodel.marder_correction_level = self.marder_correction_level
-        pywarpx.hybridpicmodel.marder_max_iterations = self.marder_max_iterations
-        pywarpx.hybridpicmodel.marder_rtol = self.marder_rtol
-        pywarpx.hybridpicmodel.marder_atol = self.marder_atol
-        pywarpx.hybridpicmodel.marder_substep_interval = self.marder_substep_interval
         pywarpx.hybridpicmodel.isotropic_hyper_resistivity = (
             self.isotropic_hyper_resistivity
         )

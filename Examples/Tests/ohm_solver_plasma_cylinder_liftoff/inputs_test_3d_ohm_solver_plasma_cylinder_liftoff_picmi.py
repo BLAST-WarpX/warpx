@@ -108,11 +108,6 @@ def setup_simulation(
     f_t_ci=F_T_CI,
     r_outer=R_OUTER,
     wall_supported=True,
-    marder=True,
-    marder_alpha=0.1,
-    marder_target="grad_pe_only",
-    marder_level="half_steps",
-    marder_interval=1,
     n_floor_frac=N_FLOOR_FRAC,
     isotropic_resistivity=True,
     isotropic_hyper=True,
@@ -125,13 +120,11 @@ def setup_simulation(
     grid_type="collocated",
     use_conformal_eb=True,
     equilibrium_b=False,
-    conformal_ect_lsq=False,
     eb_resistive_only_partial=False,
     conformal_b_curl_fill=False,
     conformal_b_curl_fill_freeze=False,
     conformal_b_curl_fill_blend=0.0,
     conformal_b_curl_fill_clamp=0.0,
-    marder_max_iterations=10,
 ):
     """Create the PICMI simulation object.
 
@@ -218,12 +211,6 @@ def setup_simulation(
         holmstrom_vacuum_region=True if holmstrom else None,
         eb_deposit_fold="pec" if wall_supported else None,
         eb_rho_dirichlet=True if wall_supported else None,
-        marder_alpha=marder_alpha if marder else None,
-        marder_target=marder_target if marder else None,
-        marder_correction_level=marder_level if marder else None,
-        marder_max_iterations=marder_max_iterations if marder else None,
-        marder_rtol=1.0e-3 if marder else None,
-        marder_substep_interval=marder_interval if marder else None,
         isotropic_resistivity=isotropic_resistivity,
         isotropic_hyper_resistivity=isotropic_hyper,
         use_rkf45=True,
@@ -240,7 +227,6 @@ def setup_simulation(
         conformal_b_curl_fill_clamp=(
             conformal_b_curl_fill_clamp if conformal_b_curl_fill_clamp else None
         ),
-        conformal_ect_lsq=True if conformal_ect_lsq else None,
         A_external=A_ext,
         **power_law_resistivity(
             ETA_PLASMA,
@@ -417,13 +403,6 @@ def main():
         action="store_true",
     )
     parser.add_argument(
-        "--marder",
-        help="enable the transitional Marder divergence cleaning of the "
-        "substep E in the low-density band (0 < rho <= n_floor*q_e), with "
-        "the pressure-only target (a natural companion to --holmstrom)",
-        action="store_true",
-    )
-    parser.add_argument(
         "--no-isotropic-resistivity",
         dest="isotropic_resistivity",
         action="store_false",
@@ -488,33 +467,9 @@ def main():
         default=1.0e-3,
     )
     parser.add_argument(
-        "--marder-alpha",
-        help="Marder damping factor (with --marder)",
-        type=float,
-        default=0.01,
-    )
-    parser.add_argument(
-        "--marder-target",
-        help="Marder divergence target (with --marder)",
-        choices=["ohm", "grad_pe_only", "zero"],
-        default="grad_pe_only",
-    )
-    parser.add_argument(
-        "--marder-level",
-        help="Marder application cadence (with --marder)",
-        choices=["all_substeps", "half_steps", "full_steps"],
-        default="half_steps",
-    )
-    parser.add_argument(
-        "--marder-interval",
-        help="apply every N substep E evaluations (with --marder, all_substeps level)",
-        type=int,
-        default=1,
-    )
-    parser.add_argument(
         "--n-floor-frac",
         help="vacuum density floor as a fraction of N_I (sets the "
-        "vacuum/transition classification of the holmstrom, Marder and "
+        "vacuum/transition classification of the holmstrom and "
         "resistivity-ramp treatments; lower is stiffer)",
         type=float,
         default=N_FLOOR_FRAC,
@@ -591,13 +546,6 @@ def main():
         "gentle mirror correction. Requires --b-curl-fill. Default 0 = no clamp.",
     )
     parser.add_argument(
-        "--div-clean",
-        type=float,
-        default=0.0,
-        help="EB Marder div(B) and div(J) cleaning coefficient "
-        "(hybrid_pic_model.divb_clean_alpha = divj_clean_alpha = this). 0 disables.",
-    )
-    parser.add_argument(
         "--eb-b-normal-weight",
         type=float,
         default=-1e30,
@@ -607,20 +555,6 @@ def main():
         "near-wall curl(B)->J wherever there is a near-wall radial B (the liftoff "
         "shell+reversal). Set to 0 to drive the covered B_normal toward 0 (PEC "
         "B_normal->0) instead. Default -1e30 = disabled (byte-identical).",
-    )
-    parser.add_argument(
-        "--marder-iters",
-        type=int,
-        default=10,
-        help="Marder max iterations per sweep (with --marder).",
-    )
-    parser.add_argument(
-        "--conformal-ect-lsq",
-        action="store_true",
-        dest="conformal_ect_lsq",
-        help="enable hybrid_pic_model.conformal_ect_lsq: accurate conformal-EB Ampere "
-        "current (covered-B PEC fill + standard Yee curl + wall-band least-squares "
-        "centroid overwrite of the near-wall current). Staggered (Yee) grid only.",
     )
     parser.add_argument(
         "--equilibrium-b",
@@ -682,11 +616,6 @@ def main():
         args.f_tci,
         r_outer_eff,
         args.wall_supported,
-        args.marder,
-        args.marder_alpha,
-        args.marder_target,
-        args.marder_level,
-        args.marder_interval,
         args.n_floor_frac,
         args.isotropic_resistivity,
         args.isotropic_hyper,
@@ -699,26 +628,20 @@ def main():
         grid_type=args.grid_type,
         use_conformal_eb=args.conformal_eb,
         equilibrium_b=args.equilibrium_b,
-        conformal_ect_lsq=args.conformal_ect_lsq,
         eb_resistive_only_partial=args.resistive_only_partial,
         conformal_b_curl_fill=args.b_curl_fill,
         conformal_b_curl_fill_freeze=args.b_curl_fill_freeze,
         conformal_b_curl_fill_blend=args.b_curl_fill_blend,
         conformal_b_curl_fill_clamp=args.b_curl_fill_clamp,
-        marder_max_iterations=args.marder_iters,
     )
 
     # conformal_b_curl_fill_blend is wired through the PICMI HybridPICSolver
-    # kwarg (in setup_simulation); div_clean and eb_b_normal_weight are not PICMI
-    # kwargs, so they are set on the hybrid_pic_model bucket directly here.
-    if args.div_clean > 0 or args.eb_b_normal_weight != -1e30:
+    # kwarg (in setup_simulation); eb_b_normal_weight is not a PICMI kwarg, so
+    # it is set on the hybrid_pic_model bucket directly here.
+    if args.eb_b_normal_weight != -1e30:
         from pywarpx import hybridpicmodel
 
-        if args.div_clean > 0:
-            hybridpicmodel.divb_clean_alpha = args.div_clean
-            hybridpicmodel.divj_clean_alpha = args.div_clean
-        if args.eb_b_normal_weight != -1e30:
-            hybridpicmodel.eb_b_fill_normal_weight = args.eb_b_normal_weight
+        hybridpicmodel.eb_b_fill_normal_weight = args.eb_b_normal_weight
 
     # Dielectric standoff: hold the plasma args.standoff_cells cells off the field wall
     # (warpx.eb_particle_scrape_offset is a ParmParse warpx.* param, not a PICMI kwarg).

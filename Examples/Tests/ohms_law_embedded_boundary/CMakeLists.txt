@@ -55,18 +55,6 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
-        test_3d_ohms_law_embedded_boundary_marder_picmi  # name
-        3  # dims
-        2  # nprocs
-        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --battery marder"  # inputs
-        OFF  # analysis
-        OFF  # checksum
-        OFF  # dependency
-    )
-endif()
-
-if(WarpX_EB)
-    add_warpx_test(
         test_3d_ohms_law_embedded_boundary_plane_picmi  # name
         3  # dims
         2  # nprocs
@@ -83,18 +71,6 @@ if(WarpX_EB)
         2  # dims
         2  # nprocs
         "inputs_test_2d_ohms_law_embedded_boundary_picmi.py --battery eb"  # inputs
-        OFF  # analysis
-        OFF  # checksum
-        OFF  # dependency
-    )
-endif()
-
-if(WarpX_EB)
-    add_warpx_test(
-        test_2d_ohms_law_embedded_boundary_marder_picmi  # name
-        2  # dims
-        2  # nprocs
-        "inputs_test_2d_ohms_law_embedded_boundary_picmi.py --battery marder"  # inputs
         OFF  # analysis
         OFF  # checksum
         OFF  # dependency
@@ -175,18 +151,6 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
-        test_2d_ohms_law_embedded_boundary_divb_clean_picmi  # name
-        2  # dims
-        1  # nprocs
-        "inputs_test_2d_ohms_law_embedded_boundary_picmi.py --battery divb_clean"  # inputs
-        OFF  # analysis
-        OFF  # checksum
-        OFF  # dependency
-    )
-endif()
-
-if(WarpX_EB)
-    add_warpx_test(
         test_rz_ohms_law_hyper_resistivity_picmi  # name
         RZ  # dims
         1  # nprocs
@@ -197,16 +161,6 @@ if(WarpX_EB)
     )
 endif()
 
-add_warpx_test(
-    test_rz_ohms_law_marder_picmi  # name
-    RZ  # dims
-    1  # nprocs
-    "inputs_test_rz_ohms_law_marder_picmi.py"  # inputs
-    OFF  # analysis
-    OFF  # checksum
-    OFF  # dependency
-)
-
 # Collocated (nodal) conformal-EB batteries: the masked nodal Faraday update with
 # the level-set mirror BC, and the nodal isotropization stencils.
 if(WarpX_EB)
@@ -215,18 +169,6 @@ if(WarpX_EB)
         3  # dims
         2  # nprocs
         "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --grid-type collocated"  # inputs
-        OFF  # analysis
-        OFF  # checksum
-        OFF  # dependency
-    )
-endif()
-
-if(WarpX_EB)
-    add_warpx_test(
-        test_3d_ohms_law_marder_collocated_picmi  # name
-        3  # dims
-        2  # nprocs
-        "inputs_test_3d_ohms_law_embedded_boundary_picmi.py --geometry plane --battery marder --grid-type collocated"  # inputs
         OFF  # analysis
         OFF  # checksum
         OFF  # dependency

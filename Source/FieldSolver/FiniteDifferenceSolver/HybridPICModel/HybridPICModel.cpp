@@ -154,32 +154,6 @@ void HybridPICModel::ReadParameters ()
             "masked nodal curl, not open-face fluxes).",
             ablastr::warn_manager::WarnPriority::medium);
     }
-    pp_hybrid.query("conformal_ect_lsq", m_conformal_ect_lsq);
-    if (m_conformal_ect_lsq
-        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC",
-            "hybrid_pic_model.conformal_ect_lsq computes the Ampere current with the "
-            "accurate conformal-EB scheme (PEC covered-B fill + standard Yee curl + "
-            "wall-band least-squares centroid overwrite + matched cut-metric div-clean), "
-            "which is only defined on a staggered (Yee) grid; it is ignored on a "
-            "collocated grid.",
-            ablastr::warn_manager::WarnPriority::medium);
-    }
-    if (m_conformal_ect_lsq && m_conformal_ect_j) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC",
-            "hybrid_pic_model.conformal_ect_lsq and conformal_ect_j are mutually "
-            "exclusive Ampere-current schemes; conformal_ect_lsq takes precedence and "
-            "conformal_ect_j is ignored.",
-            ablastr::warn_manager::WarnPriority::medium);
-    }
-    // conformal_ect_lsq Phase-2b matched cut-metric divergence-clean controls.
-    pp_hybrid.query("conformal_divclean_iters", m_conformal_divclean_iters);
-    pp_hybrid.query("conformal_divclean_rtol", m_conformal_divclean_rtol);
-    pp_hybrid.query("conformal_divclean_subsample", m_conformal_divclean_subsample);
-    pp_hybrid.query("conformal_divclean_cartesian", m_conformal_divclean_cartesian);
-    pp_hybrid.query("conformal_lsq_sliver_frac", m_conformal_lsq_sliver_frac);
     pp_hybrid.query("eb_hall_mask", m_eb_hall_mask);
 
     // Resistive-only generalized Ohm's law in partially-covered EB cells (Lever 2 /
@@ -330,71 +304,6 @@ void HybridPICModel::ReadParameters ()
             "hybrid_pic_model.conformal_b_curl_fill; the covered-B curl fill is "
             "disabled, so there is no mirror to blend.",
             ablastr::warn_manager::WarnPriority::medium);
-    }
-
-    // Optional Marder-like diffusive clean of the small curved-wall div(B) /
-    // div(J_total) the pointwise mirror injects. Each alpha defaults to 0 (off).
-    // The clean is a pure gradient correction, so it dissipates divergence
-    // without touching curl/J.
-    utils::parser::queryWithParser(pp_hybrid, "divb_clean_alpha", m_divb_clean_alpha);
-    utils::parser::queryWithParser(pp_hybrid, "divj_clean_alpha", m_divj_clean_alpha);
-    utils::parser::queryWithParser(pp_hybrid, "divb_clean_iters", m_divb_clean_iters);
-    utils::parser::queryWithParser(pp_hybrid, "divb_clean_band_cells", m_divb_clean_band_cells);
-    pp_hybrid.query("divb_clean_per_step", m_divb_clean_per_step);
-
-    // Marder divergence cleaning of the Ohm's-law E field, applied only in the low-density
-    // transition band (0 < rho <= n_floor*q_e). Disabled by default (marder_alpha = 0).
-    utils::parser::queryWithParser(pp_hybrid, "marder_alpha", m_marder_alpha);
-    utils::parser::queryWithParser(pp_hybrid, "marder_max_iterations", m_marder_max_iterations);
-    utils::parser::queryWithParser(pp_hybrid, "marder_rtol", m_marder_rtol);
-    utils::parser::queryWithParser(pp_hybrid, "marder_atol", m_marder_atol);
-    utils::parser::queryWithParser(pp_hybrid, "marder_substep_interval", m_marder_substep_interval);
-
-    std::string marder_target = "ohm";
-    pp_hybrid.query("marder_target", marder_target);
-    if (marder_target == "ohm") { m_marder_target = MarderTarget::Ohm; }
-    else if (marder_target == "grad_pe_only") { m_marder_target = MarderTarget::GradPeOnly; }
-    else if (marder_target == "zero") { m_marder_target = MarderTarget::Zero; }
-    else {
-        WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.marder_target must be 'ohm', 'grad_pe_only' or 'zero'");
-    }
-
-    std::string marder_level = "all_substeps";
-    pp_hybrid.query("marder_correction_level", marder_level);
-    if (marder_level == "all_substeps") { m_marder_level = MarderLevel::AllSubsteps; }
-    else if (marder_level == "half_steps") { m_marder_level = MarderLevel::HalfSteps; }
-    else if (marder_level == "full_steps") { m_marder_level = MarderLevel::FullSteps; }
-    else {
-        WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.marder_correction_level must be 'all_substeps', "
-            "'half_steps' or 'full_steps'");
-    }
-
-    if (m_marder_alpha != 0.0_rt) {
-#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_XZ)
-        WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.marder_alpha > 0 is only supported in 3D Cartesian, "
-            "2D Cartesian (XZ) and RZ geometry");
-#endif
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_marder_alpha > 0.0_rt && m_marder_alpha <= 0.1_rt,
-            "hybrid_pic_model.marder_alpha must be in (0, 0.1] (the explicit "
-            "grad(div) update is CFL-limited)");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_marder_max_iterations > 0,
-            "hybrid_pic_model.marder_max_iterations must be positive");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_marder_substep_interval >= 1,
-            "hybrid_pic_model.marder_substep_interval must be >= 1");
-#if defined(WARPX_DIM_RZ)
-        // The collocated Marder stencils (centered node-to-node grad/div) are
-        // derived and validated for Cartesian geometry only; RZ keeps the
-        // staggered requirement.
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            WarpX::grid_type != ablastr::utils::enums::GridType::Collocated,
-            "hybrid_pic_model.marder_alpha requires a staggered grid in RZ geometry");
-#endif
     }
 }
 
@@ -661,11 +570,9 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // tangential even), covered centers filled, on the B update mask.
     // The flux-weighted ECT curl (m_conformal_ect_j) drops covered B by its zero
     // open-face area, so it needs no covered-B mirror; skip the curl fill then.
-    // The accurate conformal scheme (conformal_ect_lsq) feeds the standard Yee curl
-    // from the same PEC covered-B fill (B_n=0 odd / tangential even), then overwrites
-    // the wall-band J below; drive the fill for it too. Form A (conformal_ect_j) reads
-    // open-face fluxes only and needs no covered-B fill, so it stays excluded.
-    if (EB::enabled() && (m_conformal_b_curl_fill || m_conformal_ect_lsq) && !m_conformal_ect_j
+    // Form A (conformal_ect_j) reads open-face fluxes only and needs no covered-B
+    // fill, so it stays excluded.
+    if (EB::enabled() && m_conformal_b_curl_fill && !m_conformal_ect_j
         && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
         if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
         // Freeze path: a valid step-start snapshot exists (taken in
@@ -754,8 +661,8 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // The flux-weighted ("Form A") conformal curl is already divergence-
     // consistent at the wall (it reads only open-face fluxes, fully-covered
     // edges are zeroed in the kernel). The mirror fill below INJECTS div(J)
-    // (see the MarderCleanDivergence comment) and would corrupt Form A's clean
-    // wall current, so it is skipped when conformal_ect_j is on.
+    // and would corrupt Form A's clean wall current, so it is skipped when
+    // conformal_ect_j is on.
     if (EB::enabled() && !m_conformal_ect_j) {
         // The plasma current uses its own (wider-band) fill classification when
         // the isotropic hyper-resistivity Laplacian is enabled: that stencil
@@ -764,13 +671,11 @@ void HybridPICModel::CalculatePlasmaCurrent (
         // one-cell band is shared with the deposit fold and the Ohm's-law E fill.
         if (static_cast<int>(m_eb_bc_status_Jplasma.size()) <= lev) { m_eb_bc_status_Jplasma.resize(lev+1); }
 
-        // Covered-cell mirror fill of the Ampere current. Needed by BOTH the masked and
-        // the conformal_ect_lsq paths: the standard Yee curl zeroes fully-covered edges,
-        // so without this fill there is a large fluid->covered current JUMP at the wall
-        // (the unmasked wall div(J) runs ~10x the stable level, and the zeroed covered J
-        // contaminates the nodal J x B) which stiffens the RKF45 B-push to a crawl.
-        // conformal_ect_lsq overwrites the fluid wall band with the accurate LSQ current
-        // afterwards; the covered edges keep this mirror fill.
+        // Covered-cell mirror fill of the Ampere current: the standard Yee curl
+        // zeroes fully-covered edges, so without this fill there is a large
+        // fluid->covered current JUMP at the wall (the unmasked wall div(J) runs
+        // ~10x the stable level, and the zeroed covered J contaminates the nodal
+        // J x B) which stiffens the RKF45 B-push to a crawl.
         warpx::hybrid::ApplyPECBoundaryToField(
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
@@ -779,28 +684,6 @@ void HybridPICModel::CalculatePlasmaCurrent (
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
             &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells,
             m_eb_cylindrical_correction, m_eb_cyl_axis);
-
-        if (m_conformal_ect_lsq
-            && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
-            // conformal_ect_lsq: OVERWRITE the fluid wall band with the accurate
-            // LSQ-centroid reconstruction of the standard Yee curl. The covered edges
-            // keep the mirror fill above (small fluid->covered jump). Phase 2b
-            // (the matched cut-metric divergence clean) is an opt-in refinement
-            // (off by default: conformal_divclean_iters == 0).
-            ApplyConformalLSQOverwrite(current_fp_plasma, lev);
-            ApplyConformalDivClean(current_fp_plasma, lev);
-        } else if (m_divj_clean_alpha > 0.0_rt && !m_divb_clean_per_step) {
-            // Masked path: optional diffusive clean dissipating the curved-wall div(J)
-            // the mirror injects in the TOTAL (Ampere) current. div(J_total)=0 is
-            // current continuity (no charge separation). This acts ONLY on the total
-            // current; the deposited ion-species current is never continuity-
-            // constrained. Skipped in the per-step cadence (done at the FullStep site).
-            MarderCleanDivergence(
-                current_fp_plasma, eb_update_E, &m_eb_bc_status_Jplasma[lev],
-                /*normal_odd=*/false, /*fill_covered_centers=*/true,
-                m_divj_clean_alpha, m_divb_clean_iters,
-                m_divb_clean_band_cells, m_eb_fill_band_cells, lev);
-        }
     }
 }
 
@@ -1682,12 +1565,6 @@ void HybridPICModel::FieldPush (
         warpx.FillBoundaryE(ng, nodal_sync);
     }
 
-    // Apply the Marder cleanup to the substep E before curl(E) so the Faraday push
-    // integrates the corrected field. No-op unless marder_correction_level = all_substeps;
-    // the cadence is set by marder_substep_interval.
-    MarderCorrectE(Efield, Jfield, Bfield, rhofield, eb_update_E,
-                   MarderSite::Substep);
-
 #ifdef AMREX_USE_EB
     // With the conformal embedded-boundary update on a staggered grid, recompute the
     // face-centered electromotive-force density (ECTRhofield) from the new E-field so
@@ -1743,18 +1620,6 @@ void HybridPICModel::FieldPush (
                 /*normal_odd=*/true, /*fill_covered_centers=*/false,
                 &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells,
                 m_eb_cylindrical_correction, m_eb_cyl_axis);
-            // Optional diffusive clean: dissipate the curved-wall div(B) the
-            // mirror injects (a pure-gradient correction, so curl(B)=J is
-            // untouched). Skipped in the per-step cadence (done once at the
-            // FullStep site).
-            if (m_divb_clean_alpha > 0.0_rt && !m_divb_clean_per_step) {
-                MarderCleanDivergence(
-                    warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    warpx.GetEBUpdateBFlag()[lev], &m_eb_bc_status_B[lev],
-                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                    m_divb_clean_alpha, m_divb_clean_iters,
-                    m_divb_clean_band_cells, m_eb_b_fill_band_cells, lev);
-            }
         }
         warpx.FillBoundaryB(ng, nodal_sync);
     }
