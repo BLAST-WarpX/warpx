@@ -200,6 +200,11 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
                 *rf, rf->nGrowVect(), WarpX::do_single_precision_comms,
                 m_WarpX->Geom(lev).periodicity(), true);
         }
+        // Deposit the per-species ion temperature T_<nm> for the Q_ei relaxation.
+        // The explicit path fills it in HybridPICDepositRhoAndJ; the implicit path
+        // does not call that, so it must deposit here (on the redistributed t^{n+1}
+        // particles) or AdvanceElectronEnergyQDSMC reads a stale T_i.
+        m_WarpX->GetPartContainer().DepositTemperatures(m_WarpX->m_fields, 0._rt);
         // Provide J_i (ion current) in hybrid_current_fp_temp, which
         // QDSMCInitializeUe needs for V_e = -(J_plasma - J_i)/(q_e n_e).
         // current_fp holds the ion current from the converged solve. Without
