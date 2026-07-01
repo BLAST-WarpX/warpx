@@ -2,6 +2,7 @@
 #
 if(WarpX_MPI)
     set(MPIEXEC_SUPPORTS_HOST OFF)
+
     # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
     if("$ENV{USER}" STREQUAL "root")
         # calling even --help as root will abort and warn on stderr
@@ -9,27 +10,27 @@ if(WarpX_MPI)
             COMMAND ${MPIEXEC_EXECUTABLE} --help
             ERROR_VARIABLE MPIEXEC_HELP_TEXT
             OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_STRIP_TRAILING_WHITESPACE
         )
-        if(${MPIEXEC_HELP_TEXT} MATCHES "^.*allow-run-as-root.*$")
+        if("${MPIEXEC_HELP_TEXT}" MATCHES "allow-run-as-root")
             set(MPI_ALLOW_ROOT --allow-run-as-root)
         endif()
-        if(${MPIEXEC_HELP_TEXT} MATCHES "^.*--host.*$")
-            set(MPIEXEC_SUPPORTS_HOST ON)
-        endif()
-    else()
-        # non-root: --help is safe to call; capture both stdout and stderr since
-        # MPI implementations vary in which stream they use for help text
+    endif()
+
+    set(MPIEXEC_HELP_COMMAND ${MPIEXEC_EXECUTABLE} ${MPI_ALLOW_ROOT})
+    foreach(MPIEXEC_HELP_OPTION "" launch)
         execute_process(
-            COMMAND ${MPIEXEC_EXECUTABLE} --help
+            COMMAND ${MPIEXEC_HELP_COMMAND} --help ${MPIEXEC_HELP_OPTION}
             OUTPUT_VARIABLE MPIEXEC_HELP_TEXT
             ERROR_VARIABLE MPIEXEC_HELP_TEXT_STDERR
             OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_STRIP_TRAILING_WHITESPACE
         )
         string(APPEND MPIEXEC_HELP_TEXT "${MPIEXEC_HELP_TEXT_STDERR}")
-        if(${MPIEXEC_HELP_TEXT} MATCHES "^.*--host.*$")
+        if("${MPIEXEC_HELP_TEXT}" MATCHES "--host")
             set(MPIEXEC_SUPPORTS_HOST ON)
         endif()
-    endif()
+    endforeach()
 endif()
 
 # Add a WarpX test set (with sub-tests)
