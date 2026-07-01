@@ -2205,6 +2205,43 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         (``conformal_b_curl_fill``). Requires ``use_conformal_eb`` and a
         staggered (Yee) grid; opt-in (default off is byte-identical).
 
+    conformal_ect_j: bool, default=False
+        If True, compute the Ampere plasma current ``J = curl(B) / mu0`` with the
+        flux-weighted ("Form A") conformal-EB curl: each ``B`` value in the Yee
+        curl is scaled by the open-fluid fraction of the cut face it lives on
+        (``face_areas`` / full face area). The result is a signed sum of open-face
+        fluxes and is discretely divergence-consistent across the cut wall, so the
+        covered-B mirror (``conformal_b_curl_fill``) is skipped and not needed.
+        Covered faces (zero open area) drop out automatically. Requires a staggered
+        (Yee) embedded-boundary grid; opt-in (default off is byte-identical, the
+        standard masked Yee curl is used).
+
+    conformal_ect_lsq: bool, default=False
+        If True, compute the Ampere plasma current ``J = curl(B) / mu0`` with the
+        accurate conformal-EB scheme ("Path 1"): the PEC covered-B fill (already
+        correct: normal odd -> ``B_n = 0``, tangential even -> Neumann) feeds the
+        standard Yee curl, then the near-wall (cut-band) ``J`` edges are overwritten
+        by a noise-free weighted-least-squares centroid reconstruction of that curl
+        in the local wall-normal frame, and the matched cut-metric divergence clean
+        (``grad := -D^T`` of the centroid-aware cut divergence) enforces
+        divergence-consistency. Unlike ``conformal_ect_j`` (divergence-free but
+        O(1)-inaccurate at the wall), this is accurate AND divergence-consistent.
+        Requires a staggered (Yee) embedded-boundary grid, 3D Cartesian; opt-in
+        (default off is byte-identical). Mutually exclusive with ``conformal_ect_j``.
+
+    conformal_divclean_iters: int, default=400
+        Maximum Jacobi-preconditioned CG iterations for the ``conformal_ect_lsq``
+        Phase-2b matched cut-metric divergence clean of the plasma current. Set to 0
+        to skip the clean (leaving the accurate but divergence-inconsistent Phase-1
+        current; for A/B testing).
+
+    conformal_divclean_rtol: float, default=1e-6
+        Relative residual tolerance for the Phase-2b divergence-clean CG solve.
+
+    conformal_divclean_subsample: int, default=16
+        Points per axis (M x M per facet) when sub-sampling ``distance_to_eb`` for the
+        Phase-2b node-dual open-facet area fractions.
+
     conformal_b_curl_fill_freeze: bool, default=False
         If True, compute the covered-B curl fill (``conformal_b_curl_fill``)
         once per RKF45 half-step from the step-entry ``B^n`` and hold those
@@ -2422,6 +2459,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         conformal_b_curl_fill_clamp=None,
         conformal_b_curl_fill_corner_skip=None,
         conformal_ect_curvature=None,
+        conformal_ect_j=None,
+        conformal_ect_lsq=None,
+        conformal_divclean_iters=None,
+        conformal_divclean_rtol=None,
+        conformal_divclean_subsample=None,
         eb_resistive_only_partial=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
@@ -2471,6 +2513,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.conformal_b_curl_fill_clamp = conformal_b_curl_fill_clamp
         self.conformal_b_curl_fill_corner_skip = conformal_b_curl_fill_corner_skip
         self.conformal_ect_curvature = conformal_ect_curvature
+        self.conformal_ect_j = conformal_ect_j
+        self.conformal_ect_lsq = conformal_ect_lsq
+        self.conformal_divclean_iters = conformal_divclean_iters
+        self.conformal_divclean_rtol = conformal_divclean_rtol
+        self.conformal_divclean_subsample = conformal_divclean_subsample
         self.eb_resistive_only_partial = eb_resistive_only_partial
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
@@ -2552,6 +2599,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             self.conformal_b_curl_fill_corner_skip
         )
         pywarpx.hybridpicmodel.conformal_ect_curvature = self.conformal_ect_curvature
+        pywarpx.hybridpicmodel.conformal_ect_j = self.conformal_ect_j
+        pywarpx.hybridpicmodel.conformal_ect_lsq = self.conformal_ect_lsq
+        pywarpx.hybridpicmodel.conformal_divclean_iters = self.conformal_divclean_iters
+        pywarpx.hybridpicmodel.conformal_divclean_rtol = self.conformal_divclean_rtol
+        pywarpx.hybridpicmodel.conformal_divclean_subsample = (
+            self.conformal_divclean_subsample
+        )
         pywarpx.hybridpicmodel.eb_resistive_only_partial = (
             self.eb_resistive_only_partial
         )

@@ -741,8 +741,11 @@ void HybridPICModel::MarderCleanFieldsPerStep () const
                 m_divb_clean_alpha, m_divb_clean_iters,
                 m_divb_clean_band_cells, m_eb_b_fill_band_cells, lev);
         }
-        // Total Ampere current (electric parity), never an ion species.
-        if (m_divj_clean_alpha > 0.0_rt) {
+        // Total Ampere current (electric parity), never an ion species. The
+        // conformal_ect_lsq scheme owns the J divergence-clean via its matched
+        // cut-metric projection (ApplyConformalDivClean), so the geometry-blind
+        // Cartesian Marder clean is skipped for it.
+        if (m_divj_clean_alpha > 0.0_rt && !m_conformal_ect_lsq) {
             if (static_cast<int>(m_eb_bc_status_Jplasma.size()) <= lev) { m_eb_bc_status_Jplasma.resize(lev+1); }
             MarderCleanDivergence(
                 warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev),

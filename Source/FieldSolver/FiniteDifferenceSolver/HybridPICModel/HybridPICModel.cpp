@@ -107,6 +107,17 @@ void HybridPICModel::ReadParameters ()
             "2nd-order covered-B gather is not yet robust).",
             ablastr::warn_manager::WarnPriority::medium);
     }
+    if (m_conformal_b_curl_fill) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.conformal_b_curl_fill (the covered-B quadratic mirror "
+            "gather run before the Ampere curl) is DEPRECATED and slated for removal: "
+            "it is a pointwise, non-divergence-constrained extrapolation that injects "
+            "div(B)/div(J) at the wall and has proven unstable. It will be replaced by "
+            "the ECT edge-circulation current (ComputeJCartesianECT), which builds "
+            "J = curl(B)/mu0 div-consistently from fluid-side B only.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
     // Freeze the covered-B curl fill across RKF45 substages: compute it once per
     // half-step from the step-entry B^n and hold it fixed, instead of re-evaluating
     // the nonsmooth curved-wall extrapolation from the live substage B each substage
@@ -132,6 +143,42 @@ void HybridPICModel::ReadParameters ()
             "nodal curl, not ECT circulations).",
             ablastr::warn_manager::WarnPriority::medium);
     }
+    pp_hybrid.query("conformal_ect_j", m_conformal_ect_j);
+    if (m_conformal_ect_j
+        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.conformal_ect_j computes the Ampere current with the "
+            "flux-weighted (open-cut-face-area) ECT curl, which is only defined on a "
+            "staggered (Yee) grid; it is ignored on a collocated grid (which uses the "
+            "masked nodal curl, not open-face fluxes).",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+    pp_hybrid.query("conformal_ect_lsq", m_conformal_ect_lsq);
+    if (m_conformal_ect_lsq
+        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.conformal_ect_lsq computes the Ampere current with the "
+            "accurate conformal-EB scheme (PEC covered-B fill + standard Yee curl + "
+            "wall-band least-squares centroid overwrite + matched cut-metric div-clean), "
+            "which is only defined on a staggered (Yee) grid; it is ignored on a "
+            "collocated grid.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+    if (m_conformal_ect_lsq && m_conformal_ect_j) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPIC",
+            "hybrid_pic_model.conformal_ect_lsq and conformal_ect_j are mutually "
+            "exclusive Ampere-current schemes; conformal_ect_lsq takes precedence and "
+            "conformal_ect_j is ignored.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+    // conformal_ect_lsq Phase-2b matched cut-metric divergence-clean controls.
+    pp_hybrid.query("conformal_divclean_iters", m_conformal_divclean_iters);
+    pp_hybrid.query("conformal_divclean_rtol", m_conformal_divclean_rtol);
+    pp_hybrid.query("conformal_divclean_subsample", m_conformal_divclean_subsample);
+    pp_hybrid.query("conformal_divclean_cartesian", m_conformal_divclean_cartesian);
 
     // Resistive-only generalized Ohm's law in partially-covered EB cells (Lever 2 /
     // GOL masking): drops the stiff 1/n Hall + electron-pressure terms in the cut-cell
@@ -610,7 +657,13 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // wall. Staggered (Yee) grid only -- the nodal quadratic gather is not yet
     // robust (see m_conformal_b_curl_fill). Magnetic parity (normal odd /
     // tangential even), covered centers filled, on the B update mask.
-    if (EB::enabled() && m_conformal_b_curl_fill
+    // The flux-weighted ECT curl (m_conformal_ect_j) drops covered B by its zero
+    // open-face area, so it needs no covered-B mirror; skip the curl fill then.
+    // The accurate conformal scheme (conformal_ect_lsq) feeds the standard Yee curl
+    // from the same PEC covered-B fill (B_n=0 odd / tangential even), then overwrites
+    // the wall-band J below; drive the fill for it too. Form A (conformal_ect_j) reads
+    // open-face fluxes only and needs no covered-B fill, so it stays excluded.
+    if (EB::enabled() && (m_conformal_b_curl_fill || m_conformal_ect_lsq) && !m_conformal_ect_j
         && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
         if (static_cast<int>(m_eb_bc_status_B.size()) <= lev) { m_eb_bc_status_B.resize(lev+1); }
         // Freeze path: a valid step-start snapshot exists (taken in
@@ -663,9 +716,21 @@ void HybridPICModel::CalculatePlasmaCurrent (
     }
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
-        current_fp_plasma, Bfield, eb_update_E, lev
-    );
+    if (m_conformal_ect_j && EB::enabled()
+        && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
+        // Flux-weighted ("Form A") conformal-EB curl: J = curl(B)/mu0 with each B
+        // weighted by its open cut-face-area fraction. Divergence-consistent across
+        // the wall, so it needs no covered-B mirror (skipped above).
+        warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpereECT(
+            current_fp_plasma, Bfield,
+            warpx.m_fields.get_alldirs(FieldType::face_areas, lev),
+            eb_update_E, lev
+        );
+    } else {
+        warpx.get_pointer_fdtd_solver_fp(lev)->CalculateCurrentAmpere(
+            current_fp_plasma, Bfield, eb_update_E, lev
+        );
+    }
 
     if (m_has_external_current) {
         // Subtract external current from "Ampere" current calculated above. Note
@@ -683,13 +748,27 @@ void HybridPICModel::CalculatePlasmaCurrent (
     // whose centers are on or inside the surface are filled too (the Ampere
     // current is evaluated at the covered centers and is not meaningful
     // there).
-    if (EB::enabled()) {
+    //
+    // The flux-weighted ("Form A") conformal curl is already divergence-
+    // consistent at the wall (it reads only open-face fluxes, fully-covered
+    // edges are zeroed in the kernel). The mirror fill below INJECTS div(J)
+    // (see the MarderCleanDivergence comment) and would corrupt Form A's clean
+    // wall current, so it is skipped when conformal_ect_j is on.
+    if (EB::enabled() && !m_conformal_ect_j) {
         // The plasma current uses its own (wider-band) fill classification when
         // the isotropic hyper-resistivity Laplacian is enabled: that stencil
         // reads diagonal/corner edges, so the band is widened to m_eb_fill_band_cells
         // (see ReadParameters). Kept separate from m_eb_bc_status_E, whose
         // one-cell band is shared with the deposit fold and the Ohm's-law E fill.
         if (static_cast<int>(m_eb_bc_status_Jplasma.size()) <= lev) { m_eb_bc_status_Jplasma.resize(lev+1); }
+
+        // Covered-cell mirror fill of the Ampere current. Needed by BOTH the masked and
+        // the conformal_ect_lsq paths: the standard Yee curl zeroes fully-covered edges,
+        // so without this fill there is a large fluid->covered current JUMP at the wall
+        // (the unmasked wall div(J) runs ~10x the stable level, and the zeroed covered J
+        // contaminates the nodal J x B) which stiffens the RKF45 B-push to a crawl.
+        // conformal_ect_lsq overwrites the fluid wall band with the accurate LSQ current
+        // afterwards; the covered edges keep this mirror fill.
         warpx::hybrid::ApplyPECBoundaryToField(
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
@@ -699,13 +778,21 @@ void HybridPICModel::CalculatePlasmaCurrent (
             &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells,
             m_eb_cylindrical_correction, m_eb_cyl_axis);
 
-        // Optional diffusive clean: dissipate the curved-wall div(J) the mirror
-        // injects in the TOTAL (Ampere) current. div(J_total)=0 is current
-        // continuity (no charge
-        // separation). This acts ONLY on the total current; the deposited
-        // ion-species current is never continuity-constrained.
-        // Skipped in the per-step cadence (done once at the FullStep site).
-        if (m_divj_clean_alpha > 0.0_rt && !m_divb_clean_per_step) {
+        if (m_conformal_ect_lsq
+            && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
+            // conformal_ect_lsq: OVERWRITE the fluid wall band with the accurate
+            // LSQ-centroid reconstruction of the standard Yee curl. The covered edges
+            // keep the mirror fill above (small fluid->covered jump). Phase 2b
+            // (the matched cut-metric divergence clean) is an opt-in refinement
+            // (off by default: conformal_divclean_iters == 0).
+            ApplyConformalLSQOverwrite(current_fp_plasma, lev);
+            ApplyConformalDivClean(current_fp_plasma, lev);
+        } else if (m_divj_clean_alpha > 0.0_rt && !m_divb_clean_per_step) {
+            // Masked path: optional diffusive clean dissipating the curved-wall div(J)
+            // the mirror injects in the TOTAL (Ampere) current. div(J_total)=0 is
+            // current continuity (no charge separation). This acts ONLY on the total
+            // current; the deposited ion-species current is never continuity-
+            // constrained. Skipped in the per-step cadence (done at the FullStep site).
             MarderCleanDivergence(
                 current_fp_plasma, eb_update_E, &m_eb_bc_status_Jplasma[lev],
                 /*normal_odd=*/false, /*fill_covered_centers=*/true,

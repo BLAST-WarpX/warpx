@@ -299,6 +299,45 @@ public:
         amrex::Real fill_band_cells,
         int lev) const;
 
+    /** conformal_ect_lsq Phase 1: OVERWRITE the near-wall (cut-band) Ampere-current
+     *  edges with a noise-free weighted-least-squares CENTROID reconstruction of the
+     *  standard Yee curl. For each uncovered wall-band edge (signed distance to EB in
+     *  (~0.05h, ~2h)) of family x/y/z, fit a degree-2 polynomial to the just-computed
+     *  curl over the surrounding genuine-fluid edges of the same family (radius 2,
+     *  the validated default), weighted by an anisotropic Gaussian in the local
+     *  wall-normal frame, and evaluate it at the edge's fluid centroid (the
+     *  edge_cent_offset along-edge shift). This recovers a converging wall current
+     *  where the bare masked curl is O(1)-wrong. Reads the standard curl from a
+     *  snapshot (so the overwrite uses the original values), then matched cut-metric
+     *  div-clean restores divergence-consistency. 3D Cartesian, staggered; no-op
+     *  otherwise. */
+    void ApplyConformalLSQOverwrite (
+        ablastr::fields::VectorField const& Jfield,
+        int lev) const;
+
+    /** conformal_ect_lsq Phase 2b: matched cut-metric divergence clean of the Ampere
+     *  current. Builds the node-dual open-facet area metric (cached, geometry-only),
+     *  then enforces the cut-metric divergence flux-balance D J = 0 by a matched
+     *  Helmholtz projection: solve the area-weighted nodal Laplacian K phi = D J (K =
+     *  D . grad_node, symmetric SPD) by Jacobi-preconditioned CG and correct
+     *  J -= grad_node(phi). The standard Yee curl is identically divergence-free in the
+     *  full interior (D.curl = 0), so D J is nonzero only in the cut wall band and the
+     *  correction is localized there. This restores divergence-consistency to the
+     *  accurate Phase-1 wall current, clearing the near-wall RKF45 stiffness without
+     *  degrading it. 3D Cartesian, staggered; no-op otherwise. */
+    void ApplyConformalDivClean (
+        ablastr::fields::VectorField const& Jfield,
+        int lev) const;
+
+    /** Build (once per level, lazily; invalidated on regrid) the node-dual open-facet
+     *  area fractions used by the conformal_ect_lsq Phase-2b div-clean. Ai[c] is
+     *  edge-staggered (same as J component c): the open fluid fraction of the dual
+     *  facet perpendicular to edge c, obtained by sub-sampling the nodal distance_to_eb
+     *  level set (the AMReX cell-EB metrics are the wrong staggering for a node-centred
+     *  dual complex). Deep-fluid facets are 1, deep-covered 0, only the band is
+     *  sub-sampled. */
+    void BuildConformalDualAreas (int lev) const;
+
     /** Once-per-step driver for the div(B)/div(J_total) clean (the
      *  divb_clean_per_step cadence): cleans Bfield_fp (magnetic parity) and the
      *  total Ampere current hybrid_current_fp_plasma (electric parity) on every
@@ -437,6 +476,52 @@ public:
      *  (Yee) grid only; opt-in (default off -> byte-identical, since the shift is
      *  zero on uncut/covered edges). */
     bool m_conformal_ect_curvature = false;
+    /** If true, compute the Ampere current J = curl(B)/mu0 with the flux-weighted
+     *  ("Form A") conformal-EB curl (CalculateCurrentAmpereCartesianECT): each B
+     *  value in the Yee curl is scaled by its open cut-face-area fraction
+     *  (face_areas / full face area), so J is a signed sum of open-face fluxes and
+     *  is discretely divergence-consistent across the cut wall with no separate
+     *  covered-B fill. Covered faces (face_areas = 0) drop out automatically, so the
+     *  conformal_b_curl_fill mirror is skipped when this is on. Reduces byte-for-byte
+     *  to the masked Yee curl on interior edges. Staggered (Yee) grid only; opt-in
+     *  (default off -> byte-identical, the standard masked Yee curl is used). */
+    bool m_conformal_ect_j = false;
+    /** If true, compute the Ampere current J = curl(B)/mu0 with the accurate
+     *  conformal-EB scheme ("Path 1"): the existing PEC covered-B fill (normal odd
+     *  -> B_n=0, tangential even -> Neumann; already correct) feeds the standard Yee
+     *  curl, then the near-wall (cut-band) J edges are OVERWRITTEN by a noise-free
+     *  weighted-least-squares centroid reconstruction of that curl, evaluated at each
+     *  edge's fluid centroid in the local wall-normal frame. This recovers an accurate
+     *  (converging) wall current where the bare masked curl is O(1)-wrong, while the
+     *  matched cut-metric div-clean (grad := -D^T of the centroid-aware cut divergence)
+     *  enforces divergence-consistency. Unlike conformal_ect_j (Form A, div-free but
+     *  O(1)-inaccurate at the wall), this is accurate AND div-consistent. Staggered
+     *  (Yee) grid, 3D Cartesian only; opt-in (default off -> byte-identical). */
+    bool m_conformal_ect_lsq = false;
+    /** conformal_ect_lsq Phase-2b div-clean controls. Max Jacobi-PCG iterations for the
+     *  matched cut-metric Laplacian solve. Default 0 = OFF: the matched clean zeros the
+     *  cut-metric (flux-form) divergence, but the RKF45 stiffness responds to the plain
+     *  Yee (point-J) divergence, which is kept small by the covered-J mirror fill, not
+     *  this clean. Opt-in refinement only. */
+    int m_conformal_divclean_iters = 0;
+    /** Relative residual tolerance for the Phase-2b div-clean CG solve. */
+    amrex::Real m_conformal_divclean_rtol = 1.e-6;
+    /** Number of points per axis when sub-sampling distance_to_eb for the Phase-2b
+     *  node-dual open-facet area fractions (M x M per facet). */
+    int m_conformal_divclean_subsample = 16;
+    /** Diagnostic/experimental: if nonzero, the Phase-2b clean targets the plain
+     *  Cartesian (Yee) divergence (binary fluid-area operator, 1 in fluid / 0 covered)
+     *  instead of the cut-metric flux-balance divergence. The Yee divergence is what the
+     *  masked Marder clean reduces and what the RKF45 stiffness responds to; the
+     *  cut-metric (flux-form) divergence is a different object. */
+    int m_conformal_divclean_cartesian = 0;
+    /** Cached node-dual open-facet area fractions per level, and a per-level built flag.
+     *  A single NODAL MultiFab with 3 components: component c is the open fluid fraction
+     *  of the node's +c-direction dual facet, which sits at the same index as the c-edge
+     *  current J[c] (so the cut-metric divergence is an area-weighted node-from-edges
+     *  stencil). Geometry-only; rebuilt on regrid. */
+    mutable amrex::Vector<std::unique_ptr<amrex::MultiFab>> m_eb_dual_area;
+    mutable amrex::Vector<int> m_eb_dual_area_built;
     /** If true, skip the collocated conformal magnetic-field wall treatment
      *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
      *  This reproduces the pre-treatment baseline and isolates the wall fill as

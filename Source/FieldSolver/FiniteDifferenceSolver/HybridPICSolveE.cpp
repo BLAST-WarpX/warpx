@@ -69,6 +69,36 @@ void FiniteDifferenceSolver::CalculateCurrentAmpere (
     }
 }
 
+void FiniteDifferenceSolver::CalculateCurrentAmpereECT (
+    ablastr::fields::VectorField & Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    [[maybe_unused]] ablastr::fields::VectorField const& face_areas,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
+    int lev )
+{
+    // The flux-weighted ECT curl is defined for the staggered Cartesian (Yee) grid
+    // only; the caller (HybridPICModel::CalculatePlasmaCurrent) gates it on a
+    // staggered embedded-boundary run. For any other configuration fall back to the
+    // standard masked curl so the entry point stays safe.
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        CalculateCurrentAmpere(Jfield, Bfield, eb_update_E, lev);
+#else
+        if (WarpX::grid_type == GridType::Staggered)
+        {
+            CalculateCurrentAmpereCartesianECT <CartesianYeeAlgorithm> (
+                Jfield, Bfield, face_areas, eb_update_E, lev
+            );
+        } else {
+            CalculateCurrentAmpere(Jfield, Bfield, eb_update_E, lev);
+        }
+#endif
+    } else {
+        amrex::Abort(Utils::TextMsg::Err(
+            "CalculateCurrentAmpereECT: Unknown algorithm choice."));
+    }
+}
+
 // /**
 //   * \brief Calculate total current from Ampere's law without displacement
 //   * current i.e. J = 1/mu_0 curl x B.
@@ -424,8 +454,9 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
             // Jx calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-                // Skip field update in the embedded boundaries
-                if (update_Jx_arr && update_Jx_arr(i, j, k) == 0) { return; }
+                // Zero the current in fully-covered cells (eb_update flag == 0):
+                // no plasma current inside the conductor (follows the update_E flag).
+                if (update_Jx_arr && update_Jx_arr(i, j, k) == 0) { Jx(i, j, k) = 0._rt; return; }
 
                 Jx(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDz(By, coefs_z, n_coefs_z, i, j, k)
@@ -436,8 +467,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
             // Jy calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-                // Skip field update in the embedded boundaries
-                if (update_Jy_arr && update_Jy_arr(i, j, k) == 0) { return; }
+                // Zero the current in fully-covered cells (eb_update flag == 0).
+                if (update_Jy_arr && update_Jy_arr(i, j, k) == 0) { Jy(i, j, k) = 0._rt; return; }
 
                 Jy(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDx(Bz, coefs_x, n_coefs_x, i, j, k)
@@ -448,8 +479,8 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
             // Jz calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int k){
 
-                // Skip field update in the embedded boundaries
-                if (update_Jz_arr && update_Jz_arr(i, j, k) == 0) { return; }
+                // Zero the current in fully-covered cells (eb_update flag == 0).
+                if (update_Jz_arr && update_Jz_arr(i, j, k) == 0) { Jz(i, j, k) = 0._rt; return; }
 
                 Jz(i, j, k) = one_over_mu0 * (
                     - T_Algo::DownwardDy(Bx, coefs_y, n_coefs_y, i, j, k)
@@ -465,6 +496,162 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
             amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
         }
     }
+}
+
+template<typename T_Algo>
+void FiniteDifferenceSolver::CalculateCurrentAmpereCartesianECT (
+    ablastr::fields::VectorField& Jfield,
+    ablastr::fields::VectorField const& Bfield,
+    [[maybe_unused]] ablastr::fields::VectorField const& face_areas,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 > const& eb_update_E,
+    int lev
+)
+{
+    // Flux-weighted ("Form A") Ampere curl for the conformal embedded boundary.
+    // Each B value entering the standard Yee curl is scaled by the open-fluid
+    // fraction of the cut face it lives on, frac = face_areas / (full face area),
+    // so curl(B) = J is a signed sum of open-face fluxes. Covered faces have
+    // face_areas = 0 -> frac = 0 -> they drop out, so no separate covered-B fill
+    // is needed. On interior edges every frac = 1 and each weighted difference
+    // reduces termwise to the standard Yee stencil (inv_d * (B_a - B_b)), so this
+    // matches CalculateCurrentAmpereCartesian byte-for-byte away from the wall.
+    //
+    // The open-face-area weighting is only well defined with the face_areas field
+    // in 3D, where face_areas[0/1/2] are the genuine cut areas of the Bx/By/Bz
+    // faces. In 2D (WARPX_DIM_XZ) only face_areas[1] (the out-of-plane By face) is
+    // an area; the in-plane Bx/Bz live on edges whose open fraction lives in
+    // edge_lengths, not face_areas. Since the validated Form A scheme is 3D
+    // (Docs/eb_fill_review/cut_circulation_3d_poc.py) and the spec passes only
+    // face_areas, the weighted path is restricted to 3D; in 2D we fall back to the
+    // standard masked Yee curl so nothing spurious is emitted. See report notes.
+#if defined(WARPX_DIM_3D)
+    using namespace amrex::literals;
+
+    // Full (uncut) face areas for the open-fraction normalization, from the cell
+    // sizes at this level: Bx face = dy*dz, By face = dx*dz, Bz face = dx*dy.
+    amrex::GpuArray<amrex::Real, 3> dx_lev{};
+    {
+        const auto cs = WarpX::GetInstance().Geom(lev).CellSizeArray();
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) { dx_lev[d] = cs[d]; }
+    }
+    amrex::Real const inv_full_area_x = 1._rt / (dx_lev[1]*dx_lev[2]); // 1/(dy*dz)
+    amrex::Real const inv_full_area_y = 1._rt / (dx_lev[0]*dx_lev[2]); // 1/(dx*dz)
+    amrex::Real const inv_full_area_z = 1._rt / (dx_lev[0]*dx_lev[1]); // 1/(dx*dy)
+
+    // for the profiler
+    amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
+
+    // Loop through the grids, and over the tiles within each grid
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Jfield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
+            amrex::Gpu::synchronize();
+        }
+        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        // Extract field data for this grid/tile
+        Array4<Real> const &Jx = Jfield[0]->array(mfi);
+        Array4<Real> const &Jy = Jfield[1]->array(mfi);
+        Array4<Real> const &Jz = Jfield[2]->array(mfi);
+        Array4<Real const> const &Bx = Bfield[0]->const_array(mfi);
+        Array4<Real const> const &By = Bfield[1]->const_array(mfi);
+        Array4<Real const> const &Bz = Bfield[2]->const_array(mfi);
+
+        // Open cut-face areas (SI m^2), B-staggered like the B components above.
+        Array4<Real const> const &Sx = face_areas[0]->const_array(mfi);
+        Array4<Real const> const &Sy = face_areas[1]->const_array(mfi);
+        Array4<Real const> const &Sz = face_areas[2]->const_array(mfi);
+
+        // Extract structures indicating where the fields
+        // should be updated, given the position of the embedded boundaries.
+        // The plasma current is stored at the same locations as the E-field,
+        // therefore the `eb_update_E` multifab also appropriately specifies
+        // where the plasma current should be calculated.
+        amrex::Array4<int> update_Jx_arr, update_Jy_arr, update_Jz_arr;
+        if (EB::enabled()) {
+            update_Jx_arr = eb_update_E[0]->array(mfi);
+            update_Jy_arr = eb_update_E[1]->array(mfi);
+            update_Jz_arr = eb_update_E[2]->array(mfi);
+        }
+
+        // Inverse cell sizes (match the inv_d used by the Yee DownwardD stencils,
+        // i.e. coefs_*[0], so the unweighted reduction is bit-identical).
+        Real const inv_dx = 1._rt / dx_lev[0];
+        Real const inv_dy = 1._rt / dx_lev[1];
+        Real const inv_dz = 1._rt / dx_lev[2];
+
+        // Extract tileboxes for which to loop with 1 guard cell included
+        Box const& tjx = mfi.tilebox(Jfield[0]->ixType().toIntVect(), IntVect(1));
+        Box const& tjy = mfi.tilebox(Jfield[1]->ixType().toIntVect(), IntVect(1));
+        Box const& tjz = mfi.tilebox(Jfield[2]->ixType().toIntVect(), IntVect(1));
+
+        Real const one_over_mu0 = 1._rt / PhysConst::mu0;
+
+        // Calculate the total current, using the flux-weighted Ampere's law, on the
+        // same grid as the E-field.
+        amrex::ParallelFor(tjx, tjy, tjz,
+
+            // Jx calculation: circulates the open-face fluxes of Bz (along y) and
+            // By (along z). frac_z = Sz/(dx*dy), frac_y = Sy/(dx*dz).
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+                // Zero the current in fully-covered cells (eb_update flag == 0):
+                // no plasma current inside the conductor (follows the update_E flag).
+                if (update_Jx_arr && update_Jx_arr(i, j, k) == 0) { Jx(i, j, k) = 0._rt; return; }
+
+                Jx(i, j, k) = one_over_mu0 * (
+                      inv_dy * ( Sz(i, j  , k) * inv_full_area_z * Bz(i, j  , k)
+                               - Sz(i, j-1, k) * inv_full_area_z * Bz(i, j-1, k) )
+                    - inv_dz * ( Sy(i, j, k  ) * inv_full_area_y * By(i, j, k  )
+                               - Sy(i, j, k-1) * inv_full_area_y * By(i, j, k-1) )
+                );
+            },
+
+            // Jy calculation: circulates the open-face fluxes of Bx (along z) and
+            // Bz (along x). frac_x = Sx/(dy*dz), frac_z = Sz/(dx*dy).
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+                // Zero the current in fully-covered cells (eb_update flag == 0).
+                if (update_Jy_arr && update_Jy_arr(i, j, k) == 0) { Jy(i, j, k) = 0._rt; return; }
+
+                Jy(i, j, k) = one_over_mu0 * (
+                      inv_dz * ( Sx(i, j, k  ) * inv_full_area_x * Bx(i, j, k  )
+                               - Sx(i, j, k-1) * inv_full_area_x * Bx(i, j, k-1) )
+                    - inv_dx * ( Sz(i  , j, k) * inv_full_area_z * Bz(i  , j, k)
+                               - Sz(i-1, j, k) * inv_full_area_z * Bz(i-1, j, k) )
+                );
+            },
+
+            // Jz calculation: circulates the open-face fluxes of By (along x) and
+            // Bx (along y). frac_y = Sy/(dx*dz), frac_x = Sx/(dy*dz).
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+
+                // Zero the current in fully-covered cells (eb_update flag == 0).
+                if (update_Jz_arr && update_Jz_arr(i, j, k) == 0) { Jz(i, j, k) = 0._rt; return; }
+
+                Jz(i, j, k) = one_over_mu0 * (
+                      inv_dx * ( Sy(i  , j, k) * inv_full_area_y * By(i  , j, k)
+                               - Sy(i-1, j, k) * inv_full_area_y * By(i-1, j, k) )
+                    - inv_dy * ( Sx(i, j  , k) * inv_full_area_x * Bx(i, j  , k)
+                               - Sx(i, j-1, k) * inv_full_area_x * Bx(i, j-1, k) )
+                );
+            }
+        );
+
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
+            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+        }
+    }
+#else
+    // 2D (XZ): face_areas alone does not carry the in-plane open fractions, so use
+    // the standard masked Yee curl (see comment above).
+    CalculateCurrentAmpereCartesian<T_Algo>(Jfield, Bfield, eb_update_E, lev);
+#endif
 }
 #endif
 

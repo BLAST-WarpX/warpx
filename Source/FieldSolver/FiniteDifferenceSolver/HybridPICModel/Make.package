@@ -1,3 +1,4 @@
+CEXE_sources += ConformalEctLSQ.cpp
 CEXE_sources += EBJBoundary.cpp
 CEXE_sources += HybridPICModel.cpp
 CEXE_sources += ExternalVectorPotential.cpp

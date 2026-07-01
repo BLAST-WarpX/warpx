@@ -184,6 +184,27 @@ class FiniteDifferenceSolver
             int lev );
 
         /**
+          * \brief Flux-weighted ("Form A") conformal-EB variant of
+          * CalculateCurrentAmpere: J = (curl x B) / mu0 with each B value weighted
+          * by its open cut-face-area fraction (face_areas / full face area). Used in
+          * place of CalculateCurrentAmpere when hybrid_pic_model.conformal_ect_j is
+          * set on a staggered embedded-boundary run; reduces byte-for-byte to the
+          * masked Yee curl on interior edges.
+          *
+          * \param[out] Jfield     vector of current MultiFabs at a given level
+          * \param[in] Bfield      vector of magnetic field MultiFabs at a given level
+          * \param[in] face_areas  open cut-face areas (B-staggered, SI m^2)
+          * \param[in] eb_update_E indicate in which cell E should be updated
+          * \param[in] lev         level number for the calculation
+          */
+        void CalculateCurrentAmpereECT (
+            ablastr::fields::VectorField& Jfield,
+            ablastr::fields::VectorField const& Bfield,
+            ablastr::fields::VectorField const& face_areas,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            int lev );
+
+        /**
           * \brief Calculation of B field from the vector potential A
           * B = (curl x A) / mu0.
           *
@@ -539,6 +560,31 @@ class FiniteDifferenceSolver
         void CalculateCurrentAmpereCartesian (
             ablastr::fields::VectorField& Jfield,
             ablastr::fields::VectorField const& Bfield,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            int lev
+        );
+
+        /**
+          * \brief Flux-weighted ("Form A") variant of CalculateCurrentAmpereCartesian
+          * for the conformal embedded boundary. Each B value in the Yee curl is
+          * weighted by the open-fluid fraction of the cut face it lives on
+          * (face_areas / full face area), so curl(B) = J is a signed sum of open-face
+          * fluxes and is discretely divergence-consistent across the cut wall, with no
+          * separate covered-B fill. Reduces byte-for-byte to the standard Yee curl on
+          * interior edges (all open fractions equal 1).
+          *
+          * \param[out] Jfield     vector of current MultiFabs at a given level
+          * \param[in] Bfield      vector of magnetic field MultiFabs at a given level
+          * \param[in] face_areas  open cut-face areas (B-staggered, SI m^2), used to
+          *                        form the per-term open-fraction weights
+          * \param[in] eb_update_E indicate in which cell E should be updated
+          * \param[in] lev         level number for the calculation
+          */
+        template<typename T_Algo>
+        void CalculateCurrentAmpereCartesianECT (
+            ablastr::fields::VectorField& Jfield,
+            ablastr::fields::VectorField const& Bfield,
+            ablastr::fields::VectorField const& face_areas,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
             int lev
         );

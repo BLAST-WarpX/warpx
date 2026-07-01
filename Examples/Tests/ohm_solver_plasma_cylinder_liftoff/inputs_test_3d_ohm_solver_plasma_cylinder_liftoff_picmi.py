@@ -121,6 +121,8 @@ def setup_simulation(
     bz_bias=BZ_BIAS,
     nz=NZ,
     grid_type="collocated",
+    equilibrium_b=False,
+    conformal_ect_lsq=False,
     eb_resistive_only_partial=False,
     conformal_b_curl_fill=False,
     conformal_b_curl_fill_freeze=False,
@@ -235,6 +237,7 @@ def setup_simulation(
         conformal_b_curl_fill_clamp=(
             conformal_b_curl_fill_clamp if conformal_b_curl_fill_clamp else None
         ),
+        conformal_ect_lsq=True if conformal_ect_lsq else None,
         A_external=A_ext,
         **power_law_resistivity(
             ETA_PLASMA,
@@ -253,11 +256,34 @@ def setup_simulation(
     # The Hermite ramp has f(0) = bz_bias, so the step-1 subtract of the
     # external A at t = 0 removes this seed and recovers plasma B = 0. A uniform
     # Bz is divergence-free, so the initial projection div cleaner is disabled.
+    if equilibrium_b:
+        # Self-consistent MHD (theta-pinch) equilibrium seed instead of the uniform
+        # bias: the diamagnetic axial field in radial force balance with the annular
+        # plasma pressure, d/dr[P + B_z^2/(2 mu0)] = 0, referenced to the bias field at
+        # the annulus/wall. P is the TOTAL (ion + electron) pressure n(r)(T_i+T_e)q_e.
+        # This is the exact fixed point of the Grad-Shafranov J = r P'(psi) iteration
+        # for a fixed radial density, so B and the particle diamagnetic current are
+        # in equilibrium at t=0 and the startup transient (which stiffens the first
+        # RKF45 step) is removed. B_z(r) is z-independent and axial, hence discretely
+        # divergence-free. The step-1 external subtract leaves the plasma self-field as
+        # the diamagnetic deviation B_eq(r) - bz_bias, sustained by the ion current.
+        n_ann_eq = N_I * R_PART**2 / (r_outer**2 - R_INNER**2)
+        n_fill_eq = 2.0 * n_floor
+        k_eq = 2.0 * constants.mu0 * (T_I0 + te) * constants.q_e
+        sgn = "" if bz_bias >= 0 else "-"
+        rr = "sqrt(x*x+y*y)"
+        n_of_r = (
+            f"({n_ann_eq}*(({rr}>={R_INNER})*({rr}<={r_outer}))"
+            f"+{n_fill_eq}*({rr}<{R_INNER}))"
+        )
+        bz_seed = f"{sgn}sqrt({bz_bias**2}+{k_eq}*({n_ann_eq}-{n_of_r}))"
+    else:
+        bz_seed = f"{bz_bias}"
     sim.add_applied_field(
         picmi.AnalyticInitialField(
             Bx_expression="0",
             By_expression="0",
-            Bz_expression=f"{bz_bias}",
+            Bz_expression=bz_seed,
             warpx_do_initial_div_cleaning=False,
         )
     )
@@ -576,6 +602,21 @@ def main():
         default=10,
         help="Marder max iterations per sweep (with --marder).",
     )
+    parser.add_argument(
+        "--conformal-ect-lsq",
+        action="store_true",
+        dest="conformal_ect_lsq",
+        help="enable hybrid_pic_model.conformal_ect_lsq: accurate conformal-EB Ampere "
+        "current (covered-B PEC fill + standard Yee curl + wall-band least-squares "
+        "centroid overwrite of the near-wall current). Staggered (Yee) grid only.",
+    )
+    parser.add_argument(
+        "--equilibrium-b",
+        action="store_true",
+        dest="equilibrium_b",
+        help="seed a self-consistent MHD (theta-pinch) equilibrium B (diamagnetic radial "
+        "force balance with the total ion+electron pressure) instead of the uniform bias.",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
@@ -624,6 +665,8 @@ def main():
         args.bz_bias,
         args.nz,
         grid_type=args.grid_type,
+        equilibrium_b=args.equilibrium_b,
+        conformal_ect_lsq=args.conformal_ect_lsq,
         eb_resistive_only_partial=args.resistive_only_partial,
         conformal_b_curl_fill=args.b_curl_fill,
         conformal_b_curl_fill_freeze=args.b_curl_fill_freeze,

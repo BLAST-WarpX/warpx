@@ -17,6 +17,7 @@
 
 #include <AMReX_Functional.H>
 #include <AMReX_GpuAtomic.H>
+#include <AMReX_ParmParse.H>
 #include <AMReX_Scan.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_MultiFab.H>
@@ -620,8 +621,28 @@ WarpX::ComputeFaceExtensions ()
         }
     };
 
-    ComputeOneWayExtensions(lent_area, intruded_mark);
-    sync_lent_areas();
+    // Opt-in balanced borrow: skip the one-way pass so every unstable face is
+    // extended by the symmetric, area-proportional eight-way split. The one-way
+    // pass borrows the entire deficit from the first stable cardinal neighbour
+    // in a fixed lattice order (-x,-y,+y,+x), which is not wall-normal aware and
+    // displaces the enlarged-face area centroid off the normal (a C4-breaking,
+    // m=4 seed on a curved wall). Eight-way-only keeps the centroid much closer
+    // to the inward normal. Default 0 => one-way runs => bit-identical to before.
+    // Read at the WarpX level so it applies to both the ECT-EM and hybrid solvers.
+    int eb_ect_balanced_borrow = 0;
+    {
+        const amrex::ParmParse pp_warpx("warpx");
+        pp_warpx.query("eb_ect_balanced_borrow", eb_ect_balanced_borrow);
+    }
+    if (eb_ect_balanced_borrow != 0) {
+        ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
+            "warpx.eb_ect_balanced_borrow is on: skipping the biased one-way face "
+            "extension; all unstable faces use the symmetric eight-way split.",
+            ablastr::warn_manager::WarnPriority::low);
+    } else {
+        ComputeOneWayExtensions(lent_area, intruded_mark);
+        sync_lent_areas();
+    }
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
