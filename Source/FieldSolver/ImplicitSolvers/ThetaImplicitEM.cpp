@@ -99,6 +99,7 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
 
     // Setup variables to handle substepping in case it is needed
     int isubstep = 0;
+    m_nsubsteps = 1;
     int const max_substeps = 8;
     amrex::Real substep_start_time = start_time;
     int exit_status;
@@ -125,7 +126,11 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
             m_nlsolver->Solve(m_E, m_Eold, substep_start_time, m_dt, a_step);
 
             exit_status = m_nlsolver->GetExitStatus();
-            if (exit_status < 0) {
+            if (exit_status >= 0) {
+                isubstep += 1;
+                break;
+            } else {
+                // Try again, dividing the step size in half
                 m_nsubsteps *= 2;
                 ablastr::warn_manager::WMRecordWarning("ThetaImplicitEM",
                     "Notice: solver failed at step " + std::to_string(a_step) + ". " +
@@ -135,7 +140,6 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
                     ablastr::warn_manager::WarnPriority::low);
                 if (m_nsubsteps > max_substeps) {
                     // Give up and just return the bad exit status
-                    m_nsubsteps = 1;
                     return exit_status;
                 }
                 // FieldType::E_old still holds E at n-1, m_Eold E at n
@@ -143,9 +147,6 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
                 m_WarpX->ResetImplicitParticleData();
                 m_dt /= 2._rt;
                 isubstep *= 2;
-            } else {
-                isubstep += 1;
-                break;
             }
         }
 
@@ -169,9 +170,6 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
 
     }
 
-    // Reset for next time step
-    m_nsubsteps = 1;
-
     return exit_status;
 }
 
@@ -190,7 +188,8 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
     const amrex::Real theta_time = start_time + m_theta*m_dt;
-    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+    const amrex::Real dt_scale = 1.0_rt/m_nsubsteps;
+    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian, dt_scale );
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);

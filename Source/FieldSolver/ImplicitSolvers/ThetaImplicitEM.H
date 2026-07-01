@@ -123,6 +123,8 @@ private:
      */
     void FinishFieldUpdate ( amrex::Real end_time );
 
+    int m_nsubsteps;
+
 };
 
 #endif

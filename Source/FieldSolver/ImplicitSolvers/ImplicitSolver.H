@@ -161,11 +161,6 @@ protected:
     mutable amrex::Real m_dt = 0.0;
 
     /**
-     * \brief Number of substeps
-     */
-    int m_nsubsteps = 1;
-
-    /**
      * \brief Time-biasing parameter for fields used on RHS to advance system.
      */
     amrex::Real m_theta = 0.5;
@@ -272,7 +267,8 @@ protected:
      */
     void PreRHSOp ( amrex::Real  a_cur_time,
                     int          a_nl_iter,
-                    bool         a_from_jacobian );
+                    bool         a_from_jacobian,
+                    amrex::Real  a_dt_scale = 1.);
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions
