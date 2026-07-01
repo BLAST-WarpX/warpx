@@ -251,6 +251,8 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
+    void CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src);
+
     void SaveEoldMultifab ();
 
     /**
@@ -265,7 +267,8 @@ protected:
      */
     void PreRHSOp ( amrex::Real  a_cur_time,
                     int          a_nl_iter,
-                    bool         a_from_jacobian );
+                    bool         a_from_jacobian,
+                    amrex::Real  a_dt_scale = 1.);
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions

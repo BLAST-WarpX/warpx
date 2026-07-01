@@ -9,6 +9,8 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "WarpX.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -89,52 +91,84 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
 {
     BL_PROFILE("ThetaImplicitEM::OneStep()");
 
-    amrex::ignore_unused(a_step);
-
     // Fields have Eg^{n} and Bg^{n}
     // Particles have up^{n} and xp^{n}.
 
     // Set the member time step
     m_dt = a_dt;
 
-    // Save up and xp at the start of the time step
-    m_WarpX->SaveParticlesAtImplicitStepStart();
+    // Setup variables to handle substepping in case it is needed
+    int isubstep = 0;
+    m_nsubsteps = 1;
+    int const max_substeps = 8;
+    amrex::Real substep_start_time = start_time;
+    int exit_status;
 
-    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
-    // (i.e., Eg used to advance the system from step n-1 to step n)
-    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
+    while (isubstep < m_nsubsteps) {
 
-    // Save Eg at start of time step
-    SaveEoldMultifab();
-    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
+        // Save up and xp at the start of the time step
+        // Copy x to x_n etc
+        m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Save Bg at start of time step
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
-        ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
-        for (int n = 0; n < 3; ++n) {
-            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(), B_old[n]->nGrowVect());
+        // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
+        // (i.e., Eg used to advance the system from step n-1 to step n)
+        m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
+
+        // Save Eg at start of time step
+        m_Eold.Copy(FieldType::Efield_fp, FieldType::None, true); // Copy FieldType::Efield_fp to m_Eold
+
+        // Save Bg at start of time step
+        CopyVectorField(FieldType::B_old, FieldType::Bfield_fp);
+
+        while (true) {
+            // Solve nonlinear system for Eg at t_{n+theta}
+            // Particles will be advanced to t_{n+1/2}
+            m_nlsolver->Solve(m_E, m_Eold, substep_start_time, m_dt, a_step);
+
+            exit_status = m_nlsolver->GetExitStatus();
+            if (exit_status >= 0) {
+                isubstep += 1;
+                break;
+            } else {
+                // Try again, dividing the step size in half
+                m_nsubsteps *= 2;
+                ablastr::warn_manager::WMRecordWarning("ThetaImplicitEM",
+                    "Notice: solver failed at step " + std::to_string(a_step) + ". " +
+                    "Attempting subcycling step " + std::to_string(isubstep) +
+                    " of " + std::to_string(m_nsubsteps) +
+                    " substeps, with exit status " + std::to_string(exit_status) + ".",
+                    ablastr::warn_manager::WarnPriority::low);
+                if (m_nsubsteps > max_substeps) {
+                    // Give up and just return the bad exit status
+                    return exit_status;
+                }
+                // FieldType::E_old still holds E at n-1, m_Eold E at n
+                m_E.linComb(1.0_rt - m_theta, FieldType::E_old, FieldType::None, m_theta, m_Eold, true);
+                m_WarpX->ResetImplicitParticleData();
+                m_dt /= 2._rt;
+                isubstep *= 2;
+            }
         }
+
+        m_Eold.copyTo(FieldType::E_old, FieldType::None, true); // Copy m_Eold to FieldType::E_old
+
+        // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
+        UpdateWarpXFields(m_E, substep_start_time);
+        m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
+
+        const amrex::Real new_time = substep_start_time + m_dt;
+
+        // Advance particles from time n+1/2 to time n+1
+        m_WarpX->FinishImplicitParticleUpdate(new_time);
+
+        // Advance Eg and Bg from time n+theta to time n+1
+        FinishFieldUpdate(new_time);
+
+        substep_start_time = new_time;
+
+        m_WarpX->HandleParticlesAtBoundaries(-1, new_time, 0);
+
     }
-
-    // Solve nonlinear system for Eg at t_{n+theta}
-    // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
-
-    const int exit_status = m_nlsolver->GetExitStatus();
-    if (exit_status < 0) { return exit_status; }
-
-    // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
-    UpdateWarpXFields(m_E, start_time);
-    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
-
-    const amrex::Real new_time = start_time + m_dt;
-
-    // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate(new_time);
-
-    // Advance Eg and Bg from time n+theta to time n+1
-    FinishFieldUpdate(new_time);
 
     return exit_status;
 }
@@ -154,7 +188,8 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
     const amrex::Real theta_time = start_time + m_theta*m_dt;
-    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+    const amrex::Real dt_scale = 1.0_rt/m_nsubsteps;
+    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian, dt_scale );
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);

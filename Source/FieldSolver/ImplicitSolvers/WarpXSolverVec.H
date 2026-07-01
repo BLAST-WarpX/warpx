@@ -110,6 +110,16 @@ public:
         }
     }
 
+    /** \brief Copy the data to MultiFabs
+     *
+     * \param[in] a_array_type type of array of MultiFabs
+     * \param[in] a_scalar_type type of scalar MultiFab
+     * \param[in] allow_type_mismatch whether the array and scalar types must match
+    **/
+    void copyTo ( warpx::fields::FieldType  a_array_type,
+                  warpx::fields::FieldType  a_scalar_type = warpx::fields::FieldType::None,
+                  bool allow_type_mismatch = false);
+
     // Prohibit Copy assignment operator
     WarpXSolverVec& operator= ( const WarpXSolverVec&  a_solver_vec ) = delete;
 
@@ -160,6 +170,14 @@ public:
             }
         }
     }
+
+    /**
+     * \brief Y = a*X + b*Y
+     *        Where X is MultiFabs, Y is WarpXSolverVec
+     */
+    void linComb (const RT a, warpx::fields::FieldType a_Xarray_type, warpx::fields::FieldType a_Xscalar_type,
+                  const RT b, const WarpXSolverVec& Y,
+                  bool allow_type_mismatch = false);
 
     /**
      * \brief Y = a*X + b*Y

@@ -519,6 +519,18 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 
 }
 
+void ImplicitSolver::CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src)
+{
+    // Copy the MultiFabs in a VectorField
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const ablastr::fields::VectorField src_vec = m_WarpX->m_fields.get_alldirs(src, lev);
+        ablastr::fields::VectorField dst_vec = m_WarpX->m_fields.get_alldirs(dst, lev);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*dst_vec[n], *src_vec[n], 0, 0, dst_vec[n]->nComp(), dst_vec[n]->nGrowVect());
+        }
+    }
+}
+
 void ImplicitSolver::SaveEoldMultifab ()
 {
     using warpx::fields::FieldType;
@@ -764,7 +776,7 @@ void ImplicitSolver::PreLinearSolve ()
 
     if (m_use_mass_matrices) {
 
-        m_WarpX->DepositMassMatrices();
+        m_WarpX->DepositMassMatrices(m_dt);
 
         if (m_use_mass_matrices_jacobian) {
             FinishMassMatrices();
@@ -783,7 +795,8 @@ void ImplicitSolver::PreLinearSolve ()
 
 void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
-                                const bool         a_from_jacobian )
+                                const bool         a_from_jacobian,
+                                const amrex::Real  a_dt_scale)
 {
     BL_PROFILE("ImplicitSolver::PreRHSOp()");
 
@@ -821,13 +834,13 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     if (m_use_mass_matrices_jacobian && a_from_jacobian) { // Called from linear stage of JFNK and using mass matrices for Jacobian
         if (m_particle_suborbits) {
             options.evolve_suborbit_particles_only = true;
-            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
+            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, a_dt_scale, &options);
         }
         const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
         ComputeJfromMassMatrices( J_from_MM_only );
     }
     else { // Conventional particle-suppressed JFNK
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, a_dt_scale, &options);
         CumulateJ();
     }
 
