@@ -38,25 +38,28 @@
  */
 enum struct InitializationPolicy {Zero=0, One, RandomExp};
 
-/**
- * \brief This map sets the initialization policy for each particle component
- * used in WarpX.
- */
-static std::map<std::string, InitializationPolicy> initialization_policies = {
-    {"w",     InitializationPolicy::Zero },
-    {"ux",    InitializationPolicy::Zero },
-    {"uy",    InitializationPolicy::Zero },
-    {"uz",    InitializationPolicy::Zero },
+namespace
+{
+    /**
+    * \brief This map sets the initialization policy for each particle component
+    * used in WarpX.
+    */
+    std::map<std::string, InitializationPolicy> initialization_policies = {
+        {"w",     InitializationPolicy::Zero },
+        {"ux",    InitializationPolicy::Zero },
+        {"uy",    InitializationPolicy::Zero },
+        {"uz",    InitializationPolicy::Zero },
 #ifdef WARPX_DIM_RZ
-    {"theta", InitializationPolicy::Zero},
+        {"theta", InitializationPolicy::Zero},
 #endif
 
 #ifdef WARPX_QED
-    {"opticalDepthBW",   InitializationPolicy::RandomExp},
-    {"opticalDepthQSR",   InitializationPolicy::RandomExp}
+        {"opticalDepthBW",   InitializationPolicy::RandomExp},
+        {"opticalDepthQSR",   InitializationPolicy::RandomExp}
 #endif
 
-};
+    };
+}
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::ParticleReal initializeRealValue (const InitializationPolicy policy, amrex::RandomEngine const& engine) noexcept
@@ -144,6 +147,11 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         constexpr int lev = 0;
         const amrex::Real t = WarpX::GetInstance().gett_new(lev);
 
+        // Check: does the particle data reside on CPU or GPU?
+        amrex::Arena const * const pc_arena = pc.arena();
+        const bool run_on_gpu =
+            pc_arena->isManaged() || pc_arena->isDevice();
+
         // Initialize the last NumRuntimeRealComps() - n_external_attr_real runtime real attributes
         for (int j = PIdx::nattribs + n_external_attr_real; j < ptile.NumRealComps() ; ++j)
         {
@@ -158,7 +166,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 const QuantumSynchrotronGetOpticalDepth quantum_sync_get_opt =
                                                 p_qs_engine->build_optical_depth_functor();
                 // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
+                if (run_on_gpu) {
                         amrex::ParallelForRNG(stop - start,
                                               [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
                                                   const int ip = i + start;
@@ -185,7 +193,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 const BreitWheelerGetOpticalDepth breit_wheeler_get_opt =
                                                 p_bw_engine->build_optical_depth_functor();;
                 // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
+                if (run_on_gpu) {
                         amrex::ParallelForRNG(stop - start,
                                               [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept {
                                                   const int ip = i + start;
@@ -214,7 +222,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                     const amrex::ParserExecutor<7> user_real_attrib_parserexec =
                                              user_real_attrib_parser[ia]->compile<7>();
                     // If the particle tile was allocated in a memory pool that can run on GPU, launch GPU kernel
-                    if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<amrex::Real>>::value) {
+                    if (run_on_gpu) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
                                                const int ip = i + start;
@@ -246,7 +254,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
             if (it_ioniz != particle_icomps.end() &&
                 std::distance(particle_icomps.begin(), it_ioniz) == j)
             {
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<int>>::value) {
+                if (run_on_gpu) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
                                                const int ip = i + start;
@@ -268,7 +276,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
                 {
                      const amrex::ParserExecutor<7> user_int_attrib_parserexec =
                                              user_int_attrib_parser[ia]->compile<7>();
-                if constexpr (amrex::RunOnGpu<typename PTile::template AllocatorType<int>>::value) {
+                if (run_on_gpu) {
                         amrex::ParallelFor(stop - start,
                                            [=] AMREX_GPU_DEVICE (int i) noexcept {
                                                const int ip = i + start;

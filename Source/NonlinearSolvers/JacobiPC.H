@@ -70,7 +70,7 @@ class JacobiPC : public Preconditioner<T,Ops>
         JacobiPC(JacobiPC&&) noexcept = delete;
         JacobiPC& operator=(JacobiPC&&) noexcept = delete;
 
-        void Define (const T&, Ops* const) override;
+        void Define (const T&, Ops*) override;
 
         void Update (const T& a_U) override;
 
@@ -203,7 +203,7 @@ auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> 
                 ? m_x_ghost[n][dim] : *(x_mfarrvec[n][dim]);
 
             for (MFIter mfi(b_mf); mfi.isValid(); ++mfi) {
-                Box bx = mfi.validbox();
+                const Box bx = mfi.validbox();
                 auto xg_arr = xg_mf.const_array(mfi);
                 auto b_arr = b_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
@@ -213,8 +213,8 @@ auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> 
                     reduce_op.eval(bx, reduce_data,
                         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
                         {
-                            RT Ax = x_arr(i,j,k) * (RT(1.0) + a_arr(i,j,k,0));
-                            RT r = b_arr(i,j,k) - Ax;
+                            const RT Ax = x_arr(i,j,k) * (RT(1.0) + a_arr(i,j,k,0));
+                            const RT r = b_arr(i,j,k) - Ax;
                             return {r * r};
                         });
                 } else {
@@ -234,8 +234,8 @@ auto JacobiPC<T,Ops>::computeResidualNorm (const T& a_x, const T& a_b) const -> 
                                     }
                                 }
                             }
-                            RT Ax = xg_arr(i,j,k) + mx;
-                            RT r = b_arr(i,j,k) - Ax;
+                            const RT Ax = xg_arr(i,j,k) + mx;
+                            const RT r = b_arr(i,j,k) - Ax;
                             return {r * r};
                         });
                 }
@@ -296,8 +296,8 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
                 if ((*m_bcoefs)[n][dim]->nComp() > 1) {
                     m_has_offdiag = true;
                     for (int d = 0; d < AMREX_SPACEDIM; d++) {
-                        int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
-                        int w_d = (nc_d - 1) / 2;
+                        const int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
+                        const int w_d = (nc_d - 1) / 2;
                         m_stencil_width = std::max(m_stencil_width, w_d);
                     }
                 }
@@ -369,7 +369,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                 const int diag_comp = (a_mf.nComp() - 1) / 2;
 
                 for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    Box bx = mfi.tilebox();
+                    const Box bx = mfi.tilebox();
                     auto x_arr = x_mf.array(mfi);
                     auto b_arr = b_mf.const_array(mfi);
                     auto a_arr = a_mf.const_array(mfi);
@@ -386,8 +386,8 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
         if (!m_has_offdiag) {
             if (m_verbose) {
-                RT bnorm = a_b.norm2();
-                RT res = computeResidualNorm(a_x, a_b);
+                const RT bnorm = a_b.norm2();
+                const RT res = computeResidualNorm(a_x, a_b);
                 amrex::Print() << "  pc_jacobi (diag): residual = " << res
                                << ", " << res / std::max(bnorm, RT(1.e-30))
                                << " (rel.)\n";
@@ -398,7 +398,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
         copyToGhostAndFill(x_mfarrvec);
 
         const RT bnorm = a_b.norm2();
-        RT res0 = computeResidualNorm(a_x, a_b);
+        const RT res0 = computeResidualNorm(a_x, a_b);
         RT res_prev = res0;
 
         if (m_verbose) {
@@ -437,7 +437,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
                     for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
                     {
-                        Box bx = mfi.tilebox();
+                        const Box bx = mfi.tilebox();
                         auto w_arr = w_mf.array(mfi);
                         auto xg_arr = xg_mf.const_array(mfi);
                         auto a_arr = a_mf.const_array(mfi);
@@ -465,7 +465,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
                     for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
                     {
-                        Box bx = mfi.tilebox();
+                        const Box bx = mfi.tilebox();
                         auto x_arr = x_mf.array(mfi);
                         auto b_arr = b_mf.const_array(mfi);
                         auto w_arr = w_mf.const_array(mfi);
@@ -474,7 +474,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
                         ParallelFor(bx,
                             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
                         {
-                            RT r = b_arr(i,j,k) - w_arr(i,j,k);
+                            const RT r = b_arr(i,j,k) - w_arr(i,j,k);
                             x_arr(i,j,k) += om * r
                                 / (RT(1.0) + a_arr(i,j,k,diag_comp));
                         });
@@ -484,7 +484,7 @@ void JacobiPC<T,Ops>::Apply (T& a_x, const T& a_b)
 
             copyToGhostAndFill(x_mfarrvec);
 
-            RT res_norm = computeResidualNorm(a_x, a_b);
+            const RT res_norm = computeResidualNorm(a_x, a_b);
             if (m_verbose) {
                 amrex::Print() << "  pc_jacobi: iter = " << (iter+1)
                                << ", residual = " << res_norm

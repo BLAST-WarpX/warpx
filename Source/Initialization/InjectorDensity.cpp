@@ -86,11 +86,7 @@ void InjectorDensity::prepare (int li, InjectorDensity** inj_rho)
 
 bool InjectorDensity::needPreparation () const
 {
-    if (type == Type::fromfile) {
-        return true;
-    } else {
-        return false;
-    }
+    return (type == Type::fromfile);
 }
 
 bool InjectorDensity::distributed () const

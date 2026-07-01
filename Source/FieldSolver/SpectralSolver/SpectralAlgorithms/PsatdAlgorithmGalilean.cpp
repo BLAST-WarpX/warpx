@@ -192,7 +192,7 @@ PsatdAlgorithmGalilean::pushSpectralFields (SpectralFieldData& f) const
             const     amrex::Real kz_c = modified_kz_arr_c[j];
 #endif
             // Physical constants and imaginary unit
-            constexpr Real c2 = PhysConst::c * PhysConst::c;
+            constexpr Real c2 = PhysConst::c2;
             constexpr Real ep0 = PhysConst::epsilon_0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 

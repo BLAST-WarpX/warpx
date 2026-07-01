@@ -98,8 +98,6 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
         if not np.isclose(self.dx, self.dz):
             raise RuntimeError("Direct solver requires dx = dz.")
 
-        self.nxguardrho = 2
-        self.nzguardrho = 2
         self.nxguardphi = 1
         self.nzguardphi = 1
 
@@ -158,8 +156,7 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
         Poisson's equation."""
 
         # get rho from WarpX
-        rho_wrapper = sim.fields.get("rho_fp", level=0)
-        self.rho_data = rho_wrapper[(), ()]
+        self.rho_data = sim.fields.get("rho_fp", level=0)[...]
 
         self.solve()
 
@@ -175,12 +172,7 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
         )
         left_voltage = 0.0
 
-        rho = (
-            -self.rho_data[
-                self.nxguardrho : -self.nxguardrho, self.nzguardrho : -self.nzguardrho
-            ]
-            / constants.ep0
-        )
+        rho = -self.rho_data / constants.ep0
 
         # Construct b vector
         nx, nz = np.shape(rho)

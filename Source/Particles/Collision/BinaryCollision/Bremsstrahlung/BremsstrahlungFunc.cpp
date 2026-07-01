@@ -53,16 +53,19 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_kdsigdk_map.count(Z) == 1,
         "Bremsstrahlung cross section not available for Z = " + std::to_string(Z) + "!");
 
-    constexpr auto m_e_eV = PhysConst::m_e*PhysConst::c*PhysConst::c/PhysConst::q_e; // 0.511e6
+    constexpr auto m_e_eV = PhysConst::m_e*PhysConst::c2/PhysConst::q_e; // 0.511e6
 
-    nkoT1 = static_cast<int>(m_koT1_grid_h.size());
-    nKE = static_cast<int>(m_KEgrid_eV_h.size());
+    constexpr auto koT1_grid_h_size = static_cast<int>(decltype(m_koT1_grid_h)::size());
+    constexpr auto KEgrid_eV_h_size = static_cast<int>(decltype(m_KEgrid_eV_h)::size());
+
+    nkoT1 = koT1_grid_h_size;
+    nKE = KEgrid_eV_h_size;
 
     m_exe.nkoT1 = nkoT1;
     m_exe.nKE = nKE;
 
-    m_sigma_total_h.resize(m_KEgrid_eV_h.size());
-    m_kdsigdk_h.resize(m_KEgrid_eV_h.size()*m_koT1_grid_h.size());
+    m_sigma_total_h.resize(KEgrid_eV_h_size);
+    m_kdsigdk_h.resize(KEgrid_eV_h_size*koT1_grid_h_size);
 
     std::vector<std::vector<amrex::ParticleReal>> & kdsigdk = m_kdsigdk_map.at(Z);
 
@@ -102,8 +105,8 @@ BremsstrahlungFunc::UploadCrossSection (int Z)
     }
 
     // Setup and transfer the data to the GPU device
-    m_koT1_grid_d.resize(m_koT1_grid_h.size());
-    m_KEgrid_eV_d.resize(m_KEgrid_eV_h.size());
+    m_koT1_grid_d.resize(koT1_grid_h_size);
+    m_KEgrid_eV_d.resize(KEgrid_eV_h_size);
     m_kdsigdk_d.resize(m_kdsigdk_h.size());
     m_sigma_total_d.resize(m_sigma_total_h.size());
 

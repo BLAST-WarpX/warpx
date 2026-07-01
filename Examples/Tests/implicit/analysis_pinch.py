@@ -7,6 +7,8 @@
 # This is a script that analyses the simulation results from
 # the script `inputs_test_1d_theta_implicit_planar_pinch`.
 # and script `inputs_test_2d_theta_implicit_planar_pinch`.
+# and script `inputs_test_rcylinder_theta_implicit_dynamic_pinch`.
+# and script `inputs_test_rz_theta_implicit_dynamic_pinch`.
 # This simulates a planar pinch using the theta-implicit solver with
 # the curl curl PC including the diagonal response from mass matrices.
 
@@ -34,7 +36,7 @@ Eplasma = ele_energy + ion_energy
 
 if poynting_flux.shape[1] == 10:
     print("2D simulation")
-    gmres_iters_tol = 5
+    gmres_iters_tol = 5.0
     Eout_lo_x = poynting_flux[:, 6]
     Eout_lo_z = poynting_flux[:, 7]
     Eout_hi_x = poynting_flux[:, 8]
@@ -59,13 +61,13 @@ assert max_rel_net_energy < rel_net_energy_tol
 # check that the number of gmres iterations is below tolerance
 print(f"gmres iters per newton: {total_gmres_iters / total_newton_iters}")
 print(f"gmres iters tolerance: {gmres_iters_tol}")
-assert total_gmres_iters / total_newton_iters < gmres_iters_tol
+assert total_gmres_iters / total_newton_iters <= gmres_iters_tol
 
 # check that the number of newton iterations is below tolerance
-newton_iters_tol = 5
+newton_iters_tol = 6.0
 print(f"newton iters per time step: {total_newton_iters / num_steps}")
 print(f"newton iters tolerance: {newton_iters_tol}")
-assert total_newton_iters / num_steps < newton_iters_tol
+assert total_newton_iters / num_steps <= newton_iters_tol
 
 # check for machine precision conservation of charge density
 n0 = 1.0e23

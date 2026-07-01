@@ -112,7 +112,7 @@ struct CartesianCKCAlgorithm {
             amrex::Real const delta_t = std::min( dx[0], dx[1] )/PhysConst::c;
 #else
             // - In Cartesian 3D geometry: determined by the minimum cell size in all direction
-            amrex::Real const delta_t = std::min( dx[0], std::min( dx[1], dx[2] ) ) / PhysConst::c;
+            amrex::Real const delta_t = std::min({dx[0], dx[1], dx[2]}) / PhysConst::c;
 #endif
         return delta_t;
     }

@@ -12,7 +12,7 @@
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
-void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
+void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 {
     BL_PROFILE("ThetaImplicitEM::Define()");
 
@@ -25,10 +25,14 @@ void ThetaImplicitEM::Define ( WarpX* const  a_WarpX )
     m_num_amr_levels = 1;
 
     // Define E and Eold vectors
-    m_E.Define( m_WarpX, "Efield_fp" );
-    m_Eold.Define( m_E );
+    m_E.Define(m_WarpX, "Efield_fp");
+    m_Eold.Define(m_E);
 
-    // Define B_old MultiFabs
+    // Set initial values for E and Eold vectors
+    m_E.Copy(FieldType::Efield_fp);
+    m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
+
+    // Define B_old MultiFab
     using ablastr::fields::Direction;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const auto& ba_Bx = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->boxArray();
@@ -79,9 +83,9 @@ void ThetaImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
-                                const amrex::Real  a_dt,
-                                const int          a_step )
+int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
+                              const amrex::Real  a_dt,
+                              const int          a_step)
 {
     BL_PROFILE("ThetaImplicitEM::OneStep()");
 
@@ -94,37 +98,45 @@ void ThetaImplicitEM::OneStep ( const amrex::Real  start_time,
     m_dt = a_dt;
 
     // Save up and xp at the start of the time step
-    m_WarpX->SaveParticlesAtImplicitStepStart ( );
+    m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Save Eg at the start of the time step
-    m_Eold.Copy( FieldType::Efield_fp );
+    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
+    // (i.e., Eg used to advance the system from step n-1 to step n)
+    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
-    const int num_levels = 1;
-    for (int lev = 0; lev < num_levels; ++lev) {
+    // Save Eg at start of time step
+    SaveEoldMultifab();
+    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
+
+    // Save Bg at start of time step
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
         ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
         for (int n = 0; n < 3; ++n) {
-            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(),
-                                  B_old[n]->nGrowVect() );
+            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0, B_old[n]->nComp(), B_old[n]->nGrowVect());
         }
     }
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
-    m_E.Copy(m_Eold); // initial guess for Eg^{n+theta}
-    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
+    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
+
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) { return exit_status; }
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+theta}
-    UpdateWarpXFields( m_E, start_time );
+    UpdateWarpXFields(m_E, start_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
+    const amrex::Real new_time = start_time + m_dt;
+
     // Advance particles from time n+1/2 to time n+1
-    m_WarpX->FinishImplicitParticleUpdate();
+    m_WarpX->FinishImplicitParticleUpdate(new_time);
 
     // Advance Eg and Bg from time n+theta to time n+1
-    const amrex::Real end_time = start_time + m_dt;
-    FinishFieldUpdate( end_time );
+    FinishFieldUpdate(new_time);
 
+    return exit_status;
 }
 
 void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
@@ -308,11 +320,11 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                     val0 = 1.0_rt;
                     val1 = 2.0_rt;
                 }
-                if (bc_type == FieldBoundaryType::Absorbing_SilverMueller) {
+                if (bc_type == FieldBoundaryType::Absorbing_Silver_Mueller) {
                     val0 = 0.5_rt;
                     val1 = 1.0_rt;
                 }
-                if (bc_type == FieldBoundaryType::PECInsulator) {
+                if (bc_type == FieldBoundaryType::PEC_Insulator) {
                     const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                     if (voltage_driven) { // Dirichlet boundary for E
                         val0 = 0.0_rt;
@@ -332,7 +344,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 #endif
 
                 // Need to overwrite BC masks for certain BCs in this geometry
-                if (bc_type == FieldBoundaryType::PECInsulator &&
+                if (bc_type == FieldBoundaryType::PEC_Insulator &&
                    !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                     const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
                                                                    : static_cast<amrex::Real>(domain_hi[bdry_dir]));
@@ -436,7 +448,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         val1 = 2.0_rt;
                         val2 = 2.0_rt;
                     }
-                    if (bc_type == FieldBoundaryType::PECInsulator) {
+                    if (bc_type == FieldBoundaryType::PEC_Insulator) {
                         const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
                         if (voltage_driven) { // Dirichlet boundary for E
                             val0 = 0.0_rt;
@@ -453,7 +465,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
 #if defined(WARPX_DIM_RZ)
                     // Need to overwrite BC masks for certain BCs in this geometry
                     if (bdry_dir == 0) {
-                        if (bc_type == FieldBoundaryType::PECInsulator &&
+                        if (bc_type == FieldBoundaryType::PEC_Insulator &&
                            !m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side)) { // Dirichlet for B
                             const amrex::Real ibdry_real = (bdry_side == 0 ? static_cast<amrex::Real>(domain_lo[bdry_dir])
                                                                            : static_cast<amrex::Real>(domain_hi[bdry_dir]));
@@ -466,7 +478,7 @@ void ThetaImplicitEM::InitializeCurlCurlBCMasks ()
                         else if (bc_type == FieldBoundaryType::None) { // None is for axis
                             val0 = 2.0_rt;
                             val1 = 4.0_rt;
-                            val2 = 0.0_rt;
+                            val2 = 4.0_rt;
                         }
                     }
 #endif

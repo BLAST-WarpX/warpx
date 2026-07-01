@@ -70,7 +70,7 @@ class MultiParticleContainer
 
 public:
 
-    MultiParticleContainer (amrex::AmrCore* amr_core);
+    explicit MultiParticleContainer (amrex::AmrCore* amr_core);
 
     ~MultiParticleContainer() = default;
 
@@ -93,6 +93,8 @@ public:
     }
 
     amrex::ParticleReal maxParticleVelocity();
+
+    void TransformMomentumToCurvilinear (bool forward);
 
     void AllocData ();
 
@@ -196,7 +198,14 @@ public:
 
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
+    std::unique_ptr<amrex::MultiFab> GetGlobalPlasmaFrequency (int lev);
     void GenerateGlobalDebyeLength ();
+
+    /*
+     * \brief Calculates the electron-ion collision frequency for the specified species
+     * @param[in] electron_species_name name of the electon species
+     */
+    void CalculateNuei (std::string const & electron_species_name);
 
     void doFieldIonization (int lev,
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
@@ -249,7 +258,7 @@ public:
 
     void deleteInvalidParticles ();
 
-    void RedistributeLocal (int num_ghost);
+    void RedistributeLocal (int max_cells_travelled);
 
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */
@@ -462,7 +471,7 @@ protected:
 
     static constexpr auto m_default_quantum_sync_photon_creation_energy_threshold =
         static_cast<amrex::ParticleReal>(
-        2.0 * PhysConst::m_e * PhysConst::c * PhysConst::c );  /*!< Default value of the energy threshold for photon creation in Quantum Synchrotron process.*/
+        2.0 * PhysConst::m_e * PhysConst::c2 );  /*!< Default value of the energy threshold for photon creation in Quantum Synchrotron process.*/
 
 
     amrex::ParticleReal m_quantum_sync_photon_creation_energy_threshold =

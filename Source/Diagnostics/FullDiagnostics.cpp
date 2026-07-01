@@ -120,7 +120,7 @@ FullDiagnostics::ReadParameters ()
         "<diag>.format must be plotfile or openpmd or checkpoint or ascent or catalyst or sensei");
     std::vector<std::string> intervals_string_vec = {"0"};
     pp_diag_name.getarr("intervals", intervals_string_vec);
-    m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
+    m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
     const bool plot_raw_fields_specified = pp_diag_name.query("plot_raw_fields", m_plot_raw_fields);
     const bool plot_raw_fields_guards_specified = pp_diag_name.query("plot_raw_fields_guards", m_plot_raw_fields_guards);
     const bool raw_specified = plot_raw_fields_specified || plot_raw_fields_guards_specified;
@@ -445,7 +445,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(std::string("j"+field_names[idir]+"_displacement"), ncomp);
                 }
-            }  else if ( m_varnames_fields[comp].rfind("T"+field_names[idir]+"_", 0) == 0 ){
+            }  else if ( m_varnames_fields[comp].starts_with("T"+field_names[idir]+"_")){
                 // Remove component to get string to lookup in field register.
                 std::string T_arr_str = std::string(m_varnames_fields[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
@@ -468,7 +468,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("rho"), ncomp);
             }
-        } else if ( m_varnames_fields[comp].rfind("rho_", 0) == 0 ){
+        } else if ( m_varnames_fields[comp].starts_with("rho_")){
             // Initialize rho functor to dump rho per species
             m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true, m_rho_per_species_index[i],
                                                         false, ncomp);
@@ -476,7 +476,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 AddRZModesToOutputNames(std::string("rho_") + m_all_species_names[m_rho_per_species_index[i]], ncomp);
             }
             i++;
-        } else if ( m_varnames_fields[comp].rfind("T_", 0) == 0 ){
+        } else if ( m_varnames_fields[comp].starts_with("T_")){
             // Initialize temperature functor to dump temperature per species
             m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
             if (update_varnames) {
@@ -675,6 +675,14 @@ FullDiagnostics::AddRZModesToOutputNames (const std::string& field, int ncomp){
         m_varnames.push_back( field + "_" + std::to_string(ic) + "_real" );
         m_varnames.push_back( field + "_" + std::to_string(ic) + "_imag" );
     }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Radial-only geometries have no azimuthal modes (a single, real
+    // component per field), so the plain field name is added once. This
+    // mirrors the single functor created per field in
+    // `InitializeFieldFunctorsRZopenPMD` and keeps `m_varnames` in sync
+    // with the field functors.
+    amrex::ignore_unused(ncomp);
+    m_varnames.push_back(field);
 #else
     amrex::ignore_unused(field, ncomp);
 #endif
@@ -871,7 +879,7 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                     m_all_field_functors[lev][comp] = std::make_unique<JdispFunctor>(idir, lev, m_crse_ratio, true);
             } else if ( m_varnames[comp] == "A"+field_names[idir] ){
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::vector_potential_fp_nodal, Direction{idir}, lev), lev, m_crse_ratio);
-            } else if ( m_varnames[comp].rfind("T"+field_names[idir]+"_", 0) == 0 ){
+            } else if ( m_varnames[comp].starts_with("T"+field_names[idir]+"_")){
                 // Remove component to get string to lookup in field register.
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
@@ -884,11 +892,11 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         if ( m_varnames[comp] == "rho" ){
             // Initialize rho functor to dump total rho
             m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true);
-        } else if ( m_varnames[comp].rfind("rho_", 0) == 0 ){
+        } else if ( m_varnames[comp].starts_with("rho_")){
             // Initialize rho functor to dump rho per species
             m_all_field_functors[lev][comp] = std::make_unique<RhoFunctor>(lev, m_crse_ratio, true, m_rho_per_species_index[i]);
             i++;
-        } else if ( m_varnames[comp].rfind("T_", 0) == 0 ){
+        } else if ( m_varnames[comp].starts_with("T_")){
             // Initialize temperature functor to dump temperature per species
             m_all_field_functors[lev][comp] = std::make_unique<TemperatureFunctor>(lev, m_crse_ratio, m_T_per_species_index[i_T_species]);
             i_T_species++;

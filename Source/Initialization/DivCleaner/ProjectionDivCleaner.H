@@ -34,7 +34,6 @@
 #include <AMReX_REAL.H>
 #include <AMReX_SPACE.H>
 #include <AMReX_Vector.H>
-#include <AMReX_LO_BCTYPES.H>
 
 #include <ablastr/utils/Enums.H>
 
@@ -71,6 +70,13 @@ protected:
     ablastr::utils::enums::GridType m_grid_type;
 
     bool m_vector_potential;
+
+    // Component of the field to clean. Some external fields (e.g. applied particle fields)
+    // are stored as several stacked, independent field maps -- one component per map, each
+    // with its own time dependence -- so each map must be cleaned separately. Defaults to 0,
+    // which is the only component for ordinary single-component fields and preserves the
+    // existing interface for callers that do not load stacked field maps.
+    int m_comp = 0;
 
 private:
     // Helper template for executing the MLMG solver with cell and node based solvers
@@ -114,7 +120,8 @@ public:
     amrex::Gpu::DeviceVector<amrex::Real> m_stencil_coefs_z;
 
     // Default Constructor
-    ProjectionDivCleaner (std::string const& a_field_name, bool a_vector_potential=false);
+    explicit ProjectionDivCleaner (std::string const& a_field_name, bool a_vector_potential=false,
+                                   int a_comp=0);
 
     void ReadParameters ();
 
