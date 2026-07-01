@@ -87,7 +87,7 @@ MultiReducedDiags::MultiReducedDiags ()
             pp_rd_name.get("type", rd_type);
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                reduced_diags_dictionary.count(rd_type) != 0,
+                reduced_diags_dictionary.contains(rd_type),
                 rd_type + " is not a valid type for reduced diagnostic " + rd_name
             );
 

@@ -187,7 +187,7 @@ ExternalVectorPotential::InitData ()
             // check if the external current parsers depend on time
             for (int idim=0; idim<3; idim++) {
                 const std::set<std::string> A_ext_symbols = m_A_external_parser[i][idim]->symbols();
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(A_ext_symbols.count("t") == 0,
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!A_ext_symbols.contains("t"),
                     "Externally Applied Vector potential time variation must be set with A_time_external_function(t)");
             }
 
