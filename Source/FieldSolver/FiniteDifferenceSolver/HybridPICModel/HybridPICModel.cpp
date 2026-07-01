@@ -545,8 +545,9 @@ void HybridPICModel::BfieldEvolve (
 
             // Check that the B-field does not have nan or inf values
             for (int idim = 0; idim < 3; ++idim) {
-                step_succeeded = step_succeeded && Bfield[lev][idim]->is_finite();
+                step_succeeded = step_succeeded && Bfield[lev][idim]->is_finite(/*local=*/true);
             }
+            amrex::ParallelDescriptor::ReduceBoolAnd(step_succeeded);
 
             if (!step_succeeded) {
                 // restart this full step and this time use RKF45
