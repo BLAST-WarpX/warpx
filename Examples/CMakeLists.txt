@@ -1,6 +1,7 @@
 # Configuration ###############################################################
 #
 if(WarpX_MPI)
+    set(MPI_ALLOW_ROOT "")
     set(MPIEXEC_SUPPORTS_HOST OFF)
 
     # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
@@ -17,6 +18,9 @@ if(WarpX_MPI)
         endif()
     endif()
 
+    # Probe whether the MPI launcher accepts --host before using the Azure
+    # Open MPI slot-count workaround. Open MPI 4.1.6 lists --host under the
+    # "launch" help category instead of the default help text.
     set(MPIEXEC_HELP_COMMAND ${MPIEXEC_EXECUTABLE} ${MPI_ALLOW_ROOT})
     foreach(MPIEXEC_HELP_OPTION "" launch)
         execute_process(
@@ -128,7 +132,7 @@ function(add_warpx_test
 
     # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
     # "There are not enough slots available in the system to satisfy the 2 slots
-    # that were requested by the application"
+    # that were requested by the application".
     if(MPIEXEC_SUPPORTS_HOST)
         set(MPI_HOST_NUMPROC --host localhost:${nprocs})
     else()
