@@ -20,6 +20,7 @@
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX.H>
+#include <AMReX_Algorithm.H>
 #include <AMReX_AmrCore.H>
 #include <AMReX_AmrParGDB.H>
 #include <AMReX_Box.H>
@@ -325,6 +326,29 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
 {
     ABLASTR_PROFILE("QdsmcParticleContainer::PushX()");
 
+    amrex::Geometry const & geom = Geom(lev);
+    auto const plo = geom.ProbLoArray();
+    auto const phi = geom.ProbHiArray();
+    auto const dx_arr = geom.CellSizeArray();
+
+    // Per-dimension domain clamp bounds. In non-periodic directions the
+    // advected position is clamped just inside the domain (positions at or
+    // beyond ProbHi count as outside) rather than handed to Redistribute,
+    // which would DELETE the marker: since InitParticles runs only once, the
+    // home cell would then have no QDSMC marker for the rest of the run and
+    // its T_e could never be updated again. Clamping instead accumulates the
+    // carried entropy at the boundary nodes and preserves the
+    // one-marker-per-cell invariant (ResetParticles returns it home).
+    // Periodic directions are left unclamped so Redistribute wraps them.
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> lo_bnd;
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> hi_bnd;
+    amrex::GpuArray<int, AMREX_SPACEDIM> is_periodic;
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        lo_bnd[d] = plo[d];
+        hi_bnd[d] = phi[d] - 1.e-6_rt * dx_arr[d];
+        is_periodic[d] = geom.isPeriodic(d);
+    }
+
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         long const np = pti.numParticles();
@@ -374,6 +398,19 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
                 x_node[ip], y_node[ip], z_node[ip],
                 vx[ip], vy[ip], vz[ip],
                 xp_new, yp_new, zp_new, dt);
+
+            // Clamp the AMReX-tracked coordinates to the domain in
+            // non-periodic directions (see the bound setup above).
+#if defined(WARPX_DIM_3D)
+            if (!is_periodic[0]) { xp_new = amrex::Clamp(xp_new, lo_bnd[0], hi_bnd[0]); }
+            if (!is_periodic[1]) { yp_new = amrex::Clamp(yp_new, lo_bnd[1], hi_bnd[1]); }
+            if (!is_periodic[2]) { zp_new = amrex::Clamp(zp_new, lo_bnd[2], hi_bnd[2]); }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            if (!is_periodic[0]) { xp_new = amrex::Clamp(xp_new, lo_bnd[0], hi_bnd[0]); }
+            if (!is_periodic[1]) { zp_new = amrex::Clamp(zp_new, lo_bnd[1], hi_bnd[1]); }
+#elif defined(WARPX_DIM_1D_Z)
+            if (!is_periodic[0]) { zp_new = amrex::Clamp(zp_new, lo_bnd[0], hi_bnd[0]); }
+#endif
 
             // Write the new position back to the AMReX-tracked position
             // slots. For axes not represented in the field, there is no

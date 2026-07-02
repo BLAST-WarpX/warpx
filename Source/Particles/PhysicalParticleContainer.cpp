@@ -1852,13 +1852,19 @@ PhysicalParticleContainer::DepositTemperature (
     // Return if we are not depositing temperature.
     if (!m_do_temperature_deposition) { return; }
 
-    if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
-        || push_type != PushType::Explicit
+    // The temperature deposit runs its own shape-N moment kernels
+    // (doVarianceDepositionShapeN) from AccumulateVelocitiesAndComputeTemperature,
+    // sharing no code or particle staging with the current-deposition algorithm,
+    // and the T_<species> fields inherit current_fp's guard cells (which only
+    // grow for the non-direct algorithms). The current-deposition algorithm is
+    // therefore not restricted here; implicit pushers and shared-memory
+    // deposition change the u/x staging assumptions and remain unsupported.
+    if (push_type != PushType::Explicit
         || WarpX::do_shared_mem_current_deposition
         )
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "Temperature Deposition only works with explicit solvers, direct current deposition, "
+            "Temperature Deposition only works with explicit solvers "
             "and non-shared memory deposition."
         );
     }

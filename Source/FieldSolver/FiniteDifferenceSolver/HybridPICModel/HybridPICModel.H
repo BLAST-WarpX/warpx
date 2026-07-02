@@ -394,9 +394,14 @@ public:
      *        (single-eta behaviour is exactly recovered when callers add
      *        a field of zeros to E).
      *
-     *        Computed once per E-solve call. Caller passes pre-allocated
-     *        Yee-staggered MultiFabs (one per direction) sized to match
-     *        Jx/Jy/Jz at this level.
+     *        Computed once per step (from HybridPICEvolveFields, into the
+     *        registered hybrid_eta_overlay_fp fields) and held frozen across
+     *        the subcycled E-solves, which only read it. Its inputs (Vs_fp,
+     *        Ve_fp, rho_fp_{spec}, T_e) are per-step quantities anyway; only
+     *        the |J| and |B| parser arguments would vary per substep, and
+     *        those are frozen along with the rest. Caller passes
+     *        pre-allocated Yee-staggered MultiFabs (one per direction) sized
+     *        to match Jx/Jy/Jz at this level.
      */
     void ComputeResistiveOverlay (
         int lev,
@@ -524,8 +529,29 @@ public:
     /** Fast-path flag: true if at least one charged species has a
      *  registered per-species resistivity parser. When false the
      *  per-species code paths short-circuit to the global parser only,
-     *  preserving the existing single-eta behaviour with zero overhead. */
+     *  preserving the existing single-eta behaviour with zero overhead.
+     *  Set from the input deck in ReadParameters (so AllocateLevelMFs can
+     *  gate the overlay fields) and confirmed in InitData when the parsers
+     *  are compiled. */
     bool m_has_per_species_eta = false;
+
+    /** True when the gridded fluid velocities Ve_fp / Vs_fp_{spec} are
+     *  needed, i.e. when a per-species resistivity parser is registered or
+     *  a hybrid_resistive_drag collision is present in the input deck.
+     *  Gates their allocation and the once-per-step
+     *  CalculateElectronFluidVelocity / CalculateIonFluidVelocity calls.
+     *  Set in ReadParameters. */
+    bool m_need_fluid_velocities = false;
+
+    /** True when the per-species deposited fields current_fp_{spec} /
+     *  rho_fp_{spec} are needed, i.e. when m_need_fluid_velocities is true
+     *  or the electron-energy equation is solved (its Joule and Q_ei
+     *  sources read the per-species charge densities). Gates their
+     *  allocation and the per-species deposition path in
+     *  HybridPICDepositRhoAndJ; when false, the deposition falls back to
+     *  the single-pass MultiParticleContainer path with zero extra cost.
+     *  Set in ReadParameters. */
+    bool m_need_per_species_fields = false;
 
     /** Plasma hyper-resisitivity */
     std::string m_eta_h_expression = "0.0";

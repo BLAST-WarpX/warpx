@@ -29,6 +29,9 @@
 
 #include <AMReX_Random.H>
 
+#include <string>
+#include <vector>
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
@@ -115,6 +118,45 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("include_temperature_relaxation", m_include_temperature_relaxation);
     pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
 
+    // Determine, from the input deck alone, which optional per-species
+    // machinery is needed (the particle containers do not exist yet at
+    // parameter-parse time, but the species names are available):
+    //   * a per-species resistivity overlay parser for any species,
+    //   * a hybrid_resistive_drag collision on any species,
+    //   * the electron-energy equation (its Joule and Q_ei sources read the
+    //     per-species charge densities).
+    // These flags gate the per-species field allocations, the per-species
+    // rho/J deposition and the fluid-velocity computations, so hybrid-PIC
+    // runs that use none of these features carry zero extra cost.
+    {
+        std::vector<std::string> species_names;
+        const ParmParse pp_particles("particles");
+        pp_particles.queryarr("species_names", species_names);
+        for (auto const & spec_name : species_names) {
+            std::string expr;
+            if (pp_hybrid.query(
+                ("plasma_resistivity_" + spec_name + "(rho_s,rho,Te,J,J_s,B,t)").c_str(),
+                expr)) {
+                m_has_per_species_eta = true;
+            }
+        }
+
+        bool has_resistive_drag = false;
+        std::vector<std::string> collision_names;
+        const ParmParse pp_collisions("collisions");
+        pp_collisions.queryarr("collision_names", collision_names);
+        for (auto const & coll_name : collision_names) {
+            const ParmParse pp_coll(coll_name);
+            std::string coll_type;
+            pp_coll.query("type", coll_type);
+            if (coll_type == "hybrid_resistive_drag") { has_resistive_drag = true; }
+        }
+
+        m_need_fluid_velocities   = m_has_per_species_eta || has_resistive_drag;
+        m_need_per_species_fields = m_need_fluid_velocities
+                                  || m_solve_electron_energy_equation;
+    }
+
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
 
@@ -173,37 +215,39 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
-    // QDSMC electron-energy-equation state. Three nodal scalar fields,
-    // all allocated unconditionally (cheap; the QDSMC orchestration
-    // only touches them when m_solve_electron_energy_equation is on, but having them always
-    // available simplifies the diagnostic side and keeps the state
-    // shape independent of the run-time flag).
-    //   * hybrid_electron_temperature_fp : T_e (Joules)
-    //   * hybrid_entropy_fp              : K_e = T_e * n_e^(1-gamma)
-    //   * hybrid_qdsmc_weights_fp        : scratch for deposited N_e
+    // Electron temperature T_e (Kelvin). Allocated unconditionally (cheap)
+    // so the Te diagnostic functor can always read it: with the energy
+    // equation on it is the QDSMC state variable, otherwise it mirrors the
+    // algebraic closure's implied temperature (CalculateElectronPressure).
     fields.alloc_init(FieldType::hybrid_electron_temperature_fp,
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_entropy_fp,
-        lev, amrex::convert(ba, rho_nodal_flag),
-        dm, ncomps, ngRho, 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_qdsmc_weights_fp,
-        lev, amrex::convert(ba, rho_nodal_flag),
-        dm, ncomps, ngRho, 0.0_rt);
 
-    // Three-component electron fluid velocity V_e on a NODAL grid. Computed
-    // each step from V_e = -(J_plasma - J_i) / (q_e * n_e) via interpolation
-    // of the Yee-staggered J fields to the nodal grid; consumed by the
-    // QDSMC particle SetV step to advect the entropy carriers.
-    fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{0},
-        lev, amrex::convert(ba, rho_nodal_flag),
-        dm, ncomps, ngRho, 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{1},
-        lev, amrex::convert(ba, rho_nodal_flag),
-        dm, ncomps, ngRho, 0.0_rt);
-    fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{2},
-        lev, amrex::convert(ba, rho_nodal_flag),
-        dm, ncomps, ngRho, 0.0_rt);
+    // QDSMC electron-energy-equation working fields, only touched (and
+    // therefore only allocated) when the energy equation is solved:
+    //   * hybrid_entropy_fp              : K_e = T_e * n_e^(1-gamma)
+    //   * hybrid_qdsmc_weights_fp        : scratch for deposited N_e
+    //   * hybrid_electron_velocity_fp    : three-component V_e on a NODAL
+    //     grid, computed each step from V_e = -(J_plasma - J_i)/(q_e n_e)
+    //     and consumed by the QDSMC particle SetV step to advect the
+    //     entropy carriers.
+    if (m_solve_electron_energy_equation) {
+        fields.alloc_init(FieldType::hybrid_entropy_fp,
+            lev, amrex::convert(ba, rho_nodal_flag),
+            dm, ncomps, ngRho, 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_qdsmc_weights_fp,
+            lev, amrex::convert(ba, rho_nodal_flag),
+            dm, ncomps, ngRho, 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{0},
+            lev, amrex::convert(ba, rho_nodal_flag),
+            dm, ncomps, ngRho, 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{1},
+            lev, amrex::convert(ba, rho_nodal_flag),
+            dm, ncomps, ngRho, 0.0_rt);
+        fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{2},
+            lev, amrex::convert(ba, rho_nodal_flag),
+            dm, ncomps, ngRho, 0.0_rt);
+    }
 
     // The "hybrid_rho_fp_temp" multifab is used to store the ion charge density
     // interpolated or extrapolated to appropriate timesteps.
@@ -239,34 +283,54 @@ void HybridPICModel::AllocateLevelMFs (
     // and rho_fp_s are deposited from particles and accumulated into the
     // global current_fp / rho_fp; Vs_fp_s is the bulk velocity J_s/rho_s,
     // used by the resistive-drag operator to shift each species' particles
-    // toward V_e without collapsing the thermal moment.
-    auto const & mypc = WarpX::GetInstance().GetPartContainer();
-    for (auto const & spec : mypc.GetSpeciesNames()) {
-        if (mypc.GetParticleContainerFromName(spec).getCharge() == 0._prt) { continue; }
-        fields.alloc_init("current_fp_" + spec, Direction{0},
-            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-        fields.alloc_init("current_fp_" + spec, Direction{1},
-            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-        fields.alloc_init("current_fp_" + spec, Direction{2},
-            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-        fields.alloc_init("rho_fp_" + spec,
-            lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
-        fields.alloc_init("Vs_fp_" + spec, Direction{0},
-            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-        fields.alloc_init("Vs_fp_" + spec, Direction{1},
-            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-        fields.alloc_init("Vs_fp_" + spec, Direction{2},
-            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    // toward V_e without collapsing the thermal moment. Only allocated when
+    // a feature that consumes them is active (see m_need_per_species_fields
+    // and m_need_fluid_velocities).
+    if (m_need_per_species_fields) {
+        auto const & mypc = WarpX::GetInstance().GetPartContainer();
+        for (auto const & spec : mypc.GetSpeciesNames()) {
+            if (mypc.GetParticleContainerFromName(spec).getCharge() == 0._prt) { continue; }
+            fields.alloc_init("current_fp_" + spec, Direction{0},
+                lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init("current_fp_" + spec, Direction{1},
+                lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init("current_fp_" + spec, Direction{2},
+                lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init("rho_fp_" + spec,
+                lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
+            if (m_need_fluid_velocities) {
+                fields.alloc_init("Vs_fp_" + spec, Direction{0},
+                    lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+                fields.alloc_init("Vs_fp_" + spec, Direction{1},
+                    lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+                fields.alloc_init("Vs_fp_" + spec, Direction{2},
+                    lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+            }
+        }
     }
 
     // Electron fluid velocity V_e on the grid, V_e = (J_i - J_plasma)/rho.
     // Face-staggered like J for direct gather by the resistive-drag operator.
-    fields.alloc_init("Ve_fp", Direction{0},
-        lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-    fields.alloc_init("Ve_fp", Direction{1},
-        lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
-    fields.alloc_init("Ve_fp", Direction{2},
-        lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    if (m_need_fluid_velocities) {
+        fields.alloc_init("Ve_fp", Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("Ve_fp", Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("Ve_fp", Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    }
+
+    // Per-species resistive overlay added to Ohm's-law E (see
+    // ComputeResistiveOverlay). Computed once per step and read by every
+    // (subcycled) E-solve; staggered like J (== E component staggering).
+    if (m_has_per_species_eta) {
+        fields.alloc_init("hybrid_eta_overlay_fp", Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_fp", Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_fp", Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+    }
 
     // the external current density multifab matches the current staggering and
     // one ghost cell is used since we interpolate the current to a nodal grid
@@ -1210,7 +1274,10 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
     amrex::MultiFab const & weights = *warpx.m_fields.get(FieldType::hybrid_qdsmc_weights_fp,        lev);
     amrex::MultiFab const & rho     = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
 
-    Te.setVal(0.0_rt);
+    // Note: T_e is NOT zeroed here. Cells that received no QDSMC weight or
+    // are below the density floor keep their previous T_e -- zeroing them
+    // would erase valid state (and seed K_e = 0 into neighbors on the next
+    // step) whenever a cell momentarily receives no deposit.
 
     auto const gamma      = m_gamma;
     auto const n_floor    = m_qdsmc_n_floor;

@@ -137,6 +137,9 @@ public:
 
     /**
      * @brief Advance the particle position by x = x_home + v*dt (forward Euler).
+     *        In non-periodic directions the new position is clamped just
+     *        inside the domain so Redistribute() cannot delete the marker
+     *        (the carried entropy accumulates at the boundary nodes instead).
      *        Calls Redistribute() at the end so particles end up in the
      *        correct tile for their new position.
      */

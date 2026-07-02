@@ -595,21 +595,16 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
-    // Only computed and added when at least one species has a per-species
-    // resistivity parser registered. Otherwise the overlay is identically zero,
-    // so the compute and the per-cell add are skipped (E += 0 is a no-op) --
-    // bit-identical to the single-eta path, but avoids the per-substep field
-    // zeroing and the overlay read in the hot E-solve.
+    // Computed once per step (HybridPICEvolveFields -> ComputeResistiveOverlay)
+    // into the registered hybrid_eta_overlay_fp fields and only READ here, so
+    // the subcycled E-solves share it instead of recomputing it. When no
+    // per-species resistivity parser is registered the fields are not
+    // allocated and the per-cell add is skipped (E += 0 is a no-op) --
+    // bit-identical to the single-eta path.
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
-    MultiFab eta_overlay_r_mf(Jfield[0]->boxArray(), Jfield[0]->DistributionMap(),
-                              1, Jfield[0]->nGrowVect());
-    MultiFab eta_overlay_t_mf(Jfield[1]->boxArray(), Jfield[1]->DistributionMap(),
-                              1, Jfield[1]->nGrowVect());
-    MultiFab eta_overlay_z_mf(Jfield[2]->boxArray(), Jfield[2]->DistributionMap(),
-                              1, Jfield[2]->nGrowVect());
+    ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
     if (has_eta_overlay) {
-        hybrid_model->ComputeResistiveOverlay(
-            lev, eta_overlay_r_mf, eta_overlay_t_mf, eta_overlay_z_mf);
+        eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
     }
 
     // Loop through the grids, and over the tiles within each grid for the
@@ -714,9 +709,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
-        Array4<Real const> const& eta_overlay_r = eta_overlay_r_mf.const_array(mfi);
-        Array4<Real const> const& eta_overlay_t = eta_overlay_t_mf.const_array(mfi);
-        Array4<Real const> const& eta_overlay_z = eta_overlay_z_mf.const_array(mfi);
+        // Overlay arrays stay default-constructed (never indexed) when no
+        // per-species resistivity is registered -- the kernels gate the read
+        // on has_eta_overlay.
+        Array4<Real const> eta_overlay_r, eta_overlay_t, eta_overlay_z;
+        if (has_eta_overlay) {
+            eta_overlay_r = eta_overlay_mf[0]->const_array(mfi);
+            eta_overlay_t = eta_overlay_mf[1]->const_array(mfi);
+            eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+        }
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -1067,19 +1068,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
-    // See HybridPICSolveECylindrical (RZ branch) for the design notes; when no
-    // per-species parser is registered the overlay is identically zero, so the
-    // compute and per-cell add are skipped (bit-identical single-eta path).
+    // Computed once per step into the registered hybrid_eta_overlay_fp fields
+    // and only READ here; see HybridPICSolveECylindrical (RZ branch) for the
+    // design notes. When no per-species parser is registered the fields are
+    // not allocated and the per-cell add is skipped (bit-identical
+    // single-eta path).
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
-    MultiFab eta_overlay_x_mf(Jfield[0]->boxArray(), Jfield[0]->DistributionMap(),
-                              1, Jfield[0]->nGrowVect());
-    MultiFab eta_overlay_y_mf(Jfield[1]->boxArray(), Jfield[1]->DistributionMap(),
-                              1, Jfield[1]->nGrowVect());
-    MultiFab eta_overlay_z_mf(Jfield[2]->boxArray(), Jfield[2]->DistributionMap(),
-                              1, Jfield[2]->nGrowVect());
+    ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
     if (has_eta_overlay) {
-        hybrid_model->ComputeResistiveOverlay(
-            lev, eta_overlay_x_mf, eta_overlay_y_mf, eta_overlay_z_mf);
+        eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
     }
 
     // Loop through the grids, and over the tiles within each grid for the
@@ -1184,9 +1181,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Bx = Bfield[0]->array(mfi);
         Array4<Real> const& By = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
-        Array4<Real const> const& eta_overlay_x = eta_overlay_x_mf.const_array(mfi);
-        Array4<Real const> const& eta_overlay_y = eta_overlay_y_mf.const_array(mfi);
-        Array4<Real const> const& eta_overlay_z = eta_overlay_z_mf.const_array(mfi);
+        // Overlay arrays stay default-constructed (never indexed) when no
+        // per-species resistivity is registered -- the kernels gate the read
+        // on has_eta_overlay.
+        Array4<Real const> eta_overlay_x, eta_overlay_y, eta_overlay_z;
+        if (has_eta_overlay) {
+            eta_overlay_x = eta_overlay_mf[0]->const_array(mfi);
+            eta_overlay_y = eta_overlay_mf[1]->const_array(mfi);
+            eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+        }
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
