@@ -180,6 +180,9 @@ computeEffectivePotentialPhi (
                     linop_nodelap->setEBDirichlet(boundary_handler.getPhiEB(current_time.value()));
                 }
             }
+            if (is_rz) {
+                linop_nodelap->setRZ(true);
+            }
             linop_nodelap->setSigma(lev, sigma);
             linop = std::move(linop_nodelap);
 #endif

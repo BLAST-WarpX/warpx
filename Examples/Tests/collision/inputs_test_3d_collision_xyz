@@ -1,7 +1,7 @@
 #################################
 ####### GENERAL PARAMETERS ######
 #################################
-max_step = 150
+max_step = 100
 amr.n_cell = 8 8 8
 amr.max_grid_size = 8
 amr.blocking_factor = 8
@@ -68,9 +68,12 @@ collision3.species = ion ion
 collision1.CoulombLog = 15.9
 collision2.CoulombLog = 15.9
 collision3.CoulombLog = 15.9
-collision1.ndt_supercycle = 10
-collision2.ndt_supercycle = 10
-collision3.ndt_supercycle = 10
+collision1.ndt_supercycle = 2
+collision2.ndt_supercycle = 2
+collision3.ndt_supercycle = 2
+collision1.cumulative_scattering_angle_model = BOBYLEV
+collision2.cumulative_scattering_angle_model = BOBYLEV
+collision3.cumulative_scattering_angle_model = BOBYLEV
 
 # Diagnostics
 diagnostics.diags_names = diag1 diag_parser_filter diag_uniform_filter diag_random_filter

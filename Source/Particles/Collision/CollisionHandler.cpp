@@ -19,6 +19,7 @@
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
+#include "Particles/Collision/InverseBremsstrahlung/InverseBremsstrahlung.H"
 #include "Utils/TextMsg.H"
 
 #include "Particles/ParticleCreation/SmartCopy.H"
@@ -86,6 +87,10 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
                     collision_names[i], mypc
                 );
         }
+        else if (type == "inverse_bremsstrahlung") {
+            allcollisions[i] = std::make_unique<InverseBremsstrahlung>(collision_names[i], mypc);
+            m_use_global_debye_length = true;
+        }
         else if (type == "linear_breit_wheeler") {
             allcollisions[i] =
                std::make_unique<BinaryCollision<LinearBreitWheelerCollisionFunc, ParticleCreationFunc>>(
@@ -140,6 +145,8 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
 #endif
 
     if (m_use_global_debye_length) {
+        // This will calculate the temperature, Vbar, and particle number that are needed by
+        // the various collision algorithms
         mypc->GenerateGlobalDebyeLength();
     }
 

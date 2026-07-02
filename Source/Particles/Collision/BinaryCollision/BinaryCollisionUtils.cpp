@@ -7,8 +7,10 @@
 
 #include "BinaryCollisionUtils.H"
 
+#include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
@@ -99,6 +101,45 @@ namespace BinaryCollisionUtils{
             return CollisionType::LinearCompton;
         }
         return CollisionType::Undefined;
+    }
+
+    amrex::Vector<ScatteringProcess>
+    parse_scattering_processes (const std::string& collision_name)
+    {
+        using namespace amrex::literals;
+
+        const amrex::ParmParse pp_collision_name(collision_name);
+
+        amrex::Vector<std::string> scattering_process_names;
+        pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+
+        // create a vector of ScatteringProcess objects from each scattering
+        // process name
+        amrex::Vector<ScatteringProcess> scattering_processes;
+        for (const auto& scattering_process : scattering_process_names) {
+            const std::string kw_cross_section = scattering_process + "_cross_section";
+            std::string cross_section_file;
+            pp_collision_name.query(kw_cross_section, cross_section_file);
+
+            // if the scattering process is excitation or ionization get the energy
+            // associated with that process (it is required for these processes);
+            // for all other processes the energy is optional and defaults to 0
+            amrex::ParticleReal energy = 0._prt;
+            const std::string kw_energy = scattering_process + "_energy";
+            if (scattering_process.find("excitation") != std::string::npos ||
+                scattering_process.find("ionization") != std::string::npos) {
+                utils::parser::getWithParser(
+                    pp_collision_name, kw_energy.c_str(), energy);
+            } else {
+                utils::parser::queryWithParser(
+                    pp_collision_name, kw_energy.c_str(), energy);
+            }
+
+            scattering_processes.push_back(ScatteringProcess(
+                scattering_process, cross_section_file, energy));
+        }
+
+        return scattering_processes;
     }
 
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,

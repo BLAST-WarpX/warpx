@@ -80,7 +80,7 @@ namespace
 }
 
 LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies, const std::string& name)
-    : WarpXParticleContainer(amr_core, ispecies),
+    : WarpXParticleContainer(amr_core, ispecies, name),
       m_laser_name{name}
 {
     m_charge = 1.0;
@@ -157,7 +157,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
     }
 
     //Check if profile exists
-    if(laser_profiles_dictionary.count(laser_type_s) == 0 ){
+    if(!laser_profiles_dictionary.contains(laser_type_s)){
         WARPX_ABORT_WITH_MESSAGE(std::string("Unknown laser type: ").append(laser_type_s));
     }
     m_up_laser_profile = laser_profiles_dictionary.at(laser_type_s)();
@@ -306,8 +306,8 @@ LaserParticleContainer::ContinuousInjection (const RealBox& injection_box)
     // the case for the R coordinate of the laser antenna in RZ (since
     // that equals 0 and thus coincides with the low end of the injection
     // box along R, which also equals 0).
-    const bool is_contained = (injection_box.lo(1) < p_pos[1] &&
-                               p_pos[1] < injection_box.hi(1));
+    const bool is_contained = (injection_box.lo(1) <= p_pos[1] &&
+                               p_pos[1] <= injection_box.hi(1));
 #else
     const bool is_contained = injection_box.contains(p_pos);
 #endif

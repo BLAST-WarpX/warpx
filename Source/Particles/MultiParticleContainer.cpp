@@ -322,8 +322,10 @@ MultiParticleContainer::ReadParameters ()
                 bool species_type_is_photon = false;
                 const ParmParse pp_species(name);
                 if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
-                    const auto physical_species =
-                        species::from_string(type_string);
+                    const auto physical_species = species::from_string(type_string);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        physical_species.has_value(),
+                        "'" + type_string + "' is not a valid species_type");
                     species_type_is_photon =
                         (physical_species.value() == PhysicalSpecies::photon);
                 }
@@ -812,6 +814,47 @@ MultiParticleContainer::GenerateGlobalDebyeLength ()
                         global_debye_array(i,j,k) = std::sqrt(1.0_rt/invLDe_sq);
                     }
                 });
+        }
+    }
+}
+
+void
+MultiParticleContainer::CalculateNuei (std::string const & electron_species_name)
+{
+    WarpX & warpx = WarpX::GetInstance();
+
+    if (allcontainers.empty()) { return; }
+
+    auto& electron_species = GetParticleContainerFromName(electron_species_name);
+
+    // Is there a nicer way to get the number of levels?
+    // This grabs it from the first species.
+    int const finest_level = allcontainers[0]->finestLevel();
+
+    for (int lev = 0 ; lev <= finest_level ; lev++) {
+
+        std::string const field_name = "nuei_" + electron_species_name;
+        if (!warpx.m_fields.has(field_name, lev)) {
+            amrex::BoxArray const & ba = warpx.boxArray(lev);
+            amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+            const int ncomps = 1;
+            const amrex::IntVect ng = amrex::IntVect::TheZeroVector();
+            const bool remake = true;
+            const bool redistribute_on_remake = false;
+            warpx.m_fields.alloc_init(field_name, lev, ba, dmap, ncomps, ng, 0.,
+                                      remake, redistribute_on_remake);
+        }
+
+        amrex::MultiFab & species_nuei = *warpx.m_fields.get(field_name, lev);
+        species_nuei.setVal(amrex::Real(0.0));
+
+        for (auto& pc : allcontainers) {
+            // Only include interactions with ion species
+            if (pc->species_name == electron_species_name ||
+                pc->getCharge() <= 0. || pc->getMass() == 0.) {
+                continue;
+            }
+            pc->CalculateNuei(species_nuei, electron_species, lev);
         }
     }
 }

@@ -635,8 +635,8 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-            if (!(field_boundary_lo[idim] == FieldBoundaryType::PECInsulator) &&
-                !(field_boundary_hi[idim] == FieldBoundaryType::PECInsulator)) { continue; }
+            if (!(field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator) &&
+                !(field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator)) { continue; }
 
             if ( (node_box.smallEnd()[idim] > domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] < domain_hi[idim]) ) { continue; }
@@ -672,8 +672,8 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
 
-                if ((iside == -1 && (field_boundary_lo[idim] != FieldBoundaryType::PECInsulator)) ||
-                    (iside == +1 && (field_boundary_hi[idim] != FieldBoundaryType::PECInsulator))) { continue; }
+                if ((iside == -1 && (field_boundary_lo[idim] != FieldBoundaryType::PEC_Insulator)) ||
+                    (iside == +1 && (field_boundary_hi[idim] != FieldBoundaryType::PEC_Insulator))) { continue; }
 
                 if ((iside == -1 && (node_box.smallEnd()[idim] > domain_lo[idim])) ||
                     (iside == +1 && (node_box.bigEnd()[idim] < domain_hi[idim]))) { continue; }
@@ -803,8 +803,8 @@ PEC_Insulator::ZeroParallelScalarInConductor (
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
 
-            if (!(field_boundary_lo[idim] == FieldBoundaryType::PECInsulator) &&
-                !(field_boundary_hi[idim] == FieldBoundaryType::PECInsulator)) { continue; }
+            if (!(field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator) &&
+                !(field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator)) { continue; }
 
             if ( (node_box.smallEnd()[idim] > domain_lo[idim]) &&
                  (node_box.bigEnd()[idim] < domain_hi[idim]) ) { continue; }
@@ -816,8 +816,8 @@ PEC_Insulator::ZeroParallelScalarInConductor (
             // Loop over sides, iside = -1 (lo), iside = +1 (hi)
             for (int iside = -1; iside <= +1; iside += 2) {
 
-                if ((iside == -1 && (field_boundary_lo[idim] != FieldBoundaryType::PECInsulator)) ||
-                    (iside == +1 && (field_boundary_hi[idim] != FieldBoundaryType::PECInsulator))) { continue; }
+                if ((iside == -1 && (field_boundary_lo[idim] != FieldBoundaryType::PEC_Insulator)) ||
+                    (iside == +1 && (field_boundary_hi[idim] != FieldBoundaryType::PEC_Insulator))) { continue; }
 
                 if ((iside == -1 && (node_box.smallEnd()[idim] > domain_lo[idim])) ||
                     (iside == +1 && (node_box.bigEnd()[idim] < domain_hi[idim]))) { continue; }

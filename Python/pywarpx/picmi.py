@@ -158,6 +158,10 @@ class Species(picmistandard.PICMI_Species):
         Resampling will be done when the average number of
         particles per cell exceeds this number
 
+    warpx_resampling_algorithm_target_ratio: float, default=1.5
+        Roughly corresponds to the ratio between the number of particles before
+        and after resampling. Only used with the `leveling_thinning` algorithm.
+
     warpx_resampling_algorithm: str, default="leveling_thinning"
         Resampling algorithm to use.
 
@@ -287,6 +291,9 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_triggering_max_avg_ppc = kw.pop(
             "warpx_resampling_trigger_max_avg_ppc", None
         )
+        self.resampling_algorithm_target_ratio = kw.pop(
+            "warpx_resampling_algorithm_target_ratio", None
+        )
         self.resampling_algorithm_target_weight = kw.pop(
             "warpx_resampling_algorithm_target_weight", None
         )
@@ -364,6 +371,7 @@ class Species(picmistandard.PICMI_Species):
             resampling_min_ppc=self.resampling_min_ppc,
             resampling_trigger_intervals=self.resampling_trigger_intervals,
             resampling_trigger_max_avg_ppc=self.resampling_triggering_max_avg_ppc,
+            resampling_algorithm_target_ratio=self.resampling_algorithm_target_ratio,
             resampling_algorithm_target_weight=self.resampling_algorithm_target_weight,
             resampling_algorithm_velocity_grid_type=self.resampling_algorithm_velocity_grid_type,
             resampling_algorithm_delta_ur=self.resampling_algorithm_delta_ur,
@@ -2837,7 +2845,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        If True, run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based divergence cleaner on the loaded B field
+        after loading, scrubbing any spurious divergence from the applied-field map(s).
+        This is opt-in (it is not enabled automatically for applied particle fields) and
+        is supported for the electromagnetic, electrostatic (labframe) and magnetostatic
+        (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+        When several applied B-field maps are stacked, each map is cleaned independently.
         (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
@@ -3293,6 +3306,62 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
                 if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
+
+
+class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle setup of inverse Bremsstrahlung collisions in WarpX. If
+    collision initialization is added to picmistandard this can be changed to
+    inherit that functionality.
+
+    Parameters
+    ----------
+    name: string
+        Name of instance (used in the inputs file)
+
+    species: list of species instances
+        The species involved in the collision. Must be of length 2.
+        The photon species must be given first, followed by the electron species.
+
+    energy_fraction: float
+        The fraction of the relative energy in the collision COM frame that is used in the distribution
+        of the absorbed photon energy.
+
+    ndt_supercycle: integer, optional
+        Run collision once every ndt_supercycle PIC time steps
+        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
+        Mutually exclusive with ndt_subcycle. Default is 1.
+
+    ndt_subcycle: integer, optional
+        Run collision ndt_subcycle times per PIC time step
+        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
+        Mutually exclusive with ndt_supercycle.
+    """
+
+    def __init__(
+        self,
+        name,
+        species,
+        energy_fraction=None,
+        ndt_supercycle=None,
+        ndt_subcycle=None,
+        **kw,
+    ):
+        self.name = name
+        self.species = species
+        self.energy_fraction = energy_fraction
+        self.ndt_supercycle = ndt_supercycle
+        self.ndt_subcycle = ndt_subcycle
+
+        self.handle_init(kw)
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "inverse_bremsstrahlung"
+        collision.species = [species.name for species in self.species]
+        collision.energy_fraction = self.energy_fraction
+        collision.ndt_supercycle = self.ndt_supercycle
+        collision.ndt_subcycle = self.ndt_subcycle
 
 
 class EmbeddedBoundary(picmistandard.base._ClassWithInit):
