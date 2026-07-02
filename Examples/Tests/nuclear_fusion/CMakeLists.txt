@@ -48,7 +48,7 @@ add_warpx_test(
     inputs_test_3d_deuterium_tritium_fusion_restart  # inputs
     "analysis_two_product_fusion_restart.py diags/diag1000002"  # analysis
     "analysis_default_regression.py --path diags/diag1000001"  # checksum
-    OFF  # dependency
+    test_3d_deuterium_tritium_fusion  # dependency
 )
 
 add_warpx_test(
