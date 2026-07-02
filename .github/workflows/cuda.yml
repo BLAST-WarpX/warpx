@@ -36,8 +36,8 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v6
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v7
+    - uses: actions/setup-python@v6
       name: Install Python
       with:
         python-version: '3.x'
@@ -45,7 +45,7 @@ jobs:
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -125,12 +125,12 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
         .github/workflows/dependencies/nvcc.sh 12.2
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -175,12 +175,12 @@ jobs:
         large-packages: false  # apt takes ~1:30min
         docker-images: true
         swap-storage: false
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Dependencies
       run: |
         .github/workflows/dependencies/nvhpc.sh 25.1
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

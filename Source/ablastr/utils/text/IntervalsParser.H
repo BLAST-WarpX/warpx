@@ -1,19 +1,20 @@
-/* Copyright 2022 Andrew Myers, Burlen Loring, Luca Fedeli
- * Maxence Thevenet, Remi Lehe, Revathi Jambunathan
+/* Copyright 2022 The ABLASTR Community
  *
- * This file is part of WarpX.
+ * This file is part of ABLASTR.
  *
+ * Authors: Neil Zaim, Luca Fedeli, Weiqun Zhang, Axel Huebl
  * License: BSD-3-Clause-LBNL
  */
 
-#ifndef WARPX_UTILS_PARSER_INTERVALSPARSER_H_
-#define WARPX_UTILS_PARSER_INTERVALSPARSER_H_
+#ifndef ABLASTR_UTILS_TEXT_INTERVALSPARSER_H_
+#define ABLASTR_UTILS_TEXT_INTERVALSPARSER_H_
 
 #include <limits>
 #include <string>
 #include <vector>
 
-namespace utils::parser
+
+namespace ablastr::utils::text
 {
 
     /**
@@ -31,9 +32,10 @@ namespace utils::parser
         * Any of these integers may be omitted in which case it will be equal to their default value
         * (0 for the starting point, std::numeric_limits<int>::max() for the stopping point and 1 for
         * the period). For example SliceParser(":1000:") is equivalent to SliceParser("0:1000:1").
-        * @param[in] isBTD whether this is a back-transformed diagnostic
+        * @param[in] require_stop whether the stopping point must be explicitly specified
+        * (e.g., for back-transformed diagnostics)
         */
-        explicit SliceParser (const std::string& instr, bool isBTD=false);
+        explicit SliceParser (const std::string& instr, bool require_stop=false);
 
         /**
         * \brief A method that returns true if the input integer is contained in the slice. (e.g. if
@@ -85,7 +87,7 @@ namespace utils::parser
         [[nodiscard]] int numContained() const;
 
     private:
-        bool m_isBTD = false;
+        bool m_require_stop = false;
         int m_start = 0;
         int m_stop = std::numeric_limits<int>::max();
         int m_period = 1;
@@ -168,59 +170,6 @@ namespace utils::parser
         bool m_activated = false;
     };
 
-    /**
-     * \brief This class is a parser for multiple slices of the form x,y,z,... where x, y and z are
-     * slices of the form i:j:k, as defined in the SliceParser class. This class contains a vector of
-     * SliceParsers. The supported function set differs from the IntervalsParser
-     */
-    class BTDIntervalsParser
-    {
-    public:
-        /**
-        * \brief Default constructor of the BTDIntervalsParser class.
-        */
-        BTDIntervalsParser () = default;
-
-        /**
-        * \brief Constructor of the BTDIntervalsParser class.
-        *
-        * @param[in] instr_vec an input vector string, which when concatenated is of the form
-        * "x,y,z,...". This will call the constructor of SliceParser using x, y and z as input
-        * arguments.
-        */
-        explicit BTDIntervalsParser (const std::vector<std::string>& instr_vec);
-
-        /**
-         * @brief Return the total number of unique labframe snapshots
-         */
-        [[nodiscard]] int NumSnapshots () const;
-
-        /**
-         * @brief Return the iteration number stored at index i_buffer
-         *
-         * @param i_buffer buffer or iteration index, between 0 and NumSnapshots
-         */
-        [[nodiscard]] int GetBTDIteration(int i_buffer) const;
-
-        /**
-         * @brief Return the final BTD iteration
-         *
-         */
-        [[nodiscard]] int GetFinalIteration() const;
-
-        /**
-        * \brief A method that returns true if any of the slices contained by the IntervalsParser
-        * has a strictly positive period.
-        */
-        [[nodiscard]] bool isActivated () const;
-
-    private:
-        std::vector<int> m_btd_iterations;
-        std::vector<SliceParser> m_slices;
-        std::vector<int> m_slice_starting_i_buffer;
-        static constexpr char m_separator = ',';
-        bool m_activated = false;
-    };
 }
 
-#endif // WARPX_UTILS_PARSER_INTERVALSPARSER_H_
+#endif // ABLASTR_UTILS_TEXT_INTERVALSPARSER_H_

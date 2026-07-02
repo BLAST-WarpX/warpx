@@ -124,25 +124,7 @@ public:
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev, PatchType patch_type, bool solve_for_Faraday) const;
 
-    void BfieldEvolveRK (
-        ablastr::fields::MultiLevelVectorField const& Bfield,
-        ablastr::fields::MultiLevelVectorField const& Efield,
-        ablastr::fields::MultiLevelVectorField const& Jfield,
-        ablastr::fields::MultiLevelScalarField const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt, SubcyclingHalf subcycling_half,
-        amrex::IntVect ng, std::optional<bool> nodal_sync);
-
-    void BfieldEvolveRK (
-        ablastr::fields::MultiLevelVectorField const& Bfield,
-        ablastr::fields::MultiLevelVectorField const& Efield,
-        ablastr::fields::MultiLevelVectorField const& Jfield,
-        ablastr::fields::MultiLevelScalarField const& rhofield,
-        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
-        amrex::IntVect ng, std::optional<bool> nodal_sync);
-
-    void BfieldEvolveRKF45 (
+    void BfieldEvolve (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
@@ -151,13 +133,33 @@ public:
         amrex::Real dt_half, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
-    void BfieldEvolveRKF45 (
+    void BfieldEvolve (
         ablastr::fields::MultiLevelVectorField const& Bfield,
         ablastr::fields::MultiLevelVectorField const& Efield,
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
         amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+        amrex::IntVect ng, std::optional<bool> nodal_sync);
+
+    void BfieldEvolveRK4 (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        std::array<amrex::MultiFab, 3>& B_old,
+        amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
+        amrex::IntVect ng, std::optional<bool> nodal_sync);
+
+    amrex::Real BfieldEvolveRKF45 (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        ablastr::fields::MultiLevelVectorField const& Efield,
+        ablastr::fields::MultiLevelVectorField const& Jfield,
+        ablastr::fields::MultiLevelScalarField const& rhofield,
+        amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
+        std::array<amrex::MultiFab, 3>& B_old,
+        amrex::Real dt, int lev, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void FieldPush (
