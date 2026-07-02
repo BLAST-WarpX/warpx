@@ -354,7 +354,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, level);
 
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -366,7 +366,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, dir, level);
 
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -390,7 +390,7 @@ namespace ablastr::fields
         std::string const & internal_name
     )
     {
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     amrex::MultiFab*
@@ -398,7 +398,7 @@ namespace ablastr::fields
         std::string const & internal_name
     )
     {
-        if (m_mf_register.count(internal_name) == 0) {
+        if (!m_mf_register.contains(internal_name)) {
             throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab & mf = m_mf_register.at(internal_name).m_mf;
@@ -411,7 +411,7 @@ namespace ablastr::fields
         std::string const & internal_name
     ) const
     {
-        if (m_mf_register.count(internal_name) == 0) {
+        if (!m_mf_register.contains(internal_name)) {
             throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab const & mf = m_mf_register.at(internal_name).m_mf;

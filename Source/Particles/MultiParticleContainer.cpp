@@ -322,8 +322,10 @@ MultiParticleContainer::ReadParameters ()
                 bool species_type_is_photon = false;
                 const ParmParse pp_species(name);
                 if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
-                    const auto physical_species =
-                        species::from_string(type_string);
+                    const auto physical_species = species::from_string(type_string);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        physical_species.has_value(),
+                        "'" + type_string + "' is not a valid species_type");
                     species_type_is_photon =
                         (physical_species.value() == PhysicalSpecies::photon);
                 }

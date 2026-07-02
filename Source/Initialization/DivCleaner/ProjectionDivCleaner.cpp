@@ -33,10 +33,12 @@ using namespace amrex;
 
 namespace warpx::initialization {
 
-ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential) :
+ProjectionDivCleaner::ProjectionDivCleaner(std::string const& a_field_name, bool a_vector_potential,
+                                           int a_comp) :
     m_field_name{a_field_name},
     m_grid_type{WarpX::grid_type},
-    m_vector_potential{a_vector_potential}
+    m_vector_potential{a_vector_potential},
+    m_comp{a_comp}
 {
     using ablastr::fields::Direction;
     ReadParameters();
@@ -227,26 +229,34 @@ ProjectionDivCleaner::setSourceFromField ()
     // This function will compute -divB and store it in the source multifab
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        // Grab B-field multifabs at this level
-        amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
-        amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
-        amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
+        // Grab B-field multifabs at this level, aliasing the single component to clean.
+        // External fields may stack several independent field maps as separate components,
+        // so we clean one component (one map) at a time with the same single-field machinery.
+        amrex::MultiFab Bx(
+            *warpx.m_fields.get(m_field_name, Direction{0}, ilev),
+            amrex::make_alias, m_comp, 1);
+        amrex::MultiFab By(
+            *warpx.m_fields.get(m_field_name, Direction{1}, ilev),
+            amrex::make_alias, m_comp, 1);
+        amrex::MultiFab Bz(
+            *warpx.m_fields.get(m_field_name, Direction{2}, ilev),
+            amrex::make_alias, m_comp, 1);
 
         // Synchronize the ghost cells, do halo exchange
         // This is done to ensure the boundaries ae filled prior to
         // generating source
-        ablastr::utils::communication::FillBoundary(*Bx,
-                Bx->nGrowVect(),
+        ablastr::utils::communication::FillBoundary(Bx,
+                Bx.nGrowVect(),
                 WarpX::do_single_precision_comms,
                 geom[ilev].periodicity(),
                 true);
-        ablastr::utils::communication::FillBoundary(*By,
-                By->nGrowVect(),
+        ablastr::utils::communication::FillBoundary(By,
+                By.nGrowVect(),
                 WarpX::do_single_precision_comms,
                 geom[ilev].periodicity(),
                 true);
-        ablastr::utils::communication::FillBoundary(*Bz,
-                Bz->nGrowVect(),
+        ablastr::utils::communication::FillBoundary(Bz,
+                Bz.nGrowVect(),
                 WarpX::do_single_precision_comms,
                 geom[ilev].periodicity(),
                 true);
@@ -256,7 +266,7 @@ ProjectionDivCleaner::setSourceFromField ()
         WarpX::ComputeDivB(
             *m_source[ilev],
             0,
-            {Bx, By, Bz},
+            {&Bx, &By, &Bz},
             WarpX::CellSize(0)
             );
 
@@ -312,10 +322,18 @@ ProjectionDivCleaner::correctField ()
     // This function computes the gradient of the solution and subtracts out divB component from B
     for (int ilev = 0; ilev < m_levels; ++ilev)
     {
-        // Grab field multifabs at this level
-        amrex::MultiFab* Bx = warpx.m_fields.get(m_field_name, Direction{0}, ilev);
-        amrex::MultiFab* By = warpx.m_fields.get(m_field_name, Direction{1}, ilev);
-        amrex::MultiFab* Bz = warpx.m_fields.get(m_field_name, Direction{2}, ilev);
+        // Grab field multifabs at this level, aliasing the single component to clean.
+        // External fields may stack several independent field maps as separate components,
+        // so we correct one component (one map) at a time with the same single-field machinery.
+        amrex::MultiFab Bx(
+            *warpx.m_fields.get(m_field_name, Direction{0}, ilev),
+            amrex::make_alias, m_comp, 1);
+        amrex::MultiFab By(
+            *warpx.m_fields.get(m_field_name, Direction{1}, ilev),
+            amrex::make_alias, m_comp, 1);
+        amrex::MultiFab Bz(
+            *warpx.m_fields.get(m_field_name, Direction{2}, ilev),
+            amrex::make_alias, m_comp, 1);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -323,23 +341,23 @@ ProjectionDivCleaner::correctField ()
         for (MFIter mfi(*m_solution[ilev], TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             // Grab references to B field arrays for this grid/tile
-            amrex::Array4<Real> const& Bx_arr = Bx->array(mfi);
+            amrex::Array4<Real> const& Bx_arr = Bx.array(mfi);
             Real const * const AMREX_RESTRICT coefs_x = m_stencil_coefs_x.dataPtr();
             auto const n_coefs_x = static_cast<int>(m_stencil_coefs_x.size());
-            const Box& tbx = mfi.tilebox(Bx->ixType().toIntVect());
+            const Box& tbx = mfi.tilebox(Bx.ixType().toIntVect());
 
 #if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-            amrex::Array4<Real> const& By_arr = By->array(mfi);
+            amrex::Array4<Real> const& By_arr = By.array(mfi);
             Real const * const AMREX_RESTRICT coefs_y = m_stencil_coefs_y.dataPtr();
             auto const n_coefs_y = static_cast<int>(m_stencil_coefs_y.size());
-            const Box& tby = mfi.tilebox(By->ixType().toIntVect());
+            const Box& tby = mfi.tilebox(By.ixType().toIntVect());
 #endif
 
 #if !defined(WARPX_DIM_RSPHERE)
-            amrex::Array4<Real> const& Bz_arr = Bz->array(mfi);
+            amrex::Array4<Real> const& Bz_arr = Bz.array(mfi);
             Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
             auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
-            const Box& tbz = mfi.tilebox(Bz->ixType().toIntVect());
+            const Box& tbz = mfi.tilebox(Bz.ixType().toIntVect());
 #endif
 
             amrex::Array4<Real> const& sol_arr = m_solution[ilev]->array(mfi);
@@ -372,18 +390,18 @@ ProjectionDivCleaner::correctField ()
 #endif
         }
         // Synchronize the ghost cells, do halo exchange
-        ablastr::utils::communication::FillBoundary(*Bx,
-                                                    Bx->nGrowVect(),
+        ablastr::utils::communication::FillBoundary(Bx,
+                                                    Bx.nGrowVect(),
                                                     WarpX::do_single_precision_comms,
                                                     geom[ilev].periodicity(),
                                                     true);
-        ablastr::utils::communication::FillBoundary(*By,
-                                                    By->nGrowVect(),
+        ablastr::utils::communication::FillBoundary(By,
+                                                    By.nGrowVect(),
                                                     WarpX::do_single_precision_comms,
                                                     geom[ilev].periodicity(),
                                                     true);
-        ablastr::utils::communication::FillBoundary(*Bz,
-                                                    Bz->nGrowVect(),
+        ablastr::utils::communication::FillBoundary(Bz,
+                                                    Bz.nGrowVect(),
                                                     WarpX::do_single_precision_comms,
                                                     geom[ilev].periodicity(),
                                                     true);
@@ -416,14 +434,47 @@ WarpX::ProjectionCleanDivB() {
                 ablastr::warn_manager::WarnPriority::low);
         }
 
-        warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
+        auto & warpx = WarpX::GetInstance();
 
+        bool cleaned_any = false;
 
-        dc.setSourceFromField();
-        dc.solve();
-        dc.correctField();
+        // External B field loaded onto the grid (warpx.B_ext_grid_init_style, i.e.
+        // LoadInitialField / AnalyticInitialField / LoadInitialFieldFromPython). It is added
+        // directly to the solver B field and is a single component.
+        if (warpx.m_fields.has_vector("Bfield_fp_external", 0)) {
+            warpx::initialization::ProjectionDivCleaner dc("Bfield_fp_external");
+            dc.setSourceFromField();
+            dc.solve();
+            dc.correctField();
+            cleaned_any = true;
+        }
 
-        amrex::Print() << Utils::TextMsg::Info( "Finished Projection B-Field divergence cleaner.");
+        // Externally-applied particle B field (particles.B_ext_particle_init_style =
+        // read_from_file, i.e. LoadAppliedField). Several applied-field maps may be stacked as
+        // independent components; each is cleaned separately so that the gathered field stays
+        // divergence free for any combination of per-map time dependences.
+        if (warpx.m_fields.has_vector("B_external_particle_field", 0)) {
+            const int ncomp = warpx.m_fields.get(
+                "B_external_particle_field", ablastr::fields::Direction{0}, 0)->nComp();
+            for (int ic = 0; ic < ncomp; ++ic) {
+                warpx::initialization::ProjectionDivCleaner dc(
+                    "B_external_particle_field", false, ic);
+                dc.setSourceFromField();
+                dc.solve();
+                dc.correctField();
+            }
+            cleaned_any = true;
+        }
+
+        if (cleaned_any) {
+            amrex::Print() << Utils::TextMsg::Info(
+                "Finished Projection B-Field divergence cleaner.");
+        } else {
+            ablastr::warn_manager::WMRecordWarning("Projection Div Cleaner",
+                "warpx.do_initial_div_cleaning is enabled but no external B field was loaded, "
+                "so there is nothing to clean.",
+                ablastr::warn_manager::WarnPriority::low);
+        }
     } else {
         ablastr::warn_manager::WMRecordWarning("Projection Div Cleaner",
             "Only Yee, HybridPIC, and MLMG based static Labframe solvers are currently supported, so divB not cleaned. "

@@ -59,13 +59,14 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
             this->m_usePC = m_solver->usePC();
         }
 
-        void Solve ( Vec& a_U,
-                     const Vec& a_b,
-                     RT a_time,
-                     RT a_dt,
-                     int a_step)  const override
+        void Solve (Vec& a_U,
+                    const Vec& a_b,
+                    RT a_time,
+                    RT a_dt,
+                    int a_step)  const override
         {
             m_solver->solve(a_U, a_b, a_time, a_dt, a_step);
+            this->m_exit_status = m_solver->getStatus();
 
             if (    !this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor()
                 &&  ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
