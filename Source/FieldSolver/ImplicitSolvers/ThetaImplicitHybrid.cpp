@@ -200,6 +200,26 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
                 *rf, rf->nGrowVect(), WarpX::do_single_precision_comms,
                 m_WarpX->Geom(lev).periodicity(), true);
         }
+        // Per-species charge densities rho_fp_<spec> at t^{n+1}: the QDSMC Joule
+        // and Q_ei sources read them for the species fractions
+        // f_s = rho_s / Sigma_t rho_t. The explicit path deposits them every step
+        // in HybridPICDepositRhoAndJ; the implicit path does not call that, so
+        // without this deposit they stay frozen at their initialization values
+        // (stale f_s, and f_s = 0 in cells the plasma has since moved into).
+        // Deposited unscaled in RZ (apply_boundary_and_scale_volume = false) to
+        // match the explicit convention -- the 2*pi*r factors cancel in f_s.
+        {
+            auto & mypc = m_WarpX->GetPartContainer();
+            for (auto const & spec : mypc.GetSpeciesNames()) {
+                auto & pc = mypc.GetParticleContainerFromName(spec);
+                if (pc.getCharge() == 0._prt) { continue; }
+                pc.DepositCharge(
+                    m_WarpX->m_fields.get_mr_levels("rho_fp_" + spec, m_num_amr_levels - 1),
+                    /*local*/false, /*reset*/true,
+                    /*apply_boundary_and_scale_volume*/false,
+                    /*interpolate_across_levels*/false);
+            }
+        }
         // Deposit the per-species ion temperature T_<nm> for the Q_ei relaxation.
         // The explicit path fills it in HybridPICDepositRhoAndJ; the implicit path
         // does not call that, so it must deposit here (on the redistributed t^{n+1}
