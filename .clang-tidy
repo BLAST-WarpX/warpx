@@ -63,7 +63,6 @@ Checks: '
         -readability-named-parameter,
         -readability-uppercase-literal-suffix,
         -readability-redundant-casting,
-        -readability-container-contains,
         -readability-redundant-inline-specifier,
         -readability-redundant-member-init,
         -readability-reference-to-constructed-temporary
@@ -90,7 +89,6 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 # -modernize-use-ranges
 # -modernize-use-integer-sign-comparison
 # -modernize-use-std-format
-# -readability-container-contains
 
 # TODO Consider enabling the following checks:
 # -bugprone-unused-local-non-trivial-variable

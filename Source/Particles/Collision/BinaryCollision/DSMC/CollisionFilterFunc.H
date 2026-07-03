@@ -25,9 +25,9 @@
  * @param[in] dt is the time step length between two collision calls.
  * @param[in] dV is the volume of the corresponding cell.
  * @param[in] pair_index is the index of the colliding pair.
- * @param[out] p_mask is a mask that will be set to a non-zero integer if a
- *             collision occurs. The integer is the index of the selected scattering
- *             process plus one (0 means no collision).
+ * @param[out] p_mask for each pair: 0 if no collision occurs ;
+ *             index+1 of the selected process for that pair if a collision occurs,
+ *             where `index` is the index of the process in the `scattering_processes` array.
  * @param[out] p_pair_reaction_weight stores the weight of the product particles.
  * @param[in] multiplier factor by which the collision probability is increased to
  *            account for all other possible binary collision partners.
@@ -75,7 +75,7 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
 
     // Evaluate the cross-section for each scattering process to determine
     // the total collision probability.
-    // The size of the arrays below is a compile-time constant (template parameter)
+    // The size of the array below is a compile-time constant (template parameter)
     // for performance reasons: it avoids dynamic memory allocation on the GPU.
     amrex::ParticleReal sigma_sums[max_process_count] = {0._prt};
     for (int ii = 0; ii < process_count; ii++) {
@@ -104,7 +104,9 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
         for (int ii = 0; ii < process_count; ii++) {
             if (random_number <= sigma_sums[ii] / sigma_tot)
             {
-                // Store the selected process index (+1) in the mask; 0 means "no collision".
+                // Store index+1 of the selected scattering process
+                // (0 is reserved to mean "no collision"), where `index`
+                // is the index of the selected process in the `scattering_processes` array.
                 // SplitAndScatterFunc looks up the process (type, angle model, energy penalty)
                 // from this index. Encoding the index rather than the process type allows the
                 // post-collision kinematics to depend on the per-process scattering angle model.
@@ -113,10 +115,9 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
                 break;
             }
         }
-    }
-    else
-    {
-        p_mask[pair_index] = false;
+    } else {
+        // No collision occurs for this pair.
+        p_mask[pair_index] = index_type(0);
     }
 }
 

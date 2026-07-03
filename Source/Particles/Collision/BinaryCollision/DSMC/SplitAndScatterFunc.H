@@ -78,8 +78,9 @@ public:
      *                                      appended to each tile.
      * @param[in]     m0                    rest mass of the first reactant species (slot 0).
      * @param[in]     m1                    rest mass of the other reactant species (slot 1).
-     * @param[in]     mask                  per-pair collision type: 0 = no collision,
-     *                                      otherwise cast of ScatteringProcessType to int.
+     * @param[in]     mask                  for each pair: 0 if no collision occurs ;
+     *                                      index+1 of the selected process for that pair if a collision occurs,
+     *                                      where `index` is the index of the process in the `m_scattering_processes_exe` array.
      * @param[in,out] products_np           macroparticle count of each product tile; updated in this
      *                                      kernel to reflect the number of new macroparticles added in each species.
      * @param[in]     copy_species0         array of SmartCopy functors (size m_num_product_species);
@@ -120,7 +121,7 @@ public:
         //   Slot 2: first true product species
         //   Slot 3: second true product species
         //
-        // For non-product producing collisions (elastic, back, forward scattering), only slots 0
+        // For non-product producing collisions (e.g. elastic, excitation), only slots 0
         // and 1 receive new macroparticles: one weight-split copy per reactant per colliding pair.
         // These are counted by `no_product_total` and NOT reflected in `m_num_products_host`.
         //
@@ -133,25 +134,26 @@ public:
         // zeros, indicating that for all the "product" species, there were no new macroparticles added.
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
-        // Per-pair process lookup: the mask stores the index of the selected scattering process
-        // plus one (0 means no collision). `processes[mask[i]-1]` gives the process type, the
-        // scattering angle model and the energy penalty used for the post-collision kinematics.
-        const ScatteringProcess::Executor* AMREX_RESTRICT processes = m_scattering_processes_data;
+        // The list of scattering processes, used to look up the type (and, further below, the
+        // energy penalty) of the process selected for each pair via its index.
+        const ScatteringProcess::Executor* AMREX_RESTRICT scattering_processes =
+            m_scattering_processes_exe.data();
 
         // The following is used to calculate the appropriate offsets for
         // non-product producing collisions (i.e., not ionization, not two-product reaction).
-        // Note that a standard cummulative sum is not appropriate since the
-        // mask is also used to specify the type of collision and can therefore
-        // have values >1
+        // Note that a standard cummulative sum is not appropriate since we count 1 for each
+        // colliding pair, regardless of the index of the selected scattering process.
         amrex::Gpu::DeviceVector<index_type> no_product_offsets(n_total_pairs);
         index_type* AMREX_RESTRICT no_product_offsets_data = no_product_offsets.data();
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 if (mask[i] == 0) { return 0; }
-                const auto type = processes[mask[i]-1].m_type;
-                return ((type != ScatteringProcessType::IONIZATION) &&
-                        (type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
-                        (type != ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
+                const auto selected_process_index = mask[i] - 1;
+                auto const& scattering_process = scattering_processes[selected_process_index];
+                const auto process_type = scattering_process.m_type;
+                return ((process_type != ScatteringProcessType::IONIZATION) &&
+                        (process_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
+                        (process_type != ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -168,18 +170,19 @@ public:
 
         // The following is used to calculate the appropriate offsets for
         // product producing processes (i.e., ionization and two-product reaction).
-        // Note that a standard cummulative sum is not appropriate since the
-        // mask is also used to specify the type of collision and can therefore
-        // have values >1
+        // Note that a standard cummulative sum is not appropriate since we count 1 for each
+        // colliding pair, regardless of the index of the selected scattering process.
         amrex::Gpu::DeviceVector<index_type> with_product_offsets(n_total_pairs);
         index_type* AMREX_RESTRICT with_product_offsets_data = with_product_offsets.data();
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
                 if (mask[i] == 0) { return 0; }
-                const auto type = processes[mask[i]-1].m_type;
-                return ((type == ScatteringProcessType::IONIZATION) ||
-                        (type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
-                        (type == ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
+                const auto selected_process_index = mask[i] - 1;
+                auto const& scattering_process = scattering_processes[selected_process_index];
+                const auto process_type = scattering_process.m_type;
+                return ((process_type == ScatteringProcessType::IONIZATION) ||
+                        (process_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
+                        (process_type == ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -234,7 +237,6 @@ public:
 #endif
 
         const int num_product_species = m_num_product_species;
-        const auto reaction_energy = m_reaction_energy;
 
         // Grab the masses of the true product species (slots 2 and 3)
         amrex::ParticleReal mass_slot2 = 0;
@@ -248,40 +250,40 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            // Look up the scattering process selected for this pair (0 means no collision).
-            const auto proc_type = (mask[i] > 0)
-                ? processes[mask[i]-1].m_type : ScatteringProcessType::INVALID;
+            // Skip pairs for which no collision occurred.
+            if (mask[i] == 0) { return; }
 
-            if ((proc_type != ScatteringProcessType::INVALID) &&
-                (proc_type != ScatteringProcessType::IONIZATION) &&
-                (proc_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
-                (proc_type != ScatteringProcessType::CHARGE_EXCHANGE))
+            // The scattering process selected for this pair, and its type.
+            const auto selected_process_index = mask[i] - 1;
+            auto const& scattering_process = scattering_processes[selected_process_index];
+            const auto process_type = scattering_process.m_type;
+
+            if ((process_type != ScatteringProcessType::IONIZATION) &&
+                (process_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
+                (process_type != ScatteringProcessType::CHARGE_EXCHANGE))
             {
-                // Particle-conserving scattering (e.g. elastic). Create one weight-split copy
-                // per reactant, then set their momenta using conservation of energy and momentum.
-                // The angular distribution in the center-of-mass frame is set by the process's
-                // scattering angle model, and any inelastic energy loss is passed as the
-                // (released) reaction energy.
-                const auto& proc = processes[mask[i]-1];
-
-                const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
-                const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
-
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
-                copy_species0[0](soa_products_data[0], soa_0, src0_idx,
+                copy_species0[0](soa_products_data[0], soa_0, static_cast<int>(p_pair_indices_0[i]),
                                 static_cast<int>(slot0_idx), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[0].m_rdata[PIdx::w][slot0_idx] = p_pair_reaction_weight[i];
 
                 const auto slot1_idx = products_np_data[1] + no_product_offsets_data[i];
                 // Make a copy of the particle from the other reactant species
-                copy_species1[1](soa_products_data[1], soa_1, src1_idx,
+                copy_species1[1](soa_products_data[1], soa_1, static_cast<int>(p_pair_indices_1[i]),
                                 static_cast<int>(slot1_idx), engine);
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[1].m_rdata[PIdx::w][slot1_idx] = p_pair_reaction_weight[i];
 
-                // Update the momenta of the two scattered particles
+                // Particle-conserving scattering (e.g. elastic, excitation). Set the momenta of
+                // the two scattered particles using conservation of energy and momentum. The
+                // angular distribution in the center-of-mass frame is set by the process's
+                // scattering angle model, and any inelastic energy loss is passed as the
+                // (released) energy penalty.
+                const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
+                const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
+
                 TwoProductComputeProductMomenta(
                     soa_0.m_rdata[PIdx::ux][src0_idx],
                     soa_0.m_rdata[PIdx::uy][src0_idx],
@@ -295,19 +297,17 @@ public:
                     soa_products_data[1].m_rdata[PIdx::ux][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uy][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uz][slot1_idx], m1,
-                    -proc.m_energy_penalty*PhysConst::q_e,
+                    -scattering_process.m_energy_penalty*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the
                     // negative sign; the energy penalty is also converted from eV to Joules.
-                    proc.m_scattering_angle_model,
+                    scattering_process.m_scattering_angle_model,
                     engine);
             }
 
             // Next perform all product-producing collisions
-            else if ((proc_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
-                     (proc_type == ScatteringProcessType::CHARGE_EXCHANGE))
+            else if ((process_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
+                     (process_type == ScatteringProcessType::CHARGE_EXCHANGE))
             {
-                const auto& proc = processes[mask[i]-1];
-
                 // create a copy of the first product species at the location of the first reactant species
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto slot2_idx = products_np_data[2] + with_product_offsets_data[i];
@@ -327,7 +327,7 @@ public:
                 // For charge exchange, swap positions at which the products are created
                 // to ensure local charge conservation. For instance in the reaction
                 // `A+ + B -> A + B+`, B+ will be created at the position of A+, instead of that of B.
-                if (proc_type == ScatteringProcessType::CHARGE_EXCHANGE) {
+                if (process_type == ScatteringProcessType::CHARGE_EXCHANGE) {
                     // The SoA components that define the positions depend on the geometry.
 #if defined(WARPX_DIM_1D_Z)
                     constexpr std::array<int, 1> position_indices = {PIdx::z};
@@ -363,15 +363,15 @@ public:
                     soa_products_data[3].m_rdata[PIdx::ux][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uy][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uz][slot3_idx], mass_slot3,
-                    -reaction_energy*PhysConst::q_e,
+                    -scattering_process.m_energy_penalty*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     // We also convert from eV to Joules
-                    proc.m_scattering_angle_model,
+                    scattering_process.m_scattering_angle_model,
                     // The angular distribution of the products in the center-of-mass frame is set by
                     // the process's scattering angle model (forward by default for these processes).
                     engine);
             }
-            else if (proc_type == ScatteringProcessType::IONIZATION)
+            else if (process_type == ScatteringProcessType::IONIZATION)
             {
                 const auto slot0_idx = products_np_data[0] + no_product_total + with_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species (slot 0)
@@ -450,7 +450,8 @@ public:
                 const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
                 const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
                 // subtract the energy cost for ionization (converted from eV to J)
-                const amrex::ParticleReal E_out = E_coll - reaction_energy * PhysConst::q_e;
+                const amrex::ParticleReal E_out =
+                    E_coll - scattering_process.m_energy_penalty * PhysConst::q_e;
 
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
                 // distributed among the products) depend on the nature of the incident particle
@@ -588,20 +589,15 @@ public:
 private:
     // How many different type of species the collision produces
     int m_num_product_species;
-    // If ionization collisions are included, what is the energy cost
-    amrex::ParticleReal m_reaction_energy = 0.0;
+    // The scattering processes, in the same order as the input list (and as the indices encoded
+    // in the per-pair mask). Used to look up, for each pair, the process type and energy penalty.
+    amrex::Vector<ScatteringProcess> m_scattering_processes;
+    amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_scattering_processes_exe;
     // Vector of size m_num_product_species: for each product slot, the number of new particles
     // created per *reaction* event (ionization, two-product reaction, charge exchange).
     // Weight-split particles added to slots 0 and 1 during non-reaction events are NOT counted
     // here; they are tracked separately via `no_product_total` inside operator().
     amrex::Gpu::HostVector<int> m_num_products_host;
     CollisionType m_collision_type;
-
-    // The scattering processes (in the same order as the input list and as the indices
-    // encoded in the per-pair mask). These are used to look up, for each colliding pair,
-    // the process type, the scattering angle model and the energy penalty.
-    amrex::Vector<ScatteringProcess> m_scattering_processes;
-    amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_scattering_processes_exe;
-    const ScatteringProcess::Executor* m_scattering_processes_data = nullptr;
 };
 #endif // WARPX_SPLIT_AND_SCATTER_FUNC_H_
