@@ -4,7 +4,7 @@
 add_warpx_test(
     test_1d_background_mcc_picmi  # name
     1  # dims
-    2  # nprocs
+    1  # nprocs
     "inputs_base_1d_picmi.py --test"  # inputs
     "analysis_1d.py"  # analysis
     "analysis_default_regression.py --path diags/diag1000050"  # checksum
@@ -14,7 +14,7 @@ add_warpx_test(
 add_warpx_test(
     test_1d_dsmc_picmi  # name
     1  # dims
-    2  # nprocs
+    1  # nprocs
     "inputs_base_1d_picmi.py --test --dsmc"  # inputs
     "analysis_1d.py"  # analysis
     "analysis_default_regression.py --path diags/diag1000050"  # checksum
