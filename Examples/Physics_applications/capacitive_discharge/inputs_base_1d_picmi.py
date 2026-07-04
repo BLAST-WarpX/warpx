@@ -183,9 +183,9 @@ class CapacitiveDischargeExample(object):
         self.diag_steps = int(self.diag_interval / self.dt)
 
         if self.test:
-            assert n==0 # The parameters below were chosen specifically for case 1.
+            assert n == 0  # The parameters below were chosen specifically for case 1.
             # In test mode, we obtain essentially the same ion density
-            # profile as the Turner et al. (2013) benchmark, but at lower 
+            # profile as the Turner et al. (2013) benchmark, but at lower
             # computational cost, by using a coarser resolution (fewer cells, fewer
             # particles per cell and a larger timestep) and by stopping early
             # in time, at a point where the ion density has already converged.
@@ -193,7 +193,9 @@ class CapacitiveDischargeExample(object):
             self.seed_nppc = 256
             self.dt = 2 * self.dt[n]
             self.dsmc_ndt_supercycle = self.dsmc_ndt_supercycle / 2
-            self.max_steps = int(320 / self.freq / self.dt)  # 320 RF cycles instead of 1280
+            self.max_steps = int(
+                320 / self.freq / self.dt
+            )  # 320 RF cycles instead of 1280
             self.rng = np.random.default_rng(23094290)
         else:
             self.rng = np.random.default_rng()
