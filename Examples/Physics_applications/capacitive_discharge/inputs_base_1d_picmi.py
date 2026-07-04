@@ -191,7 +191,7 @@ class CapacitiveDischargeExample(object):
             # in time, at a point where the ion density has already converged.
             self.nz = 32
             self.seed_nppc = 256
-            self.dt = 2 * self.dt[n]
+            self.dt = 2 * self.dt
             self.dsmc_ndt_supercycle = self.dsmc_ndt_supercycle / 2
             self.max_steps = int(320 / self.freq / self.dt)  # 320 RF cycles instead of 1280
             self.rng = np.random.default_rng(23094290)
