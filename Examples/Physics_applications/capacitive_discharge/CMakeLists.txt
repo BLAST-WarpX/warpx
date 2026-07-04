@@ -7,7 +7,7 @@ add_warpx_test(
     1  # nprocs
     "inputs_base_1d_picmi.py --test"  # inputs
     "analysis_1d.py"  # analysis
-    "analysis_default_regression.py --path diags/diag1000050"  # checksum
+    "analysis_default_regression.py --path diags/diag1064000"  # checksum
     OFF  # dependency
 )
 
@@ -17,7 +17,7 @@ add_warpx_test(
     1  # nprocs
     "inputs_base_1d_picmi.py --test --dsmc"  # inputs
     "analysis_1d.py"  # analysis
-    "analysis_default_regression.py --path diags/diag1000050"  # checksum
+    "analysis_default_regression.py --path diags/diag1064000"  # checksum
     OFF  # dependency
 )
 
