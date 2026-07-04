@@ -4,10 +4,7 @@
 
 # This script checks the time-averaged ion density profile of the 1D
 # capacitive discharge (case 1) against the benchmark data published in
-# Turner et al. (2013) - https://doi.org/10.1063/1.4775084 (their Fig. 5,
-# case 1). The simulation is run (in "test" mode) for a reduced number of RF
-# cycles that is still long enough for the ion density to converge to the
-# benchmark profile.
+# Turner et al. (2013) - https://doi.org/10.1063/1.4775084
 
 import matplotlib
 
@@ -16,8 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Turner et al. (2013) benchmark, case 1: ion density (m^-3), averaged over
-# time, on the 129-point grid spanning the 6.7 cm gap (i.e. the "Ion density,
-# mean" column of their published data).
+# time, on the 129-point grid spanning the 6.7 cm gap
 # fmt: off
 ref_density = np.array([
     3.615140e+13,  3.649310e+13,  3.700160e+13,  3.750370e+13,
@@ -81,15 +77,10 @@ plt.savefig("ion_density_case_1.png")
 # absorbing walls the nodal charge deposition only sees half a cell, so the
 # density there is a grid artifact (~half the physical value) rather than a
 # physical disagreement with the (cell-averaged) benchmark.
-interior = slice(1, -1)
-rel_err = np.abs(density_data[interior] - ref_on_grid[interior]) / ref_on_grid[interior]
+rel_err = np.abs(density_data[1:-1] - ref_on_grid[1:-1]) / ref_on_grid[1:-1]
 rms_rel_err = np.sqrt(np.mean(rel_err**2))
 print(f"Max relative error (interior): {rel_err.max() * 100:.2f} %")
 print(f"RMS relative error (interior): {rms_rel_err * 100:.2f} %")
-
-# Tolerance accounts for the residual statistical (PIC) noise of the reduced
-# run; the systematic agreement with the benchmark is better than this (the
-# time-averaged interior RMS error is typically around 4%).
 tolerance = 0.06
 assert rms_rel_err < tolerance, (
     f"RMS relative error {rms_rel_err * 100:.2f} % exceeds tolerance "

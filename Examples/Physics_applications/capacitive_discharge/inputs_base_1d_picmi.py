@@ -167,6 +167,7 @@ class CapacitiveDischargeExample(object):
         self.test = test
         self.pythonsolver = pythonsolver
         self.dsmc = dsmc
+        self.dsmc_ndt_supercycle = 4
 
         # Case specific input parameters
         self.voltage = f"{self.voltage[n]}*sin(2*pi*{self.freq:.5e}*t)"
@@ -182,17 +183,17 @@ class CapacitiveDischargeExample(object):
         self.diag_steps = int(self.diag_interval / self.dt)
 
         if self.test:
-            # In test mode we obtain essentially the same case-1 ion density
-            # profile as the Turner et al. (2013) benchmark (checked by
-            # analysis_1d.py) in a much shorter time, by using a coarser
-            # resolution than the original Turner benchmark (fewer cells, fewer
+            assert n==0 # The parameters below were chosen specifically for case 1.
+            # In test mode, we obtain essentially the same ion density
+            # profile as the Turner et al. (2013) benchmark, but at lower 
+            # computational cost, by using a coarser resolution (fewer cells, fewer
             # particles per cell and a larger timestep) and by stopping early
             # in time, at a point where the ion density has already converged.
             self.nz = 32
             self.seed_nppc = 256
-            self.dt = 2 * self.dt
-            self.max_steps = int(320 / self.freq / self.dt)  # 320 RF cycles
-            self.diag_steps = int(self.diag_interval / self.dt)
+            self.dt = 2 * self.dt[n]
+            self.dsmc_ndt_supercycle = self.dsmc_ndt_supercycle / 2
+            self.max_steps = int(320 / self.freq / self.dt)  # 320 RF cycles instead of 1280
             self.rng = np.random.default_rng(23094290)
         else:
             self.rng = np.random.default_rng()
@@ -300,7 +301,7 @@ class CapacitiveDischargeExample(object):
                 name="coll_elec_dsmc",
                 species=[self.electrons, self.neutrals],
                 product_species=[self.electrons, self.ions],
-                ndt_supercycle=4,
+                ndt_supercycle=self.dsmc_ndt_supercycle,
                 scattering_processes=ionization,
             )
             electron_colls_mcc = picmi.MCCCollisions(
