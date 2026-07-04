@@ -90,7 +90,7 @@ print(f"RMS relative error (interior): {rms_rel_err * 100:.2f} %")
 # Tolerance accounts for the residual statistical (PIC) noise of the reduced
 # run; the systematic agreement with the benchmark is better than this (the
 # time-averaged interior RMS error is typically around 4%).
-tolerance = 0.07
+tolerance = 0.06
 assert rms_rel_err < tolerance, (
     f"RMS relative error {rms_rel_err * 100:.2f} % exceeds tolerance "
     f"{tolerance * 100:.2f} %"
