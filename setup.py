@@ -187,7 +187,10 @@ class CMakeBuild(build_ext):
                     cfg.upper(), os.path.join(extdir, "pywarpx")
                 )
             ]
-            if sys.maxsize > 2**32:
+            generator_platform = os.environ.get("CMAKE_GENERATOR_PLATFORM")
+            if generator_platform:
+                cmake_args += ["-A", generator_platform]
+            elif sys.maxsize > 2**32:
                 cmake_args += ["-A", "x64"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
