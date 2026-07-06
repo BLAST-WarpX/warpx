@@ -429,8 +429,9 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
-            // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
-            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
+            // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
+            // for other collision types, 1 if particle creation occurs, 0 otherwise
+            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
             amrex::Gpu::DeviceVector<index_type> pair_indices_1(n_total_pairs);
@@ -915,7 +916,8 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
-            // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
+            // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
+            // for other collision types, 1 if particle creation occurs, 0 otherwise
             amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
