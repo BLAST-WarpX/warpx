@@ -140,4 +140,5 @@ diag1.fields_to_plot = rho DTF1_particle_production DTF2_particle_production
 
 checkpoint.format = checkpoint
 checkpoint.diag_type = Full
-checkpoint.intervals = 1
+checkpoint.intervals = 1:1:1
+checkpoint.dump_last_timestep = 0
