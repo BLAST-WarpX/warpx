@@ -64,6 +64,9 @@ private:
 
     amrex::ParticleReal m_energy_fraction = 0.05;
 
+    ParticleShufflingMethod m_shuffling_method;
+    int m_modulus_rounds;
+
 };
 
 #endif // WARPX_PARTICLES_COLLISION_INVERSEBREMSSTRAHLUNG_H
