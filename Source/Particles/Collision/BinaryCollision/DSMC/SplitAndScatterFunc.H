@@ -150,10 +150,7 @@ public:
                 if (mask[i] == 0) { return 0; }
                 const auto selected_process_index = mask[i] - 1;
                 auto const& scattering_process = scattering_processes[selected_process_index];
-                const auto process_type = scattering_process.m_type;
-                return ((process_type != ScatteringProcessType::IONIZATION) &&
-                        (process_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
-                        (process_type != ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
+                return !scattering_process.m_produces_products;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -179,10 +176,7 @@ public:
                 if (mask[i] == 0) { return 0; }
                 const auto selected_process_index = mask[i] - 1;
                 auto const& scattering_process = scattering_processes[selected_process_index];
-                const auto process_type = scattering_process.m_type;
-                return ((process_type == ScatteringProcessType::IONIZATION) ||
-                        (process_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
-                        (process_type == ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
+                return scattering_process.m_produces_products;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -258,9 +252,7 @@ public:
             auto const& scattering_process = scattering_processes[selected_process_index];
             const auto process_type = scattering_process.m_type;
 
-            if ((process_type != ScatteringProcessType::IONIZATION) &&
-                (process_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
-                (process_type != ScatteringProcessType::CHARGE_EXCHANGE))
+            if (!scattering_process.m_produces_products)
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
