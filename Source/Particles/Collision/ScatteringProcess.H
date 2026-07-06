@@ -107,6 +107,9 @@ public:
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
+        /** True if this process creates new product particles (ionization, charge exchange,
+         *  two-product reaction); false for purely scattering processes (elastic, excitation). **/
+        bool m_produces_products = false;
     };
 
     [[nodiscard]]

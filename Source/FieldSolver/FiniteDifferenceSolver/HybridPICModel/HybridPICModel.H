@@ -24,6 +24,7 @@
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_REAL.H>
@@ -130,7 +131,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt_half, SubcyclingHalf subcycling_half,
+        int step, amrex::Real dt_half, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void BfieldEvolve (
@@ -139,7 +140,7 @@ public:
         ablastr::fields::MultiLevelVectorField const& Jfield,
         ablastr::fields::MultiLevelScalarField const& rhofield,
         amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E,
-        amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
+        int step, amrex::Real dt_half, int lev, SubcyclingHalf subcycling_half,
         amrex::IntVect ng, std::optional<bool> nodal_sync);
 
     void BfieldEvolveRK4 (
@@ -191,11 +192,16 @@ public:
         amrex::MultiFab& Pe_field,
         amrex::MultiFab const& rho_field ) const;
 
+    /** Check if rkf45 should be used */
+    [[nodiscard]] bool DoRKF45(int step) const { return m_rkf45_intervals.contains(step); }
+
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
      *  count guess when RKF45 adaptive stepping is active) */
     int m_substeps = 10;
 
+    /** Intervals to use RKF45 integrator and to update substeps parameter */
+    ablastr::utils::text::IntervalsParser m_rkf45_intervals;
     /** Relative tolerance for RKF45 adaptive substep error control */
     amrex::Real m_substep_rtol = 1.e-4;
     /** Absolute tolerance for RKF45 adaptive substep error control */
@@ -206,8 +212,6 @@ public:
     amrex::Real m_substep_max_growth = 5.0;
     /** Maximum number of substep attempts (accepted + rejected) before abort */
     int m_max_substep_attempts = 250;
-    /** If true, use the adaptive RKF45 integrator; if false, use fixed-step RK4 */
-    bool m_use_rkf45 = false;
 
     bool m_holmstrom_vacuum_region = false;
 
