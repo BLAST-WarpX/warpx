@@ -296,15 +296,19 @@ class CapacitiveDischargeExample(object):
             },
         }
         if self.dsmc:
-            ionization = {"ionization": electron_scattering_processes.pop("ionization")}
-            ionization["ionization"]["target_species"] = self.neutrals
-            ionization["ionization"].pop("species")
+            dsmc_processes = {
+                "ionization": electron_scattering_processes.pop("ionization"),
+                "excitation1": electron_scattering_processes.pop("excitation1"),
+                "excitation2": electron_scattering_processes.pop("excitation2"),
+            }
+            dsmc_processes["ionization"]["target_species"] = self.neutrals
+            dsmc_processes["ionization"].pop("species")
             electron_colls_dsmc = picmi.DSMCCollisions(
                 name="coll_elec_dsmc",
                 species=[self.electrons, self.neutrals],
                 product_species=[self.electrons, self.ions],
                 ndt_supercycle=self.dsmc_ndt_supercycle,
-                scattering_processes=ionization,
+                scattering_processes=dsmc_processes,
             )
             electron_colls_mcc = picmi.MCCCollisions(
                 name="coll_elec",
