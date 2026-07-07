@@ -124,9 +124,6 @@ ScatteringProcess process = cross_section_file_momentum.empty()
     ? ScatteringProcess(scattering_process, cross_section_file, energy)
     : ScatteringProcess(scattering_process, cross_section_file, energy, cross_section_file_momentum);
 
-    else if (scattering_process.find("rutherford") != std::string::npos) {
-
-        }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                          "Cannot add an unknown scattering process type");
 
@@ -176,11 +173,6 @@ ScatteringProcess process = cross_section_file_momentum.empty()
 #endif
 }
 
-amrex::ParticleReal
-BackgroundMCCCollision::get_eta(amrex::Vector<ScatteringProcess> const& mcc_processes) const
-{
-
-}
 /** Calculate the maximum collision frequency using a fixed energy grid that
  *  ranges from 1e-4 to 5000 eV in 0.2 eV increments
  */
@@ -212,6 +204,7 @@ BackgroundMCCCollision::get_nu_max(amrex::Vector<ScatteringProcess> const& mcc_p
         for (const auto &scattering_process : mcc_processes) {
             // get collision cross-section
             sigma_E += scattering_process.getCrossSection(E);
+            //maybe add here a condition to use getCrossSectinomentum if needed
         }
 
         // calculate collision frequency
@@ -466,29 +459,48 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   }
 
                                 else if (scattering_process.m_type == ScatteringProcessType::RUTHERFORD)
-                                      { amrex::ParticleReal Ux;
+                                      { 
+                                        
+                                        //amrex::Print() << "les vitesses au début" << sqrt(vx*vx+vy*vy+vz*vz) << std::endl;
+                                        //amrex::Print() << "vz au début" << vz << std::endl;
+
+                                        amrex::ParticleReal Ux;
                                         amrex::ParticleReal Uy;
                                         amrex::ParticleReal Uz;
                                         amrex::ParticleReal Upx;
-                                        amrex::ParticleReal Vpy;
+                                        amrex::ParticleReal Upy;
                                         amrex::ParticleReal Upz;
-                                        amrex::ParticleReal fac = sqrt(Ux*vx + Uy*vy +Uz*vz)
-                                        amrex::ParticleReal norm_fac = sqrt(vx*vx + vy*vy + vz*vz)/sqrt(1-pow(fac,2));
+                                        amrex::ParticleReal norm_v =sqrt(vx*vx + vy*vy + vz*vz);
+                                        amrex::ParticleReal vnx = vx/norm_v;
+                                        amrex::ParticleReal vny=vy/norm_v;
+                                        amrex::ParticleReal vnz=vz/norm_v;
+
                                         ParticleUtils::RandomizeVelocity(
                                           Ux, Uy, Uz, 1, engine
-                                      );
+                                        );
+                                        amrex::ParticleReal fac = Ux*vnx + Uy*vny +Uz*vnz;
 
-                                       Upx = norm_fac*(Ux+fac*vx);
-                                       Upy = norm_fac*(Uy+fac*vy);  
-                                       Upz = norm_fac*(Uz+fac*vz);
-                                    x=amrex::Random(engine)
-                                    eta=get_eta(static_cast<amrex::ParticleReal>(E_coll));
-                                    amrex::ParticleReal costheta = 1-2*x/(1-x+eta);
-                                    amrex::ParticleReal sintheta = sqrt(1 - costheta*costheta);
-                                    vx = vx*costheta+Upx*sintheta;
-                                    vy = vy*costheta+Upx*sintheta;
-                                    vz = vz*costheta+Upx*sintheta;
-                                    }   
+                                        amrex::ParticleReal norm_fac = sqrt(vx*vx + vy*vy + vz*vz)/sqrt(1.0-fac*fac);
+
+                                        Upx = norm_fac*(Ux-fac*vnx);
+                                        Upy = norm_fac*(Uy-fac*vny);  
+                                        Upz = norm_fac*(Uz-fac*vnz);
+                                        amrex::Real X = amrex::Random(engine);
+                                        amrex::ParticleReal eta=scattering_process.getEta(static_cast<amrex::ParticleReal>(E_coll));
+                                        amrex::Print() << "eta" << eta << std::endl;
+                                        amrex::ParticleReal costheta = 1-2*eta*X/(1-X+eta);
+                                        //amrex::Print() << "costheta" << costheta << std::endl;
+                                        amrex::ParticleReal sintheta = sqrt(1 - costheta*costheta);
+                                        vx = vx*costheta+Upx*sintheta;
+                                        vy = vy*costheta+Upy*sintheta;
+                                        vz = vz*costheta+Upz*sintheta;
+                                        //amrex::Print() << "vz  à la fin" << vz << std::endl;
+                                        //amrex::Print() << "vx  à la fin" << vx << std::endl;
+                                        //amrex::Print() << "vy  à la fin" << vy << std::endl;
+
+                                        //amrex::Print() << "eta" << eta << std::endl;
+                                        //amrex::Print() << "les vitesses à la fin" << sqrt(vx*vx+vy*vy+vz*vz) << std::endl;
+                                        }   
 
                                   else if (scattering_process.m_type == ScatteringProcessType::BACK) {
                                       // elastic scattering with cos(chi) = -1 (i.e. 180 degrees)

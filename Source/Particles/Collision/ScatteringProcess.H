@@ -129,32 +129,33 @@ public:
         }
         [[nodiscard]]
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-        amrex::ParticleReal getEta (amrex::ParticleReal Rn) const
+        amrex::ParticleReal getEta (amrex::ParticleReal E_coll) const
         {
-            amrex::ParticleReal m_Rn_0 = 0.1;
-            amrex::ParticleReal m_Rn_1 = 0.9;
-            amrex::ParticleReal m_dRn = m_Rn_1 - m_Rn_0;
-            if (Rn < m_Rn_0) {
-                return m_sigma_mt_lo;
-            } else if (Rn > m_Rn_1) {
-                return m_sigma_mt_hi;
+            if (E_coll < m_energy_lo) {
+                return std::exp(m_log_etan_lo);
+            } else if (E_coll > m_energy_hi) {
+                return std::exp(m_log_etan_hi);
             } else {
                 using amrex::Math::floor;
                 using amrex::Math::ceil;
                 // calculate index of bounding energy pairs
-                amrex::ParticleReal temp = (Rn - m_Rn_0) / m_dRn;
+                amrex::ParticleReal temp = (E_coll - m_energy_lo) / m_dE;
                 const int idx_1 = static_cast<int>(floor(temp));
                 const int idx_2 = static_cast<int>(ceil(temp));
 
                 // linearly interpolate to the given energy value
                 temp -= idx_1;
-                return m_sigmas_mt_data[idx_1] + (m_sigmas_mt_data[idx_2] - m_sigmas_mt_data[idx_1]) * temp;
+                return std::exp(m_log_etan[idx_1])*std::exp(std::log(std::exp(m_log_etan[idx_2])/std::exp(m_log_etan[idx_1]))/std::log(m_energies_data[idx_2]/m_energies_data[idx_1])*std::log(E_coll/m_energies_data[idx_1]));
             }
         }
 
+
         amrex::ParticleReal* m_sigmas_data = nullptr;
         amrex::ParticleReal* m_sigmas_mt_data = nullptr;
-        amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_sigma_mt_lo, m_sigma_mt_hi, m_dE;
+        amrex::ParticleReal* m_energies_data = nullptr;
+        amrex::ParticleReal* m_log_etan = nullptr;  
+
+        amrex::ParticleReal m_energy_lo, m_Rn, m_energy_hi, m_sigma_lo, m_sigma_hi, m_sigma_mt_lo, m_sigma_mt_hi, m_dE, m_log_etan_lo, m_log_etan_hi;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
     };
@@ -188,14 +189,19 @@ private:
     void init (const std::string& scattering_process, amrex::ParticleReal energy);
 
     amrex::Vector<amrex::ParticleReal> m_energies;
+    amrex::Gpu::HostVector<amrex::ParticleReal> m_log_etan_h;  
 
 #ifdef AMREX_USE_GPU
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_sigmas_d;
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_sigmas_mt_d;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_energies_d;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_log_etan_d;  
+
     Executor m_exe_d;
 #endif
     amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_h;
     amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_mt_h;
+    amrex::Gpu::HostVector<amrex::ParticleReal> m_energies_h;
 
     Executor m_exe_h;
 

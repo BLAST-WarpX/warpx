@@ -39,32 +39,94 @@ ScatteringProcess::ScatteringProcess (
     init(scattering_process, energy);
 }
 
+
 void
 ScatteringProcess::init (const std::string& scattering_process, const amrex::ParticleReal energy)
 {
     using namespace amrex::literals;
-    m_exe_h.m_sigmas_data = m_sigmas_h.data();
-    if (!m_sigmas_mt_h.empty()) {
-        m_exe_h.m_sigmas_mt_data = m_sigmas_mt_h.data();
-        m_exe_h.m_sigma_mt_lo = m_sigmas_mt_h[0];
-        m_exe_h.m_sigma_mt_hi = m_sigmas_mt_h[m_grid_size-1];
-    }
-    // save energy grid parameters for easy use
-    m_grid_size = static_cast<int>(m_energies.size());
-    m_exe_h.m_energy_lo = m_energies[0];
-    m_exe_h.m_energy_hi = m_energies[m_grid_size-1];
-    m_exe_h.m_sigma_lo = m_sigmas_h[0];
-    m_exe_h.m_sigma_hi = m_sigmas_h[m_grid_size-1];
-    m_exe_h.m_dE = (m_exe_h.m_energy_hi - m_exe_h.m_energy_lo)/(m_grid_size - 1._prt);
-    m_exe_h.m_energy_penalty = energy;
-    m_exe_h.m_type = parseProcessType(scattering_process);
 
-    // sanity check cross-section energy grid
+    // m_grid_size doit être initialisé EN PREMIER
+    m_grid_size = static_cast<int>(m_energies.size());
+
+    m_exe_h.m_sigmas_data = m_sigmas_h.data();
+    m_exe_h.m_energies_data = m_energies.data();
+
+    if (!m_sigmas_mt_h.empty()) {
+    m_exe_h.m_sigmas_mt_data = m_sigmas_mt_h.data();
+    m_exe_h.m_sigma_mt_lo = m_sigmas_mt_h[0];
+    m_exe_h.m_sigma_mt_hi = m_sigmas_mt_h[m_grid_size-1];
+
+    const int N_case = 1000;
+    const amrex::ParticleReal eta_min = 1e-3;
+    const amrex::ParticleReal eta_max = 1000;
+
+    amrex::Vector<amrex::ParticleReal> log_eta_i(N_case);
+    amrex::Vector<amrex::ParticleReal> Ri(N_case);
+
+    // Construction d'une grille LOGARITHMIQUE (recommandé pour la physique de eta)
+    const amrex::ParticleReal log_eta_min = std::log(eta_min);
+    const amrex::ParticleReal log_eta_max = std::log(eta_max);
+    const amrex::ParticleReal d_log_eta = (log_eta_max - log_eta_min) / (N_case - 1);
+
+    for (int i = 0; i < N_case; ++i) {
+        log_eta_i[i] = log_eta_min + i * d_log_eta;
+        amrex::ParticleReal eta = std::exp(log_eta_i[i]);
+        
+        // Utilisation de std::log1p pour préserver la précision de la formule
+        amrex::ParticleReal internal_term = (eta + 1.0) * std::log1p(1.0 / eta) - 1.0;
+        Ri[i] = std::log(2.0 * eta * internal_term);
+    }
+
+    // Remplissage de m_log_etan_h sur CPU
+    m_log_etan_h.resize(m_grid_size);
+    for (int i = 0; i < m_grid_size; ++i) {
+        amrex::ParticleReal Rn = std::log(m_sigmas_mt_h[i] / m_sigmas_h[i]);
+
+        // Clamp aux bornes
+        if (Rn <= Ri[0]) {
+            m_log_etan_h[i] = log_eta_i[0];
+            continue;
+        }
+        if (Rn >= Ri[N_case - 1]) {
+            m_log_etan_h[i] = log_eta_i[N_case - 1];
+            continue;
+        }
+
+        // Recherche binaire sur Ri (Ri est strictement croissante)
+        int lo = 0;
+        int hi = N_case - 2;
+        while (lo < hi) {
+            int mid = lo + (hi - lo + 1) / 2;
+            if (Ri[mid] <= Rn) { lo = mid; }
+            else               { hi = mid - 1; }
+        }
+
+        // Interpolation linéaire propre (sans appels répétés à std::log)
+        const amrex::ParticleReal Rn_lo = Ri[lo];
+        const amrex::ParticleReal Rn_hi = Ri[lo + 1];
+        const amrex::ParticleReal ln_eta_lo = log_eta_i[lo];
+        const amrex::ParticleReal ln_eta_hi = log_eta_i[lo + 1];
+        
+        m_log_etan_h[i] = ln_eta_lo + (ln_eta_hi - ln_eta_lo) / (Rn_hi - Rn_lo) * (Rn - Rn_lo);
+}
+
+m_exe_h.m_log_etan    = m_log_etan_h.data();
+m_exe_h.m_log_etan_lo = m_log_etan_h[0];
+m_exe_h.m_log_etan_hi = m_log_etan_h[m_grid_size - 1];
+amrex::Print() << "m_exe_h.m_log_etan (lo, hi): " << std::exp(m_exe_h.m_log_etan_lo) << " " << std::exp(m_exe_h.m_log_etan_hi) << std::endl;
+    }
+
+    // Paramètres de grille
+    m_exe_h.m_energy_lo      = m_energies[0];
+    m_exe_h.m_energy_hi      = m_energies[m_grid_size-1];
+    m_exe_h.m_sigma_lo       = m_sigmas_h[0];
+    m_exe_h.m_sigma_hi       = m_sigmas_h[m_grid_size-1];
+    m_exe_h.m_dE             = (m_exe_h.m_energy_hi - m_exe_h.m_energy_lo) / (m_grid_size - 1._prt);
+    m_exe_h.m_energy_penalty = energy;
+    m_exe_h.m_type           = parseProcessType(scattering_process);
+
     sanityCheckEnergyGrid(m_energies, m_exe_h.m_dE);
 
-    // check that the cross-section is 0 at the energy cost if the energy
-    // cost is > 0 - this is to prevent the possibility of negative left
-    // over energy after a collision event
     if (m_exe_h.m_energy_penalty > 0) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             (getCrossSection(m_exe_h.m_energy_penalty) == 0),
@@ -76,14 +138,24 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
     m_exe_d = m_exe_h;
     m_sigmas_d.resize(m_sigmas_h.size());
     m_sigmas_mt_d.resize(m_sigmas_mt_h.size());
+    m_energies_d.resize(m_energies.size());
+    m_log_etan_d.resize(m_log_etan_h.size());
 
+    m_exe_d.m_energies_data = m_energies_d.data();
     m_exe_d.m_sigmas_data = m_sigmas_d.data();
     m_exe_d.m_sigmas_mt_data = m_sigmas_mt_d.data();
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_sigmas_h.begin(), m_sigmas_h.end(),
-                          m_sigmas_d.begin());
-    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_sigmas_mt_h.begin(), m_sigmas_mt_h.end(),
-                          m_sigmas_mt_d.begin());
+    m_exe_d.m_ln_etan = m_ln_etan_d.data();
+
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+        m_sigmas_h.begin(), m_sigmas_h.end(), m_sigmas_d.begin());
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+        m_sigmas_mt_h.begin(), m_sigmas_mt_h.end(), m_sigmas_mt_d.begin());
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+        m_energies.begin(), m_energies.end(), m_energies_d.begin());
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice,
+        m_log_etan_h.begin(), m_log_etan_h.end(), m_log_etan_d.begin());
     amrex::Gpu::streamSynchronize();
+
 #endif
 }
 
@@ -110,6 +182,7 @@ ScatteringProcess::parseProcessType(const std::string& scattering_process)
         return ScatteringProcessType::INVALID;
     }
 }
+
 
 void
 ScatteringProcess::readCrossSectionFile (
@@ -142,6 +215,7 @@ ScatteringProcess::readCrossSectionFile (
     if (infile2.bad()) { WARPX_ABORT_WITH_MESSAGE("Failed to read cross-section momentum data from file."); }
     infile2.close();
     };
+
 }
 
 
