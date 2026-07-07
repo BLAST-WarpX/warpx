@@ -1,9 +1,6 @@
 # Configuration ###############################################################
 #
 if(WarpX_MPI)
-    set(MPI_ALLOW_ROOT "")
-    set(MPIEXEC_SUPPORTS_HOST OFF)
-
     # OpenMPI root guard: https://github.com/open-mpi/ompi/issues/4451
     if("$ENV{USER}" STREQUAL "root")
         # calling even --help as root will abort and warn on stderr
@@ -11,30 +8,11 @@ if(WarpX_MPI)
             COMMAND ${MPIEXEC_EXECUTABLE} --help
             ERROR_VARIABLE MPIEXEC_HELP_TEXT
             OUTPUT_STRIP_TRAILING_WHITESPACE
-            ERROR_STRIP_TRAILING_WHITESPACE
         )
-        if("${MPIEXEC_HELP_TEXT}" MATCHES "allow-run-as-root")
+        if(${MPIEXEC_HELP_TEXT} MATCHES "^.*allow-run-as-root.*$")
             set(MPI_ALLOW_ROOT --allow-run-as-root)
         endif()
     endif()
-
-    # Probe whether the MPI launcher accepts --host before using the Azure
-    # Open MPI slot-count workaround. Open MPI 4.1.6 lists --host under the
-    # "launch" help category instead of the default help text.
-    set(MPIEXEC_HELP_COMMAND ${MPIEXEC_EXECUTABLE} ${MPI_ALLOW_ROOT})
-    foreach(MPIEXEC_HELP_OPTION "" launch)
-        execute_process(
-            COMMAND ${MPIEXEC_HELP_COMMAND} --help ${MPIEXEC_HELP_OPTION}
-            OUTPUT_VARIABLE MPIEXEC_HELP_TEXT
-            ERROR_VARIABLE MPIEXEC_HELP_TEXT_STDERR
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            ERROR_STRIP_TRAILING_WHITESPACE
-        )
-        string(APPEND MPIEXEC_HELP_TEXT "${MPIEXEC_HELP_TEXT_STDERR}")
-        if("${MPIEXEC_HELP_TEXT}" MATCHES "--host")
-            set(MPIEXEC_SUPPORTS_HOST ON)
-        endif()
-    endforeach()
 endif()
 
 # Add a WarpX test set (with sub-tests)
@@ -130,20 +108,10 @@ function(add_warpx_test
         return()
     endif()
 
-    # Avoid the following error seen with Open MPI 4.1.6 in the Azure pipelines:
-    # "There are not enough slots available in the system to satisfy the 2 slots
-    # that were requested by the application".
-    if(MPIEXEC_SUPPORTS_HOST)
-        set(MPI_HOST_NUMPROC --host localhost:${nprocs})
-    else()
-        set(MPI_HOST_NUMPROC "")
-    endif()
-
     # set MPI executable
     set(THIS_MPI_TEST_EXE
         ${MPIEXEC_EXECUTABLE}
         ${MPI_ALLOW_ROOT}
-        ${MPI_HOST_NUMPROC}
         ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
         ${MPIEXEC_POSTFLAGS}
         ${MPIEXEC_PREFLAGS}
