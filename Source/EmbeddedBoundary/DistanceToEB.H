@@ -47,7 +47,7 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
 {
     using namespace amrex::literals;
 
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
     amrex::RealVect normal{0.0, 0.0, 0.0};
     for (int iic = 0; iic < 2; ++iic) {
         for (int kk = 0; kk < 2; ++kk) {

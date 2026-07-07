@@ -52,7 +52,7 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
 
     bool no_overlap = false;
     for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-#if (defined(WARPX_DIM_3D))
+#if defined(WARPX_DIM_3D)
         if (dir == plasma_injector.flux_normal_axis) {
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         if (2*dir == plasma_injector.flux_normal_axis) {

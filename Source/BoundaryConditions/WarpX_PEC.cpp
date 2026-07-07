@@ -153,12 +153,12 @@ namespace
                 const bool isPECBoundary = ( (iside == 0)
                     ? fbndry_lo[idim] == bc_type
                     : fbndry_hi[idim] == bc_type );
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 // For 2D : for icomp==1, (Ey in XZ, Etheta in RZ),
                 //          icomp=1 is tangential to both x and z boundaries
                 //          The logic below ensures that the flags are set right for 2D
                 const bool is_tangent_to_PEC = (icomp != AMREX_SPACEDIM*idim);
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
                 // For 1D : icomp=0 and icomp=1 (Ex and Ey are tangential to the z boundary)
                 //          The logic below ensures that the flags are set right for 1D
                 const bool is_tangent_to_PEC = (icomp != idim+2);
@@ -294,12 +294,12 @@ namespace
                     ? fbndry_lo[idim] == bc_type
                     : fbndry_hi[idim] == bc_type );
                 if (isPECBoundary) {
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     // For 2D : for icomp==1, (By in XZ, Btheta in RZ),
                     //          icomp=1 is not normal to x or z boundary
                     //          The logic below ensures that the flags are set right for 2D
                     const bool is_normal_to_PEC = (icomp == (AMREX_SPACEDIM*idim));
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
                     // For 1D : icomp=0 and icomp=1 (Bx and By are not normal to the z boundary)
                     //          The logic below ensures that the flags are set right for 1D
                     const bool is_normal_to_PEC = (icomp == (idim+2));
@@ -394,7 +394,7 @@ namespace
             if (fabbox.contains(ijk_mirror)) {
                 // Note that this includes the cells on the boundary
                 amrex::Real rscale = 1._rt; // NOLINT(misc-const-correctness)
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
                 const amrex::Real rvalid = ijk_vec[idim] + rshift;
                 if (idim == 0 && iside == 1) {
@@ -414,7 +414,7 @@ namespace
                     amrex::IntVect ijk_guard = ijk_vec;
                     for (int ig = 0 ; ig < nguards ; ig++) {
                         ijk_guard[idim] += isign;
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                         if (idim == 0 && iside == 1) {
                             rscale = (rvalid + ig + 1)/rvalid;
 #if defined(WARPX_DIM_RSPHERE)
@@ -485,7 +485,7 @@ namespace
             // This assumes that the nodal boundary cells are not included in the box.
             if (fabbox.contains(ijk_mirror)) {
                 auto inv_rscale = 1._rt; // NOLINT(misc-const-correctness)
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 if (idim == 0 && iside == 1) {
                     // Account for different dV at different radii
                     amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
@@ -946,11 +946,11 @@ PEC::ApplyReflectiveBoundarytoJfield (
 
         for (int icomp = 0; icomp < 3; ++icomp) {
             // Set the psign value for each component of J for each direction
-#if (defined WARPX_DIM_1D_Z)
+#if defined(WARPX_DIM_1D_Z)
             // For 1D : icomp=0 and icomp=1 (Jx and Jy are tangential to the z boundary)
             //          The logic below ensures that the flags are set right for 1D
             is_tangent_to_bndy = (icomp != (idim+2));
-#elif (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // For 2D : for icomp==1, (Jy in XZ, Jtheta in RZ),
             //          icomp=1 is tangential to both x and z boundaries
             //          The logic below ensures that the flags are set right for 2D

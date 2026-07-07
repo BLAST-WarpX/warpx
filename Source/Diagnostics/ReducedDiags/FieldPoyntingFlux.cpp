@@ -185,10 +185,10 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
         // Only calculate the ExB term that is normal to the surface.
         // normal_dir is the normal direction relative to the WarpX coordinates
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         // For 2D : it is either 0, or 2
         int const normal_dir = 2*face_dir;
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
         // For 1D : it is always 2
         int const normal_dir = 2;
 #else

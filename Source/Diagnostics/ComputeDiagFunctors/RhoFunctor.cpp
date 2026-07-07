@@ -1,7 +1,7 @@
 #include "RhoFunctor.H"
 
 #include "Diagnostics/ComputeDiagFunctors/ComputeDiagFunctor.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
     #include "FieldSolver/SpectralSolver/SpectralFieldData.H"
     #include "FieldSolver/SpectralSolver/SpectralSolverRZ.H"
     #include "Utils/WarpXAlgorithmSelection.H"
@@ -60,7 +60,7 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
     // apply the filtering if requested.
     warpx.ApplyFilterandSumBoundaryRho(m_lev, m_lev, *rho, 0, rho->nComp());
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
     // Apply k-space filtering when using the PSATD solver
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
     {

@@ -11,7 +11,7 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Diagnostics/MultiDiagnostics.H"
@@ -427,7 +427,7 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
                 const auto x = 0.0_rt;
                 const auto y = 0.0_rt;
                 const auto z = problo[0] + (i+Real(0.5))*dx[0];
-#elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 const auto x = problo[0] + (i+Real(0.5))*dx[0];
                 const auto y = 0.0_rt;
                 const auto z = problo[1] + (j+Real(0.5))*dx[1];
@@ -1033,7 +1033,7 @@ WarpX::InitPML ()
     if (do_pml)
     {
         bool const eb_enabled = EB::enabled();
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
         do_pml_Lo[0][0] = 0; // no PML at r=0, in cylindrical geometry
         pml_rz[0] = std::make_unique<PML_RZ>(0, boxArray(0), DistributionMap(0), &Geom(0), m_fields, pml_ncell, do_pml_in_domain);
 #else

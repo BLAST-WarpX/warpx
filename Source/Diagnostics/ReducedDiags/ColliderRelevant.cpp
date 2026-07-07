@@ -9,7 +9,7 @@
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
 #include "Fields.H"
-#if (defined WARPX_QED)
+#if defined(WARPX_QED)
 #   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #endif
 #include "Particles/Gather/FieldGather.H"
@@ -73,7 +73,7 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
         "Collider-relevant diagnostics must involve exactly two species");
 
     // RZ coordinate is not supported
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ABORT_WITH_MESSAGE(
         "Collider-relevant diagnostics do not work in cylindrical and spherical geometry.");
 #endif
@@ -119,9 +119,9 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
         all_diag_names.push_back(name);
     };
 
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
     add_diag("dL_dt", "dL_dt(m^-2*s^-1)");
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
     add_diag("dL_dt", "dL_dt(m^-1*s^-1)");
 #else
     add_diag("dL_dt", "dL_dt(s^-1)");
@@ -138,7 +138,7 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
             add_diag("chiave_"+m_beam_name[i_s], "chi_ave_"+m_beam_name[i_s]+"()");
             add_diag("chimax_"+m_beam_name[i_s], "chi_max_"+m_beam_name[i_s]+"()");
         }
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
         add_diag("x_ave_"+m_beam_name[i_s], "x_ave_"+m_beam_name[i_s]+"(m)");
         add_diag("x_std_"+m_beam_name[i_s], "x_std_"+m_beam_name[i_s]+"(m)");
         add_diag("y_ave_"+m_beam_name[i_s], "y_ave_"+m_beam_name[i_s]+"(m)");
@@ -152,7 +152,7 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
         add_diag("thetay_max_"+m_beam_name[i_s], "theta_y_max_"+m_beam_name[i_s]+"(rad)");
         add_diag("thetay_std_"+m_beam_name[i_s], "theta_y_std_"+m_beam_name[i_s]+"(rad)");
 
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
         add_diag("x_ave_"+m_beam_name[i_s], "x_ave_"+m_beam_name[i_s]+"(m)");
         add_diag("x_std_"+m_beam_name[i_s], "x_std_"+m_beam_name[i_s]+"(m)");
         add_diag("thetax_min_"+m_beam_name[i_s], "theta_x_min_"+m_beam_name[i_s]+"(rad)");
@@ -190,7 +190,7 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
 
 void ColliderRelevant::ComputeDiags (int step)
 {
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::ignore_unused(step);
 #else
 
@@ -416,7 +416,7 @@ void ColliderRelevant::ComputeDiags (int step)
         m_data[get_idx("thetay_std_"+m_beam_name[i_s])] = thetay_std;
 #endif
 
-#if (defined WARPX_QED)
+#if defined(WARPX_QED)
         // get mass
         amrex::ParticleReal m = myspc.getMass();
         const bool is_photon = myspc.AmIA<PhysicalSpecies::photon>();

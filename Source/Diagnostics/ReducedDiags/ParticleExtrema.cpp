@@ -8,7 +8,7 @@
 #include "ParticleExtrema.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#if (defined WARPX_QED)
+#if defined(WARPX_QED)
 #   include "Particles/ElementaryProcess/QEDInternals/QedChiFunctions.H"
 #endif
 #include "Fields.H"
@@ -107,10 +107,10 @@ ParticleExtrema::ParticleExtrema (const std::string& rd_name)
         add_diag("gmin", "gmin()");
         add_diag("gmax", "gmax()");
 
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
         add_diag("wmin", "wmin()");
         add_diag("wmax", "wmax()");
-#elif (defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ))
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         add_diag("wmin", "wmin(1/m)");
         add_diag("wmax", "wmax(1/m)");
 #else
@@ -240,7 +240,7 @@ void ParticleExtrema::ComputeDiags (int step)
         amrex::ParallelDescriptor::ReduceRealMin({xmin,ymin,zmin,uxmin,uymin,uzmin,gmin,wmin});
         amrex::ParallelDescriptor::ReduceRealMax({xmax,ymax,zmax,uxmax,uymax,uzmax,gmax,wmax});
 
-#if (defined WARPX_QED)
+#if defined(WARPX_QED)
         // get number of level (int)
         const auto level_number = WarpX::GetInstance().finestLevel();
 
@@ -385,7 +385,7 @@ void ParticleExtrema::ComputeDiags (int step)
         m_data[get_idx("gmax")] = gmax;
         m_data[get_idx("wmin")] = wmin;
         m_data[get_idx("wmax")] = wmax;
-#if (defined WARPX_QED)
+#if defined(WARPX_QED)
         if (myspc.DoQED())
         {
             m_data[get_idx("chimin")] = chimin_f;

@@ -28,7 +28,7 @@ FieldReduction::FieldReduction (const std::string& rd_name)
     using namespace amrex::literals;
 
     // Non-Cartesian coordinates not working
-#if (defined WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
         "FieldReduction reduced diagnostics not implemented for cylindrical and spherical coordinates.");
 #endif

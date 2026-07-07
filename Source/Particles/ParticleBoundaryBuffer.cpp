@@ -131,7 +131,7 @@ struct FindEmbeddedBoundaryIntersection {
         amrex::RealVect normal = DistanceToEB::interp_normal(i, j, k, W, ic, jc, kc, Wc, phiarr, dxi);
         DistanceToEB::normalize(normal);
 
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
         dst.m_rdata[PIdx::x][dst_i] = x_temp;
         dst.m_rdata[PIdx::y][dst_i] = y_temp;
         dst.m_rdata[PIdx::z][dst_i] = z_temp;
@@ -139,7 +139,7 @@ struct FindEmbeddedBoundaryIntersection {
         dst.m_runtime_rdata[m_normal_index][dst_i] = normal[0];
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = normal[1];
         dst.m_runtime_rdata[m_normal_index+2][dst_i] = normal[2];
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
         dst.m_rdata[PIdx::x][dst_i] = x_temp;
         dst.m_rdata[PIdx::z][dst_i] = z_temp;
         amrex::ignore_unused(y_temp);
@@ -147,7 +147,7 @@ struct FindEmbeddedBoundaryIntersection {
         dst.m_runtime_rdata[m_normal_index][dst_i] = normal[0];
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+2][dst_i] = normal[1];
-#elif (defined WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ)
         dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
         dst.m_rdata[PIdx::z][dst_i] = z_temp;
         dst.m_rdata[PIdx::theta][dst_i] = std::atan2(y_temp, x_temp);
@@ -156,14 +156,14 @@ struct FindEmbeddedBoundaryIntersection {
         dst.m_runtime_rdata[m_normal_index][dst_i] = normal[0]*std::cos(theta);
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = normal[0]*std::sin(theta);
         dst.m_runtime_rdata[m_normal_index+2][dst_i] = normal[1];
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
         dst.m_rdata[PIdx::z][dst_i] = z_temp;
         amrex::ignore_unused(x_temp, y_temp);
         //normal not defined
         dst.m_runtime_rdata[m_normal_index][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+1][dst_i] = 0.0;
         dst.m_runtime_rdata[m_normal_index+2][dst_i] = 0.0;
-#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 #if defined(WARPX_DIM_RCYLINDER)
         amrex::ignore_unused(z_temp);
         dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
@@ -244,7 +244,7 @@ ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
 #if defined(WARPX_DIM_1D_Z)
     constexpr auto idx_zlo = 0;
     constexpr auto idx_zhi = 1;
-#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     constexpr auto idx_xlo = 0;
     constexpr auto idx_xhi = 1;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
@@ -269,7 +269,7 @@ ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
 #if defined(WARPX_DIM_1D_Z)
         pp_species.query("save_particles_at_zlo", m_do_boundary_buffer[idx_zlo][ispecies]);
         pp_species.query("save_particles_at_zhi", m_do_boundary_buffer[idx_zhi][ispecies]);
-#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         pp_species.query("save_particles_at_xlo", m_do_boundary_buffer[idx_xlo][ispecies]);
         pp_species.query("save_particles_at_xhi", m_do_boundary_buffer[idx_xhi][ispecies]);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
@@ -297,7 +297,7 @@ ParticleBoundaryBuffer::ParticleBoundaryBuffer ()
 #if defined(WARPX_DIM_1D_Z)
     m_boundary_names[idx_zlo] = "zlo";
     m_boundary_names[idx_zhi] = "zhi";
-#elif (defined WARPX_DIM_RCYLINDER) || (defined WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     m_boundary_names[idx_xlo] = "xlo";
     m_boundary_names[idx_xhi] = "xhi";
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)

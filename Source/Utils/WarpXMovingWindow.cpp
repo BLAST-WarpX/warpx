@@ -9,7 +9,7 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Initialization/ExternalField.H"
@@ -222,7 +222,7 @@ namespace
             }
         }
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
         if (PMLRZ_flag) {
             // This does the exchange of data in the corner guard cells, the cells that are in the
             // guard region both radially and longitudinally. These are the PML cells in the overlapping
@@ -482,7 +482,7 @@ WarpX::MoveWindow (const int step, bool move_j)
                 ::shiftMF(*pml_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
                 ::shiftMF(*pml_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
             }
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
             const bool PMLRZ_flag = pml_rz[0].get();
             if (pml_rz[lev] && dim < 2) {
                 amrex::MultiFab* pml_rz_B = m_fields.get(FieldType::pml_B_fp, Direction{dim}, lev);
