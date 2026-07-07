@@ -87,7 +87,6 @@ Intel-PVC:
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
           -DCMAKE_CXX_FLAGS="-fp-model=precise" \
           -DWarpX_COMPUTE=SYCL                  \
-          -DAMReX_INTEL_ARCH=pvc                \
           -DAMReX_PARALLEL_LINK_JOBS=4          \
           -DWarpX_EB=ON                         \
           -DWarpX_FFT=ON                        \
@@ -97,5 +96,5 @@ Intel-PVC:
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=SINGLE
     - cmake --build build -j 16
-    - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
+    - export AMREX_THE_ARENA_INIT_SIZE=1e9
     - ctest --test-dir build -R test_3d_collision_xyz.run --output-on-failure --no-tests=error
