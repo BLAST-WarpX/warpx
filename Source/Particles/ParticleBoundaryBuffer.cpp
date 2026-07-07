@@ -559,7 +559,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                     if (np == 0) { continue; }
 
                     using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
-                    auto predicate = [=] AMREX_GPU_HOST_DEVICE(const SrcData & /*src*/, const int ip)
+                    auto predicate = [=] AMREX_GPU_HOST_DEVICE(const SrcData & src, const int ip)
                             /* NVCC 11.3.109 chokes in C++17 on this: noexcept */
                     {
                         amrex::ParticleReal xp, yp, zp;
@@ -568,7 +568,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                         amrex::Real const phi_value = ablastr::particles::doGatherScalarFieldNodal(
                             xp, yp, zp, phiarr, dxi, plo
                         );
-                        return phi_value < 0.0 ? 1 : 0;
+                        return (phi_value < 0.0 && !amrex::ParticleIDWrapper{src.m_idcpu[ip]}.is_valid()) ? 1 : 0;
                     };
 
                     const auto ptile_data = ptile.getConstParticleTileData();

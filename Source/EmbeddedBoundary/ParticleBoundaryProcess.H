@@ -56,7 +56,7 @@ struct Reflect {
         amrex::ParticleReal& ux = ptd.m_rdata[PIdx::ux][i];
         amrex::ParticleReal& uy = ptd.m_rdata[PIdx::uy][i];
         amrex::ParticleReal& uz = ptd.m_rdata[PIdx::uz][i];
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ)
         // momentum (ux,uy,uz) is Cartesian; the EB normal is (n_r, n_z). Rotate
         // the normal to the particle's azimuth to build the Cartesian normal.
         amrex::ParticleReal const theta = ptd.m_rdata[PIdx::theta][i];
@@ -65,25 +65,25 @@ struct Reflect {
         amrex::Real const nx = normal[0]*ct;
         amrex::Real const ny = normal[0]*st;
         amrex::Real const nz = normal[1];
-#elif (defined WARPX_DIM_3D)
+#elif defined(WARPX_DIM_3D)
         amrex::Real const nx = normal[0];
         amrex::Real const ny = normal[1];
         amrex::Real const nz = normal[2];
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
         amrex::Real const nx = normal[0];
         amrex::Real const ny = 0._rt;
         amrex::Real const nz = normal[1];
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
         amrex::Real const nx = 0._rt;
         amrex::Real const ny = 0._rt;
         amrex::Real const nz = normal[0];
-#elif (defined WARPX_DIM_RCYLINDER)
+#elif defined(WARPX_DIM_RCYLINDER)
         // 1D radial: only a radial normal; rotate to the particle's azimuth.
         amrex::ParticleReal const theta = ptd.m_rdata[PIdx::theta][i];
         amrex::Real const nx = normal[0]*std::cos(theta);
         amrex::Real const ny = normal[0]*std::sin(theta);
         amrex::Real const nz = 0._rt;
-#elif (defined WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RSPHERE)
         // 1D radial (spherical): radial unit vector uses azimuth theta and polar phi.
         amrex::ParticleReal const theta = ptd.m_rdata[PIdx::theta][i];
         amrex::ParticleReal const phi   = ptd.m_rdata[PIdx::phi][i];
