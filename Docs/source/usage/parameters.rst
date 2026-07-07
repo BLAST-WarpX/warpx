@@ -1758,24 +1758,29 @@ Particle initialization
         p(\mathbf{u}) \propto \exp(-\gamma(\mathbf{u})mc^2/k_B T) = \exp(-\gamma (\mathbf{u})/\theta)
 
       (with :math:`\gamma(\mathbf{u}) = \sqrt{1+\mathbf{u}^2}` and :math:`\theta = k_B T/m c^2`) in a
-      **drifting Lorentz frame** that is moving with a bulk velocity :math:`\beta = v_{drift}/c`.
+      **drifting Lorentz frame** that is moving with a bulk velocity specified by the normalized momentum
+      :math:`\boldsymbol{u}_{\rm mean} = (u_{x,{\rm mean}}, u_{y,{\rm mean}}, u_{z,{\rm mean}}) = \gamma \boldsymbol{v}/c` (see below).
       Thus, particles can potentially be relativistic in two ways: by having relativistic bulk drift :math:`\beta`
       in the lab frame, and/or by having high temperature :math:`\theta` in the drift frame.
 
       It requires the following arguments:
 
-      * ``<species_name>.beta_distribution_type`` (`string`, default ``constant``):
-        Specifies the distribution type for the bulk velocity :math:`\beta`.
-        The magnitude must satisfy :math:`|\beta| < 1`.
+      * ``<species_name>.maxwell_juttner_u_mean_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the bulk (mean) particle momentum ``u_mean``.
+        Here, ``u_mean`` is a 3D vector (with components ``ux_mean``, ``uy_mean``, ``uz_mean``)
+        representing the normalized momentum, defined as
+        :math:`\boldsymbol{u}_\mathrm{mean} = \gamma \boldsymbol{\beta}`, where
+        :math:`\boldsymbol{\beta} = \boldsymbol{v}/c` and :math:`\gamma = 1/\sqrt{1-|\boldsymbol{\beta}|^2}`.
+        The distribution is boosted from the drift frame to the simulation frame along the
+        direction of :math:`\boldsymbol{u}_\mathrm{mean}`; the bulk velocity :math:`|\boldsymbol{\beta}|` derived from
+        :math:`\boldsymbol{u}_\mathrm{mean}` is therefore always in the physical range :math:`|\boldsymbol{\beta}| < 1`.
 
-        * If ``constant``, the following can be set: ``<species_name>.beta`` (`float`, default ``0``).
-        * If ``parser``, the following is required: ``<species_name>.beta_function(x,y,z)``.
-
-      * ``<species_name>.bulk_vel_dir`` (`string`, default ``x``):
-        Specifies the direction of the bulk velocity :math:`\beta`.
-        The direction of the velocity field is given by ``<species_name>.bulk_vel_dir = (+/-) 'x', 'y', 'z'``, and must be the same across the domain.
-        Please leave no whitespace between the sign and the character on input. A direction without a sign will be treated as positive.
-        The signed bulk velocity is ``beta`` times the direction given here.
+        * If ``constant``, the following are required: ``<species_name>.ux_mean``,
+          ``<species_name>.uy_mean``, ``<species_name>.uz_mean`` (`float`, default ``0``).
+        * If ``parser``, the following are required:
+          ``<species_name>.ux_mean_function(x,y,z)``,
+          ``<species_name>.uy_mean_function(x,y,z)``,
+          ``<species_name>.uz_mean_function(x,y,z)``.
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.
@@ -3704,11 +3709,17 @@ Maxwell solver: kinetic-fluid hybrid
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the total number of sub-steps used to advance
     the B-field over one full timestep (split evenly between the two half-steps, so ``substeps/2`` RK4 steps are taken
     per half-step, each of duration :math:`\Delta t / \text{substeps}`). Must be divisible by 2; if not, the value is
-    automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this is
+    automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is active, this is
     instead used only as the initial substep count estimate for the adaptive solver.
+    After each timestep on which :pp:param:`hybrid_pic_model.use_rkf45` is active, this value is updated based on
+    ``n_attempts``, the total number of RKF45 sub-step attempts (accepted and rejected) taken in the most recent
+    half-step: if the current value is less than ``2 * n_attempts``, it jumps immediately to ``2 * n_attempts``;
+    otherwise it decays slowly toward that target via exponential smoothing (95% of the current value,
+    5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where
+    :pp:param:`hybrid_pic_model.use_rkf45` is not active.
 
 .. pp:param:: hybrid_pic_model.use_rkf45
-    :type: ``bool``
+    :type: ``string`` or ``bool``
     :default: ``false``
     :optional:
 
@@ -3719,12 +3730,18 @@ Maxwell solver: kinetic-fluid hybrid
     is used, controlling the local truncation error to stay within
     :pp:param:`hybrid_pic_model.substep_rtol` and :pp:param:`hybrid_pic_model.substep_atol`.
 
+    This parameter also accepts the `Time intervals`_ syntax to enable the RKF45 integrator only
+    on specific timesteps, e.g. ``hybrid_pic_model.use_rkf45 = 1::5``, which enables RKF45
+    every 5 steps from step 1.
+    When ``false`` or ``0``, the RKF45 integrator is never used.
+    When ``true``, ``1``, or ``::`` the RKF45 integrator is used at every timestep.
+
 .. pp:param:: hybrid_pic_model.substep_rtol
     :type: ``float``
     :default: ``1e-4``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the relative tolerance for the RKF45
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the relative tolerance for the RKF45
     adaptive step-size control.
 
 .. pp:param:: hybrid_pic_model.substep_atol
@@ -3732,7 +3749,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``1e-8``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the absolute tolerance for the RKF45
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the absolute tolerance for the RKF45
     adaptive step-size control.
 
 .. pp:param:: hybrid_pic_model.substep_safety
@@ -3740,7 +3757,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``0.9``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the safety factor applied to the
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the safety factor applied to the
     step-size adjustment formula.
 
 .. pp:param:: hybrid_pic_model.substep_max_growth
@@ -3748,7 +3765,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``5.0``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum factor by which the
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the maximum factor by which the
     substep size may grow after an accepted step.
 
 .. pp:param:: hybrid_pic_model.max_substep_attempts
@@ -3756,7 +3773,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``250``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum number of substep attempts
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the maximum number of substep attempts
     (accepted and rejected combined) per half-step before the simulation aborts.
 
 .. pp:param:: hybrid_pic_model.holmstrom_vacuum_region
@@ -3896,8 +3913,15 @@ Additional parameters
     :type: ``0`` or ``1``
     :default: 0
 
-    Whether to use projection method to scrub A/B field divergence in externally
-    loaded fields. This is automatically turned on if external/initial B or time varying A fields are loaded.
+    Whether to use a projection method to scrub A/B field divergence in externally
+    loaded fields. This applies to both externally loaded grid fields
+    (``warpx.B_ext_grid_init_style``) and externally applied particle fields
+    (``particles.B_ext_particle_init_style = read_from_file``); when several applied
+    field maps are stacked, each map is cleaned independently. It is supported for the
+    electromagnetic (Yee, hybrid-PIC), electrostatic (labframe) and magnetostatic
+    (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+    This is automatically turned on if external/initial grid B or time varying A fields
+    are loaded; for applied particle fields it must be enabled explicitly (opt-in).
 
 .. pp:param:: warpx.projection_div_cleaner.rtol
     :type: ``float``

@@ -55,7 +55,7 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
     if (m_collision_type == CollisionType::ProtonBoronToAlphasFusion
         || BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
     {
-        pp_collision_name.query_enum_sloppy("scattering_angle_model", m_scattering_angle_model, "-_");
+        pp_collision_name.query_enum_case_insensitive("scattering_angle_model", m_scattering_angle_model);
     }
 
 #ifdef AMREX_USE_GPU

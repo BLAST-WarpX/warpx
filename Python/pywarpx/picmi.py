@@ -158,6 +158,10 @@ class Species(picmistandard.PICMI_Species):
         Resampling will be done when the average number of
         particles per cell exceeds this number
 
+    warpx_resampling_algorithm_target_ratio: float, default=1.5
+        Roughly corresponds to the ratio between the number of particles before
+        and after resampling. Only used with the `leveling_thinning` algorithm.
+
     warpx_resampling_algorithm: str, default="leveling_thinning"
         Resampling algorithm to use.
 
@@ -287,6 +291,9 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_triggering_max_avg_ppc = kw.pop(
             "warpx_resampling_trigger_max_avg_ppc", None
         )
+        self.resampling_algorithm_target_ratio = kw.pop(
+            "warpx_resampling_algorithm_target_ratio", None
+        )
         self.resampling_algorithm_target_weight = kw.pop(
             "warpx_resampling_algorithm_target_weight", None
         )
@@ -364,6 +371,7 @@ class Species(picmistandard.PICMI_Species):
             resampling_min_ppc=self.resampling_min_ppc,
             resampling_trigger_intervals=self.resampling_trigger_intervals,
             resampling_trigger_max_avg_ppc=self.resampling_triggering_max_avg_ppc,
+            resampling_algorithm_target_ratio=self.resampling_algorithm_target_ratio,
             resampling_algorithm_target_weight=self.resampling_algorithm_target_weight,
             resampling_algorithm_velocity_grid_type=self.resampling_algorithm_velocity_grid_type,
             resampling_algorithm_delta_ur=self.resampling_algorithm_delta_ur,
@@ -2148,37 +2156,49 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         RK4 steps are taken per half-step, each of duration
         ``dt / substeps``). Must be divisible by 2; if not, the value is
         automatically rounded up to the next even number.
-        When ``use_rkf45=True``, this is instead used only as the initial
-        substep count estimate for the adaptive solver.
+        When ``use_rkf45`` is active (True or a non-empty interval string),
+        this is instead used only as the initial substep count estimate for
+        the adaptive solver. After each timestep on which ``use_rkf45`` is
+        active, this value is updated based on ``n_attempts``, the total number
+        of RKF45 sub-step attempts (accepted and rejected) taken in the most
+        recent half-step: if the current value is less than ``2 * n_attempts``,
+        it jumps immediately to ``2 * n_attempts``; otherwise it decays slowly
+        toward that target via exponential smoothing (95% old, 5% of
+        ``2 * n_attempts``). This warm-start guess also carries over to
+        RK4 steps on timesteps where ``use_rkf45`` is not active.
 
-    use_rkf45: bool, default=False
-        If True, use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45)
-        integrator (Fehlberg 1969, NASA Technical Report R-315,
+    use_rkf45: bool or str, default=False
+        If True (or the WarpX time-interval string ``"::"``), use the
+        adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) integrator (Fehlberg
+        1969, NASA Technical Report R-315,
         https://ntrs.nasa.gov/citations/19690021375) for the B-field substep
         advance, with step-size control governed by ``substep_rtol`` and
         ``substep_atol``. If False, use the fixed-step classical RK4
         integrator with ``substeps`` total substeps per timestep.
+        A WarpX time-interval string (e.g. ``"1::5"`` to enable from step
+        every 5 steps starting from step 1) may also be passed to activate
+        RKF45 only on specific timesteps.
 
     substep_rtol: float, default=1e-4
         Relative tolerance for the RKF45 adaptive step-size control.
-        Only used when ``use_rkf45=True``.
+        Only used when ``use_rkf45`` is active.
 
     substep_atol: float, default=1e-8
         Absolute tolerance for the RKF45 adaptive step-size control.
-        Only used when ``use_rkf45=True``.
+        Only used when ``use_rkf45`` is active.
 
     substep_safety: float, default=0.9
         Safety factor applied to the step-size adjustment formula.
-        Only used when ``use_rkf45=True``.
+        Only used when ``use_rkf45`` is active.
 
     substep_max_growth: float, default=5.0
         Maximum factor by which the substep size may grow after an accepted
-        step. Only used when ``use_rkf45=True``.
+        step. Only used when ``use_rkf45`` is active.
 
     max_substep_attempts: int, default=250
         Maximum number of substep attempts (accepted + rejected combined) per
         half-step before the simulation aborts. Only used when
-        ``use_rkf45=True``.
+        ``use_rkf45`` is active.
 
     holmstrom_vacuum_region: bool, default=False
         Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
@@ -2837,7 +2857,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        If True, run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based divergence cleaner on the loaded B field
+        after loading, scrubbing any spurious divergence from the applied-field map(s).
+        This is opt-in (it is not enabled automatically for applied particle fields) and
+        is supported for the electromagnetic, electrostatic (labframe) and magnetostatic
+        (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+        When several applied B-field maps are stacked, each map is cleaned independently.
         (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
