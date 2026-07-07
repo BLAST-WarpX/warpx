@@ -3709,11 +3709,17 @@ Maxwell solver: kinetic-fluid hybrid
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the total number of sub-steps used to advance
     the B-field over one full timestep (split evenly between the two half-steps, so ``substeps/2`` RK4 steps are taken
     per half-step, each of duration :math:`\Delta t / \text{substeps}`). Must be divisible by 2; if not, the value is
-    automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this is
+    automatically rounded up to the next even number. When :pp:param:`hybrid_pic_model.use_rkf45` is active, this is
     instead used only as the initial substep count estimate for the adaptive solver.
+    After each timestep on which :pp:param:`hybrid_pic_model.use_rkf45` is active, this value is updated based on
+    ``n_attempts``, the total number of RKF45 sub-step attempts (accepted and rejected) taken in the most recent
+    half-step: if the current value is less than ``2 * n_attempts``, it jumps immediately to ``2 * n_attempts``;
+    otherwise it decays slowly toward that target via exponential smoothing (95% of the current value,
+    5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where
+    :pp:param:`hybrid_pic_model.use_rkf45` is not active.
 
 .. pp:param:: hybrid_pic_model.use_rkf45
-    :type: ``bool``
+    :type: ``string`` or ``bool``
     :default: ``false``
     :optional:
 
@@ -3724,12 +3730,18 @@ Maxwell solver: kinetic-fluid hybrid
     is used, controlling the local truncation error to stay within
     :pp:param:`hybrid_pic_model.substep_rtol` and :pp:param:`hybrid_pic_model.substep_atol`.
 
+    This parameter also accepts the `Time intervals`_ syntax to enable the RKF45 integrator only
+    on specific timesteps, e.g. ``hybrid_pic_model.use_rkf45 = 1::5``, which enables RKF45
+    every 5 steps from step 1.
+    When ``false`` or ``0``, the RKF45 integrator is never used.
+    When ``true``, ``1``, or ``::`` the RKF45 integrator is used at every timestep.
+
 .. pp:param:: hybrid_pic_model.substep_rtol
     :type: ``float``
     :default: ``1e-4``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the relative tolerance for the RKF45
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the relative tolerance for the RKF45
     adaptive step-size control.
 
 .. pp:param:: hybrid_pic_model.substep_atol
@@ -3737,7 +3749,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``1e-8``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the absolute tolerance for the RKF45
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the absolute tolerance for the RKF45
     adaptive step-size control.
 
 .. pp:param:: hybrid_pic_model.substep_safety
@@ -3745,7 +3757,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``0.9``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the safety factor applied to the
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the safety factor applied to the
     step-size adjustment formula.
 
 .. pp:param:: hybrid_pic_model.substep_max_growth
@@ -3753,7 +3765,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``5.0``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum factor by which the
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the maximum factor by which the
     substep size may grow after an accepted step.
 
 .. pp:param:: hybrid_pic_model.max_substep_attempts
@@ -3761,7 +3773,7 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``250``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.use_rkf45` is ``true``, this sets the maximum number of substep attempts
+    If :pp:param:`hybrid_pic_model.use_rkf45` is active, this sets the maximum number of substep attempts
     (accepted and rejected combined) per half-step before the simulation aborts.
 
 .. pp:param:: hybrid_pic_model.holmstrom_vacuum_region

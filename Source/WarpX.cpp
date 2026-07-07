@@ -759,7 +759,7 @@ WarpX::ReadParameters ()
 #ifndef WARPX_USE_FFT
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         poisson_solver_id!=PoissonSolverAlgo::IntegratedGreenFunction,
-        "To use the FFT Poisson solver, compile with WARPX_USE_FFT=ON.");
+        "To use the FFT Poisson solver, compile with -DWarpX_FFT=ON.");
 #endif
         // Read magnetostatic solver parameters
         // First use self_fields_* as defaults for backward compatibility,
