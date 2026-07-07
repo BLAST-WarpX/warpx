@@ -272,8 +272,7 @@ public:
                 // the two scattered particles using conservation of energy and momentum. The
                 // angular distribution in the center-of-mass frame is set by the process's
                 // scattering angle model, and any inelastic energy loss (e.g. for excitation) is
-                // passed as the (released) energy penalty. Excitation is therefore handled
-                // generically here, through its per-process energy penalty.
+                // passed as the (released) energy penalty.
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
 
@@ -361,7 +360,7 @@ public:
                     // We also convert from eV to Joules
                     scattering_process.m_scattering_angle_model,
                     // The angular distribution of the products in the center-of-mass frame is set by
-                    // the process's scattering angle model (forward by default for these processes).
+                    // the process's scattering angle model.
                     engine);
             }
             else if (process_type == ScatteringProcessType::IONIZATION)

@@ -107,9 +107,6 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
                 // Store index+1 of the selected scattering process
                 // (0 is reserved to mean "no collision"), where `index`
                 // is the index of the selected process in the `scattering_processes` array.
-                // SplitAndScatterFunc looks up the process (type, angle model, energy penalty)
-                // from this index. Encoding the index rather than the process type allows the
-                // post-collision kinematics to depend on the per-process scattering angle model.
                 p_mask[pair_index] = static_cast<index_type>(ii + 1);
                 p_pair_reaction_weight[pair_index] = w_min;
                 break;
