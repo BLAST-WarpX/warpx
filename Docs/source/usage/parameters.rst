@@ -4284,6 +4284,15 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Note that the fields are averaged on the cell centers before they are written to file.
     Otherwise, we reconstruct a 2D Cartesian slice of the fields for output at :math:`\theta=0`.
 
+.. pp:param:: <diag_name>.additional_fields_to_plot
+    :type: list of ``strings``
+    :optional:
+
+    Additional fields written to output, beyond the standard defualt list as specified with :pp:param:`<diag_name>.fields_to_plot`.
+    Any of the same fields can be listed here.
+    Any MultiFab added to the internal registry can also be included in the list.
+    If :pp:param:`<diag_name>.fields_to_plot` is set to ``none``, this input is ignored.
+
 .. pp:param:: <diag_name>.dump_rz_modes
     :type: ``0`` or ``1``
     :default: ``0``
