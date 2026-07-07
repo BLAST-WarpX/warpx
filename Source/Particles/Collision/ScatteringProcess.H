@@ -110,6 +110,9 @@ public:
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
         ScatteringAngleModel m_scattering_angle_model;
+        /** True if this process creates new product particles (ionization, charge exchange,
+         *  two-product reaction); false for purely scattering processes (elastic, excitation). **/
+        bool m_produces_products = false;
     };
 
     [[nodiscard]]

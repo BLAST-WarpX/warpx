@@ -150,10 +150,7 @@ public:
                 if (mask[i] == 0) { return 0; }
                 const auto selected_process_index = mask[i] - 1;
                 auto const& scattering_process = scattering_processes[selected_process_index];
-                const auto process_type = scattering_process.m_type;
-                return ((process_type != ScatteringProcessType::IONIZATION) &&
-                        (process_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
-                        (process_type != ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
+                return !scattering_process.m_produces_products;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -179,10 +176,7 @@ public:
                 if (mask[i] == 0) { return 0; }
                 const auto selected_process_index = mask[i] - 1;
                 auto const& scattering_process = scattering_processes[selected_process_index];
-                const auto process_type = scattering_process.m_type;
-                return ((process_type == ScatteringProcessType::IONIZATION) ||
-                        (process_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
-                        (process_type == ScatteringProcessType::CHARGE_EXCHANGE)) ? 1 : 0;
+                return scattering_process.m_produces_products;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -258,9 +252,7 @@ public:
             auto const& scattering_process = scattering_processes[selected_process_index];
             const auto process_type = scattering_process.m_type;
 
-            if ((process_type != ScatteringProcessType::IONIZATION) &&
-                (process_type != ScatteringProcessType::TWOPRODUCT_REACTION) &&
-                (process_type != ScatteringProcessType::CHARGE_EXCHANGE))
+            if (!scattering_process.m_produces_products)
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
@@ -279,8 +271,9 @@ public:
                 // Particle-conserving scattering (e.g. elastic, excitation). Set the momenta of
                 // the two scattered particles using conservation of energy and momentum. The
                 // angular distribution in the center-of-mass frame is set by the process's
-                // scattering angle model, and any inelastic energy loss is passed as the
-                // (released) energy penalty.
+                // scattering angle model, and any inelastic energy loss (e.g. for excitation) is
+                // passed as the (released) energy penalty. Excitation is therefore handled
+                // generically here, through its per-process energy penalty.
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
 

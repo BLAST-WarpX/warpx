@@ -34,8 +34,9 @@ DSMCFunc::DSMCFunc (
 
     bool reaction_produces_new_species = false;
     for (const auto& process : m_scattering_processes) {
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::EXCITATION,
-                                        "Excitation collisions are not yet supported in DSMC");
+        // Note: excitation is now supported in DSMC (handled generically through the per-process
+        // energy penalty in SplitAndScatterFunc), and forward scattering is handled via the
+        // per-process scattering angle model, so neither has a blocking assert here.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(process.type() != ScatteringProcessType::INVALID,
                                         "Cannot add an unknown scattering process type");
 
