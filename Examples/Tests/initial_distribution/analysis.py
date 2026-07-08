@@ -17,6 +17,7 @@
 # 8 denotes uniform distribution
 # 9 denotes maxwellian (parser mean/std) w/ spatially-varying mean and thermal spread
 # 10 denotes maxwell-juttner distribution w/ low temperature (Gaussian fallback)
+# 11 denotes maxwell-juttner distribution w/ constant diagonal bulk drift
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
 import numpy as np
@@ -237,6 +238,44 @@ f5_error = (
 print("Maxwell-Juttner parser temperature difference:", f5_error)
 
 assert f5_error < tolerance
+
+# =================================================
+# maxwell-juttner with a constant asymmetric bulk drift
+# =================================================
+# The species drifts with normalized momentum u_mean = (0.5, 0.3, 0.1), giving
+# gamma_bulk = sqrt(1.35). All three components are non-zero to verify that each
+# axis is read and applied correctly. The reduced diagnostic h11 histograms the
+# drift-frame Lorentz factor gamma' = gamma_bulk*gamma_lab - u_mean.u, which must
+# follow MJ(theta=1).
+
+# load data
+bin_value, bin_data_drift = read_reduced_diags_histogram("h11.txt")[2:]
+
+# parameters of theory (same MJ(theta=1) as the non-drifting case above)
+theta = 1.0
+K2 = scs.kn(2, 1.0 / theta)
+n = 1.0e21
+V = 8.0
+db = 0.22
+
+# compute the analytical solution
+f = (
+    n
+    * V
+    * db
+    * bin_value**2
+    * np.sqrt(1.0 - 1.0 / bin_value**2)
+    / (theta * K2)
+    * np.exp(-bin_value / theta)
+)
+f_peak = np.amax(f)
+
+# compute error
+f11_error = np.sum(np.abs(f - bin_data_drift)) / bin_value.size / f_peak
+
+print("Maxwell-Juttner drift-frame distribution difference:", f11_error)
+
+assert f11_error < tolerance
 
 # =======================================================
 # maxwell-juttner with low temperature (Gaussian fallback)

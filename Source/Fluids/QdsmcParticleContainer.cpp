@@ -8,14 +8,15 @@
  */
 
 #include "QdsmcParticleContainer.H"
-#include "Qdsmc_K.H"
 
+#include "Particles/Deposition/ChargeDeposition.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/particles/NodalFieldGather.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
@@ -43,6 +44,11 @@
 #include <cstdint>
 
 using namespace amrex::literals;
+
+// The QDSMC grid fields (K_e, the deposited weights and the nodal v_e) are
+// stored with NODAL staggering; every gather and scatter below uses the
+// matching order-1 (linear) nodal weights, so a marker at rest reproduces
+// its cell values exactly.
 
 
 QdsmcParticleContainer::QdsmcParticleContainer (amrex::AmrCore* amr_core)
@@ -137,6 +143,7 @@ void QdsmcParticleContainer::InitParticles (int lev)
         amrex::ParallelFor(tile_box,
         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
         {
+            amrex::ignore_unused(j, k);  // unused below AMREX_SPACEDIM
             amrex::IntVect const iv(AMREX_D_DECL(i, j, k));
             long const ip = poffset[tile_box.index(iv)];
 
@@ -156,20 +163,25 @@ void QdsmcParticleContainer::InitParticles (int lev)
             // In 2D Cartesian and RZ the second in-plane coord is z; the y
             // axis is the unused out-of-plane direction.
             amrex::Real const x_pos = plo[0] + (iv[0] + amrex::Real(0.5)) * dx_arr[0];
-            amrex::Real const y_pos = amrex::Real(0);
+            auto const y_pos = amrex::Real(0);
             amrex::Real const z_pos = plo[1] + (iv[1] + amrex::Real(0.5)) * dx_arr[1];
             pa[QdsmcPIdx::x][ip] = x_pos;
             pa[QdsmcPIdx::z][ip] = z_pos;
 #elif defined(WARPX_DIM_1D_Z)
-            amrex::Real const x_pos = amrex::Real(0);
-            amrex::Real const y_pos = amrex::Real(0);
+            auto const x_pos = amrex::Real(0);
+            auto const y_pos = amrex::Real(0);
             amrex::Real const z_pos = plo[0] + (iv[0] + amrex::Real(0.5)) * dx_arr[0];
             pa[QdsmcPIdx::z][ip] = z_pos;
 #else
-            // RCYLINDER / RSPHERE intentionally not supported in this PR.
-            amrex::Real const x_pos = amrex::Real(0);
-            amrex::Real const y_pos = amrex::Real(0);
-            amrex::Real const z_pos = amrex::Real(0);
+            // WARPX_DIM_RCYLINDER / WARPX_DIM_RSPHERE: 1D radial; the single
+            // AMReX-tracked position slot is x (= r). QDSMC is not validated
+            // in these geometries (no radial volume weighting yet) and
+            // HybridPICModel::ReadParameters refuses to enable the energy
+            // equation there -- this branch only needs to compile and be sane.
+            amrex::Real const x_pos = plo[0] + (iv[0] + amrex::Real(0.5)) * dx_arr[0];
+            auto const y_pos = amrex::Real(0);
+            auto const z_pos = amrex::Real(0);
+            pa[QdsmcPIdx::x][ip] = x_pos;
 #endif
 
             // Home position is always stored as a 3D vector.
@@ -209,16 +221,11 @@ QdsmcParticleContainer::SetV (int lev,
     auto & warpx = WarpX::GetInstance();
     auto const plo = warpx.Geom(lev).ProbLoArray();
     auto const dxi = warpx.Geom(lev).InvCellSizeArray();
-    auto const ix_type = Ux.ixType().toIntVect();
 
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
-
-        amrex::Box const tilebox = pti.tilebox();
-        amrex::Box box = amrex::convert(tilebox, ix_type);
-        box.grow(Ux.nGrowVect());
 
         amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
@@ -233,25 +240,20 @@ QdsmcParticleContainer::SetV (int lev,
         amrex::ParticleReal* const AMREX_RESTRICT vz =
             attribs[QdsmcPIdx::vz].dataPtr();
 
-        auto const ux_arr = Ux[pti].array();
-        auto const uy_arr = Uy[pti].array();
-        auto const uz_arr = Uz[pti].array();
+        auto const ux_arr = Ux.const_array(pti);
+        auto const uy_arr = Uy.const_array(pti);
+        auto const uz_arr = Uz.const_array(pti);
 
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
         {
-            amrex::Real vxp = 0;
-            amrex::Real vyp = 0;
-            amrex::Real vzp = 0;
-
-            gather_vector_field_qdsmc(
+            // Linear gather of the nodal field at the marker's home position.
+            auto const v = ablastr::particles::doGatherVectorFieldNodal(
                 x_node[ip], y_node[ip], z_node[ip],
-                vxp, vyp, vzp,
-                ux_arr, uy_arr, uz_arr,
-                plo, dxi, box);
+                ux_arr, uy_arr, uz_arr, dxi, plo);
 
-            vx[ip] = vxp;
-            vy[ip] = vyp;
-            vz[ip] = vzp;
+            vx[ip] = v[0];
+            vy[ip] = v[1];
+            vz[ip] = v[2];
         });
     }
 
@@ -276,16 +278,10 @@ QdsmcParticleContainer::SetK (int lev,
         cell_volume *= dx_arr[d];
     }
 
-    auto const ix_type = Kfield.ixType().toIntVect();
-
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
-
-        amrex::Box const tilebox = pti.tilebox();
-        amrex::Box box = amrex::convert(tilebox, ix_type);
-        box.grow(Kfield.nGrowVect());
 
         amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
@@ -303,17 +299,17 @@ QdsmcParticleContainer::SetK (int lev,
 
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
         {
-            amrex::Real n_p = 0;
-            amrex::Real kn_p = 0;
-
-            gather_density_entropy(
-                x_node[ip], y_node[ip], z_node[ip],
-                n_p, kn_p,
-                rho_arr, K_arr,
-                plo, dxi, cell_volume, box);
+            // Linear gathers of the nodal charge density and entropy at the
+            // marker's home position; the marker then carries the electron
+            // count N of its cell and the matching entropy content K*N.
+            amrex::Real const n_p = ablastr::particles::doGatherScalarFieldNodal(
+                x_node[ip], y_node[ip], z_node[ip], rho_arr, dxi, plo)
+                * cell_volume / PhysConst::q_e;
+            amrex::Real const k_p = ablastr::particles::doGatherScalarFieldNodal(
+                x_node[ip], y_node[ip], z_node[ip], K_arr, dxi, plo);
 
             np_real[ip] = n_p;
-            entropy[ip] = kn_p;
+            entropy[ip] = k_p * n_p;
         });
     }
 
@@ -354,16 +350,22 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
 
+        // Home and velocity components are only needed for the axes with an
+        // AMReX-tracked position slot (x everywhere but 1D_Z, y only in 3D).
+#if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
-            attribs[QdsmcPIdx::y_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT z_node =
-            attribs[QdsmcPIdx::z_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT vx =
             attribs[QdsmcPIdx::vx].dataPtr();
+#endif
+#if defined(WARPX_DIM_3D)
+        amrex::ParticleReal* const AMREX_RESTRICT y_node =
+            attribs[QdsmcPIdx::y_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT vy =
             attribs[QdsmcPIdx::vy].dataPtr();
+#endif
+        amrex::ParticleReal* const AMREX_RESTRICT z_node =
+            attribs[QdsmcPIdx::z_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT vz =
             attribs[QdsmcPIdx::vz].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT np_real =
@@ -390,39 +392,36 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
             // before a SetK call). They contribute nothing to the deposit.
             if (np_real[ip] <= amrex::Real(0)) { return; }
 
-            amrex::Real xp_new = 0;
-            amrex::Real yp_new = 0;
-            amrex::Real zp_new = 0;
+            // Forward-Euler push of one coordinate by one PIC step, clamped
+            // just inside the domain in non-periodic directions (see the
+            // bound setup above). The caller owns the CFL constraint
+            // |v| dt < dx (at most one cell per step).
+            auto const push_clamp = [&] (amrex::Real x0, amrex::Real v, int d)
+            {
+                amrex::Real const xnew = x0 + v * dt;
+                return is_periodic[d] ? xnew
+                                      : amrex::Clamp(xnew, lo_bnd[d], hi_bnd[d]);
+            };
 
-            push_qdsmc_particle(
-                x_node[ip], y_node[ip], z_node[ip],
-                vx[ip], vy[ip], vz[ip],
-                xp_new, yp_new, zp_new, dt);
-
-            // Clamp the AMReX-tracked coordinates to the domain in
-            // non-periodic directions (see the bound setup above).
+            // Write the new position to the AMReX-tracked position slots.
+            // Axes not represented in the field have no enum slot and are
+            // simply not tracked (consistent with field dimensionality).
 #if defined(WARPX_DIM_3D)
-            if (!is_periodic[0]) { xp_new = amrex::Clamp(xp_new, lo_bnd[0], hi_bnd[0]); }
-            if (!is_periodic[1]) { yp_new = amrex::Clamp(yp_new, lo_bnd[1], hi_bnd[1]); }
-            if (!is_periodic[2]) { zp_new = amrex::Clamp(zp_new, lo_bnd[2], hi_bnd[2]); }
+            pa_x[ip] = push_clamp(x_node[ip], vx[ip], 0);
+            pa_y[ip] = push_clamp(y_node[ip], vy[ip], 1);
+            pa_z[ip] = push_clamp(z_node[ip], vz[ip], 2);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            if (!is_periodic[0]) { xp_new = amrex::Clamp(xp_new, lo_bnd[0], hi_bnd[0]); }
-            if (!is_periodic[1]) { zp_new = amrex::Clamp(zp_new, lo_bnd[1], hi_bnd[1]); }
+            pa_x[ip] = push_clamp(x_node[ip], vx[ip], 0);
+            pa_z[ip] = push_clamp(z_node[ip], vz[ip], 1);
 #elif defined(WARPX_DIM_1D_Z)
-            if (!is_periodic[0]) { zp_new = amrex::Clamp(zp_new, lo_bnd[0], hi_bnd[0]); }
+            pa_z[ip] = push_clamp(z_node[ip], vz[ip], 0);
+#else
+            // WARPX_DIM_RCYLINDER / WARPX_DIM_RSPHERE: x (= r) is the single
+            // tracked position (QDSMC is refused at runtime in these
+            // geometries); z is a plain attribute, advanced unclamped.
+            pa_x[ip] = push_clamp(x_node[ip], vx[ip], 0);
+            pa_z[ip] = z_node[ip] + vz[ip] * dt;
 #endif
-
-            // Write the new position back to the AMReX-tracked position
-            // slots. For axes not represented in the field, there is no
-            // corresponding enum slot and the position is simply not
-            // tracked by AMReX (consistent with field dimensionality).
-#if !defined(WARPX_DIM_1D_Z)
-            pa_x[ip] = xp_new;
-#endif
-#if defined(WARPX_DIM_3D)
-            pa_y[ip] = yp_new;
-#endif
-            pa_z[ip] = zp_new;
         });
     }
 
@@ -441,10 +440,16 @@ QdsmcParticleContainer::ResetParticles (int lev)
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
 
+        // The home components are only needed where a matching AMReX-tracked
+        // position slot exists (x everywhere but 1D_Z, y only in 3D).
+#if !defined(WARPX_DIM_1D_Z)
         amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
+#endif
+#if defined(WARPX_DIM_3D)
         amrex::ParticleReal* const AMREX_RESTRICT y_node =
             attribs[QdsmcPIdx::y_node].dataPtr();
+#endif
         amrex::ParticleReal* const AMREX_RESTRICT z_node =
             attribs[QdsmcPIdx::z_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT vx =
@@ -493,91 +498,73 @@ QdsmcParticleContainer::ResetParticles (int lev)
 
 
 void
-QdsmcParticleContainer::DepositK (int lev, amrex::MultiFab & Kfield)
+QdsmcParticleContainer::DepositScalar (int lev, int const attr,
+                                       amrex::Real const scale,
+                                       amrex::MultiFab & field)
 {
-    ABLASTR_PROFILE("QdsmcParticleContainer::DepositK()");
-
     auto & warpx = WarpX::GetInstance();
-    amrex::Geometry const & geom = warpx.Geom(lev);
-    amrex::Periodicity const & period = geom.periodicity();
-    auto const plo = geom.ProbLoArray();
-    auto const dxi = geom.InvCellSizeArray();
+    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
+    amrex::XDim3 const dinv = WarpX::InvCellSize(lev);
 
-    Kfield.setVal(0);
-
-    auto const ix_type = Kfield.ixType().toIntVect();
+    field.setVal(0);
 
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
 
-        amrex::Box const tilebox = pti.tilebox();
-        amrex::Box box = amrex::convert(tilebox, ix_type);
-        box.grow(Kfield.nGrowVect());
-
-        amrex::ParticleReal* const AMREX_RESTRICT entropy =
-            attribs[QdsmcPIdx::entropy].dataPtr();
-
-        // The y-home is used in 2D (Cartesian/RZ) as the implicit y=0 coord;
-        // the x-home is used in 1D as the implicit x=0 coord. In 3D the
-        // full position lives in the AMReX-tracked pa_x/pa_y/pa_z slots, so
-        // no home component is needed.
-#if defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* const AMREX_RESTRICT x_node =
-            attribs[QdsmcPIdx::x_node].dataPtr();
-#endif
-#if !defined(WARPX_DIM_3D)
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
-            attribs[QdsmcPIdx::y_node].dataPtr();
-#endif
-
-        // After PushX the *advected* position lives in the (dim-dependent)
-        // position slots. Re-read whichever ones exist; the missing axes
-        // remain at their home value (which is 0 for unrepresented dims).
-#if !defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* const AMREX_RESTRICT pa_x =
-            attribs[QdsmcPIdx::x].dataPtr();
-#endif
+        // Assemble the position functor by hand: its constructor indexes the
+        // SoA with the physical-particle PIdx layout, which does not match
+        // QdsmcPIdx, so it must not be used with this container. The y_node
+        // attribute (identically zero outside 3D) stands in for the angle
+        // components, so the azimuthal geometries evaluate to (r, 0, z).
+        GetParticlePosition<PIdx> GetPosition;
 #if defined(WARPX_DIM_3D)
-        amrex::ParticleReal* const AMREX_RESTRICT pa_y =
-            attribs[QdsmcPIdx::y].dataPtr();
-#endif
-        amrex::ParticleReal* const AMREX_RESTRICT pa_z =
-            attribs[QdsmcPIdx::z].dataPtr();
-
-        auto const K_arr = Kfield.array(pti);
-
-        amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
-        {
-            if (entropy[ip] <= amrex::Real(0)) { return; }
-
-            // Assemble the 3D scatter position from per-dim slots.
-#if defined(WARPX_DIM_3D)
-            amrex::Real const xp = pa_x[ip];
-            amrex::Real const yp = pa_y[ip];
-            amrex::Real const zp = pa_z[ip];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            amrex::Real const xp = pa_x[ip];
-            amrex::Real const yp = y_node[ip];
-            amrex::Real const zp = pa_z[ip];
+        GetPosition.m_x = attribs[QdsmcPIdx::x].dataPtr();
+        GetPosition.m_y = attribs[QdsmcPIdx::y].dataPtr();
+        GetPosition.m_z = attribs[QdsmcPIdx::z].dataPtr();
+#elif defined(WARPX_DIM_XZ)
+        GetPosition.m_x = attribs[QdsmcPIdx::x].dataPtr();
+        GetPosition.m_z = attribs[QdsmcPIdx::z].dataPtr();
+#elif defined(WARPX_DIM_RZ)
+        GetPosition.m_x = attribs[QdsmcPIdx::x].dataPtr();
+        GetPosition.m_z = attribs[QdsmcPIdx::z].dataPtr();
+        GetPosition.m_theta = attribs[QdsmcPIdx::y_node].dataPtr();
 #elif defined(WARPX_DIM_1D_Z)
-            amrex::Real const xp = x_node[ip];
-            amrex::Real const yp = y_node[ip];
-            amrex::Real const zp = pa_z[ip];
-#else
-#   error "QdsmcParticleContainer::DepositK does not support WARPX_DIM_RCYLINDER / WARPX_DIM_RSPHERE yet"
+        GetPosition.m_z = attribs[QdsmcPIdx::z].dataPtr();
+#elif defined(WARPX_DIM_RCYLINDER)
+        GetPosition.m_x = attribs[QdsmcPIdx::x].dataPtr();
+        GetPosition.m_theta = attribs[QdsmcPIdx::y_node].dataPtr();
+#elif defined(WARPX_DIM_RSPHERE)
+        GetPosition.m_x = attribs[QdsmcPIdx::x].dataPtr();
+        GetPosition.m_theta = attribs[QdsmcPIdx::y_node].dataPtr();
+        GetPosition.m_phi = attribs[QdsmcPIdx::y_node].dataPtr();
 #endif
 
-            do_deposit_scalar(K_arr, xp, yp, zp, plo, dxi, entropy[ip], box);
-        });
+        amrex::Box tilebox = pti.tilebox();
+        tilebox.grow(field.nGrowVect());
+        amrex::Dim3 const lo = amrex::lbound(tilebox);
+        amrex::XDim3 const xyzmin = WarpX::LowerCorner(tilebox, lev, 0.0_rt);
+
+        doChargeDepositionShapeN<1>(GetPosition, attribs[attr].dataPtr(),
+                                    nullptr, field[pti], np, dinv, xyzmin, lo,
+                                    scale, WarpX::n_rz_azimuthal_modes);
     }
 
     amrex::Gpu::synchronize();
 
     ablastr::utils::communication::SumBoundary(
-        Kfield, 0, Kfield.nComp(), Kfield.nGrowVect(), Kfield.nGrowVect(),
+        field, 0, field.nComp(), field.nGrowVect(), field.nGrowVect(),
         WarpX::do_single_precision_comms, period);
+}
+
+
+void
+QdsmcParticleContainer::DepositK (int lev, amrex::MultiFab & Kfield)
+{
+    ABLASTR_PROFILE("QdsmcParticleContainer::DepositK()");
+
+    DepositScalar(lev, QdsmcPIdx::entropy, 1.0_rt, Kfield);
 }
 
 
@@ -586,86 +573,12 @@ QdsmcParticleContainer::DepositField (int lev, amrex::MultiFab & Field)
 {
     ABLASTR_PROFILE("QdsmcParticleContainer::DepositField()");
 
-    auto & warpx = WarpX::GetInstance();
-    amrex::Geometry const & geom = warpx.Geom(lev);
-    amrex::Periodicity const & period = geom.periodicity();
-    auto const plo = geom.ProbLoArray();
-    auto const dxi = geom.InvCellSizeArray();
-    auto const * dx_arr = geom.CellSize();
-
+    // np_real carries the electron count n_e * V_cell; the 1/V_cell scale
+    // makes the deposited field an electron (number) density.
+    auto const * dx_arr = WarpX::GetInstance().Geom(lev).CellSize();
     amrex::Real cell_volume = 1.0_rt;
     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
         cell_volume *= dx_arr[d];
     }
-
-    Field.setVal(0);
-
-    auto const ix_type = Field.ixType().toIntVect();
-
-    for (iterator pti(*this, lev); pti.isValid(); ++pti)
-    {
-        long const np = pti.numParticles();
-        auto & attribs = pti.GetStructOfArrays().GetRealData();
-
-        amrex::Box const tilebox = pti.tilebox();
-        amrex::Box box = amrex::convert(tilebox, ix_type);
-        box.grow(Field.nGrowVect());
-
-        amrex::ParticleReal* const AMREX_RESTRICT np_real =
-            attribs[QdsmcPIdx::np_real].dataPtr();
-
-#if defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* const AMREX_RESTRICT x_node =
-            attribs[QdsmcPIdx::x_node].dataPtr();
-#endif
-#if !defined(WARPX_DIM_3D)
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
-            attribs[QdsmcPIdx::y_node].dataPtr();
-#endif
-
-#if !defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* const AMREX_RESTRICT pa_x =
-            attribs[QdsmcPIdx::x].dataPtr();
-#endif
-#if defined(WARPX_DIM_3D)
-        amrex::ParticleReal* const AMREX_RESTRICT pa_y =
-            attribs[QdsmcPIdx::y].dataPtr();
-#endif
-        amrex::ParticleReal* const AMREX_RESTRICT pa_z =
-            attribs[QdsmcPIdx::z].dataPtr();
-
-        auto const field_arr = Field.array(pti);
-
-        amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
-        {
-            if (np_real[ip] <= amrex::Real(0)) { return; }
-
-#if defined(WARPX_DIM_3D)
-            amrex::Real const xp = pa_x[ip];
-            amrex::Real const yp = pa_y[ip];
-            amrex::Real const zp = pa_z[ip];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            amrex::Real const xp = pa_x[ip];
-            amrex::Real const yp = y_node[ip];
-            amrex::Real const zp = pa_z[ip];
-#elif defined(WARPX_DIM_1D_Z)
-            amrex::Real const xp = x_node[ip];
-            amrex::Real const yp = y_node[ip];
-            amrex::Real const zp = pa_z[ip];
-#else
-#   error "QdsmcParticleContainer::DepositField does not support WARPX_DIM_RCYLINDER / WARPX_DIM_RSPHERE yet"
-#endif
-
-            // np_real already carries the n_e * V_cell weight; divide by V_cell
-            // so the scatter accumulates an n_e (density) field.
-            amrex::Real const val = np_real[ip] / cell_volume;
-            do_deposit_scalar(field_arr, xp, yp, zp, plo, dxi, val, box);
-        });
-    }
-
-    amrex::Gpu::synchronize();
-
-    ablastr::utils::communication::SumBoundary(
-        Field, 0, Field.nComp(), Field.nGrowVect(), Field.nGrowVect(),
-        WarpX::do_single_precision_comms, period);
+    DepositScalar(lev, QdsmcPIdx::np_real, 1.0_rt / cell_volume, Field);
 }

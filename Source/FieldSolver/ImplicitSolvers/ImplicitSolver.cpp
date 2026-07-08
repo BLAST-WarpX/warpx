@@ -73,7 +73,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
             lbc[i] = LinOpBCType::Dirichlet;
         } else if (a_fbc[i] == FieldBoundaryType::Damped) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
-        } else if (a_fbc[i] == FieldBoundaryType::Absorbing_SilverMueller) {
+        } else if (a_fbc[i] == FieldBoundaryType::Absorbing_Silver_Mueller) {
             ablastr::warn_manager::WMRecordWarning("Implicit solver",
                 "With SilverMueller, in the Curl-Curl preconditioner Symmetry boundary will be used since the full boundary is not yet implemented.",
                 ablastr::warn_manager::WarnPriority::medium);
@@ -81,7 +81,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
         } else if (a_fbc[i] == FieldBoundaryType::Neumann) {
             // Also for FieldBoundaryType::PMC
             lbc[i] = LinOpBCType::symmetry;
-        } else if (a_fbc[i] == FieldBoundaryType::PECInsulator) {
+        } else if (a_fbc[i] == FieldBoundaryType::PEC_Insulator) {
             const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(i,bdry_side);
             if (voltage_driven) { // Dirichlet for E
                 lbc[i] = LinOpBCType::Dirichlet;

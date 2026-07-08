@@ -45,9 +45,9 @@
  *
  * The home positions and velocities are always stored as 3 components even when
  * the field dimension is lower. In 2D the y-home is set to 0 at init; in 1D
- * both x-home and y-home are 0. The dim-agnostic kernels in Qdsmc_K.H consume
- * (x, y, z) as a 3-vector and the underlying compute_weights\<NODE\> routes them
- * to the right field axes per dim (e.g. r = sqrt(x^2 + y^2) for RZ).
+ * both x-home and y-home are 0. The gathers and scatters consume (x, y, z) as
+ * a 3-vector and the underlying nodal shape weights route them to the right
+ * field axes per dim (e.g. r = sqrt(x^2 + y^2) for RZ).
  */
 struct QdsmcPIdx
 {
@@ -95,7 +95,7 @@ public:
     static constexpr int NReal = QdsmcPIdx::nattribs;
     static constexpr int NInt = 0;
 
-    QdsmcParticleContainer (amrex::AmrCore* amr_core);
+    explicit QdsmcParticleContainer (amrex::AmrCore* amr_core);
     ~QdsmcParticleContainer() override = default;
 
     QdsmcParticleContainer ( QdsmcParticleContainer const &)             = delete;
@@ -164,6 +164,16 @@ public:
      *        Calls Redistribute() afterward.
      */
     void ResetParticles (int lev);
+
+private:
+    /**
+     * @brief Scatter one real attribute of every marker onto a nodal
+     *        MultiFab with the order-1 charge-deposition kernel:
+     *        field += scale * attribute * S(x). The field is zeroed first
+     *        and guard-cell deposits are summed back in afterward.
+     */
+    void DepositScalar (int lev, int attr, amrex::Real scale,
+                        amrex::MultiFab & field);
 };
 
 #endif // WARPX_QDSMCPARTICLECONTAINER_H_

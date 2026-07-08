@@ -209,9 +209,9 @@ namespace SpeciesUtils {
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name);
             const GetTemperature getTemp(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name);
-            const GetVelocity getVel(*h_mom_vel);
+            const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
-            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVel));
+            h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVelVec));
         } else if (mom_dist_s == "parse_momentum_function") {
             // The momentum is defined by the parser functions ux_mean_function,
             // uy_mean_function, uz_mean_function, stored in VelocityProperties and

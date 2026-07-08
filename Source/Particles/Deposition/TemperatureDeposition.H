@@ -329,9 +329,9 @@ void doVarianceDepositionShapeNKernel(
         const amrex::Real wpy_var = wp*sx_jy[ix];
         const amrex::Real wpz_var = wp*sx_jz[ix];
 
-        amrex::IntVectND<3> ixv{lo.x+j_jx+ix, 0, 0};
-        amrex::IntVectND<3> iyv{lo.x+j_jy+ix, 0, 0};
-        amrex::IntVectND<3> izv{lo.x+j_jz+ix, 0, 0};
+        amrex::IntVectND<3> const ixv{lo.x+j_jx+ix, 0, 0};
+        amrex::IntVectND<3> const iyv{lo.x+j_jy+ix, 0, 0};
+        amrex::IntVectND<3> const izv{lo.x+j_jz+ix, 0, 0};
 
         varianceDepositionSubKernel(
             vx, vy, vz,
