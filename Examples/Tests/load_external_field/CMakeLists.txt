@@ -42,6 +42,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_rz_load_external_field_parser  # name
+    RZ  # dims
+    1  # nprocs
+    inputs_test_rz_load_external_field_parser  # inputs
+    "analysis_rz_parser.py diags/diag1000000"  # analysis
+    "analysis_default_regression.py --path diags/diag1000000"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_rz_load_external_field_particles  # name
     RZ  # dims
     1  # nprocs

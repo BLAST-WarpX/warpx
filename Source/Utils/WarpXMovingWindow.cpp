@@ -371,6 +371,21 @@ WarpX::MoveWindow (const int step, bool move_j)
     }
     if (!moving_window_active(step)) { return 0; }
 
+#if defined(WARPX_DIM_RZ)
+    // The external field parser only initializes the m=0 mode, but shiftMF
+    // below fills every azimuthal-mode component with the same (m=0) value
+    // when the parser is used. That would silently corrupt modes m > 0, so
+    // restrict the combination to a single mode.
+    if (n_rz_azimuthal_modes > 1 &&
+        (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::parse_ext_grid_function ||
+         m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::parse_ext_grid_function)) {
+        WARPX_ABORT_WITH_MESSAGE(
+            "The external field parser in RZ only supports the m=0 mode and "
+            "cannot be used with a moving window when n_rz_azimuthal_modes > 1. "
+            "Use read_from_file or Python (PICMI) instead.");
+    }
+#endif
+
     // Update the continuous position of the moving window,
     // and of the plasma injection
     moving_window_x += (moving_window_v - WarpX::beta_boost * PhysConst::c)/(1 - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt[0];

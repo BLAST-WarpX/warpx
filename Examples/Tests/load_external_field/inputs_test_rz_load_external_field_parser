@@ -1,0 +1,62 @@
+# This test checks that the external B and E field parser works in RZ geometry.
+# In RZ the parser coordinates (x,y,z) map to (r,0,z), so the Bx/By/Bz and
+# Ex/Ey/Ez functions initialize the radial (Br/Er), azimuthal (Bt/Et) and
+# longitudinal (Bz/Ez) components of the m=0 mode respectively.
+# The analysis script compares the initialized grid values against the
+# analytical expressions.
+
+warpx.abort_on_warning_threshold = medium
+warpx.serialize_initial_conditions = 1
+warpx.do_dynamic_scheduling = 0
+
+# External magnetic field: Br = 0.5*z, Bt = 0.1, Bz = 1.0
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = "0.5*z"
+warpx.By_external_grid_function(x,y,z) = "0.1"
+warpx.Bz_external_grid_function(x,y,z) = "1.0"
+
+# External electric field: Er = 2.0*x, Et = 0.0, Ez = -0.5*z
+warpx.E_ext_grid_init_style = parse_E_ext_grid_function
+warpx.Ex_external_grid_function(x,y,z) = "2.0*x"
+warpx.Ey_external_grid_function(x,y,z) = "0.0"
+warpx.Ez_external_grid_function(x,y,z) = "-0.5*z"
+
+warpx.grid_type = collocated
+warpx.do_electrostatic = labframe
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 0
+amr.n_cell = 8 16
+warpx.numprocs = 1 1
+amr.max_level = 0
+geometry.dims = RZ
+
+geometry.prob_lo =  0.0 0.0
+geometry.prob_hi =  1.0 4.0
+
+#################################
+###### Boundary Condition #######
+#################################
+boundary.field_lo = none pec
+boundary.field_hi = pec pec
+boundary.potential_lo_x = 0
+boundary.potential_hi_x = 0
+boundary.potential_lo_y = 0
+boundary.potential_hi_y = 0
+boundary.potential_lo_z = 0
+boundary.potential_hi_z = 0
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.verbose = 0
+warpx.const_dt = 1.0e-7
+warpx.use_filter = 0
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz Er Et Ez

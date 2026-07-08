@@ -120,7 +120,7 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
         warnMsg << "Parser for external B (r and theta) fields in RZ geometry only initializes the m=0 (axisymmetric) mode.\n"
             << "For theta-dependent external fields (modes m > 0), use Python (PICMI) or read from file.\n";
         ablastr::warn_manager::WMRecordWarning(
-          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
+          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::low);
 #endif
         utils::parser::Store_parserString(pp_warpx, "Bx_external_grid_function(x,y,z)",
           str_Bx_ext_grid_function);
@@ -153,7 +153,7 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
         warnMsg << "Parser for external E (r and theta) fields in RZ geometry only initializes the m=0 (axisymmetric) mode.\n"
             << "For theta-dependent external fields (modes m > 0), use Python (PICMI) or read from file.\n";
         ablastr::warn_manager::WMRecordWarning(
-          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
+          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::low);
 #endif
 
         //! Strings storing parser function to initialize the components of the electric field on the grid
