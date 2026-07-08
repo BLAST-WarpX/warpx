@@ -1646,7 +1646,7 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
         const amrex::Real rminr = xyzmin.x + (tbr.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const amrex::Real rmint = xyzmin.x + (tbt.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
         const amrex::Real rminz = xyzmin.x + (tbz.type(0) == NODE ? 0._rt : 0.5_rt*dx[0]);
-        const amrex::Dim3 lo = lbound(tilebox);
+        const amrex::Dim3 lo = amrex::lbound(tilebox);
         const int irmin = lo.x;
 
         // For ishift, 1 means cell centered, 0 means node centered

@@ -2126,6 +2126,7 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
+
 class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
     """
     Sets up the "theta implicit" hybrid-PIC evolve scheme
@@ -2137,18 +2138,30 @@ class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
 
     theta: float, optional
         The "theta" parameter, determining the level of implicitness.
+
+    use_darwin_split: bool, optional
+        When True, apply the Darwin split to the JFNK solver. The curl-free
+        part E_L = grad(phi) of the Ohm's law E is computed via a Poisson
+        solve (Laplacian(phi) = div(E_Ohm)) and removed from the JFNK iterate.
+        Only E_T (the transverse part) is solved for in the Newton-Krylov loop,
+        which improves conditioning by decoupling the stiff longitudinal
+        (electron-pressure) physics from the Alfvenic/Hall physics.
+        E_L is refreshed once per Newton step and frozen across GMRES matvecs.
     """
 
-    def __init__(self, nonlinear_solver, theta=None):
+    def __init__(self, nonlinear_solver, theta=None, use_darwin_split=None):
         self.nonlinear_solver = nonlinear_solver
         self.theta = theta
+        self.use_darwin_split = use_darwin_split
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "theta_implicit_hybrid"
         implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
         implicit_evolve.theta = self.theta
+        implicit_evolve.use_darwin_split = self.use_darwin_split
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
+
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):
     """
