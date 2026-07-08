@@ -2442,24 +2442,34 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                     f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
                     pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
                 )
-        pywarpx.hybridpicmodel.solve_electron_energy_equation = (
-            self.solve_electron_energy_equation
-        )
-        pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
-        pywarpx.hybridpicmodel.redirect_joule_to_ions = self.redirect_joule_to_ions
-        pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
-            self.joule_redirect_Te_threshold
-        )
-        pywarpx.hybridpicmodel.include_temperature_relaxation = (
-            self.include_temperature_relaxation
-        )
-        pywarpx.hybridpicmodel.__setattr__(
-            "electron_ion_relaxation_rate(rho,Te,Ti,t)",
-            pywarpx.my_constants.mangle_expression(
-                self.electron_ion_relaxation_rate, self.mangle_dict
-            ),
-        )
-        pywarpx.hybridpicmodel.qdsmc_n_floor = self.qdsmc_n_floor
+        # Only assign the electron-energy-equation attributes when given, so
+        # that scripts setting them directly on the hybridpicmodel bucket are
+        # not clobbered with None here.
+        if self.solve_electron_energy_equation is not None:
+            pywarpx.hybridpicmodel.solve_electron_energy_equation = (
+                self.solve_electron_energy_equation
+            )
+        if self.include_joule_heating is not None:
+            pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
+        if self.redirect_joule_to_ions is not None:
+            pywarpx.hybridpicmodel.redirect_joule_to_ions = self.redirect_joule_to_ions
+        if self.joule_redirect_Te_threshold is not None:
+            pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
+                self.joule_redirect_Te_threshold
+            )
+        if self.include_temperature_relaxation is not None:
+            pywarpx.hybridpicmodel.include_temperature_relaxation = (
+                self.include_temperature_relaxation
+            )
+        if self.electron_ion_relaxation_rate is not None:
+            pywarpx.hybridpicmodel.__setattr__(
+                "electron_ion_relaxation_rate(rho,Te,Ti,t)",
+                pywarpx.my_constants.mangle_expression(
+                    self.electron_ion_relaxation_rate, self.mangle_dict
+                ),
+            )
+        if self.qdsmc_n_floor is not None:
+            pywarpx.hybridpicmodel.qdsmc_n_floor = self.qdsmc_n_floor
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
