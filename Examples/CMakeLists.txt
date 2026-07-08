@@ -109,13 +109,17 @@ function(add_warpx_test
     endif()
 
     # set MPI executable
-    set(THIS_MPI_TEST_EXE
-        ${MPIEXEC_EXECUTABLE}
-        ${MPI_ALLOW_ROOT}
-        ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
-        ${MPIEXEC_POSTFLAGS}
-        ${MPIEXEC_PREFLAGS}
-    )
+    if(WarpX_MPI)
+        set(THIS_MPI_TEST_EXE
+            ${MPIEXEC_EXECUTABLE}
+            ${MPI_ALLOW_ROOT}
+            ${MPIEXEC_NUMPROC_FLAG} ${nprocs}
+            ${MPIEXEC_POSTFLAGS}
+            ${MPIEXEC_PREFLAGS}
+        )
+    else()
+        set(THIS_MPI_TEST_EXE "")
+    endif()
 
     # set Python executable
     if(python)
