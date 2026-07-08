@@ -8,6 +8,7 @@
  */
 #include "Fields.H"
 #include "SemiImplicitDarwin.H"
+#include "BoundaryConditions/WarpX_PEC.H"
 #include "Python/callbacks.H"
 #include "WarpX.H"
 
@@ -26,16 +27,48 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Retain a pointer back to main WarpX class
     m_WarpX = a_WarpX;
 
-    // The guard-cell handling throughout this solver (SumBoundaryJ and
-    // FillBoundaryAndSync calls using the domain periodicity) and the GMRES
-    // operator in ComputeRHS() assume periodic boundaries; with conducting
-    // (PEC) walls the run would proceed but give wrong results near the walls.
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ)
+    // Conducting (PEC) walls are supported in 1D and 2D: the wall treatment
+    // (image-symmetry ghost fills on Z/dA, guard-cell folds of J and of the
+    // chi*dA product, and projection of the constrained wall DOFs) is applied
+    // wherever m_has_pec is set below. Any other non-periodic boundary type
+    // is not handled by this solver.
+    {
+        const auto& fbl = m_WarpX->GetFieldBoundaryLo();
+        const auto& fbh = m_WarpX->GetFieldBoundaryHi();
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (fbl[idim] == FieldBoundaryType::Periodic || fbl[idim] == FieldBoundaryType::PEC) &&
+                (fbh[idim] == FieldBoundaryType::Periodic || fbh[idim] == FieldBoundaryType::PEC),
+                "The semi-implicit Darwin solver only supports periodic and PEC "
+                "field boundary conditions.");
+            m_has_pec = m_has_pec ||
+                (fbl[idim] == FieldBoundaryType::PEC) || (fbh[idim] == FieldBoundaryType::PEC);
+        }
+    }
+    if (m_has_pec) {
+        // Orbit cropping at PEC walls is only implemented in the Villasenor
+        // deposition kernels; with direct deposition the guard-cell deposits
+        // are folded back into the domain instead (see
+        // AccumulateCurrentAndSusceptibility and ApplySusceptibility).
+        bool crop_on_pec = false;
+        const amrex::ParmParse pp_particles("particles");
+        pp_particles.query("crop_on_PEC_boundary", crop_on_pec);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !(crop_on_pec && WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct),
+            "particles.crop_on_PEC_boundary is not supported with direct current "
+            "deposition in the semi-implicit Darwin solver.");
+    }
+#else
+    // The wall treatment below is only implemented (and verified) for the
+    // 1D and 2D Cartesian geometries so far.
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             m_WarpX->Geom(lev).isAllPeriodic(),
             "The semi-implicit Darwin solver requires periodic field boundary "
-            "conditions in all directions.");
+            "conditions in all directions in this geometry.");
     }
+#endif
 
     // Define dA MultiFabs
     using ablastr::fields::Direction;
@@ -180,6 +213,12 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Populate the source vector
     CalculateSourceVector();
 
+    // Project the warm-start initial guess (the previous step's Z) at
+    // conducting (PEC) walls: the wall-normal rows of the projected system
+    // have identically zero residual, so a nonzero wall value in the initial
+    // guess would persist through the solve and contaminate dA at the wall.
+    ApplyPECtoZ(m_Z.getArrayVec()[0], 0, amrex::IntVect(0));
+
     // Solve MS equation
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
@@ -270,6 +309,15 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
         Zscratch[ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
 
+    // At conducting (PEC) walls, fill Zscratch's guard cells with the B-type
+    // image symmetry (2 layers, covering the nabla^4 stencil below) and zero
+    // the wall-normal DOFs of the iterate - the projection that, together
+    // with the corresponding zeroing of the operator output and source, makes
+    // GMRES solve the reflected half-domain problem. Must come after the
+    // periodic fill above so mirror reads (and 2D corner ghosts) see valid
+    // data.
+    ApplyPECtoZ(Zscratch, lev, m_Zscratch_x.nGrowVect());
+
     // Evaluation of the (single) 4th-order field equation:
     // ∇^4(Z), discretized directly in a single pass. Composing two
     // separate ComputeVectorLaplacian calls (with an intermediate boundary
@@ -295,6 +343,14 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
         // clear E_temp since ApplySusceptibility accumulates into its rhs argument
         E_temp[lev][ii]->setVal(0);
     }
+
+    // At conducting (PEC) walls, fill dA's guard cells with the E-type image
+    // symmetry before the band product below reads them: the guard-cell S
+    // deposits multiply these beyond-wall dA values, and the mixed-staggering
+    // blocks (S_xz etc.) only fold with the correct sign when the ghost dA
+    // holds the image values.
+    ApplyPECtodA(dA_fp[lev], lev, dA_fp[lev][0]->nGrowVect());
+
     // Calculate chi dA and write into E_temp
     ApplySusceptibility(E_temp, dA_fp);
 
@@ -326,6 +382,12 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
     {
         rhs_vec[lev][ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
+
+    // Project the operator output at conducting (PEC) walls: zero the
+    // constrained wall-normal rows so they stay trivially satisfied for
+    // every Krylov vector (rhs_vec has no guard cells, so ng must be 0
+    // here - only the on-wall zeroing is performed).
+    ApplyPECtoZ(rhs_vec[lev], lev, amrex::IntVect(0));
 }
 
 void SemiImplicitDarwin::PrepareCurrentDeposition ()
@@ -448,7 +510,25 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
 
-    // Sum boundaries for mass matrices
+    // At conducting (PEC) walls, fold the guard-cell current deposited by
+    // particles near the wall back into the domain (the image-charge
+    // contribution) and set image guard values, which curl(J) in
+    // CalculateSourceVector() reads. No-op for periodic boundaries.
+    m_WarpX->ApplyJfieldBoundary(
+        lev,
+        m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::current_fp, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev),
+        PatchType::fine);
+
+    // Sum boundaries for mass matrices.
+    // NOTE: at conducting (PEC) walls the mass matrices are deliberately NOT
+    // folded or image-filled: SyncMassMatrices() leaves the raw guard-cell S
+    // deposits in place (guards at physical walls have no communication
+    // partner), and ApplySusceptibility() consumes them directly by
+    // evaluating chi*dA over the grown boxes and folding the resulting
+    // E-staggered product with ApplyJfieldBoundary. Folding S itself would
+    // require remapping its band component indices under reflection.
     m_WarpX->SyncMassMatrices();
 
     // The deposit routine only fills half of each diagonal mass matrix's
@@ -522,6 +602,12 @@ void SemiImplicitDarwin::CalculateSourceVector ()
     {
         b[lev][ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
+
+    // Project the source at conducting (PEC) walls: zero the constrained
+    // wall-normal rows so b lies exactly in the range of the projected
+    // operator applied by ComputeRHS (deposition noise would otherwise
+    // leave a residual there that GMRES can never reduce).
+    ApplyPECtoZ(b[lev], lev, amrex::IntVect(0));
 }
 
 void SemiImplicitDarwin::UpdateEfromdA ( int astep )
@@ -565,7 +651,13 @@ void SemiImplicitDarwin::UpdateEfromdA ( int astep )
         Zscratch[ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
 
-    // Calculate dA = ∇ x Z
+    // At conducting (PEC) walls, fill Zscratch's guard cells with the B-type
+    // image symmetry so the curl below produces dA with tangential
+    // components that vanish at the wall (the solved-for Z was projected,
+    // but its guard cells must hold the image values for the stencil).
+    ApplyPECtoZ(Zscratch, lev, curl_ng);
+
+    // Calculate dA = curl(Z)
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
         dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
     );
@@ -573,6 +665,11 @@ void SemiImplicitDarwin::UpdateEfromdA ( int astep )
     {
         dAfield[lev][ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
+
+    // At conducting (PEC) walls, set dA's image guard values (and re-zero
+    // the on-wall tangential values against stencil roundoff) so the
+    // ghost-inclusive copy into Efield_fp below carries consistent data.
+    ApplyPECtodA(dAfield[lev], lev, dAfield[lev][0]->nGrowVect());
 
     const auto prefac = -1.0_rt / m_dt;
     for (int ii = 0; ii < 3; ii++)
@@ -582,6 +679,13 @@ void SemiImplicitDarwin::UpdateEfromdA ( int astep )
                                 dAfield[lev][ii]->nGrowVect() );
         Efield[lev][ii]->mult(prefac, 0); // use zero ghost cells since FillBoundary is called below
     }
+
+    // At conducting (PEC) walls, keep A's wall and guard values consistent
+    // with the accumulated dA increments (tangential A stays zero at the
+    // wall, being the time integral of the tangential E-field there). The
+    // curl(A) -> B sync reads only valid cells in 1D/2D, so this is for
+    // consistency of diagnostics and guard-dependent consumers.
+    ApplyPECtodA(Afield[lev], lev, Afield[lev][0]->nGrowVect());
 
     // Apply E-field boundary
     m_WarpX->ApplyEfieldBoundary(0, PatchType::fine, astep*m_dt);
@@ -961,9 +1065,67 @@ void SemiImplicitDarwin::ApplySusceptibility (
             });
         }
 
+        // At conducting (PEC) walls, fold the guard-cell chi*dA products
+        // (accumulated above from the raw guard-cell S deposits and the
+        // image-filled dA values) back into the domain and set image guard
+        // values. This must precede the FillBoundaryAndSync below so
+        // neighboring boxes' guard cells pick up the post-fold valid values.
+        // No-op for periodic boundaries.
+        //
+        // Deliberately call PEC::ApplyReflectiveBoundarytoJfield directly
+        // here instead of the WarpX::ApplyJfieldBoundary wrapper used for the
+        // real deposited current below: that wrapper reads the *particle*
+        // boundary type and switches to a PMC-like fold sign whenever
+        // particles are Reflecting/Thermal (correct for actual deposited
+        // current, which really does come from bouncing particles). The
+        // chi*dA product folded here is a purely field-space intermediate in
+        // the GMRES matvec with no notion of particle reflection, so it must
+        // always use the field-boundary-only PEC convention - pass
+        // Absorbing unconditionally so the sign is never coupled to whatever
+        // particle boundary the user configured for real particles.
+        {
+            const amrex::Array<ParticleBoundaryType, AMREX_SPACEDIM> no_particle_reflection =
+                {{AMREX_D_DECL(ParticleBoundaryType::Absorbing,
+                               ParticleBoundaryType::Absorbing,
+                               ParticleBoundaryType::Absorbing)}};
+            PEC::ApplyReflectiveBoundarytoJfield(
+                rhs[lev][0], rhs[lev][1], rhs[lev][2],
+                m_WarpX->GetFieldBoundaryLo(), m_WarpX->GetFieldBoundaryHi(),
+                no_particle_reflection, no_particle_reflection,
+                m_WarpX->Geom(lev), lev, PatchType::fine, m_WarpX->refRatio());
+        }
+
         // Fill and sync guard cells & edges
         rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
         rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
         rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
+}
+
+void SemiImplicitDarwin::ApplyPECtoZ ( const ablastr::fields::VectorField& a_field,
+                                       int lev, const amrex::IntVect& ng )
+{
+    if (!m_has_pec) { return; }
+    // Z shares B's staggering, so the standard B-type PEC image symmetry
+    // (tangential components even-mirrored, normal components odd-mirrored
+    // and zeroed on the wall plane) is exactly what makes dA = curl(Z)
+    // satisfy the E-type PEC symmetry (tangential dA = 0 at the wall).
+    PEC::ApplyPECtoBfield(
+        a_field,
+        m_WarpX->GetFieldBoundaryLo(), m_WarpX->GetFieldBoundaryHi(),
+        FieldBoundaryType::PEC, ng,
+        m_WarpX->Geom(lev), lev, PatchType::fine, m_WarpX->refRatio());
+}
+
+void SemiImplicitDarwin::ApplyPECtodA ( const ablastr::fields::VectorField& a_field,
+                                        int lev, const amrex::IntVect& ng )
+{
+    if (!m_has_pec) { return; }
+    // dA shares E's staggering (E = -dA/dt), so the standard E-type PEC
+    // image symmetry applies directly.
+    PEC::ApplyPECtoEfield(
+        a_field,
+        m_WarpX->GetFieldBoundaryLo(), m_WarpX->GetFieldBoundaryHi(),
+        FieldBoundaryType::PEC, ng,
+        m_WarpX->Geom(lev), lev, PatchType::fine, m_WarpX->refRatio());
 }

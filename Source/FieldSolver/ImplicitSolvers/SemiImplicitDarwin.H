@@ -64,6 +64,28 @@ public:
     void ClearParticleVelocities ();
     void FinishVelocityUpdate ();
 
+    /**
+     * \brief Apply conducting-wall (PEC) boundary conditions to a Z-staggered
+     *  (i.e., B-staggered) vector field: zero the wall-normal components on
+     *  the wall plane and fill `ng` guard layers with the B-type image
+     *  symmetry (tangential components even-mirrored, normal components
+     *  odd-mirrored). With ng = 0 only the on-wall zeroing (the projection of
+     *  the constrained DOFs) is performed. No-op unless a PEC boundary is
+     *  present.
+     */
+    void ApplyPECtoZ ( const ablastr::fields::VectorField& a_field,
+                       int lev, const amrex::IntVect& ng );
+
+    /**
+     * \brief Apply conducting-wall (PEC) boundary conditions to a dA-staggered
+     *  (i.e., E-staggered) vector field: zero the wall-tangential components
+     *  on the wall plane and fill `ng` guard layers with the E-type image
+     *  symmetry (tangential components odd-mirrored, normal components
+     *  even-mirrored). No-op unless a PEC boundary is present.
+     */
+    void ApplyPECtodA ( const ablastr::fields::VectorField& a_field,
+                        int lev, const amrex::IntVect& ng );
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -75,6 +97,12 @@ private:
      * \brief Solver vectors for delta A
      */
     WarpXSolverVec m_Z, m_source;
+
+    /**
+     * \brief True if any field boundary is a conducting (PEC) wall; set in
+     *  Define(). Gates all wall-BC handling so periodic runs are untouched.
+     */
+    bool m_has_pec = false;
 
     /**
      * \brief Scratch space used by ComputeRHS(), allocated once here rather
