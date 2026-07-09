@@ -115,18 +115,34 @@ namespace
         }
     }
 
-    // Copy all three vector-field components with the same source and destination layout.
+    /**
+     * \brief Copy all three vector-field components with the same source and destination layout.
+     *
+     * \param[in,out] dst Destination vector field
+     * \param[in] src Source vector field
+     * \param[in] ng Number of guard cells to copy
+     */
     void CopyVectorField (
         ablastr::fields::VectorField const& dst,
         ablastr::fields::VectorField const& src,
         amrex::IntVect const& ng)
     {
         for (int idim = 0; idim < 3; ++idim) {
-            amrex::MultiFab::Copy(*dst[idim], *src[idim], /*srccomp=*/0, /*dstcomp=*/0, dst[idim]->nComp(), ng);
+            amrex::MultiFab::Copy(
+                *dst[idim], *src[idim], /*srccomp=*/0, /*dstcomp=*/0,
+                dst[idim]->nComp(), ng);
         }
     }
 
-    // Copy all three components from a registered field type into an auxiliary vector field.
+    /**
+     * \brief Copy all three components from a registered field type into an auxiliary vector field.
+     *
+     * \param[in,out] dst Destination vector field
+     * \param[in] fields MultiFab register containing the source field
+     * \param[in] src_type Field type to copy from
+     * \param[in] lev AMR level
+     * \param[in] ng Number of guard cells to copy
+     */
     void CopyVectorField (
         ablastr::fields::VectorField const& dst,
         ablastr::fields::MultiFabRegister& fields,
@@ -143,7 +159,15 @@ namespace
         }
     }
 
-    // Update level-0 aux fields from either averaged fine-patch fields or regular fine fields.
+    /**
+     * \brief Update level-0 aux fields from averaged fine-patch fields or regular fine fields.
+     *
+     * \param[in] fields MultiFab register used when copying averaged fields
+     * \param[in,out] field_aux Aux field to update
+     * \param[in] field_fp Fine-patch field used when time averaging is off
+     * \param[in] field_avg_fp_type Averaged fine-patch field type used when time averaging is on
+     * \param[in] ng_src Number of source guard cells to copy
+     */
     void CopyLevelZeroAuxiliaryData (
         ablastr::fields::MultiFabRegister& fields,
         ablastr::fields::MultiLevelVectorField const& field_aux,
@@ -158,7 +182,15 @@ namespace
         }
     }
 
-    // Center all three level-0 components from their native staggering onto the nodal aux grid.
+    /**
+     * \brief Center level-0 components onto the nodal aux grid.
+     *
+     * \param[in,out] field_aux Nodal aux field to update
+     * \param[in] field_src Source field with the native component staggering
+     * \param[in] device_field_centering_stencil_coeffs_x Centering stencil coefficients in x
+     * \param[in] device_field_centering_stencil_coeffs_y Centering stencil coefficients in y
+     * \param[in] device_field_centering_stencil_coeffs_z Centering stencil coefficients in z
+     */
     void InterpLevelZeroStagToNodal (
         ablastr::fields::VectorField const& field_aux,
         ablastr::fields::VectorField const& field_src,
@@ -212,7 +244,23 @@ namespace
         }
     }
 
-    // Update one vector field on refined levels when the fine and aux grids differ in staggering.
+    /**
+     * \brief Update one vector field on refined levels for staggered-to-nodal aux data.
+     *
+     * \param[in] fields MultiFab register containing fine, coarse, and coarse-aux fields
+     * \param[in] field_fp Fine-patch field
+     * \param[in,out] field_aux Aux field to update
+     * \param[in] field_fp_type Fine-patch field type
+     * \param[in] field_cp_type Coarse-patch field type
+     * \param[in] field_cax_type Coarse-aux field type
+     * \param[in] lev AMR level
+     * \param[in] cnba Coarsened box array for temporary coarse aux data
+     * \param[in] dm Distribution mapping for temporary coarse aux data
+     * \param[in] cperiod Coarse-level periodicity
+     * \param[in] refinement_ratio Refinement ratio between levels \c lev-1 and \c lev
+     * \param[in] ng_src Number of source guard cells to copy
+     * \param[in] electromagnetic_solver_id Active electromagnetic solver
+     */
     void UpdateAuxiliaryDataStagToNodalField (
         ablastr::fields::MultiFabRegister& fields,
         ablastr::fields::MultiLevelVectorField const& field_fp,
@@ -330,7 +378,20 @@ namespace
         }
     }
 
-    // Update one vector field on refined levels when fine, coarse, and aux grids share a layout.
+    /**
+     * \brief Update one vector field on refined levels when all grids share a layout.
+     *
+     * \param[in] fields MultiFab register containing coarse and coarse-aux fields
+     * \param[in] field_fp Fine-patch field
+     * \param[in,out] field_aux Aux field to update
+     * \param[in] field_cp_type Coarse-patch field type
+     * \param[in] field_cax_type Coarse-aux field type
+     * \param[in] lev AMR level
+     * \param[in] ng_src Number of source guard cells to copy
+     * \param[in] crse_period Coarse-level periodicity
+     * \param[in] refinement_ratio Refinement ratio between levels \c lev-1 and \c lev
+     * \param[in] electromagnetic_solver_id Active electromagnetic solver
+     */
     void UpdateAuxiliaryDataSameTypeField (
         ablastr::fields::MultiFabRegister& fields,
         ablastr::fields::MultiLevelVectorField const& field_fp,
