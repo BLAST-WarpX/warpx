@@ -3671,7 +3671,7 @@ For each index ``N`` (starting from 0):
     Bounding box of the drive injection box in physical coordinates [m].
 
 * ``warpx.current_injection.pair_N.drive.A`` (`float`)
-    Cross-sectional area of the drive face [m²] used to convert total current :math:`I(t)`
+    Cross-sectional area of the drive face [m^2] used to convert total current :math:`I(t)`
     to current density :math:`J = I(t)/A`.
 
 * ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
@@ -3681,6 +3681,15 @@ For each index ``N`` (starting from 0):
 * ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
     Sign of the injected current: :math:`J = \mathrm{sign}\, I(t)/A`.  Use ``-1`` to define a
     return face that injects the opposite current.
+
+**PICMI interface (WarpX extension).** The same feature is available from Python/PICMI
+via ``pywarpx.picmi.PrescribedCurrentDrive`` and
+``pywarpx.picmi.PrescribedCurrentInjection``, added to a simulation with
+``Simulation.add_prescribed_current_injection``. See the example
+``Examples/Tests/prescribed_current_injection/inputs_test_3d_prescribed_current_injection_picmi.py``
+and the :ref:`PICMI Python documentation <usage-picmi-parameters>`.
+Set ``particle_shape`` (and a current deposition algorithm) on the simulation, since
+injection uses the particle deposition path.
 
 .. _running-cpp-parameters-hybrid-model:
 

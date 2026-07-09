@@ -10,3 +10,13 @@ add_warpx_test(
     OFF                                      # checksum (physics-based check only)
     OFF                                      # dependency
 )
+
+add_warpx_test(
+    test_3d_prescribed_current_injection_picmi  # name
+    3                                           # dims
+    2                                           # nprocs
+    inputs_test_3d_prescribed_current_injection_picmi.py  # inputs
+    "analysis.py"                               # analysis
+    OFF                                         # checksum (physics-based check only)
+    OFF                                         # dependency
+)

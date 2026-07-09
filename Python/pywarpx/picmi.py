@@ -2617,6 +2617,144 @@ class LaserAntenna(picmistandard.PICMI_LaserAntenna):
             ) / constants.c
 
 
+class PrescribedCurrentDrive(picmistandard.base._ClassWithInit):
+    """
+    One rectangular drive face for WarpX prescribed current injection.
+
+    This is a WarpX-specific extension (not part of the PICMI standard).
+    Maps to ``warpx.current_injection.pair_N.drive.*``.
+
+    Parameters
+    ----------
+    lower_bound: sequence of 3 floats
+        Lower corner of the drive box ``[xlo, ylo, zlo]`` in meters.
+        In 2D XZ geometry the y-bounds are still required by the input parser
+        (they may be set to any values that contain the invariant plane).
+    upper_bound: sequence of 3 floats
+        Upper corner of the drive box ``[xhi, yhi, zhi]`` in meters.
+    area: float
+        Cross-sectional area ``A`` [m^2] used to form ``J = sign * I(t) / A``.
+    direction: {0, 1, 2}, default=0
+        Injected current density component (0 = x, 1 = y, 2 = z).
+    sign: {+1, -1}, default=+1
+        Sign of the injected current. Use ``-1`` for a return face.
+    file: str, optional
+        Per-face two-column waveform file (``t [s]``, ``I [A]``). Overrides
+        the global file set on ``PrescribedCurrentInjection`` when given.
+    """
+
+    def __init__(
+        self,
+        lower_bound,
+        upper_bound,
+        area,
+        direction=0,
+        sign=1,
+        file=None,
+        **kw,
+    ):
+        self.lower_bound = list(lower_bound)
+        self.upper_bound = list(upper_bound)
+        self.area = area
+        self.direction = int(direction)
+        self.sign = int(sign)
+        self.file = file
+        super().__init__(**kw)
+
+        if len(self.lower_bound) != 3 or len(self.upper_bound) != 3:
+            raise ValueError(
+                "PrescribedCurrentDrive lower_bound and upper_bound must each "
+                "have three components [x, y, z]."
+            )
+        if self.direction not in (0, 1, 2):
+            raise ValueError("PrescribedCurrentDrive direction must be 0, 1, or 2.")
+        if self.sign not in (1, -1):
+            raise ValueError("PrescribedCurrentDrive sign must be +1 or -1.")
+        if self.area is None or self.area <= 0.0:
+            raise ValueError("PrescribedCurrentDrive area must be > 0.")
+
+
+class PrescribedCurrentInjection(picmistandard.base._ClassWithInit):
+    """
+    WarpX-specific PICMI interface for file-driven prescribed current injection.
+
+    Deposits a user waveform ``I(t)`` as current density
+    ``J = sign * I(t) / A`` on one or more rectangular faces via
+    ``PrescribedCurrentParticleContainer`` (``warpx.current_injection.*``).
+
+    This class is **not** part of the PICMI standard; it is a WarpX extension.
+    Add it to a simulation with ``Simulation.add_prescribed_current_injection``.
+
+    Example::
+
+        drive = picmi.PrescribedCurrentDrive(
+            lower_bound=[-0.01, -0.14, 0.09],
+            upper_bound=[0.01, -0.10, 0.15],
+            area=2.565e-3,
+            direction=0,
+            sign=1,
+        )
+        current = picmi.PrescribedCurrentInjection(
+            drives=[drive],
+            file="current_profile.txt",
+        )
+        sim.add_prescribed_current_injection(current)
+
+    Parameters
+    ----------
+    drives: list of PrescribedCurrentDrive
+        One or more drive faces. A return path is a second drive with
+        ``sign=-1`` (or a separate face with opposite direction as needed).
+    file: str, optional
+        Global two-column waveform file (``t [s]``, ``I [A]``) used by every
+        drive that does not set its own ``file``. Required if any drive omits
+        ``file``.
+    """
+
+    def __init__(self, drives, file=None, **kw):
+        self.drives = list(drives)
+        self.file = file
+        super().__init__(**kw)
+
+        if len(self.drives) < 1:
+            raise ValueError(
+                "PrescribedCurrentInjection requires at least one drive face."
+            )
+        for i, drive in enumerate(self.drives):
+            if not isinstance(drive, PrescribedCurrentDrive):
+                raise TypeError(
+                    f"drives[{i}] must be a PrescribedCurrentDrive, got "
+                    f"{type(drive)!r}."
+                )
+        if self.file is None and any(d.file is None for d in self.drives):
+            raise ValueError(
+                "PrescribedCurrentInjection: set file=... globally or provide "
+                "file= on every PrescribedCurrentDrive."
+            )
+
+    def initialize_inputs(self):
+        """Map this object onto ``warpx.current_injection.*`` input keys."""
+        pywarpx.warpx.current_injection = 1
+        if self.file is not None:
+            pywarpx.warpx.__setattr__("current_injection.file", self.file)
+
+        pywarpx.warpx.__setattr__("current_injection.n_pairs", len(self.drives))
+
+        for n, drive in enumerate(self.drives):
+            base = f"current_injection.pair_{n}"
+            if drive.file is not None:
+                pywarpx.warpx.__setattr__(f"{base}.file", drive.file)
+            pywarpx.warpx.__setattr__(f"{base}.drive.xlo", drive.lower_bound[0])
+            pywarpx.warpx.__setattr__(f"{base}.drive.xhi", drive.upper_bound[0])
+            pywarpx.warpx.__setattr__(f"{base}.drive.ylo", drive.lower_bound[1])
+            pywarpx.warpx.__setattr__(f"{base}.drive.yhi", drive.upper_bound[1])
+            pywarpx.warpx.__setattr__(f"{base}.drive.zlo", drive.lower_bound[2])
+            pywarpx.warpx.__setattr__(f"{base}.drive.zhi", drive.upper_bound[2])
+            pywarpx.warpx.__setattr__(f"{base}.drive.A", drive.area)
+            pywarpx.warpx.__setattr__(f"{base}.drive.dir", drive.direction)
+            pywarpx.warpx.__setattr__(f"{base}.drive.sign", drive.sign)
+
+
 class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
     """
     Field Initializer that loads the initial field from a file.
@@ -3802,8 +3940,27 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.self_fields_max_iters = kw.pop("warpx_self_fields_max_iters", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
 
+        # WarpX-specific prescribed current injection objects
+        self.prescribed_current_injections = []
+
         self.inputs_initialized = False
         self.warpx_initialized = False
+
+    def add_prescribed_current_injection(self, injection):
+        """
+        Add a WarpX prescribed current injection object to the simulation.
+
+        Parameters
+        ----------
+        injection: PrescribedCurrentInjection
+            File-driven current injection configuration.
+        """
+        if not isinstance(injection, PrescribedCurrentInjection):
+            raise TypeError(
+                "add_prescribed_current_injection expects a "
+                "PrescribedCurrentInjection instance."
+            )
+        self.prescribed_current_injections.append(injection)
 
     def initialize_inputs(self):
         if self.inputs_initialized:
@@ -3885,7 +4042,9 @@ class Simulation(picmistandard.PICMI_Simulation):
                 particle_shape = s.particle_shape
 
         if particle_shape is not None and (
-            len(self.species) > 0 or len(self.lasers) > 0
+            len(self.species) > 0
+            or len(self.lasers) > 0
+            or len(self.prescribed_current_injections) > 0
         ):
             if isinstance(particle_shape, str):
                 interpolation_order = {
@@ -3951,6 +4110,9 @@ class Simulation(picmistandard.PICMI_Simulation):
             self.laser_injection_methods[i].laser_antenna_initialize_inputs(
                 self.lasers[i]
             )
+
+        for prescribed_current in self.prescribed_current_injections:
+            prescribed_current.initialize_inputs()
 
         for applied_field in self.applied_fields:
             applied_field.applied_field_initialize_inputs()

@@ -38,7 +38,7 @@ Simulation and Grid Setup
 -------------------------
 
 .. autoclass:: pywarpx.picmi.Simulation
-    :members: step, add_species, add_laser, add_applied_field, add_interaction, add_diagnostic, write_input_file
+    :members: step, add_species, add_laser, add_applied_field, add_interaction, add_diagnostic, add_prescribed_current_injection, write_input_file
 
 .. autoclass:: pywarpx.picmi.Cartesian3DGrid
 
@@ -119,6 +119,17 @@ Instances of the classes below need to be passed to the method `add_applied_fiel
 .. autoclass:: pywarpx.picmi.PlasmaLens
 
 .. autoclass:: pywarpx.picmi.Mirror
+
+Prescribed current injection
+----------------------------
+
+WarpX-specific PICMI classes for file-driven prescribed current injection
+(``warpx.current_injection.*``). Instances of ``PrescribedCurrentInjection`` are
+passed to ``Simulation.add_prescribed_current_injection``.
+
+.. autoclass:: pywarpx.picmi.PrescribedCurrentDrive
+
+.. autoclass:: pywarpx.picmi.PrescribedCurrentInjection
 
 Diagnostics
 -----------

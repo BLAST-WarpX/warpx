@@ -35,9 +35,21 @@ works with the explicit **and** implicit field solvers and with the `vacuum` and
 Requires `algo.particle_shape >= 1` and `algo.current_deposition` (`direct` or a
 charge-conserving scheme).
 
+### PICMI interface
+
+WarpX-specific PICMI classes (not part of the PICMI standard):
+
+- `picmi.PrescribedCurrentDrive` — one drive face (box, area, direction, sign, optional file).
+- `picmi.PrescribedCurrentInjection` — one or more drives plus optional global waveform file.
+- `Simulation.add_prescribed_current_injection(...)` — register injection on the simulation.
+
+Example: `Examples/Tests/prescribed_current_injection/inputs_test_3d_prescribed_current_injection_picmi.py`.
+
 ### Modified files
 
 - `Source/Particles/PrescribedCurrentParticleContainer.{H,cpp}` — new antenna species that parses `warpx.current_injection.*` and deposits `J = I(t)/A`.
 - `Source/Particles/MultiParticleContainer.cpp` — creates the container when `warpx.current_injection = 1`.
 - `Source/WarpX.cpp` — sets the particle shape when current injection is enabled.
+- `Python/pywarpx/picmi.py` — PICMI wrapper for `warpx.current_injection.*`.
+- `Examples/Tests/prescribed_current_injection/inputs_test_3d_prescribed_current_injection_picmi.py` — PICMI example.
 - `Docs/source/usage/parameters.rst` — section *Maxwell solver: prescribed current injection*.
