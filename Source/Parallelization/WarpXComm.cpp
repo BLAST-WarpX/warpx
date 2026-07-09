@@ -115,6 +115,7 @@ namespace
         }
     }
 
+    // Copy all three vector-field components with the same source and destination layout.
     void CopyVectorField (
         ablastr::fields::VectorField const& dst,
         ablastr::fields::VectorField const& src,
@@ -125,6 +126,7 @@ namespace
         }
     }
 
+    // Copy all three components from a registered field type into an auxiliary vector field.
     void CopyVectorField (
         ablastr::fields::VectorField const& dst,
         ablastr::fields::MultiFabRegister& fields,
@@ -141,6 +143,7 @@ namespace
         }
     }
 
+    // Update level-0 aux fields from either averaged fine-patch fields or regular fine fields.
     void CopyLevelZeroAuxiliaryData (
         ablastr::fields::MultiFabRegister& fields,
         ablastr::fields::MultiLevelVectorField const& field_aux,
@@ -155,6 +158,7 @@ namespace
         }
     }
 
+    // Center all three level-0 components from their native staggering onto the nodal aux grid.
     void InterpLevelZeroStagToNodal (
         ablastr::fields::VectorField const& field_aux,
         ablastr::fields::VectorField const& field_src,
@@ -166,7 +170,7 @@ namespace
         amrex::IntVect const& Fy_stag = field_src[1]->ixType().toIntVect();
         amrex::IntVect const& Fz_stag = field_src[2]->ixType().toIntVect();
 
-        // Destination MultiFab (aux) always has nodal index type when this function is called
+        // Aux data are nodal in the momentum-conserving field-gather path.
         amrex::IntVect const& dst_stag = amrex::IntVect::TheNodeVector();
 
 #ifdef AMREX_USE_OMP
@@ -181,17 +185,14 @@ namespace
             Array4<Real const> const& fy_src = field_src[1]->const_array(mfi);
             Array4<Real const> const& fz_src = field_src[2]->const_array(mfi);
 
-            // Loop includes ghost cells (`growntilebox`)
-            // (input arrays will be padded with zeros beyond ghost cells
-            // for out-of-bound accesses due to large-stencil operations)
+            // Include ghost cells; the interpolation kernels zero-pad out-of-bounds reads.
             const Box bx = mfi.growntilebox();
 
-            // Order of finite-order centering of fields
+            // Finite-order field-centering stencil.
             const int fg_nox = WarpX::field_centering_nox;
             const int fg_noy = WarpX::field_centering_noy;
             const int fg_noz = WarpX::field_centering_noz;
 
-            // Device vectors of stencil coefficients used for finite-order centering of fields
             amrex::Real const * stencil_coeffs_x =
                 device_field_centering_stencil_coeffs_x.data();
             amrex::Real const * stencil_coeffs_y =
@@ -211,6 +212,7 @@ namespace
         }
     }
 
+    // Update one vector field on refined levels when the fine and aux grids differ in staggering.
     void UpdateAuxiliaryDataStagToNodalField (
         ablastr::fields::MultiFabRegister& fields,
         ablastr::fields::MultiLevelVectorField const& field_fp,
@@ -244,8 +246,7 @@ namespace
             for (int idim = 0; idim < 3; ++idim) {
                 Ftmp[idim]->setVal(0.0);
                 const IntVect ng = Ftmp[idim]->nGrowVect();
-                // Copy aux to Ftmp, using up to ng_src (=ng_FieldGather) guard cells from
-                // aux and filling up to ng (=nGrow) guard cells in Ftmp.
+                // Recreate coarse aux data with enough guard cells for interpolation.
                 ablastr::utils::communication::ParallelCopy(
                     *Ftmp[idim], *field_aux[lev - 1][idim], 0, 0, 1,
                     ng_src, ng, WarpX::do_single_precision_comms, cperiod);
@@ -329,6 +330,7 @@ namespace
         }
     }
 
+    // Update one vector field on refined levels when fine, coarse, and aux grids share a layout.
     void UpdateAuxiliaryDataSameTypeField (
         ablastr::fields::MultiFabRegister& fields,
         ablastr::fields::MultiLevelVectorField const& field_fp,
@@ -356,8 +358,7 @@ namespace
                     fields.get(field_cp_type, Direction{idim}, lev)->nComp(), ng);
                 dF[idim]->setVal(0.0);
 
-                // Copy aux to the dF MultiFabs, using up to ng_src (=ng_FieldGather) guard
-                // cells from aux and filling up to ng (=nGrow) guard cells in the dF MultiFabs.
+                // Build the coarse correction from the previous level's aux data.
                 ablastr::utils::communication::ParallelCopy(
                     *dF[idim], *field_aux[lev - 1][idim], 0, 0,
                     field_aux[lev - 1][idim]->nComp(), ng_src, ng,
@@ -430,16 +431,17 @@ WarpX::UpdateAuxiliaryData ()
 
     ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
 
+    // Choose the aux update path from the level-0 B-field staggering.
     if (Bfield_aux_lvl0_0->ixType() == Bfield_fp[0][0]->ixType()) {
         UpdateAuxiliaryDataSameType();
     } else {
         UpdateAuxiliaryDataStagToNodal();
     }
 
-    // When loading particle fields from file: add the external fields
+    // When loading particle fields from file, add the external fields.
     for (int lev = 0; lev <= finest_level; ++lev) {
 
-        // external particle E field maps
+        // External particle E-field maps.
         if (mypc->m_E_ext_particle_s == "read_from_file") {
             ablastr::fields::VectorField E_aux = m_fields.get_alldirs(FieldType::Efield_aux, lev);
             const auto& E_ext = m_fields.get_alldirs(FieldType::E_external_particle_field, lev);
@@ -447,13 +449,13 @@ WarpX::UpdateAuxiliaryData ()
             const auto& metaE = mypc->m_external_particle_fields_metadata.m_E_field_metadata;
             const int ncomp_src = E_ext[0]->nComp();
 
-            // number of external particle fields must match m_field ncomps
+            // The number of external particle fields must match the field metadata.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 ncomp_src == static_cast<int>(metaE.size()),
                 "Mismatch: E_external_particle_field nComp != number of E field metadata entries."
             );
 
-            // Loop over field maps, multiply with time dependency function, add to field map
+            // Apply each external field map with its time-dependent scale factor.
             for (int ic = 0; ic < ncomp_src; ++ic) {
                 const amrex::ParticleReal time_factor = metaE[ic].time_executor(t_new[lev]);
 
@@ -467,7 +469,7 @@ WarpX::UpdateAuxiliaryData ()
             }
         }
 
-        // external particle B field maps
+        // External particle B-field maps.
         if (mypc->m_B_ext_particle_s == "read_from_file") {
             ablastr::fields::VectorField B_aux = m_fields.get_alldirs(FieldType::Bfield_aux, lev);
             const auto& B_ext = m_fields.get_alldirs(FieldType::B_external_particle_field, lev);
@@ -475,13 +477,13 @@ WarpX::UpdateAuxiliaryData ()
             const auto& metaB = mypc->m_external_particle_fields_metadata.m_B_field_metadata;
             const int ncomp_src = B_ext[0]->nComp();
 
-            // number of external particle fields must match m_field ncomps
+            // The number of external particle fields must match the field metadata.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 ncomp_src == static_cast<int>(metaB.size()),
                 "Mismatch: B_external_particle_field nComp != number of B field metadata entries."
             );
 
-            // Loop over field maps, multiply with time dependency function, add to field map
+            // Apply each external field map with its time-dependent scale factor.
             for (int ic = 0; ic < ncomp_src; ++ic) {
                 const amrex::ParticleReal time_factor = metaB[ic].time_executor(t_new[lev]);
 
@@ -522,7 +524,7 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
         m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level) :
         Efield_fp;
 
-    // For level 0, we only need to do the average.
+    // Level 0 only needs native-to-nodal centering, optionally from time-averaged fields.
     InterpLevelZeroStagToNodal(
         Bfield_aux[0], Bmf[0],
         device_field_centering_stencil_coeffs_x,
@@ -534,7 +536,7 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
         device_field_centering_stencil_coeffs_y,
         device_field_centering_stencil_coeffs_z);
 
-    // NOTE: high-order interpolation is not implemented for mesh refinement
+    // Refined levels use the low-order coarse/fine interpolation path for both B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {
         BoxArray const& nba = Bfield_aux[lev][0]->boxArray();
@@ -559,7 +561,7 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
 void
 WarpX::UpdateAuxiliaryDataSameType ()
 {
-    // Update aux field, including guard cells, up to ng_FieldGather
+    // Update aux fields, including guard cells, up to ng_FieldGather.
     const amrex::IntVect& ng_src = guard_cells.ng_FieldGather;
 
     ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
@@ -567,12 +569,12 @@ WarpX::UpdateAuxiliaryDataSameType ()
     ablastr::fields::MultiLevelVectorField Efield_aux = m_fields.get_mr_levels_alldirs(FieldType::Efield_aux, finest_level);
     ablastr::fields::MultiLevelVectorField Bfield_aux = m_fields.get_mr_levels_alldirs(FieldType::Bfield_aux, finest_level);
 
-    // Level 0: Copy from fine to aux
-    // Note: in some configurations, Efield_aux/Bfield_aux and Efield_fp/Bfield_fp are simply aliases to the
-    // same MultiFab object. MultiFab::Copy operation automatically detects this and does nothing in this case.
+    // Level 0 copies fine to aux. In some configurations aux and fine fields are aliases,
+    // and MultiFab::Copy detects that and does nothing.
     CopyLevelZeroAuxiliaryData(m_fields, Efield_aux, Efield_fp, FieldType::Efield_avg_fp, ng_src);
     CopyLevelZeroAuxiliaryData(m_fields, Bfield_aux, Bfield_fp, FieldType::Bfield_avg_fp, ng_src);
 
+    // Refined levels add the coarse-patch correction through the same helper for B and E.
     for (int lev = 1; lev <= finest_level; ++lev)
     {
         const amrex::Periodicity& crse_period = Geom(lev-1).periodicity();
