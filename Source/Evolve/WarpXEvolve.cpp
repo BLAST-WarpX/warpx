@@ -769,19 +769,22 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
             max_distance_relative_to_grid[d] += std::abs(v_galilean[d]) * dt[0] / dx[d];
         }
 
-        // Convert to an integer number of cells (rounding up) and take the largest
-        // value over all directions.
-        amrex::IntVect max_cells_travelled_vect;
+        // Convert to an integer number of cells (rounding up), per direction.
+        amrex::IntVect max_cells_travelled;
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            max_cells_travelled_vect[d] =
+            max_cells_travelled[d] =
                 static_cast<int>(std::ceil(max_distance_relative_to_grid[d]));
         }
-        const int max_cells_travelled = max_cells_travelled_vect.max();
 
-        // If max_cells_travelled reaches the domain size the local search is
-        // no longer more efficient than (and may crash in lieu of) a full
-        // redistribute, so fall back in that case.
-        if (max_cells_travelled < Geom(0).Domain().length().min()) {
+        // If, in any direction, max_cells_travelled reaches the domain size, the
+        // local search is no longer more efficient than (and may crash in lieu
+        // of) a full redistribute, so fall back in that case.
+        const amrex::IntVect domain_length = Geom(0).Domain().length();
+        bool use_local_redistribute = true;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            if (max_cells_travelled[d] >= domain_length[d]) { use_local_redistribute = false; }
+        }
+        if (use_local_redistribute) {
             mypc->RedistributeLocal(max_cells_travelled);
         } else {
             mypc->Redistribute();
