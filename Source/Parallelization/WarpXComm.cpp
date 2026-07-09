@@ -564,10 +564,10 @@ WarpX::UpdateAuxiliaryDataSameType ()
     // Update aux fields, including guard cells, up to ng_FieldGather.
     const amrex::IntVect& ng_src = guard_cells.ng_FieldGather;
 
-    ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
-    ablastr::fields::MultiLevelVectorField Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
-    ablastr::fields::MultiLevelVectorField Efield_aux = m_fields.get_mr_levels_alldirs(FieldType::Efield_aux, finest_level);
-    ablastr::fields::MultiLevelVectorField Bfield_aux = m_fields.get_mr_levels_alldirs(FieldType::Bfield_aux, finest_level);
+    ablastr::fields::MultiLevelVectorField const Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
+    ablastr::fields::MultiLevelVectorField const Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
+    ablastr::fields::MultiLevelVectorField const Efield_aux = m_fields.get_mr_levels_alldirs(FieldType::Efield_aux, finest_level);
+    ablastr::fields::MultiLevelVectorField const Bfield_aux = m_fields.get_mr_levels_alldirs(FieldType::Bfield_aux, finest_level);
 
     // Level 0 copies fine to aux. In some configurations aux and fine fields are aliases,
     // and MultiFab::Copy detects that and does nothing.
