@@ -122,7 +122,7 @@ namespace
         amrex::IntVect const& ng)
     {
         for (int idim = 0; idim < 3; ++idim) {
-            amrex::MultiFab::Copy(*dst[idim], *src[idim], 0, 0, dst[idim]->nComp(), ng);
+            amrex::MultiFab::Copy(*dst[idim], *src[idim], /*srccomp=*/0, /*dstcomp=*/0, dst[idim]->nComp(), ng);
         }
     }
 
@@ -139,7 +139,7 @@ namespace
         for (int idim = 0; idim < 3; ++idim) {
             amrex::MultiFab::Copy(
                 *dst[idim], *fields.get(src_type, Direction{idim}, lev),
-                0, 0, dst[idim]->nComp(), ng);
+                /*srccomp=*/0, /*dstcomp=*/0, dst[idim]->nComp(), ng);
         }
     }
 
@@ -152,7 +152,7 @@ namespace
         amrex::IntVect const& ng_src)
     {
         if (WarpX::fft_do_time_averaging) {
-            CopyVectorField(field_aux[0], fields, field_avg_fp_type, 0, ng_src);
+            CopyVectorField(field_aux[0], fields, field_avg_fp_type, /*lev=*/0, ng_src);
         } else {
             CopyVectorField(field_aux[0], field_fp[0], ng_src);
         }
