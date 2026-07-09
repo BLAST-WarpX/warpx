@@ -2452,12 +2452,13 @@ are applied to the grid directly. In particular, these fields can be seen in the
     required to be set at initialization. If set to "constant", then an
     additional parameter, namely, :pp:param:`warpx.B_external_grid` must be specified.
     If set to ``parse_B_ext_grid_function``, then a mathematical expression can
-    be used to initialize the external magnetic field on the grid. It
-    requires additional parameters in the input file, namely,
+    be used to initialize the external magnetic field on the grid. The
+    optional parameters
     ``warpx.Bx_external_grid_function(x,y,z)``,
-    ``warpx.By_external_grid_function(x,y,z)``,
-    ``warpx.Bz_external_grid_function(x,y,z)`` to initialize the external
+    ``warpx.By_external_grid_function(x,y,z)``, and
+    ``warpx.Bz_external_grid_function(x,y,z)`` initialize the external
     magnetic field for each of the three components on the grid.
+    Any component that is omitted defaults to ``0``.
     Constants required in the expression can be set using ``my_constants``.
     For example, if ``warpx.Bx_external_grid_function(x,y,z)=Bo*x + delta*(y + z)``
     then the constants ``Bo`` and ``delta`` required in the above equation
@@ -2490,12 +2491,13 @@ are applied to the grid directly. In particular, these fields can be seen in the
     additional parameter, namely, :pp:param:`warpx.E_external_grid` must be specified
     in the input file.
     If set to ``parse_E_ext_grid_function``, then a mathematical expression can
-    be used to initialize the external electric field on the grid. It
-    required additional parameters in the input file, namely,
+    be used to initialize the external electric field on the grid. The
+    optional parameters
     ``warpx.Ex_external_grid_function(x,y,z)``,
-    ``warpx.Ey_external_grid_function(x,y,z)``,
-    ``warpx.Ez_external_grid_function(x,y,z)`` to initialize the external
+    ``warpx.Ey_external_grid_function(x,y,z)``, and
+    ``warpx.Ez_external_grid_function(x,y,z)`` initialize the external
     electric field for each of the three components on the grid.
+    Any component that is omitted defaults to ``0``.
     Constants required in the expression can be set using ``my_constants``.
     For example, if ``warpx.Ex_external_grid_function(x,y,z)=Eo*x + delta*(y + z)``
     then the constants ``Bo`` and ``delta`` required in the above equation
