@@ -49,6 +49,10 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
     m_exe_h.m_dE = (m_exe_h.m_energy_hi - m_exe_h.m_energy_lo)/(m_grid_size - 1._prt);
     m_exe_h.m_energy_penalty = energy;
     m_exe_h.m_type = parseProcessType(scattering_process);
+    m_exe_h.m_produces_products = (
+        m_exe_h.m_type == ScatteringProcessType::IONIZATION ||
+        m_exe_h.m_type == ScatteringProcessType::TWOPRODUCT_REACTION ||
+        m_exe_h.m_type == ScatteringProcessType::CHARGE_EXCHANGE);
 
     // sanity check cross-section energy grid
     sanityCheckEnergyGrid(m_energies, m_exe_h.m_dE);

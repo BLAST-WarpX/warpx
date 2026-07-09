@@ -234,6 +234,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
                 if ( !fft_periodic_single_box ) {
                     realspace_ba.grow(1, ngEB[1]); // add guard cells only in z
                 }
+                if (field_boundary_hi[0] == FieldBoundaryType::PML && !do_pml_in_domain) {
+                    // Extend region that is solved for to include the guard cells
+                    // which is where the PML boundary is applied.
+                    realspace_ba.growHi(0, pml_ncell);
+                }
                 AllocLevelSpectralSolverRZ(spectral_solver_fp,
                                            lev,
                                            realspace_ba,
@@ -273,6 +278,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 
 #   ifdef WARPX_DIM_RZ
                     c_realspace_ba.grow(1, ngEB[1]); // add guard cells only in z
+                    if (field_boundary_hi[0] == FieldBoundaryType::PML && !do_pml_in_domain) {
+                        // Extend region that is solved for to include the guard cells
+                        // which is where the PML boundary is applied.
+                        c_realspace_ba.growHi(0, pml_ncell);
+                    }
                     AllocLevelSpectralSolverRZ(spectral_solver_cp,
                                                lev,
                                                c_realspace_ba,

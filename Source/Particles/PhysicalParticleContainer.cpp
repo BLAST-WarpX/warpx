@@ -67,7 +67,6 @@
 #include <AMReX_GpuBuffer.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuDevice.H>
-#include <AMReX_GpuElixir.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_INT.H>
@@ -566,15 +565,13 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             FArrayBox const* byfab = &By[pti];
             FArrayBox const* bzfab = &Bz[pti];
 
-            Elixir exeli, eyeli, ezeli, bxeli, byeli, bzeli;
-
             if (WarpX::use_fdtd_nci_corr)
             {
                 // Filter arrays Ex[pti], store the result in
                 // filtered_Ex and update pointer exfab so that it
                 // points to filtered_Ex (and do the same for all
                 // components of E and B).
-                applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                applyNCIFilter(lev, pti.tilebox(),
                                filtered_Ex, filtered_Ey, filtered_Ez,
                                filtered_Bx, filtered_By, filtered_Bz,
                                Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
@@ -683,7 +680,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         // filtered_Ex and update pointer cexfab so that it
                         // points to filtered_Ex (and do the same for all
                         // components of E and B)
-                        applyNCIFilter(lev-1, cbox, exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                        applyNCIFilter(lev-1, cbox,
                                        filtered_Ex, filtered_Ey, filtered_Ez,
                                        filtered_Bx, filtered_By, filtered_Bz,
                                        cEx[pti], cEy[pti], cEz[pti],
@@ -914,8 +911,6 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
 void
 PhysicalParticleContainer::applyNCIFilter (
     int lev, const Box& box,
-    Elixir& exeli, Elixir& eyeli, Elixir& ezeli,
-    Elixir& bxeli, Elixir& byeli, Elixir& bzeli,
     FArrayBox& filtered_Ex, FArrayBox& filtered_Ey, FArrayBox& filtered_Ez,
     FArrayBox& filtered_Bx, FArrayBox& filtered_By, FArrayBox& filtered_Bz,
     const FArrayBox& Ex, const FArrayBox& Ey, const FArrayBox& Ez,
@@ -943,9 +938,9 @@ PhysicalParticleContainer::applyNCIFilter (
 #endif
 
     // Filter Ex (Both 2D and 3D)
-    filtered_Ex.resize(amrex::convert(tbox,Ex.box().ixType()));
-    // Safeguard for GPU
-    exeli = filtered_Ex.elixir();
+    // Allocated on the async arena so that the memory of the previous
+    // iteration stays valid until the GPU kernels using it complete
+    filtered_Ex.resize(amrex::convert(tbox,Ex.box().ixType()), 1, amrex::The_Async_Arena());
     // Apply filter on Ex, result stored in filtered_Ex
 
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Ex, Ex, filtered_Ex.box());
@@ -953,37 +948,31 @@ PhysicalParticleContainer::applyNCIFilter (
     ex_ptr = &filtered_Ex;
 
     // Filter Ez
-    filtered_Ez.resize(amrex::convert(tbox,Ez.box().ixType()));
-    ezeli = filtered_Ez.elixir();
+    filtered_Ez.resize(amrex::convert(tbox,Ez.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_Ez, Ez, filtered_Ez.box());
     ez_ptr = &filtered_Ez;
 
     // Filter By
-    filtered_By.resize(amrex::convert(tbox,By.box().ixType()));
-    byeli = filtered_By.elixir();
+    filtered_By.resize(amrex::convert(tbox,By.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_By, By, filtered_By.box());
     by_ptr = &filtered_By;
 #if defined(WARPX_DIM_3D)
     // Filter Ey
-    filtered_Ey.resize(amrex::convert(tbox,Ey.box().ixType()));
-    eyeli = filtered_Ey.elixir();
+    filtered_Ey.resize(amrex::convert(tbox,Ey.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Ey, Ey, filtered_Ey.box());
     ey_ptr = &filtered_Ey;
 
     // Filter Bx
-    filtered_Bx.resize(amrex::convert(tbox,Bx.box().ixType()));
-    bxeli = filtered_Bx.elixir();
+    filtered_Bx.resize(amrex::convert(tbox,Bx.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_Bx, Bx, filtered_Bx.box());
     bx_ptr = &filtered_Bx;
 
     // Filter Bz
-    filtered_Bz.resize(amrex::convert(tbox,Bz.box().ixType()));
-    bzeli = filtered_Bz.elixir();
+    filtered_Bz.resize(amrex::convert(tbox,Bz.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Bz, Bz, filtered_Bz.box());
     bz_ptr = &filtered_Bz;
 #else
-    amrex::ignore_unused(eyeli, bxeli, bzeli,
-        filtered_Ey, filtered_Bx, filtered_Bz,
+    amrex::ignore_unused(filtered_Ey, filtered_Bx, filtered_Bz,
         Ey, Bx, Bz, ey_ptr, bx_ptr, bz_ptr);
 #endif
 }
