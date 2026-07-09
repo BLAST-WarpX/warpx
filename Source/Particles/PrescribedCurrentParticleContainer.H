@@ -50,6 +50,19 @@
  * direct or a charge-conserving scheme (esirkepov/villasenor): positions are
  * pushed by v*dt before deposition (then reset), so the displacement yields
  * J = q w v either way.
+ *
+ * Dimensionality:
+ *  - 3D and 2D (XZ): J = sign * I(t) / A is uniform over the drive box; the
+ *    per-cell weight w = sign * dV / (vel_coeff * A) is constant.
+ *  - RZ: dir = 0/1/2 -> Jr/Jtheta/Jz. Antenna particles are seeded at theta = 0
+ *    so the Cartesian push is a radial/azimuthal/axial step. The RZ current
+ *    path deposits a raw J that ApplyInverseVolumeScalingToCurrentDensity later
+ *    divides by 2*pi*r, so the per-cell weight is set to give the physical
+ *    profile: dir = 0 (Jr) uses a uniform weight -> Jr = I(t)/(2*pi*r*dz), the
+ *    1/r coaxial profile with total radial current I conserved across shells
+ *    (A is unused/optional); dir = 1,2 (Jtheta/Jz) use a weight ~ r -> uniform
+ *    J = sign * I(t) / A over the r-z box (A is the physical cross-section,
+ *    e.g. pi*(r_o^2-r_i^2) for Jz, (r_o-r_i)*dz for Jtheta).
  */
 class PrescribedCurrentParticleContainer
     : public WarpXParticleContainer

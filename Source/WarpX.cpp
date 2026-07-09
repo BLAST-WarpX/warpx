@@ -703,7 +703,6 @@ WarpX::ReadParameters ()
 
         ReadBoostedFrameParameters(gamma_boost, beta_boost, boost_direction);
 
-
         // queryWithParser returns 1 if argument zmax_plasma_to_compute_max_step is
         // specified by the user, 0 otherwise.
         if(auto temp = 0.0_rt; utils::parser::queryWithParser(pp_warpx, "zmax_plasma_to_compute_max_step",temp)){

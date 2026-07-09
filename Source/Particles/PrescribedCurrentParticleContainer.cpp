@@ -112,9 +112,23 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
         utils::parser::getWithParser(pp_warpx, (base + ".drive.yhi").c_str(), f.hi[1]);
         utils::parser::getWithParser(pp_warpx, (base + ".drive.zlo").c_str(), f.lo[2]);
         utils::parser::getWithParser(pp_warpx, (base + ".drive.zhi").c_str(), f.hi[2]);
-        utils::parser::getWithParser(pp_warpx, (base + ".drive.A").c_str(),   f.A);
         pp_warpx.query(base + ".drive.dir",  f.dir);
         pp_warpx.query(base + ".drive.sign", f.sign);
+
+        // Area A is the physical cross-section perpendicular to the current.
+        // In RZ with dir = 0 (Jr) the imposed profile is the conserved-total-I
+        // 1/r coaxial profile Jr = I/(2*pi*r*dz), which has no single A, so A is
+        // unused and may be omitted. In every other case A is required.
+#if defined(WARPX_DIM_RZ)
+        const bool a_required = (f.dir != 0);
+#else
+        const bool a_required = true;
+#endif
+        if (a_required) {
+            utils::parser::getWithParser(pp_warpx, (base + ".drive.A").c_str(), f.A);
+        } else {
+            pp_warpx.query(base + ".drive.A", f.A);
+        }
 
         // Per-pair waveform file overrides the global one.
         std::string pair_file;
@@ -132,8 +146,20 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             f.dir >= 0 && f.dir < 3, "current_injection drive.dir must be 0, 1 or 2");
+#if defined(WARPX_DIM_RZ)
+        if (f.dir == 0) {
+            // Jr coaxial drive: box must lie off-axis (r > 0); Jr ~ 1/r diverges
+            // at r = 0 and the inverse-volume scaling forces Jr = 0 on axis.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                f.lo[0] > 0., "current_injection RZ drive (dir=0, Jr) needs xlo > 0 (off-axis)");
+        } else {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                f.A > 0., "current_injection drive.A must be > 0");
+        }
+#else
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             f.A > 0., "current_injection drive.A must be > 0");
+#endif
         m_faces.push_back(std::move(f));
     }
 
@@ -158,6 +184,9 @@ PrescribedCurrentParticleContainer::InitData ()
 {
     if (!m_enabled) { return; }
 
+#if defined(WARPX_DIM_1D_Z)
+    m_enabled = false;
+#else
     const int lev = 0;
     const auto& geom    = Geom(lev);
     const auto problo   = geom.ProbLoArray();
@@ -166,10 +195,23 @@ PrescribedCurrentParticleContainer::InitData ()
 
 #if defined(WARPX_DIM_3D)
     const Real dV = dx[0]*dx[1]*dx[2];
+#elif defined(WARPX_DIM_XZ)
+    // 2D XZ: per-unit-length in the invariant y-direction. AMReX index 0 -> x,
+    // index 1 -> z. A drive face area f.A is likewise per-unit-length in y.
+    const Real dV = dx[0]*dx[1];
+#elif defined(WARPX_DIM_RZ)
+    // RZ: AMReX index 0 -> r, index 1 -> z; theta is invariant. The physical
+    // cell volume is 2*pi*r*dr*dz, but the RZ current-deposition path deposits a
+    // *raw* J (without the 2*pi*r factor) and ApplyInverseVolumeScalingToCurrent
+    // Density divides by 2*pi*r afterward, so the physical current density is
+    //   J = w * q * v / (2*pi*r*dr*dz).
+    // See the per-face weight derivation in the seeding loop below.
+    const Real dr = dx[0];
+    const Real dz = dx[1];
+    const Real two_pi = MathConst::pi * 2._rt;
 #else
     WARPX_ABORT_WITH_MESSAGE(
-        "PrescribedCurrentParticleContainer is only implemented in 3D for now.");
-    const Real dV = 1._rt;
+        "PrescribedCurrentParticleContainer is only implemented in 3D, 2D (XZ) and RZ.");
 #endif
 
     // Peak |I| over ALL faces' waveforms -> velocity scale so the fastest
@@ -199,7 +241,10 @@ PrescribedCurrentParticleContainer::InitData ()
         const auto hi = domain.bigEnd();
         for (const Face& f : m_faces)
         {
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
             const Real W = f.sign * dV / (m_vel_coeff * f.A);
+#endif
+#if defined(WARPX_DIM_3D)
             for (int k = lo[2]; k <= hi[2]; ++k) {
             for (int j = lo[1]; j <= hi[1]; ++j) {
             for (int i = lo[0]; i <= hi[0]; ++i) {
@@ -214,6 +259,59 @@ PrescribedCurrentParticleContainer::InitData ()
                     ws.push_back(W);
                 }
             }}}
+#elif defined(WARPX_DIM_XZ)
+            // AMReX index 0 -> x, index 1 -> z; y is invariant (face y-bounds
+            // f.lo[1]/f.hi[1] are ignored). Seed at y = 0 (AddNParticles drops y).
+            for (int j = lo[1]; j <= hi[1]; ++j) {
+            for (int i = lo[0]; i <= hi[0]; ++i) {
+                const Real xc = problo[0] + (i + 0.5_rt) * dx[0];
+                const Real zc = problo[1] + (j + 0.5_rt) * dx[1];
+                if (xc >= f.lo[0] && xc < f.hi[0] &&
+                    zc >= f.lo[2] && zc < f.hi[2])
+                {
+                    xs.push_back(xc); ys.push_back(0._rt); zs.push_back(zc);
+                    ws.push_back(W);
+                }
+            }}
+#elif defined(WARPX_DIM_RZ)
+            // AMReX index 0 -> r, index 1 -> z; theta is invariant (face
+            // y-bounds f.lo[1]/f.hi[1] are ignored). Seed at theta = 0, i.e.
+            // (x = r, y = 0): AddNParticles stores (r, theta=0, z), and the
+            // Cartesian position push in Evolve is then exactly a radial
+            // (Jr), azimuthal (Jtheta) or axial (Jz) step at theta = 0.
+            //
+            // Per-cell weight so that, after ApplyInverseVolumeScalingToCurrent
+            // Density divides the raw deposit by 2*pi*r, the physical current
+            // density is the prescribed profile:
+            //   dir = 0 (Jr, conserved total I): uniform weight
+            //       W = sign * dr / vel_coeff
+            //     -> Jr = I(t) / (2*pi*r*dz)   (the 1/r coaxial profile; total
+            //        radial current I conserved across every cylindrical shell)
+            //   dir = 1,2 (Jtheta/Jz, uniform J): weight ~ r
+            //       W = sign * (2*pi*r*dr*dz) / (vel_coeff * A)
+            //     -> J = sign * I(t) / A        (uniform over the r-z box)
+            for (int j = lo[1]; j <= hi[1]; ++j) {
+            for (int i = lo[0]; i <= hi[0]; ++i) {
+                const Real rc = problo[0] + (i + 0.5_rt) * dx[0];
+                const Real zc = problo[1] + (j + 0.5_rt) * dx[1];
+                if (rc >= f.lo[0] && rc < f.hi[0] &&
+                    zc >= f.lo[2] && zc < f.hi[2])
+                {
+                    const int n_spokes = std::max(1, WarpX::n_rz_azimuthal_modes);
+                    const Real W = (f.dir == 0)
+                         ? f.sign * dr / (n_spokes * m_vel_coeff)
+                         : f.sign * (two_pi * rc * dr * dz) / (n_spokes * m_vel_coeff * f.A);
+
+                    for (int spoke = 0; spoke < n_spokes; spoke++) {
+                        const Real phase = two_pi * spoke / n_spokes;
+                        xs.push_back(rc * std::cos(phase));
+                        ys.push_back(rc * std::sin(phase));
+                        zs.push_back(zc);
+                        ws.push_back(W);
+                    }
+                }
+            }}
+#endif
         }
     }
 
@@ -237,6 +335,7 @@ PrescribedCurrentParticleContainer::InitData ()
             ablastr::warn_manager::WarnPriority::high);
         m_enabled = false;
     }
+#endif
 }
 
 void
@@ -312,15 +411,50 @@ PrescribedCurrentParticleContainer::Evolve (
             GetPosition(ip, x, y, z);
             int fc = 0;
             for (int f = 0; f < nfaces; ++f) {
+#if defined(WARPX_DIM_3D)
                 if (x >= lo_p[3*f] && x < hi_p[3*f] &&
                     y >= lo_p[3*f+1] && y < hi_p[3*f+1] &&
                     z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
+#else   // 2D XZ and RZ: the invariant coordinate is dropped. GetPosition
+                // returns y = 0 for XZ. For RZ, particles are placed at spokes with
+                // x = r*cos(theta) and y = r*sin(theta), so we test r = sqrt(x*x + y*y).
+#if defined(WARPX_DIM_RZ)
+                const Real r = std::sqrt(x*x + y*y);
+                if (r >= lo_p[3*f] && r < hi_p[3*f] &&
+                    z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
+#else
+                if (x >= lo_p[3*f] && x < hi_p[3*f] &&
+                    z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
+#endif
+#endif
             }
             const int  fdir = dir_f[fc];
             const Real u    = speed_f[fc];
+#if defined(WARPX_DIM_RZ)
+            if (fdir == 0) {
+                const Real r = std::sqrt(x*x + y*y);
+                const Real cos_theta = (r > 0._rt) ? x/r : 1._rt;
+                const Real sin_theta = (r > 0._rt) ? y/r : 0._rt;
+                ux_ptr[ip] = u * cos_theta;
+                uy_ptr[ip] = u * sin_theta;
+                uz_ptr[ip] = 0._rt;
+            } else if (fdir == 1) {
+                const Real r = std::sqrt(x*x + y*y);
+                const Real cos_theta = (r > 0._rt) ? x/r : 1._rt;
+                const Real sin_theta = (r > 0._rt) ? y/r : 0._rt;
+                ux_ptr[ip] = -u * sin_theta;
+                uy_ptr[ip] = u * cos_theta;
+                uz_ptr[ip] = 0._rt;
+            } else {
+                ux_ptr[ip] = 0._rt;
+                uy_ptr[ip] = 0._rt;
+                uz_ptr[ip] = u;
+            }
+#else
             ux_ptr[ip] = (fdir == 0) ? u : 0._rt;
             uy_ptr[ip] = (fdir == 1) ? u : 0._rt;
             uz_ptr[ip] = (fdir == 2) ? u : 0._rt;
+#endif
 
             // Push along whichever component is non-zero (dir-agnostic).
             const Real ginv = 1._rt / std::sqrt(1._rt + (u*u)/c2);
