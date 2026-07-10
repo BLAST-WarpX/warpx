@@ -259,19 +259,27 @@ public:
     amrex::ParserExecutor<2> m_eta_h;
     bool m_include_hyper_resistivity_term = false;
     bool m_hyper_resistivity_has_B_dependence = false;
-    /** If true (opt-in), evaluate the hyper-resistivity Laplacian with the
+    /** Evaluate the hyper-resistivity Laplacian of the plasma current with the
      *  isotropic Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of
-     *  the cross stencil, removing the cos(4*theta) anisotropy of its
+     *  the cross stencil, removing the cos(4*theta) grid anisotropy of its
      *  damping rate (fully isotropic on cubic cells; Cartesian only). */
     bool m_isotropic_hyper_resistivity = false;
-    /** If true (opt-in), add an isotropizing corner-curl correction to the
-     *  resistive electric field so the emergent in-plane B diffusion uses the
-     *  isotropic (Mehrstellen) Laplacian instead of the cross stencil. This
-     *  removes the cos(4*theta) modulation of the resistive damping rate that
-     *  drives a grid m=4 mode. Applied through E, so the standard Faraday
-     *  curl is unchanged and div(B) stays exactly zero. Cartesian only (the
-     *  RZ resistive operator is axisymmetric and has no such anisotropy). */
+
+    /** Isotropize the in-plane resistive diffusion of the out-of-plane B
+     *  component (Bz in 3D, By in 2D XZ): a corner-curl correction added to
+     *  the in-plane E components makes the Faraday curl of the resistive E
+     *  emit the isotropic (Mehrstellen) Laplacian instead of the cross
+     *  stencil. This preserves div(B) exactly since the correction enters
+     *  only through E (Cartesian only). */
     bool m_isotropic_resistivity = false;
+
+    /** Evaluate the electron-pressure gradient in Ohm's law with the
+     *  transverse-smoothed (isotropized) staggered difference instead of the
+     *  plain two-point stencil, removing the cos(4*theta) grid anisotropy of
+     *  |grad Pe| (fully isotropic on cubic cells; Cartesian only). Only
+     *  affects the E used for the particle push and diagnostics: the
+     *  Faraday/B-integration path omits grad(Pe) entirely. */
+    bool m_isotropic_gradient = false;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";

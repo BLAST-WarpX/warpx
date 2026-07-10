@@ -4019,8 +4019,10 @@ Maxwell solver: kinetic-fluid hybrid
     diagonals, which imprints fourfold structure on diffusing fields at grid-scale wavenumbers;
     the isotropic stencils cancel that term (their leading error is proportional to the
     isotropic biharmonic; fully isotropic on cubic cells, consistent on non-cubic cells).
-    Cartesian geometries only; in RZ the standard cylindrical operator is used (with the
-    on-axis radial term carrying its L'Hopital factor of two).
+    Near an embedded boundary the hybrid EB mirror fills are widened to the diagonal stencil
+    reach (see :pp:param:`hybrid_pic_model.eb_b_fill_band_cells`), so the operator keeps its
+    isotropic form there. Cartesian geometries only; in RZ the standard cylindrical operator
+    is used (with the on-axis radial term carrying its L'Hopital factor of two).
 
 .. pp:param:: hybrid_pic_model.isotropic_resistivity
     :type: ``bool``
@@ -4038,6 +4040,28 @@ Maxwell solver: kinetic-fluid hybrid
     is preserved exactly; it is a pure O(h^2) truncation-error canceller (zero for fields of
     degree :math:`\leq 3`). Cartesian geometries only; the RZ resistive operator is axisymmetric
     and has no such anisotropy.
+
+.. pp:param:: hybrid_pic_model.isotropic_gradient
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If ``true`` (opt-in), the electron-pressure gradient of the hybrid Ohm's law is evaluated
+    with a transverse-smoothed (isotropized) staggered difference instead of the plain two-point
+    stencil. The two-point stencil's leading truncation error modulates :math:`|\nabla P_e|` as
+    :math:`\cos 4\theta` between the grid axes and the diagonals; pre-smoothing the scalar along
+    each transverse direction :math:`t` with weight :math:`\Delta x^2/(24\,\Delta t^2)`
+    (:math:`\Delta x^2/(6\,\Delta t^2)` for the wide centered difference on collocated grids)
+    turns the leading error into the corresponding component of
+    :math:`(h^2/24)\,\nabla(\nabla^2 P_e)`, which is isotropic. The on-axis stencil is
+    unchanged: isotropization equalizes the diagonal error to the axis error rather than adding
+    accuracy. Note that, unlike the plain staggered gradient, the isotropized gradient is not
+    discretely curl-free (its Yee curl is :math:`O(h^2)` small rather than identically zero);
+    this is benign because the term is only evaluated for the electric field used in the
+    particle push and diagnostics — the Faraday/B-integration path omits :math:`\nabla P_e`
+    entirely (its analytic curl is zero), so no spurious magnetic field can be generated.
+    Near an embedded boundary the electron-pressure mirror fill maintains the transverse
+    reads. Cartesian geometries only.
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``

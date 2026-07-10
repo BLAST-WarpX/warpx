@@ -1160,6 +1160,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // Faraday UpwardD); the call sites below select via T_Algo. Both isotropize the
     // in-plane resistive diffusion of the out-of-plane B and preserve div(B) exactly.
     const bool iso_resistivity = hybrid_model->m_isotropic_resistivity;
+    // isotropized electron-pressure gradient (transverse-smoothed staggered
+    // difference; Yee and nodal variants selected via T_Algo). Only evaluated
+    // on the !solve_for_Faraday path, so its O(h^2) discrete-curl defect can
+    // never feed the B integration (see IsotropicOperators.H).
+    const bool iso_gradient = hybrid_model->m_isotropic_gradient;
+    const bool nodal_grid = std::is_same_v<T_Algo, CartesianNodalAlgorithm>;
     // Nodal-eta interpolation: evaluate the (hyper-)resistivity parsers ONCE per
     // node from the nodal rho and the Hall-consistent nodal J/B, then interpolate
     // the resulting eta fields to the staggered E locations (exactly like the
@@ -1195,10 +1201,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // index -- no per-component half-shifts at the plasma/vacuum seam).
     const int switch_mode = hybrid_model->m_holmstrom_switch_mode;
     const amrex::Real inv_mu0 = 1._rt/PhysConst::mu0;
-#if defined(WARPX_DIM_1D_Z)
-    // only consumed by the 3D / 2D XZ corner-curl corrections below
-    amrex::ignore_unused(inv_mu0);
-#endif
     amrex::GpuArray<amrex::Real, 3> dx_arr{};
     amrex::GpuArray<amrex::Real, 3> h2{};
     amrex::GpuArray<amrex::Real, 3> inv_h2{};
@@ -1210,9 +1212,27 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             inv_h2[d] = 1._rt/h2[d];
         }
     }
+    // Near-EB fallback plumbing of the isotropic-operators PR (#7040): the
+    // per-point guards below downgrade to the standard compact stencils where
+    // iso_phi says the point is within a corner reach of the level set. On
+    // this branch the hybrid EB boundary layer mirror-fills the J/B/Pe bands
+    // to the diagonal stencil reach (m_eb_fill_band_cells,
+    // m_eb_b_fill_band_cells, and the Pe fill), so the wide reads stay valid
+    // near the wall and the fallback is left disengaged (empty iso_phi).
+    amrex::Real h_max_iso = dx_arr[0];
+    for (int d = 1; d < AMREX_SPACEDIM; ++d) { h_max_iso = std::max(h_max_iso, dx_arr[d]); }
+    const amrex::Real d_iso_compact =
+        (std::sqrt(static_cast<amrex::Real>(AMREX_SPACEDIM)) + 0.5_rt) * h_max_iso;
+    amrex::MultiFab const* iso_phi_mf = nullptr;
+#if defined(WARPX_DIM_1D_Z)
+    // only consumed by the 3D / 2D XZ isotropic upgrades below
+    amrex::ignore_unused(iso_hyper, iso_resistivity, iso_gradient, nodal_grid,
+                         inv_mu0, dx_arr, h2, inv_h2, d_iso_compact);
+#endif
 
     auto & warpx = WarpX::GetInstance();
     const amrex::Real t_new = warpx.gett_new(lev);
+
     ablastr::fields::VectorField Bfield_external, Efield_external;
     if (include_external_fields) {
         Bfield_external = warpx.m_fields.get_alldirs(FieldType::hybrid_B_fp_external, 0); // lev=0
@@ -1417,6 +1437,15 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             update_Ez_arr = eb_update_E[2]->array(mfi);
         }
 
+        // Level-set distance for the near-EB fallback of the isotropic
+        // stencils (empty Array4 when no EB or no isotropic option is on:
+        // the kernels then apply the isotropic stencils everywhere)
+        amrex::Array4<amrex::Real const> iso_phi;
+        if (iso_phi_mf) { iso_phi = iso_phi_mf->const_array(mfi); }
+#if defined(WARPX_DIM_1D_Z)
+        amrex::ignore_unused(iso_phi);
+#endif
+
         Array4<Real> Ex_ext, Ey_ext, Ez_ext;
         if (include_external_fields) {
             Ex_ext = Efield_external[0]->array(mfi);
@@ -1459,10 +1488,28 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
-                    T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
-                    : 0._rt;
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0.
+                // (The isotropized gradient's discrete curl is only O(h^2) small rather
+                // than identically zero, which is benign precisely because this term is
+                // never evaluated on the Faraday path -- see IsotropicOperators.H.)
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) {
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+                    if (iso_gradient && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                        grad_Pe = nodal_grid
+#if defined(WARPX_DIM_3D)
+                            ? warpx::hybrid_isotropic::UpwardDxIsotropic_3D_Nodal(Pe, i, j, k, h2, inv_h2, coefs_x[0])
+                            : warpx::hybrid_isotropic::UpwardDxIsotropic_3D(Pe, i, j, k, h2, inv_h2, coefs_x[0]);
+#else
+                            ? warpx::hybrid_isotropic::UpwardDxIsotropic_XZ_Nodal(Pe, i, j, k, h2, inv_h2, coefs_x[0])
+                            : warpx::hybrid_isotropic::UpwardDxIsotropic_XZ(Pe, i, j, k, h2, inv_h2, coefs_x[0]);
+#endif
+                    } else
+#endif
+                    {
+                        grad_Pe = T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k);
+                    }
+                }
 
                 // interpolate the nodal neE values to the Yee grid
                 const auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
@@ -1524,11 +1571,18 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    const Real nabla2Jx = iso_hyper
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+                    const Real nabla2Jx =
+                        (iso_hyper && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact))
                         ? warpx::hybrid_isotropic::LaplacianIsotropic(Jx, i, j, k, h2, inv_h2)
                         : T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
                           + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
                           + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
+#else
+                    const Real nabla2Jx = T_Algo::Dxx(Jx, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jx, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
+#endif
 
                     const amrex::Real eta_h_val = eta_nodal
                         ? Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 4)
@@ -1538,34 +1592,21 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                 // Isotropize the in-plane resistive diffusion of the
                 // out-of-plane B (Bz in 3D, By in 2D XZ) via the corner-curl
-                // correction; div(B) preserved (added through E).
-                if (iso_resistivity) {
-                    // Runtime if (not if constexpr): nvcc forbids an extended
-                    // __device__ lambda from first-capturing a variable inside a
-                    // constexpr-if. The condition is still compile-time constant,
-                    // so the dead branch is pruned.
-                    const bool nodal_grid =
-                        std::is_same_v<T_Algo, CartesianNodalAlgorithm>;
+                // correction; div(B) preserved (the correction enters only
+                // through E).
 #if defined(WARPX_DIM_3D)
-                    if (nodal_grid) {
-                        Ex(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEx_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0);
-                    } else {
-                        Ex(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEx_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
-                    }
-#elif defined(WARPX_DIM_XZ)
-                    if (nodal_grid) {
-                        Ex(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEx_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0);
-                    } else {
-                        Ex(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEx_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
-                    }
-#else
-                    amrex::ignore_unused(nodal_grid);
-#endif
+                if (iso_resistivity && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                    Ex(i, j, k) += eta_val * (nodal_grid
+                        ? warpx::hybrid_isotropic::CornerResistiveEx_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0)
+                        : warpx::hybrid_isotropic::CornerResistiveEx_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0));
                 }
+#elif defined(WARPX_DIM_XZ)
+                if (iso_resistivity && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                    Ex(i, j, k) += eta_val * (nodal_grid
+                        ? warpx::hybrid_isotropic::CornerResistiveEx_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0)
+                        : warpx::hybrid_isotropic::CornerResistiveEx_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0));
+                }
+#endif
             }
 
             if (include_external_fields) {
@@ -1595,10 +1636,22 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
-                    T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
-                    : 0._rt;
+                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0.
+                // (In 2D XZ there is no y derivative, so Ey keeps the plain stencil,
+                // which is identically zero there.)
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) {
+#if defined(WARPX_DIM_3D)
+                    if (iso_gradient && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                        grad_Pe = nodal_grid
+                            ? warpx::hybrid_isotropic::UpwardDyIsotropic_3D_Nodal(Pe, i, j, k, h2, inv_h2, coefs_y[0])
+                            : warpx::hybrid_isotropic::UpwardDyIsotropic_3D(Pe, i, j, k, h2, inv_h2, coefs_y[0]);
+                    } else
+#endif
+                    {
+                        grad_Pe = T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k);
+                    }
+                }
 
                 // interpolate the nodal neE values to the Yee grid
                 const auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
@@ -1660,11 +1713,18 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    const Real nabla2Jy = iso_hyper
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+                    const Real nabla2Jy =
+                        (iso_hyper && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact))
                         ? warpx::hybrid_isotropic::LaplacianIsotropic(Jy, i, j, k, h2, inv_h2)
                         : T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
                           + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
                           + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
+#else
+                    const Real nabla2Jy = T_Algo::Dxx(Jy, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jy, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
+#endif
 
                     const amrex::Real eta_h_val = eta_nodal
                         ? Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 4)
@@ -1672,17 +1732,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ey(i, j, k) -= eta_h_val * nabla2Jy;
                 }
 
-                // Bz corner-curl correction, second (Ey) half (3D only; in
-                // 2D XZ the out-of-plane corner is delivered via Ex and Ez).
+                // Corner-curl isotropization of the resistive diffusion of
+                // Bz (3D only: in 2D XZ the out-of-plane B is By and the
+                // correction is carried by Ex and Ez).
 #if defined(WARPX_DIM_3D)
-                if (iso_resistivity) {
-                    if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
-                        Ey(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEy_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0);
-                    } else {
-                        Ey(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEy_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
-                    }
+                if (iso_resistivity && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                    Ey(i, j, k) += eta_val * (nodal_grid
+                        ? warpx::hybrid_isotropic::CornerResistiveEy_3D_Nodal(Bz, i, j, k, dx_arr, inv_mu0)
+                        : warpx::hybrid_isotropic::CornerResistiveEy_3D(Bz, i, j, k, h2, inv_h2, dx_arr, inv_mu0));
                 }
 #endif
             }
@@ -1715,9 +1772,24 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
-                    T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
-                    : 0._rt;
+                Real grad_Pe = 0._rt;
+                if (!solve_for_Faraday) {
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+                    if (iso_gradient && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                        grad_Pe = nodal_grid
+#if defined(WARPX_DIM_3D)
+                            ? warpx::hybrid_isotropic::UpwardDzIsotropic_3D_Nodal(Pe, i, j, k, h2, inv_h2, coefs_z[0])
+                            : warpx::hybrid_isotropic::UpwardDzIsotropic_3D(Pe, i, j, k, h2, inv_h2, coefs_z[0]);
+#else
+                            ? warpx::hybrid_isotropic::UpwardDzIsotropic_XZ_Nodal(Pe, i, j, k, h2, inv_h2, coefs_z[0])
+                            : warpx::hybrid_isotropic::UpwardDzIsotropic_XZ(Pe, i, j, k, h2, inv_h2, coefs_z[0]);
+#endif
+                    } else
+#endif
+                    {
+                        grad_Pe = T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k);
+                    }
+                }
 
                 // interpolate the nodal neE values to the Yee grid
                 const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
@@ -1779,11 +1851,18 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         btot_val = std::sqrt(bx_val*bx_val + by_val*by_val + bz_val*bz_val);
                     }
 
-                    const Real nabla2Jz = iso_hyper
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+                    const Real nabla2Jz =
+                        (iso_hyper && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact))
                         ? warpx::hybrid_isotropic::LaplacianIsotropic(Jz, i, j, k, h2, inv_h2)
                         : T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
                           + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
                           + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
+#else
+                    const Real nabla2Jz = T_Algo::Dxx(Jz, coefs_x, n_coefs_x, i, j, k)
+                        + T_Algo::Dyy(Jz, coefs_y, n_coefs_y, i, j, k)
+                        + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
+#endif
 
                     const amrex::Real eta_h_val = eta_nodal
                         ? Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 4)
@@ -1791,17 +1870,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     Ez(i, j, k) -= eta_h_val * nabla2Jz;
                 }
 
-                // By corner-curl correction, second (Ez) half (2D XZ only;
-                // in 3D the axial Bz corner is delivered via Ex and Ey).
+                // Corner-curl isotropization of the resistive diffusion of
+                // the out-of-plane By (2D XZ only: in 3D the out-of-plane B
+                // is Bz and the correction is carried by Ex and Ey).
 #if defined(WARPX_DIM_XZ)
-                if (iso_resistivity) {
-                    if (std::is_same_v<T_Algo, CartesianNodalAlgorithm>) {
-                        Ez(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEz_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0);
-                    } else {
-                        Ez(i, j, k) += eta_val
-                            * warpx::hybrid_isotropic::CornerResistiveEz_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0);
-                    }
+                if (iso_resistivity && (!iso_phi || iso_phi(i, j, k) >= d_iso_compact)) {
+                    Ez(i, j, k) += eta_val * (nodal_grid
+                        ? warpx::hybrid_isotropic::CornerResistiveEz_XZ_Nodal(By, i, j, k, dx_arr, inv_mu0)
+                        : warpx::hybrid_isotropic::CornerResistiveEz_XZ(By, i, j, k, h2, inv_h2, dx_arr, inv_mu0));
                 }
 #endif
             }

@@ -16,13 +16,14 @@
 #include <AMReX_Gpu.H>
 #include <AMReX_REAL.H>
 
-/** Isotropic finite-difference operators for the Hybrid-PIC resistive E solve.
+/** Isotropic finite-difference operators for the Hybrid-PIC Ohm's-law solve.
  *
- *  These device-inline helpers isotropize the hyper-resistivity Laplacian and
- *  the resistive diffusion of the out-of-plane B (corner-curl correction). They
- *  are header-only because they are evaluated inside GPU lambdas in
- *  HybridPICSolveE.cpp. They are guarded by the same dimensionality macros as
- *  the Cartesian solve (no definitions in RZ / RSPHERE / RCYLINDER builds).
+ *  These device-inline helpers isotropize the hyper-resistivity Laplacian,
+ *  the resistive diffusion of the out-of-plane B (corner-curl correction),
+ *  and the staggered gradient of the electron pressure. They are header-only
+ *  because they are evaluated inside GPU lambdas in HybridPICSolveE.cpp. They
+ *  are guarded by the same dimensionality macros as the Cartesian solve (no
+ *  definitions in RZ / RSPHERE / RCYLINDER builds).
  */
 namespace warpx::hybrid_isotropic
 {
@@ -256,6 +257,192 @@ namespace warpx::hybrid_isotropic
             return By(ii,j+1,k) - 2._rt*By(ii,j,k) + By(ii,j-1,k);
         };
         return (inv_mu0/3._rt) * (0.5_rt/dx[0]) * (d2z(i+1) - d2z(i-1));
+    }
+#endif
+
+    // Isotropized gradient of a nodal scalar (the electron pressure).
+    //
+    // The two-point staggered difference D_x has truncation error
+    // (dx^2/24) d^3F/dx^3, whose Fourier symbol depends on k_x alone: the
+    // relative error of the gradient vector is modulated in angle as
+    // cos(4*theta) -- the same fourfold grid imprint the cross-Laplacian puts
+    // on diffusion rates. Pre-smoothing the scalar along each TRANSVERSE
+    // direction t with weight a_t = dx^2/(24 dt^2) turns the leading error
+    // into (dx^2/24) d/dx(laplacian F): the x-component of an isotropic
+    // vector field, so the angular modulation cancels (fully isotropic on
+    // cubic cells, consistent 2nd order otherwise). On the collocated grid
+    // the wide centered difference has truncation error (dx^2/6) d^3F/dx^3,
+    // so the nodal variants use a_t = dx^2/(6 dt^2). Either way the result
+    // stays on the component's native staggering and the on-axis stencil is
+    // unchanged: isotropization equalizes the diagonal error to the
+    // (pre-existing) axis error rather than adding accuracy.
+    //
+    // NOTE (curl(grad) identity): the Yee curl of the PLAIN staggered
+    // gradient vanishes identically, which is why the Ohm's-law solve may
+    // omit grad(Pe) on the solve_for_Faraday path. The isotropized gradient
+    // smooths each component along different (transverse) directions, so its
+    // discrete curl is only O(h^2) small, not zero. This is benign here
+    // precisely because grad(Pe) is only ever evaluated on the
+    // !solve_for_Faraday path (the E used for the particle push and
+    // diagnostics) and the B integration never sees the term -- do not route
+    // this operator into an E that feeds a curl without revisiting that
+    // argument.
+#if defined(WARPX_DIM_3D)
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDxIsotropic_3D (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dx)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ay = h2[0]*inv_h2[1]/24._rt;
+        amrex::Real const az = h2[0]*inv_h2[2]/24._rt;
+        auto const dfx = [&] (int jj, int kk) { return F(i+1,jj,kk) - F(i,jj,kk); };
+        return inv_dx * ( (1._rt - 2._rt*(ay + az))*dfx(j,k)
+                        + ay*(dfx(j+1,k) + dfx(j-1,k))
+                        + az*(dfx(j,k+1) + dfx(j,k-1)) );
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDyIsotropic_3D (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dy)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ax = h2[1]*inv_h2[0]/24._rt;
+        amrex::Real const az = h2[1]*inv_h2[2]/24._rt;
+        auto const dfy = [&] (int ii, int kk) { return F(ii,j+1,kk) - F(ii,j,kk); };
+        return inv_dy * ( (1._rt - 2._rt*(ax + az))*dfy(i,k)
+                        + ax*(dfy(i+1,k) + dfy(i-1,k))
+                        + az*(dfy(i,k+1) + dfy(i,k-1)) );
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDzIsotropic_3D (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dz)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ax = h2[2]*inv_h2[0]/24._rt;
+        amrex::Real const ay = h2[2]*inv_h2[1]/24._rt;
+        auto const dfz = [&] (int ii, int jj) { return F(ii,jj,k+1) - F(ii,jj,k); };
+        return inv_dz * ( (1._rt - 2._rt*(ax + ay))*dfz(i,j)
+                        + ax*(dfz(i+1,j) + dfz(i-1,j))
+                        + ay*(dfz(i,j+1) + dfz(i,j-1)) );
+    }
+
+    // Collocated (nodal) analogues: wide centered difference, a_t = dx^2/(6 dt^2).
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDxIsotropic_3D_Nodal (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dx)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ay = h2[0]*inv_h2[1]/6._rt;
+        amrex::Real const az = h2[0]*inv_h2[2]/6._rt;
+        auto const dfx = [&] (int jj, int kk) { return F(i+1,jj,kk) - F(i-1,jj,kk); };
+        return 0.5_rt*inv_dx * ( (1._rt - 2._rt*(ay + az))*dfx(j,k)
+                               + ay*(dfx(j+1,k) + dfx(j-1,k))
+                               + az*(dfx(j,k+1) + dfx(j,k-1)) );
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDyIsotropic_3D_Nodal (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dy)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ax = h2[1]*inv_h2[0]/6._rt;
+        amrex::Real const az = h2[1]*inv_h2[2]/6._rt;
+        auto const dfy = [&] (int ii, int kk) { return F(ii,j+1,kk) - F(ii,j-1,kk); };
+        return 0.5_rt*inv_dy * ( (1._rt - 2._rt*(ax + az))*dfy(i,k)
+                               + ax*(dfy(i+1,k) + dfy(i-1,k))
+                               + az*(dfy(i,k+1) + dfy(i,k-1)) );
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDzIsotropic_3D_Nodal (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dz)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ax = h2[2]*inv_h2[0]/6._rt;
+        amrex::Real const ay = h2[2]*inv_h2[1]/6._rt;
+        auto const dfz = [&] (int ii, int jj) { return F(ii,jj,k+1) - F(ii,jj,k-1); };
+        return 0.5_rt*inv_dz * ( (1._rt - 2._rt*(ax + ay))*dfz(i,j)
+                               + ax*(dfz(i+1,j) + dfz(i-1,j))
+                               + ay*(dfz(i,j+1) + dfz(i,j-1)) );
+    }
+#elif defined(WARPX_DIM_XZ)
+    // 2D XZ: j is the z index; the single transverse direction of d/dx is z
+    // and of d/dz is x. (No y derivative exists, so Ey keeps the plain
+    // stencil, which is identically zero in XZ.)
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDxIsotropic_XZ (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dx)
+    {
+        using namespace amrex::literals;
+        amrex::Real const az = h2[0]*inv_h2[1]/24._rt;
+        auto const dfx = [&] (int jj) { return F(i+1,jj,k) - F(i,jj,k); };
+        return inv_dx * ( (1._rt - 2._rt*az)*dfx(j) + az*(dfx(j+1) + dfx(j-1)) );
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDzIsotropic_XZ (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dz)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ax = h2[1]*inv_h2[0]/24._rt;
+        auto const dfz = [&] (int ii) { return F(ii,j+1,k) - F(ii,j,k); };
+        return inv_dz * ( (1._rt - 2._rt*ax)*dfz(i) + ax*(dfz(i+1) + dfz(i-1)) );
+    }
+
+    // Collocated (nodal) analogues: wide centered difference, a_t = dx^2/(6 dt^2).
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDxIsotropic_XZ_Nodal (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dx)
+    {
+        using namespace amrex::literals;
+        amrex::Real const az = h2[0]*inv_h2[1]/6._rt;
+        auto const dfx = [&] (int jj) { return F(i+1,jj,k) - F(i-1,jj,k); };
+        return 0.5_rt*inv_dx * ( (1._rt - 2._rt*az)*dfx(j) + az*(dfx(j+1) + dfx(j-1)) );
+    }
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real UpwardDzIsotropic_XZ_Nodal (
+        amrex::Array4<amrex::Real const> const& F,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, 3> const& h2,
+        amrex::GpuArray<amrex::Real, 3> const& inv_h2,
+        amrex::Real const inv_dz)
+    {
+        using namespace amrex::literals;
+        amrex::Real const ax = h2[1]*inv_h2[0]/6._rt;
+        auto const dfz = [&] (int ii) { return F(ii,j+1,k) - F(ii,j-1,k); };
+        return 0.5_rt*inv_dz * ( (1._rt - 2._rt*ax)*dfz(i) + ax*(dfz(i+1) + dfz(i-1)) );
     }
 #endif
 
