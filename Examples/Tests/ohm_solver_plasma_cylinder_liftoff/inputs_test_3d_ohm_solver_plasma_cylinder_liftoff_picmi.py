@@ -540,8 +540,9 @@ def main():
         action=argparse.BooleanOptionalAction,
         default=None,
         help="corner-curl isotropization of the resistive diffusion. "
-        "Default: OFF on staggered (cuts late m=4, deepens the implosion), "
-        "ON on collocated.",
+        "Default ON (both grids): the all-operators A/B (with the #7040 "
+        "isotropized grad Pe in the set) cut peak rho m4/m0 to 0.053 "
+        "collocated / 0.145 Yee vs the 0.344 / 0.466 baselines.",
     )
     parser.add_argument(
         "--isotropic-hyper",
@@ -549,17 +550,18 @@ def main():
         action=argparse.BooleanOptionalAction,
         default=None,
         help="isotropic Mehrstellen/Patra-Karttunen hyper-resistivity "
-        "Laplacian. Default: OFF on staggered, ON on collocated.",
+        "Laplacian. Default ON (both grids; see --isotropic-resistivity).",
     )
     parser.add_argument(
         "--isotropic-gradient",
         dest="isotropic_gradient",
         action=argparse.BooleanOptionalAction,
-        default=False,
+        default=None,
         help="transverse-smoothed (isotropized) electron-pressure gradient "
         "(PR #7040); removes the cos(4*theta) modulation of |grad Pe| that "
-        "feeds the particle push. Default off on both grids pending the "
-        "liftoff A/B below.",
+        "feeds the particle push. Default ON (both grids; measured the "
+        "decisive piece of the all-operators m=4 reduction, and the "
+        "operator that finally makes isotropization a net win on Yee).",
     )
     parser.add_argument(
         "--nz",
@@ -800,17 +802,22 @@ def main():
     # the charge-conserving Esirkepov deposition (keeps the current sheet
     # coherent: div J_i consistent with d(rho)/dt discretely; aborts on
     # collocated, which uses direct), the level-set wall treatment (straight
-    # mirror + component-center update masks), the cell-sampled holmstrom
-    # switch with the p1w4 blend (the seam regularization), and anisotropic
-    # (plain) resistive stencils; collocated keeps the isotropized stencils
-    # and its conformal wall.
+    # mirror + component-center update masks), and the cell-sampled holmstrom
+    # switch with the p1w4 blend (the seam regularization); collocated keeps
+    # its conformal wall. BOTH grids now default to the full isotropized
+    # operator set (resistivity corner-curl, hyper-resistivity Laplacian, and
+    # the #7040 grad Pe): the all-operators n=128 A/B cut peak rho m4/m0 to
+    # 0.053 collocated / 0.145 Yee vs the 0.344 / 0.466 baselines (the old
+    # staggered OFF default predated the isotropized gradient).
     staggered = args.grid_type == "staggered"
     if args.deposition is None:
         args.deposition = "esirkepov" if staggered else "direct"
     if args.isotropic_resistivity is None:
-        args.isotropic_resistivity = not staggered
+        args.isotropic_resistivity = True
     if args.isotropic_hyper is None:
-        args.isotropic_hyper = not staggered
+        args.isotropic_hyper = True
+    if args.isotropic_gradient is None:
+        args.isotropic_gradient = True
     if args.eb_b_straight_mirror is None:
         args.eb_b_straight_mirror = staggered
     if args.holmstrom_switch_mode is None:
