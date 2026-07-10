@@ -51,6 +51,23 @@ class constants:
 picmistandard.register_constants(constants)
 
 
+def _set_refined_region_inputs(refined_regions):
+    if refined_regions:
+        assert len(refined_regions) == 1, Exception(
+            "WarpX only supports one refined region."
+        )
+        assert refined_regions[0][0] == 1, Exception(
+            "The one refined region can only be level 1"
+        )
+        pywarpx.amr.max_level = 1
+        pywarpx.warpx.fine_tag_lo = refined_regions[0][1]
+        pywarpx.warpx.fine_tag_hi = refined_regions[0][2]
+        if len(refined_regions[0]) == 4:
+            pywarpx.amr.ref_ratio_vect = refined_regions[0][3]
+    else:
+        pywarpx.amr.max_level = 0
+
+
 class Species(picmistandard.PICMI_Species):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
@@ -1102,19 +1119,7 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
@@ -1217,19 +1222,7 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
@@ -1353,19 +1346,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
@@ -1510,19 +1491,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
@@ -2382,7 +2351,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of the
         cross stencil, removing the fourfold (cos 4*theta) anisotropy of
         its damping rate (fully isotropic on cubic cells; Cartesian
-        geometries).
+        geometries; near an embedded boundary the hybrid EB fill layer
+        maintains the wide stencil reads).
 
     isotropic_resistivity: bool, default=False
         Add an isotropizing corner-curl correction to the resistive electric
@@ -2392,6 +2362,23 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         mode. Applied through E, so the Faraday curl is unchanged and div(B)
         stays exactly zero (Cartesian geometries; the RZ resistive operator
         is axisymmetric and has no such anisotropy).
+
+    isotropic_gradient: bool, default=False
+        Evaluate the electron-pressure gradient in Ohm's law with the
+        transverse-smoothed (isotropized) staggered difference instead of
+        the plain two-point stencil, removing the cos 4*theta anisotropy of
+        |grad Pe| (fully isotropic on cubic cells; Cartesian geometries).
+        Only affects the E used for the particle push and diagnostics: the
+        Faraday/B-integration path omits grad(Pe) entirely, which is also
+        what keeps the (only O(h^2)-small, not identically zero) discrete
+        curl of the isotropized gradient out of the B update.
+
+    isotropic_eb_compact_fallback: bool, default=False
+        Near an embedded boundary, fall back per point from the isotropic
+        stencils to the standard compact ones within a corner reach of the
+        level set. Defaults to off here because the hybrid EB boundary layer
+        mirror-fills the wide-stencil bands to the diagonal reach, keeping
+        the reads valid near the wall; opt back in for A/B isolation.
 
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
@@ -2474,6 +2461,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         dive_seam_band=None,
         isotropic_hyper_resistivity=None,
         isotropic_resistivity=None,
+        isotropic_gradient=None,
+        isotropic_eb_compact_fallback=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2527,6 +2516,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.dive_seam_band = dive_seam_band
         self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
         self.isotropic_resistivity = isotropic_resistivity
+        self.isotropic_gradient = isotropic_gradient
+        self.isotropic_eb_compact_fallback = isotropic_eb_compact_fallback
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2610,6 +2601,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             self.isotropic_hyper_resistivity
         )
         pywarpx.hybridpicmodel.isotropic_resistivity = self.isotropic_resistivity
+        pywarpx.hybridpicmodel.isotropic_gradient = self.isotropic_gradient
+        pywarpx.hybridpicmodel.isotropic_eb_compact_fallback = (
+            self.isotropic_eb_compact_fallback
+        )
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(

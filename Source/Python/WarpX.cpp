@@ -350,39 +350,6 @@ void init_WarpX (py::module& m)
             "scalar field (rho_fp or hybrid_electron_pressure_fp): odd "
             "(Dirichlet 0 at the surface) or even (Neumann)."
         )
-        .def("hybrid_solve_e",
-            [](WarpX& wx, bool const solve_for_faraday) {
-                using warpx::fields::FieldType;
-                auto* hybrid = wx.get_pointer_HybridPICModel();
-                if (hybrid == nullptr) {
-                    throw std::runtime_error("hybrid_solve_e requires the hybrid solver");
-                }
-                // the in-step path guarantees ghost-fresh inputs; fields
-                // poked through the wrappers only hold valid data
-                for (int lev = 0; lev <= wx.finestLevel(); ++lev) {
-                    const auto& period = wx.Geom(lev).periodicity();
-                    for (auto ft : {FieldType::hybrid_current_fp_plasma,
-                                    FieldType::current_fp, FieldType::Bfield_fp}) {
-                        for (auto* mf : wx.m_fields.get_alldirs(ft, lev)) {
-                            mf->FillBoundary(period);
-                        }
-                    }
-                    wx.m_fields.get(FieldType::rho_fp, lev)->FillBoundary(period);
-                }
-                hybrid->HybridPICSolveE(
-                    wx.m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, wx.finestLevel()),
-                    wx.m_fields.get_mr_levels_alldirs(FieldType::current_fp, wx.finestLevel()),
-                    wx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, wx.finestLevel()),
-                    wx.m_fields.get_mr_levels(FieldType::rho_fp, wx.finestLevel()),
-                    wx.GetEBUpdateEFlag(), solve_for_faraday);
-            },
-            py::arg("solve_for_faraday") = true,
-            "Evaluate the hybrid Ohm's-law E solve on the registered fields "
-            "(Efield_fp from current_fp/Bfield_fp/rho_fp and the registered "
-            "plasma current and electron pressure), including the resistive "
-            "and hyper-resistive terms when solve_for_faraday is True (unit "
-            "tests of the Ohm's-law stencils)."
-        )
         .def("hybrid_calculate_plasma_current",
             [](WarpX& wx) {
                 using warpx::fields::FieldType;
@@ -504,6 +471,41 @@ void init_WarpX (py::module& m)
                 return wx.get_pointer_HybridPICModel()->m_n_floor;
             },
             "Gets the number of substeps to take in the hybrid solver."
+        )
+        .def("hybrid_solve_e",
+            [](WarpX& wx, bool const solve_for_faraday) {
+                using warpx::fields::FieldType;
+                auto* hybrid = wx.get_pointer_HybridPICModel();
+                if (hybrid == nullptr) {
+                    throw std::runtime_error("hybrid_solve_e requires the hybrid solver");
+                }
+                // the in-step path guarantees ghost-fresh inputs; fields
+                // poked through the wrappers only hold valid data
+                for (int lev = 0; lev <= wx.finestLevel(); ++lev) {
+                    const auto& period = wx.Geom(lev).periodicity();
+                    for (auto ft : {FieldType::hybrid_current_fp_plasma,
+                                    FieldType::current_fp, FieldType::Bfield_fp}) {
+                        for (auto* mf : wx.m_fields.get_alldirs(ft, lev)) {
+                            mf->FillBoundary(period);
+                        }
+                    }
+                    wx.m_fields.get(FieldType::rho_fp, lev)->FillBoundary(period);
+                    wx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev)
+                        ->FillBoundary(period);
+                }
+                hybrid->HybridPICSolveE(
+                    wx.m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, wx.finestLevel()),
+                    wx.m_fields.get_mr_levels_alldirs(FieldType::current_fp, wx.finestLevel()),
+                    wx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, wx.finestLevel()),
+                    wx.m_fields.get_mr_levels(FieldType::rho_fp, wx.finestLevel()),
+                    wx.GetEBUpdateEFlag(), solve_for_faraday);
+            },
+            py::arg("solve_for_faraday") = true,
+            "Evaluate the hybrid Ohm's-law E solve on the registered fields "
+            "(Efield_fp from current_fp/Bfield_fp/rho_fp and the registered "
+            "plasma current and electron pressure), including the resistive "
+            "and hyper-resistive terms when solve_for_faraday is True (unit "
+            "tests of the Ohm's-law stencils)."
         )
     ;
 

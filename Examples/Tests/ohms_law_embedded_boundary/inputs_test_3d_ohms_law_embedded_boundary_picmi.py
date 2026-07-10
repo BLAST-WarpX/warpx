@@ -32,7 +32,6 @@
 # --- interpolated normals and uses sign/containment assertions.
 
 import argparse
-import os
 import sys
 
 import numpy as np
@@ -55,9 +54,6 @@ X_WALL = LO + (X_WALL_NODE + X_WALL_OFFSET) * H
 
 R_WALL = 0.8  # cylinder variant
 
-ETA_H = 1.0  # constant hyper-resistivity of the stencil battery
-ETA_R = 1.0  # constant resistivity of the resistive-stencil battery
-
 # mirror geometry of the fill operators (EBJBoundary.cpp)
 D_IMG_MIN = 0.5 * H
 
@@ -73,11 +69,7 @@ def scalar_ratio(s):
     return s / max(abs(s), D_IMG_MIN)
 
 
-def setup_simulation(geometry, hyper=False, resistive=False, grid_type="staggered"):
-    # The hyper and resistive batteries need a single box: the species-free
-    # deck allocates the plasma current with zero ghost cells, so the
-    # isotropization stencils must not straddle a box seam.
-    single_box = hyper or resistive
+def setup_simulation(geometry, grid_type="staggered"):
     grid = picmi.Cartesian3DGrid(
         number_of_cells=[N_XY, N_XY, N_Z],
         lower_bound=[LO, LO, -N_Z * H / 2],
@@ -87,7 +79,7 @@ def setup_simulation(geometry, hyper=False, resistive=False, grid_type="staggere
         lower_boundary_conditions_particles=["absorbing", "periodic", "periodic"],
         upper_boundary_conditions_particles=["absorbing", "periodic", "periodic"],
         warpx_max_grid_size=2048,
-        warpx_max_grid_size_x=2048 if single_box else N_XY // 2,
+        warpx_max_grid_size_x=N_XY // 2,
         warpx_blocking_factor=8,
     )
 
@@ -106,13 +98,7 @@ def setup_simulation(geometry, hyper=False, resistive=False, grid_type="staggere
         Te=0.0,
         n0=1.0e18,
         n_floor=1.0e16,
-        # the hyper battery isolates the hyper-resistive term
-        # (E = -eta_h*nabla^2 J); the resistive battery isolates the resistive
-        # term (E = eta*J) with the corner-curl isotropization on.
-        plasma_resistivity=(ETA_R if resistive else (0.0 if hyper else 1.0e-6)),
-        plasma_hyper_resistivity=ETA_H if hyper else None,
-        isotropic_resistivity=resistive,
-        isotropic_hyper_resistivity=hyper,
+        plasma_resistivity=1.0e-6,
         substeps=4,
         # The staggered batteries deliberately exercise the always-on staircase
         # EB fills (their gates assert that path), so the conformal wall
@@ -616,299 +602,10 @@ def run_cylinder_battery(sim):
 
 
 # ----------------------------------------------------------------------------
-# Transitional Marder battery (planar wall; ports the four Phoenix
-# transitional-Marder unit tests plus a target-mode consistency check)
-# ----------------------------------------------------------------------------
-def run_hyper_battery(sim):
-    wx = sim.extension.warpx
-    ck = CheckSet()
-
-    rho = fields.RhoFPWrapper()
-    r = np.asarray(rho[...])
-    rho[...] = np.full(r.shape, 100.0 * 1.0e16 * constants.q_e)
-    for w in (
-        fields.BxFPWrapper(),
-        fields.ByFPWrapper(),
-        fields.BzFPWrapper(),
-        fields.JxFPWrapper(),
-        fields.JyFPWrapper(),
-        fields.JzFPWrapper(),
-        fields.JxFPPlasmaWrapper(),
-        fields.JyFPPlasmaWrapper(),
-        fields.JzFPPlasmaWrapper(),
-    ):
-        w[...] = 0.0
-
-    Jpz = fields.JzFPPlasmaWrapper()
-    Ez = fields.EzFPWrapper()
-
-    # numpy mirrors of the two stencils (y and z are periodic, so np.roll is
-    # exact there; comparisons stay on an interior x slab away from the wall)
-    def d2(a, ax):
-        return np.roll(a, -1, ax) - 2.0 * a + np.roll(a, 1, ax)
-
-    def lap_cross(a):
-        return (d2(a, 0) + d2(a, 1) + d2(a, 2)) / H**2
-
-    def lap_iso(a):
-        cxy = d2(d2(a, 0), 1)
-        cxz = d2(d2(a, 0), 2)
-        cyz = d2(d2(a, 1), 2)
-        txyz = d2(cxy, 2)
-        return lap_cross(a) + (cxy + cxz + cyz) / (6.0 * H**2) + txyz / (30.0 * H**2)
-
-    interior = (slice(4, 21), slice(2, 31), slice(None))
-
-    # --- 1) stencil exactness on a random field ---------------------------
-    rng = np.random.RandomState(2024)
-    jz = rng.rand(*np.asarray(Jpz[...]).shape) - 0.5
-    Jpz[...] = jz
-    wx.hybrid_solve_e(True)
-    ez = np.asarray(Ez[...])
-    expected = -ETA_H * lap_iso(jz)
-    scale = float(np.max(np.abs(expected[interior])))
-    ck.close(
-        "hyper: solver matches the 27-point Patra-Karttunen closed form",
-        ez[interior] / scale,
-        expected[interior] / scale,
-        1e-12,
-    )
-    d_cross = float(
-        np.max(np.abs(ez[interior] + ETA_H * lap_cross(jz)[interior])) / scale
-    )
-    ck.expect(
-        "hyper: result differs from the cross stencil (teeth)",
-        d_cross > 1e-3,
-        f"rel dev from cross = {d_cross:.3e}",
-    )
-
-    # --- 2) consistency: exact on quadratics (laplacian of x^2 is 2) ------
-    # (x only: the periodic y/z ghost wrap would corrupt y^2/z^2 stencils)
-    shape = np.asarray(Jpz[...]).shape
-    xn = LO + np.arange(shape[0]) * H
-    yn = LO + np.arange(shape[1]) * H
-    zc = (np.arange(shape[2]) + 0.5) * H - N_Z * H / 2
-    X, Y, Z = np.meshgrid(xn, yn, zc, indexing="ij")
-    Jpz[...] = X**2
-    wx.hybrid_solve_e(True)
-    ez = np.asarray(Ez[...])
-    ck.close(
-        "hyper: exact on quadratics (laplacian of x^2 is 2)",
-        ez[interior],
-        -ETA_H * 2.0,
-        1e-9,
-    )
-
-    # --- 3) isotropization demonstration: plane-wave damping rates --------
-    # cos(k.x) is an exact eigenfunction of every translation-invariant
-    # stencil, so the discrete damping rate lambda(k) = -L(F)/F is read off
-    # pointwise with no quadrature. The cross stencil's rate differs between
-    # axis-aligned and diagonal k of equal magnitude at O((kh)^2) - the
-    # cos(4*theta) anisotropy that squares diffusing fields - while the
-    # isotropic stencil cancels that term.
-    kmag = 1.0 / H  # kh = 1
-
-    def solver_rate(j_field):
-        Jpz[...] = j_field
-        wx.hybrid_solve_e(True)
-        lam = (np.asarray(Ez[...]) / (ETA_H * j_field))[interior]
-        return float(np.median(lam[np.abs(j_field[interior]) > 0.5]))
-
-    def stencil_rate(lap, j_field):
-        lam = (-lap(j_field) / j_field)[interior]
-        return float(np.median(lam[np.abs(j_field[interior]) > 0.5]))
-
-    j_axis = np.cos(kmag * X)
-    j_diag = np.cos(kmag * (X + Y) / np.sqrt(2.0))
-
-    lam_axis = solver_rate(j_axis)
-    lam_diag = solver_rate(j_diag)
-    aniso_iso = abs(lam_axis - lam_diag) / kmag**2
-    aniso_cross = (
-        abs(stencil_rate(lap_cross, j_axis) - stencil_rate(lap_cross, j_diag)) / kmag**2
-    )
-    aniso_iso_np = (
-        abs(stencil_rate(lap_iso, j_axis) - stencil_rate(lap_iso, j_diag)) / kmag**2
-    )
-    ratio = aniso_iso / max(aniso_cross, 1e-300)
-    ck.expect(
-        "hyper: solver anisotropy equals the isotropic closed form",
-        abs(aniso_iso - aniso_iso_np) <= 1e-10,
-        f"|solver - numpy| = {abs(aniso_iso - aniso_iso_np):.3e}",
-    )
-    ck.expect(
-        "hyper: axis/diagonal damping anisotropy suppressed (>= 4x at kh=1)",
-        ratio < 0.25,
-        f"aniso(iso)/aniso(cross) = {ratio:.4f} "
-        f"(cross = {aniso_cross:.4f} k^2, iso = {aniso_iso:.5f} k^2)",
-    )
-
-    ck.finish()
-
-
-# ----------------------------------------------------------------------------
-# Resistive isotropization battery: the corner-curl correction added to the
-# resistive E makes the standard Faraday curl emit the in-plane Mehrstellen
-# Laplacian of the out-of-plane B (Bz), cancelling the cross-stencil
-# cos(4*theta) anisotropy that drives the grid m=4. Validated by isolating
-# the correction (ion current set to zero so the base eta*J term vanishes):
-# curl_up(E) must equal -(eta/mu0)*corner(Bz) to round-off, the emergent
-# operator (cross + corner) must be isotropic, div(B) must stay zero, and the
-# correction must vanish for fields with no mixed 4th difference.
-# ----------------------------------------------------------------------------
-def run_resistive_battery(sim):
-    wx = sim.extension.warpx
-    ck = CheckSet()
-    mu0 = constants.mu0
-
-    rho = fields.RhoFPWrapper()
-    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
-    for w in (
-        fields.JxFPWrapper(),
-        fields.JyFPWrapper(),
-        fields.JzFPWrapper(),
-        fields.JxFPPlasmaWrapper(),
-        fields.JyFPPlasmaWrapper(),
-        fields.JzFPPlasmaWrapper(),
-        fields.BxFPWrapper(),
-        fields.ByFPWrapper(),
-        fields.ExFPWrapper(),
-        fields.EyFPWrapper(),
-        fields.EzFPWrapper(),
-    ):
-        w[...] = 0.0
-
-    Bz = fields.BzFPWrapper()
-    shp = np.asarray(Bz[...]).shape  # Bz: cc x, cc y, node z
-    # common crop box (Ex,Ey,Bz have different staggered shapes); asserts use
-    # the deep interior only, so cropping + periodic roll is safe there
-    NC = (N_XY, N_XY, N_Z + 1)
-
-    def crop(a):
-        return np.asarray(a)[: NC[0], : NC[1], : NC[2]]
-
-    def set_bz(prof2d):
-        Bz[...] = np.broadcast_to(prof2d[:, :, None], shp).copy()
-
-    def solve_corr():
-        # ion current is zero, so E holds only the corner-curl correction
-        wx.hybrid_solve_e(True)
-        return crop(fields.ExFPWrapper()[...]), crop(fields.EyFPWrapper()[...])
-
-    h = H
-
-    def d2(a, ax):
-        return np.roll(a, -1, ax) - 2.0 * a + np.roll(a, 1, ax)
-
-    def upx(F):
-        return (np.roll(F, -1, 0) - F) / h
-
-    def upy(F):
-        return (np.roll(F, -1, 1) - F) / h
-
-    def dnx(F):
-        return (F - np.roll(F, 1, 0)) / h
-
-    ii = (slice(4, 20), slice(4, 20), slice(2, 4))
-
-    # --- 1) the correction's Faraday curl is the Mehrstellen corner ---------
-    rng = np.random.RandomState(7)
-    bz = rng.rand(shp[0], shp[1]) - 0.5
-    set_bz(bz)
-    Ex, Ey = solve_corr()
-    bz3 = np.broadcast_to(bz[:, :, None], shp)[: NC[0], : NC[1], : NC[2]]
-    corner = (1.0 / (6.0 * h * h)) * d2(
-        d2(bz3, 0), 1
-    )  # cubic in-plane Mehrstellen corner
-    curlz = upx(Ey) - upy(Ex)  # curl_up(E)_z
-    expected = -(ETA_R / mu0) * corner
-    scale = float(np.max(np.abs(expected[ii])))
-    ck.close(
-        "resistive: Faraday curl of the correction is the in-plane corner",
-        curlz[ii] / scale,
-        expected[ii] / scale,
-        1e-12,
-    )
-
-    # --- 2) emergent operator (cross + corner) is isotropic; teeth ----------
-    # the total resistive diffusion is (eta/mu0)(lap_cross + corner) = lap_iso
-    lap_cross = (d2(bz3, 0) + d2(bz3, 1)) / h**2
-    lap_iso = lap_cross + (1.0 / (6.0 * h * h)) * d2(d2(bz3, 0), 1)
-    emergent = lap_cross - (mu0 / ETA_R) * curlz  # = lap_cross + corner_measured
-    ck.close(
-        "resistive: emergent operator equals the isotropic Laplacian",
-        emergent[ii],
-        lap_iso[ii],
-        1e-9 * float(np.max(np.abs(lap_iso[ii]))),
-    )
-    teeth = float(np.max(np.abs(emergent[ii] - lap_cross[ii])))
-    ck.expect(
-        "resistive: differs from the cross stencil (teeth)",
-        teeth > 1e-3 * float(np.max(np.abs(lap_cross[ii]))),
-        f"max|iso-cross|={teeth:.3e}",
-    )
-
-    # --- 3) div(B) preserved exactly (correction enters only through E) -----
-    # div_down(curl_up E) is structurally zero; verify numerically on Bz curl
-    divb = dnx(upx(Ey) - upy(Ex))  # contribution of corrected dBz to div via z-face
-    # full discrete div of the Faraday increment of B from this E:
-    # dBz = -dt curl_up(E)_z (only Bz changes here); div_down(dB) reduces to
-    # dnz(dBz) which is zero for z-independent dBz -> check round-off
-    ck.expect(
-        "resistive: div(B) increment is round-off",
-        float(np.max(np.abs(np.roll(curlz, -1, 2)[ii] - curlz[ii]))) < 1e-6 * scale * h,
-        "z-uniform dBz keeps div(B)=0",
-    )
-    del divb
-
-    # --- 4) plane-wave anisotropy of the emergent operator suppressed -------
-    xc = (np.arange(NC[0]) + 0.5) * h + LO
-    yc = (np.arange(NC[1]) + 0.5) * h + LO
-    X, Y = np.meshgrid(xc, yc, indexing="ij")
-    kmag = 1.0 / h
-
-    def rate_axis_diag(lap_fn):
-        ja = np.cos(kmag * X)
-        jd = np.cos(kmag * (X + Y) / np.sqrt(2.0))
-        ja3 = np.broadcast_to(ja[:, :, None], NC)
-        jd3 = np.broadcast_to(jd[:, :, None], NC)
-        la = (-lap_fn(ja3) / ja3)[ii]
-        ld = (-lap_fn(jd3) / jd3)[ii]
-        return abs(float(np.median(la)) - float(np.median(ld))) / kmag**2
-
-    def lap_cross_fn(a):
-        return (d2(a, 0) + d2(a, 1)) / h**2
-
-    def lap_iso_fn(a):
-        return lap_cross_fn(a) + (1.0 / (6.0 * h * h)) * d2(d2(a, 0), 1)
-
-    a_cross = rate_axis_diag(lap_cross_fn)
-    a_iso = rate_axis_diag(lap_iso_fn)
-    ck.expect(
-        "resistive: axis/diagonal damping anisotropy suppressed (>= 4x at kh=1)",
-        a_iso < 0.25 * a_cross,
-        f"aniso(iso)/aniso(cross)={a_iso / max(a_cross, 1e-300):.4f}",
-    )
-
-    # --- 5) pure truncation canceller: zero on quadratics -------------------
-    set_bz(X**2)
-    Ex, Ey = solve_corr()
-    ck.close(
-        "resistive: correction vanishes on quadratics",
-        np.asarray(Ex)[ii],
-        0.0,
-        1e-9 * float(np.max(np.abs(np.asarray(Ex)))) + 1e-12,
-    )
-
-    ck.finish()
-
-
-# ----------------------------------------------------------------------------
-# Collocated (nodal) batteries. On a collocated grid every field component lives
+# Collocated (nodal) battery. On a collocated grid every field component lives
 # at the mesh node, so the conformal embedded boundary uses the masked nodal
-# Faraday update with the level-set mirror BC, and the isotropization operators
-# use their nodal (centered, "wide") stencils. These batteries mirror the Yee
-# ones above but with the nodal closed forms.
+# Faraday update with the level-set mirror BC. Mirrors the Yee battery above
+# with the nodal closed forms.
 # ----------------------------------------------------------------------------
 def run_eb_collocated_battery(sim):
     """Planar-wall level-set mirror BC on a fully-nodal E field: tangential odd,
@@ -1000,207 +697,6 @@ def _nodal_interior_z():
     return slice(2, max(3, N_Z - 1))
 
 
-def run_hyper_collocated_battery(sim):
-    """Nodal iso-hyper: E == -eta_h*lap_iso(Jz) (27-pt Patra-Karttunen) to
-    round-off, differs from the cross stencil, axis/diagonal anisotropy killed."""
-    wx = sim.extension.warpx
-    ck = CheckSet()
-
-    rho = fields.RhoFPWrapper()
-    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
-    for w in (
-        fields.BxFPWrapper(),
-        fields.ByFPWrapper(),
-        fields.BzFPWrapper(),
-        fields.JxFPWrapper(),
-        fields.JyFPWrapper(),
-        fields.JzFPWrapper(),
-        fields.JxFPPlasmaWrapper(),
-        fields.JyFPPlasmaWrapper(),
-        fields.JzFPPlasmaWrapper(),
-    ):
-        w[...] = 0.0
-    Jpz = fields.JzFPPlasmaWrapper()
-    Ez = fields.EzFPWrapper()
-
-    def d2(a, ax):
-        return np.roll(a, -1, ax) - 2.0 * a + np.roll(a, 1, ax)
-
-    def lap_cross(a):
-        return (d2(a, 0) + d2(a, 1) + d2(a, 2)) / H**2
-
-    def lap_iso(a):
-        cxy = d2(d2(a, 0), 1)
-        cxz = d2(d2(a, 0), 2)
-        cyz = d2(d2(a, 1), 2)
-        txyz = d2(cxy, 2)
-        return lap_cross(a) + (cxy + cxz + cyz) / (6.0 * H**2) + txyz / (30.0 * H**2)
-
-    interior = (slice(4, 21), slice(2, 31), _nodal_interior_z())
-    rng = np.random.RandomState(2024)
-    jz = rng.rand(*np.asarray(Jpz[...]).shape) - 0.5
-    Jpz[...] = jz
-    wx.hybrid_solve_e(True)
-    ez = np.asarray(Ez[...])
-    expected = -ETA_H * lap_iso(jz)
-    scale = float(np.max(np.abs(expected[interior])))
-    ck.close(
-        "nodal hyper: matches 27-pt Patra-Karttunen closed form",
-        ez[interior] / scale,
-        expected[interior] / scale,
-        1e-12,
-    )
-    d_cross = float(
-        np.max(np.abs(ez[interior] + ETA_H * lap_cross(jz)[interior])) / scale
-    )
-    ck.expect(
-        "nodal hyper: differs from the cross stencil (teeth)",
-        d_cross > 1e-3,
-        f"rel dev = {d_cross:.3e}",
-    )
-
-    # plane-wave anisotropy suppression
-    shape = np.asarray(Jpz[...]).shape
-    xn = LO + np.arange(shape[0]) * H
-    yn = LO + np.arange(shape[1]) * H
-    zc = (np.arange(shape[2]) + 0.5) * H - N_Z * H / 2
-    X, Y, Z = np.meshgrid(xn, yn, zc, indexing="ij")
-    kmag = 1.0 / H
-
-    def solver_rate(jf):
-        Jpz[...] = jf
-        wx.hybrid_solve_e(True)
-        lam = (np.asarray(Ez[...]) / (ETA_H * jf))[interior]
-        return float(np.median(lam[np.abs(jf[interior]) > 0.5]))
-
-    def stencil_rate(lap, jf):
-        lam = (-lap(jf) / jf)[interior]
-        return float(np.median(lam[np.abs(jf[interior]) > 0.5]))
-
-    ja = np.cos(kmag * X)
-    jd = np.cos(kmag * (X + Y) / np.sqrt(2.0))
-    aniso_iso = abs(solver_rate(ja) - solver_rate(jd)) / kmag**2
-    aniso_cross = (
-        abs(stencil_rate(lap_cross, ja) - stencil_rate(lap_cross, jd)) / kmag**2
-    )
-    ck.expect(
-        "nodal hyper: axis/diagonal damping anisotropy suppressed (>= 4x at kh=1)",
-        aniso_iso < 0.25 * aniso_cross,
-        f"aniso(iso)/aniso(cross) = {aniso_iso / max(aniso_cross, 1e-300):.4f}",
-    )
-
-    ck.finish()
-
-
-def run_resistive_collocated_battery(sim):
-    """Nodal iso-resistivity corner-curl: with all currents zero the solver E is
-    only the corner correction; it matches the derived nodal stencil to round-off,
-    the emergent operator is isotropic, and it vanishes on quadratics."""
-    wx = sim.extension.warpx
-    ck = CheckSet()
-    mu0 = constants.mu0
-
-    rho = fields.RhoFPWrapper()
-    rho[...] = np.full(np.asarray(rho[...]).shape, 100.0 * 1.0e16 * constants.q_e)
-    for w in (
-        fields.JxFPWrapper(),
-        fields.JyFPWrapper(),
-        fields.JzFPWrapper(),
-        fields.JxFPPlasmaWrapper(),
-        fields.JyFPPlasmaWrapper(),
-        fields.JzFPPlasmaWrapper(),
-        fields.BxFPWrapper(),
-        fields.ByFPWrapper(),
-        fields.ExFPWrapper(),
-        fields.EyFPWrapper(),
-        fields.EzFPWrapper(),
-    ):
-        w[...] = 0.0
-    Bz = fields.BzFPWrapper()
-    shp = np.asarray(Bz[...]).shape
-
-    def set_bz(prof2d):
-        Bz[...] = np.broadcast_to(prof2d[:, :, None], shp).copy()
-
-    def Dn(F, ax):
-        return (np.roll(F, -1, ax) - np.roll(F, 1, ax)) / (2.0 * H)
-
-    def d2(F, ax):
-        return np.roll(F, -1, ax) - 2.0 * F + np.roll(F, 1, ax)
-
-    ii = (slice(5, 20), slice(5, 28), _nodal_interior_z())
-
-    rng = np.random.RandomState(7)
-    bz2 = rng.rand(shp[0], shp[1]) - 0.5
-    set_bz(bz2)
-    wx.hybrid_solve_e(True)
-    Ex = np.asarray(fields.ExFPWrapper()[...])
-    Ey = np.asarray(fields.EyFPWrapper()[...])
-    bz3 = np.broadcast_to(bz2[:, :, None], shp)
-    Ex_expect = ETA_R * (1.0 / mu0) * (1.0 / 3.0) * Dn(d2(bz3, 0), 1)
-    Ey_expect = -ETA_R * (1.0 / mu0) * (1.0 / 3.0) * Dn(d2(bz3, 1), 0)
-    sx = float(np.max(np.abs(Ex_expect[ii]))) + 1e-300
-    sy = float(np.max(np.abs(Ey_expect[ii]))) + 1e-300
-    ck.close(
-        "nodal resistive: Ex matches the derived corner stencil",
-        Ex[ii] / sx,
-        Ex_expect[ii] / sx,
-        1e-12,
-    )
-    ck.close(
-        "nodal resistive: Ey matches the derived corner stencil",
-        Ey[ii] / sy,
-        Ey_expect[ii] / sy,
-        1e-12,
-    )
-
-    # emergent operator (wide cross + corner) isotropic vs the uncorrected cross
-    xs = np.arange(shp[0]) * H
-    ys = np.arange(shp[1]) * H
-    X, Y = np.meshgrid(xs, ys, indexing="ij")
-    kmag = 1.0 / H
-
-    def wide_cross(F):
-        return Dn(Dn(F, 0), 0) + Dn(Dn(F, 1), 1)
-
-    def emergent_rate(prof2d):
-        set_bz(prof2d)
-        wx.hybrid_solve_e(True)
-        ex = np.asarray(fields.ExFPWrapper()[...])
-        ey = np.asarray(fields.EyFPWrapper()[...])
-        b3 = np.broadcast_to(prof2d[:, :, None], shp)
-        op = wide_cross(b3) + (mu0 / ETA_R) * (Dn(ex, 1) - Dn(ey, 0))
-        lam = (op / b3)[ii]
-        return float(np.median(lam[np.abs(b3[ii]) > 0.5]))
-
-    def wide_rate(prof2d):
-        b3 = np.broadcast_to(prof2d[:, :, None], shp)
-        lam = (wide_cross(b3) / b3)[ii]
-        return float(np.median(lam[np.abs(b3[ii]) > 0.5]))
-
-    ja = np.cos(kmag * X)
-    jd = np.cos(kmag * (X + Y) / np.sqrt(2.0))
-    aniso_iso = abs(emergent_rate(ja) - emergent_rate(jd)) / kmag**2
-    aniso_cross = abs(wide_rate(ja) - wide_rate(jd)) / kmag**2
-    ck.expect(
-        "nodal resistive: axis/diagonal anisotropy suppressed (>= 4x at kh=1)",
-        aniso_iso < 0.25 * aniso_cross,
-        f"aniso(iso)/aniso(cross) = {aniso_iso / max(aniso_cross, 1e-300):.4f}",
-    )
-
-    set_bz(X**2)
-    wx.hybrid_solve_e(True)
-    ex = np.asarray(fields.ExFPWrapper()[...])
-    ck.close(
-        "nodal resistive: correction vanishes on quadratics",
-        ex[ii],
-        0.0,
-        1e-9 * float(np.max(np.abs(ex))) + 1e-12,
-    )
-
-    ck.finish()
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1211,75 +707,28 @@ def main():
     )
     parser.add_argument(
         "--battery",
-        choices=["eb", "hyper", "resistive", "stencils"],
+        choices=["eb"],
         default="eb",
-        help="which unit battery to run (eb fills/folds, the isotropized "
-        "hyper-resistivity stencil, or the isotropized resistive-diffusion "
-        "corner-curl); 'stencils' runs the hyper and resistive batteries "
-        "as two subprocess children (they need different simulation "
-        "setups, and WarpX initializes once per process)",
+        help="which unit battery to run (the isotropized-stencil batteries "
+        "moved to Examples/Tests/ohm_solver_isotropic_operators with the "
+        "standalone isotropic-operators PR)",
     )
     parser.add_argument(
         "--grid-type",
         choices=["staggered", "collocated"],
         default="staggered",
-        help="grid staggering; the collocated batteries exercise the nodal "
-        "conformal-EB path (masked nodal Faraday + level-set BC) and the nodal "
-        "isotropization stencils",
+        help="grid staggering; the collocated battery exercises the nodal "
+        "conformal-EB path (masked nodal Faraday + level-set BC)",
     )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
-    if args.battery == "stencils":
-        # The hyper and resistive batteries configure the solver differently
-        # (each isolates its own term), and WarpX initializes once per
-        # process: run each as a fresh singleton child, scrubbing the MPI
-        # launcher environment like the staggered-abort test so the child
-        # does not try to join the parent's MPI job.
-        import subprocess
-
-        launcher_prefixes = ("PMI_", "PMIX_", "HYDRA_", "HYDI_", "OMPI_", "PRTE_")
-        env = {
-            k: v for k, v in os.environ.items() if not k.startswith(launcher_prefixes)
-        }
-        for battery in ("hyper", "resistive"):
-            cmd = [
-                sys.executable,
-                os.path.abspath(__file__),
-                "--geometry",
-                args.geometry,
-                "--grid-type",
-                args.grid_type,
-                "--battery",
-                battery,
-            ]
-            result = subprocess.run(cmd, env=env, check=False)
-            assert result.returncode == 0, f"{battery} battery failed"
-            print(f"[stencils] {battery} battery passed")
-        return
-
-    sim = setup_simulation(
-        args.geometry,
-        hyper=(args.battery == "hyper"),
-        resistive=(args.battery == "resistive"),
-        grid_type=args.grid_type,
-    )
+    sim = setup_simulation(args.geometry, grid_type=args.grid_type)
 
     if args.grid_type == "collocated":
-        # Collocated batteries use the nodal closed forms (the planar wall makes
-        # the level-set geometry analytic; the isotropization checks are interior).
-        if args.battery == "resistive":
-            run_resistive_collocated_battery(sim)
-        elif args.battery == "hyper":
-            run_hyper_collocated_battery(sim)
-        else:
-            run_eb_collocated_battery(sim)
-        return
-
-    if args.battery == "resistive":
-        run_resistive_battery(sim)
-    elif args.battery == "hyper":
-        run_hyper_battery(sim)
+        # The collocated battery uses the nodal closed forms (the planar wall
+        # makes the level-set geometry analytic).
+        run_eb_collocated_battery(sim)
     elif args.geometry == "plane":
         run_plane_battery(sim)
     else:

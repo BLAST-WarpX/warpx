@@ -75,6 +75,20 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
+    // isotropized stencil upgrades of the dissipative/gradient terms
+    // (Cartesian 2D/3D only; see IsotropicOperators.H)
+    pp_hybrid.query("isotropic_hyper_resistivity", m_isotropic_hyper_resistivity);
+    pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
+    pp_hybrid.query("isotropic_gradient", m_isotropic_gradient);
+    pp_hybrid.query("isotropic_eb_compact_fallback", m_isotropic_eb_compact_fallback);
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_isotropic_hyper_resistivity && !m_isotropic_resistivity
+            && !m_isotropic_gradient,
+        "hybrid_pic_model.isotropic_* options are only implemented for the "
+        "Cartesian 2D (XZ) and 3D geometries");
+#endif
+
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
     // convert electron temperature from eV to J
@@ -253,17 +267,12 @@ void HybridPICModel::ReadParameters ()
     // Neumann (even) to reflect the back-pressure with zero normal gradient.
     pp_hybrid.query("eb_pe_dirichlet", m_eb_pe_dirichlet);
 
-    // isotropized hyper-resistivity Laplacian (Cartesian geometries)
-    pp_hybrid.query("isotropic_hyper_resistivity", m_isotropic_hyper_resistivity);
-    // Near-wall downgrade of the isotropic Laplacian to the compact stencil
+    // Near-wall downgrade of the isotropic stencils to the compact ones
     // (staggered conformal path; see the header docs).
     pp_hybrid.query("isotropic_hyper_wall_compact", m_isotropic_hyper_wall_compact);
 
-    // isotropized resistive diffusion via the corner-curl E correction
-    // (Cartesian geometries; suppresses the grid m=4 from the resistive term)
-    pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
-
-    // The isotropic hyper-resistivity Laplacian reads the plasma current at its
+    // The isotropic hyper-resistivity Laplacian (parsed with the resistivity
+    // options above) reads the plasma current at its
     // diagonal/corner neighbors (sqrt(2)*h in plane, sqrt(3)*h at a 3D cube
     // corner). Widen the plasma-current EB mirror-fill band to that corner reach
     // so the diagonal edges near a curved wall are mirror-filled rather than left
