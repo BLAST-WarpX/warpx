@@ -113,6 +113,7 @@ def setup_simulation(
     n_floor_frac=N_FLOOR_FRAC,
     isotropic_resistivity=True,
     isotropic_hyper=True,
+    isotropic_gradient=False,
     substeps=SUBSTEPS,
     substep_rtol=1.0e-3,
     te=T_E0,
@@ -228,6 +229,7 @@ def setup_simulation(
         eb_rho_dirichlet=True,
         isotropic_resistivity=isotropic_resistivity,
         isotropic_hyper_resistivity=isotropic_hyper,
+        isotropic_gradient=isotropic_gradient if isotropic_gradient else None,
         eta_nodal_interp=True if eta_nodal else None,
         holmstrom_blend_pow=holmstrom_blend_pow if holmstrom_blend_pow > 0 else None,
         holmstrom_blend_width=holmstrom_blend_width
@@ -550,6 +552,16 @@ def main():
         "Laplacian. Default: OFF on staggered, ON on collocated.",
     )
     parser.add_argument(
+        "--isotropic-gradient",
+        dest="isotropic_gradient",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="transverse-smoothed (isotropized) electron-pressure gradient "
+        "(PR #7040); removes the cos(4*theta) modulation of |grad Pe| that "
+        "feeds the particle push. Default off on both grids pending the "
+        "liftoff A/B below.",
+    )
+    parser.add_argument(
         "--nz",
         dest="nz",
         help="number of axial (z) cells in the periodic slab (default 8 = thin "
@@ -865,6 +877,7 @@ def main():
         args.n_floor_frac,
         args.isotropic_resistivity,
         args.isotropic_hyper,
+        args.isotropic_gradient,
         args.substeps,
         args.substep_rtol,
         args.te,
