@@ -2288,7 +2288,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Evaluate the electron-pressure gradient in Ohm's law with the
         transverse-smoothed (isotropized) staggered difference instead of
         the plain two-point stencil, removing the cos 4*theta anisotropy of
-        |grad Pe| (fully isotropic on cubic cells; Cartesian geometries).
+        the pressure-gradient magnitude (fully isotropic on cubic cells;
+        Cartesian geometries).
         Only affects the E used for the particle push and diagnostics: the
         Faraday/B-integration path omits grad(Pe) entirely, which is also
         what keeps the (only O(h^2)-small, not identically zero) discrete
