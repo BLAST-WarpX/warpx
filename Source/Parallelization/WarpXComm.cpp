@@ -202,7 +202,7 @@ namespace
         amrex::IntVect const& Fy_stag = field_src[1]->ixType().toIntVect();
         amrex::IntVect const& Fz_stag = field_src[2]->ixType().toIntVect();
 
-        // Aux data are nodal in the momentum-conserving field-gather path.
+        // Aux data are always nodal in this update path.
         amrex::IntVect const& dst_stag = amrex::IntVect::TheNodeVector();
 
 #ifdef AMREX_USE_OMP
@@ -220,7 +220,7 @@ namespace
             // Include ghost cells; the interpolation kernels zero-pad out-of-bounds reads.
             const Box bx = mfi.growntilebox();
 
-            // Finite-order field-centering stencil.
+            // Read the field-centering stencil once per tile for the three components.
             const int fg_nox = WarpX::field_centering_nox;
             const int fg_noy = WarpX::field_centering_noy;
             const int fg_noz = WarpX::field_centering_noz;
@@ -234,6 +234,7 @@ namespace
 
             amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
             {
+                // Each component keeps its native staggering on input and lands on the nodal aux grid.
                 warpx_interp(j, k, l, fx_aux, fx_src, dst_stag, Fx_stag, fg_nox, fg_noy, fg_noz,
                              stencil_coeffs_x, stencil_coeffs_y, stencil_coeffs_z);
                 warpx_interp(j, k, l, fy_aux, fy_src, dst_stag, Fy_stag, fg_nox, fg_noy, fg_noz,
@@ -281,11 +282,13 @@ namespace
         if (electromagnetic_solver_id != ElectromagneticSolverAlgo::None) {
             Array<std::unique_ptr<MultiFab>,3> Ftmp;
             if (fields.has_vector(field_cax_type, lev)) {
+                // Reuse the solver-provided coarse-aux buffers when they already exist on this level.
                 for (int idim = 0; idim < 3; ++idim) {
                     Ftmp[idim] = std::make_unique<MultiFab>(
                         *fields.get(field_cax_type, Direction{idim}, lev), amrex::make_alias, 0, 1);
                 }
             } else {
+                // Otherwise allocate a temporary coarse-aux field with the aux guard-cell footprint.
                 const IntVect ngtmp = field_aux[lev-1][0]->nGrowVect();
                 for (int idim = 0; idim < 3; ++idim) {
                     Ftmp[idim] = std::make_unique<MultiFab>(cnba, dm, 1, ngtmp);
@@ -294,7 +297,7 @@ namespace
             for (int idim = 0; idim < 3; ++idim) {
                 Ftmp[idim]->setVal(0.0);
                 const IntVect ng = Ftmp[idim]->nGrowVect();
-                // Recreate coarse aux data with enough guard cells for interpolation.
+                // Rebuild the coarsened aux data, including guards needed by the coarse/fine stencil.
                 ablastr::utils::communication::ParallelCopy(
                     *Ftmp[idim], *field_aux[lev - 1][idim], 0, 0, 1,
                     ng_src, ng, WarpX::do_single_precision_comms, cperiod);
@@ -342,6 +345,7 @@ namespace
                 amrex::ParallelFor(bx,
                 [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
                 {
+                    // Interpolate fine data together with coarse-patch and coarse-aux information.
                     warpx_interp(j, k, l, fx_aux, fx_fp, fx_cp, fx_c,
                                  Fx_fp_stag, Fx_cp_stag, refinement_ratio);
                     warpx_interp(j, k, l, fy_aux, fy_fp, fy_cp, fy_c,
@@ -370,6 +374,7 @@ namespace
                 amrex::ParallelFor(bx,
                 [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
                 {
+                    // Electrostatic fields only interpolate each component from its field layout to nodal aux.
                     warpx_interp(j, k, l, fx_aux, fx_fp, Fx_fp_stag);
                     warpx_interp(j, k, l, fy_aux, fy_fp, Fy_fp_stag);
                     warpx_interp(j, k, l, fz_aux, fz_fp, Fz_fp_stag);
@@ -414,23 +419,26 @@ namespace
 
             Array<std::unique_ptr<MultiFab>,3> dF;
             for (int idim = 0; idim < 3; ++idim) {
+                // dF stores the coarse-level correction on the same index type as the level-lev fields.
                 dF[idim] = std::make_unique<MultiFab>(
                     fields.get(field_cp_type, Direction{idim}, lev)->boxArray(), dm,
                     fields.get(field_cp_type, Direction{idim}, lev)->nComp(), ng);
                 dF[idim]->setVal(0.0);
 
-                // Build the coarse correction from the previous level's aux data.
+                // First import the previous level's aux field onto the coarsened layout of this level.
                 ablastr::utils::communication::ParallelCopy(
                     *dF[idim], *field_aux[lev - 1][idim], 0, 0,
                     field_aux[lev - 1][idim]->nComp(), ng_src, ng,
                     WarpX::do_single_precision_comms, crse_period);
 
                 if (fields.has_vector(field_cax_type, lev)) {
+                    // Keep an explicit copy of that coarsened aux field when the solver requests it.
                     MultiFab::Copy(
                         *fields.get(field_cax_type, Direction{idim}, lev), *dF[idim],
                         0, 0, fields.get(field_cax_type, Direction{idim}, lev)->nComp(), ng);
                 }
 
+                // Convert coarse aux into the additive correction relative to the coarse patch field.
                 MultiFab::Subtract(
                     *dF[idim], *fields.get(field_cp_type, Direction{idim}, lev),
                     0, 0, fields.get(field_cp_type, Direction{idim}, lev)->nComp(), ng);
@@ -458,6 +466,7 @@ namespace
                 amrex::ParallelFor(Box(fx_aux), Box(fy_aux), Box(fz_aux),
                 [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
                 {
+                    // Add the coarse correction after refining the native fine data onto the aux grid.
                     warpx_interp(j, k, l, fx_aux, fx_fp, fx_c, Fx_stag, refinement_ratio);
                 },
                 [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
