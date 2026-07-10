@@ -234,7 +234,7 @@ namespace
 
             amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
             {
-                // Each component keeps its native staggering on input and lands on the nodal aux grid.
+                // Interpolate each component from its source staggering to the nodal aux grid.
                 warpx_interp(j, k, l, fx_aux, fx_src, dst_stag, Fx_stag, fg_nox, fg_noy, fg_noz,
                              stencil_coeffs_x, stencil_coeffs_y, stencil_coeffs_z);
                 warpx_interp(j, k, l, fy_aux, fy_src, dst_stag, Fy_stag, fg_nox, fg_noy, fg_noz,
