@@ -4063,6 +4063,20 @@ Maxwell solver: kinetic-fluid hybrid
     Near an embedded boundary the electron-pressure mirror fill maintains the transverse
     reads. Cartesian geometries only.
 
+.. pp:param:: hybrid_pic_model.isotropic_eb_compact_fallback
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Near an embedded boundary, fall back per point from the isotropic stencils
+    (:pp:param:`hybrid_pic_model.isotropic_hyper_resistivity`,
+    :pp:param:`hybrid_pic_model.isotropic_resistivity`,
+    :pp:param:`hybrid_pic_model.isotropic_gradient`) to the standard compact ones within a
+    corner reach (:math:`(\sqrt{d}+1/2)\,h`) of the level set. Defaults to off here because
+    the hybrid EB boundary layer mirror-fills the wide-stencil bands to the diagonal reach
+    (:pp:param:`hybrid_pic_model.eb_b_fill_band_cells` and the plasma-current band), keeping
+    the diagonal reads valid near the wall; opt back in for A/B isolation.
+
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
     :default: ``false``

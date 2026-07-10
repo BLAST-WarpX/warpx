@@ -2294,6 +2294,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         what keeps the (only O(h^2)-small, not identically zero) discrete
         curl of the isotropized gradient out of the B update.
 
+    isotropic_eb_compact_fallback: bool, default=False
+        Near an embedded boundary, fall back per point from the isotropic
+        stencils to the standard compact ones within a corner reach of the
+        level set. Defaults to off here because the hybrid EB boundary layer
+        mirror-fills the wide-stencil bands to the diagonal reach, keeping
+        the reads valid near the wall; opt back in for A/B isolation.
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
@@ -2364,6 +2371,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         isotropic_hyper_resistivity=None,
         isotropic_resistivity=None,
         isotropic_gradient=None,
+        isotropic_eb_compact_fallback=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2406,6 +2414,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
         self.isotropic_resistivity = isotropic_resistivity
         self.isotropic_gradient = isotropic_gradient
+        self.isotropic_eb_compact_fallback = isotropic_eb_compact_fallback
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2474,6 +2483,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         )
         pywarpx.hybridpicmodel.isotropic_resistivity = self.isotropic_resistivity
         pywarpx.hybridpicmodel.isotropic_gradient = self.isotropic_gradient
+        pywarpx.hybridpicmodel.isotropic_eb_compact_fallback = (
+            self.isotropic_eb_compact_fallback
+        )
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(

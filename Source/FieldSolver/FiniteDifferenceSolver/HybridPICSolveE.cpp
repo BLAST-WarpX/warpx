@@ -1218,12 +1218,17 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // this branch the hybrid EB boundary layer mirror-fills the J/B/Pe bands
     // to the diagonal stencil reach (m_eb_fill_band_cells,
     // m_eb_b_fill_band_cells, and the Pe fill), so the wide reads stay valid
-    // near the wall and the fallback is left disengaged (empty iso_phi).
+    // near the wall and isotropic_eb_compact_fallback DEFAULTS TO OFF here
+    // (opt back in for A/B isolation).
     amrex::Real h_max_iso = dx_arr[0];
     for (int d = 1; d < AMREX_SPACEDIM; ++d) { h_max_iso = std::max(h_max_iso, dx_arr[d]); }
     const amrex::Real d_iso_compact =
         (std::sqrt(static_cast<amrex::Real>(AMREX_SPACEDIM)) + 0.5_rt) * h_max_iso;
-    amrex::MultiFab const* iso_phi_mf = nullptr;
+    const bool iso_any = iso_hyper || iso_resistivity || iso_gradient;
+    amrex::MultiFab const* iso_phi_mf =
+        (iso_any && EB::enabled() && hybrid_model->m_isotropic_eb_compact_fallback)
+        ? WarpX::GetInstance().m_fields.get(FieldType::distance_to_eb, lev)
+        : nullptr;
 #if defined(WARPX_DIM_1D_Z)
     // only consumed by the 3D / 2D XZ isotropic upgrades below
     amrex::ignore_unused(iso_hyper, iso_resistivity, iso_gradient, nodal_grid,

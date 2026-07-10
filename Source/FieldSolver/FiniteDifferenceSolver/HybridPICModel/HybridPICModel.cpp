@@ -80,6 +80,7 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("isotropic_hyper_resistivity", m_isotropic_hyper_resistivity);
     pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
     pp_hybrid.query("isotropic_gradient", m_isotropic_gradient);
+    pp_hybrid.query("isotropic_eb_compact_fallback", m_isotropic_eb_compact_fallback);
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_isotropic_hyper_resistivity && !m_isotropic_resistivity

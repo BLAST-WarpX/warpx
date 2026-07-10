@@ -281,6 +281,16 @@ public:
      *  Faraday/B-integration path omits grad(Pe) entirely. */
     bool m_isotropic_gradient = false;
 
+    /** Near an embedded boundary, fall back per point from the isotropic
+     *  stencils to the standard compact ones within a corner reach of the
+     *  level set, where the diagonal reads are not maintained by the EB
+     *  update masks. Default true; a hybrid EB boundary layer that
+     *  mirror-fills the wide-stencil bands (so the diagonal reads stay
+     *  valid) may disable it. On this branch the hybrid EB boundary layer
+     *  mirror-fills the J/B/Pe bands to the diagonal stencil reach, so the
+     *  fallback defaults to OFF (opt back in for A/B isolation). */
+    bool m_isotropic_eb_compact_fallback = false;
+
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
     std::string m_Jy_ext_grid_function = "0.0";

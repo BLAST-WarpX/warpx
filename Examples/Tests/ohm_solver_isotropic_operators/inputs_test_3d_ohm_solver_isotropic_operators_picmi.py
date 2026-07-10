@@ -118,6 +118,11 @@ def setup_simulation(battery, grid_type="staggered"):
         isotropic_hyper_resistivity=(True if hyper else None),
         isotropic_resistivity=(True if resistive else None),
         isotropic_gradient=(True if gradient else None),
+        # request the near-EB compact fallback explicitly: it is the default
+        # upstream, but branches whose EB boundary layer mirror-fills the
+        # wide-stencil bands flip that default -- this battery asserts the
+        # fallback itself, so pin it on
+        isotropic_eb_compact_fallback=(True if battery == "eb_fallback" else None),
         substeps=4,
     )
 
