@@ -550,6 +550,12 @@ void HybridPICModel::BfieldEvolve (
             amrex::ParallelDescriptor::ReduceBoolAnd(step_succeeded);
 
             if (!step_succeeded) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "HybridPIC",
+                    "NaN or Inf value encountered in the B-field during RK4 "
+                    "substepping. Restarting this step using RKF45.",
+                    ablastr::warn_manager::WarnPriority::medium);
+
                 // restart this full step and this time use RKF45
                 t = 0._rt;
                 n_accepted = 0;
