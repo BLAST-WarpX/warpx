@@ -242,6 +242,12 @@ class EMModes(object):
             linear_solver=picmi.GMRESLinearSolver(
                 relative_tolerance=5e-5,
                 max_iterations=2048,
+                # The unpreconditioned Darwin operator needs a long Krylov
+                # cycle to resolve its hardest modes in one sweep (see the
+                # darwin_solver_pec decks): with the default restart length
+                # of 30 the 2D ES-coupled case sits at the max_iterations
+                # cap, converging only marginally or not at all.
+                restart_length=512,
                 verbose_int=(2 if self.test else 0),
             ),
         )

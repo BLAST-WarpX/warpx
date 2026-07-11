@@ -36,6 +36,14 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     {
         const auto& fbl = m_WarpX->GetFieldBoundaryLo();
         const auto& fbh = m_WarpX->GetFieldBoundaryHi();
+        // Map each spatial dimension to the vector component normal to its
+        // boundary planes, to identify the exact constant null vectors of the
+        // wall-projected operator (see ProjectOutNullConstants).
+#if defined(WARPX_DIM_1D_Z)
+        const std::array<int, 1> wall_normal_comp = {2};
+#else
+        const std::array<int, 2> wall_normal_comp = {0, 2};
+#endif
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (fbl[idim] == FieldBoundaryType::Periodic || fbl[idim] == FieldBoundaryType::PEC) &&
@@ -44,6 +52,16 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
                 "field boundary conditions.");
             m_has_pec = m_has_pec ||
                 (fbl[idim] == FieldBoundaryType::PEC) || (fbh[idim] == FieldBoundaryType::PEC);
+        }
+        if (m_has_pec) {
+            // A constant Z component is an exact null vector unless some PEC
+            // wall is normal to it (the wall projection zeroes those DOFs).
+            m_null_constant_comp = {true, true, true};
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                if (fbl[idim] == FieldBoundaryType::PEC || fbh[idim] == FieldBoundaryType::PEC) {
+                    m_null_constant_comp[wall_normal_comp[idim]] = false;
+                }
+            }
         }
     }
     if (m_has_pec) {
@@ -110,6 +128,13 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
                             Zvec[lev][1]->nComp(), biharmonic_ng);
         m_Zscratch_z.define(Zvec[lev][2]->boxArray(), Zvec[lev][2]->DistributionMap(),
                             Zvec[lev][2]->nComp(), biharmonic_ng);
+
+        // div(Z) of the B-staggered Z is fully cell-centered in every
+        // Cartesian geometry. One guard layer: AddGradDivZTerm() evaluates
+        // div(Z) on each FAB's grown box so the gradient can consume it
+        // without an intermediate boundary fill.
+        m_divZ.define(amrex::convert(Zvec[lev][0]->boxArray(), amrex::IndexType::TheCellType()),
+                      Zvec[lev][0]->DistributionMap(), 1, amrex::IntVect(1));
     }
 
     // Parse implicit solver parameters
@@ -126,6 +151,15 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     pp_l.query("absolute_tolerance",  m_linsol_atol);
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
+
+    // Multiplier on the grad-div (Coulomb-gauge penalty) stabilization
+    // coefficient (see AddGradDivZTerm); 0 disables the term.
+    const amrex::ParmParse pp_darwin("semi_implicit_darwin");
+    pp_darwin.query("graddiv_factor", m_graddiv_factor);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_graddiv_factor >= 0.0_rt,
+        "semi_implicit_darwin.graddiv_factor must be >= 0 (a negative value "
+        "would make the grad-div penalty term indefinite).");
 
     // Define the linear function - Note we could use JacobianFunctionMF if we
     // write ComputeRHS appropriately, this will add some extra overhead in MF operations
@@ -159,6 +193,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
+    amrex::Print()     << "Grad-div (gauge penalty) factor:                    " << m_graddiv_factor << "\n";
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
@@ -329,6 +364,24 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
         rhs_vec[lev], Zscratch, m_WarpX->GetEBUpdateBFlag()[lev], lev
     );
 
+    // Constrain Z's divergence with a grad-div (Coulomb-gauge penalty) term.
+    // Deriving nabla^4(Z) + curl(chi(curl(Z))) from the validated 2nd-order
+    // (dA, xi) equation relies on curl(curl(Z)) = -nabla^2(Z), which only
+    // holds if div(Z)=0. Nothing else in the operator constrains div(Z): the
+    // curl(chi curl) term annihilates curl-free modes, leaving them
+    // controlled by the bare biharmonic k^4 alone - orders of magnitude more
+    // singular than the solenoidal modes' k^4 + chi*k^2 in domains large
+    // compared to the electron skin depth, which makes GMRES grind on any
+    // divergence-carrying source content (wall deposits, PIC noise). Adding
+    // -grad(alpha div(Z)) with alpha = mean(chi) lifts curl-free modes to
+    // the same k^4 + alpha*k^2 scale while leaving solenoidal modes (and,
+    // since curl(grad(.)) = 0 discretely, dA = curl(Z)) exactly unchanged.
+    // Note this is deliberately NOT the exact-identity correction
+    // -grad(nabla^2(div Z)) (which would cancel the biharmonic on curl-free
+    // modes exactly, making the null space exact and requiring the source to
+    // be divergence-cleaned); the penalty sign regularizes instead.
+    AddGradDivZTerm(rhs_vec[lev], Zscratch, lev);
+
     // Calculate dA = ∇ x Z (ComputeCurlB resets dA_fp to zero internally).
     // Use Zscratch (guard cells already filled above) rather than Zvec directly.
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
@@ -388,6 +441,12 @@ void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
     // every Krylov vector (rhs_vec has no guard cells, so ng must be 0
     // here - only the on-wall zeroing is performed).
     ApplyPECtoZ(rhs_vec[lev], lev, amrex::IntVect(0));
+
+    // Remove the (analytically zero, numerically roundoff-level) projection
+    // of the operator output onto the exact constant null vectors, so the
+    // Krylov space stays orthogonal to them (their component in the source
+    // is removed in CalculateSourceVector and can never be reduced).
+    ProjectOutNullConstants(rhs_vec[lev]);
 }
 
 void SemiImplicitDarwin::PrepareCurrentDeposition ()
@@ -535,6 +594,32 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
     // band (exploiting symmetry); mirror the other half back in now that
     // deposition and boundary summation are complete.
     FinishMassMatrices();
+
+    // Refresh the grad-div penalty coefficient (see AddGradDivZTerm) from
+    // the freshly deposited mass matrices: the diagonal band row-sum is the
+    // local chi the curl(chi curl Z) term applies to a uniform dA, so its
+    // domain mean (averaged over the three diagonal blocks) scaled by the
+    // same 2 mu0/dt prefactor gives the mean solenoidal-mode chi scale.
+    // The coefficient must be spatially constant: a varying alpha would
+    // couple the curl-free and solenoidal subspaces and change dA.
+    {
+        const amrex::MultiFab* Sdiag[3] = {Sxx, Syy, Szz};
+        amrex::Real chi_sum[3];
+        for (int d = 0; d < 3; ++d) {
+            amrex::Real s_sum = 0.0_rt;
+            for (int c = 0; c < Sdiag[d]->nComp(); ++c) {
+                s_sum += Sdiag[d]->sum(c, true);
+            }
+            chi_sum[d] = s_sum;
+        }
+        amrex::ParallelDescriptor::ReduceRealSum(chi_sum, 3);
+        amrex::Real chi_mean = 0.0_rt;
+        for (int d = 0; d < 3; ++d) {
+            chi_mean += chi_sum[d] / static_cast<amrex::Real>(Sdiag[d]->boxArray().numPts());
+        }
+        m_graddiv_alpha =
+            m_graddiv_factor * 2.0_rt * PhysConst::mu0 / m_dt * chi_mean / 3.0_rt;
+    }
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()
@@ -608,6 +693,14 @@ void SemiImplicitDarwin::CalculateSourceVector ()
     // operator applied by ComputeRHS (deposition noise would otherwise
     // leave a residual there that GMRES can never reduce).
     ApplyPECtoZ(b[lev], lev, amrex::IntVect(0));
+
+    // Remove the source's projection onto the exact constant null vectors
+    // of the wall-projected operator (with PEC walls, curl(J)'s domain sum
+    // telescopes to the tangential wall currents, which are physically
+    // nonzero with reflecting particles): that component is irreducible
+    // residual GMRES can never remove, and being constant it has zero curl,
+    // so removing it cannot change dA = curl(Z).
+    ProjectOutNullConstants(b[lev]);
 }
 
 void SemiImplicitDarwin::UpdateEfromdA ( int astep )
@@ -1121,4 +1214,145 @@ void SemiImplicitDarwin::ApplyPECtodA ( const ablastr::fields::VectorField& a_fi
         m_WarpX->GetFieldBoundaryLo(), m_WarpX->GetFieldBoundaryHi(),
         FieldBoundaryType::PEC, ng,
         m_WarpX->Geom(lev), lev, PatchType::fine, m_WarpX->refRatio());
+}
+
+void SemiImplicitDarwin::AddGradDivZTerm ( const ablastr::fields::VectorField& a_rhs,
+                                           const ablastr::fields::VectorField& a_Z,
+                                           int lev )
+{
+    BL_PROFILE("SemiImplicitDarwin::AddGradDivZTerm()");
+
+    if (m_graddiv_alpha == 0.0_rt) { return; }
+
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+    // The B-staggered Z is nodal exactly in each component's own direction,
+    // so div(Z) built from the "Upward" (node-pair) difference of each
+    // component lands fully cell-centered, and the "Downward" (cell-pair)
+    // gradient of that scalar lands back on Z's staggering. This matched
+    // Upward/Downward pair makes the term symmetric positive semidefinite
+    // (<-grad(alpha div Z), Z> = alpha ||div Z||^2) and, since the Downward
+    // gradient commutes with the curl stencils, exactly curl-free.
+    const auto dxinv = m_WarpX->Geom(lev).InvCellSizeArray();
+    const amrex::Real alpha = m_graddiv_alpha;
+
+    // No tiling: div(Z) is evaluated on each FAB's grown box (into m_divZ's
+    // own guard cells, reading a_Z's image/periodic-filled guards at
+    // distance <= 2) and immediately consumed by the gradient within the
+    // same FAB, avoiding an intermediate boundary fill. Growing a *tile*
+    // box instead would make neighboring tiles write overlapping cells.
+    // At conducting walls a_Z's guards hold the B-type image values, so the
+    // guard div(Z) is automatically the even mirror of the interior value
+    // and the wall-normal gradient vanishes on the wall plane.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( amrex::MFIter mfi(m_divZ, false); mfi.isValid(); ++mfi )
+    {
+        amrex::Array4<amrex::Real> const& divZ = m_divZ.array(mfi);
+
+        amrex::Array4<const amrex::Real> const& Zx = a_Z[0]->const_array(mfi);
+        amrex::Array4<const amrex::Real> const& Zy = a_Z[1]->const_array(mfi);
+        amrex::Array4<const amrex::Real> const& Zz = a_Z[2]->const_array(mfi);
+
+        amrex::Array4<amrex::Real> const& Fx = a_rhs[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fy = a_rhs[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fz = a_rhs[2]->array(mfi);
+
+        const amrex::Box gbx = amrex::grow(mfi.validbox(), 1);
+
+#if defined(WARPX_DIM_1D_Z)
+        const amrex::Real dzi = dxinv[0];
+
+        amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            divZ(i,j,k) = (Zz(i+1,j,k) - Zz(i,j,k))*dzi;
+        });
+
+        const amrex::Box tbz = amrex::convert(mfi.validbox(), a_rhs[2]->ixType());
+        amrex::ParallelFor(tbz, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            Fz(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i-1,j,k))*dzi;
+        });
+        amrex::ignore_unused(Zx, Zy, Fx, Fy);
+#elif defined(WARPX_DIM_XZ)
+        const amrex::Real dxi = dxinv[0];
+        const amrex::Real dzi = dxinv[1];
+
+        amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            divZ(i,j,k) = (Zx(i+1,j,k) - Zx(i,j,k))*dxi
+                        + (Zz(i,j+1,k) - Zz(i,j,k))*dzi;
+        });
+
+        const amrex::Box tbx = amrex::convert(mfi.validbox(), a_rhs[0]->ixType());
+        const amrex::Box tbz = amrex::convert(mfi.validbox(), a_rhs[2]->ixType());
+        amrex::ParallelFor(tbx, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fx(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i-1,j,k))*dxi;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fz(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i,j-1,k))*dzi;
+            }
+        );
+        // The out-of-plane (y) component contributes nothing to div(Z) and
+        // receives no in-plane gradient component.
+        amrex::ignore_unused(Zy, Fy);
+#elif defined(WARPX_DIM_3D)
+        const amrex::Real dxi = dxinv[0];
+        const amrex::Real dyi = dxinv[1];
+        const amrex::Real dzi = dxinv[2];
+
+        amrex::ParallelFor(gbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            divZ(i,j,k) = (Zx(i+1,j,k) - Zx(i,j,k))*dxi
+                        + (Zy(i,j+1,k) - Zy(i,j,k))*dyi
+                        + (Zz(i,j,k+1) - Zz(i,j,k))*dzi;
+        });
+
+        const amrex::Box tbx = amrex::convert(mfi.validbox(), a_rhs[0]->ixType());
+        const amrex::Box tby = amrex::convert(mfi.validbox(), a_rhs[1]->ixType());
+        const amrex::Box tbz = amrex::convert(mfi.validbox(), a_rhs[2]->ixType());
+        amrex::ParallelFor(tbx, tby, tbz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fx(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i-1,j,k))*dxi;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fy(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i,j-1,k))*dyi;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                Fz(i,j,k) -= alpha*(divZ(i,j,k) - divZ(i,j,k-1))*dzi;
+            }
+        );
+#endif
+    }
+#else
+    amrex::ignore_unused(a_rhs, a_Z, lev);
+    WARPX_ABORT_WITH_MESSAGE(
+        "SemiImplicitDarwin::AddGradDivZTerm is only implemented for the "
+        "Cartesian 1D/2D/3D geometries.");
+#endif
+}
+
+void SemiImplicitDarwin::ProjectOutNullConstants ( const ablastr::fields::VectorField& a_field )
+{
+    BL_PROFILE("SemiImplicitDarwin::ProjectOutNullConstants()");
+
+    if (!m_has_pec) { return; }
+
+    for (int comp = 0; comp < 3; ++comp)
+    {
+        if (!m_null_constant_comp[comp]) { continue; }
+        amrex::MultiFab& mf = *a_field[comp];
+        // Both sum() and numPts() count nodal points shared between boxes
+        // once per box, consistently; the residual projection error from
+        // that shared-point weighting is O(1/N) of the removed mean.
+        const amrex::Real mean =
+            mf.sum(0, false) / static_cast<amrex::Real>(mf.boxArray().numPts());
+        mf.plus(-mean, 0, 1, 0);
+    }
 }

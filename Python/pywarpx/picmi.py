@@ -2128,11 +2128,18 @@ class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
 
     linear_solver:
         GMRESLinearSolver instance.
+
+    graddiv_factor: float, optional
+        Multiplier on the grad-div (Coulomb-gauge penalty) stabilization
+        term added to the Darwin field operator, which lifts the otherwise
+        nearly singular curl-free modes to the same eigenvalue scale as the
+        solenoidal modes. Defaults to 1; set to 0 to disable the term.
     """
 
     def __init__(
         self,
         linear_solver,
+        graddiv_factor=None,
     ):
         if not isinstance(linear_solver, GMRESLinearSolver):
             raise TypeError(
@@ -2141,9 +2148,12 @@ class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
                 "linear solver to attach to, which PETScKSPLinearSolver requires)"
             )
         self.linear_solver = linear_solver
+        self.graddiv_factor = graddiv_factor
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        semi_implicit_darwin = pywarpx.warpx.get_bucket("semi_implicit_darwin")
+        semi_implicit_darwin.graddiv_factor = self.graddiv_factor
         self.linear_solver.linear_solver_initialize_inputs()
 
 
