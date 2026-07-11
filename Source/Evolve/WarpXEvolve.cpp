@@ -761,6 +761,23 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
                 // Standard algorithm ; particles can move by up to the max number
                 max_cells_travelled += particle_max_grid_crossings;
             }
+            if (evolve_scheme == EvolveScheme::Semi_Implicit_Darwin) {
+                // The semi-implicit Darwin scheme has no CFL condition linking
+                // the time step to the cell size, so c*dt/dx can exceed 1 and
+                // the Maxwellian velocity tail legitimately crosses several
+                // cells per step. The (relativistic) pusher bounds |v| < c,
+                // so ceil(c*dt/dx_min) cells is a hard per-step travel bound -
+                // size the local redistribute to at least that automatically
+                // rather than relying on particles.max_grid_crossings.
+                const amrex::Real* cell_size = Geom(0).CellSize();
+                amrex::Real dx_min = cell_size[0];
+                for (int idim = 1; idim < AMREX_SPACEDIM; ++idim) {
+                    dx_min = std::min(dx_min, cell_size[idim]);
+                }
+                const auto cdt_cells = static_cast<int>(
+                    std::ceil(PhysConst::c * dt[0] / dx_min));
+                max_cells_travelled = std::max(max_cells_travelled, num_moved + cdt_cells);
+            }
             mypc->RedistributeLocal(max_cells_travelled);
         }
         else {
