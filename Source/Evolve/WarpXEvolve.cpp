@@ -127,7 +127,7 @@ WarpX::SynchronizeVelocityWithPosition () {
             FillBoundaryE_avg(guard_cells.ng_FieldGather);
             FillBoundaryB_avg(guard_cells.ng_FieldGather);
         }
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
         for (int lev = 0; lev <= finest_level; ++lev) {
             mypc->PushP(
@@ -678,7 +678,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
         FillBoundaryE(guard_cells.ng_alloc_EB);
         FillBoundaryB(guard_cells.ng_alloc_EB);
 
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
         // on first step, push p by -0.5*dt
         for (int lev = 0; lev <= finest_level; ++lev)
@@ -712,12 +712,12 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 FillBoundaryE_avg(guard_cells.ng_FieldGather);
                 FillBoundaryB_avg(guard_cells.ng_FieldGather);
             }
-            // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
+            // TODO Remove call to FillBoundaryAux before UpdateAuxiliaryData?
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
                 FillBoundaryAux(guard_cells.ng_UpdateAux);
             }
         }
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
     }
 }
@@ -1212,10 +1212,10 @@ WarpX::OneStep_sub1 (Real cur_time)
     EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], cur_time);
     FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
-    // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
+    // TODO Remove call to FillBoundaryAux before UpdateAuxiliaryData?
     FillBoundaryAux(guard_cells.ng_UpdateAux);
     // iii) Get auxiliary fields on the fine grid, at dt[fine_lev]
-    UpdateAuxilaryData();
+    UpdateAuxiliaryData();
     FillBoundaryAux(guard_cells.ng_UpdateAux);
 
     // iv) Push particles and fields on the fine patch (second fine step)
