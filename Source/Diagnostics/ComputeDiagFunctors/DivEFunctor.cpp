@@ -14,17 +14,16 @@
 #include <AMReX_MultiFab.H>
 
 DivEFunctor::DivEFunctor (
-    ablastr::fields::VectorField const & arr_mf_src,
     const int lev,
     const amrex::IntVect crse_ratio,
     bool convertRZmodes2cartesian,
-    const int ncomp
+    const int ncomp,
+    bool use_fp_field
 )
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_arr_mf_src(arr_mf_src), m_lev(lev),
-      m_convertRZmodes2cartesian(convertRZmodes2cartesian)
-{
-    amrex::ignore_unused(m_arr_mf_src);
-}
+    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev),
+      m_convertRZmodes2cartesian(convertRZmodes2cartesian),
+      m_use_fp_field(use_fp_field)
+{}
 
 void
 DivEFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_buffer*/) const
@@ -48,7 +47,7 @@ DivEFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_
 
     const amrex::BoxArray& ba = amrex::convert(warpx.boxArray(m_lev), cell_type);
     amrex::MultiFab divE(ba, warpx.DistributionMap(m_lev), WarpX::ncomps, ng );
-    warpx.ComputeDivE(divE, m_lev);
+    warpx.ComputeDivE(divE, m_lev, m_use_fp_field);
 
 #ifdef WARPX_DIM_RZ
     if (m_convertRZmodes2cartesian) {

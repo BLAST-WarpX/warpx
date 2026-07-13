@@ -410,6 +410,12 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
     // diagnostic output
     bool deposit_current = !m_solver_deposits_current;
 
+    // With the hybrid-PIC solver, compute the divergence diagnostics from the
+    // solver (fp) fields; otherwise use the gather (aux) fields, which include
+    // the fields reconstructed from overlapping mesh-refinement levels.
+    const bool use_fp_field =
+        (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC);
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     std::vector<std::string> field_names = {"r", "t", "z"};
 #elif defined(WARPX_DIM_RSPHERE)
@@ -517,15 +523,13 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             }
         } else if ( m_varnames_fields[comp] == "divB" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(
-                warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                lev, m_crse_ratio, false, ncomp);
+                lev, m_crse_ratio, false, ncomp, use_fp_field);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("divB"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "divE" ){
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(
-                warpx.m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                lev, m_crse_ratio, false, ncomp);
+                lev, m_crse_ratio, false, ncomp, use_fp_field);
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("divE"), ncomp);
             }
@@ -641,9 +645,13 @@ FullDiagnostics::AddRZModesToDiags (int lev)
     }
     // divE
     if (divE_requested) {
+        // With the hybrid-PIC solver, compute divE from the solver (fp) fields;
+        // otherwise use the gather (aux) fields, which include the fields
+        // reconstructed from overlapping mesh-refinement levels.
+        const bool use_fp_field =
+            (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC);
         m_all_field_functors[lev].push_back(std::make_unique<DivEFunctor>(
-            warpx.m_fields.get_alldirs(FieldType::Efield_fp, lev),
-            lev, m_crse_ratio, false, ncomp_multimodefab));
+            lev, m_crse_ratio, false, ncomp_multimodefab, use_fp_field));
         AddRZModesToOutputNames(std::string("divE"), ncomp_multimodefab);
     }
     // rho
@@ -854,6 +862,12 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     // diagnostic output
     bool deposit_current = !m_solver_deposits_current;
 
+    // With the hybrid-PIC solver, compute the divergence diagnostics from the
+    // solver (fp) fields; otherwise use the gather (aux) fields, which include
+    // the fields reconstructed from overlapping mesh-refinement levels.
+    const bool use_fp_field =
+        (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC);
+
     using ablastr::fields::Direction;
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
@@ -913,9 +927,9 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "proc_num" ){
             m_all_field_functors[lev][comp] = std::make_unique<ProcessNumberFunctor>(nullptr, lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "divB" ){
-            m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<DivBFunctor>(lev, m_crse_ratio, true, 1, use_fp_field);
         } else if ( m_varnames[comp] == "divE" ){
-            m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_fp, lev), lev, m_crse_ratio);
+            m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(lev, m_crse_ratio, true, 1, use_fp_field);
         } else if ( m_varnames[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
         } else {

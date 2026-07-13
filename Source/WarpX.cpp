@@ -3355,22 +3355,22 @@ WarpX::ComputeDivB (amrex::MultiFab& divB, int const dcomp,
 }
 
 void
-WarpX::ComputeDivE(amrex::MultiFab& divE, const int lev)
+WarpX::ComputeDivE(amrex::MultiFab& divE, const int lev, const bool use_fp_field)
 {
-    // Use the solver (fp) fields: with momentum-conserving gathering the aux
-    // fields are nodal averages, and differencing those reports the
-    // interpolation truncation instead of the solver's divergence.
+    // The aux (gather) fields include the fields reconstructed from overlapping
+    // mesh-refinement levels, whereas the fp fields are the raw solver fields.
+    const ablastr::fields::VectorField Efield_lev = use_fp_field ?
+        m_fields.get_alldirs(FieldType::Efield_fp, lev) :
+        m_fields.get_alldirs(FieldType::Efield_aux, lev);
     if ( WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD ) {
 #ifdef WARPX_USE_FFT
-        const ablastr::fields::VectorField Efield_fp_lev = m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        spectral_solver_fp[lev]->ComputeSpectralDivE(lev, Efield_fp_lev, divE);
+        spectral_solver_fp[lev]->ComputeSpectralDivE(lev, Efield_lev, divE);
 #else
         WARPX_ABORT_WITH_MESSAGE(
             "ComputeDivE: PSATD requested but not compiled");
 #endif
     } else {
-        const ablastr::fields::VectorField Efield_fp_lev = m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        m_fdtd_solver_fp[lev]->ComputeDivE(Efield_fp_lev, divE);
+        m_fdtd_solver_fp[lev]->ComputeDivE(Efield_lev, divE);
     }
 }
 

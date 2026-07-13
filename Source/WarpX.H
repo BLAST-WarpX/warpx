@@ -790,7 +790,14 @@ public:
                              ablastr::fields::VectorField const & B,
                              const std::array<amrex::Real,3>& dx, amrex::IntVect ngrow);
 
-    void ComputeDivE(amrex::MultiFab& divE, int lev);
+    /** Compute the divergence of the electric field at level lev
+     *
+     * \param[out] divE MultiFab where the result is written
+     * \param[in] lev mesh-refinement level
+     * \param[in] use_fp_field if true, compute divE from the fine-patch (solver) fields
+     *            instead of the aux (gather) fields
+     */
+    void ComputeDivE(amrex::MultiFab& divE, int lev, bool use_fp_field = false);
 
     void ProjectionCleanDivB ();
     void CalculateExternalCurlA ();

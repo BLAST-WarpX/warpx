@@ -3,11 +3,7 @@
 
 #include "ComputeDiagFunctor.H"
 
-#include <ablastr/fields/MultiFabRegister.H>
-
 #include <AMReX_BaseFwd.H>
-
-#include <array>
 
 /**
  * \brief Functor to compute divE into mf_out.
@@ -16,19 +12,20 @@ class DivEFunctor final : public ComputeDiagFunctor
 {
 public:
     /** Constructor.
-     * \param[in] arr_mf_src source multifabs (3 elements for x y z).
      * \param[in] lev level of multifab.
      * \param[in] crse_ratio coarsening ratio for interpolation of field values
      *                       from simulation MultiFabs to the output MultiFab mf_dst
      * \param[in] convertRZmodes2cartesian if true, all RZ modes are averaged into one component
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
+     * \param[in] use_fp_field if true, compute divE from the fine-patch (solver) fields
+     *            instead of the aux (gather) fields
      */
     DivEFunctor (
-        ablastr::fields::VectorField const & arr_mf_src,
         int lev,
         amrex::IntVect crse_ratio,
         bool convertRZmodes2cartesian=true,
-        int ncomp=1
+        int ncomp=1,
+        bool use_fp_field=false
     );
 
     /** \brief Compute DivE directly into mf_dst.
@@ -39,11 +36,11 @@ public:
      */
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
-    /** Vector of pointer to source multifab Bx, By, Bz */
-    ablastr::fields::VectorField m_arr_mf_src;
     int m_lev; /**< level on which mf_src is defined (used in cylindrical) */
     /**< (for cylindrical) whether to average all modes into 1 comp */
     bool m_convertRZmodes2cartesian;
+    /**< whether to compute divE from the fine-patch (solver) fields instead of the aux fields */
+    bool m_use_fp_field;
 };
 
 #endif // WARPX_DIVEFUNCTOR_H_
