@@ -74,9 +74,6 @@ AMD-MI300:
     - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
 
 Intel-PVC:
-  # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
-  rules:
-    - when: never
   extends: .install-dependencies
   tags: [intel-data-center-max-1100]
   image: intel/oneapi-basekit:2025.3.0-0-devel-ubuntu24.04
