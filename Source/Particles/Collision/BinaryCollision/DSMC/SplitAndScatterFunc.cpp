@@ -19,8 +19,8 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
         // Build the ScatteringProcess objects using the same shared helper as DSMCFunc, so
         // that the process ordering matches the indices encoded in the per-pair mask. The
-        // scatter kernel uses these to look up, for each colliding pair, the process type and
-        // its energy penalty.
+        // scatter kernel uses these to look up, for each colliding pair, the process type,
+        // scattering angle model and energy penalty.
         m_scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
 #ifdef AMREX_USE_GPU
         amrex::Gpu::HostVector<ScatteringProcess::Executor> h_scattering_processes_exe;

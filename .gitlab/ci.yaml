@@ -15,6 +15,7 @@
 #
 .install-dependencies:
   before_script:
+    - hostname
     - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
     - python3 -m venv venv
     - source venv/bin/activate
@@ -73,6 +74,9 @@ AMD-MI300:
     - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
 
 Intel-PVC:
+  # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
+  rules:
+    - when: never
   extends: .install-dependencies
   tags: [intel-data-center-max-1100]
   image: intel/oneapi-basekit:2025.3.0-0-devel-ubuntu24.04
