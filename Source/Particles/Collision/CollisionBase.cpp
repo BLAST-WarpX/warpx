@@ -10,6 +10,9 @@
 #include "Utils/TextMsg.H"
 
 #include <AMReX_ParmParse.H>
+#include <AMReX_Vector.H>
+
+#include <string>
 
 CollisionBase::CollisionBase (const std::string& collision_name) :
     m_collision_name{collision_name}
@@ -61,4 +64,17 @@ CollisionBase::BackwardCompatibility ()
         "<collision_name>.ndt is no longer a valid option. "
         "Please use <collision_name>.ndt_supercycle (run collision every N PIC steps) "
     );
+
+    // The 'back' and 'forward' scattering process names are no longer supported: the
+    // scattering angle is now an attribute of the process (see <process>_scattering_angle_model).
+    amrex::Vector<std::string> scattering_process_names;
+    pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+    for (const auto& scattering_process : scattering_process_names) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            scattering_process != "back" && scattering_process != "forward",
+            "The scattering process names 'back' and 'forward' are no longer supported. "
+            "Use 'elastic' or 'excitationX' with "
+            "'<collision_name>.<process>_scattering_angle_model = backward' or '= forward' instead."
+        );
+    }
 }
