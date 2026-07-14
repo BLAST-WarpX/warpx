@@ -22,6 +22,7 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
@@ -1241,6 +1242,265 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         uz[ip] = 0.5_prt*(uzp_n0 + uzp_n);
 
     });
+
+    amrex::Gpu::streamSynchronize();
+}
+
+namespace {
+
+/* \brief Deposit rho from a list of particles (given by indices) into rho_arr.
+ *        The per-particle body mirrors doChargeDepositionShapeN (ChargeDeposition.H).
+ *        The deposit goes into the new-time component block of rho (starting at
+ *        icomp_new) and, when deposit_old_comp is true, also into the old-time block
+ *        (starting at component 0).
+ */
+template <int depos_order>
+void doSuborbitRhoDeposition (const GetParticlePosition<PIdx>& GetPosition,
+                              const amrex::ParticleReal * const wp,
+                              const int* ion_lev,
+                              amrex::Array4<amrex::Real> const& rho_arr,
+                              amrex::IntVect const rho_type,
+                              const int icomp_new,
+                              const bool deposit_old_comp,
+                              const long* indices,
+                              const long num_particles,
+                              const amrex::XDim3 & dinv,
+                              const amrex::XDim3 & xyzmin,
+                              const amrex::Dim3 lo,
+                              const amrex::Real q,
+                              [[maybe_unused]] const int n_rz_azimuthal_modes)
+{
+    using namespace amrex;
+
+    const bool do_ionization = ion_lev;
+    const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
+
+    constexpr int NODE = amrex::IndexType::NODE;
+    constexpr int CELL = amrex::IndexType::CELL;
+
+    amrex::ParallelFor(
+            num_particles,
+            [=] AMREX_GPU_DEVICE (long idx) {
+            const long ip = indices[idx];
+
+            // --- Get particle quantities
+            amrex::Real wq = q*wp[ip]*invvol;
+            if (do_ionization){
+                wq *= ion_lev[ip];
+            }
+
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(ip, xp, yp, zp);
+
+            // --- Compute shape factors
+            Compute_shape_factor< depos_order > const compute_shape_factor;
+#if !defined(WARPX_DIM_1D_Z)
+            // x direction
+            // Get particle position in grid coordinates
+#if defined(WARPX_DIM_RZ)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+            const amrex::Real costheta = (rp > 0._rt ? xp/rp : 1._rt);
+            const amrex::Real sintheta = (rp > 0._rt ? yp/rp : 0._rt);
+            const Complex xy0 = Complex{costheta, sintheta};
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RCYLINDER)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp);
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+            const amrex::Real rp = std::sqrt(xp*xp + yp*yp + zp*zp);
+            const amrex::Real x = (rp - xyzmin.x)*dinv.x;
+#else
+            const amrex::Real x = (xp - xyzmin.x)*dinv.x;
+#endif
+
+            // Compute shape factor along x
+            // i: leftmost grid point that the particle touches
+            amrex::Real sx[depos_order + 1] = {0._rt};
+            int i = 0;
+            if (rho_type[0] == NODE) {
+                i = compute_shape_factor(sx, x);
+            } else if (rho_type[0] == CELL) {
+                i = compute_shape_factor(sx, x - 0.5_rt);
+            }
+#endif // !defined(WARPX_DIM_1D_Z)
+#if defined(WARPX_DIM_3D)
+            // y direction
+            const amrex::Real y = (yp - xyzmin.y)*dinv.y;
+            amrex::Real sy[depos_order + 1] = {0._rt};
+            int j = 0;
+            if (rho_type[1] == NODE) {
+                j = compute_shape_factor(sy, y);
+            } else if (rho_type[1] == CELL) {
+                j = compute_shape_factor(sy, y - 0.5_rt);
+            }
+#endif
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            // z direction
+            const amrex::Real z = (zp - xyzmin.z)*dinv.z;
+            amrex::Real sz[depos_order + 1] = {0._rt};
+            int k = 0;
+            if (rho_type[WARPX_ZINDEX] == NODE) {
+                k = compute_shape_factor(sz, z);
+            } else if (rho_type[WARPX_ZINDEX] == CELL) {
+                k = compute_shape_factor(sz, z - 0.5_rt);
+            }
+#endif
+
+            // Deposit charge into rho_arr
+#if defined(WARPX_DIM_1D_Z)
+            for (int iz=0; iz<=depos_order; iz++){
+                const amrex::Real val = sz[iz]*wq;
+                amrex::Gpu::Atomic::AddNoRet(
+                    &rho_arr(lo.x+k+iz, 0, 0, icomp_new), val);
+                if (deposit_old_comp) {
+                    amrex::Gpu::Atomic::AddNoRet(
+                        &rho_arr(lo.x+k+iz, 0, 0, 0), val);
+                }
+            }
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            for (int ix=0; ix<=depos_order; ix++){
+                const amrex::Real val = sx[ix]*wq;
+                amrex::Gpu::Atomic::AddNoRet(
+                    &rho_arr(lo.x+i+ix, 0, 0, icomp_new), val);
+                if (deposit_old_comp) {
+                    amrex::Gpu::Atomic::AddNoRet(
+                        &rho_arr(lo.x+i+ix, 0, 0, 0), val);
+                }
+            }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            for (int iz=0; iz<=depos_order; iz++){
+                for (int ix=0; ix<=depos_order; ix++){
+                    const amrex::Real val = sx[ix]*sz[iz]*wq;
+                    amrex::Gpu::Atomic::AddNoRet(
+                        &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, icomp_new), val);
+                    if (deposit_old_comp) {
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, 0), val);
+                    }
+#if defined(WARPX_DIM_RZ)
+                    Complex xy = xy0; // Throughout the following loop, xy takes the value e^{i m theta}
+                    for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
+                        // The factor 2 on the weighting comes from the normalization of the modes
+                        amrex::Gpu::Atomic::AddNoRet( &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, icomp_new+2*imode-1), 2._rt*val*xy.real());
+                        amrex::Gpu::Atomic::AddNoRet( &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, icomp_new+2*imode  ), 2._rt*val*xy.imag());
+                        if (deposit_old_comp) {
+                            amrex::Gpu::Atomic::AddNoRet( &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, 2*imode-1), 2._rt*val*xy.real());
+                            amrex::Gpu::Atomic::AddNoRet( &rho_arr(lo.x+i+ix, lo.y+k+iz, 0, 2*imode  ), 2._rt*val*xy.imag());
+                        }
+                        xy = xy*xy0;
+                    }
+#endif
+                }
+            }
+#elif defined(WARPX_DIM_3D)
+            for (int iz=0; iz<=depos_order; iz++){
+                for (int iy=0; iy<=depos_order; iy++){
+                    for (int ix=0; ix<=depos_order; ix++){
+                        const amrex::Real val = sx[ix]*sy[iy]*sz[iz]*wq;
+                        amrex::Gpu::Atomic::AddNoRet(
+                            &rho_arr(lo.x+i+ix, lo.y+j+iy, lo.z+k+iz, icomp_new), val);
+                        if (deposit_old_comp) {
+                            amrex::Gpu::Atomic::AddNoRet(
+                                &rho_arr(lo.x+i+ix, lo.y+j+iy, lo.z+k+iz, 0), val);
+                        }
+                    }
+                }
+            }
+#endif
+        }
+        );
+}
+
+} // namespace
+
+/* \brief Deposit rho from the suborbit particles only, at their current positions.
+ *
+ * Called right after ImplicitPushXPSubOrbits, which leaves the suborbit particles at
+ * their half-time positions with their weights restored. Deposits into the new-time
+ * component block of rho, and also into the old-time block when deposit_old_comp is
+ * true (suborbit-only linear stage of JFNK, where the old-time block is likewise
+ * composed as rho_fp_non_suborbit + suborbit rho).
+ *
+ * \param[in] pti                       The WarpXParIter holding the particles
+ * \param[in/out] rho                   The charge density MultiFab to deposit into
+ * \param[in] deposit_old_comp          Also deposit into the old-time component block
+ * \param[in] index_offset              Offset in the list of unconverged particles
+ * \param[in] num_unconverged_particles Number of unconverged (suborbit) particles
+ * \param[in] unconverged_indices       The list of indices of unconverged particles
+ * \param[in] lev                       The refinement level
+ * \param[in] depos_lev                 The refinement level at which to deposit
+ */
+void
+PhysicalParticleContainer::DepositSuborbitRho (WarpXParIter& pti,
+                                               amrex::MultiFab* rho,
+                                               bool deposit_old_comp,
+                                               long index_offset,
+                                               long num_unconverged_particles,
+                                               amrex::Gpu::DeviceVector<long> const & unconverged_indices,
+                                               int lev, int depos_lev)
+{
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
+                                     (depos_lev==(lev  )),
+                                     "Deposition buffers only work for lev-1");
+
+    // If no particles, do not do anything
+    if (num_unconverged_particles == 0) { return; }
+
+    ABLASTR_PROFILE("PhysicalParticleContainer::DepositSuborbitRho()");
+
+    const int nc = WarpX::ncomps;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho->nComp() >= 2*nc,
+        "DepositSuborbitRho requires rho with old and new time-level components");
+    const int icomp_new = rho->nComp() - nc;
+
+    // Tile box and physical lower corner, following the conventions of
+    // WarpXParticleContainer::DepositCharge
+    amrex::Box tilebox;
+    if (lev == depos_lev) {
+        tilebox = pti.tilebox();
+    } else {
+        tilebox = amrex::coarsen(pti.tilebox(), WarpX::RefRatio(depos_lev));
+    }
+    const amrex::IntVect& ng_rho = WarpX::GetInstance().get_ng_depos_rho();
+    tilebox.grow(ng_rho);
+
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(tilebox, depos_lev, 0.0_rt);
+    const amrex::Dim3 lo = lbound(tilebox);
+    const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
+
+    const auto GetPosition = GetParticlePosition<PIdx>(pti, 0);
+    auto& attribs = pti.GetAttribs();
+    const amrex::ParticleReal* const wp = attribs[PIdx::w].dataPtr();
+    const int* const ion_lev = (do_field_ionization)?
+        pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
+
+    amrex::Array4<amrex::Real> const& rho_arr = (*rho)[pti].array();
+    const amrex::IntVect rho_type = rho->ixType().toIntVect();
+    const long* indices = unconverged_indices.data() + index_offset;
+
+    const amrex::Real q = this->m_charge;
+
+    if (WarpX::nox == 1){
+        ::doSuborbitRhoDeposition<1>(GetPosition, wp, ion_lev, rho_arr, rho_type,
+                                     icomp_new, deposit_old_comp, indices,
+                                     num_unconverged_particles, dinv, xyzmin, lo, q,
+                                     WarpX::n_rz_azimuthal_modes);
+    } else if (WarpX::nox == 2){
+        ::doSuborbitRhoDeposition<2>(GetPosition, wp, ion_lev, rho_arr, rho_type,
+                                     icomp_new, deposit_old_comp, indices,
+                                     num_unconverged_particles, dinv, xyzmin, lo, q,
+                                     WarpX::n_rz_azimuthal_modes);
+    } else if (WarpX::nox == 3){
+        ::doSuborbitRhoDeposition<3>(GetPosition, wp, ion_lev, rho_arr, rho_type,
+                                     icomp_new, deposit_old_comp, indices,
+                                     num_unconverged_particles, dinv, xyzmin, lo, q,
+                                     WarpX::n_rz_azimuthal_modes);
+    } else if (WarpX::nox == 4){
+        ::doSuborbitRhoDeposition<4>(GetPosition, wp, ion_lev, rho_arr, rho_type,
+                                     icomp_new, deposit_old_comp, indices,
+                                     num_unconverged_particles, dinv, xyzmin, lo, q,
+                                     WarpX::n_rz_azimuthal_modes);
+    }
 
     amrex::Gpu::streamSynchronize();
 }

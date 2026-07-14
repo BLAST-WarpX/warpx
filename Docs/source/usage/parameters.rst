@@ -300,6 +300,12 @@ Overall simulation parameters
             This can enhance the overall efficiency of the Newton solver.
             Default is true if ``implicit_evolve.particle_suborbits = true``.
 
+          - ``implicit_evolve.use_rho_non_suborbit`` (``bool``, default: true).
+            Only used when ``implicit_evolve.use_mass_matrices_jacobian = true``, ``implicit_evolve.particle_suborbits = true``, and the charge density is allocated (e.g., with the hybrid-PIC solver).
+            When ``true``, the charge density from the particles represented by the mass matrices is cached once per nonlinear iteration, so that only the suborbit particles deposit charge density during the linear stage of PS-JFNK, analogous to the treatment of the current density.
+            This avoids all-particle charge deposits in every GMRES iteration.
+            Can be set to ``false`` for debugging or benchmarking.
+
         - ``implicit_evolve.use_mass_matrices_pc`` (``bool``, default: false).
           When ``true``, the plasma response is captured in the preconditioner.
           Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, or ``pc_jacobi``).

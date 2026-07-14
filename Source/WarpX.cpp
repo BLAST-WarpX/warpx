@@ -2735,6 +2735,15 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::rho_fp,
             lev, amrex::convert(ba, rho_nodal_flag), dm,
             rho_ncomps, ngRho, 0.0_rt);
+
+        if (m_implicit_solver) {
+            // With mass matrices and suborbit particles, rho from the non-suborbit
+            // particles is frozen during the linear stage of JFNK and cached here,
+            // so that only suborbit particles need to deposit rho per linear iteration.
+            m_fields.alloc_init(FieldType::rho_fp_non_suborbit,
+                lev, amrex::convert(ba, rho_nodal_flag), dm,
+                ncomps, ngRho, 0.0_rt);
+        }
     }
 
     if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrame ||

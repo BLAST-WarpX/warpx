@@ -513,12 +513,23 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     bool const deposit_charge = (
         has_rho &&
         !skip_deposition &&
-        !do_not_deposit
+        !do_not_deposit &&
+        !(implicit_options && implicit_options->evolve_suborbit_particles_only &&
+          implicit_options->use_rho_non_suborbit)
     );
     bool const deposit_current = (
         !skip_deposition &&
         !do_not_deposit &&
         !(implicit_options && implicit_options->evolve_suborbit_particles_only)
+    );
+    // With mass matrices and suborbits, rho from non-suborbit particles is frozen during
+    // the linear stage of JFNK: it is cached in rho_fp_non_suborbit once per nonlinear
+    // iteration and only the suborbit particles deposit rho per residual evaluation.
+    bool const deposit_charge_suborbit = (
+        has_rho &&
+        !skip_deposition &&
+        !do_not_deposit &&
+        implicit_options && implicit_options->use_rho_non_suborbit
     );
     bool const split_particles = (
         do_splitting &&
@@ -614,6 +625,15 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
                     DepositCharge(pti, wp, ion_lev, crho, 0, np_to_deposit,
                                   np-np_to_deposit, thread_num, lev, lev-1);
+                }
+                if (deposit_charge_suborbit && do_not_push) {
+                    // Species that are not pushed never enter the suborbit machinery
+                    // and their positions are static, so their full rho belongs in the
+                    // non-suborbit cache (deposited below for pushed species, in the
+                    // window where the suborbit particles' weights are zeroed).
+                    amrex::MultiFab* rho0 = fields.get(FieldType::rho_fp_non_suborbit, lev);
+                    DepositCharge(pti, wp, ion_lev, rho0, 0, 0,
+                                  np_to_deposit, thread_num, lev, lev);
                 }
             }
 
@@ -736,6 +756,15 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
+                        if (deposit_charge_suborbit) {
+                            // Cache rho from the non-suborbit particles at their half-time
+                            // positions. The suborbit particles' weights are still zeroed
+                            // here (restored in ImplicitPushXPSubOrbits below), so they do
+                            // not contribute.
+                            amrex::MultiFab* rho0 = fields.get(FieldType::rho_fp_non_suborbit, lev);
+                            DepositCharge(pti, wp, ion_lev, rho0, 0, 0,
+                                          np_to_deposit, thread_num, lev, lev);
+                        }
                     }
                     else {
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -771,6 +800,18 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                                 jx, jy, jz,
                                                 offset, lev, gather_lev, dt, skip_deposition,
                                                 num_unconverged_particles, unconverged_indices, saved_weights);
+                        if (deposit_charge_suborbit) {
+                            // Deposit rho from the suborbit particles at their half-time
+                            // positions (set by ImplicitPushXPSubOrbits, weights restored).
+                            // In the suborbit-only linear stage both rho components are
+                            // composed this way; in the nonlinear stage only the new-time
+                            // component (the old-time one was deposited in full above).
+                            amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
+                            DepositSuborbitRho(pti, rho,
+                                               implicit_options->evolve_suborbit_particles_only,
+                                               offset, num_unconverged_particles,
+                                               unconverged_indices, lev, lev);
+                        }
                     }
                     if (num_unconverged_particles_c > 0) {
 
@@ -802,13 +843,17 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                                 cjx, cjy, cjz,
                                                 offset, lev, lev-1, dt, skip_deposition,
                                                 num_unconverged_particles_c, unconverged_indices, saved_weights);
+                        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!deposit_charge_suborbit,
+                            "Suborbit rho deposition (mass matrices + suborbits with rho) is not implemented for particles in mesh-refinement deposition buffers");
                     }
                 }
 
             } // end of "if do_not_push"
 
-            if (deposit_charge) {
+            if (deposit_charge && !deposit_charge_suborbit) {
                 // Deposit charge after particle push, in component 1 of MultiFab rho.
+                // (With deposit_charge_suborbit, component 1 is instead composed as
+                // rho_fp_non_suborbit + suborbit rho, see DepositSuborbitRho and CumulateRho.)
                 // (Skipped for electrostatic solver, as this may lead to out-of-bounds)
                 if (WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None) {
                     amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);

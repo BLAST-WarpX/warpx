@@ -189,6 +189,21 @@ public:
                                   amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                   amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights);
 
+    /** Deposit rho from the suborbit particles only, at their current (half-time) positions.
+     *
+     * Used with mass matrices + suborbits, where rho from the non-suborbit particles is
+     * cached in rho_fp_non_suborbit and only the suborbit particles re-deposit per
+     * residual evaluation. Deposits into the new-time component block of rho, and also
+     * into the old-time block when deposit_old_comp is true (suborbit-only linear stage).
+     */
+    void DepositSuborbitRho (WarpXParIter& pti,
+                             amrex::MultiFab* rho,
+                             bool deposit_old_comp,
+                             long index_offset,
+                             long num_unconverged_particles,
+                             amrex::Gpu::DeviceVector<long> const & unconverged_indices,
+                             int lev, int depos_lev);
+
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
                         const amrex::MultiFab& Ey,
