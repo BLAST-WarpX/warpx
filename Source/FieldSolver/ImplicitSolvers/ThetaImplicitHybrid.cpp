@@ -227,17 +227,29 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         m_WarpX->GetPartContainer().DepositTemperatures(m_WarpX->m_fields, 0._rt);
         // Provide J_i (ion current) in hybrid_current_fp_temp, which
         // QDSMCInitializeUe needs for V_e = -(J_plasma - J_i)/(q_e n_e).
-        // current_fp holds the ion current from the converged solve. Without
-        // this, J_i = 0 makes V_e the full plasma drift (far too large) and the
-        // QDSMC entropy carriers overshoot the grid (out-of-bounds deposit).
+        // Deposit it fresh from the redistributed t^{n+1} particles rather
+        // than copying the solver's current_fp: that copy holds the ion
+        // current from the last Newton residual evaluation (theta-level
+        // positions, different deposit path), and mixing it with the t^{n+1}
+        // B-field in V_e feeds a systematic entropy drift into the QDSMC
+        // transport (electron temperature falls well below the adiabat).
+        // DepositCurrent zeroes the target and applies the RZ inverse-volume
+        // scaling internally; fold guard-cell deposits afterwards, matching
+        // the rho^{n+1} handling above.
+        m_WarpX->GetPartContainer().DepositCurrent(
+            m_WarpX->m_fields.get_mr_levels_alldirs(
+                FieldType::hybrid_current_fp_temp, m_num_amr_levels - 1),
+            m_dt, 0.0_rt);
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            ablastr::fields::VectorField Ji_src =
-                m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-            ablastr::fields::VectorField Ji_dst =
+            ablastr::fields::VectorField Jt =
                 m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
             for (int n = 0; n < 3; ++n) {
-                amrex::MultiFab::Copy(*Ji_dst[n], *Ji_src[n], 0, 0,
-                                      Ji_dst[n]->nComp(), Ji_dst[n]->nGrowVect());
+                ablastr::utils::communication::SumBoundary(
+                    *Jt[n], 0, Jt[n]->nComp(), Jt[n]->nGrowVect(), Jt[n]->nGrowVect(),
+                    WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
+                ablastr::utils::communication::FillBoundary(
+                    *Jt[n], Jt[n]->nGrowVect(), WarpX::do_single_precision_comms,
+                    m_WarpX->Geom(lev).periodicity(), true);
             }
         }
         m_hybrid_pic_model->AdvanceElectronEnergyQDSMC( m_dt );
