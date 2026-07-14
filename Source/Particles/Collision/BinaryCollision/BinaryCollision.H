@@ -30,6 +30,8 @@
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/WarpXParticleContainer_fwd.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
+
 #include <AMReX.H>
 #include <AMReX_Algorithm.H>
 #include <AMReX_BLassert.H>
@@ -59,6 +61,7 @@
 
 #include <cmath>
 #include <string>
+#include <type_traits>
 
 /**
  * \brief This class performs generic binary collisions.
@@ -642,7 +645,14 @@ public:
             // that do not touch the same macroparticles, so that there is no race condition),
             // where the number of independent pairs is determined by the lower number of
             // macroparticles of either species, within each cell.
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions",
+                                prof_loopOverCollisions);
+            ABLASTR_PROFILE_VAR_NS(
+                "BinaryCollision::doCollisionsWithinTile::LinearCompton::eventEvaluation",
+                prof_linearComptonEventEvaluation);
+            if constexpr (std::is_same_v<CollisionFunctor, LinearComptonCollisionFunc>) {
+                ABLASTR_PROFILE_VAR_START(prof_linearComptonEventEvaluation);
+            }
             amrex::ParallelForRNG( n_independent_pairs,
                 [=] AMREX_GPU_DEVICE (int i_coll, amrex::RandomEngine const& engine) noexcept
                 {
@@ -694,10 +704,15 @@ public:
                         p_pair_reaction_weight, p_product_data, engine);
                 }
             );
+            if constexpr (std::is_same_v<CollisionFunctor, LinearComptonCollisionFunc>) {
+                ABLASTR_PROFILE_VAR_STOP(prof_linearComptonEventEvaluation);
+            }
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::createProductParticles",
+                                prof_createProductParticles);
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_1,
                                                     product_species_vector,
@@ -707,11 +722,15 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_createProductParticles);
 
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::setProductParticleIDs",
+                                prof_setProductParticleIDs);
             for (int i = 0; i < n_product_species; i++)
             {
                 setNewParticleIDs(*(tile_products_data[i]), static_cast<int>(products_np[i]), num_added[i]);
             }
+            ABLASTR_PROFILE_VAR_STOP(prof_setProductParticleIDs);
 
             if (m_correct_energy_momentum) {
                 // Loop over cells and calculate the change in energy and momentum.
@@ -1241,7 +1260,14 @@ public:
             // that do not touch the same macroparticles, so that there is no race condition),
             // where the number of independent pairs is determined by the lower number of
             // macroparticles of either species, within each cell.
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions", prof_loopOverCollisions);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::LoopOverCollisions",
+                                prof_loopOverCollisions);
+            ABLASTR_PROFILE_VAR_NS(
+                "BinaryCollision::doCollisionsWithinTile::LinearCompton::eventEvaluation",
+                prof_linearComptonEventEvaluation);
+            if constexpr (std::is_same_v<CollisionFunctor, LinearComptonCollisionFunc>) {
+                ABLASTR_PROFILE_VAR_START(prof_linearComptonEventEvaluation);
+            }
             amrex::ParallelForRNG( n_independent_pairs,
                 [=] AMREX_GPU_DEVICE (int i_coll, amrex::RandomEngine const& engine) noexcept
                 {
@@ -1300,11 +1326,16 @@ public:
                         p_pair_reaction_weight, p_product_data, engine);
                 }
             );
+            if constexpr (std::is_same_v<CollisionFunctor, LinearComptonCollisionFunc>) {
+                ABLASTR_PROFILE_VAR_STOP(prof_linearComptonEventEvaluation);
+            }
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
 
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::createProductParticles",
+                                prof_createProductParticles);
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_2,
                                                     product_species_vector,
@@ -1314,11 +1345,15 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_createProductParticles);
 
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::setProductParticleIDs",
+                                prof_setProductParticleIDs);
             for (int i = 0; i < n_product_species; i++)
             {
                 setNewParticleIDs(*(tile_products_data[i]), static_cast<int>(products_np[i]), num_added[i]);
             }
+            ABLASTR_PROFILE_VAR_STOP(prof_setProductParticleIDs);
 
             if (m_correct_energy_momentum) {
                 // Loop over cells and calculate the change in energy and momentum.

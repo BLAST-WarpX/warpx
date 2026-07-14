@@ -18,6 +18,8 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
+
 #include <AMReX_DenseBins.H>
 #include <AMReX_GpuAtomic.H>
 #include <AMReX_GpuDevice.H>
@@ -115,12 +117,18 @@ public:
     {
         using namespace amrex::literals;
 
+        ABLASTR_PROFILE("ParticleCreationFunc::operator()");
+
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
         // Compute offset array and allocate memory for the produced species
+        ABLASTR_PROFILE_VAR("ParticleCreationFunc::operator()::computeOffsets",
+                            prof_computeOffsets);
         amrex::Gpu::DeviceVector<index_type> offsets(n_total_pairs);
         const auto total = amrex::Scan::ExclusiveSum(n_total_pairs, p_mask, offsets.data());
         const index_type* AMREX_RESTRICT p_offsets = offsets.dataPtr();
+        ABLASTR_PROFILE_VAR_STOP(prof_computeOffsets);
+
         // How many particles of each product species are created.
         // Linear Compton: one macroparticle per product species
         // (one product photon at reactant photon position, same for electron)
@@ -132,17 +140,22 @@ public:
         const int products_per_reactant_factor =
             (m_collision_type == CollisionType::LinearCompton) ? 1 : 2;
         amrex::Vector<int> num_added_vec(m_num_product_species);
+        ABLASTR_PROFILE_VAR("ParticleCreationFunc::operator()::resizeProductTiles",
+                            prof_resizeProductTiles);
         for (int i = 0; i < m_num_product_species; i++)
         {
             const index_type num_added = total * m_num_products_host[i] * products_per_reactant_factor;
             num_added_vec[i] = static_cast<int>(num_added);
             tile_products[i]->resize(products_np[i] + num_added);
         }
+        ABLASTR_PROFILE_VAR_STOP(prof_resizeProductTiles);
 
         const auto soa_1 = ptile1.getParticleTileData();
         const auto soa_2 = ptile2.getParticleTileData();
 
         // Create necessary GPU vectors, that will be used in the kernel below
+        ABLASTR_PROFILE_VAR("ParticleCreationFunc::operator()::prepareProductData",
+                            prof_prepareProductData);
         amrex::Vector<SoaData_type> soa_products;
         for (int i = 0; i < m_num_product_species; i++)
         {
@@ -170,12 +183,21 @@ public:
         const index_type* AMREX_RESTRICT products_np_data = products_np.data();
         const amrex::ParticleReal* AMREX_RESTRICT products_mass_data = products_mass.data();
 #endif
+        ABLASTR_PROFILE_VAR_STOP(prof_prepareProductData);
 
         const int t_num_product_species = m_num_product_species;
         const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
         const CollisionType t_collision_type = m_collision_type;
         const ScatteringAngleModel t_scattering_angle_model = m_scattering_angle_model;
 
+        ABLASTR_PROFILE_VAR("ParticleCreationFunc::operator()::createProductsAndInitializeMomentum",
+                            prof_createProductsAndInitializeMomentum);
+        ABLASTR_PROFILE_VAR_NS(
+            "ParticleCreationFunc::operator()::LinearCompton::createProductsAndInitializeMomentum",
+            prof_linearComptonCreateProductsAndInitializeMomentum);
+        if (m_collision_type == CollisionType::LinearCompton) {
+            ABLASTR_PROFILE_VAR_START(prof_linearComptonCreateProductsAndInitializeMomentum);
+        }
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
@@ -267,8 +289,14 @@ public:
                 }
             }
         });
+        if (m_collision_type == CollisionType::LinearCompton) {
+            ABLASTR_PROFILE_VAR_STOP(prof_linearComptonCreateProductsAndInitializeMomentum);
+        }
+        ABLASTR_PROFILE_VAR_STOP(prof_createProductsAndInitializeMomentum);
 
         // Initialize the user runtime components
+        ABLASTR_PROFILE_VAR("ParticleCreationFunc::operator()::defaultInitializeRuntimeAttributes",
+                            prof_defaultInitializeRuntimeAttributes);
         for (int i = 0; i < m_num_product_species; i++)
         {
             const auto start_index = int(products_np[i]);
@@ -276,8 +304,11 @@ public:
             ParticleCreation::DefaultInitializeRuntimeAttributes(*tile_products[i],
                                                  *pc_products[i], start_index, stop_index);
         }
+        ABLASTR_PROFILE_VAR_STOP(prof_defaultInitializeRuntimeAttributes);
 
+        ABLASTR_PROFILE_VAR("ParticleCreationFunc::operator()::synchronize", prof_synchronize);
         amrex::Gpu::synchronize();
+        ABLASTR_PROFILE_VAR_STOP(prof_synchronize);
 
         return num_added_vec;
     }
