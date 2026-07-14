@@ -109,6 +109,13 @@ public:
     }
 
     /**
+     * \brief Return pointer to nodal MultiFab vector for spatially varying alpha coefficient
+     */
+    [[nodiscard]] virtual const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const {
+        return nullptr;
+    }
+
+    /**
      * \brief Return reference to the multifabs for curl curl mask
      */
     [[nodiscard]] virtual const amrex::MultiFab* GetCurl2BCmask (const int lev, const int dir) const
@@ -188,6 +195,13 @@ protected:
      * m_max_particle_iterations iterations
      */
     bool m_particle_suborbits = false;
+
+    /**
+     * With mass matrices + suborbits, cache rho from the non-suborbit particles once per
+     * nonlinear iteration so that only suborbit particles deposit rho during the linear
+     * stage of JFNK. Enabled by default; can be disabled for debugging/benchmarking.
+     */
+    bool m_use_rho_non_suborbit = true;
 
     /**
      * \brief whether the details of unconverged particles are printed out during
@@ -273,14 +287,22 @@ protected:
     void SyncMassMatricesPCAndApplyBCs ();
 
     /**
-     * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
+     * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms.
+     * Derived classes (e.g. hybrid) may override to apply a different or no scaling.
      */
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt );
+    virtual void SetMassMatricesForPC ( amrex::Real a_theta_dt );
 
     /**
      * \brief Add J from particles included in mass matrices at start of each Newton step
      */
     void CumulateJ ();
+
+    /**
+     * \brief Add the cached rho from non-suborbit particles (rho_fp_non_suborbit) to the
+     * new-time component of rho_fp, and also to the old-time component during the
+     * suborbit-only linear stage of JFNK, where only suborbit particles deposit rho.
+     */
+    void CumulateRho ( bool a_include_old_comp );
 
     /**
      * \brief Save E at start of each Newton step

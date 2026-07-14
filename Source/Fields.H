@@ -46,12 +46,18 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
+        hybrid_electron_temperature_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron temperature T_e (Joules) as a state variable; updated each step from the entropy K_e after QDSMC scatter and used as input for the polytropic pressure relation. */
+        hybrid_entropy_fp,           /**< Used with the QDSMC electron-energy equation. Stores the electron entropy K_e = T_e * n_e^(1-gamma) on the grid; the QDSMC fictitious particles read this at the start of each step and rewrite it after Lagrangian advection. */
+        hybrid_qdsmc_weights_fp,     /**< Used with the QDSMC electron-energy equation. Scratch field for the per-cell weight (N_e) deposited by QDSMC particles after their push, used to recover K_e^{n+1} as (deposited K*N) / (deposited N). */
+        hybrid_electron_velocity_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron fluid velocity V_e = -(J_plasma - J_i) / (q_e * n_e) on a NODAL grid (3 components); read by QDSMC SetV at the start of each step to advect the entropy-carrying particles. */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
         hybrid_current_fp_external,  /**< Used with Ohm's law solver. Stores external current */
         hybrid_B_fp_external,       /**< Used with Ohm's law solver. Stores external B field */
         hybrid_E_fp_external,       /**< Used with Ohm's law solver. Stores external E field */
+        hybrid_darwin_phi_fp,        /**< Darwin split: nodal scalar potential φ, s.t. E_long = ∇φ */
+        hybrid_E_fp_long,            /**< Darwin split: longitudinal (curl-free) part of E on Yee stagger */
         Efield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         Bfield_cp,  /**< Only used with MR. The field that is updated by the field solver at each timestep, on the coarse patch of each level */
         current_cp, /**< Only used with MR. The current that is used as a source for the field solver, on the coarse patch of each level */
@@ -85,6 +91,7 @@ namespace warpx::fields
         E_old, // Stores the value of E at the beginning of the timestep, for the implicit solver
         Efield_fp_save,  // E at start of Newton step used by the implicit solvers
         current_fp_non_suborbit, // J from non-suborbit particles used by the implicit solvers
+        rho_fp_non_suborbit, // rho from non-suborbit particles used by the implicit solvers with mass matrices
         MassMatrices_X,  // Stores full mass matrix elements for Jx used by the implicit solvers
         MassMatrices_Y,  // Stores full mass matrix elements for Jy used by the implicit solvers
         MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
@@ -116,6 +123,7 @@ namespace warpx::fields
         FieldType::hybrid_current_fp_external,
         FieldType::hybrid_B_fp_external,
         FieldType::hybrid_E_fp_external,
+        FieldType::hybrid_E_fp_long,
         FieldType::Efield_cp,
         FieldType::Bfield_cp,
         FieldType::current_cp,

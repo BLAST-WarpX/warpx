@@ -92,7 +92,9 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
                 lbc[i] = LinOpBCType::symmetry;
             }
         } else if (a_fbc[i] == FieldBoundaryType::None) {
-            WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
+            // In RZ/cylindrical geometry the r=0 axis uses FieldBoundaryType::None;
+            // treat it as a symmetry (Neumann/reflecting) boundary for the MLMG operator.
+            lbc[i] = LinOpBCType::symmetry;
         } else if (a_fbc[i] == FieldBoundaryType::Open) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
         } else {
@@ -121,6 +123,31 @@ void ImplicitSolver::CumulateJ ()
         amrex::MultiFab::Add(*J[0], *J0[0], 0, 0, J0[0]->nComp(), J0[0]->nGrowVect());
         amrex::MultiFab::Add(*J[1], *J0[1], 0, 0, J0[1]->nComp(), J0[1]->nGrowVect());
         amrex::MultiFab::Add(*J[2], *J0[2], 0, 0, J0[2]->nComp(), J0[2]->nGrowVect());
+    }
+
+}
+
+void ImplicitSolver::CumulateRho ( const bool a_include_old_comp )
+{
+
+    // With mass matrices and suborbit particles, rho is composed as
+    // rho = rho_suborbit + rho0, where rho0 (rho_fp_non_suborbit) is the charge density of
+    // the particles represented by the mass matrices, deposited once per nonlinear iteration
+    // at their (frozen) half-time positions. The new-time component of rho_fp always receives
+    // rho0 here; the old-time component is fully deposited during the nonlinear stage and is
+    // only composed this way during the suborbit-only linear stage of JFNK.
+    // Do this BEFORE the inverse-volume scaling and the call to SyncCurrentAndRho(),
+    // so rho0 stays unscaled and guard-cell deposits are folded in with the rest of rho.
+
+    using warpx::fields::FieldType;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+        const amrex::MultiFab* rho0 = m_WarpX->m_fields.get(FieldType::rho_fp_non_suborbit, lev);
+        const int nc = rho0->nComp();
+        amrex::MultiFab::Add(*rho, *rho0, 0, rho->nComp() - nc, nc, rho0->nGrowVect());
+        if (a_include_old_comp) {
+            amrex::MultiFab::Add(*rho, *rho0, 0, 0, nc, rho0->nGrowVect());
+        }
     }
 
 }
@@ -477,6 +504,7 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
+        pp.query("use_rho_non_suborbit", m_use_rho_non_suborbit);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
             m_use_mass_matrices = true;
         }
@@ -806,6 +834,9 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     options.use_mass_matrices_pc = m_use_mass_matrices_pc;
     options.use_mass_matrices_jacobian = m_use_mass_matrices_jacobian;
     options.evolve_suborbit_particles_only = false;
+    options.use_rho_non_suborbit = m_use_rho_non_suborbit &&
+                                   m_use_mass_matrices_jacobian && m_particle_suborbits &&
+                                   m_WarpX->m_fields.has(FieldType::rho_fp, 0);
 
     if (a_nl_iter == 0 && !a_from_jacobian &&
         m_use_mass_matrices_jacobian && m_skip_particle_picard_init) {
@@ -831,10 +862,24 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
         CumulateJ();
     }
 
+    if (options.use_rho_non_suborbit) {
+        // rho = rho_suborbit + rho0; add rho0 to the old-time component as well during the
+        // suborbit-only linear stage (the nonlinear stage deposits it in full).
+        CumulateRho( options.evolve_suborbit_particles_only );
+    }
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // rho_fp is freshly deposited (via PushParticlesandDeposit) in all paths except the
+    // MM-Jacobian linear stage without suborbit particles, where no particle push occurs and
+    // rho_fp retains the already-scaled value from the last nonlinear iteration.
+    const bool rho_freshly_deposited = !(m_use_mass_matrices_jacobian && a_from_jacobian && !m_particle_suborbits);
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
+        if (rho_freshly_deposited && m_WarpX->m_fields.has(FieldType::rho_fp, lev)) {
+            m_WarpX->ApplyInverseVolumeScalingToChargeDensity(
+                m_WarpX->m_fields.get(FieldType::rho_fp, lev), lev);
+        }
     }
 #endif
 
@@ -1160,6 +1205,9 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
             amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
             if (m_use_mass_matrices_jacobian) {
                 amrex::Print() << "        skip particle picard init:  " << (m_skip_particle_picard_init ? "true":"false") << "\n";
+                if (m_particle_suborbits) {
+                    amrex::Print() << "        use rho non suborbit:       " << (m_use_rho_non_suborbit ? "true":"false") << "\n";
+                }
             }
             amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
             if (m_use_mass_matrices_pc) {

@@ -148,6 +148,7 @@ public:
     void SpectralSourceFreeFieldAdvance ( amrex::Real start_time);
     void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_theta, amrex::Real a_time );
+    void ApplyFillBoundaryE();
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
                                const ablastr::fields::MultiLevelVectorField& Field_n,
                                amrex::Real theta );

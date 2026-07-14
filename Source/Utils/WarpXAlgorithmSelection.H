@@ -32,6 +32,7 @@ AMREX_ENUM(MediumForEM,
 AMREX_ENUM(EvolveScheme,
            Explicit,
            Theta_Implicit_EM,
+           Theta_Implicit_Hybrid,
            Semi_Implicit_EM,
            Strang_Implicit_Spectral_EM,
            Default = Explicit);

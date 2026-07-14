@@ -1,0 +1,611 @@
+/* Copyright 2026 Prabhat Kumar
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+#include "Fields.H"
+#include "ThetaImplicitHybrid.H"
+#include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/ExternalVectorPotential.H"
+#include "Particles/MultiParticleContainer.H"
+#include "WarpX.H"
+#include <ablastr/utils/Communication.H>
+#include <ablastr/coarsen/sample.H>
+
+using warpx::fields::FieldType;
+using namespace amrex::literals;
+
+void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
+{
+    BL_PROFILE("ThetaImplicitHybrid::Define()");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_is_defined,
+        "ThetaImplicitHybrid object is already defined!");
+
+    m_WarpX = a_WarpX;
+    m_num_amr_levels = 1;
+
+    m_hybrid_pic_model = m_WarpX->get_pointer_HybridPICModel();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_hybrid_pic_model != nullptr,
+        "ThetaImplicitHybrid solver requires hybrid PIC model to be defined");
+
+    /// Set flag for external fields from vector potentials
+    m_add_external_fields = m_hybrid_pic_model->m_add_external_fields;
+
+    m_E.Define( m_WarpX, "Efield_fp" );
+    m_Eold.Define( m_E );
+
+    // Define B_old MultiFabs
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const auto& Bfp_x = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev);
+        const auto& dm = Bfp_x->DistributionMap();
+        const amrex::IntVect ngb = Bfp_x->nGrowVect();
+
+        for (int dir = 0; dir < 3; ++dir) {
+            const auto& ba = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{dir}, lev)->boxArray();
+            m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{dir}, lev, ba, dm, 1, ngb, 0.0_rt);
+        }
+    }
+
+    const amrex::ParmParse pp("implicit_evolve");
+    pp.query("theta", m_theta);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_theta >= 0.5 && m_theta <= 1.0,
+        "theta parameter must be between 0.5 and 1.0");
+    pp.query("use_darwin_split", m_use_darwin_split);
+
+    // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
+    m_alpha_mf.resize(m_num_amr_levels);
+    m_alpha_mfarrvec.resize(m_num_amr_levels);
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const auto* rho_mf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+        auto const& ba = amrex::convert(rho_mf->boxArray(),
+                                        amrex::IntVect::TheNodeVector());
+        m_alpha_mf[lev].define(ba, rho_mf->DistributionMap(),
+                               1, amrex::IntVect::TheZeroVector());
+        m_alpha_mfarrvec[lev] = &m_alpha_mf[lev];
+    }
+
+    parseNonlinearSolverParams( pp );
+    m_nlsolver->Define(m_E, this);
+
+    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+
+    m_is_defined = true;
+}
+
+void ThetaImplicitHybrid::PrintParameters () const
+{
+    BL_PROFILE("ThetaImplicitHybrid::PrintParameters()");
+
+    if (!m_WarpX->Verbose()) { return; }
+    amrex::Print() << "\n";
+    amrex::Print() << "-----------------------------------------------------------\n";
+    amrex::Print() << "-------- THETA IMPLICIT HYBRID PIC SOLVER PARAMETERS ------\n";
+    amrex::Print() << "-----------------------------------------------------------\n";
+    amrex::Print() << "Time-bias parameter theta:           " << m_theta << "\n";
+    PrintBaseImplicitSolverParameters();
+    m_nlsolver->PrintParams();
+    amrex::Print() << "-----------------------------------------------------------\n\n";
+}
+
+int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
+                                    const amrex::Real  a_dt,
+                                    const int          a_step )
+{
+    BL_PROFILE("ThetaImplicitHybrid::OneStep()");
+
+    m_dt = a_dt;
+
+    // Handle external field splitting: work with internal fields during the solve
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            start_time, 0.5_rt * m_dt);
+        SubtractExternalEfield();
+        SubtractExternalBfield();
+    }
+
+    // Save particle state at t^n
+    m_WarpX->SaveParticlesAtImplicitStepStart();
+
+    // QDSMC electron-energy equation (operator-split): capture rho^n now, while
+    // the particles are still at t^n, into hybrid_rho_fp_temp. The end-of-step
+    // AdvanceElectronEnergyQDSMC reads it as the start-of-step density.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_WarpX->GetPartContainer().DepositCharge(
+            m_WarpX->m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, m_num_amr_levels - 1),
+            0._rt);
+        // DepositCharge does NOT sync boundaries; fold guard-cell deposits into
+        // the valid (incl. periodic) nodes, else n_e is biased at the domain
+        // edges and QDSMC T_e shows a systematic dip there.
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            amrex::MultiFab* rt = m_WarpX->m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
+            ablastr::utils::communication::SumBoundary(
+                *rt, 0, rt->nComp(), rt->nGrowVect(), rt->nGrowVect(),
+                WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
+            ablastr::utils::communication::FillBoundary(
+                *rt, rt->nGrowVect(), WarpX::do_single_precision_comms,
+                m_WarpX->Geom(lev).periodicity(), true);
+        }
+    }
+
+    // Save E^n (or E_T^n if Darwin split)
+    m_Eold.Copy(FieldType::Efield_fp);
+
+    // Darwin split: decompose E^n = E_T^n + E_L^n; JFNK iterates on E_T only
+    if (m_use_darwin_split) {
+        m_hybrid_pic_model->ComputeLongitudinalE(0, GetLinOpBCLo(), GetLinOpBCHi());
+        SubtractLongitudinalE(m_Eold);
+    }
+
+    // Save B^n
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+        ablastr::fields::VectorField B_old = m_WarpX->m_fields.get_alldirs(FieldType::B_old, lev);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*B_old[n], *Bfp[n], 0, 0,
+                                  B_old[n]->nComp(), B_old[n]->nGrowVect());
+        }
+    }
+
+    // Initial guess: E^{n+θ} = E^n  (or E_T^{n+θ} = E_T^n if Darwin split)
+    m_E.Copy(m_Eold);
+
+    // Solve nonlinear system for E^{n+θ} (and eventually Pe^{n+θ})
+    m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
+
+    const int exit_status = m_nlsolver->GetExitStatus();
+    if (exit_status < 0) { return exit_status; }
+
+    // Update WarpX fields to t^{n+θ}
+    UpdateWarpXFields( m_E, start_time );
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
+
+    // Advance particles from t^{n+1/2} to t^{n+1}
+    m_WarpX->FinishImplicitParticleUpdate( start_time + m_dt );
+
+    // Advance fields from t^{n+θ} to t^{n+1}
+    FinishFieldUpdate( start_time + m_dt );
+
+    // QDSMC electron-energy equation (operator-split): particles and fields are
+    // now at t^{n+1}. Deposit rho^{n+1}, then advance T_e^n -> T_e^{n+1}, which
+    // refills hybrid_electron_pressure_fp = n_e k_B T_e for the next step's
+    // Ohm's-law E-solve. The JFNK residual reads that field directly (the
+    // per-iteration adiabatic CalculateElectronPressure is skipped in ComputeRHS
+    // when m_solve_electron_energy_equation is true), so Pe is lagged one step --
+    // the standard operator split for the kinetic electron-energy closure.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        // FinishImplicitParticleUpdate moved particles to t^{n+1} but did not
+        // Redistribute them into their valid cells. QDSMCApplyIonHeating does a
+        // per-ion NGP lookup into a zero-guard coefficient MultiFab, so ions left
+        // in guard cells would read out of bounds. Redistribute first, matching
+        // the explicit path's precondition (it redistributes before the QDSMC step).
+        m_WarpX->GetPartContainer().Redistribute();
+        m_WarpX->GetPartContainer().DepositCharge(
+            m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1),
+            0._rt);
+        // Sync rho^{n+1} (DepositCharge does not): fold guard-cell deposits into
+        // the valid (incl. periodic) nodes so n_e is unbiased at the boundaries.
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            amrex::MultiFab* rf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+            ablastr::utils::communication::SumBoundary(
+                *rf, 0, rf->nComp(), rf->nGrowVect(), rf->nGrowVect(),
+                WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
+            ablastr::utils::communication::FillBoundary(
+                *rf, rf->nGrowVect(), WarpX::do_single_precision_comms,
+                m_WarpX->Geom(lev).periodicity(), true);
+        }
+        // Per-species charge densities rho_fp_<spec> at t^{n+1}: the QDSMC Joule
+        // and Q_ei sources read them for the species fractions
+        // f_s = rho_s / Sigma_t rho_t. The explicit path deposits them every step
+        // in HybridPICDepositRhoAndJ; the implicit path does not call that, so
+        // without this deposit they stay frozen at their initialization values
+        // (stale f_s, and f_s = 0 in cells the plasma has since moved into).
+        // Deposited unscaled in RZ (apply_boundary_and_scale_volume = false) to
+        // match the explicit convention -- the 2*pi*r factors cancel in f_s.
+        {
+            auto & mypc = m_WarpX->GetPartContainer();
+            for (auto const & spec : mypc.GetSpeciesNames()) {
+                auto & pc = mypc.GetParticleContainerFromName(spec);
+                if (pc.getCharge() == 0._prt) { continue; }
+                pc.DepositCharge(
+                    m_WarpX->m_fields.get_mr_levels("rho_fp_" + spec, m_num_amr_levels - 1),
+                    /*local*/false, /*reset*/true,
+                    /*apply_boundary_and_scale_volume*/false,
+                    /*interpolate_across_levels*/false);
+            }
+        }
+        // Deposit the per-species ion temperature T_<nm> for the Q_ei relaxation.
+        // The explicit path fills it in HybridPICDepositRhoAndJ; the implicit path
+        // does not call that, so it must deposit here (on the redistributed t^{n+1}
+        // particles) or AdvanceElectronEnergyQDSMC reads a stale T_i.
+        m_WarpX->GetPartContainer().DepositTemperatures(m_WarpX->m_fields, 0._rt);
+        // Provide J_i (ion current) in hybrid_current_fp_temp, which
+        // QDSMCInitializeUe needs for V_e = -(J_plasma - J_i)/(q_e n_e).
+        // Deposit it fresh from the redistributed t^{n+1} particles rather
+        // than copying the solver's current_fp: that copy holds the ion
+        // current from the last Newton residual evaluation (theta-level
+        // positions, different deposit path), and mixing it with the t^{n+1}
+        // B-field in V_e feeds a systematic entropy drift into the QDSMC
+        // transport (electron temperature falls well below the adiabat).
+        // DepositCurrent zeroes the target and applies the RZ inverse-volume
+        // scaling internally; fold guard-cell deposits afterwards, matching
+        // the rho^{n+1} handling above.
+        m_WarpX->GetPartContainer().DepositCurrent(
+            m_WarpX->m_fields.get_mr_levels_alldirs(
+                FieldType::hybrid_current_fp_temp, m_num_amr_levels - 1),
+            m_dt, 0.0_rt);
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            ablastr::fields::VectorField Jt =
+                m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
+            for (int n = 0; n < 3; ++n) {
+                ablastr::utils::communication::SumBoundary(
+                    *Jt[n], 0, Jt[n]->nComp(), Jt[n]->nGrowVect(), Jt[n]->nGrowVect(),
+                    WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
+                ablastr::utils::communication::FillBoundary(
+                    *Jt[n], Jt[n]->nGrowVect(), WarpX::do_single_precision_comms,
+                    m_WarpX->Geom(lev).periodicity(), true);
+            }
+        }
+        m_hybrid_pic_model->AdvanceElectronEnergyQDSMC( m_dt );
+    }
+
+    return exit_status;
+}
+
+void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
+                                       const WarpXSolverVec&  a_E,
+                                       amrex::Real            start_time,
+                                       int                    a_nl_iter,
+                                       bool                   a_from_jacobian )
+{
+    BL_PROFILE("ThetaImplicitHybrid::ComputeRHS()");
+
+    UpdateWarpXFields( a_E, start_time );
+
+    const amrex::Real theta_time = start_time + m_theta * m_dt;
+
+    ablastr::fields::MultiLevelVectorField Efield_fp =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, m_num_amr_levels - 1);
+    ablastr::fields::MultiLevelVectorField Bfield_fp =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, m_num_amr_levels - 1);
+    ablastr::fields::MultiLevelVectorField current_fp =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, m_num_amr_levels - 1);
+    ablastr::fields::MultiLevelScalarField rho_fp =
+        m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1);
+
+    // --- Compute resistivity-free E for particle push ---
+    m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
+    // QDSMC on: Pe is set once per step by AdvanceElectronEnergyQDSMC -- do not
+    // overwrite it here with the adiabatic closure.
+    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    }
+
+    m_hybrid_pic_model->HybridPICSolveE(
+        Efield_fp, current_fp, Bfield_fp, rho_fp,
+        m_WarpX->GetEBUpdateEFlag(),
+        false  // no resistivity; ∇Pe included
+    );
+
+    m_WarpX->ApplyFillBoundaryE();
+
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            theta_time, 0.5_rt * m_dt);
+        AddExternalBfield();
+        AddExternalEfield();
+    }
+
+    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+
+    if (m_add_external_fields) {
+        SubtractExternalBfield();
+        SubtractExternalEfield();
+    }
+
+    // --- Compute full Ohm's law E for Faraday update ---
+    // J_plasma unchanged (same B), but Pe depends on newly deposited ρ
+    // QDSMC on: Pe is set once per step by AdvanceElectronEnergyQDSMC -- do not
+    // overwrite it here with the adiabatic closure.
+    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    }
+
+    m_hybrid_pic_model->HybridPICSolveE(
+        Efield_fp, current_fp, Bfield_fp, rho_fp,
+        m_WarpX->GetEBUpdateEFlag(),
+        true, true   // with resistivity and ∇Pe included (∇Pe is curl-free so doesn't affect Faraday, but needed for self-consistent Newton residual)
+    );
+
+    m_WarpX->ApplyFillBoundaryE();
+
+    // Darwin split: always compute E_L from the current E_Ohm so that the JFNK
+    // Jacobian (J·v = (F(x+εv) - F(x))/ε) includes ∂E_L/∂E_T and is exactly
+    // consistent with the residual R = E_T_Ohm - E_T^n.  Freezing E_L only in
+    // GMRES matvecs (a_from_jacobian=true) misses ∂E_L/∂E_T and causes Newton
+    // to enter a 2-cycle at late simulation times when E_L is large.
+    //
+    // To keep the MLMG warm-start seed (hybrid_darwin_phi_fp) from being
+    // corrupted by the small ε-perturbations inside each matvec, we save and
+    // restore phi around every a_from_jacobian call.  The outer (!a_from_jacobian)
+    // call advances phi normally and provides the warm-start seed.
+    if (m_use_darwin_split) {
+        if (a_from_jacobian) {
+            // Save the outer phi so each matvec starts from the same warm seed.
+            amrex::MultiFab& phi_mf =
+                *m_WarpX->m_fields.get(FieldType::hybrid_darwin_phi_fp, 0);
+            amrex::MultiFab phi_save(phi_mf.boxArray(), phi_mf.DistributionMap(),
+                                     1, phi_mf.nGrowVect());
+            amrex::MultiFab::Copy(phi_save, phi_mf, 0, 0, 1, phi_mf.nGrowVect());
+            m_hybrid_pic_model->ComputeLongitudinalE(0, GetLinOpBCLo(), GetLinOpBCHi());
+            amrex::MultiFab::Copy(phi_mf, phi_save, 0, 0, 1, phi_mf.nGrowVect());
+        } else {
+            m_hybrid_pic_model->ComputeLongitudinalE(0, GetLinOpBCLo(), GetLinOpBCHi());
+        }
+        SubtractLongitudinalE();  // Efield_fp = E_T = E_Ohm - E_L
+    }
+
+    // RHS = E_T_ohm - E_T_old  (or E_ohm - E_old when Darwin split is off)
+    a_RHS.Copy(FieldType::Efield_fp);
+    a_RHS.linComb(1.0, a_RHS, -1.0, m_Eold);
+}
+
+void ThetaImplicitHybrid::SetMassMatricesForPC ( const amrex::Real /*a_theta_dt*/ )
+{
+    using ablastr::fields::Direction;
+
+    // Skip c²μ₀θΔt EM scaling from the base class: it is derived from
+    // Ampere's law and is physically incorrect for the hybrid solver, where
+    // E is determined by Ohm's law (not by the displacement current).
+    //
+    // For curl-curl MLMG: still add +1 to the diagonal so that
+    // beta = 1 + (particle response) >= 1 everywhere, including in vacuum
+    // cells where the particle response is zero.  Without this, the curl-curl
+    // operator is singular in vacuum and GMRES stagnates.
+    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
+    if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            amrex::MultiFab* MMxx_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
+            amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);
+            amrex::MultiFab* MMzz_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev);
+            const int diag_Mxx = (MMxx_PC->nComp()-1)/2;
+            const int diag_Myy = (MMyy_PC->nComp()-1)/2;
+            const int diag_Mzz = (MMzz_PC->nComp()-1)/2;
+            MMxx_PC->plus(1.0_rt, diag_Mxx, 1, 0);
+            MMyy_PC->plus(1.0_rt, diag_Myy, 1, 0);
+            MMzz_PC->plus(1.0_rt, diag_Mzz, 1, 0);
+        }
+    }
+}
+
+void ThetaImplicitHybrid::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
+                                                amrex::Real start_time )
+{
+    BL_PROFILE("ThetaImplicitHybrid::UpdateWarpXFields()");
+
+    const amrex::Real theta_time = start_time + m_theta * m_dt;
+
+    // Set E^{n+θ} in WarpX
+    m_WarpX->SetElectricFieldAndApplyBCs( a_E, theta_time );
+
+    // Compute B^{n+θ} = B^n - θ·dt·curl(E^{n+θ}) via Faraday's law
+    ablastr::fields::MultiLevelVectorField const& B_old =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, m_num_amr_levels - 1);
+    m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta * m_dt, start_time );
+}
+
+void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
+{
+    BL_PROFILE("ThetaImplicitHybrid::FinishFieldUpdate()");
+
+    // Extrapolate from t^{n+θ} to t^{n+1}:
+    // F^{n+1} = (1/θ)·F^{n+θ} + (1 - 1/θ)·F^n
+    const amrex::Real c0 = 1.0_rt / m_theta;
+    const amrex::Real c1 = 1.0_rt - c0;
+
+    // E^{n+1}  (or E_T^{n+1} if Darwin split)
+    m_E.linComb( c0, m_E, c1, m_Eold );
+    m_WarpX->SetElectricFieldAndApplyBCs( m_E, end_time );
+    // Restore full E^{n+1} = E_T^{n+1} + E_L^{n+θ}  (E_L from final Newton iter)
+    if (m_use_darwin_split) { AddLongitudinalE(); }
+
+    // B^{n+1}
+    ablastr::fields::MultiLevelVectorField const& B_old =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
+    m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, end_time );
+
+    // Add external fields to get total fields at t^{n+1}
+    if (m_add_external_fields) {
+        m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
+            end_time, 0.5_rt * m_dt);
+        AddExternalBfield();
+        AddExternalEfield();
+    }
+}
+
+void ThetaImplicitHybrid::AddExternalBfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Add(
+                *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::SubtractExternalBfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Subtract(
+                *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_B_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::AddExternalEfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Add(
+                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::SubtractExternalEfield ()
+{
+    using ablastr::fields::Direction;
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Subtract(
+                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_external, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::AddLongitudinalE ()
+{
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Add(
+                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_long, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::SubtractLongitudinalE ()
+{
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Subtract(
+                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_long, Direction{idim}, lev),
+                0, 0, 1,
+                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
+        }
+    }
+}
+
+void ThetaImplicitHybrid::SubtractLongitudinalE (WarpXSolverVec& a_vec)
+{
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Subtract(
+                *a_vec.getArrayVec()[lev][idim],
+                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_long, Direction{idim}, lev),
+                0, 0, 1,
+                a_vec.getArrayVec()[lev][idim]->nGrowVect());
+        }
+    }
+}
+
+const amrex::Vector<amrex::MultiFab*>*
+ThetaImplicitHybrid::GetAlphaCoeff () const
+{
+    BL_PROFILE("ThetaImplicitHybrid::GetAlphaCoeff()");
+    using namespace amrex;
+    using namespace ablastr::coarsen::sample;
+
+    // If fields aren't initialized yet (called from Define()),
+    // return the pointer without computing — alpha_mf was
+    // initialized to 0 and will be filled properly in Update().
+    if (!m_is_defined) {
+        return &m_alpha_mfarrvec;
+    }
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const ablastr::fields::VectorField Bfield_fp =
+            m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+        const MultiFab& rho_fp =
+            *m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+
+        const GpuArray<int, 3> Bx_stag = m_hybrid_pic_model->Bx_IndexType;
+        const GpuArray<int, 3> By_stag = m_hybrid_pic_model->By_IndexType;
+        const GpuArray<int, 3> Bz_stag = m_hybrid_pic_model->Bz_IndexType;
+        const GpuArray<int, 3> nodal   = {1, 1, 1};
+        const GpuArray<int, 3> coarsen = {1, 1, 1};
+
+        const Real rho_floor    = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+        const Real theta_dt     = m_theta * m_dt;
+        const Real one_over_mu0 = 1._rt / PhysConst::mu0;
+        const auto eta          = m_hybrid_pic_model->m_eta;
+        const Real t_new        = m_WarpX->gett_new(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(m_alpha_mf[lev], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+
+            Array4<Real>       const& alpha = m_alpha_mf[lev].array(mfi);
+            Array4<Real const> const& Bx    = Bfield_fp[0]->const_array(mfi);
+            Array4<Real const> const& By    = Bfield_fp[1]->const_array(mfi);
+            Array4<Real const> const& Bz    = Bfield_fp[2]->const_array(mfi);
+            Array4<Real const> const& rho   = rho_fp.const_array(mfi);
+
+            amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+
+                // Interpolate B from Yee grid to nodal grid
+                const Real Bx_n = Interp(Bx, Bx_stag, nodal, coarsen, i, j, k, 0);
+                const Real By_n = Interp(By, By_stag, nodal, coarsen, i, j, k, 0);
+                const Real Bz_n = Interp(Bz, Bz_stag, nodal, coarsen, i, j, k, 0);
+
+                // |B| at nodal point
+                const Real Bmag = std::sqrt(Bx_n*Bx_n + By_n*By_n + Bz_n*Bz_n);
+
+                // rho is nodal in the hybrid model - read directly, apply floor
+                const Real rho_limited = std::max(rho(i, j, k), rho_floor);
+
+                // alpha = theta*dt * sqrt((|B|/rho)^2 + eta^2) / mu0
+                //
+                // The hybrid Jacobian on the transverse (Er, Etheta) block has eigenvalues
+                //   -(theta*dt*k^2/mu0) * (eta ± i*|B|/rho)
+                // (J×B/rho gives the imaginary skew part; eta*J gives the real diagonal).
+                // The curl-curl PC clusters J·P^{-1} eigenvalues at magnitude ~1 when
+                //   alpha * k^2 = k^2 * sqrt(eta^2 + (|B|/rho)^2),
+                // i.e., alpha = sqrt((|B|/rho)^2 + eta^2) / mu0.
+                // For eta=0, this reduces to the original |B|/(mu0*rho).
+                // For eta >> |B|/rho (high resistivity), alpha → eta/mu0.
+                const Real eta_val       = eta(rho_limited, 0._rt, t_new);
+                const Real Bmag_over_rho = Bmag / rho_limited;
+                alpha(i, j, k) = theta_dt * one_over_mu0
+                                //  * std::sqrt(Bmag_over_rho*Bmag_over_rho + eta_val*eta_val);
+                                 * std::sqrt(Bmag_over_rho*Bmag_over_rho);
+            });
+        }
+    }
+
+    return &m_alpha_mfarrvec;
+}

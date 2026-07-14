@@ -506,6 +506,10 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 fields.get(FieldType::current_fp_non_suborbit, Direction{0}, lev)->setVal(0.0);
                 fields.get(FieldType::current_fp_non_suborbit, Direction{1}, lev)->setVal(0.0);
                 fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev)->setVal(0.0);
+                if (implicit_options->use_rho_non_suborbit &&
+                    fields.has(FieldType::rho_fp_non_suborbit, lev)) {
+                    fields.get(FieldType::rho_fp_non_suborbit, lev)->setVal(0.0);
+                }
             }
 
             // If using a preconditioner (pc), suborbit particles deposit their contribution

@@ -1746,6 +1746,8 @@ class CurlCurlMLMGPreconditioner(PreconditionerBase):
         self.absolute_tolerance = absolute_tolerance
 
     def preconditioner_type_initialize_inputs(self):
+        jacobian = pywarpx.warpx.get_bucket("jacobian")
+        jacobian.pc_type = "pc_curl_curl_mlmg"
         pc_curl_curl_mlmg = pywarpx.warpx.get_bucket("pc_curl_curl_mlmg")
         pc_curl_curl_mlmg.verbose = self.verbose
         pc_curl_curl_mlmg.bottom_verbose = self.bottom_verbose
@@ -1789,6 +1791,8 @@ class JacobiPreconditioner(PreconditionerBase):
         self.absolute_tolerance = absolute_tolerance
 
     def preconditioner_type_initialize_inputs(self):
+        jacobian = pywarpx.warpx.get_bucket("jacobian")
+        jacobian.pc_type = "pc_jacobi"
         pc_jacobi = pywarpx.warpx.get_bucket("pc_jacobi")
         pc_jacobi.verbose = self.verbose
         pc_jacobi.max_iter = self.max_iter
@@ -1838,6 +1842,8 @@ class PETScPreconditioner(PreconditionerBase):
         self.euclid_factor_levels = euclid_factor_levels
 
     def preconditioner_type_initialize_inputs(self):
+        jacobian = pywarpx.warpx.get_bucket("jacobian")
+        jacobian.pc_type = "pc_petsc"
         pc_petsc = pywarpx.warpx.get_bucket("pc_petsc")
         pc_petsc.type = self.type
         pc_petsc.asm_overlap = self.asm_overlap
@@ -2090,6 +2096,42 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
+class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the "theta implicit" hybrid-PIC evolve scheme
+
+    Parameters
+    ----------
+    nonlinear_solver: nonlinear solver instance
+        The nonlinear solver to use for the iterations
+
+    theta: float, optional
+        The "theta" parameter, determining the level of implicitness.
+
+    use_darwin_split: bool, optional
+        When True, apply the Darwin split to the JFNK solver. The curl-free
+        part E_L = grad(phi) of the Ohm's law E is computed via a Poisson
+        solve (Laplacian(phi) = div(E_Ohm)) and removed from the JFNK iterate.
+        Only E_T (the transverse part) is solved for in the Newton-Krylov loop,
+        which improves conditioning by decoupling the stiff longitudinal
+        (electron-pressure) physics from the Alfvenic/Hall physics.
+        E_L is refreshed once per Newton step and frozen across GMRES matvecs.
+    """
+
+    def __init__(self, nonlinear_solver, theta=None, use_darwin_split=None):
+        self.nonlinear_solver = nonlinear_solver
+        self.theta = theta
+        self.use_darwin_split = use_darwin_split
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "theta_implicit_hybrid"
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.theta = self.theta
+        implicit_evolve.use_darwin_split = self.use_darwin_split
+
+        self.nonlinear_solver.nonlinear_solver_initialize_inputs()
+
+
 class HybridPICSolver(picmistandard.base._ClassWithInit):
     """
     Hybrid-PIC solver based on Ohm's law.
@@ -2118,6 +2160,55 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Value or expression to use for the plasma hyper-resistivity in Ohm*m^3.
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
+
+    plasma_resistivity_species: dict, optional
+        Per-species resistivity overlays added on top of ``plasma_resistivity``,
+        as a dictionary mapping a charged species name to a value or expression
+        in Ohm*m. The expression may depend on ``rho_s`` (the species charge
+        density), ``rho`` (total charge density), ``Te`` (electron temperature
+        in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the
+        species current density magnitude), ``B`` (magnetic field magnitude)
+        and ``t`` (time). The effective resistivity applied to species ``s``
+        in Ohm's law, the Joule heating source and the resistive drag is
+        ``plasma_resistivity + plasma_resistivity_species[s]``.
+
+    solve_electron_energy_equation: bool, default=False
+        Solve the electron energy equation instead of the algebraic adiabatic
+        pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is
+        transported each step by QDSMC markers advected with the electron
+        fluid velocity, the source terms below are applied per cell, and
+        ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve.
+
+    include_joule_heating: bool, default=False
+        Add the resistive (Joule) heating source to the electron temperature.
+        Reduces to ``eta * J**2`` for a single ion species. Only used when
+        ``solve_electron_energy_equation`` is True.
+
+    redirect_joule_to_ions: bool, default=False
+        Route the Joule heating of cells with
+        ``Te >= joule_redirect_Te_threshold`` to the ions (as an
+        energy-conserving stochastic kick) instead of the electrons, allowing
+        ``Ti > Te`` to develop. Requires ``include_joule_heating``.
+
+    joule_redirect_Te_threshold: float, default=100
+        Electron temperature threshold in eV for ``redirect_joule_to_ions``.
+
+    include_temperature_relaxation: bool, default=False
+        Add the electron-ion thermal equilibration ``Q_ei`` to the electron
+        temperature, with the conjugate ion heating applied as an
+        energy-conserving drag-diffusion kick on each ion. Requires
+        ``do_temperature_deposition`` on every charged ion species. Only used
+        when ``solve_electron_energy_equation`` is True.
+
+    electron_ion_relaxation_rate: float or str
+        Value or expression for the electron-ion energy-equilibration rate
+        ``nu_ei`` in 1/s used by ``include_temperature_relaxation``. The
+        expression may depend on ``rho`` (charge density in C/m^3), ``Te``
+        and ``Ti`` (temperatures in eV) and ``t`` (time).
+
+    qdsmc_n_floor: float, optional
+        Minimum electron number density (in m^-3) used when recovering the
+        electron temperature from the QDSMC entropy deposit.
 
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full
@@ -2220,6 +2311,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         n_floor=None,
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
+        plasma_resistivity_species=None,
+        solve_electron_energy_equation=None,
+        include_joule_heating=None,
+        redirect_joule_to_ions=None,
+        joule_redirect_Te_threshold=None,
+        include_temperature_relaxation=None,
+        electron_ion_relaxation_rate=None,
+        qdsmc_n_floor=None,
         substeps=None,
         use_rkf45=None,
         substep_rtol=None,
@@ -2244,6 +2343,15 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
+        self.plasma_resistivity_species = plasma_resistivity_species
+
+        self.solve_electron_energy_equation = solve_electron_energy_equation
+        self.include_joule_heating = include_joule_heating
+        self.redirect_joule_to_ions = redirect_joule_to_ions
+        self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
+        self.include_temperature_relaxation = include_temperature_relaxation
+        self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
+        self.qdsmc_n_floor = qdsmc_n_floor
 
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
@@ -2297,6 +2405,40 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_hyper_resistivity, self.mangle_dict
             ),
         )
+        if self.plasma_resistivity_species is not None:
+            for name, expr in self.plasma_resistivity_species.items():
+                pywarpx.hybridpicmodel.__setattr__(
+                    f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
+                    pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
+                )
+        # Only assign the electron-energy-equation attributes when given, so
+        # that scripts setting them directly on the hybridpicmodel bucket are
+        # not clobbered with None here.
+        if self.solve_electron_energy_equation is not None:
+            pywarpx.hybridpicmodel.solve_electron_energy_equation = (
+                self.solve_electron_energy_equation
+            )
+        if self.include_joule_heating is not None:
+            pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
+        if self.redirect_joule_to_ions is not None:
+            pywarpx.hybridpicmodel.redirect_joule_to_ions = self.redirect_joule_to_ions
+        if self.joule_redirect_Te_threshold is not None:
+            pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
+                self.joule_redirect_Te_threshold
+            )
+        if self.include_temperature_relaxation is not None:
+            pywarpx.hybridpicmodel.include_temperature_relaxation = (
+                self.include_temperature_relaxation
+            )
+        if self.electron_ion_relaxation_rate is not None:
+            pywarpx.hybridpicmodel.__setattr__(
+                "electron_ion_relaxation_rate(rho,Te,Ti,t)",
+                pywarpx.my_constants.mangle_expression(
+                    self.electron_ion_relaxation_rate, self.mangle_dict
+                ),
+            )
+        if self.qdsmc_n_floor is not None:
+            pywarpx.hybridpicmodel.qdsmc_n_floor = self.qdsmc_n_floor
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
@@ -4223,6 +4365,11 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "proc_number",
                     "part_per_cell",
                     "eb_covered",
+                    # Hybrid-PIC electron-energy-equation state. Both are
+                    # always allocated when the hybrid solver is selected,
+                    # zero-initialized otherwise.
+                    "Te",
+                    "Pe",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:

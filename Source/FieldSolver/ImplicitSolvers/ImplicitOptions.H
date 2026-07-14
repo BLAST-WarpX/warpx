@@ -12,6 +12,10 @@ struct ImplicitOptions
     bool use_mass_matrices_pc = false;
     bool linear_stage_of_jfnk = false;
     bool evolve_suborbit_particles_only = false;
+    // Compose rho as rho_suborbit + rho_fp_non_suborbit (mass matrices + suborbits):
+    // non-suborbit rho is cached once per nonlinear iteration and only suborbit
+    // particles deposit rho during the linear stage of JFNK.
+    bool use_rho_non_suborbit = false;
 };
 
 #endif

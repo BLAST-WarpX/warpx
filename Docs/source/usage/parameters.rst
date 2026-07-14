@@ -300,6 +300,12 @@ Overall simulation parameters
             This can enhance the overall efficiency of the Newton solver.
             Default is true if ``implicit_evolve.particle_suborbits = true``.
 
+          - ``implicit_evolve.use_rho_non_suborbit`` (``bool``, default: true).
+            Only used when ``implicit_evolve.use_mass_matrices_jacobian = true``, ``implicit_evolve.particle_suborbits = true``, and the charge density is allocated (e.g., with the hybrid-PIC solver).
+            When ``true``, the charge density from the particles represented by the mass matrices is cached once per nonlinear iteration, so that only the suborbit particles deposit charge density during the linear stage of PS-JFNK, analogous to the treatment of the current density.
+            This avoids all-particle charge deposits in every GMRES iteration.
+            Can be set to ``false`` for debugging or benchmarking.
+
         - ``implicit_evolve.use_mass_matrices_pc`` (``bool``, default: false).
           When ``true``, the plasma response is captured in the preconditioner.
           Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, or ``pc_jacobi``).
@@ -3710,6 +3716,86 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
+
+.. pp:param:: hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)
+    :type: ``float`` or ``str``
+    :default: ``0``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this adds a per-species resistivity overlay in :math:`\Omega m`
+    for the named charged species, on top of :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`
+    (see the :ref:`theory section <theory-kinetic-fluid-hybrid-model>`). The expression can depend on the species
+    charge density ``rho_s`` and total charge density ``rho`` (:math:`C/m^3`), the electron temperature ``Te`` (:math:`K`),
+    the current-density magnitudes ``J`` and ``J_s`` (:math:`A/m^2`), the magnetic-field magnitude ``B`` (:math:`T`)
+    and the time ``t`` (:math:`s`). The same effective per-species resistivity enters the Joule-heating source of the
+    electron energy equation when :pp:param:`hybrid_pic_model.include_joule_heating` is on.
+
+.. pp:param:: hybrid_pic_model.solve_electron_energy_equation
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this evolves the electron temperature used for the
+    electron pressure with the electron energy equation, solved with the QDSMC scheme
+    (see the :ref:`theory section <theory-hybrid-model-electron-energy-eq>`), instead of evaluating the polytropic
+    closure with the constant reference state :math:`(n_0, T_{e0})`.
+
+.. pp:param:: hybrid_pic_model.qdsmc_n_floor
+    :type: ``float``
+    :default: ``1``
+    :optional:
+
+    Density floor, in :math:`m^{-3}`, below which cells are excluded from the QDSMC electron-energy-equation
+    update (the electron temperature is left unchanged there).
+
+.. pp:param:: hybrid_pic_model.include_joule_heating
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the Joule-heating source
+    consistent with the resistive friction in Ohm's law, applied per ion species with the effective resistivity
+    :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. For a single species this reduces to
+    :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
+
+.. pp:param:: hybrid_pic_model.redirect_joule_to_ions
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.include_joule_heating` is on, cells with electron temperature at or above
+    :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold` deposit their Joule heat to the kinetic ions
+    (as stochastic thermal-velocity kicks, bookkept per species) instead of the electron fluid. This caps the
+    electron heating at the threshold and allows :math:`T_i > T_e` to develop, mimicking regimes where the
+    electrons radiate strongly.
+
+.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
+    :type: ``float``
+    :default: ``100``
+    :optional:
+
+    Electron temperature threshold, in eV, used by :pp:param:`hybrid_pic_model.redirect_joule_to_ions`.
+
+.. pp:param:: hybrid_pic_model.include_temperature_relaxation
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the electron-ion
+    thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})` as a sink on the
+    electron fluid, paired with matching (energy-conserving) heating of the ion macro-particles. Requires the
+    ion species to activate ``<species>.do_temperature_deposition`` so that the deposited ion temperature is
+    available on the grid.
+
+.. pp:param:: hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t)
+    :type: ``float`` or ``str``
+    :default: ``0``
+    :optional:
+
+    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`, used by
+    :pp:param:`hybrid_pic_model.include_temperature_relaxation`. The expression can depend on the total charge
+    density ``rho`` (:math:`C/m^3`), the electron and ion temperatures ``Te`` and ``Ti`` (both in eV) and the
+    time ``t`` (:math:`s`), which permits, e.g., the NRL-formulary Spitzer rate.
 
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``
