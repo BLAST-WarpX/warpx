@@ -65,9 +65,10 @@ class AdiabaticCompression(object):
     steps_per_period = 400
     substeps = 10
 
-    def __init__(self, test, verbose):
+    def __init__(self, test, verbose, use_implicit=False):
         self.test = test
         self.verbose = verbose or test
+        self.use_implicit = use_implicit
 
         if self.test:
             self.NX = 32
@@ -151,8 +152,38 @@ class AdiabaticCompression(object):
             include_joule_heating=False,
         )
 
+
+        # Optional theta-implicit hybrid solver (validated robust config:
+        # theta = 0.5, tight Newton, loose GMRES, no particle suborbits).
+        if self.use_implicit:
+            linear_solver = picmi.GMRESLinearSolver(
+                verbose_int=1,
+                max_iterations=1000,
+                relative_tolerance=1.0e-2,
+                absolute_tolerance=0.0,
+                restart_length=100,
+            )
+            nonlinear_solver = picmi.NewtonNonlinearSolver(
+                verbose=True,
+                max_iterations=20,
+                relative_tolerance=1.0e-6,
+                absolute_tolerance=0.0,
+                require_convergence=False,
+                linear_solver=linear_solver,
+                max_particle_iterations=21,
+                particle_tolerance=1.0e-10,
+                particle_suborbits=False,
+            )
+            evolve_scheme = picmi.ThetaImplicitHybridEvolveScheme(
+                theta=0.5,
+                nonlinear_solver=nonlinear_solver,
+            )
+        else:
+            evolve_scheme = None
+
         simulation = picmi.Simulation(
             solver=self.solver,
+            warpx_evolve_scheme=evolve_scheme,
             time_step_size=self.dt,
             max_steps=self.total_steps,
             verbose=self.verbose,
@@ -219,8 +250,13 @@ parser.add_argument(
     help="Verbose output",
     action="store_true",
 )
+parser.add_argument(
+    "--implicit",
+    help="use the theta-implicit hybrid solver",
+    action="store_true",
+)
 args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
-run = AdiabaticCompression(test=args.test, verbose=args.verbose)
+run = AdiabaticCompression(test=args.test, verbose=args.verbose, use_implicit=args.implicit)
 simulation.step()
