@@ -114,7 +114,7 @@ public:
     [[nodiscard]] virtual const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const {
         return nullptr;
     }
-    
+
     /**
      * \brief Return reference to the multifabs for curl curl mask
      */

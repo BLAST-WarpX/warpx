@@ -154,7 +154,6 @@ class QeiRelaxation(object):
             electron_ion_relaxation_rate=f"{self.nu_ei}",
         )
 
-
         # Optional theta-implicit hybrid solver (validated robust config:
         # theta = 0.5, tight Newton, loose GMRES, no particle suborbits).
         if self.use_implicit:

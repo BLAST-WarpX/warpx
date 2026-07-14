@@ -190,7 +190,6 @@ class ForceFreeJoule(object):
             include_joule_heating=True,
         )
 
-
         # Optional theta-implicit hybrid solver (validated robust config:
         # theta = 0.5, tight Newton, loose GMRES, no particle suborbits).
         if self.use_implicit:
@@ -326,5 +325,10 @@ parser.add_argument(
 args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
-run = ForceFreeJoule(test=args.test, verbose=args.verbose, eta_scale=args.eta_scale, use_implicit=args.implicit)
+run = ForceFreeJoule(
+    test=args.test,
+    verbose=args.verbose,
+    eta_scale=args.eta_scale,
+    use_implicit=args.implicit,
+)
 simulation.step()

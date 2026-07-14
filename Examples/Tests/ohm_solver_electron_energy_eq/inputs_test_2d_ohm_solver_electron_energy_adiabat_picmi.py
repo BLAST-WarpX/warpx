@@ -152,7 +152,6 @@ class AdiabaticCompression(object):
             include_joule_heating=False,
         )
 
-
         # Optional theta-implicit hybrid solver (validated robust config:
         # theta = 0.5, tight Newton, loose GMRES, no particle suborbits).
         if self.use_implicit:
@@ -258,5 +257,7 @@ parser.add_argument(
 args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
-run = AdiabaticCompression(test=args.test, verbose=args.verbose, use_implicit=args.implicit)
+run = AdiabaticCompression(
+    test=args.test, verbose=args.verbose, use_implicit=args.implicit
+)
 simulation.step()
