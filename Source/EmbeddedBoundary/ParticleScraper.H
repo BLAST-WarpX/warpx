@@ -196,17 +196,17 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
                     amrex::RealVect normal = DistanceToEB::interp_normal(i, j, k, W, ic, jc, kc, Wc, phi, dxi);
                     DistanceToEB::normalize(normal);
                     amrex::RealVect pos;
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
                     pos[0] = xp;
                     pos[1] = yp;
                     pos[2] = zp;
-#elif (defined WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ)
                     pos[0] = xp;
                     pos[1] = zp;
-#elif (defined WARPX_DIM_RZ)
+#elif defined(WARPX_DIM_RZ)
                     pos[0] = std::sqrt(xp*xp + yp*yp);
                     pos[1] = zp;
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
                     pos[0] = zp;
 #endif
                     f(ptd, ip, pos, normal, engine);

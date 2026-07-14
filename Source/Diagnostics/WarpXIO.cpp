@@ -12,7 +12,7 @@
 
 
 #include "BoundaryConditions/PML.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
 #    include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Diagnostics/Diagnostics.H"
@@ -407,7 +407,7 @@ WarpX::InitFromCheckpoint ()
             if (pml[lev]) {
                 pml[lev]->Restart(m_fields, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "pml"));
             }
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
             if (pml_rz[lev]) {
                 pml_rz[lev]->Restart(m_fields, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, "pml_rz"));
             }

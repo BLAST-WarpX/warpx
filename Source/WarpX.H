@@ -631,7 +631,7 @@ public:
     static bool isAnyParticleBoundaryThermal();
 
     PML* GetPML (int lev);
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
     PML_RZ* GetPML_RZ (int lev);
 #endif
 
@@ -1264,7 +1264,7 @@ private:
     amrex::Vector<amrex::IntVect> do_pml_Lo;
     amrex::Vector<amrex::IntVect> do_pml_Hi;
     amrex::Vector<std::unique_ptr<PML> > pml;
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
     amrex::Vector<std::unique_ptr<PML_RZ> > pml_rz;
 #endif
     amrex::Real v_particle_pml;

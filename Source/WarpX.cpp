@@ -420,7 +420,7 @@ WarpX::WarpX ()
     gather_buffer_masks.resize(nlevs_max);
 
     pml.resize(nlevs_max);
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
     pml_rz.resize(nlevs_max);
 #endif
 
@@ -3153,7 +3153,7 @@ void WarpX::AllocLevelSpectralSolver (amrex::Vector<std::unique_ptr<SpectralSolv
     const RealVect dx_vect(dx[0], dx[2]);
 #elif defined(WARPX_DIM_1D_Z)
     const RealVect dx_vect(dx[2]);
-#elif (defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const RealVect dx_vect(dx[0]);
 #endif
 
@@ -3344,7 +3344,7 @@ WarpX::ComputeDivE(amrex::MultiFab& divE, const int lev)
     }
 }
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
 PML_RZ*
 WarpX::GetPML_RZ (int lev)
 {
