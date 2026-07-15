@@ -624,17 +624,16 @@ public:
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // shuffle
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
             if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
                 ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
             } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
                 FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
             }
-
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR_STOP(prof_shuffle);
 
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
@@ -698,6 +697,7 @@ public:
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::copyTransform", prof_copyTransform);
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_1,
@@ -708,6 +708,7 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_copyTransform);
 
             for (int i = 0; i < n_product_species; i++)
             {
@@ -1204,18 +1205,18 @@ public:
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
-        ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
             if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
                 ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
             } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
                 FisherYatesShuffle(n_cells, cell_offsets_1, indices_1,
                                             cell_offsets_2, indices_2);
-            }
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
+        }
+            ABLASTR_PROFILE_VAR_STOP(prof_shuffle);
 
-        ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
             // as possible (while avoiding race conditions): Instead of looping with one GPU
@@ -1286,6 +1287,7 @@ public:
 
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::copyTransform", prof_copyTransform);
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_2,
@@ -1296,6 +1298,7 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_copyTransform);
 
             for (int i = 0; i < n_product_species; i++)
             {

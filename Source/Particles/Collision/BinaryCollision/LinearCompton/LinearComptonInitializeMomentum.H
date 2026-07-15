@@ -139,7 +139,7 @@ namespace {
         // By convention, in WarpX, the photon momentum u is normalized by the electron mass m_e, so k corresponds to p/(m_e*c)
         amrex::ParticleReal const c0 = 2._prt * (2._prt*k*k + 2._prt*k + 1._prt) / amrex::Math::powi<3>(2._prt*k + 1._prt);
         amrex::ParticleReal const b = (2._prt + c0) / (2._prt - c0);
-        amrex::ParticleReal const a = 2._prt*b - 1._prt;
+        amrex::ParticleReal const a = 2._prt*( b - 1._prt );
         // Use rejection method to draw x
         bool reject = true;
         amrex::ParticleReal x = 0;

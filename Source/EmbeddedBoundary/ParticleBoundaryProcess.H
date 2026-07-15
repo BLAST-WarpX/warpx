@@ -19,7 +19,7 @@ struct NoOp {
     template <typename PData>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator() (const PData& /*ptd*/, int /*i*/,
-                     const amrex::RealVect& /*pos*/, const amrex::RealVect& /*normal*/,
+                     const amrex::RealVect& /*pos*/,
                      amrex::RandomEngine const& /*engine*/) const noexcept
     {}
 };
@@ -28,7 +28,7 @@ struct Absorb {
     template <typename PData>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator() (PData& ptd, int i,
-                     const amrex::RealVect& /*pos*/, const amrex::RealVect& /*normal*/,
+                     const amrex::RealVect& /*pos*/,
                      amrex::RandomEngine const& /*engine*/) const noexcept
     {
         amrex::ParticleIDWrapper{ptd.m_idcpu[i]}.make_invalid();
