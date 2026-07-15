@@ -82,7 +82,7 @@ struct FindEmbeddedBoundaryIntersection {
         // Move it to the point of intersection with the embedded boundary
         // (which is found by using a bisection algorithm)
 
-        const auto& p = dst.getSuperParticle(dst_i);
+        auto p = dst.getSuperParticle(dst_i);
         amrex::ParticleReal xp, yp, zp;
         get_particle_position( p, xp, yp, zp );
         amrex::ParticleReal const ux = dst.m_rdata[PIdx::ux][dst_i];
@@ -123,24 +123,8 @@ struct FindEmbeddedBoundaryIntersection {
         auto const n3d = DistanceToEB::interp_normal(x_temp, y_temp, z_temp, plo, dxi, phiarr);
 
         // record the position of the intersection point on the destination
-#if (defined WARPX_DIM_3D)
-        dst.m_rdata[PIdx::x][dst_i] = x_temp;
-        dst.m_rdata[PIdx::y][dst_i] = y_temp;
-        dst.m_rdata[PIdx::z][dst_i] = z_temp;
-#elif (defined WARPX_DIM_XZ)
-        dst.m_rdata[PIdx::x][dst_i] = x_temp;
-        dst.m_rdata[PIdx::z][dst_i] = z_temp;
-#elif (defined WARPX_DIM_RZ)
-        dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
-        dst.m_rdata[PIdx::z][dst_i] = z_temp;
-        dst.m_rdata[PIdx::theta][dst_i] = std::atan2(y_temp, x_temp);
-#elif (defined WARPX_DIM_1D_Z)
-        dst.m_rdata[PIdx::z][dst_i] = z_temp;
-#elif (defined WARPX_DIM_RCYLINDER)
-        dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp);
-#elif (defined WARPX_DIM_RSPHERE)
-        dst.m_rdata[PIdx::r][dst_i] = std::sqrt(x_temp*x_temp + y_temp*y_temp + z_temp*z_temp);
-#endif
+        set_particle_position( p, x_temp, y_temp, z_temp );
+        dst.setSuperParticle( p, dst_i );
 
         // record the surface normal (in 3D Cartesian coordinates) on the destination
         dst.m_runtime_rdata[m_normal_index][dst_i]   = n3d[0];

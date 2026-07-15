@@ -130,15 +130,21 @@ struct LorentzTransformParticles
         // weighted sum of old and new values
 #if !defined(WARPX_DIM_1D_Z)
         const amrex::ParticleReal xp = m_xpold[i_src] * weight_old + xpnew * weight_new;
+#else
+        amrex::ParticleReal constexpr xp = 0._rt;
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         const amrex::ParticleReal yp = m_ypold[i_src] * weight_old + ypnew * weight_new;
+#else
+        amrex::ParticleReal constexpr yp = 0._rt;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
         const amrex::Real z_new_p = m_gammaboost* ( zpnew + m_betaboost * m_Phys_c * m_t_boost);
         const amrex::Real z_old_p = m_gammaboost * ( m_zpold[i_src] + m_betaboost
                                                      * m_Phys_c * (m_t_boost - m_dt ) );
         const amrex::ParticleReal zp = z_old_p * weight_old + z_new_p * weight_new;
+#else
+        amrex::ParticleReal constexpr zp = 0._rt;
 #endif
         const amrex::ParticleReal uxp = m_uxpold[i_src] * weight_old
                                       + m_uxpnew[i_src] * weight_new;
@@ -146,28 +152,7 @@ struct LorentzTransformParticles
                                       + m_uypnew[i_src] * weight_new;
         const amrex::ParticleReal uzp = uz_old_p * weight_old
                                       + uz_new_p * weight_new;
-#if defined (WARPX_DIM_3D)
-        dst.m_rdata[PIdx::x][i_dst] = xp;
-        dst.m_rdata[PIdx::y][i_dst] = yp;
-        dst.m_rdata[PIdx::z][i_dst] = zp;
-#elif defined (WARPX_DIM_RZ)
-        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp);
-        dst.m_rdata[PIdx::z][i_dst] = zp;
-        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
-#elif defined(WARPX_DIM_RCYLINDER)
-        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp);
-        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
-#elif defined(WARPX_DIM_RSPHERE)
-        amrex::ParticleReal const rpxy = std::sqrt(xp*xp + yp*yp);
-        dst.m_rdata[PIdx::r][i_dst] = std::sqrt(xp*xp + yp*yp + zp*zp);
-        dst.m_rdata[PIdx::theta][i_dst] = std::atan2(yp, xp);
-        dst.m_rdata[PIdx::phi][i_dst] = std::atan2(rpxy, zp);
-#elif defined (WARPX_DIM_XZ)
-        dst.m_rdata[PIdx::x][i_dst] = xp;
-        dst.m_rdata[PIdx::z][i_dst] = zp;
-#elif defined (WARPX_DIM_1D_Z)
-        dst.m_rdata[PIdx::z][i_dst] = zp;
-#endif
+        set_particle_position( dst, i_dst, xp, yp, zp );
         dst.m_rdata[PIdx::w][i_dst] = m_wpnew[i_src];
         dst.m_rdata[PIdx::ux][i_dst] = uxp;
         dst.m_rdata[PIdx::uy][i_dst] = uyp;
