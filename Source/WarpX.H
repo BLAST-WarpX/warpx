@@ -218,6 +218,11 @@ public:
      */
     static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_hi;
 
+    /** Particle boundary condition at embedded boundaries.
+     *  Default is Absorbing
+     */
+    static inline ParticleBoundaryType eb_particle_boundary = ParticleBoundaryType::Absorbing;
+
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto time_dependency_J = TimeDependencyJ::Default;
@@ -655,9 +660,9 @@ public:
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
-    void UpdateAuxilaryData ();
-    void UpdateAuxilaryDataStagToNodal ();
-    void UpdateAuxilaryDataSameType ();
+    void UpdateAuxiliaryData ();
+    void UpdateAuxiliaryDataStagToNodal ();
+    void UpdateAuxiliaryDataSameType ();
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);

@@ -290,6 +290,17 @@ void WarpX::MakeWarpX ()
     std::tie(particle_boundary_lo, particle_boundary_hi) =
         warpx::particles::parse_particle_boundaries(is_field_boundary_periodic);
 
+    // Parse embedded boundary particle boundary condition
+    if (EB::enabled()) {
+        amrex::ParmParse const pp_boundary("boundary");
+        // Defaults to Absorbing; overwritten only if boundary.particle_eb is set.
+        pp_boundary.query_enum_case_insensitive("particle_eb", eb_particle_boundary);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            eb_particle_boundary == ParticleBoundaryType::Absorbing ||
+            eb_particle_boundary == ParticleBoundaryType::Reflecting,
+            "boundary.particle_eb must be Absorbing or Reflecting");
+    }
+
     CheckGriddingForRZSpectral();
 
     m_instance = new WarpX();

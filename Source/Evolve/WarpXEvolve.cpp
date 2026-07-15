@@ -49,10 +49,12 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 #include <AMReX_REAL.H>
+#include <AMReX_RealVect.H>
 #include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <memory>
 #include <ostream>
@@ -125,7 +127,7 @@ WarpX::SynchronizeVelocityWithPosition () {
             FillBoundaryE_avg(guard_cells.ng_FieldGather);
             FillBoundaryB_avg(guard_cells.ng_FieldGather);
         }
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
         for (int lev = 0; lev <= finest_level; ++lev) {
             mypc->PushP(
@@ -676,7 +678,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
         FillBoundaryE(guard_cells.ng_alloc_EB);
         FillBoundaryB(guard_cells.ng_alloc_EB);
 
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
         // on first step, push p by -0.5*dt
         for (int lev = 0; lev <= finest_level; ++lev)
@@ -710,12 +712,12 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 FillBoundaryE_avg(guard_cells.ng_FieldGather);
                 FillBoundaryB_avg(guard_cells.ng_FieldGather);
             }
-            // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
+            // TODO Remove call to FillBoundaryAux before UpdateAuxiliaryData?
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
                 FillBoundaryAux(guard_cells.ng_UpdateAux);
             }
         }
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
     }
 }
@@ -729,31 +731,67 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
-    // Non-Maxwell solver: particles can move by an arbitrary number of cells
-    if( electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
-        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
-    {
-        mypc->Redistribute();
-    }
-    else
-    {
-        // Electromagnetic solver: due to CFL condition, particles can
-        // only move by one or two cells per time step
-        // The implicit scheme can allow additional cell crossings, as specified by particle_max_grid_crossings.
-        if (finest_level == 0) {
-            int max_cells_travelled = num_moved;
-            if ((m_v_galilean[0]!=0) or (m_v_galilean[1]!=0) or (m_v_galilean[2]!=0)) {
-                // Galilean algorithm ; particles can move by up to one additional cell beyond the max number
-                max_cells_travelled += particle_max_grid_crossings + 1;
-            } else {
-                // Standard algorithm ; particles can move by up to the max number
-                max_cells_travelled += particle_max_grid_crossings;
-            }
-            mypc->RedistributeLocal(max_cells_travelled);
+    // Without mesh refinement, use a local redistribute when particles can only
+    // have moved by a small number of cells; otherwise fall back to a global one.
+    if (finest_level == 0) {
+        // Estimate, per direction, the maximum distance a particle may have
+        // travelled during this step, expressed in number of cells.
+        // (Geom().CellSizeArray() is indexed by active dimension 0..SPACEDIM-1.)
+        const amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> dx = Geom(0).CellSizeArray();
+
+        // Particles cannot travel faster than the speed of light, so c * dt / dx
+        // is a physical upper bound on the number of cells crossed per direction.
+        amrex::RealVect max_distance_relative_to_grid;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            max_distance_relative_to_grid[d] = PhysConst::c * dt[0] / dx[d];
         }
-        else {
+
+        // Moving window: particles can additionally move by the number of cells
+        // that the window was shifted, along the moving-window direction.
+        if (moving_window_dir >= 0) {
+            max_distance_relative_to_grid[moving_window_dir] += static_cast<amrex::Real>(num_moved);
+        }
+
+
+        // Galilean algorithm: account for the extra grid shift due to the moving
+        // Galilean frame. m_v_galilean is indexed by x/y/z, so map its components
+        // onto the active simulation dimensions.
+#if defined(WARPX_DIM_3D)
+        const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[1], m_v_galilean[2]};
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[2]};
+#elif defined(WARPX_DIM_1D_Z)
+        const amrex::RealVect v_galilean(m_v_galilean[2]);
+#else // WARPX_DIM_RCYLINDER, WARPX_DIM_RSPHERE: no Galilean shift
+        const amrex::RealVect v_galilean = amrex::RealVect::TheZeroVector();
+#endif
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            max_distance_relative_to_grid[d] += std::abs(v_galilean[d]) * dt[0] / dx[d];
+        }
+
+        // Convert to an integer number of cells (rounding up), per direction.
+        amrex::IntVect max_cells_travelled;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            max_cells_travelled[d] =
+                static_cast<int>(std::ceil(max_distance_relative_to_grid[d]));
+        }
+
+        // If, in any direction, max_cells_travelled reaches the domain size, the
+        // local search is no longer more efficient than (and may crash in lieu
+        // of) a full redistribute, so fall back in that case.
+        const amrex::IntVect domain_length = Geom(0).Domain().length();
+        bool use_local_redistribute = true;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            if (max_cells_travelled[d] >= domain_length[d]) { use_local_redistribute = false; }
+        }
+        if (use_local_redistribute) {
+            mypc->RedistributeLocal(max_cells_travelled);
+        } else {
             mypc->Redistribute();
         }
+    }
+    else {
+        mypc->Redistribute();
     }
 
     // interact the particles with EB walls (if present)
@@ -762,8 +800,15 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
-        // Remove particles that have been flagged to be scraped
-        mypc->deleteInvalidParticles();
+        if (eb_particle_boundary == ParticleBoundaryType::Absorbing) {
+            // If particles are simply absorbed, no need for a full Redistribute.
+            // Instead: simply delete the absorbed particles
+            mypc->deleteInvalidParticles();
+        } else {
+            // For other particle boundary conditions (e.g. reflecting),
+            // particles can move to a different sub-domain, so we need a full Redistribute
+            mypc->Redistribute();
+        }
     }
 
     if (sort_intervals.contains(step+1)) {
@@ -1174,10 +1219,10 @@ WarpX::OneStep_sub1 (Real cur_time)
     EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], cur_time);
     FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
-    // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
+    // TODO Remove call to FillBoundaryAux before UpdateAuxiliaryData?
     FillBoundaryAux(guard_cells.ng_UpdateAux);
     // iii) Get auxiliary fields on the fine grid, at dt[fine_lev]
-    UpdateAuxilaryData();
+    UpdateAuxiliaryData();
     FillBoundaryAux(guard_cells.ng_UpdateAux);
 
     // iv) Push particles and fields on the fine patch (second fine step)
@@ -1394,21 +1439,29 @@ WarpX::PushParticlesandDeposit (
         implicit_options
     );
 
-    if (!skip_deposition && !implicit_options) {
+    if (!skip_deposition) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
-        ApplyInverseVolumeScalingToCurrentDensity(
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            lev);
-        if (m_fields.has_vector(FieldType::current_buf, lev)) {
+        if (!implicit_options) {
+            // Skip scaling J here for the implicit solvers: the total current is
+            // accumulated from multiple containers after this call (see CumulateJ()
+            // and ComputeJfromMassMatrices()), and is scaled in PreRHSOp().
             ApplyInverseVolumeScalingToCurrentDensity(
-                m_fields.get(FieldType::current_buf, Direction{0}, lev),
-                m_fields.get(FieldType::current_buf, Direction{1}, lev),
-                m_fields.get(FieldType::current_buf, Direction{2}, lev),
-                lev-1);
+                m_fields.get(FieldType::current_fp, Direction{0}, lev),
+                m_fields.get(FieldType::current_fp, Direction{1}, lev),
+                m_fields.get(FieldType::current_fp, Direction{2}, lev),
+                lev);
+            if (m_fields.has_vector(FieldType::current_buf, lev)) {
+                ApplyInverseVolumeScalingToCurrentDensity(
+                    m_fields.get(FieldType::current_buf, Direction{0}, lev),
+                    m_fields.get(FieldType::current_buf, Direction{1}, lev),
+                    m_fields.get(FieldType::current_buf, Direction{2}, lev),
+                    lev-1);
+            }
         }
+        // Unlike J, the charge density has no post-deposition accumulation step:
+        // rho is reset and fully deposited within this call on both the explicit
+        // and implicit paths, so it is scaled here in all cases.
         if (m_fields.has(FieldType::rho_fp, lev)) {
             ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_fp, lev), lev);
             if (m_fields.has(FieldType::rho_buf, lev)) {
@@ -1423,7 +1476,7 @@ WarpX::PushParticlesandDeposit (
         // of the filter to avoid incorrect results (moved to `SyncCurrentAndRho()`).
         // Might this be related to issue #1943?
 #endif
-        if (do_fluid_species) {
+        if (do_fluid_species && !implicit_options) {
             myfl->Evolve(m_fields,
                          lev,
                          current_fp_string,

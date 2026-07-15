@@ -61,9 +61,10 @@ coll_ion.type = background_mcc
 coll_ion.species = he_ions
 coll_ion.background_density = Ngas
 coll_ion.background_temperature = Tgas
-coll_ion.scattering_processes = elastic back
+coll_ion.scattering_processes = elastic elastic_back
 coll_ion.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/He/ion_scattering.dat
-coll_ion.back_cross_section = ../../../../warpx-data/MCC_cross_sections/He/ion_back_scatter.dat
+coll_ion.elastic_back_cross_section = ../../../../warpx-data/MCC_cross_sections/He/ion_back_scatter.dat
+coll_ion.elastic_back_scattering_angle_model = backward
 
 coll_elec.type = background_mcc
 coll_elec.species = electrons
