@@ -9,10 +9,13 @@
 
 #include "Utils/TextMsg.H"
 
+#include <ablastr/particles/NodalFieldGather.H>
+
 #include <AMReX.H>
+#include <AMReX_Array.H>
+#include <AMReX_Array4.H>
 #include <AMReX_REAL.H>
 #include <AMReX_RealVect.H>
-#include <AMReX_Array.H>
 
 namespace DistanceToEB
 {
@@ -23,29 +26,29 @@ amrex::Real dot_product (const amrex::RealVect& a, const amrex::RealVect& b) noe
     return AMREX_D_TERM(a[0]*b[0], + a[1]*b[1], + a[2]*b[2]);
 }
 
+// This function calculates the unit normal vector to the embedded boundary at
+// the particle position (xp, yp, zp), by interpolating the signed distance
+// function distance_to_eb. plo/dxi are the geometry data; the returned vector
+// is normalized to unit length.
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-void normalize (amrex::RealVect& a) noexcept
+amrex::RealVect interp_normal (amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi,
+                               amrex::Array4<const amrex::Real> const& distance_to_eb) noexcept
 {
     using namespace amrex::literals;
-    amrex::Real const inv_norm = 1.0_rt / std::sqrt(dot_product(a, a));
-    AMREX_D_DECL(a[0] *= inv_norm,
-                 a[1] *= inv_norm,
-                 a[2] *= inv_norm);
-}
 
-
-
-// This function calculates the normal vector using the nodal and cell-centered data.
-// i,j,k are the index of the nearest node to the left of the point at which we interpolate.
-// W are the interpolation weight for the left and right nodes (for the 0th component and 1st component respectively)
-// ic,jc,kc are the index of the nearest cell-center to the left of the point at which we interpolate.
-AMREX_GPU_HOST_DEVICE AMREX_INLINE
-amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SPACEDIM][2],
-                               int ic, int jc, int kc, const amrex::Real Wc[AMREX_SPACEDIM][2],
-                               amrex::Array4<const amrex::Real> const& phi,
-                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi) noexcept
-{
-    using namespace amrex::literals;
+    // Compute the nodal and cell-centered interpolation weights at the position.
+    // i,j,k (ic,jc,kc) are the indices of the nearest node (cell-center) to the
+    // left of the point; W (Wc) are the corresponding interpolation weights.
+    int i, j, k;
+    amrex::Real W[AMREX_SPACEDIM][2];
+    ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+        xp, yp, zp, plo, dxi, i, j, k, W);
+    int ic, jc, kc;
+    amrex::Real Wc[AMREX_SPACEDIM][2];
+    ablastr::particles::compute_weights<amrex::IndexType::CELL>(
+        xp, yp, zp, plo, dxi, ic, jc, kc, Wc);
 
 #if (defined WARPX_DIM_3D)
     amrex::RealVect normal{0.0, 0.0, 0.0};
@@ -58,7 +61,7 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
                     int const wccomp = static_cast<int>(iic%2);
                     int const w1comp = static_cast<int>(jj%2);
                     int const w2comp = static_cast<int>(kk%2);
-                    normal[0] += sign * phi(icstart + ii, j + jj, k + kk) * dxi[0] * Wc[0][wccomp] * W[1][w1comp] * W[2][w2comp];
+                    normal[0] += sign * distance_to_eb(icstart + ii, j + jj, k + kk) * dxi[0] * Wc[0][wccomp] * W[1][w1comp] * W[2][w2comp];
                 }
             }
         }
@@ -72,7 +75,7 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
                     int const wccomp = static_cast<int>(iic%2);
                     int const w1comp = static_cast<int>(ii%2);
                     int const w2comp = static_cast<int>(kk%2);
-                    normal[1] += sign * phi(i + ii, jcstart + jj, k + kk) * dxi[1] * W[0][w1comp] * Wc[1][wccomp] * W[2][w2comp];
+                    normal[1] += sign * distance_to_eb(i + ii, jcstart + jj, k + kk) * dxi[1] * W[0][w1comp] * Wc[1][wccomp] * W[2][w2comp];
                 }
             }
         }
@@ -86,7 +89,7 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
                     int const wccomp = static_cast<int>(iic%2);
                     int const w1comp = static_cast<int>(ii%2);
                     int const w2comp = static_cast<int>(jj%2);
-                    normal[2] += sign * phi(i + ii, j + jj, kcstart + kk) * dxi[2] * W[0][w1comp] * W[1][w2comp] * Wc[2][wccomp];
+                    normal[2] += sign * distance_to_eb(i + ii, j + jj, kcstart + kk) * dxi[2] * W[0][w1comp] * W[1][w2comp] * Wc[2][wccomp];
                 }
             }
         }
@@ -101,7 +104,7 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
                 amrex::Real const sign = (ii%2)*2._rt - 1._rt;
                 int const wccomp = static_cast<int>(iic%2);
                 int const w1comp = static_cast<int>(jj%2);
-                normal[0] += sign * phi(icstart + ii, j + jj, k) * dxi[0] * Wc[0][wccomp] * W[1][w1comp];
+                normal[0] += sign * distance_to_eb(icstart + ii, j + jj, k) * dxi[0] * Wc[0][wccomp] * W[1][w1comp];
             }
         }
     }
@@ -112,14 +115,14 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
                 amrex::Real const sign = (jj%2)*2._rt - 1._rt;
                 int const wccomp = static_cast<int>(iic%2);
                 int const w1comp = static_cast<int>(ii%2);
-                normal[1] += sign * phi(i + ii, jcstart + jj, k) * dxi[1] * W[0][w1comp] * Wc[1][wccomp];
+                normal[1] += sign * distance_to_eb(i + ii, jcstart + jj, k) * dxi[1] * W[0][w1comp] * Wc[1][wccomp];
             }
         }
     }
     amrex::ignore_unused(kc);
 
 #else
-    amrex::ignore_unused(i, j, k, ic, jc, kc, W, Wc, phi, dxi);
+    amrex::ignore_unused(i, j, k, ic, jc, kc, W, Wc, distance_to_eb, dxi);
     amrex::RealVect normal(0.0);
 
     AMREX_IF_ON_DEVICE((
@@ -130,6 +133,12 @@ amrex::RealVect interp_normal (int i, int j, int k, const amrex::Real W[AMREX_SP
     ))
 
 #endif
+
+    // Normalize to unit length
+    amrex::Real const inv_norm = 1.0_rt / std::sqrt(dot_product(normal, normal));
+    AMREX_D_DECL(normal[0] *= inv_norm,
+                 normal[1] *= inv_norm,
+                 normal[2] *= inv_norm);
     return normal;
 }
 }

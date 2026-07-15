@@ -37,8 +37,8 @@
  *
  *  The operation to be performed is specified by the callable function
  *  passed in to this function as an argument. This function can access the
- *  position at which the particle hit the boundary, and also the associated
- *  normal vector. Particles can be `absorbed` by setting their ids to negative
+ *  position at which the particle hit the boundary. Particles can be `absorbed`
+ *  by setting their ids to negative
  *  to flag them for removal. Likewise, they can be reflected back into the domain
  *  by modifying their data appropriately and leaving their ids alone.
  *
@@ -56,11 +56,11 @@
  *        template <typename PData>
  *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
  *        void operator() (const PData& ptd, int i,
- *                         const amrex::RealVect& pos, const amrex::RealVect& normal,
+ *                         const amrex::RealVect& pos,
  *                         amrex::RandomEngine const& engine);
  *
  *        where ptd is the particle tile, i the index of the particle operated on,
- *        pos and normal the location of the collision and the boundary normal vector.
+ *        pos the location of the collision.
  *        engine is for random number generation, if needed.
  */
 template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
@@ -81,8 +81,8 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
  *
  *  The operation to be performed is specified by the callable function
  *  passed in to this function as an argument. This function can access the
- *  position at which the particle hit the boundary, and also the associated
- *  normal vector. Particles can be `absorbed` by setting their ids to negative
+ *  position at which the particle hit the boundary. Particles can be `absorbed`
+ *  by setting their ids to negative
  *  to flag them for removal. Likewise, they can be reflected back into the domain
  *  by modifying their data appropriately and leaving their ids alone.
  *
@@ -99,11 +99,11 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
  *        template <typename PData>
  *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
  *        void operator() (const PData& ptd, int i,
- *                         const amrex::RealVect& pos, const amrex::RealVect& normal,
+ *                         const amrex::RealVect& pos,
  *                         amrex::RandomEngine const& engine);
  *
  *        where ptd is the particle tile, i the index of the particle operated on,
- *        pos and normal the location of the collision and the boundary normal vector.
+ *        pos the location of the collision.
  *        engine is for random number generation, if needed.
  */
 template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
@@ -124,9 +124,9 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
  *
  *  The operation to be performed is specified by the callable function
  *  passed in to this function as an argument. This function can access the
- *  position at which the particle hit the boundary, and also the associated
- *  normal vector. Particles can be `absorbed` by setting their ids to negative
- *  to flag them for removal. Likewise, the can be reflected back into the domain
+ *  position at which the particle hit the boundary. Particles can be `absorbed`
+ *  by setting their ids to negative
+ *  to flag them for removal. Likewise, they can be reflected back into the domain
  *  by modifying their data appropriately and leaving their ids alone.
  *
  *  This version operates only at the specified levels.
@@ -144,11 +144,11 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
  *        template <typename PData>
  *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
  *        void operator() (const PData& ptd, int i,
- *                         const amrex::RealVect& pos, const amrex::RealVect& normal,
+ *                         const amrex::RealVect& pos,
  *                         amrex::RandomEngine const& engine);
  *
  *        where ptd is the particle tile, i the index of the particle operated on,
- *        pos and normal the location of the collision and the boundary normal vector.
+ *        pos the location of the collision.
  *        engine is for random number generation, if needed.
  */
 template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
@@ -189,12 +189,6 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
 
                 if (phi_value < 0.0)
                 {
-                    int ic, jc, kc; // Cell-centered indices
-                    amrex::Real Wc[AMREX_SPACEDIM][2]; // Cell-centered weights
-                    ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                        xp, yp, zp, plo, dxi, ic, jc, kc, Wc);
-                    amrex::RealVect normal = DistanceToEB::interp_normal(i, j, k, W, ic, jc, kc, Wc, phi, dxi);
-                    DistanceToEB::normalize(normal);
                     amrex::RealVect pos;
 #if (defined WARPX_DIM_3D)
                     pos[0] = xp;
@@ -209,8 +203,7 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
 #elif (defined WARPX_DIM_1D_Z)
                     pos[0] = zp;
 #endif
-                    f(ptd, ip, pos, normal, engine);
-
+                    f(ptd, ip, pos, engine);
                 }
             });
         }
