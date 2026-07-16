@@ -51,7 +51,7 @@ grid = picmi.Cartesian2DGrid(
 solver = picmi.ElectrostaticSolver(
     grid=grid,
     method="Multigrid",
-    required_precision=1e-6,
+    required_precision=1e-8,
     warpx_self_fields_verbosity=0,
 )
 
