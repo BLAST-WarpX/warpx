@@ -34,6 +34,7 @@ AMREX_ENUM(EvolveScheme,
            Theta_Implicit_EM,
            Semi_Implicit_EM,
            Strang_Implicit_Spectral_EM,
+           Semi_Implicit_Darwin,
            Default = Explicit);
 
 /**
@@ -171,30 +172,26 @@ AMREX_ENUM(PushType,
            Default = Explicit);
 
 /** \brief For advanced collision algorithms that split the particle push in substeps */
-AMREX_ENUM(
-    PositionPushType,
-    None,
-    Full,
-    Default = Full
-);
+AMREX_ENUM(PositionPushType,
+           Full,
+           FirstHalf,
+           SecondHalf,
+           None,
+           Default = Full);
 
 /** \brief For advanced collision algorithms that split the particle push in substeps */
-AMREX_ENUM(
-    MomentumPushType,
-    Full,
-    FirstHalf,
-    SecondHalf,
-    Default = Full
-);
+AMREX_ENUM(MomentumPushType,
+           Full,
+           FirstHalf,
+           SecondHalf,
+           Default = Full);
 
 /** \brief For binary collision algorithms, the strategy to determine
  *  the scattering angle in the center of mass frame */
-AMREX_ENUM(
-    ScatteringAngleModel,
-    Forward,    /**< Scattering angle is zero, i.e., products have the same direction as the incident particle in the center of mass frame */
-    Backward,   /**< Scattering angle is pi, i.e., products have the opposite direction of the incident particle in the center of mass frame */
-    Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
-    Default = Isotropic  /**< Isotropic */
-);
+AMREX_ENUM(ScatteringAngleModel,
+           Forward,    /**< Scattering angle is zero, i.e., products have the same direction as the incident particle in the center of mass frame */
+           Backward,   /**< Scattering angle is pi, i.e., products have the opposite direction of the incident particle in the center of mass frame */
+           Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
+           Default = Isotropic);
 
 #endif // WARPX_UTILS_WARPXALGORITHMSELECTION_H_

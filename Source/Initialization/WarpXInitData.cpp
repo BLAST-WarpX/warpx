@@ -900,8 +900,9 @@ WarpX::InitData ()
              has_boundary_potential)
             && WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC)
         {
-            bool const reset_fields = false; // Do not erase previous user-specified values on the grid
-            ComputeSpaceChargeField(reset_fields);
+            bool const reset_E_field = false; // Do not erase previous user-specified values on the grid
+            bool const reset_B_field = false; // Do not erase previous user-specified values on the grid
+            ComputeSpaceChargeField(reset_E_field, reset_B_field);
             if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
                 ComputeMagnetostaticField();
             }

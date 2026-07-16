@@ -140,6 +140,7 @@ public:
     // Functions used by implicit solvers
     //
     void SyncMassMatricesPC ();
+    void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
@@ -809,7 +810,7 @@ public:
     [[nodiscard]] amrex::IntVect get_numprocs() const {return numprocs;}
 
     /** Electrostatic solve call */
-    void ComputeSpaceChargeField (bool reset_fields);
+    void ComputeSpaceChargeField (bool reset_E_field, bool reset_B_field);
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
