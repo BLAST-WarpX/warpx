@@ -197,6 +197,22 @@ class FiniteDifferenceSolver
             int lev );
 
         /**
+          * \brief Calculation of the curl of a B-staggered vector field,
+          * output on E/A/J mesh staggering, i.e. curl(input) with no
+          * additional scaling factors.
+          *
+          * \param[out] Efield  vector of output MultiFabs at a given level
+          * \param[in] Bfield   vector of input MultiFabs at a given level
+          * \param[in] eb_update_E  array indicating where the field should be updated with respect to the position of the embedded boundary
+          * \param[in] lev  level number for the calculation
+          */
+        void ComputeCurlB (
+            ablastr::fields::VectorField& Efield,
+            ablastr::fields::VectorField const& Bfield,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            int lev );
+
+        /**
           * \brief Calculation of the gradient of the given scalar field.
           *
           * \param[out] out_field  vector of output MultiFabs at a given level
@@ -233,6 +249,23 @@ class FiniteDifferenceSolver
           * \param[in] lev  level number for the calculation
           */
         void ComputeVectorLaplacian (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev );
+
+        /**
+          * \brief Calculation of the vector bi-Laplacian (nabla^4) of the given vector field,
+          * using a single-pass discretization of the biharmonic stencil (as opposed to
+          * composing two separate ComputeVectorLaplacian calls with an intermediate
+          * boundary fill).
+          *
+          * \param[out] out_field  vector of output MultiFabs at a given level
+          * \param[in] in_field   vector of input MultiFabs at a given level
+          * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
+          * \param[in] lev  level number for the calculation
+          */
+        void ComputeVectorBiLaplacian (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::VectorField const& in_field,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
@@ -331,6 +364,14 @@ class FiniteDifferenceSolver
         );
 
         template<typename T_Algo>
+        void ComputeCurlBCylindrical (
+            ablastr::fields::VectorField& Efield,
+            ablastr::fields::VectorField const& Bfield,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            int lev
+        );
+
+        template<typename T_Algo>
         void ComputeGradientCylindrical (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::ScalarField const& in_field,
@@ -348,6 +389,14 @@ class FiniteDifferenceSolver
 
         template<typename T_Algo>
         void ComputeVectorLaplacianCylindrical (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeVectorBiLaplacianCylindrical (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::VectorField const& in_field,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
@@ -412,6 +461,14 @@ class FiniteDifferenceSolver
         );
 
         template<typename T_Algo>
+        void ComputeCurlBSpherical (
+            ablastr::fields::VectorField& Efield,
+            ablastr::fields::VectorField const& Bfield,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            int lev
+        );
+
+        template<typename T_Algo>
         void ComputeGradientSpherical (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::ScalarField const& in_field,
@@ -429,6 +486,14 @@ class FiniteDifferenceSolver
 
         template<typename T_Algo>
         void ComputeVectorLaplacianSpherical (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeVectorBiLaplacianSpherical (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::VectorField const& in_field,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
@@ -548,6 +613,14 @@ class FiniteDifferenceSolver
         );
 
         template<typename T_Algo>
+        void ComputeCurlBCartesian (
+            ablastr::fields::VectorField & Efield,
+            ablastr::fields::VectorField const& Bfield,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
+            int lev
+        );
+
+        template<typename T_Algo>
         void ComputeGradientCartesian (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::ScalarField const& in_field,
@@ -565,6 +638,14 @@ class FiniteDifferenceSolver
 
         template<typename T_Algo>
         void ComputeVectorLaplacianCartesian (
+            ablastr::fields::VectorField& out_field,
+            ablastr::fields::VectorField const& in_field,
+            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
+            int lev
+        );
+
+        template<typename T_Algo>
+        void ComputeVectorBiLaplacianCartesian (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::VectorField const& in_field,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,

@@ -4,6 +4,7 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         ImplicitSolver.cpp
         SemiImplicitEM.cpp
+        SemiImplicitDarwin.cpp
         ThetaImplicitEM.cpp
         StrangImplicitSpectralEM.cpp
         WarpXImplicitOps.cpp

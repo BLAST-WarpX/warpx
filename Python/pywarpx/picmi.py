@@ -1670,8 +1670,9 @@ class GMRESLinearSolver(LinearSolverBase):
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "amrex_gmres"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "amrex_gmres"
         amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         amrex_gmres.verbose_int = self.verbose_int
         amrex_gmres.restart_length = self.restart_length
@@ -1689,7 +1690,7 @@ class PETScKSPLinearSolver(LinearSolverBase):
     """
 
     def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "petsc_ksp"
+        nonlinear_solver.linear_solver = "petsc_ksp"
 
 
 class PreconditionerBase(picmistandard.base._ClassWithInit):
@@ -2088,6 +2089,41 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         pywarpx.algo.evolve_scheme = "semi_implicit_em"
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
+
+
+class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the semi-implicit Darwin evolve scheme.
+
+    linear_solver:
+        GMRESLinearSolver instance.
+
+    graddiv_factor: float, optional
+        Multiplier on the grad-div (Coulomb-gauge penalty) stabilization
+        term added to the Darwin field operator, which lifts the otherwise
+        nearly singular curl-free modes to the same eigenvalue scale as the
+        solenoidal modes. Defaults to 1; set to 0 to disable the term.
+    """
+
+    def __init__(
+        self,
+        linear_solver,
+        graddiv_factor=None,
+    ):
+        if not isinstance(linear_solver, GMRESLinearSolver):
+            raise TypeError(
+                "SemiImplicitDarwinEvolveScheme only supports GMRESLinearSolver "
+                "as its linear_solver (there is no nonlinear solver for the "
+                "linear solver to attach to, which PETScKSPLinearSolver requires)"
+            )
+        self.linear_solver = linear_solver
+        self.graddiv_factor = graddiv_factor
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        semi_implicit_darwin = pywarpx.warpx.get_bucket("semi_implicit_darwin")
+        semi_implicit_darwin.graddiv_factor = self.graddiv_factor
+        self.linear_solver.linear_solver_initialize_inputs()
 
 
 class HybridPICSolver(picmistandard.base._ClassWithInit):
@@ -2763,12 +2799,13 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                     f"B{sdir}_external_grid_function(x,y,z)", expression
                 )
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            pywarpx.warpx.add_new_group_attr(
-                "projection_div_cleaner", "atol", self.div_cleaner_atol
-            )
-            pywarpx.warpx.add_new_group_attr(
-                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
-            )
+            if self.do_initial_div_cleaning:
+                pywarpx.warpx.add_new_group_attr(
+                    "projection_div_cleaner", "atol", self.div_cleaner_atol
+                )
+                pywarpx.warpx.add_new_group_attr(
+                    "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+                )
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
