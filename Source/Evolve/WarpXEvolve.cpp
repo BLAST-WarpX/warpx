@@ -296,13 +296,17 @@ WarpX::Evolve (int numsteps)
 
             if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
                 // Electrostatic solver:
+                // The E-field is always reset to hold just the electrostatic component
+                bool const reset_E_field = true;
+                // The B-field is also reset unless the Darwin solver is used
+                bool const reset_B_field = true;
+
                 // For each species: deposit charge and add the associated space-charge
                 // E and B field to the grid ; this is done at the end of the PIC
                 // loop (i.e. immediately after a `Redistribute` and before particle
                 // positions are next pushed) so that the particles do not deposit out of bounds
                 // and so that the fields are at the correct time in the output.
-                bool const reset_fields = true;
-                ComputeSpaceChargeField( reset_fields );
+                ComputeSpaceChargeField( reset_E_field, reset_B_field );
                 if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
                     // Call Magnetostatic Solver to solve for the vector potential A and compute the
                     // B field.  Time varying A contribution to E field is neglected.
