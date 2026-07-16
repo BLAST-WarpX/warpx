@@ -680,13 +680,6 @@ void SemiImplicitDarwin::UpdateEfromdA ( int astep )
         Efield[lev][ii]->mult(prefac, 0); // use zero ghost cells since FillBoundary is called below
     }
 
-    // At conducting (PEC) walls, keep A's wall and guard values consistent
-    // with the accumulated dA increments (tangential A stays zero at the
-    // wall, being the time integral of the tangential E-field there). The
-    // curl(A) -> B sync reads only valid cells in 1D/2D, so this is for
-    // consistency of diagnostics and guard-dependent consumers.
-    ApplyPECtodA(Afield[lev], lev, Afield[lev][0]->nGrowVect());
-
     // Apply E-field boundary
     m_WarpX->ApplyEfieldBoundary(0, PatchType::fine, astep*m_dt);
     m_WarpX->FillBoundaryE(m_WarpX->getngEB(), true);
