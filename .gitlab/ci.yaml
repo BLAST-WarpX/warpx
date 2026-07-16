@@ -19,6 +19,13 @@
     - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
     - python3 -m venv venv
     - source venv/bin/activate
+    # Dependencies required for analysis and checksums.
+    # Remove system copy of Matplotlib to avoid conflict
+    # with the version set in the requirements file, see
+    # https://github.com/matplotlib/matplotlib/issues/28768.
+    - apt-get remove python3-matplotlib
+    - python3 -m pip install --upgrade -r Regression/requirements.txt
+    - python3 -m pip cache purge
 
 Nvidia-H100-single-precision:
   extends: .install-dependencies
