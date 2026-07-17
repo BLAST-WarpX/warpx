@@ -228,19 +228,25 @@ namespace
             return g;
         }
 
-        // boundary normal (toward the plasma) from the level set
-        int ic, jc, kc;
-        amrex::Real Wc[AMREX_SPACEDIM][2];
-        ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-            xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-        g.nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+        // Boundary normal (toward the plasma) from the level set. The
+        // post-#7051 interp_normal returns a unit 3D Cartesian normal for
+        // every dimensionality; with yq = 0 the RZ azimuthal rotation is the
+        // identity, so components 0 and 2 are the (x,z)/(r,z) grid normal.
+        auto const n3 = DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+        g.nv = amrex::RealVect(
+            amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2]));
+#else
+        g.nv = amrex::RealVect(amrex::Real(n3[0]), amrex::Real(n3[2]));
+#endif
         amrex::Real const nv2 = DistanceToEB::dot_product(g.nv, g.nv);
-        if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
-            // degenerate level-set gradient: treat as deep interior
+        if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
+            // degenerate level-set gradient (interp_normal normalizes
+            // internally, so a vanishing gradient arrives non-finite):
+            // treat as deep interior
             g.band = false;
             return g;
         }
-        DistanceToEB::normalize(g.nv);
 
         // image point in the plasma, at least one cell away from this point
         // so that the interpolation stencil decouples from the fill band;
@@ -766,20 +772,26 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                         return {std::abs(v_old), 0._rt};
                     }
 
-                    // boundary normal (toward the plasma) from the level set
-                    int ic, jc, kc;
-                    amrex::Real Wc[AMREX_SPACEDIM][2];
-                    ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                        xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-                    amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+                    // Boundary normal (toward the plasma) from the level
+                    // set (unit 3D Cartesian; yq = 0 makes the RZ rotation
+                    // the identity, so components 0/2 are the grid normal).
+                    auto const n3 =
+                        DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+                    amrex::RealVect const nv{
+                        amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2])};
+#else
+                    amrex::RealVect const nv{
+                        amrex::Real(n3[0]), amrex::Real(n3[2])};
+#endif
                     amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-                    if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
-                        // degenerate level-set gradient (e.g. saturated far
-                        // field): treat as deep interior
+                    if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
+                        // degenerate level-set gradient (interp_normal
+                        // normalizes internally, so a vanishing gradient
+                        // arrives non-finite): treat as deep interior
                         Jc(i, j, k, n) = 0._rt;
                         return {std::abs(v_old), 0._rt};
                     }
-                    DistanceToEB::normalize(nv);
 
                     // Image point at least one cell into the plasma so its
                     // stencil decouples from the boundary band (fast Jacobi
@@ -1146,14 +1158,17 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
             amrex::Real W[AMREX_SPACEDIM][2];
             ablastr::particles::compute_weights<amrex::IndexType::NODE>(
                 xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
-            int ic, jc, kc;
-            amrex::Real Wc[AMREX_SPACEDIM][2];
-            ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-            amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+            auto const n3 =
+                DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2])};
+#else
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[2])};
+#endif
             amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-            if (!(nv2 > 0._rt) || !std::isfinite(nv2)) { return; }
-            DistanceToEB::normalize(nv);
+            if (!std::isfinite(nv2) || !(nv2 > 0._rt)) { return; }
 
             // exact mirror image of this point inside the conductor
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xm;
@@ -1395,18 +1410,23 @@ void warpx::hybrid::ApplyEBBoundaryToNodalScalar (
             amrex::Real W[AMREX_SPACEDIM][2];
             ablastr::particles::compute_weights<amrex::IndexType::NODE>(
                 xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
-            int ic, jc, kc;
-            amrex::Real Wc[AMREX_SPACEDIM][2];
-            ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-            amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+            auto const n3 =
+                DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2])};
+#else
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[2])};
+#endif
             amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-            if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
-                // degenerate level-set gradient: treat as deep interior
+            if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
+                // degenerate level-set gradient (interp_normal normalizes
+                // internally, so a vanishing gradient arrives non-finite):
+                // treat as deep interior
                 f(i, j, k, n) = 0._rt;
                 return;
             }
-            DistanceToEB::normalize(nv);
 
             // Image point at the exact mirror distance, regularized near the
             // surface so the stencil retains fluid nodes; the gather never
