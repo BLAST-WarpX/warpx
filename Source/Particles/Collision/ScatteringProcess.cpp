@@ -47,18 +47,18 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
     m_exe_h.m_sigmas_data = m_sigmas_h.data();
 
     // save energy grid parameters for easy use
-    m_grid_size = static_cast<int>(m_energies.size());
-    m_exe_h.m_grid_size = m_grid_size;
+    const int grid_size = static_cast<int>(m_energies.size());
+    m_exe_h.m_grid_size = grid_size;
     m_exe_h.m_energy_lo = m_energies[0];
-    m_exe_h.m_energy_hi = m_energies[m_grid_size-1];
+    m_exe_h.m_energy_hi = m_energies[grid_size-1];
     m_exe_h.m_sigma_lo = m_sigmas_h[0];
-    m_exe_h.m_sigma_hi = m_sigmas_h[m_grid_size-1];
+    m_exe_h.m_sigma_hi = m_sigmas_h[grid_size-1];
     // The energy grid does not need to be evenly spaced; `m_dE` is only used as a
     // representative energy step (e.g. to set the scan resolution when computing the
     // maximum collision frequency). Use the smallest spacing so that finely resolved
     // regions of a non-uniform grid are not skipped over.
-    m_exe_h.m_dE = m_energies[m_grid_size-1] - m_energies[0];
-    for (int i = 1; i < m_grid_size; i++) {
+    m_exe_h.m_dE = m_energies[grid_size-1] - m_energies[0];
+    for (int i = 1; i < grid_size; i++) {
         m_exe_h.m_dE = std::min(m_exe_h.m_dE, m_energies[i] - m_energies[i-1]);
     }
     m_exe_h.m_energy_penalty = energy;

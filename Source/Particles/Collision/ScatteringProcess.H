@@ -157,8 +157,6 @@ private:
 #endif
     amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_h;
     Executor m_exe_h;
-
-    int m_grid_size;
 };
 
 #endif // WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
