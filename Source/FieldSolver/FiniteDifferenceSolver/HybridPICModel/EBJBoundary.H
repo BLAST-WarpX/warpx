@@ -110,6 +110,11 @@ namespace warpx::hybrid
      *            is isotropic (reaches the diagonal/corner neighbors) passes
      *            sqrt(AMREX_SPACEDIM) so the corner edges are mirror-filled
      *            instead of left in the zeroed deep interior.
+     * \param[in] divfree apply the divergence-consistent covered-band
+     *            correction after the fill (collocated B only, see
+     *            DivFreeFixCoveredB)
+     * \param[in] divfree_debug verify the div-free invariant after the
+     *            correction and abort on violation (test/debug)
      */
     void ApplyPECBoundaryToField (
         ablastr::fields::VectorField const& field,
