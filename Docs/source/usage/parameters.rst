@@ -3075,8 +3075,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     for the given scattering processes. The cross-section file must have exactly
     2 columns of data, the first containing energies in eV and the
     second the corresponding cross-section in :math:`m^2`. The energies must be sorted in
-    strictly increasing order, but they do not need to be evenly spaced. The energy column
-    should represent the kinetic energy of the colliding particles in the center-of-mass frame.
+    strictly increasing order. The energy column should represent the kinetic energy of the 
+    colliding particles in the center-of-mass frame.
 
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
