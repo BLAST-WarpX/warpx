@@ -71,7 +71,6 @@ algo.particle_pusher = vay
 ########### PARTICLES ###########
 #################################
 particles.species_names = beam1 beam2 pho1 pho2 ele1 pos1 ele2 pos2
-particles.photon_species = pho1 pho2
 
 beam1.species_type = electron
 beam1.injection_style = NUniformPerCell

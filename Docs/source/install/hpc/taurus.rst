@@ -53,7 +53,7 @@ Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following comman
    cmake -S . -B build -DWarpX_DIMS="1;2;3" -DWarpX_COMPUTE=CUDA
    cmake --build build -j 16
 
-The general :ref:`cmake compile-time options <building-cmake>` apply as usual.
+The general :ref:`cmake compile-time options <install-build-cmake>` apply as usual.
 
 
 .. _running-cpp-taurus:

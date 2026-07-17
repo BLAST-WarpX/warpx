@@ -39,6 +39,23 @@ module_path = os.path.dirname(os.path.abspath(__file__))
 checksum_path = os.path.join(module_path, "../../Regression/Checksum")
 sys.path.insert(0, checksum_path)
 
+# Modify sys.path to use custom extension in _ext
+_ext_path = os.path.join(module_path, "_ext")
+sys.path.insert(0, _ext_path)
+
+
+def download_with_headers(url, filename):
+    """Download a file with proper User-Agent header to avoid 403 errors."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "WarpX-docs-builder"})
+        with urllib.request.urlopen(req) as response:
+            with open(filename, "wb") as f:
+                f.write(response.read())
+    except Exception as e:
+        print(f"Could not download {filename} from {url}: {e}")
+        print("Continuing build without cross-reference file...")
+
+
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -58,6 +75,7 @@ extensions = [
     "breathe",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
+    "parmparse",
 ]
 
 # Google Analytics
@@ -68,7 +86,7 @@ googleanalytics_enabled = True
 templates_path = ["_templates"]
 
 # Relative path to bibliography file, bibliography style
-bibtex_bibfiles = ["latex_theory/allbibs.bib", "refs.bib"]
+bibtex_bibfiles = ["refs.bib"]
 
 
 # An brief introduction to custom BibTex formatting can be found in the Sphinx documentation:
@@ -243,11 +261,14 @@ primary_domain = "cpp"
 highlight_language = "cpp"
 
 # Download AMReX & openPMD-api Doxygen Tagfile to interlink Doxygen docs
-url = "https://amrex-codes.github.io/amrex/docs_xml/doxygen/amrex-doxygen-web.tag.xml"
-urllib.request.urlretrieve(url, "../amrex-doxygen-web.tag.xml")
-
-url = "https://openpmd-api.readthedocs.io/en/latest/_static/doxyhtml/openpmd-api-doxygen-web.tag.xml"
-urllib.request.urlretrieve(url, "../openpmd-api-doxygen-web.tag.xml")
+download_with_headers(
+    url="https://amrex-codes.github.io/amrex/docs_xml/doxygen/amrex-doxygen-web.tag.xml",
+    filename="../amrex-doxygen-web.tag.xml",
+)
+download_with_headers(
+    url="https://openpmd-api.readthedocs.io/en/latest/_static/doxyhtml/openpmd-api-doxygen-web.tag.xml",
+    filename="../openpmd-api-doxygen-web.tag.xml",
+)
 
 # Build Doxygen
 subprocess.call(

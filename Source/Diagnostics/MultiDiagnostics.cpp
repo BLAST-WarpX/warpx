@@ -9,8 +9,6 @@
 #include <AMReX.H>
 #include <AMReX_REAL.H>
 
-#include <algorithm>
-
 using namespace amrex;
 
 MultiDiagnostics::MultiDiagnostics ()
@@ -34,10 +32,10 @@ MultiDiagnostics::MultiDiagnostics ()
 }
 
 void
-MultiDiagnostics::InitData ()
+MultiDiagnostics::InitData (const MultiParticleContainer& mpc)
 {
     for( auto& diag : alldiags ){
-        diag->InitData();
+        diag->InitData(mpc);
     }
 }
 

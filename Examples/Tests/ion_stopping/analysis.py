@@ -88,7 +88,9 @@ ad0 = ds0.all_data()
 
 Zb = 1.0  # Ion charge state
 
-ne = float(ds0.parameters["stopping_on_electrons_constant.background_density"])
+ne = float(
+    ds0.parameters["stopping_on_electrons_constant.background_density"].split("#")[0]
+)
 Te = (
     eval(ds0.parameters["stopping_on_electrons_constant.background_temperature"])
     * kb
@@ -97,8 +99,10 @@ Te = (
 ion_mass12 = m_p
 
 mi = eval(ds0.parameters["stopping_on_ions_constant.background_mass"])
-Zi = float(ds0.parameters["stopping_on_ions_constant.background_charge_state"])
-ni = float(ds0.parameters["stopping_on_ions_constant.background_density"])
+Zi = float(
+    ds0.parameters["stopping_on_ions_constant.background_charge_state"].split("#")[0]
+)
+ni = float(ds0.parameters["stopping_on_ions_constant.background_density"].split("#")[0])
 Ti = eval(ds0.parameters["stopping_on_ions_constant.background_temperature"]) * kb / e
 ion_mass34 = 4.0 * m_p
 

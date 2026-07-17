@@ -142,7 +142,7 @@ On Perlmutter, you can run either on GPU nodes with fast A100 GPUs (recommended)
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
 
@@ -233,8 +233,11 @@ Running
    .. tab-item:: A100 (40GB) GPUs
 
       The batch script below can be used to run a WarpX simulation on multiple nodes (change ``-N`` accordingly) on the supercomputer Perlmutter at NERSC.
-      This partition as up to `1536 nodes <https://docs.nersc.gov/systems/perlmutter/architecture/>`__.
+      This partition has up to `1536 nodes <https://docs.nersc.gov/systems/perlmutter/architecture/>`__.
 
+      The batch script is set up for Python (PICMI) by default (``EXE=python3``, ``INPUTS=run_script.py``).
+      To use the WarpX executable instead, edit the script and comment the Python lines and uncomment the ``EXE``/``INPUTS`` lines.
+      Source your ``perlmutter_gpu_warpx.profile`` before submitting (the script will try to source it if you forgot).
       Replace descriptions between chevrons ``<>`` by relevant values, for instance ``<input file>`` could be ``plasma_mirror_inputs``.
       Note that we run one MPI rank per GPU.
 
@@ -259,7 +262,8 @@ Running
 
    .. tab-item:: CPU Nodes
 
-      The Perlmutter CPU partition as up to `3072 nodes <https://docs.nersc.gov/systems/perlmutter/architecture/>`__, each with 2x AMD EPYC 7763 CPUs.
+      The Perlmutter CPU partition has up to `3072 nodes <https://docs.nersc.gov/systems/perlmutter/architecture/>`__, each with 2x AMD EPYC 7763 CPUs.
+      The batch script is set up for Python (PICMI) by default; to use the executable instead, edit ``EXE``/``INPUTS``. Source your ``perlmutter_cpu_warpx.profile`` before submitting (the script will try to source it if you forgot).
 
       .. literalinclude:: ../../../../Tools/machines/perlmutter-nersc/perlmutter_cpu.sbatch
          :language: bash

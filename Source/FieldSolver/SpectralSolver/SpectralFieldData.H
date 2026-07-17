@@ -144,8 +144,7 @@ class SpectralFieldData
 {
 
     public:
-        SpectralFieldData( int lev,
-                           const amrex::BoxArray& realspace_ba,
+        SpectralFieldData( const amrex::BoxArray& realspace_ba,
                            const SpectralKSpace& k_space,
                            const amrex::DistributionMapping& dm,
                            int n_field_required,

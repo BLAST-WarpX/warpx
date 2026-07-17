@@ -27,7 +27,9 @@ filename = sys.argv[1]
 ds = yt.load(filename)
 ad = ds.all_data()
 
-gamma_boost = float(ds.parameters.get("warpx.gamma_boost", 1.0))
+gamma_boost = ds.parameters.get("warpx.gamma_boost", 1.0)
+if isinstance(gamma_boost, str):
+    gamma_boost = float(gamma_boost.split("#")[0])
 uz_boost = np.sqrt(gamma_boost * gamma_boost - 1.0) * c
 
 # Fetch the final particle position
@@ -53,13 +55,15 @@ def read_lattice(rootname, z_location):
     for element in lattice_elements:
         element_type = ds.parameters.get(f"{element}.type")
         if element_type == "drift":
-            length = float(ds.parameters.get(f"{element}.ds"))
+            length = float(ds.parameters.get(f"{element}.ds").split("#")[0])
             z_location += length
         elif element_type == "quad":
-            length = float(ds.parameters.get(f"{element}.ds"))
+            length = float(ds.parameters.get(f"{element}.ds").split("#")[0])
             quad_starts.append(z_location)
             quad_lengths.append(length)
-            quad_strengths_E.append(float(ds.parameters.get(f"{element}.dEdx")))
+            quad_strengths_E.append(
+                float(ds.parameters.get(f"{element}.dEdx").split("#")[0])
+            )
             z_location += length
         elif element_type == "line":
             z_location = read_lattice(element, z_location)
@@ -69,8 +73,14 @@ def read_lattice(rootname, z_location):
 read_lattice("lattice", z_location)
 
 # Fetch the initial position of the particle
-x0 = [float(x) for x in ds.parameters.get("electron.single_particle_pos").split()]
-ux0 = [float(x) * c for x in ds.parameters.get("electron.single_particle_u").split()]
+x0 = [
+    float(x)
+    for x in ds.parameters.get("electron.single_particle_pos").split("#")[0].split()
+]
+ux0 = [
+    float(x) * c
+    for x in ds.parameters.get("electron.single_particle_u").split("#")[0].split()
+]
 
 xx = x0[0]
 zz = x0[2]

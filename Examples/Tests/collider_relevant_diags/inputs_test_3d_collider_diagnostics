@@ -16,7 +16,6 @@ amr.max_level = 0
 geometry.dims = 3
 geometry.prob_lo = 0 0 0
 geometry.prob_hi =  8 8 8
-particles.do_tiling = 0
 warpx.use_filter = 0
 warpx.abort_on_warning_threshold = high
 
@@ -47,7 +46,6 @@ particles.B_external_particle = 0. 5000. 0.
 ########### PARTICLES ###########
 #################################
 particles.species_names = pho beam_p beam_e
-particles.photon_species = pho
 
 beam_e.species_type = electron
 beam_e.injection_style = MultipleParticles

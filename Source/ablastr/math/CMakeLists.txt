@@ -3,6 +3,7 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(ablastr_${SD}
       PRIVATE
         FiniteDifference.cpp
+        RandomSeed.cpp
     )
 endforeach()
 

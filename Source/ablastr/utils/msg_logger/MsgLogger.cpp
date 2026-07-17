@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <array>
-#include <memory>
 #include <numeric>
 
 namespace abl_msg_logger = ablastr::utils::msg_logger;

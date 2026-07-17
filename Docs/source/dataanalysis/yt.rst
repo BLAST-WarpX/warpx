@@ -1,7 +1,8 @@
+.. _dataanalysis-amrex-plotfiles:
 .. _dataanalysis-yt:
 
-yt-project
-==========
+Read AMReX Plotfiles with yt
+============================
 
 `yt <http://yt-project.org/>`__ is a Python package that can help in analyzing and visualizing WarpX data (among other data formats).
 It is convenient to use yt within a `Jupyter notebook <http://jupyter.org/>`__.
@@ -118,3 +119,5 @@ corresponding notebook tutorials `here <http://yt-project.org/doc/>`__.
 
    plot_parallel
    advanced
+
+In the WarpX repository you can find other examples of visualization scripts, e.g., the serial script :download:`video_yt.py <../../../Tools/PostProcessing/video_yt.py>` and the parallel script :download:`yt3d_mpi.py <../../../Tools/PostProcessing/yt3d_mpi.py>`.

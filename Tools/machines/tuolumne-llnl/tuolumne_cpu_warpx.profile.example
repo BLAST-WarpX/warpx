@@ -1,0 +1,68 @@
+# please set your project account
+export proj=""  # change me!
+
+# remembers the location of this script
+export MY_PROFILE=$(cd $(dirname $BASH_SOURCE) && pwd)"/"$(basename $BASH_SOURCE)
+# early access: not yet used
+# if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in your $MY_PROFILE file! Please edit its line 2 to continue!"; return; fi
+
+# required dependencies
+module unload cray-libsci
+module load cmake/3.29.2
+module load cray-fftw/3.3.10.11
+
+# optional: faster builds
+# ccache is system provided
+module load ninja/1.10.2
+
+# optional: for QED support with detailed tables
+# TODO: no Boost module found
+
+# optional: for openPMD and PSATD+RZ support
+SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/cpu"
+export CMAKE_PREFIX_PATH=${SW_DIR}/hdf5-1.14.1.2:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-2.15.1:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/lapackpp-2024.05.31:$CMAKE_PREFIX_PATH
+export CMAKE_PREFIX_PATH=${SW_DIR}/petsc-3.24.0:$CMAKE_PREFIX_PATH
+
+export LD_LIBRARY_PATH=${SW_DIR}/hdf5-1.14.1.2/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/c-blosc-2.15.1/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/adios2-2.10.2/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/blaspp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=${SW_DIR}/petsc-3.24.0/lib:$LD_LIBRARY_PATH
+
+export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
+export PATH=${SW_DIR}/hdf5-1.14.1.2/bin:${PATH}
+
+# python
+module load cray-python/3.11.7
+
+if [ -d "${SW_DIR}/venvs/warpx-tuolumne-cpu" ]
+then
+  source ${SW_DIR}/venvs/warpx-tuolumne-cpu/bin/activate
+fi
+
+# an alias to request an interactive batch node for one hour
+#   for parallel execution, start on the batch node: srun <command>
+alias getNode="salloc -N 1 -t 1:00:00"
+# an alias to run a command on a batch node for up to 30min
+#   usage: runNode <command>
+alias runNode="srun -N 1 --ntasks-per-node=4 -t 0:30:00"
+
+# Transparent huge pages on CPU
+# https://hpc.llnl.gov/documentation/user-guides/using-el-capitan-systems/introduction-and-quickstart/pro-tips
+#export LDFLAGS="${LDFLAGS} -lhugetlbfs"
+#export HSA_XNACK=1
+#export HUGETLB_MORECORE=yes
+
+# optimize compilation for MI300A CPU part (Zen4)
+export CXXFLAGS="-march=znver4"
+export CFLAGS="-march=znver4"
+
+# compiler environment hints
+export CC=$(which cc)
+export CXX=$(which CC)
+export FC=$(which ftn)

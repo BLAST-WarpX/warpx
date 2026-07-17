@@ -14,7 +14,7 @@ import dill
 import numpy as np
 from mpi4py import MPI as mpi
 
-from pywarpx import callbacks, fields, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 constants = picmi.constants
 
@@ -54,7 +54,7 @@ class IonLandauDamping(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = 1e-7
     # Number of substeps used to update B
-    substeps = 10
+    substeps = 20
 
     def __init__(self, test, dim, m, T_ratio, verbose):
         """Get input parameters for the specific case desired."""
@@ -254,7 +254,7 @@ class IonLandauDamping(object):
         simulation.initialize_warpx()
 
         # get ion particle container wrapper
-        self.ion_part_container = particle_containers.ParticleContainerWrapper("ions")
+        self.ions = simulation.particles.get("ions")
 
     def text_diag(self):
         """Diagnostic function to print out timing data and particle numbers."""
@@ -269,7 +269,7 @@ class IonLandauDamping(object):
 
         status_dict = {
             "step": step,
-            "nplive ions": self.ion_part_container.nps,
+            "nplive ions": self.ions.size,
             "wall_time": wall_time,
             "step_rate": step_rate,
             "diag_steps": self.diag_steps,
@@ -299,7 +299,7 @@ class IonLandauDamping(object):
         if step % self.diag_steps != 0:
             return
 
-        Ez_warpx = fields.EzWrapper()[...]
+        Ez_warpx = simulation.fields.get("Efield_fp", dir="z", level=0)[...]
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return

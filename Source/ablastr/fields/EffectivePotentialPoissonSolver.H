@@ -13,12 +13,12 @@
 #define ABLASTR_EFFECTIVE_POTENTIAL_POISSON_SOLVER_H
 
 #include <ablastr/constant.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/TextMsg.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
-#include <ablastr/profiler/ProfilerWrapper.H>
 #include "PoissonSolver.H"
 
 #if defined(WARPX_USE_FFT) && defined(WARPX_DIM_3D)
@@ -117,9 +117,9 @@ computeEffectivePotentialPhi (
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
-    [[maybe_unused]] T_BoundaryHandler const boundary_handler = std::nullopt,
+    [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-    [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
+    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
 ) {
     using namespace amrex::literals;
 
@@ -150,17 +150,13 @@ computeEffectivePotentialPhi (
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
 
-    // determine if rho is zero everywhere
-    const amrex::Real max_norm_b = getMaxNormRho(
-        amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
-
     const amrex::LPInfo info;
 
     for (int lev=0; lev<=finest_level; lev++) {
 
         // Use the Multigrid (MLMG) solver but first scale rho appropriately
         using namespace ablastr::constant::SI;
-        rho[lev]->mult(-1._rt/ep0);
+        rho[lev]->mult(-1._rt/epsilon_0);
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
         // In the presence of EB or RZ the EB enabled linear solver is used
@@ -183,6 +179,9 @@ computeEffectivePotentialPhi (
                 } else {
                     linop_nodelap->setEBDirichlet(boundary_handler.getPhiEB(current_time.value()));
                 }
+            }
+            if (is_rz) {
+                linop_nodelap->setRZ(true);
             }
             linop_nodelap->setSigma(lev, sigma);
             linop = std::move(linop_nodelap);
@@ -231,7 +230,7 @@ computeEffectivePotentialPhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
@@ -267,7 +266,7 @@ computeEffectivePotentialPhi (
                 post_phi_calculation.value()(mlmg, lev);
             }
         }
-        rho[lev]->mult(-ep0);  // Multiply rho by epsilon again
+        rho[lev]->mult(-epsilon_0);  // Multiply rho by epsilon again
     } // loop over lev(els)
 }
 

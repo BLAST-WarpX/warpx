@@ -75,6 +75,13 @@ macro(find_amrex)
             set(AMReX_EB OFF CACHE INTERNAL "")
         endif()
 
+        # PETSc support in AMReX
+        if(WarpX_PETSC)
+            set(AMReX_PETSC ON CACHE INTERNAL "")
+        else()
+            set(AMReX_PETSC OFF CACHE INTERNAL "")
+        endif()
+
         if(WarpX_MPI)
             set(AMReX_MPI ON CACHE INTERNAL "")
             if(WarpX_MPI_THREAD_MULTIPLE)
@@ -263,8 +270,10 @@ macro(find_amrex)
             set(COMPONENT_SIMD)
         endif()
 
-        set(WarpX_amrex_dim ${WarpX_DIMS})  # RZ is AMReX 2D
+        set(WarpX_amrex_dim ${WarpX_DIMS})
         list(TRANSFORM WarpX_amrex_dim REPLACE RZ 2)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RCYLINDER 1)
+        list(TRANSFORM WarpX_amrex_dim REPLACE RSPHERE 1)
         list(REMOVE_DUPLICATES WarpX_amrex_dim)
         set(COMPONENT_DIMS)
         foreach(D IN LISTS WarpX_amrex_dim)
@@ -280,6 +289,11 @@ macro(find_amrex)
         else()
             set(COMPONENT_EB)
         endif()
+        if(WarpX_PETSC)
+            set(COMPONENT_PETSC PETSC)
+        else()
+            set(COMPONENT_PETSC)
+        endif()
         if(WarpX_LIB)
             set(COMPONENT_PIC PIC)
         else()
@@ -292,7 +306,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
+        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PETSC} ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts

@@ -98,7 +98,7 @@ private:
     /** Conductivity, sigma, of the medium */
     amrex::Real m_sigma = 0.0;
     /** Permittivity, epsilon, of the medium */
-    amrex::Real m_epsilon = PhysConst::ep0;
+    amrex::Real m_epsilon = PhysConst::epsilon_0;
     /** Permeability, mu, of the medium */
     amrex::Real m_mu = PhysConst::mu0;
     /** Multifab for m_sigma */

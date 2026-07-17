@@ -43,7 +43,9 @@ ux_sim = ad["electrons", "particle_momentum_x"].v[i0] / m_e
 uy_sim = ad["electrons", "particle_momentum_y"].v[i1] / m_e
 
 if "warpx.gamma_boost" in ds.parameters:
-    gamma_boost = float(ds.parameters.get("warpx.gamma_boost"))
+    gamma_boost = ds.parameters.get("warpx.gamma_boost")
+    if isinstance(gamma_boost, str):
+        gamma_boost = float(gamma_boost.split("#")[0])
     uz_boost = np.sqrt(gamma_boost * gamma_boost - 1.0) * c
     time = ds.current_time.to_value()
     zz_sim0 = gamma_boost * zz_sim0 + uz_boost * time
@@ -68,23 +70,31 @@ except TypeError:
 
 if "particles.repeated_plasma_lens_period" in ds.parameters:
     plasma_lens_period = float(
-        ds.parameters.get("particles.repeated_plasma_lens_period")
+        ds.parameters.get("particles.repeated_plasma_lens_period").split("#")[0]
     )
     plasma_lens_starts = [
         float(x)
-        for x in ds.parameters.get("particles.repeated_plasma_lens_starts").split()
+        for x in ds.parameters.get("particles.repeated_plasma_lens_starts")
+        .split("#")[0]
+        .split()
     ]
     plasma_lens_lengths = [
         float(x)
-        for x in ds.parameters.get("particles.repeated_plasma_lens_lengths").split()
+        for x in ds.parameters.get("particles.repeated_plasma_lens_lengths")
+        .split("#")[0]
+        .split()
     ]
     plasma_lens_strengths_E = [
         eval(x)
-        for x in ds.parameters.get("particles.repeated_plasma_lens_strengths_E").split()
+        for x in ds.parameters.get("particles.repeated_plasma_lens_strengths_E")
+        .split("#")[0]
+        .split()
     ]
     plasma_lens_strengths_B = [
         eval(x)
-        for x in ds.parameters.get("particles.repeated_plasma_lens_strengths_B").split()
+        for x in ds.parameters.get("particles.repeated_plasma_lens_strengths_B")
+        .split("#")[0]
+        .split()
     ]
 elif "lattice.elements" in ds.parameters:
     lattice_elements = ds.parameters.get("lattice.elements").split()
@@ -94,11 +104,13 @@ elif "lattice.elements" in ds.parameters:
     z_location = 0.0
     for element in lattice_elements:
         element_type = ds.parameters.get(f"{element}.type")
-        length = float(ds.parameters.get(f"{element}.ds"))
+        length = float(ds.parameters.get(f"{element}.ds").split("#")[0])
         if element_type == "plasmalens":
             plasma_lens_zstarts.append(z_location)
             plasma_lens_lengths.append(length)
-            plasma_lens_strengths_E.append(float(ds.parameters.get(f"{element}.dEdx")))
+            plasma_lens_strengths_E.append(
+                float(ds.parameters.get(f"{element}.dEdx").split("#")[0])
+            )
         z_location += length
 
     plasma_lens_period = 0.5
@@ -110,13 +122,28 @@ elif "lattice.elements" in ds.parameters:
 
 try:
     # The picmi version
-    x0 = float(ds.parameters.get("electrons.dist0.multiple_particles_pos_x"))
-    y0 = float(ds.parameters.get("electrons.dist1.multiple_particles_pos_y"))
-    z0 = float(ds.parameters.get("electrons.dist0.multiple_particles_pos_z"))
-    ux0 = float(ds.parameters.get("electrons.dist0.multiple_particles_ux")) * c
-    uy0 = float(ds.parameters.get("electrons.dist1.multiple_particles_uy")) * c
-    uz0 = eval(ds.parameters.get("electrons.dist0.multiple_particles_uz")) * c
-except TypeError:
+    x0 = float(
+        ds.parameters.get("electrons.dist0.multiple_particles_pos_x").split("#")[0]
+    )
+    y0 = float(
+        ds.parameters.get("electrons.dist1.multiple_particles_pos_y").split("#")[0]
+    )
+    z0 = float(
+        ds.parameters.get("electrons.dist0.multiple_particles_pos_z").split("#")[0]
+    )
+    ux0 = (
+        float(ds.parameters.get("electrons.dist0.multiple_particles_ux").split("#")[0])
+        * c
+    )
+    uy0 = (
+        float(ds.parameters.get("electrons.dist1.multiple_particles_uy").split("#")[0])
+        * c
+    )
+    uz0 = (
+        eval(ds.parameters.get("electrons.dist0.multiple_particles_uz").split("#")[0])
+        * c
+    )
+except Exception:
     # The inputs version
     x0 = float(ds.parameters.get("electrons.multiple_particles_pos_x").split()[0])
     y0 = float(ds.parameters.get("electrons.multiple_particles_pos_y").split()[1])

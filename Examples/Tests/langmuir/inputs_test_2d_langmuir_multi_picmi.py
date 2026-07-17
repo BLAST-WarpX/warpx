@@ -25,12 +25,12 @@ diagnostic_intervals = "::10"
 
 # --- Grid
 nx = 64
-ny = 64
+nz = 64
 
 xmin = -20.0e-6
-ymin = -20.0e-6
+zmin = -20.0e-6
 xmax = +20.0e-6
-ymax = +20.0e-6
+zmax = +20.0e-6
 
 number_per_cell_each_dim = [2, 2]
 
@@ -53,9 +53,9 @@ electrons = picmi.Species(
 ##########################
 
 grid = picmi.Cartesian2DGrid(
-    number_of_cells=[nx, ny],
-    lower_bound=[xmin, ymin],
-    upper_bound=[xmax, ymax],
+    number_of_cells=[nx, nz],
+    lower_bound=[xmin, zmin],
+    upper_bound=[xmax, zmax],
     lower_boundary_conditions=["periodic", "periodic"],
     upper_boundary_conditions=["periodic", "periodic"],
     moving_window_velocity=[0.0, 0.0, 0.0],

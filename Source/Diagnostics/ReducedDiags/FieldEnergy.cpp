@@ -125,7 +125,7 @@ void FieldEnergy::ComputeDiags (int step)
         constexpr int index_B = 2;
 
         // save data
-        m_data[lev*noutputs+index_E] = 0.5_rt * Es * PhysConst::ep0 * dV;
+        m_data[lev*noutputs+index_E] = 0.5_rt * Es * PhysConst::epsilon_0 * dV;
         m_data[lev*noutputs+index_B] = 0.5_rt * Bs / PhysConst::mu0 * dV;
         m_data[lev*noutputs+index_total] = m_data[lev*noutputs+index_E] +
                                            m_data[lev*noutputs+index_B];

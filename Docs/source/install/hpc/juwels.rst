@@ -60,7 +60,7 @@ Then, ``cd`` into the directory ``$HOME/src/warpx`` and use the following comman
    cmake -S . -B build -DWarpX_DIMS="1;2;3" -DWarpX_COMPUTE=CUDA -DWarpX_FFT=ON -DWarpX_MPI_THREAD_MULTIPLE=OFF
    cmake --build build -j 16
 
-The other :ref:`general compile-time options <install-developers>` apply as usual.
+The other :ref:`general compile-time options <install-build-cmake>` apply as usual.
 
 **That's it!**
 A 3D WarpX executable is now in ``build/bin/`` and :ref:`can be run <running-cpp-juwels>` with a :ref:`3D example inputs file <usage-examples>`.

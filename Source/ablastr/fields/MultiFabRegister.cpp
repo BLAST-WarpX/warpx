@@ -7,6 +7,8 @@
  */
 #include "MultiFabRegister.H"
 
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_MakeType.H>
 
 #include <array>
@@ -305,7 +307,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, level);
 
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -317,7 +319,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, dir, level);
 
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -341,7 +343,7 @@ namespace ablastr::fields
         std::string const & internal_name
     )
     {
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     amrex::MultiFab*
@@ -349,7 +351,7 @@ namespace ablastr::fields
         std::string const & internal_name
     )
     {
-        if (m_mf_register.count(internal_name) == 0) {
+        if (!m_mf_register.contains(internal_name)) {
             throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab & mf = m_mf_register.at(internal_name).m_mf;
@@ -362,7 +364,7 @@ namespace ablastr::fields
         std::string const & internal_name
     ) const
     {
-        if (m_mf_register.count(internal_name) == 0) {
+        if (!m_mf_register.contains(internal_name)) {
             throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab const & mf = m_mf_register.at(internal_name).m_mf;
@@ -628,15 +630,11 @@ namespace ablastr::fields
         int level
     ) const
     {
-        // Add the suffix for the direction [x] or [y] or [z]
-        // note: since Cartesian is not correct for all our supported geometries,
-        //       in the future we might want to break this to "[dir=0/1/2]".
-        //       This will be a breaking change for (Python) users that rely on that string.
-        constexpr int x_in_ascii = 120;
-        std::string const component_name{char(x_in_ascii + dir.dir)};
+        // Add the suffix for the direction [dir=x] or [dir=y] or [dir=z] or [dir=r]
+        std::string const component_name = dir;
         return mf_name(
             name
-            .append("[")
+            .append("[dir=")
             .append(component_name)
             .append("]"),
             level
@@ -648,12 +646,10 @@ namespace ablastr::fields
         std::array< std::unique_ptr<amrex::MultiFab>, 3 > const & old_vectorfield
     )
     {
-        std::vector<Direction> const all_dirs = {Direction{0}, Direction{1}, Direction{2}};
-
         VectorField field_on_level;
 
         // insert components
-        for (auto const dir : {0, 1, 2})
+        for (auto const dir : MultiFabRegister::m_all_dirs)
         {
             field_on_level[Direction{dir}] = old_vectorfield[dir].get();
         }

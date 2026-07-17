@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import re
 import sys
 
 import numpy as np
@@ -13,8 +12,9 @@ rtol = 5e-10
 
 # extract numbers from a string
 def find_num_in_line(line):
-    items = re.findall("-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?", line)
-    fitems = [float(it) for it in items]
+    line = line.split("#")[0]  # remove comment
+    line = line.split("=")[1]  # remove variable assignment
+    fitems = [float(it) for it in line.split()]
     if len(fitems) == 1:
         return fitems[0]
     else:

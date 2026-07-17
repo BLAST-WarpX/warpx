@@ -7,7 +7,7 @@ import sys
 
 import numpy as np
 
-from pywarpx import callbacks, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 
 ##########################
 # physics parameters
@@ -22,21 +22,21 @@ dt = 7.5e-10
 max_steps = 10
 
 nx = 64
-ny = 64
+nz = 64
 
 xmin = 0
 xmax = 0.03
-ymin = 0
-ymax = 0.03
+zmin = 0
+zmax = 0.03
 
 ##########################
 # numerics components
 ##########################
 
 grid = picmi.Cartesian2DGrid(
-    number_of_cells=[nx, ny],
-    lower_bound=[xmin, ymin],
-    upper_bound=[xmax, ymax],
+    number_of_cells=[nx, nz],
+    lower_bound=[xmin, zmin],
+    upper_bound=[xmax, zmax],
     lower_boundary_conditions=["dirichlet", "periodic"],
     upper_boundary_conditions=["dirichlet", "periodic"],
     lower_boundary_conditions_particles=["absorbing", "periodic"],
@@ -112,8 +112,8 @@ sim.initialize_warpx()
 np.random.seed(30025025)
 
 # wrap the electrons particle container
-electron_wrapper = particle_containers.ParticleContainerWrapper("electrons")
-electron_wrapper.add_real_comp("newPid")
+electrons = sim.particles.get("electrons")
+electrons.add_real_comp("newPid")
 
 
 def add_particles():
@@ -127,9 +127,7 @@ def add_particles():
     w = np.ones(nps) * 2.0
     newPid = 5.0
 
-    electron_wrapper.add_particles(
-        x=x, y=y, z=z, ux=ux, uy=uy, uz=uz, w=w, newPid=newPid
-    )
+    electrons.add_particles(x=x, y=y, z=z, ux=ux, uy=uy, uz=uz, w=w, newPid=newPid)
 
 
 callbacks.installbeforestep(add_particles)
@@ -145,5 +143,15 @@ sim.step(max_steps)
 # check that the ids and cpus are read properly
 ###############################################
 
-assert np.sum(np.concatenate(electron_wrapper.get_particle_id())) == 5050
-assert np.sum(np.concatenate(electron_wrapper.get_particle_cpu())) == 0
+ids_sum = 0
+cpu_sum = 0
+for pti in electrons.iterator(level=0):
+    idcpu = pti["idcpu"]
+    ids = libwarpx.amr.unpack_ids(idcpu)
+    cpu = libwarpx.amr.unpack_cpus(idcpu)
+
+    ids_sum += np.sum(ids)
+    cpu_sum += np.sum(cpu)
+
+assert ids_sum == 5050
+assert cpu_sum == 0

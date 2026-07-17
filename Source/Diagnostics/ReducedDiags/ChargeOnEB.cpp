@@ -213,7 +213,7 @@ void ChargeOnEB::ComputeDiags (const int step)
     amrex::ParallelDescriptor::ReduceRealSum( surface_integral_value );
 
     // save data
-    m_data[0] = PhysConst::ep0 * surface_integral_value;
+    m_data[0] = PhysConst::epsilon_0 * surface_integral_value;
 #endif
 }
 // end void ChargeOnEB::ComputeDiags

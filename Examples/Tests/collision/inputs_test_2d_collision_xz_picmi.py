@@ -17,12 +17,12 @@ max_steps = 150
 max_grid_size = 8
 max_level = 0
 nx = max_grid_size
-ny = max_grid_size
+nz = max_grid_size
 
 xmin = 0
 xmax = 4.154046151855669e2
-ymin = xmin
-ymax = xmax
+zmin = xmin
+zmax = xmax
 
 plasma_density = 1e21
 elec_rms_velocity = 0.044237441120300 * constants.c
@@ -88,11 +88,11 @@ collision3 = picmi.CoulombCollisions(
 #################################
 
 grid = picmi.Cartesian2DGrid(
-    number_of_cells=[nx, ny],
+    number_of_cells=[nx, nz],
     warpx_max_grid_size=max_grid_size,
     warpx_blocking_factor=max_grid_size,
-    lower_bound=[xmin, ymin],
-    upper_bound=[xmax, ymax],
+    lower_bound=[xmin, zmin],
+    upper_bound=[xmax, zmax],
     lower_boundary_conditions=["periodic", "periodic"],
     upper_boundary_conditions=["periodic", "periodic"],
 )

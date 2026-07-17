@@ -11,7 +11,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
-#include <ostream>
+#include <fstream>
 #include <string>
 
 
@@ -29,7 +29,7 @@ ablastr::utils::write_used_inputs_file (std::string const & filename, bool verbo
     if (amrex::ParallelDescriptor::IOProcessor()) {
         std::ofstream jobInfoFile;
         jobInfoFile.open(filename.c_str(), std::ios::out);
-        amrex::ParmParse::prettyPrintTable(jobInfoFile);
+        amrex::ParmParse::prettyPrintUsedInputs(jobInfoFile);
         jobInfoFile.close();
     }
 }

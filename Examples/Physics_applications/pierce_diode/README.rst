@@ -47,7 +47,7 @@ This example can be run with the WarpX executable using an input file: ``warpx.1
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
 .. literalinclude:: inputs_test_1d_pierce_diode
-   :language: ini
+   :language: none
    :caption: You can copy this file from ``Examples/Physics_applications/pierce_diode/inputs_test_1d_pierce_diode``.
 
 Visualize
@@ -62,5 +62,5 @@ The figure below shows the results of the simulation (orange curves), which agre
 This figure was obtained with the script below, which can be run with ``python3 plot_sim.py``.
 
 .. literalinclude:: plot_sim.py
-   :language: ini
+   :language: none
    :caption: You can copy this file from ``Examples/Physics_applications/pierce_diode/plot_sim.py``.

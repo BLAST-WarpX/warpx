@@ -11,9 +11,11 @@ foreach(D IN LISTS WarpX_DIMS)
         RhoFunctor.cpp
         PartPerCellFunctor.cpp
         PartPerGridFunctor.cpp
+        ProcessNumberFunctor.cpp
         BackTransformFunctor.cpp
         BackTransformParticleFunctor.cpp
         ParticleReductionFunctor.cpp
+        PhiFunctor.cpp
         TemperatureFunctor.cpp
     )
 endforeach()

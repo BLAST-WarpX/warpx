@@ -192,8 +192,8 @@ void FieldMomentum::ComputeDiags (int step)
 
         // Save data (offset: 3 values for each refinement level)
         const int offset = lev*3;
-        m_data[offset+0] = PhysConst::ep0 * ExB_x * dV;
-        m_data[offset+1] = PhysConst::ep0 * ExB_y * dV;
-        m_data[offset+2] = PhysConst::ep0 * ExB_z * dV;
+        m_data[offset+0] = PhysConst::epsilon_0 * ExB_x * dV;
+        m_data[offset+1] = PhysConst::epsilon_0 * ExB_y * dV;
+        m_data[offset+2] = PhysConst::epsilon_0 * ExB_z * dV;
     }
 }

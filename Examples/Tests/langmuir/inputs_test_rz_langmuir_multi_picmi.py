@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 
 constants = picmi.constants
 
@@ -271,13 +271,13 @@ t0 = sim.extension.warpx.gett_new(0)
 
 # Get the raw field data. Note that these are the real and imaginary
 # parts of the fields for each azimuthal mode.
-Ex_sim_wrap = fields.ExWrapper()
-Ez_sim_wrap = fields.EzWrapper()
-Ex_sim_modes = Ex_sim_wrap[...]
+Er_sim_wrap = sim.fields.get("Efield_aux", dir="r", level=0)
+Ez_sim_wrap = sim.fields.get("Efield_aux", dir="z", level=0)
+Er_sim_modes = Er_sim_wrap[...]
 Ez_sim_modes = Ez_sim_wrap[...]
 
-rr_Er = Ex_sim_wrap.mesh("r")
-zz_Er = Ex_sim_wrap.mesh("z")
+rr_Er = Er_sim_wrap.mesh("r")
+zz_Er = Er_sim_wrap.mesh("z")
 rr_Ez = Ez_sim_wrap.mesh("r")
 zz_Ez = Ez_sim_wrap.mesh("z")
 
@@ -287,7 +287,7 @@ rr_Ez = rr_Ez[:, np.newaxis] * np.ones(zz_Ez.shape[0])[np.newaxis, :]
 zz_Ez = zz_Ez[np.newaxis, :] * np.ones(rr_Ez.shape[0])[:, np.newaxis]
 
 # Sum the real components to get the field along x-axis (theta = 0)
-Er_sim = Ex_sim_modes[:, :, 0] + np.sum(Ex_sim_modes[:, :, 1::2], axis=2)
+Er_sim = Er_sim_modes[:, :, 0] + np.sum(Er_sim_modes[:, :, 1::2], axis=2)
 Ez_sim = Ez_sim_modes[:, :, 0] + np.sum(Ez_sim_modes[:, :, 1::2], axis=2)
 
 # The analytical solutions

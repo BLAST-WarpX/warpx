@@ -3,7 +3,7 @@
 How to compile locally and fast
 ===============================
 
-For simplicity, WarpX :ref:`compilation with CMake <building-cmake>` by default downloads, configures and compiles compatible versions of :ref:`central dependencies <install-dependencies>` such as:
+For simplicity, WarpX :ref:`compilation with CMake <install-build-cmake>` by default downloads, configures and compiles compatible versions of :ref:`central dependencies <install-dependencies>` such as:
 
 * `AMReX <https://amrex-codes.github.io>`__
 * `PICSAR <https://github.com/ECP-WarpX/picsar>`__
@@ -43,7 +43,7 @@ For instance, clone these dependencies to ``$HOME/src``:
    git clone https://github.com/pybind/pybind11.git
 
 Now modify the dependencies as needed in their source locations, update sources if you cloned them earlier, etc.
-When building WarpX, :ref:`the following CMake flags <building-cmake-options>` will use the respective local sources:
+When building WarpX, :ref:`the following CMake flags <install-build-options>` will use the respective local sources:
 
 .. code-block:: bash
 
@@ -76,7 +76,7 @@ This workflow is the best and fastest to compile WarpX, when you just want to ch
 Instead of downloading the source code of the above central dependencies, or using a local copy of their source, we can compile and install those dependencies once.
 By setting the `CMAKE_PREFIX_PATH <https://cmake.org/cmake/help/latest/envvar/CMAKE_PREFIX_PATH.html>`__ environment variable to the respective dependency install location prefixes, we can instruct CMake to `find their install locations and configurations <https://hsf-training.github.io/hsf-training-cmake-webpage/09-findingpackages/index.html>`__.
 
-WarpX supports this with :ref:`the following CMake flags <building-cmake-options>`:
+WarpX supports this with :ref:`the following CMake flags <install-build-options>`:
 
 .. code-block:: bash
 
@@ -95,7 +95,7 @@ WarpX supports this with :ref:`the following CMake flags <building-cmake-options
    cmake --build build -j 8
    cmake --build build -j 8 --target pip_install
 
-As a background, this is also the workflow how WarpX is built in :ref:`package managers such as Spack and Conda-Forge <install-dependencies>`.
+As a background, this is also the workflow how WarpX is built in :ref:`package managers such as Spack and conda-forge <install-dependencies>`.
 
 
 .. _developers-local-compile-pylto:

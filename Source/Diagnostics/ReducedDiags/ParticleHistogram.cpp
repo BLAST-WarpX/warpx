@@ -262,7 +262,7 @@ void ParticleHistogram::ComputeDiags (int step)
         Real f_max = 0.0_rt;
         for ( int i = 0; i < m_bin_num; ++i )
         {
-            if ( m_data[i] > f_max ) { f_max = m_data[i]; }
+            f_max = std::max(f_max, m_data[i]);
         }
         for ( int i = 0; i < m_bin_num; ++i )
         {

@@ -21,9 +21,6 @@
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
 
-#include <memory>
-
-
 namespace ablastr::coarsen::sample
 {
     void

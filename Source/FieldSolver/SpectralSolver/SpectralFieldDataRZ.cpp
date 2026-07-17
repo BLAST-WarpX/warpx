@@ -66,7 +66,10 @@ SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
     // as the forward plan anyway.
     backward_plan = FFTplans(spectralspace_ba, dm);
 #endif
-    multi_spectral_hankel_transformer = MultiSpectralHankelTransformer(spectralspace_ba, dm);
+
+    bool has_box = false;
+    int nr = 0;
+    amrex::Real rmax = 0._rt;
 
     // Loop over boxes and allocate the corresponding plan
     // for each box owned by the local MPI proc.
@@ -198,9 +201,20 @@ SpectralFieldDataRZ::SpectralFieldDataRZ (const int lev,
                                FFTW_ESTIMATE); // unsigned flags
 #endif
 
-        // Create the Hankel transformer for each box.
+        // Assert that all boxes have the same r-axis so that they can share one Hankel transformer.
         amrex::XDim3 const xyzmax = WarpX::UpperCorner(mfi.tilebox(), lev, 0._rt);
-        multi_spectral_hankel_transformer[mfi] = SpectralHankelTransformer(grid_size[0], n_rz_azimuthal_modes, xyzmax.x);
+        if (has_box) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(nr == grid_size[0] && rmax == xyzmax.x,
+                "All boxes should have the same r axis");
+        } else {
+            has_box = true;
+            nr = grid_size[0];
+            rmax = xyzmax.x;
+        }
+    }
+
+    if (has_box) {
+        spectral_hankel_transformer = SpectralHankelTransformer(nr, n_rz_azimuthal_modes, rmax);
     }
 }
 
@@ -491,7 +505,7 @@ SpectralFieldDataRZ::ForwardTransform (const int lev,
             field_mf_copy[mfi].setVal<amrex::RunOn::Device>(0._rt, realspace_bx, 0, m_ncomps);
             }
         field_mf_copy[mfi].copy<amrex::RunOn::Device>(field_mf[mfi], i_comp*m_ncomps, 0, m_ncomps);
-        multi_spectral_hankel_transformer[mfi].PhysicalToSpectral_Scalar(field_mf_copy[mfi], tempHTransformedSplit[mfi]);
+        spectral_hankel_transformer.PhysicalToSpectral_Scalar(field_mf_copy[mfi], tempHTransformedSplit[mfi]);
 
         FABZForwardTransform(mfi, realspace_bx, tempHTransformedSplit, field_index, is_nodal_z);
 
@@ -554,9 +568,9 @@ SpectralFieldDataRZ::ForwardTransform (const int lev,
         field_mf_t_copy[mfi].copy<amrex::RunOn::Device>(field_mf_t[mfi], 1, 2, ncomps_left);
 
         // Perform the Hankel transform first.
-        multi_spectral_hankel_transformer[mfi].PhysicalToSpectral_Vector(realspace_bx,
-                                                           field_mf_r_copy[mfi], field_mf_t_copy[mfi],
-                                                           tempHTransformedSplit_p[mfi], tempHTransformedSplit_m[mfi]);
+        spectral_hankel_transformer.PhysicalToSpectral_Vector(realspace_bx,
+            field_mf_r_copy[mfi], field_mf_t_copy[mfi],
+            tempHTransformedSplit_p[mfi], tempHTransformedSplit_m[mfi]);
 
         FABZForwardTransform(mfi, realspace_bx, tempHTransformedSplit_p, field_index_r, is_nodal_z);
         FABZForwardTransform(mfi, realspace_bx, tempHTransformedSplit_m, field_index_t, is_nodal_z);
@@ -606,7 +620,7 @@ SpectralFieldDataRZ::BackwardTransform (const int lev,
         // Perform the Hankel inverse transform last.
         // tempHTransformedSplit includes the imaginary component of mode 0.
         // field_mf does not.
-        multi_spectral_hankel_transformer[mfi].SpectralToPhysical_Scalar(tempHTransformedSplit[mfi], field_mf_copy[mfi]);
+        spectral_hankel_transformer.SpectralToPhysical_Scalar(tempHTransformedSplit[mfi], field_mf_copy[mfi]);
 
         amrex::Array4<amrex::Real> const & field_mf_array = field_mf[mfi].array();
         amrex::Array4<amrex::Real> const & field_mf_copy_array = field_mf_copy[mfi].array();
@@ -692,7 +706,7 @@ SpectralFieldDataRZ::BackwardTransform (const int lev,
         // Perform the Hankel inverse transform last.
         // tempHTransformedSplit includes the imaginary component of mode 0.
         // field_mf_[ri] do not.
-        multi_spectral_hankel_transformer[mfi].SpectralToPhysical_Vector(realspace_bx,
+        spectral_hankel_transformer.SpectralToPhysical_Vector(realspace_bx,
                                                            tempHTransformedSplit_p[mfi], tempHTransformedSplit_m[mfi],
                                                            field_mf_r_copy[mfi], field_mf_t_copy[mfi]);
 
@@ -751,19 +765,63 @@ SpectralFieldDataRZ::BackwardTransform (const int lev,
 
 }
 
+
+void SpectralFieldDataRZ::CopySpectralDataComp (const int src_comp, const int dest_comp)
+{
+    // In spectral space fields of each mode are grouped together, so that the index
+    // of a field for a specific mode is given by field_index + mode*n_fields.
+    // That’s why, looping over all azimuthal modes, we need to take into account corresponding
+    // shift, given by imode * m_n_fields.
+    for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
+    {
+        const int shift_comp = imode * m_n_fields;
+        // The last two arguments represent the number of components and
+        // the number of ghost cells to perform this operation
+        Copy(fields, fields, src_comp + shift_comp, dest_comp + shift_comp, 1, 0);
+    }
+}
+
+void SpectralFieldDataRZ::ZeroOutDataComp(const int icomp)
+{
+    // In spectral space fields of each mode are grouped together, so that the index
+    // of a field for a specific mode is given by field_index + mode*n_fields.
+    // That’s why, looping over all azimuthal modes, we need to take into account corresponding
+    // shift, given by imode * m_n_fields.
+    for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
+    {
+        const int shift_comp = imode * m_n_fields;
+        // The last argument represents the number of components to perform this operation
+        fields.setVal(0., icomp + shift_comp, 1);
+    }
+}
+
+void SpectralFieldDataRZ::ScaleDataComp(const int icomp, const amrex::Real scale_factor)
+{
+    // In spectral space fields of each mode are grouped together, so that the index
+    // of a field for a specific mode is given by field_index + mode*n_fields.
+    // That’s why, looping over all azimuthal modes, we need to take into account corresponding
+    // shift, given by imode * m_n_fields.
+    for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
+    {
+        const int shift_comp = imode * m_n_fields;
+        // The last argument represents the number of components to perform this operation
+        fields.mult(scale_factor, icomp + shift_comp, 1);
+    }
+}
+
 /* \brief Initialize arrays used for filtering */
 void
 SpectralFieldDataRZ::InitFilter (amrex::IntVect const & filter_npass_each_dir, bool const compensation,
                                  SpectralKSpaceRZ const & k_space)
 {
-    binomialfilter = BinomialFilter(multi_spectral_hankel_transformer.boxArray(),
-                                    multi_spectral_hankel_transformer.DistributionMap());
+    binomialfilter = BinomialFilter(forward_plan.boxArray(),
+                                    forward_plan.DistributionMap());
 
     auto const & dx = k_space.getCellSize();
     auto const & kz = k_space.getKzArray();
 
     for (amrex::MFIter mfi(binomialfilter); mfi.isValid(); ++mfi){
-        binomialfilter[mfi].InitFilterArray(multi_spectral_hankel_transformer[mfi].getKrArray(),
+        binomialfilter[mfi].InitFilterArray(spectral_hankel_transformer.getKrArray(),
                                             kz[mfi], dx, filter_npass_each_dir, compensation);
     }
 }

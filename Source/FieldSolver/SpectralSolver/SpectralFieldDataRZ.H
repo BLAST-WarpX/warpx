@@ -29,9 +29,6 @@ class SpectralFieldDataRZ
         // the local MPI rank)
         using FFTplans = amrex::LayoutData<ablastr::math::anyfft::VendorFFTPlan>;
 
-        // Similarly, define the Hankel transformers and filter for each box.
-        using MultiSpectralHankelTransformer = amrex::LayoutData<SpectralHankelTransformer>;
-
         using BinomialFilter = amrex::LayoutData<SpectralBinomialFilter>;
 
         SpectralFieldDataRZ (int lev,
@@ -77,39 +74,14 @@ class SpectralFieldDataRZ
          * \param[in] src_comp  component of the source FabArray from which the data are copied
          * \param[in] dest_comp component of the destination FabArray where the data are copied
          */
-        void CopySpectralDataComp (int src_comp, int dest_comp)
-        {
-            // In spectral space fields of each mode are grouped together, so that the index
-            // of a field for a specific mode is given by field_index + mode*n_fields.
-            // That’s why, looping over all azimuthal modes, we need to take into account corresponding
-            // shift, given by imode * m_n_fields.
-            for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
-            {
-                const int shift_comp = imode * m_n_fields;
-                // The last two arguments represent the number of components and
-                // the number of ghost cells to perform this operation
-                Copy(fields, fields, src_comp + shift_comp, dest_comp + shift_comp, 1, 0);
-            }
-        }
+        void CopySpectralDataComp (int src_comp, int dest_comp);
 
         /**
          * \brief Set to zero the data on component \c icomp of \c fields
          *
          * \param[in] icomp component of the FabArray where the data are set to zero
          */
-        void ZeroOutDataComp(int icomp)
-        {
-            // In spectral space fields of each mode are grouped together, so that the index
-            // of a field for a specific mode is given by field_index + mode*n_fields.
-            // That’s why, looping over all azimuthal modes, we need to take into account corresponding
-            // shift, given by imode * m_n_fields.
-            for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
-            {
-                const int shift_comp = imode * m_n_fields;
-                // The last argument represents the number of components to perform this operation
-                fields.setVal(0., icomp + shift_comp, 1);
-            }
-        }
+        void ZeroOutDataComp(int icomp);
 
         /**
          * \brief Scale the data on component \c icomp of \c fields by a given scale factor
@@ -117,19 +89,7 @@ class SpectralFieldDataRZ
          * \param[in] icomp component of the FabArray where the data are scaled
          * \param[in] scale_factor scale factor to use for scaling
          */
-        void ScaleDataComp(int icomp, amrex::Real scale_factor)
-        {
-            // In spectral space fields of each mode are grouped together, so that the index
-            // of a field for a specific mode is given by field_index + mode*n_fields.
-            // That’s why, looping over all azimuthal modes, we need to take into account corresponding
-            // shift, given by imode * m_n_fields.
-            for (int imode=0 ; imode < n_rz_azimuthal_modes ; imode++)
-            {
-                const int shift_comp = imode * m_n_fields;
-                // The last argument represents the number of components to perform this operation
-                fields.mult(scale_factor, icomp + shift_comp, 1);
-            }
-        }
+        void ScaleDataComp(int icomp, amrex::Real scale_factor);
 
         void InitFilter (amrex::IntVect const & filter_npass_each_dir, bool compensation,
                          SpectralKSpaceRZ const & k_space);
@@ -139,8 +99,8 @@ class SpectralFieldDataRZ
                           int field_index2, int field_index3);
 
         // Returns an array that holds the kr for all of the modes
-        HankelTransform::RealVector const & getKrArray (amrex::MFIter const & mfi) const {
-            return multi_spectral_hankel_transformer[mfi].getKrArray();
+        HankelTransform::RealVector const & getKrArray () const {
+            return spectral_hankel_transformer.getKrArray();
         }
 
         //! `fields` stores fields in spectral space, as multicomponent FabArray
@@ -164,7 +124,7 @@ class SpectralFieldDataRZ
         // Correcting "shift" factors when performing FFT from/to
         // a cell-centered grid in real space, instead of a nodal grid
         SpectralShiftFactor zshift_FFTfromCell, zshift_FFTtoCell;
-        MultiSpectralHankelTransformer multi_spectral_hankel_transformer;
+        SpectralHankelTransformer spectral_hankel_transformer;
         BinomialFilter binomialfilter;
 
 };

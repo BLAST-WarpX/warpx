@@ -11,7 +11,7 @@ import numpy as np
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
-from pywarpx import callbacks, fields, libwarpx, particle_containers, picmi
+from pywarpx import callbacks, libwarpx, picmi
 from pywarpx.LoadThirdParty import load_cupy
 
 constants = picmi.constants
@@ -98,11 +98,11 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
         """Function run on every step to perform the required steps to solve
         Poisson's equation."""
         # get rho from WarpX
-        self.rho_data = fields.RhoFPWrapper(0)[...]
+        self.rho_data = self.sim.fields.get("rho_fp", level=0)[...]
         # run superLU solver to get phi
         self.solve()
         # write phi to WarpX
-        fields.PhiFPWrapper(0)[()] = self.phi[:]
+        self.sim.fields.get("phi_fp", level=0)[()] = self.phi[:]
 
     def solve(self):
         """The solution step. Includes getting the boundary potentials and
@@ -167,6 +167,7 @@ class CapacitiveDischargeExample(object):
         self.test = test
         self.pythonsolver = pythonsolver
         self.dsmc = dsmc
+        self.dsmc_ndt_supercycle = 4
 
         # Case specific input parameters
         self.voltage = f"{self.voltage[n]}*sin(2*pi*{self.freq:.5e}*t)"
@@ -182,12 +183,21 @@ class CapacitiveDischargeExample(object):
         self.diag_steps = int(self.diag_interval / self.dt)
 
         if self.test:
-            self.max_steps = 50
-            self.diag_steps = 5
-            self.mcc_subcycling_steps = 2
+            assert n == 0  # The parameters below were chosen specifically for case 1.
+            # In test mode, we obtain essentially the same ion density
+            # profile as the Turner et al. (2013) benchmark, but at lower
+            # computational cost, by using a coarser resolution (fewer cells, fewer
+            # particles per cell and a larger timestep) and by stopping early
+            # in time, at a point where the ion density has already converged.
+            self.nz = 32
+            self.seed_nppc = 256
+            self.dt = 2 * self.dt
+            self.dsmc_ndt_supercycle = self.dsmc_ndt_supercycle / 2
+            self.max_steps = int(
+                320 / self.freq / self.dt
+            )  # 320 RF cycles instead of 1280
             self.rng = np.random.default_rng(23094290)
         else:
-            self.mcc_subcycling_steps = None
             self.rng = np.random.default_rng()
 
         self.ion_density_array = np.zeros(self.nz + 1)
@@ -286,15 +296,19 @@ class CapacitiveDischargeExample(object):
             },
         }
         if self.dsmc:
-            ionization = {"ionization": electron_scattering_processes.pop("ionization")}
-            ionization["ionization"]["target_species"] = self.neutrals
-            ionization["ionization"].pop("species")
+            dsmc_processes = {
+                "ionization": electron_scattering_processes.pop("ionization"),
+                "excitation1": electron_scattering_processes.pop("excitation1"),
+                "excitation2": electron_scattering_processes.pop("excitation2"),
+            }
+            dsmc_processes["ionization"]["target_species"] = self.neutrals
+            dsmc_processes["ionization"].pop("species")
             electron_colls_dsmc = picmi.DSMCCollisions(
                 name="coll_elec_dsmc",
                 species=[self.electrons, self.neutrals],
                 product_species=[self.electrons, self.ions],
-                ndt=4,
-                scattering_processes=ionization,
+                ndt_supercycle=self.dsmc_ndt_supercycle,
+                scattering_processes=dsmc_processes,
             )
             electron_colls_mcc = picmi.MCCCollisions(
                 name="coll_elec",
@@ -302,7 +316,6 @@ class CapacitiveDischargeExample(object):
                 background_density=self.gas_density,
                 background_temperature=self.gas_temp,
                 background_mass=self.ions.mass,
-                ndt=self.mcc_subcycling_steps,
                 scattering_processes=electron_scattering_processes,
             )
             electron_colls = [electron_colls_mcc, electron_colls_dsmc]
@@ -313,21 +326,23 @@ class CapacitiveDischargeExample(object):
                 background_density=self.gas_density,
                 background_temperature=self.gas_temp,
                 background_mass=self.ions.mass,
-                ndt=self.mcc_subcycling_steps,
                 scattering_processes=electron_scattering_processes,
             )
             electron_colls = [electron_colls_mcc]
 
         ion_scattering_processes = {
             "elastic": {"cross_section": cross_sec_direc + "ion_scattering.dat"},
-            "back": {"cross_section": cross_sec_direc + "ion_back_scatter.dat"},
+            "elastic_back": {
+                "cross_section": cross_sec_direc + "ion_back_scatter.dat",
+                "scattering_angle_model": "backward",
+            },
             # 'charge_exchange': {'cross_section': cross_sec_direc+'charge_exchange.dat'}
         }
         if self.dsmc:
             ion_colls = picmi.DSMCCollisions(
                 name="coll_ion",
                 species=[self.ions, self.neutrals],
-                ndt=5,
+                ndt_supercycle=5,
                 scattering_processes=ion_scattering_processes,
             )
         else:
@@ -336,7 +351,6 @@ class CapacitiveDischargeExample(object):
                 species=self.ions,
                 background_density=self.gas_density,
                 background_temperature=self.gas_temp,
-                ndt=self.mcc_subcycling_steps,
                 scattering_processes=ion_scattering_processes,
             )
         ion_colls = [ion_colls]
@@ -350,6 +364,7 @@ class CapacitiveDischargeExample(object):
             time_step_size=self.dt,
             max_steps=self.max_steps,
             warpx_collisions=electron_colls + ion_colls,
+            warpx_collisions_split_momentum_push=0,
             verbose=self.test,
         )
         self.solver.sim = self.sim
@@ -408,36 +423,32 @@ class CapacitiveDischargeExample(object):
         if step % 1000 != 10:
             return
 
-        if not hasattr(self, "neutral_cont"):
-            self.neutral_cont = particle_containers.ParticleContainerWrapper(
-                self.neutrals.name
-            )
-
-        ux_arrays = self.neutral_cont.uxp
-        uy_arrays = self.neutral_cont.uyp
-        uz_arrays = self.neutral_cont.uzp
+        if not hasattr(self, "neutral_particles"):
+            self.neutral_particles = self.sim.particles.get(self.neutrals.name)
 
         xp, _ = load_cupy()
 
         vel_std = np.sqrt(constants.kb * self.gas_temp / self.m_ion)
-        for ii in range(len(ux_arrays)):
-            nps = len(ux_arrays[ii])
-            ux_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
-            uy_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
-            uz_arrays[ii][:] = xp.array(vel_std * self.rng.normal(size=nps))
+        for pti in self.neutral_particles.iterator(level=0):
+            nps = pti.size
+            pti["ux"][:] = xp.array(vel_std * self.rng.normal(size=nps))
+            pti["uy"][:] = xp.array(vel_std * self.rng.normal(size=nps))
+            pti["uz"][:] = xp.array(vel_std * self.rng.normal(size=nps))
 
     def _get_rho_ions(self):
         # deposit the ion density in rho_fp
-        he_ions_wrapper = particle_containers.ParticleContainerWrapper("he_ions")
-        he_ions_wrapper.deposit_charge_density(level=0)
+        self.rho.set_val(0.0)
+        he_ions = self.sim.particles.get("he_ions")
+        he_ions.deposit_charge(self.rho, lev=0)
+        libwarpx.warpx.sync_rho()
 
-        rho_data = self.rho_wrapper[...]
+        rho_data = self.rho[...]
         self.ion_density_array += rho_data / constants.q_e / self.diag_steps
 
     def run_sim(self):
         self.sim.step(self.max_steps - self.diag_steps)
 
-        self.rho_wrapper = fields.RhoFPWrapper(0)
+        self.rho = self.sim.fields.get("rho_fp", level=0)
         callbacks.installafterstep(self._get_rho_ions)
 
         self.sim.step(self.diag_steps)
@@ -452,9 +463,11 @@ class CapacitiveDischargeExample(object):
         # query the particle z-coordinates if this is run during CI testing
         # to cover that functionality
         if self.test:
-            he_ions_wrapper = particle_containers.ParticleContainerWrapper("he_ions")
-            nparts = he_ions_wrapper.get_particle_count(local=True)
-            z_coords = np.concatenate(he_ions_wrapper.zp)
+            he_ions = self.sim.particles.get("he_ions")
+            nparts = he_ions.number_of_particles(only_local=True)
+            z_coords = np.concatenate(
+                list(pti["z"] for pti in he_ions.iterator(level=0))
+            )
             assert len(z_coords) == nparts
             assert np.all(z_coords >= 0.0) and np.all(z_coords <= self.gap)
 

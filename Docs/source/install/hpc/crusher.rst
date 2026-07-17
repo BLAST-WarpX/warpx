@@ -92,7 +92,7 @@ Finally, since Crusher does not yet provide software modules for some of our dep
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. code-block:: bash
 
@@ -178,7 +178,7 @@ Post-Processing
 
 For post-processing, most users use Python via OLCFs's `Jupyter service <https://jupyter.olcf.ornl.gov>`__ (`Docs <https://docs.olcf.ornl.gov/services_and_applications/jupyter/index.html>`__).
 
-Please follow the same guidance as for :ref:`OLCF Summit post-processing <post-processing-summit>`.
+Please follow the same guidance as for :ref:`OLCF Frontier post-processing <post-processing-frontier>`.
 
 .. _known-crusher-issues:
 

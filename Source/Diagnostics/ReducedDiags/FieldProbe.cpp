@@ -161,7 +161,7 @@ FieldProbe::FieldProbe (const std::string& rd_name)
 
     // ensure assumption holds: we read the fields in the interpolation kernel as they are,
     // without further communication of guard/ghost/halo regions
-    int particle_shape;
+    int particle_shape = 0;
     const ParmParse pp_algo("algo");
     utils::parser::getWithParser(pp_algo, "particle_shape", particle_shape);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(interp_order <= particle_shape ,

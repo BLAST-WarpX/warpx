@@ -20,9 +20,9 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #include <AMReX.H>
 #include <AMReX_BLassert.H>
@@ -73,8 +73,8 @@ WarpX::CheckLoadBalance (int step)
 void
 WarpX::LoadBalance ()
 {
-    WARPX_PROFILE_REGION("LoadBalance");
-    WARPX_PROFILE("WarpX::LoadBalance()");
+    ABLASTR_PROFILE_REGION("LoadBalance");
+    ABLASTR_PROFILE("WarpX::LoadBalance()");
 
     AMREX_ALWAYS_ASSERT(!costs.empty());
     AMREX_ALWAYS_ASSERT(costs[0] != nullptr);
@@ -183,7 +183,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         const IntVect& ng = mf->nGrowVect();
         auto pmf = std::remove_reference_t<decltype(mf)>{};
         AllocInitMultiFab(pmf, mf->boxArray(), dm, mf->nComp(), ng, lev, mf->tags()[0]);
-        mf = std::move(pmf);
+        *mf = std::move(*pmf);
     };
 
     bool const eb_enabled = EB::enabled();
@@ -234,6 +234,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
                 if ( !fft_periodic_single_box ) {
                     realspace_ba.grow(1, ngEB[1]); // add guard cells only in z
                 }
+                if (field_boundary_hi[0] == FieldBoundaryType::PML && !do_pml_in_domain) {
+                    // Extend region that is solved for to include the guard cells
+                    // which is where the PML boundary is applied.
+                    realspace_ba.growHi(0, pml_ncell);
+                }
                 AllocLevelSpectralSolverRZ(spectral_solver_fp,
                                            lev,
                                            realspace_ba,
@@ -273,6 +278,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 
 #   ifdef WARPX_DIM_RZ
                     c_realspace_ba.grow(1, ngEB[1]); // add guard cells only in z
+                    if (field_boundary_hi[0] == FieldBoundaryType::PML && !do_pml_in_domain) {
+                        // Extend region that is solved for to include the guard cells
+                        // which is where the PML boundary is applied.
+                        c_realspace_ba.growHi(0, pml_ncell);
+                    }
                     AllocLevelSpectralSolverRZ(spectral_solver_cp,
                                                lev,
                                                c_realspace_ba,
@@ -293,12 +303,6 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 #endif
         }
 
-        if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
-            if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
-                BuildBufferMasks();
-            }
-        }
-
         // Re-initialize the lattice element finder with the new ba and dm.
         m_accelerator_lattice[lev]->InitElementFinder(lev, gamma_boost, gett_new(), ba, dm);
 
@@ -314,6 +318,18 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         }
 
         SetDistributionMap(lev, dm);
+
+        if (lev > 0 && (n_field_gather_buffer > 0 || n_current_deposition_buffer > 0)) {
+            if (current_buffer_masks[lev] || gather_buffer_masks[lev]) {
+                if (current_buffer_masks[lev]) {
+                    RemakeMultiFab( current_buffer_masks[lev] );
+                }
+                if (gather_buffer_masks[lev]) {
+                    RemakeMultiFab( gather_buffer_masks[lev] );
+                }
+                BuildBufferMasks();
+            }
+        }
 
     } else
     {

@@ -23,12 +23,12 @@ max_steps = 100
 # --- grid
 
 nx = 64
-ny = 8
+nz = 8
 
 xmin = 0
 xmax = 0.032
-ymin = 0
-ymax = 0.004
+zmin = 0
+zmax = 0.004
 
 
 ##########################
@@ -36,9 +36,9 @@ ymax = 0.004
 ##########################
 
 grid = picmi.Cartesian2DGrid(
-    number_of_cells=[nx, ny],
-    lower_bound=[xmin, ymin],
-    upper_bound=[xmax, ymax],
+    number_of_cells=[nx, nz],
+    lower_bound=[xmin, zmin],
+    upper_bound=[xmax, zmax],
     lower_boundary_conditions=["dirichlet", "periodic"],
     upper_boundary_conditions=["dirichlet", "periodic"],
     lower_boundary_conditions_particles=["absorbing", "periodic"],

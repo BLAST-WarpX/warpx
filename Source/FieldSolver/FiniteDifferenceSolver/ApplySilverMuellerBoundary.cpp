@@ -84,10 +84,10 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
 #endif
 
     // Infer whether the Silver-Mueller needs to be applied in each direction
-    bool const apply_hi_r = (field_boundary_hi[0] == FieldBoundaryType::Absorbing_SilverMueller);
+    bool const apply_hi_r = (field_boundary_hi[0] == FieldBoundaryType::Absorbing_Silver_Mueller);
 #if defined(WARPX_DIM_RZ)
-    bool const apply_lo_z = (field_boundary_lo[1] == FieldBoundaryType::Absorbing_SilverMueller);
-    bool const apply_hi_z = (field_boundary_hi[1] == FieldBoundaryType::Absorbing_SilverMueller);
+    bool const apply_lo_z = (field_boundary_lo[1] == FieldBoundaryType::Absorbing_Silver_Mueller);
+    bool const apply_hi_z = (field_boundary_hi[1] == FieldBoundaryType::Absorbing_Silver_Mueller);
 #endif
 
     // tiling is usually set by TilingIfNotGPU()
@@ -231,15 +231,15 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     amrex::Real const coef2_z = 2._rt*cdt_over_dz/(1._rt + cdt_over_dz) / PhysConst::c;
 
 #if (defined WARPX_DIM_3D || WARPX_DIM_XZ)
-    bool const apply_lo_x = (field_boundary_lo[0] == FieldBoundaryType::Absorbing_SilverMueller);
-    bool const apply_hi_x = (field_boundary_hi[0] == FieldBoundaryType::Absorbing_SilverMueller);
+    bool const apply_lo_x = (field_boundary_lo[0] == FieldBoundaryType::Absorbing_Silver_Mueller);
+    bool const apply_hi_x = (field_boundary_hi[0] == FieldBoundaryType::Absorbing_Silver_Mueller);
 #endif
 #ifdef WARPX_DIM_3D
-    bool const apply_lo_y = (field_boundary_lo[1] == FieldBoundaryType::Absorbing_SilverMueller);
-    bool const apply_hi_y = (field_boundary_hi[1] == FieldBoundaryType::Absorbing_SilverMueller);
+    bool const apply_lo_y = (field_boundary_lo[1] == FieldBoundaryType::Absorbing_Silver_Mueller);
+    bool const apply_hi_y = (field_boundary_hi[1] == FieldBoundaryType::Absorbing_Silver_Mueller);
 #endif
-    bool const apply_lo_z = (field_boundary_lo[WARPX_ZINDEX] == FieldBoundaryType::Absorbing_SilverMueller);
-    bool const apply_hi_z = (field_boundary_hi[WARPX_ZINDEX] == FieldBoundaryType::Absorbing_SilverMueller);
+    bool const apply_lo_z = (field_boundary_lo[WARPX_ZINDEX] == FieldBoundaryType::Absorbing_Silver_Mueller);
+    bool const apply_hi_z = (field_boundary_hi[WARPX_ZINDEX] == FieldBoundaryType::Absorbing_Silver_Mueller);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP

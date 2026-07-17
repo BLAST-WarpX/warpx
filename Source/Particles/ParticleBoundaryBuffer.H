@@ -9,7 +9,6 @@
 
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Particles/WarpXParticleContainer.H"
-#include "Particles/PinnedMemoryParticleContainer.H"
 #include "Utils/export.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -41,9 +40,10 @@ public:
 
     const std::vector<std::string>& getSpeciesNames() const;
 
-    void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc);
+    void gatherParticlesFromDomainBoundaries (MultiParticleContainer& mypc, amrex::Real cur_time);
     void gatherParticlesFromEmbeddedBoundaries (
-        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb
+        MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb,
+        amrex::Real cur_time
     );
 
     void redistribute ();
@@ -54,9 +54,9 @@ public:
 
     int getNumParticlesInContainer(const std::string& species_name, int boundary, bool local);
 
-    PinnedMemoryParticleContainer& getParticleBuffer(const std::string& species_name, int boundary);
+    WarpXParticleContainer::Base& getParticleBuffer(const std::string& species_name, int boundary);
 
-    PinnedMemoryParticleContainer* getParticleBufferPointer(const std::string& species_name, int boundary);
+    WarpXParticleContainer::Base* getParticleBufferPointer(const std::string& species_name, int boundary);
 
     static constexpr int numBoundaries () {
         return AMREX_SPACEDIM*2
@@ -72,7 +72,7 @@ public:
 
 private:
     // over boundary, then number of species
-    std::vector<std::vector<PinnedMemoryParticleContainer> > m_particle_containers;
+    std::vector<std::vector<WarpXParticleContainer::Base> > m_particle_containers;
 
     // over boundary, then number of species
     std::vector<std::vector<int> > m_do_boundary_buffer;

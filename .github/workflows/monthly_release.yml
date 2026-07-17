@@ -1,13 +1,17 @@
-name: Autoupdate
+name: Monthly release
 
 on:
   schedule:
-    - cron: "0 0 1 * *"  # every first day of the month at midnight
+    - cron: "0 9 2 * *"  # every second day of the month at 1:00am PST (9:00am UTC)
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
-  monthly_release:
-    name: Monthly release
+  autoupdate:
+    name: Autoupdate
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -16,7 +20,7 @@ jobs:
         run: |
           echo "DATE=$(date +'%y.%m')" >> $GITHUB_ENV
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
@@ -33,7 +37,7 @@ jobs:
           git commit -m "Update dependencies.json"
       - name: Push changes
         run: |
-          git push -u origin monthly_release
+          git push -f origin monthly_release
       - name: Open pull request
         run: |
           gh pr create \

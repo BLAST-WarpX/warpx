@@ -34,7 +34,6 @@ warpx.cfl = 0.99999
 
 # Particles
 particles.species_names = electrons protons photons
-particles.photon_species = photons
 
 electrons.charge = -q_e
 electrons.mass = m_e

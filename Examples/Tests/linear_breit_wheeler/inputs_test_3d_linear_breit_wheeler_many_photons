@@ -31,7 +31,6 @@ algo.particle_pusher = boris
 ############ PLASMA #############
 #################################
 particles.species_names = photonA photonB electron positron
-particles.photon_species = photonA photonB
 
 photonA.species_type = photon
 photonA.injection_style = "NRandomPerCell"

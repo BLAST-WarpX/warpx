@@ -170,7 +170,6 @@ def generate():
         f.write("warpx.cfl = 1.0\n")
 
         f.write("particles.species_names = {}\n".format(" ".join(spec_names)))
-        f.write("particles.photon_species = {}\n".format(" ".join(spec_names)))
 
         f.write("\namr.plot_int = 50\n\n")
 

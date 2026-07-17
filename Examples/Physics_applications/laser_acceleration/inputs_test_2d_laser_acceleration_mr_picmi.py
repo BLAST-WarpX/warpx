@@ -39,7 +39,9 @@ grid = picmi.Cartesian2DGrid(
     moving_window_velocity=[0.0, c],
     warpx_max_grid_size=max_grid_size,
     warpx_blocking_factor=blocking_factor,
-    refined_regions=[[1, [xmin_refined, zmin_refined], [xmax_refined, zmax_refined]]],
+    refined_regions=[
+        [1, [xmin_refined, zmin_refined], [xmax_refined, zmax_refined], [2, 2]]
+    ],
 )
 
 # Particles: plasma electrons
@@ -137,7 +139,7 @@ sim = picmi.Simulation(
 
 # Add plasma electrons
 sim.add_species(
-    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[1, 1, 1])
+    electrons, layout=picmi.GriddedLayout(grid=grid, n_macroparticle_per_cell=[1, 1])
 )
 
 # Add beam electrons

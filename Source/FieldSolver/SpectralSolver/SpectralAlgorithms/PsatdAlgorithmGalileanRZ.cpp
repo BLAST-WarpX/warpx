@@ -8,9 +8,9 @@
 
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <cmath>
 
 using namespace amrex::literals;
@@ -79,7 +79,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
         amrex::Array4<const Complex> const& T_rho_arr = T_rho_coef[mfi].array();
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);
@@ -124,7 +124,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
             amrex::Real const kr = kr_arr[ir];
             amrex::Real const kz = modified_kz_arr[j];
 
-            constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
+            constexpr amrex::Real c2 = PhysConst::c2;
             Complex const I = Complex{0._rt,1._rt};
             amrex::Real const C = C_arr(i,j,k,mode);
             amrex::Real const S_ck = S_ck_arr(i,j,k,mode);
@@ -142,7 +142,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
                 Complex const divE = kr*(Ep_old - Em_old) + I*kz*Ez_old;
                 Complex const divJ = kr*(Jp - Jm) + I*kz*Jz;
 
-                auto const myeps0 = PhysConst::ep0;  // temporary for NVCC
+                auto const myeps0 = PhysConst::epsilon_0;  // temporary for NVCC
                 rho_diff = T2*(X2 - X3)*myeps0*divE + T_rho*X2*divJ;
             }
 
@@ -157,7 +157,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
                         + T2*S_ck*(c2*I*kr*Bp_old + c2*I*kr*Bm_old)
                         + X4*Jz - I*kz*rho_diff;
             // Update B (see WarpX online documentation: theory section)
-            // Note: here X1 is T2*x1/(ep0*c*c*k_norm*k_norm), where
+            // Note: here X1 is T2*x1/(epsilon_0*c*c*k_norm*k_norm), where
             // x1 has the same definition as in the original paper
             fields(i,j,k,Bp_m) = T2*C*Bp_old
                         - T2*S_ck*(-I*kr/2._rt*Ez_old + kz*Ep_old)
@@ -198,7 +198,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         // Extract real (for portability on GPU)
         const amrex::Real vz = m_v_galilean[2];
 
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         int const nr = bx.length(0);
         amrex::Real const dt = m_dt;
@@ -209,7 +209,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         [=] AMREX_GPU_DEVICE(int i, int j, int k, int mode) noexcept
         {
             constexpr amrex::Real c = PhysConst::c;
-            constexpr amrex::Real ep0 = PhysConst::ep0;
+            constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
 
             // Calculate norm of vector
@@ -290,7 +290,7 @@ void
 PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
 {
     // Profiling
-    WARPX_PROFILE( "PsatdAlgorithmGalileanRZ::CurrentCorrection" );
+    ABLASTR_PROFILE( "PsatdAlgorithmGalileanRZ::CurrentCorrection" );
 
     const SpectralFieldIndex& Idx = m_spectral_index;
 
@@ -303,7 +303,7 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = field_data.getKrArray(mfi);
+        auto const & kr_modes = field_data.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);

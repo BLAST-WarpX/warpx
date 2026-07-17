@@ -1,0 +1,12 @@
+{
+  "beam1": {
+    "particle_momentum_x": 4.222627241785717e-14,
+    "particle_momentum_y": 1.131583197131103e-15,
+    "particle_momentum_z": 1.3360487849541085e-10,
+    "particle_position_x": 1.1288391053970308,
+    "particle_position_y": 0.02391393806881765,
+    "particle_position_z": 478.7122905262462,
+    "particle_weight": 19999660000.0
+  },
+  "lev=0": {}
+}

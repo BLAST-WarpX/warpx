@@ -9,7 +9,7 @@
 #ifndef ABLASTR_UTILS_TEXT_STRINGUTILS_H_
 #define ABLASTR_UTILS_TEXT_STRINGUTILS_H_
 
-#include <AMReX_Utility.H>
+#include <AMReX_String.H>
 
 #include <cstddef>
 #include <string>

@@ -8,12 +8,11 @@
 #ifndef WARPX_PhotonParticleContainer_H_
 #define WARPX_PhotonParticleContainer_H_
 
-#include "Evolve/WarpXDtType.H"
-#include "Evolve/WarpXPushType.H"
 #include "Particles/Gather/ScaleFields.H"
 #include "PhysicalParticleContainer.H"
 
 #include "Particles/WarpXParticleContainer_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_Particles.H>
 #include <AMReX_REAL.H>
@@ -51,10 +50,11 @@ public:
                  const std::string& current_fp_string,
                  amrex::Real t,
                  amrex::Real dt,
-                 DtType a_dt_type=DtType::Full,
+                 SubcyclingHalf subcycling_half=SubcyclingHalf::None,
                  bool skip_deposition=false,
-                 bool deposit_mass_matrices=false,
-                 PushType push_type=PushType::Explicit) override;
+                 PositionPushType position_push_type=PositionPushType::Full,
+                 MomentumPushType momentum_push_type=MomentumPushType::Full,
+                 ImplicitOptions const * implicit_options = nullptr) override;
 
     void PushPX (WarpXParIter& pti,
                         amrex::FArrayBox const * exfab,
@@ -68,7 +68,16 @@ public:
                         long np_to_push,
                         int lev, int gather_lev,
                         amrex::Real dt, ScaleFields scaleFields,
-                        DtType a_dt_type) override;
+                        SubcyclingHalf subcycling_half,
+                        PositionPushType position_push_type=PositionPushType::Full,
+                        MomentumPushType momentum_push_type=MomentumPushType::Full) override;
+
+    /**
+     * \brief Advances photon position at the end of an implicit time step.
+     */
+    void FinishImplicitParticleUpdate (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev,  amrex::Real t, amrex::Real dt) override;
 
     // Do nothing
     void PushP (int /*lev*/,
@@ -78,8 +87,8 @@ public:
                         const amrex::MultiFab& /*Ez*/,
                         const amrex::MultiFab& /*Bx*/,
                         const amrex::MultiFab& /*By*/,
-                        const amrex::MultiFab& /*Bz*/) override {}
-
+                        const amrex::MultiFab& /*Bz*/,
+                        MomentumPushType /*momentum_push_type*/) override {}
 
     // DepositCharge should do nothing for photons
     void DepositCharge (WarpXParIter& /*pti*/,
@@ -111,6 +120,16 @@ public:
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
                                  PushType /*push_type*/) override {}
+
+    /**
+     * \brief No-op override: photons are massless and carry no charge, so
+     * they do not contribute to the implicit-solver mass matrices
+     * (S_xx, S_xy, ..., S_zz) that weighted, charged particles deposit onto
+     * the grid.
+     */
+    void DepositMassMatrices (ablastr::fields::MultiFabRegister& /*fields*/,
+                              int /*lev*/,
+                              amrex::Real /*dt*/) override {}
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_

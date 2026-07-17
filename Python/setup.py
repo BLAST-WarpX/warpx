@@ -64,11 +64,12 @@ elif args.with_lib_dir or PYWARPX_LIB_DIR:
 else:
     package_data = {}
 
-# Parse WarpX version information
+# Parse WarpX, PICMI versions information
 dependencies_file = "../dependencies.json"
 with open(dependencies_file, "r") as file:
     dependencies_data = json.load(file)
 warpx_version = dependencies_data.get("version_warpx")
+picmi_version = dependencies_data.get("version_picmi")
 
 setup(
     name="pywarpx",
@@ -77,7 +78,7 @@ setup(
     package_dir={"pywarpx": "pywarpx"},
     description="""Wrapper of WarpX""",
     package_data=package_data,
-    install_requires=["numpy", "picmistandard==0.33.0", "periodictable"],
+    install_requires=["numpy", f"picmistandard=={picmi_version}", "periodictable"],
     python_requires=">=3.8",  # left for CI, truly ">=3.9"
     zip_safe=False,
 )

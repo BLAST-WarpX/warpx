@@ -92,7 +92,7 @@ using namespace amrex;
 
 // Defining constants to be used in the calculations
 
-constexpr amrex::Real c2 = PhysConst::c * PhysConst::c;
+constexpr amrex::Real c2 = PhysConst::c2;
 constexpr amrex::Real c2i = 1._rt/c2;
 const amrex::Real dxi = 1._rt/dx;
 const amrex::Real dzi = 1._rt/dz;
@@ -165,7 +165,7 @@ const amrex::Real dyi = 1._rt/dy;
     const amrex::Real Emu0J = ex*mu0jx + ey*mu0jy + ez*mu0jz;
     const amrex::Real Bmu0J = bx*mu0jx + by*mu0jy + bz*mu0jz;
 
-    const amrex::Real beta = 4._rt*xi_c2*( c2i*ee - bb ) + PhysConst::ep0;
+    const amrex::Real beta = 4._rt*xi_c2*( c2i*ee - bb ) + PhysConst::epsilon_0;
 
     const amrex::Real Alpha[3] = {
         2._rt*xi_c2*( -7._rt*bx*EVxE - 7._rt*VxE[0]*eb + 4._rt*ex*BVxE ) + VxM[0],
@@ -291,7 +291,7 @@ const amrex::Real dyi = 1._rt/dy;
     const amrex::Real Emu0J = ex*mu0jx + ey*mu0jy + ez*mu0jz;
     const amrex::Real Bmu0J = bx*mu0jx + by*mu0jy + bz*mu0jz;
 
-    const amrex::Real beta = 4._rt*xi_c2*( c2i*ee - bb ) + PhysConst::ep0;
+    const amrex::Real beta = 4._rt*xi_c2*( c2i*ee - bb ) + PhysConst::epsilon_0;
 
     const amrex::Real Alpha[3] = {
         2._rt*xi_c2*( -7._rt*bx*EVxE - 7._rt*VxE[0]*eb + 4._rt*ex*BVxE ) + VxM[0],

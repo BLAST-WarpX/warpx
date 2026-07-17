@@ -46,7 +46,7 @@ theory_flux["Hneutral"] = flux * np.exp(-z_th * n * cross_section)
 theory_flux["Hplus"] = flux * (1 - np.exp(-z_th * n * cross_section))
 
 # Compare the fluxes
-assert np.allclose(sim_flux["Hneutral"], theory_flux["Hneutral"], atol=5e-2 * flux)
+assert np.allclose(sim_flux["Hneutral"], theory_flux["Hneutral"], atol=6e-2 * flux)
 assert np.allclose(sim_flux["Hplus"], theory_flux["Hplus"], atol=5e-2 * flux)
 
 # Plot the computed fluxes

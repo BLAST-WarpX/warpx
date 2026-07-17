@@ -7,17 +7,16 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "Evolve/WarpXDtType.H"
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 
@@ -28,15 +27,12 @@ void WarpX::HybridPICEvolveFields ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    WARPX_PROFILE("WarpX::HybridPICEvolveFields()");
+    ABLASTR_PROFILE("WarpX::HybridPICEvolveFields()");
 
     // The below deposition is hard coded for a single level simulation
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         finest_level == 0,
         "Ohm's law E-solve only works with a single level.");
-
-    // Get requested number of substeps to use
-    const int sub_steps = m_hybrid_pic_model->m_substeps;
 
     // Get flag to include external fields.
     const bool add_external_fields = m_hybrid_pic_model->m_add_external_fields;
@@ -99,18 +95,16 @@ void WarpX::HybridPICEvolveFields ()
     // Push the B field from t=n to t=n+1/2 using the current and density
     // at t=n, while updating the E field along with B using the electron
     // momentum equation
-    for (int sub_step = 0; sub_step < sub_steps; sub_step++)
-    {
-        m_hybrid_pic_model->BfieldEvolveRK(
-            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-            m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
-            current_fp_temp, rho_fp_temp,
-            m_eb_update_E,
-            0.5_rt/sub_steps*dt[0],
-            DtType::FirstHalf, guard_cells.ng_FieldSolver,
-            WarpX::sync_nodal_points
-        );
-    }
+    m_hybrid_pic_model->BfieldEvolve(
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+        current_fp_temp, rho_fp_temp,
+        m_eb_update_E,
+        getistep(0),
+        0.5_rt*dt[0],
+        SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
+        WarpX::sync_nodal_points
+    );
 
     // Average rho^{n} and rho^{n+1} to get rho^{n+1/2} in rho_fp_temp
     for (int lev = 0; lev <= finest_level; ++lev)
@@ -132,19 +126,17 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
-    for (int sub_step = 0; sub_step < sub_steps; sub_step++)
-    {
-        m_hybrid_pic_model->BfieldEvolveRK(
-            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-            m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
-            m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
-            rho_fp_temp,
-            m_eb_update_E,
-            0.5_rt/sub_steps*dt[0],
-            DtType::SecondHalf, guard_cells.ng_FieldSolver,
-            WarpX::sync_nodal_points
-        );
-    }
+    m_hybrid_pic_model->BfieldEvolve(
+        m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
+        m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
+        rho_fp_temp,
+        m_eb_update_E,
+        getistep(0),
+        0.5_rt*dt[0],
+        SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
+        WarpX::sync_nodal_points
+    );
 
     // Extrapolate the ion current density to t=n+1 using
     // J_i^{n+1} = 1/2 * J_i^{n-1/2} + 3/2 * J_i^{n+1/2}, and recalling that
@@ -215,18 +207,6 @@ void WarpX::HybridPICEvolveFields ()
         for (int idim = 0; idim < 3; ++idim) {
             MultiFab::Copy(*current_fp_temp[lev][idim], *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                            0, 0, 1, current_fp_temp[lev][idim]->nGrowVect());
-        }
-    }
-
-    // Check that the E-field does not have nan or inf values, otherwise print a clear message
-    ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        for (int idim = 0; idim < 3; ++idim) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                Efield_fp[lev][idim]->is_finite(),
-                "Non-finite value detected in E-field; this indicates more substeps should be used in the field solver."
-            );
         }
     }
 }
@@ -348,7 +328,7 @@ void WarpX::HybridPICInitializeRhoJandB ()
 
 void
 WarpX::CalculateExternalCurlA() {
-    WARPX_PROFILE("WarpX::CalculateExternalCurlA()");
+    ABLASTR_PROFILE("WarpX::CalculateExternalCurlA()");
 
     auto & warpx = WarpX::GetInstance();
 

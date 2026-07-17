@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_3d_load_external_field_particle_time
+
+# test input parameters
+amr.restart = "../test_3d_load_external_field_particle_time/diags/chk000150"

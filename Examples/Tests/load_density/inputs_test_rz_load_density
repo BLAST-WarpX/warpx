@@ -1,0 +1,52 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 64
+amr.n_cell = 32 64
+amr.max_grid_size = 16
+amr.blocking_factor = 16
+amr.max_level = 0
+geometry.dims = RZ
+warpx.n_rz_azimuthal_modes = 1
+geometry.prob_lo =  0.e-6   -50.e-6    # physical domain
+geometry.prob_hi =  50.e-6    50.e-6
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = none pec
+boundary.field_hi = pec pec
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.cfl = 1.0
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+# Moving window
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons
+
+electrons.species_type = electron
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 2 2 2
+electrons.profile = "read_from_file"
+electrons.read_density_from_path = "../test_rz_load_density_prepare/example-density.h5"
+electrons.momentum_distribution_type = "at_rest"
+electrons.do_continuous_injection = 1
+# Diagnostics
+diagnostics.diags_names = diag
+diag.intervals = 5
+diag.diag_type = Full
+diag.fields_to_plot = rho
+diag.format = openpmd

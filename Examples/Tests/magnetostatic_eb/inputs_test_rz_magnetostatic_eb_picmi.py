@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.constants as con
 
-from pywarpx import fields, picmi
+from pywarpx import picmi
 
 ##########################
 # physics parameters
@@ -161,7 +161,7 @@ sim.step(max_steps)
 # Testing
 ##########################
 
-Er = fields.ExWrapper()
+Er = sim.fields.get("Efield_aux", dir="r", level=0)
 r_vec = Er.mesh("r")
 z_vec = Er.mesh("z")
 
@@ -207,7 +207,7 @@ assert er_err < 0.02, "Er Error increased above 2%"
 # Check B field
 ########################
 
-Bth = fields.ByWrapper()
+Bth = sim.fields.get("Bfield_aux", dir="theta", level=0)
 
 r_vec = Bth.mesh("r")
 z_vec = Bth.mesh("z")

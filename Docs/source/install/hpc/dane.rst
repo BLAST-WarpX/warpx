@@ -92,7 +92,7 @@ So the activation needs to be done this way only this one time.
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable.
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable.
 The options should be modified to suit your needs, for example only building for the dimensions needed.
 
 .. code-block:: bash

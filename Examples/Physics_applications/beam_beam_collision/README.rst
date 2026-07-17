@@ -26,7 +26,7 @@ The PICMI input file is not available for this example yet.
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
 .. literalinclude:: inputs_test_3d_beam_beam_collision
-   :language: ini
+   :language: none
    :caption: You can copy this file from ``Examples/Physics_applications/beam_beam_collision/inputs_test_3d_beam_beam_collision``.
 
 

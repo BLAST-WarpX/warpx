@@ -69,7 +69,7 @@ On Polaris, you can run either on GPU nodes with fast A100 GPUs (recommended) or
       .. code-block:: bash
 
          bash $HOME/src/warpx/Tools/machines/polaris-alcf/install_gpu_dependencies.sh
-         source ${CFS}/${proj%_g}/${USER}/sw/polaris/gpu/venvs/warpx/bin/activate
+         source $HOME/sw/polaris/gpu/venvs/warpx/bin/activate
 
       .. dropdown:: Script Details
          :color: light
@@ -90,7 +90,7 @@ On Polaris, you can run either on GPU nodes with fast A100 GPUs (recommended) or
 Compilation
 -----------
 
-Use the following :ref:`cmake commands <building-cmake>` to compile the application executable:
+Use the following :ref:`cmake commands <install-build-cmake>` to compile the application executable:
 
 .. tab-set::
 

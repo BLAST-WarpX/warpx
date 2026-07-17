@@ -34,8 +34,6 @@
 #include <ostream>
 #include <vector>
 
-using warpx::fields::FieldType;
-
 // forward declaration
 class WarpX;
 
@@ -85,8 +83,8 @@ public:
 
     [[nodiscard]] RT dotProduct( const WarpXSolverVec&  a_X ) const;
 
-    void Copy ( FieldType  a_array_type,
-                FieldType  a_scalar_type = FieldType::None,
+    void Copy ( warpx::fields::FieldType  a_array_type,
+                warpx::fields::FieldType  a_scalar_type = warpx::fields::FieldType::None,
                 bool allow_type_mismatch = false);
 
     inline
@@ -306,14 +304,17 @@ public:
     }
 
     // copy to/from Real-type arrays
-    void copyFrom (const amrex::Real* const);
-    void copyTo   (amrex::Real* const) const;
+    void copyFrom (const amrex::Real*);
+    void copyTo   (amrex::Real*) const;
 
     // return WarpX pointer
-    inline auto getWarpX () const { return m_WarpX; }
+    [[nodiscard]] auto getWarpX () const { return m_WarpX; }
 
     // return the number of AMR levels
-    inline auto numAMRLevels () const { return m_num_amr_levels; }
+    [[nodiscard]] auto numAMRLevels () const { return m_num_amr_levels; }
+
+    // return DOFs object pointer
+    [[nodiscard]] inline const auto& getDOFsObject () const { return m_dofs; }
 
 private:
 

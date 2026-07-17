@@ -37,7 +37,6 @@ algo.particle_shape = 3
 ############ PLASMA #############
 #################################
 particles.species_names = p1 p2 p3 p4 qsp_1 qsp_2 qsp_3 qsp_4 dummy_ele dummy_pos
-particles.photon_species = qsp_1 qsp_2 qsp_3 qsp_4
 #################################
 
 p1.species_type = "electron"

@@ -28,7 +28,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
             .. tab-item:: Executable: Input File
 
                 .. literalinclude:: inputs_test_2d_ionization_lab
-                    :language: ini
+                    :language: none
                     :caption: You can copy this file from ``Examples/Tests/field_ionization/inputs_test_2d_ionization_lab``.
 
    .. tab-item:: boosted frame
@@ -38,7 +38,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
         * WarpX **executable** using an input file: ``warpx.2d inputs_test_2d_ionization_boost max_step=420``
 
         .. literalinclude:: inputs_test_2d_ionization_boost
-            :language: ini
+            :language: none
             :caption: You can copy this file from ``Examples/Tests/field_ionization/inputs_test_2d_ionization_boost``.
 
 Analyze

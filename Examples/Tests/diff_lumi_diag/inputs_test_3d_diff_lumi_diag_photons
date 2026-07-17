@@ -3,8 +3,6 @@ FILE = inputs_base_3d
 
 # Test with electrons/positrons: use parse_density_function
 
-particles.photon_species = beam1 beam2
-
 beam1.species_type = photon
 beam1.injection_style = "NUniformPerCell"
 beam1.num_particles_per_cell_each_dim = 1 1 1

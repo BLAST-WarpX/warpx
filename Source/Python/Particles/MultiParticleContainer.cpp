@@ -15,7 +15,7 @@
 void init_MultiParticleContainer (py::module& m)
 {
     py::class_<MultiParticleContainer>(m, "MultiParticleContainer")
-        .def("get_particle_container_from_name",
+        .def("get",
             &MultiParticleContainer::GetParticleContainerFromName,
             py::arg("name"),
             py::return_value_policy::reference_internal
