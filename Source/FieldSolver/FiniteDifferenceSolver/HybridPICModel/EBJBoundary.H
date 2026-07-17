@@ -122,7 +122,50 @@ namespace warpx::hybrid
         bool normal_odd = false,
         bool fill_covered_centers = false,
         EBFillStatus* status_cache = nullptr,
-        amrex::Real band_cells = 1.0);
+        amrex::Real band_cells = 1.0,
+        bool divfree = false,
+        bool divfree_debug = false);
+
+    /** \brief One-pass divergence-consistent correction of the mirror-filled
+     * covered B band (collocated grid only).
+     *
+     * The pointwise level-set mirror injects O(h) central-difference div(B)
+     * into every fluid node whose stencil reads a covered node, concentrated
+     * (and dynamically unstable) at sharp wall corners, where the level-set
+     * normal is ill-posed (the closest boundary point is the corner ring and
+     * the normal direction is a fan; the image method is only valid for
+     * wedge angles pi/n). Because each covered B component is read by
+     * exactly ONE fluid divergence stencil (multiplicity 1; opposing-fluid
+     * one-node "fin" components are detected and skipped symmetrically),
+     * the minimum-deviation div-constrained re-fill collapses to a closed
+     * form: for each fluid wall node m, scatter
+     * delta = c * (-div B)_m / |c|^2 into the covered axis neighbors its
+     * stencil reads (c = the +/- 1/(2 dx_d) stencil coefficients). One
+     * ParallelFor, no linear solve, no atomics; fluid values untouched;
+     * only the covered band values move, by an amount proportional to the
+     * mirror's own injected divergence. After this pass the
+     * central-difference div(B) at every constrained fluid node is machine
+     * zero, and since the collocated central-difference Faraday update is
+     * exactly divergence-free (div curl = 0 discretely), the fill ceases to
+     * be a divergence source entirely -- the sharp-corner div(B) instability
+     * never seeds and no divergence cleaner is needed.
+     *
+     * Must run after every covered-B fill (the fill re-injects on each
+     * call). Rows within one node of a non-periodic domain boundary are
+     * skipped (their stencils read domain ghosts).
+     *
+     * \param[in,out] field the collocated (nodal) magnetic field
+     * \param[in] distance_to_eb nodal signed distance (positive in fluid)
+     * \param[in] geom level geometry
+     * \param[in] debug_check verify the invariant after the pass (one extra
+     *            reduction sweep): abort if any constrained fluid row's
+     *            |div B| exceeds an absolute round-off tolerance
+     */
+    void DivFreeFixCoveredB (
+        ablastr::fields::VectorField const& field,
+        amrex::MultiFab const& distance_to_eb,
+        amrex::Geometry const& geom,
+        bool debug_check = false);
 
     /** \brief Enforce an embedded-boundary condition on a nodal scalar field
      * (the hybrid solver's ion charge density and electron pressure).

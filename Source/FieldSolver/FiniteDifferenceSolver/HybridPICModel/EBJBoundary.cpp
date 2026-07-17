@@ -409,7 +409,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     bool normal_odd,
     bool fill_covered_centers,
     EBFillStatus* status_cache,
-    amrex::Real band_cells)
+    amrex::Real band_cells,
+    bool divfree,
+    bool divfree_debug)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -672,6 +674,13 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             }
         }
 
+        // Divergence-consistent correction of the covered band (collocated B
+        // only, hybrid_pic_model.eb_bc_divfree_fill): run after the fill and
+        // before the ghost sync so the ghosts carry the corrected values.
+        if (divfree) {
+            warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom, divfree_debug);
+        }
+
         // Leave ghost edges consistent for the stencils that consume the field
         for (int c = 0; c < 3; ++c) {
             field[c]->FillBoundary(geom.periodicity());
@@ -820,6 +829,13 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             ablastr::warn_manager::WarnPriority::low);
     }
 
+    // Divergence-consistent correction of the covered band (collocated B
+    // only, hybrid_pic_model.eb_bc_divfree_fill): run after the fill and
+    // before the ghost sync so the ghosts carry the corrected values.
+    if (divfree) {
+        warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom, divfree_debug);
+    }
+
     // Leave ghost edges consistent with the final band values for the
     // stencils that consume J (nodal interpolation, hyper-resistivity)
     for (int c = 0; c < 3; ++c) {
@@ -828,7 +844,199 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 #else
     amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
                          direct_fill, normal_odd, fill_covered_centers, status_cache,
-                         band_cells);
+                         band_cells, divfree, divfree_debug);
+#endif
+}
+
+void warpx::hybrid::DivFreeFixCoveredB (
+    ablastr::fields::VectorField const& field,
+    amrex::MultiFab const& distance_to_eb,
+    amrex::Geometry const& geom,
+    bool debug_check)
+{
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+    using namespace amrex::literals;
+
+    ABLASTR_PROFILE("warpx::hybrid::DivFreeFixCoveredB()");
+
+    // Collocated (fully nodal) fields only: the closed form relies on the
+    // central-difference nodal divergence whose stencil reads one covered
+    // component per axis neighbor.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        field[0]->ixType().nodeCentered() && field[2]->ixType().nodeCentered(),
+        "DivFreeFixCoveredB requires a collocated (nodal) field");
+
+    auto const dx = geom.CellSizeArray();
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> inv2dx{};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { inv2dx[d] = 0.5_rt/dx[d]; }
+
+    // Skip rows whose divergence stencil reads beyond a non-periodic
+    // physical domain boundary (one nodal layer).
+    const amrex::Box nodal_domain =
+        amrex::convert(geom.Domain(), amrex::IntVect::TheNodeVector());
+    amrex::GpuArray<int, 3> dom_lo{INT_MIN, INT_MIN, INT_MIN};
+    amrex::GpuArray<int, 3> dom_hi{INT_MAX, INT_MAX, INT_MAX};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        if (!geom.isPeriodic(d)) {
+            dom_lo[d] = nodal_domain.smallEnd(d) + 1;
+            dom_hi[d] = nodal_domain.bigEnd(d) - 1;
+        }
+    }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*field[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        // Grow one node at BOX boundaries only (growntilebox never overlaps
+        // neighbouring tiles, which would double-apply the correction
+        // concurrently): ghost-adjacent rows are then evaluated consistently
+        // on every rank that sees them, from FillBoundary-consistent B and
+        // phi.
+        amrex::Box const tb = mfi.growntilebox(1);
+        auto const& Bx = field[0]->array(mfi);
+        auto const& By = field[1]->array(mfi);
+        auto const& Bz = field[2]->array(mfi);
+        auto const& phi = distance_to_eb.const_array(mfi);
+
+        amrex::ParallelFor(tb,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            if (!(phi(i, j, k) > 0.0_rt)) { return; }  // fluid rows only
+            if (i < dom_lo[0] || i > dom_hi[0]
+                || j < dom_lo[1] || j > dom_hi[1]
+                || k < dom_lo[2] || k > dom_hi[2]) { return; }
+
+            // Unknown selection per axis neighbor: the covered component is a
+            // free DOF of THIS row unless the node on the far side of that
+            // covered neighbor is also fluid (a one-node "fin": the component
+            // is then read by two opposing rows whose demands are generically
+            // incompatible -- skip it; the symmetric test makes both rows
+            // skip it consistently, so no covered component is ever written
+            // by more than one row and the pass needs no atomics).
+#if defined(WARPX_DIM_3D)
+            const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+            const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+            const bool uym = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+            const bool uyp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+            const bool uzm = (phi(i, j, k-1) <= 0.0_rt) && !(phi(i, j, k-2) > 0.0_rt);
+            const bool uzp = (phi(i, j, k+1) <= 0.0_rt) && !(phi(i, j, k+2) > 0.0_rt);
+            if (!(uxm || uxp || uym || uyp || uzm || uzp)) { return; }
+
+            amrex::Real const r =
+                  (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                + (By(i, j+1, k) - By(i, j-1, k))*inv2dx[1]
+                + (Bz(i, j, k+1) - Bz(i, j, k-1))*inv2dx[2];
+
+            amrex::Real c2 = 0.0_rt;
+            if (uxm) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uxp) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uym) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (uyp) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (uzm) { c2 += inv2dx[2]*inv2dx[2]; }
+            if (uzp) { c2 += inv2dx[2]*inv2dx[2]; }
+            if (!(c2 > 0.0_rt)) { return; }
+            amrex::Real const lam = -r / c2;
+
+            // delta_u = c_u * lam with c_u = +/- 1/(2 dx_d)
+            if (uxm) { Bx(i-1, j, k) += (-inv2dx[0])*lam; }
+            if (uxp) { Bx(i+1, j, k) += ( inv2dx[0])*lam; }
+            if (uym) { By(i, j-1, k) += (-inv2dx[1])*lam; }
+            if (uyp) { By(i, j+1, k) += ( inv2dx[1])*lam; }
+            if (uzm) { Bz(i, j, k-1) += (-inv2dx[2])*lam; }
+            if (uzp) { Bz(i, j, k+1) += ( inv2dx[2])*lam; }
+#elif defined(WARPX_DIM_XZ)
+            amrex::ignore_unused(By);
+            const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+            const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+            const bool uzm = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+            const bool uzp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+            if (!(uxm || uxp || uzm || uzp)) { return; }
+
+            amrex::Real const r =
+                  (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                + (Bz(i, j+1, k) - Bz(i, j-1, k))*inv2dx[1];
+
+            amrex::Real c2 = 0.0_rt;
+            if (uxm) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uxp) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uzm) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (uzp) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (!(c2 > 0.0_rt)) { return; }
+            amrex::Real const lam = -r / c2;
+
+            if (uxm) { Bx(i-1, j, k) += (-inv2dx[0])*lam; }
+            if (uxp) { Bx(i+1, j, k) += ( inv2dx[0])*lam; }
+            if (uzm) { Bz(i, j-1, k) += (-inv2dx[1])*lam; }
+            if (uzp) { Bz(i, j+1, k) += ( inv2dx[1])*lam; }
+#endif
+        });
+    }
+
+    // Invariant verification (hybrid_pic_model.eb_bc_divfree_debug = 1): the
+    // residual central-difference div at every constrained fluid row must be
+    // round-off after the pass. Aborts on violation, which makes the CI test
+    // of this feature a plain run with the knob enabled. Costs one extra
+    // reduction sweep per fill; off by default.
+    if (debug_check) {
+        amrex::ReduceOps<amrex::ReduceOpMax> rop;
+        amrex::ReduceData<amrex::Real> rdata(rop);
+        using RTuple = typename decltype(rdata)::Type;
+        amrex::Real bmax = 0.0_rt;
+        for (int c = 0; c < 3; ++c) {
+            bmax = std::max(bmax, field[c]->norminf());  // collective
+        }
+        for (amrex::MFIter mfi(*field[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const tbv = mfi.tilebox(amrex::IntVect::TheNodeVector());
+            auto const& Bx = field[0]->const_array(mfi);
+            auto const& By = field[1]->const_array(mfi);
+            auto const& Bz = field[2]->const_array(mfi);
+            auto const& phi = distance_to_eb.const_array(mfi);
+            rop.eval(tbv, rdata,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) -> RTuple
+            {
+                if (!(phi(i, j, k) > 0.0_rt)) { return {0.0_rt}; }
+                if (i < dom_lo[0] || i > dom_hi[0]
+                    || j < dom_lo[1] || j > dom_hi[1]
+                    || k < dom_lo[2] || k > dom_hi[2]) { return {0.0_rt}; }
+#if defined(WARPX_DIM_3D)
+                const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+                const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+                const bool uym = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+                const bool uyp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+                const bool uzm = (phi(i, j, k-1) <= 0.0_rt) && !(phi(i, j, k-2) > 0.0_rt);
+                const bool uzp = (phi(i, j, k+1) <= 0.0_rt) && !(phi(i, j, k+2) > 0.0_rt);
+                if (!(uxm || uxp || uym || uyp || uzm || uzp)) { return {0.0_rt}; }
+                amrex::Real const r =
+                      (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                    + (By(i, j+1, k) - By(i, j-1, k))*inv2dx[1]
+                    + (Bz(i, j, k+1) - Bz(i, j, k-1))*inv2dx[2];
+#elif defined(WARPX_DIM_XZ)
+                amrex::ignore_unused(By);
+                const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+                const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+                const bool uzm = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+                const bool uzp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+                if (!(uxm || uxp || uzm || uzp)) { return {0.0_rt}; }
+                amrex::Real const r =
+                      (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                    + (Bz(i, j+1, k) - Bz(i, j-1, k))*inv2dx[1];
+#endif
+                return {std::abs(r)};
+            });
+        }
+        amrex::Real rmax = amrex::get<0>(rdata.value(rop));
+        amrex::ParallelDescriptor::ReduceRealMax(rmax);
+        // Round-off scale: a handful of ulps of the field scale over a cell.
+        amrex::Real h_min = dx[0];
+        for (int d = 1; d < AMREX_SPACEDIM; ++d) { h_min = std::min(h_min, dx[d]); }
+        amrex::Real const tol =
+            1.0e-11_rt * std::max(bmax, 1.0e-30_rt) / h_min + 1.0e-300_rt;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rmax <= tol,
+            "DivFreeFixCoveredB invariant violated: constrained-row div(B) "
+            "exceeds round-off after the pass");
+    }
+#else
+    amrex::ignore_unused(field, distance_to_eb, geom, debug_check);
 #endif
 }
 

@@ -69,7 +69,7 @@ def scalar_ratio(s):
     return s / max(abs(s), D_IMG_MIN)
 
 
-def setup_simulation(geometry, grid_type="staggered"):
+def setup_simulation(geometry, grid_type="staggered", div_free_fill=False):
     grid = picmi.Cartesian3DGrid(
         number_of_cells=[N_XY, N_XY, N_Z],
         lower_bound=[LO, LO, -N_Z * H / 2],
@@ -103,7 +103,16 @@ def setup_simulation(geometry, grid_type="staggered"):
         # The conformal wall treatment is collocated-only (staggered aborts);
         # the staggered batteries exercise the always-on staircase EB fills.
         use_conformal_eb=True if grid_type == "collocated" else None,
+        # Divergence-consistent covered-B fill (collocated only): the test
+        # variant also enables the in-solver invariant verification, which
+        # ABORTS if any constrained fluid node's div(B) exceeds round-off
+        # after a fill -- the abort is this variant's assertion.
+        eb_bc_divfree_fill=True if div_free_fill else None,
     )
+    if div_free_fill:
+        from pywarpx import hybridpicmodel
+
+        hybridpicmodel.eb_bc_divfree_debug = 1
 
     if geometry == "plane":
         sim.embedded_boundary = picmi.EmbeddedBoundary(
@@ -690,10 +699,87 @@ def run_eb_collocated_battery(sim):
     ck.finish()
 
 
-def _nodal_interior_z():
-    # nodal z is periodic with a duplicate node (node N_Z == node 0); restrict
-    # the z comparison to interior nodes whose stencil never reaches it
-    return slice(2, max(3, N_Z - 1))
+def run_divfree_battery(sim):
+    """Divergence-consistent covered-B fill (eb_bc_divfree_fill, collocated):
+    every fill call self-verifies the machine-zero invariant at constrained
+    fluid nodes (eb_bc_divfree_debug aborts on violation -- that abort is this
+    battery's primary assertion); the python-side checks add fill+fix
+    selectivity (fluid bit-identical), an independent divergence measurement
+    at the first fluid layer, and second-call convergence (no ratchet)."""
+    wx = sim.extension.warpx
+    ck = CheckSet()
+    x_node = LO + np.arange(N_XY + 1) * H
+    s_node = X_WALL - x_node  # > 0 fluid, < 0 conductor; every component is nodal
+
+    def node_rows(lo, hi):
+        return [i for i in range(N_XY + 1) if lo < s_node[i] / H <= hi]
+
+    Bx = fields.BxFPWrapper()
+    By = fields.ByFPWrapper()
+    Bz = fields.BzFPWrapper()
+
+    # A spatially varying field: the pointwise mirror of it injects O(B/h)
+    # central-difference div(B) at the first fluid layer; the div-free
+    # correction must remove it there exactly. The y/z dependence must be
+    # periodic (the domain is periodic in y/z and the solver fills the wrap
+    # stencils from periodic ghosts, so a non-periodic seed would make this
+    # python-side divergence check disagree with the solver at the wrap
+    # rows); x (the wall normal) is unconstrained.
+    shape = np.asarray(Bx[...]).shape
+    ii, jj, kk = np.meshgrid(
+        np.arange(shape[0]), np.arange(shape[1]), np.arange(shape[2]), indexing="ij"
+    )
+    py = 2.0 * np.pi * jj / N_XY
+    pz = 2.0 * np.pi * kk / N_Z
+    Bx[...] = 1.0 + 0.17 * ii + 0.30 * np.sin(py) + 0.10 * np.cos(pz)
+    By[...] = 0.5 - 0.07 * ii + 0.20 * np.cos(py) - 0.15 * np.sin(pz)
+    Bz[...] = -0.3 + 0.05 * ii - 0.13 * np.sin(py) + 0.25 * np.cos(pz)
+    before = [np.array(F[...]) for F in (Bx, By, Bz)]
+
+    # Fill + div-free fix; eb_bc_divfree_debug makes the solver ABORT here if
+    # any constrained fluid node's div(B) exceeds round-off after the pass.
+    wx.hybrid_apply_eb_boundary_to_face_field("Bfield_fp", 0)
+    after1 = [np.array(F[...]) for F in (Bx, By, Bz)]
+
+    i_fluid = node_rows(0.05, 50.0)
+    for name, b, a in zip(("Bx", "By", "Bz"), before, after1):
+        ck.close(
+            f"divfree selectivity: {name} bit-identical in fluid",
+            a[i_fluid, :, :],
+            b[i_fluid, :, :],
+            0.0,
+        )
+
+    # Independent python-side divergence measurement at the first fluid layer
+    # (the constrained rows): central differences of the solver output.
+    bx, by, bz = after1
+    div = np.zeros_like(bx)
+    div[1:-1, 1:-1, 1:-1] = (
+        (bx[2:, 1:-1, 1:-1] - bx[:-2, 1:-1, 1:-1])
+        + (by[1:-1, 2:, 1:-1] - by[1:-1, :-2, 1:-1])
+        + (bz[1:-1, 1:-1, 2:] - bz[1:-1, 1:-1, :-2])
+    ) / (2 * H)
+    i_first = node_rows(0.05, 1.0)  # fluid nodes whose stencil reads the wall
+    bscale = max(float(np.max(np.abs(a))) for a in after1)
+    ck.expect(
+        "divfree invariant: first-fluid-layer div(B) at round-off",
+        float(np.max(np.abs(div[i_first, 1:-1, 1:-1]))) < 1e-10 * bscale / H,
+        f"max|div| = {float(np.max(np.abs(div[i_first, 1:-1, 1:-1]))):.3e}",
+    )
+
+    # Second fill call: the corrected covered band is already consistent, so
+    # the combined fill+fix must be converged (no ratchet).
+    wx.hybrid_apply_eb_boundary_to_face_field("Bfield_fp", 0)
+    after2 = [np.asarray(F[...]) for F in (Bx, By, Bz)]
+    for name, a1, a2 in zip(("Bx", "By", "Bz"), after1, after2):
+        ck.close(
+            f"divfree convergence: second fill call is a fixed point ({name})",
+            a2,
+            a1,
+            1e-12,
+        )
+
+    ck.finish()
 
 
 def main():
@@ -719,12 +805,24 @@ def main():
         help="grid staggering; the collocated battery exercises the nodal "
         "conformal-EB path (masked nodal Faraday + level-set BC)",
     )
+    parser.add_argument(
+        "--div-free-fill",
+        action="store_true",
+        help="enable the divergence-consistent covered-B fill plus its "
+        "abort-on-violation invariant check (collocated only)",
+    )
     args, left = parser.parse_known_args()
     sys.argv = sys.argv[:1] + left
 
-    sim = setup_simulation(args.geometry, grid_type=args.grid_type)
+    sim = setup_simulation(
+        args.geometry, grid_type=args.grid_type, div_free_fill=args.div_free_fill
+    )
 
-    if args.grid_type == "collocated":
+    if args.div_free_fill:
+        # Dedicated battery: the parity batteries assert pure-mirror covered
+        # values, which the div-free correction intentionally modifies.
+        run_divfree_battery(sim)
+    elif args.grid_type == "collocated":
         # The collocated battery uses the nodal closed forms (the planar wall
         # makes the level-set geometry analytic).
         run_eb_collocated_battery(sim)

@@ -180,6 +180,8 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
+    pp_hybrid.query("eb_bc_divfree_fill", m_eb_bc_divfree_fill);
+    pp_hybrid.query("eb_bc_divfree_debug", m_eb_bc_divfree_debug);
     // Optionally disable the collocated conformal B wall treatment entirely (no
     // EB B fill) to recover the pre-treatment baseline (for A/B comparison).
     pp_hybrid.query("conformal_b_off", m_conformal_b_off);
@@ -460,7 +462,8 @@ void HybridPICModel::InitialBEBFill ()
             warpx.Geom(lev),
             m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/true, /*fill_covered_centers=*/false,
-            &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
+            &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells,
+            m_eb_bc_divfree_fill && collocated_fill, m_eb_bc_divfree_debug);
     }
 #endif
 }
@@ -1505,7 +1508,8 @@ void HybridPICModel::FieldPush (
                 warpx.Geom(lev),
                 m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
                 /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
+                &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells,
+                m_eb_bc_divfree_fill && collocated_fill, m_eb_bc_divfree_debug);
         }
         warpx.FillBoundaryB(ng, nodal_sync);
     }

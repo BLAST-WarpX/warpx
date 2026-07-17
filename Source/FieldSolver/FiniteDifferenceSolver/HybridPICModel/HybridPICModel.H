@@ -383,6 +383,17 @@ public:
      *  single-pass mirrored interpolation over unmasked (solution-domain)
      *  values; if false, the iterative Jacobi band relaxation */
     bool m_eb_bc_direct_fill = true;
+    /** Divergence-consistent covered-B fill (collocated only): after every
+     *  covered-B mirror fill, apply the closed-form one-pass correction that
+     *  zeroes the central-difference div(B) at every fluid node whose
+     *  stencil reads a covered node (see DivFreeFixCoveredB). Removes the
+     *  fill's divergence injection at the source -- including the
+     *  sharp-corner instability seed -- so no divergence cleaner is needed.
+     *  Runtime knob hybrid_pic_model.eb_bc_divfree_fill; default off. */
+    bool m_eb_bc_divfree_fill = false;
+    /** Verify the div-free fill invariant after every pass and abort on
+     *  violation (test/debug; one extra reduction sweep per fill). */
+    bool m_eb_bc_divfree_debug = false;
     /** Image parity of the embedded-boundary deposit fold: true (default)
      *  folds with the PEC image signs (charge and tangential current
      *  subtracted, normal current added); false uses the reflecting-wall

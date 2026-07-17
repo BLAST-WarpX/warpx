@@ -260,7 +260,10 @@ void init_WarpX (py::module& m)
                     hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
                     hybrid->m_eb_bc_direct_fill,
                     /*normal_odd=*/true, fill_covered_centers,
-                    &hybrid->m_eb_bc_status_B[lev], band_cells);
+                    &hybrid->m_eb_bc_status_B[lev], band_cells,
+                    hybrid->m_eb_bc_divfree_fill
+                        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated,
+                    hybrid->m_eb_bc_divfree_debug);
             },
             py::arg("name"), py::arg("lev") = 0,
             py::arg("fill_covered_centers") = false,

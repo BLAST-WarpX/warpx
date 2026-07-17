@@ -3863,6 +3863,32 @@ Maxwell solver: kinetic-fluid hybrid
     calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
     :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
 
+.. pp:param:: hybrid_pic_model.eb_bc_divfree_fill
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Divergence-consistent covered-B fill (collocated grid only). After every covered-B mirror
+    fill, apply a closed-form one-pass correction that zeroes the central-difference
+    :math:`\nabla \cdot \mathbf{B}` at every fluid node whose stencil reads a covered node:
+    because each covered component is read by exactly one fluid divergence stencil, the
+    minimum-deviation divergence-constrained re-fill reduces to scattering
+    :math:`\delta = c\,(-\nabla\cdot\mathbf{B})/\lVert c\rVert^2` into the covered axis
+    neighbors of each fluid wall node (:math:`c` are the :math:`\pm 1/(2\Delta x_d)` stencil
+    coefficients). Since the collocated central-difference Faraday update is discretely
+    divergence-free, the wall fill then ceases to be a divergence source entirely: the
+    sharp-corner :math:`\nabla \cdot \mathbf{B}` instability never seeds and no divergence
+    cleaner is needed. Only covered-band values are modified, by an amount proportional to the
+    fill's own injected divergence.
+
+.. pp:param:: hybrid_pic_model.eb_bc_divfree_debug
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Verify the div-free fill invariant after every pass (one extra reduction sweep) and abort
+    if any constrained fluid node's divergence exceeds round-off. For tests and debugging.
+
 .. pp:param:: hybrid_pic_model.conformal_b_off
     :type: ``bool``
     :default: ``false``
