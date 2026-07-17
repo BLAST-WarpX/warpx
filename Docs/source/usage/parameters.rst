@@ -3073,9 +3073,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``dsmc`` and ``background_mcc``. Path to the file containing cross-section data
     for the given scattering processes. The cross-section file must have exactly
-    2 columns of data, the first containing equally spaced energies in eV and the
-    second the corresponding cross-section in :math:`m^2`. The energy column should
-    represent the kinetic energy of the colliding particles in the center-of-mass frame.
+    2 columns of data, the first containing energies in eV and the
+    second the corresponding cross-section in :math:`m^2`. The energies must be sorted in
+    strictly increasing order, but they do not need to be evenly spaced. The energy column
+    should represent the kinetic energy of the colliding particles in the center-of-mass frame.
 
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
