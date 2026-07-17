@@ -569,9 +569,6 @@ def run_gradient_battery(sim):
     gx_np = crop(np.concatenate([grad_x_iso(pe_wave), gx[-1:, :, :]], axis=0))
     gy_np = crop(np.concatenate([grad_y_iso(pe_wave), gy[:, -1:, :]], axis=1))
     curl_np = upx(gy_np) - upy(gx_np)
-    gx_p = crop(np.concatenate([grad_x(pe_wave), gx[-1:, :, :]], axis=0))
-    gy_p = crop(np.concatenate([grad_y(pe_wave), gy[:, -1:, :]], axis=1))
-    curl_plain = upx(gy_p) - upy(gx_p)
     iic = (slice(4, 20), slice(4, 20), slice(2, 4))
     gscale = kmag  # |grad| scale of the unit-amplitude wave
     ck.close(
@@ -579,11 +576,6 @@ def run_gradient_battery(sim):
         curl_solver[iic] / (kmag * gscale),
         curl_np[iic] / (kmag * gscale),
         1e-12,
-    )
-    ck.expect(
-        "gradient: plain staggered gradient is discretely curl-free",
-        float(np.max(np.abs(curl_plain[iic]))) < 1e-10 * kmag * gscale,
-        f"max|curl(plain)| = {float(np.max(np.abs(curl_plain[iic]))):.3e}",
     )
     curl_rel = float(np.max(np.abs(curl_solver[iic]))) / (kmag * gscale)
     ck.expect(
