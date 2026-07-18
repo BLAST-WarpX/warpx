@@ -1,0 +1,19 @@
+FILE=inputs_base_3d_field_probe
+
+max_step = 0
+warpx.do_moving_window = 0
+
+FP.intervals = 1
+FP.probe_geometry = Plane
+FP.x_probe = 0
+FP.y_probe = 0
+FP.z_probe = 0
+FP.target_normal_x = 0
+FP.target_normal_y = 0
+FP.target_normal_z = 1
+FP.target_up_x = 0
+FP.target_up_y = 1
+FP.target_up_z = 0
+FP.detector_radius = 50.e-6
+FP.resolution = 5
+FP.do_moving_window_FP = 0

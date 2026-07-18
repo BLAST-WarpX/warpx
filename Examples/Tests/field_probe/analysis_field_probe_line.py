@@ -75,6 +75,44 @@ def check_has_data_for_every_step(df, args):
     checkEq(found_steps, list(range(0, args.max_step + 1, args.intervals)))
 
 
+def check_expected_particle_count(df, args):
+    if args.expected_count is None:
+        return
+    counts = df.groupby(STEP_COLUMN).size()
+    for step, count in counts.items():
+        checkEq(
+            count,
+            args.expected_count,
+            f"Unexpected particle count at step {step}",
+        )
+
+
+def check_enters_domain(df, args):
+    if df.empty:
+        raise ValueError("The probe never entered the moving-window domain")
+    found_steps = sorted(df[STEP_COLUMN].unique())
+    checkLt(0, found_steps[0], "Probe should start outside the domain")
+    checkEq(found_steps[-1], args.max_step, "Probe should remain visible at the end")
+
+
+def check_window_bounds(df, args):
+    z_by_step = df.groupby(STEP_COLUMN)[Z_COLUMN].first()
+    before_start = z_by_step[z_by_step.index < args.window_start]
+    after_end = z_by_step[z_by_step.index >= args.window_end]
+    checkEq(
+        before_start.nunique(),
+        1,
+        "Probe moved before the configured moving-window start",
+    )
+    checkEq(
+        after_end.nunique(),
+        1,
+        "Probe moved after the configured moving-window end",
+    )
+    if z_by_step.nunique() <= 1:
+        raise ValueError("Probe did not move while the moving window was active")
+
+
 def check_has_every_column(df, args):
     expected_columns = [
         STEP_COLUMN,
@@ -145,6 +183,12 @@ def check_moving_windows(df, args):
                 current_step_max,
                 f"Maximum z at step {step} should be greater than step {step - args.intervals}",
             )
+        elif args.moving_window:
+            checkLte(
+                prev_step_max,
+                current_step_max,
+                f"Maximum z at step {step} should not decrease from step {step - args.intervals}",
+            )
         else:
             checkEq(
                 prev_step_max,
@@ -171,11 +215,12 @@ def check_integrate(df):
         for _, row in df[is_current_step].iterrows():
             z = row[Z_COLUMN]
             poynting = row[POYNTING_COLUMN_INTEGRATE]
-            checkLte(
-                prev_z_to_poynting.get(z, math.inf),
-                poynting,
-                f"Poynting value at step {step} for position {z} should be greater than previous step's Poynting value",
-            )
+            if z in prev_z_to_poynting:
+                checkLte(
+                    prev_z_to_poynting[z],
+                    poynting,
+                    f"Poynting value at step {step} for position {z} should be greater than previous step's Poynting value",
+                )
             next_z_to_poynting[z] = poynting
         prev_z_to_poynting = next_z_to_poynting
 
@@ -184,7 +229,21 @@ def validate_fieldprobe_file(args):
     df = pd.read_csv(args.path, sep=" ")
 
     check_has_every_column(df, args)
+    if args.expect_empty:
+        checkEq(len(df), 0, "Expected no in-domain probe rows")
+        return
+    if args.enters_domain:
+        check_enters_domain(df, args)
+        return
+
     check_has_data_for_every_step(df, args)
+    check_expected_particle_count(df, args)
+    if args.positions_only:
+        return
+    if args.window_start is not None:
+        check_window_bounds(df, args)
+        return
+
     check_non_zero_ranges(df, args)
     check_moving_windows(df, args)
     if args.integrate:
@@ -237,6 +296,37 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--expected_count",
+        help="expected number of in-domain probe particles per output step",
+        type=int,
+    )
+    parser.add_argument(
+        "--expect_empty",
+        help="expect the output file to contain only its header",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--enters_domain",
+        help="expect an initially absent probe to enter the moving-window domain",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--positions_only",
+        help="only validate columns, steps, positions, and particle counts",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--window_start",
+        help="first step at which the moving window is active",
+        type=int,
+    )
+    parser.add_argument(
+        "--window_end",
+        help="first step at which the moving window is inactive",
+        type=int,
+    )
+
     # parse arguments
     args = parser.parse_args()
 
