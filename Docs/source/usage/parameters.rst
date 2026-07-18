@@ -1646,7 +1646,9 @@ Particle initialization
       are distributed among MPI processes. If particles are continuously
       injected during the simulation and
       ``<species_name>.read_density_distributed`` is true, chunks of the
-      openPMD data are loaded and cached as needed.
+      openPMD data are loaded and cached as needed. As for the other density
+      profiles, the ``<species_name>.density_min`` and ``<species_name>.density_max``
+      options (see below) are applied to the density read from the file.
 
 .. pp:param:: <species_name>.flux_profile
     :type: ``string``
@@ -1666,6 +1668,7 @@ Particle initialization
     :optional:
 
     Minimum plasma density. No particle is injected where the density is below this value.
+    This applies to all density profiles (``constant``, ``parse_density_function`` and ``read_from_file``).
 
 .. pp:param:: <species_name>.density_max
     :type: ``float``
