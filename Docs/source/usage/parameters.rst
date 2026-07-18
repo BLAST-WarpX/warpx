@@ -3077,7 +3077,6 @@ Details about the collision models can be found in the :ref:`theory section <mul
     second the corresponding cross-section in :math:`m^2`. The energy column should
     represent the kinetic energy of the center-of-mass frame. The energy values in this column
     must be in strictly increasing order.
-    colliding particles in the center-of-mass frame.
 
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
