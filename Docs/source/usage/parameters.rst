@@ -1629,7 +1629,7 @@ Particle initialization
       It requires additional argument ``<species_name>.density_function(x,y,z)``, which is a
       mathematical expression for the density of the species, e.g.
       ``electrons.density_function(x,y,z) = "n0+n0*x**2*1.e12"`` where ``n0`` is a
-      user-defined constant, see above. WARNING: where ``density_function(x,y,z)`` is close to zero, particles will still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is undesirable because it results in useless computing. To avoid this, see option ``density_min`` below.
+      user-defined constant, see above.
 
     * ``read_from_file``: load the density profile from an openPMD file.
       An additional parameter, indicating the path of an openPMD data file,
@@ -1646,9 +1646,7 @@ Particle initialization
       are distributed among MPI processes. If particles are continuously
       injected during the simulation and
       ``<species_name>.read_density_distributed`` is true, chunks of the
-      openPMD data are loaded and cached as needed. As for the other density
-      profiles, the ``<species_name>.density_min`` and ``<species_name>.density_max``
-      options (see below) are applied to the density read from the file.
+      openPMD data are loaded and cached as needed.
 
 .. pp:param:: <species_name>.flux_profile
     :type: ``string``
@@ -1668,7 +1666,10 @@ Particle initialization
     :optional:
 
     Minimum plasma density. No particle is injected where the density is below this value.
-    This applies to all density profiles (``constant``, ``parse_density_function`` and ``read_from_file``).
+    This is useful because, where the density is close to zero, particles would otherwise
+    still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is
+    undesirable because it results in useless computing. This option applies to all density
+    profiles (``constant``, ``parse_density_function`` and ``read_from_file``).
 
 .. pp:param:: <species_name>.density_max
     :type: ``float``
