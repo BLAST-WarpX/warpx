@@ -1677,6 +1677,7 @@ Particle initialization
     :optional:
 
     Maximum plasma density. The density at each point is the minimum between the value given in the profile, and ``density_max``.
+    This option applies to all density profiles (``constant``, ``parse_density_function`` and ``read_from_file``).
 
 .. pp:param:: <species_name>.radial_numpercell_power
     :type: ``float``
