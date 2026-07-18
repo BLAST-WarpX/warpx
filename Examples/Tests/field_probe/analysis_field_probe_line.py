@@ -23,6 +23,11 @@ NON_ZERO_RANGES = {
 }
 
 STEP_COLUMN = "[0]step()"
+POSITION_COLUMNS = [
+    "[2]part_x_lev0-(m)",
+    "[3]part_y_lev0-(m)",
+    "[4]part_z_lev0-(m)",
+]
 Z_COLUMN = "[4]part_z_lev0-(m)"
 POYNTING_COLUMN = "[11]part_S_lev0-(W/m^2)"
 POYNTING_COLUMN_INTEGRATE = "[11]part_S_lev0-(W*s/m^2)"
@@ -111,6 +116,31 @@ def check_window_bounds(df, args):
     )
     if z_by_step.nunique() <= 1:
         raise ValueError("Probe did not move while the moving window was active")
+
+
+def check_restart_positions(df, args):
+    reference_df = pd.read_csv(args.reference_path, sep=" ")
+    positions = df[df[STEP_COLUMN] == args.max_step][POSITION_COLUMNS]
+    reference_positions = reference_df[reference_df[STEP_COLUMN] == args.max_step][
+        POSITION_COLUMNS
+    ]
+
+    if positions.empty:
+        raise ValueError(f"Restart output has no probe data at step {args.max_step}")
+
+    positions = (
+        positions.drop_duplicates().sort_values(POSITION_COLUMNS).reset_index(drop=True)
+    )
+    reference_positions = (
+        reference_positions.drop_duplicates()
+        .sort_values(POSITION_COLUMNS)
+        .reset_index(drop=True)
+    )
+    pd.testing.assert_frame_equal(
+        positions,
+        reference_positions,
+        check_exact=True,
+    )
 
 
 def check_has_every_column(df, args):
@@ -235,6 +265,9 @@ def validate_fieldprobe_file(args):
     if args.enters_domain:
         check_enters_domain(df, args)
         return
+    if args.reference_path is not None:
+        check_restart_positions(df, args)
+        return
 
     check_has_data_for_every_step(df, args)
     check_expected_particle_count(df, args)
@@ -315,6 +348,11 @@ if __name__ == "__main__":
         "--positions_only",
         help="only validate columns, steps, positions, and particle counts",
         action="store_true",
+    )
+    parser.add_argument(
+        "--reference_path",
+        help="uninterrupted FieldProbe output used for a restart comparison",
+        type=str,
     )
     parser.add_argument(
         "--window_start",

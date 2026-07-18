@@ -94,6 +94,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_field_probe_moving_window_checkpoint
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_field_probe_moving_window_checkpoint  # inputs
+    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt --intervals 10 --max_step 20 --expected_count 1 --positions_only"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_field_probe_moving_window_restart
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_field_probe_moving_window_restart  # inputs
+    "analysis_field_probe_line.py --path diags/reducedfiles/FP.txt --max_step 20 --reference_path ../test_3d_field_probe_moving_window_checkpoint/diags/reducedfiles/FP.txt"  # analysis
+    OFF  # checksum
+    test_3d_field_probe_moving_window_checkpoint  # dependency
+)
+
+add_warpx_test(
     test_3d_field_probe_plane_sparse_ids
     3  # dims
     2  # nprocs

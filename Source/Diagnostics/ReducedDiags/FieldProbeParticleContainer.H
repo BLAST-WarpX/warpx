@@ -36,7 +36,7 @@ struct FieldProbePIdx
         Ex, Ey, Ez,
         Bx, By, Bz,
         S, //!< the Poynting vector
-        probe_x, probe_y, probe_z, //!< logical probe position (can be outside the domain)
+        probe_x, probe_y, probe_z, //!< immutable input position (can be outside the domain)
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         theta,      ///< Cylindrical and spherical needs the angle
 

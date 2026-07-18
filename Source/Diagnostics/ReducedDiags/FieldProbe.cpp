@@ -309,6 +309,49 @@ private:
     }
 };
 
+/** \brief Move a logical probe position along an AMReX problem-domain direction. */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE void
+MoveProbePosition ([[maybe_unused]] amrex::ParticleReal& xp,
+                   [[maybe_unused]] amrex::ParticleReal& yp,
+                   [[maybe_unused]] amrex::ParticleReal& zp,
+                   [[maybe_unused]] const int direction,
+                   const amrex::Real position_offset)
+{
+#if defined(WARPX_DIM_1D_Z)
+    zp += position_offset;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    xp += position_offset;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    if (direction == 0) {
+        xp += position_offset;
+    } else {
+        zp += position_offset;
+    }
+#else
+    if (direction == 0) {
+        xp += position_offset;
+    } else if (direction == 1) {
+        yp += position_offset;
+    } else {
+        zp += position_offset;
+    }
+#endif
+}
+
+/** \brief Return the total co-moving displacement selected by the WarpX geometry. */
+AMREX_FORCE_INLINE amrex::Real
+GetProbePositionOffset (const ProblemDomainVec& current_prob_lo,
+                        const ProblemDomainVec& initial_prob_lo,
+                        const bool do_moving_window_FP,
+                        const int moving_window_dir)
+{
+    if (do_moving_window_FP && moving_window_dir >= 0 &&
+        moving_window_dir < AMREX_SPACEDIM) {
+        return current_prob_lo[moving_window_dir] - initial_prob_lo[moving_window_dir];
+    }
+    return 0._rt;
+}
+
 void FieldProbe::InitData ()
 {
     using namespace amrex::literals;
@@ -412,19 +455,28 @@ void FieldProbe::InitData ()
     const amrex::Geometry& gm = warpx.Geom(0);
     const ParticleDomainMapper domain_mapper{gm.ProbLoArray(), gm.ProbHiArray(),
                                              gm.CellSizeArray()};
+    amrex::Vector<amrex::Real> initial_prob_lo(AMREX_SPACEDIM);
+    const amrex::ParmParse pp_geometry("geometry");
+    utils::parser::getArrWithParser(
+        pp_geometry, "prob_lo", initial_prob_lo, 0, AMREX_SPACEDIM);
+    for (int direction = 0; direction < AMREX_SPACEDIM; ++direction) {
+        m_initial_prob_lo[direction] = initial_prob_lo[direction];
+    }
 
+    const int moving_window_dir = WarpX::moving_window_dir;
+    const amrex::Real probe_position_offset = GetProbePositionOffset(
+        gm.ProbLoArray(), m_initial_prob_lo, do_moving_window_FP, moving_window_dir);
     amrex::Vector<amrex::ParticleReal> storage_x = xpos;
     amrex::Vector<amrex::ParticleReal> storage_y = ypos;
     amrex::Vector<amrex::ParticleReal> storage_z = zpos;
     for (amrex::Long i = 0; i < xpos.size(); ++i) {
+        MoveProbePosition(storage_x[i], storage_y[i], storage_z[i],
+                          moving_window_dir, probe_position_offset);
         domain_mapper.mapToDomain(storage_x[i], storage_y[i], storage_z[i]);
     }
 
-    m_last_prob_lo = gm.ProbLoArray();
-    m_last_prob_lo_initialized = true;
-
     // The storage positions are always kept in-domain for AMReX ownership. The
-    // original logical positions are retained separately for domain filtering.
+    // immutable input positions are retained separately for domain filtering.
     m_probe.AddNParticles(0, xpos, ypos, zpos, storage_x, storage_y, storage_z);
 }
 
@@ -436,26 +488,20 @@ void FieldProbe::LoadBalance ()
     const ParticleDomainMapper domain_mapper{current_prob_lo, gm.ProbHiArray(),
                                              gm.CellSizeArray()};
 
-    amrex::Real move_dist = 0._rt;
     const int moving_window_dir = WarpX::moving_window_dir;
-    if (m_last_prob_lo_initialized && do_moving_window_FP &&
-        moving_window_dir >= 0 && moving_window_dir < AMREX_SPACEDIM) {
-        move_dist = current_prob_lo[moving_window_dir] -
-                    m_last_prob_lo[moving_window_dir];
-    }
-    m_last_prob_lo = current_prob_lo;
-    m_last_prob_lo_initialized = true;
+    const amrex::Real probe_position_offset = GetProbePositionOffset(
+        current_prob_lo, m_initial_prob_lo, do_moving_window_FP, moving_window_dir);
 
     using MyParIter = FieldProbeParticleContainer::iterator;
     for (int lev = 0; lev < m_probe.numLevels(); ++lev) {
         for (MyParIter pti(m_probe, lev); pti.isValid(); ++pti) {
             auto setPosition = SetParticlePosition<FieldProbePIdx>(pti);
             auto& attribs = pti.GetStructOfArrays().GetRealData();
-            auto* const AMREX_RESTRICT probe_x =
+            auto const* const AMREX_RESTRICT probe_x =
                 attribs[FieldProbePIdx::probe_x].dataPtr();
-            auto* const AMREX_RESTRICT probe_y =
+            auto const* const AMREX_RESTRICT probe_y =
                 attribs[FieldProbePIdx::probe_y].dataPtr();
-            auto* const AMREX_RESTRICT probe_z =
+            auto const* const AMREX_RESTRICT probe_z =
                 attribs[FieldProbePIdx::probe_z].dataPtr();
             const auto np = pti.numParticles();
 
@@ -464,29 +510,7 @@ void FieldProbe::LoadBalance ()
                 amrex::ParticleReal yp = probe_y[ip];
                 amrex::ParticleReal zp = probe_z[ip];
 
-#if defined(WARPX_DIM_1D_Z)
-                zp += move_dist;
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                xp += move_dist;
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                if (moving_window_dir == 0) {
-                    xp += move_dist;
-                } else {
-                    zp += move_dist;
-                }
-#else
-                if (moving_window_dir == 0) {
-                    xp += move_dist;
-                } else if (moving_window_dir == 1) {
-                    yp += move_dist;
-                } else {
-                    zp += move_dist;
-                }
-#endif
-
-                probe_x[ip] = xp;
-                probe_y[ip] = yp;
-                probe_z[ip] = zp;
+                MoveProbePosition(xp, yp, zp, moving_window_dir, probe_position_offset);
 
                 domain_mapper.mapToDomain(xp, yp, zp);
                 setPosition(ip, xp, yp, zp);
@@ -513,6 +537,10 @@ void FieldProbe::ComputeDiags (int step)
     const amrex::Geometry& gm = warpx.Geom(0);
     const ParticleDomainMapper domain_mapper{gm.ProbLoArray(), gm.ProbHiArray(),
                                              gm.CellSizeArray()};
+    const int moving_window_dir = WarpX::moving_window_dir;
+    const amrex::Real probe_position_offset = GetProbePositionOffset(
+        gm.ProbLoArray(), m_initial_prob_lo, do_moving_window_FP,
+        moving_window_dir);
 
     // get number of mesh-refinement levels
     const auto nLevel = warpx.finestLevel() + 1;
@@ -587,11 +615,11 @@ void FieldProbe::ComputeDiags (int step)
             ParticleReal* const AMREX_RESTRICT part_By = attribs[FieldProbePIdx::By].dataPtr();
             ParticleReal* const AMREX_RESTRICT part_Bz = attribs[FieldProbePIdx::Bz].dataPtr();
             ParticleReal* const AMREX_RESTRICT part_S = attribs[FieldProbePIdx::S].dataPtr();
-            ParticleReal* const AMREX_RESTRICT probe_x =
+            ParticleReal const* const AMREX_RESTRICT probe_x =
                 attribs[FieldProbePIdx::probe_x].dataPtr();
-            ParticleReal* const AMREX_RESTRICT probe_y =
+            ParticleReal const* const AMREX_RESTRICT probe_y =
                 attribs[FieldProbePIdx::probe_y].dataPtr();
-            ParticleReal* const AMREX_RESTRICT probe_z =
+            ParticleReal const* const AMREX_RESTRICT probe_z =
                 attribs[FieldProbePIdx::probe_z].dataPtr();
 
             auto* const AMREX_RESTRICT idcpu = pti.GetStructOfArrays().GetIdCPUData().data();
@@ -608,9 +636,11 @@ void FieldProbe::ComputeDiags (int step)
             // Interpolate only logical probe positions that are currently
             // in-domain.
             amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
-                const amrex::ParticleReal xp = probe_x[ip];
-                const amrex::ParticleReal yp = probe_y[ip];
-                const amrex::ParticleReal zp = probe_z[ip];
+                amrex::ParticleReal xp = probe_x[ip];
+                amrex::ParticleReal yp = probe_y[ip];
+                amrex::ParticleReal zp = probe_z[ip];
+                MoveProbePosition(
+                    xp, yp, zp, moving_window_dir, probe_position_offset);
 
                 amrex::ParticleReal Exp = 0._prt, Eyp = 0._prt, Ezp = 0._prt;
                 amrex::ParticleReal Bxp = 0._prt, Byp = 0._prt, Bzp = 0._prt;
@@ -666,9 +696,11 @@ void FieldProbe::ComputeDiags (int step)
                 amrex::Gpu::DeviceVector<amrex::Real> dv(np * noutputs);
                 amrex::Real* dvp = dv.data();
                 amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) {
-                    const amrex::ParticleReal xp = probe_x[ip];
-                    const amrex::ParticleReal yp = probe_y[ip];
-                    const amrex::ParticleReal zp = probe_z[ip];
+                    amrex::ParticleReal xp = probe_x[ip];
+                    amrex::ParticleReal yp = probe_y[ip];
+                    amrex::ParticleReal zp = probe_z[ip];
+                    MoveProbePosition(
+                        xp, yp, zp, moving_window_dir, probe_position_offset);
                     long idx = ip * noutputs;
                     if (!domain_mapper.contains(xp, yp, zp)) {
                         dvp[idx] = -1._rt;

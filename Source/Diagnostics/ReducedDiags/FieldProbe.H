@@ -83,10 +83,8 @@ private:
     //! counts number of particles for all MPI ranks
     long m_valid_particles {0};
 
-    //! problem-domain position used to co-move probes by the actual window
-    //! displacement
-    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_last_prob_lo{};
-    bool m_last_prob_lo_initialized = false;
+    //! initial problem-domain position used as the origin for co-moving probes
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_initial_prob_lo{};
 
     //! determines geometry of detector point distribution
     DetectorGeometry m_probe_geometry = DetectorGeometry::Point;
