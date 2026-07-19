@@ -47,6 +47,9 @@ public:
     Diagnostics(Diagnostics&& )                    = default;
     Diagnostics& operator=(Diagnostics&& )         = default;
 
+    /** Return the file prefix (output directory and base name) of this diagnostic */
+    [[nodiscard]] std::string GetFilePrefix () const { return m_file_prefix; }
+
     /** Stores the diag type */
     DiagTypes m_diag_type;
     /** Pack (stack) all fields in the cell-centered output MultiFab m_mf_output.
