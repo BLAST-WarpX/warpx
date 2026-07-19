@@ -111,9 +111,9 @@ public:
         amrex::ParticleReal getCrossSection_momentum (amrex::ParticleReal E_coll) const
         {
             if (E_coll < m_energy_lo) {
-                return m_sigma_mt_lo;
-            } else if (E_coll > m_energy_hi) {
                 return m_sigma_mt_hi;
+            } else if (E_coll > m_energy_hi) {
+                return m_sigma_mt_lo;
             } else {
                 using amrex::Math::floor;
                 using amrex::Math::ceil;

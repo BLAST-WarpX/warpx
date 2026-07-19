@@ -370,7 +370,8 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                           [=] AMREX_GPU_HOST_DEVICE (long ip, amrex::RandomEngine const& engine)
                           {
                               // determine if this particle should collide
-                              if (amrex::Random(engine) > total_collision_prob) { return; }
+                              amrex::ParticleReal Prob=amrex::Random(engine);
+                              if (Prob > total_collision_prob) { return; }
 
                               amrex::ParticleReal x, y, z;
                               GetPosition.AsStored(ip, x, y, z);
@@ -407,6 +408,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
 
                               // loop through all collision pathways
                               for (int i = 0; i < process_count; i++) {
+                                  
                                   auto const& scattering_process = *(scattering_processes + i);
 
                                   // get collision cross-section
@@ -460,10 +462,6 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
 
                                 else if (scattering_process.m_type == ScatteringProcessType::RUTHERFORD)
                                       { 
-                                        
-                                        //amrex::Print() << "les vitesses au début" << sqrt(vx*vx+vy*vy+vz*vz) << std::endl;
-                                        //amrex::Print() << "vz au début" << vz << std::endl;
-
                                         amrex::ParticleReal Ux;
                                         amrex::ParticleReal Uy;
                                         amrex::ParticleReal Uz;
@@ -487,19 +485,11 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                         Upz = norm_fac*(Uz-fac*vnz);
                                         amrex::Real X = amrex::Random(engine);
                                         amrex::ParticleReal eta=scattering_process.getEta(static_cast<amrex::ParticleReal>(E_coll));
-                                        amrex::Print() << "eta" << eta << std::endl;
                                         amrex::ParticleReal costheta = 1-2*eta*X/(1-X+eta);
-                                        //amrex::Print() << "costheta" << costheta << std::endl;
                                         amrex::ParticleReal sintheta = sqrt(1 - costheta*costheta);
                                         vx = vx*costheta+Upx*sintheta;
                                         vy = vy*costheta+Upy*sintheta;
                                         vz = vz*costheta+Upz*sintheta;
-                                        //amrex::Print() << "vz  à la fin" << vz << std::endl;
-                                        //amrex::Print() << "vx  à la fin" << vx << std::endl;
-                                        //amrex::Print() << "vy  à la fin" << vy << std::endl;
-
-                                        //amrex::Print() << "eta" << eta << std::endl;
-                                        //amrex::Print() << "les vitesses à la fin" << sqrt(vx*vx+vy*vy+vz*vz) << std::endl;
                                         }   
 
                                   else if (scattering_process.m_type == ScatteringProcessType::BACK) {

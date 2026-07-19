@@ -57,13 +57,12 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
     m_exe_h.m_sigma_mt_hi = m_sigmas_mt_h[m_grid_size-1];
 
     const int N_case = 1000;
-    const amrex::ParticleReal eta_min = 1e-3;
-    const amrex::ParticleReal eta_max = 1000;
+    const amrex::ParticleReal eta_min = 1e-5;
+    const amrex::ParticleReal eta_max = 0.5;
 
     amrex::Vector<amrex::ParticleReal> log_eta_i(N_case);
     amrex::Vector<amrex::ParticleReal> Ri(N_case);
 
-    // Construction d'une grille LOGARITHMIQUE (recommandé pour la physique de eta)
     const amrex::ParticleReal log_eta_min = std::log(eta_min);
     const amrex::ParticleReal log_eta_max = std::log(eta_max);
     const amrex::ParticleReal d_log_eta = (log_eta_max - log_eta_min) / (N_case - 1);
@@ -72,17 +71,14 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
         log_eta_i[i] = log_eta_min + i * d_log_eta;
         amrex::ParticleReal eta = std::exp(log_eta_i[i]);
         
-        // Utilisation de std::log1p pour préserver la précision de la formule
         amrex::ParticleReal internal_term = (eta + 1.0) * std::log1p(1.0 / eta) - 1.0;
         Ri[i] = std::log(2.0 * eta * internal_term);
     }
 
-    // Remplissage de m_log_etan_h sur CPU
     m_log_etan_h.resize(m_grid_size);
     for (int i = 0; i < m_grid_size; ++i) {
         amrex::ParticleReal Rn = std::log(m_sigmas_mt_h[i] / m_sigmas_h[i]);
 
-        // Clamp aux bornes
         if (Rn <= Ri[0]) {
             m_log_etan_h[i] = log_eta_i[0];
             continue;
@@ -92,7 +88,6 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
             continue;
         }
 
-        // Recherche binaire sur Ri (Ri est strictement croissante)
         int lo = 0;
         int hi = N_case - 2;
         while (lo < hi) {
@@ -101,7 +96,6 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
             else               { hi = mid - 1; }
         }
 
-        // Interpolation linéaire propre (sans appels répétés à std::log)
         const amrex::ParticleReal Rn_lo = Ri[lo];
         const amrex::ParticleReal Rn_hi = Ri[lo + 1];
         const amrex::ParticleReal ln_eta_lo = log_eta_i[lo];
@@ -113,7 +107,6 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
 m_exe_h.m_log_etan    = m_log_etan_h.data();
 m_exe_h.m_log_etan_lo = m_log_etan_h[0];
 m_exe_h.m_log_etan_hi = m_log_etan_h[m_grid_size - 1];
-amrex::Print() << "m_exe_h.m_log_etan (lo, hi): " << std::exp(m_exe_h.m_log_etan_lo) << " " << std::exp(m_exe_h.m_log_etan_hi) << std::endl;
     }
 
     // Paramètres de grille
