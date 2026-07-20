@@ -60,6 +60,18 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
+    // Calculate the electron pressure at t=n+1 (and mirror the implied
+    // electron temperature for diagnostics). Moved here, right after the
+    // deposition, from the end of this function. This does NOT change any
+    // results: the B-substep E-solves (solve_for_Faraday = true) skip the
+    // grad(Pe) term entirely -- for the polytropic closure Pe(ne),
+    // grad(Pe)/(e ne) is an exact gradient with zero curl -- so Pe is only
+    // consumed by the final (solve_for_Faraday = false) E-solve below, which
+    // sees Pe(rho^{n+1}) in either placement. Relocating it establishes the
+    // loop position where an electron-energy-equation closure would emit
+    // Pe/Te, keeping both closures at the same point.
+    m_hybrid_pic_model->CalculateElectronPressure();
+
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
 
@@ -162,8 +174,8 @@ void WarpX::HybridPICEvolveFields ()
             0.5_rt*dt[0]);
     }
 
-    // Calculate the electron pressure at t=n+1
-    m_hybrid_pic_model->CalculateElectronPressure();
+    // Note: the electron pressure at t=n+1 was already computed right after
+    // the deposition at the top of this function.
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculatePlasmaCurrent(

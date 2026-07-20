@@ -123,6 +123,14 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
+    // Electron temperature T_e (Kelvin) implied by the electron-pressure
+    // closure, T_e = P_e / (n_e k_B). Filled alongside P_e in
+    // CalculateElectronPressure; allocated unconditionally (one cheap scalar
+    // field) so the "Te" diagnostic can always read it.
+    fields.alloc_init(FieldType::hybrid_electron_temperature_fp,
+        lev, amrex::convert(ba, rho_nodal_flag),
+        dm, ncomps, ngRho, 0.0_rt);
+
     // The "hybrid_rho_fp_temp" multifab is used to store the ion charge density
     // interpolated or extrapolated to appropriate timesteps.
     fields.alloc_init(FieldType::hybrid_rho_fp_temp,
@@ -289,6 +297,18 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     if (m_add_external_fields) {
         m_external_vector_potential->InitData();
     }
+
+    // Seed T_e with the uniform value parsed from <hybrid>.elec_temp (in
+    // Joules after ReadParameters, so dividing by k_B gives Kelvin). The
+    // iter-0 diagnostic dump -- which WarpX::InitData() flushes BEFORE the
+    // first field-solve -- then sees a meaningful T_e rather than the
+    // zero-initialized allocation; CalculateElectronPressure overwrites it
+    // each step thereafter.
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        amrex::MultiFab & Te_mf = *warpx.m_fields.get(
+            FieldType::hybrid_electron_temperature_fp, lev);
+        Te_mf.setVal(m_elec_temp / PhysConst::kb);
+    }
 }
 
 void HybridPICModel::GetCurrentExternal ()
@@ -430,6 +450,35 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *rho_fp
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
+
+    // Mirror the closure's implied electron temperature,
+    // T_e = P_e / (n_e k_B), into hybrid_electron_temperature_fp so the "Te"
+    // diagnostic is meaningful. Diagnostic-only for now: nothing in the
+    // solver reads it back (an electron-energy-equation extension will make
+    // it a state variable filled at this same point in the loop).
+    {
+        amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+        amrex::MultiFab const & Pe  = *electron_pressure_fp;
+        amrex::MultiFab const & rho = *rho_fp;
+        auto const rho_floor = PhysConst::q_e * m_n_floor;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
+            amrex::Array4<amrex::Real const> const & Pe_arr  = Pe.const_array(mfi);
+            amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+            amrex::Box const & tbox = mfi.tilebox();
+            amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
+                amrex::Real const ne      = rho_val / PhysConst::q_e;
+                Te_arr(i,j,k) = Pe_arr(i,j,k) / (ne * PhysConst::kb);
+            });
+        }
+    }
+
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
         WarpX::do_single_precision_comms,

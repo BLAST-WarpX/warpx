@@ -489,6 +489,31 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             if (update_varnames) {
                 AddRZModesToOutputNames(std::string("F"), ncomp);
             }
+        } else if ( m_varnames_fields[comp] == "Te" ){
+            // Electron temperature [K] implied by the hybrid-PIC
+            // electron-pressure closure.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
+                "The 'Te' diagnostic output requires the hybrid-PIC solver "
+                "(algo.maxwell_solver = hybrid).");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev),
+                lev, m_crse_ratio, false, ncomp);
+            if (update_varnames) {
+                AddRZModesToOutputNames(std::string("Te"), ncomp);
+            }
+        } else if ( m_varnames_fields[comp] == "Pe" ){
+            // Electron pressure [Pa] consumed by the Ohm's-law E-solve.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
+                "The 'Pe' diagnostic output requires the hybrid-PIC solver "
+                "(algo.maxwell_solver = hybrid).");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+                lev, m_crse_ratio, false, ncomp);
+            if (update_varnames) {
+                AddRZModesToOutputNames(std::string("Pe"), ncomp);
+            }
         } else if ( m_varnames_fields[comp] == "G" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>( warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio,
                                                         false, ncomp);
@@ -902,6 +927,25 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             i_T_species++;
         } else if ( m_varnames[comp] == "F" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "Te" ){
+            // Electron temperature [K] implied by the hybrid-PIC
+            // electron-pressure closure.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
+                "The 'Te' diagnostic output requires the hybrid-PIC solver "
+                "(algo.maxwell_solver = hybrid).");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev),
+                lev, m_crse_ratio);
+        } else if ( m_varnames[comp] == "Pe" ){
+            // Electron pressure [Pa] consumed by the Ohm's-law E-solve.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
+                "The 'Pe' diagnostic output requires the hybrid-PIC solver "
+                "(algo.maxwell_solver = hybrid).");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(
+                warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+                lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "G" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::G_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "phi" ){
