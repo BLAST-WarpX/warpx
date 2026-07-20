@@ -252,42 +252,56 @@ void WarpX::HybridPICDepositRhoAndJ ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Perform charge deposition in component 0 of rho_fp at current time.
-    mypc->DepositCharge(m_fields.get_mr_levels(FieldType::rho_fp, finest_level), 0._rt);
-
     auto current_fp = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
+    auto rho_fp = m_fields.get_mr_levels(FieldType::rho_fp, finest_level);
     if (m_hybrid_pic_model->m_need_per_species_fields) {
-        // Per-species current deposition at t_{n-1/2}: each charged species
-        // deposits into its own MultiFab and the totals are accumulated into
-        // current_fp. The per-species fields are kept on the grid for
-        // downstream coupling (electron-energy-equation sources, per-species
-        // resistivity, resistive-drag collision operator).
-        for (auto const & J_lev : current_fp) {
-            for (int idim = 0; idim < 3; ++idim) { J_lev[idim]->setVal(0._rt); }
+        // Per-species deposition at t_{n+1} (rho) and t_{n-1/2} (J): each
+        // charged species deposits once into its own MultiFabs and the raw
+        // deposits are accumulated into the totals rho_fp / current_fp (which
+        // get their guard-cell sum, filtering, boundaries and RZ volume
+        // scaling later, via SyncCurrentAndRho). The per-species fields are
+        // kept on the grid for downstream coupling (electron-energy-equation
+        // sources, per-species resistivity, resistive-drag collision
+        // operator).
+        auto rho_species_sum = m_fields.get_mr_levels("hybrid_rho_species_sum_fp", finest_level);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            rho_fp[lev]->setVal(0._rt);
+            rho_species_sum[lev]->setVal(0._rt);
+            for (int idim = 0; idim < 3; ++idim) { current_fp[lev][idim]->setVal(0._rt); }
         }
         for (auto const & spec : mypc->GetSpeciesNames()) {
             auto & pc = mypc->GetParticleContainerFromName(spec);
-            if (pc.getCharge() == 0._prt) { continue; }
+            if (pc.getCharge() == 0._prt || pc.do_not_deposit) { continue; }
             auto J_spec = m_fields.get_mr_levels_alldirs("current_fp_" + spec, finest_level);
+            auto rho_spec = m_fields.get_mr_levels("rho_fp_" + spec, finest_level);
             for (auto const & J_lev : J_spec) {
                 for (int idim = 0; idim < 3; ++idim) { J_lev[idim]->setVal(0._rt); }
             }
             pc.DepositCurrent(J_spec, dt[0], -0.5_rt * dt[0]);
+            pc.DepositCharge(rho_spec, /*local*/true, /*reset*/true,
+                             /*apply_boundary_and_scale_volume*/false,
+                             /*interpolate_across_levels*/false);
+            // Accumulate the RAW (locally deposited, unsummed) per-species
+            // fields into the totals: shape-spread contributions near box
+            // edges sit in guard cells at this point and are folded into the
+            // valid cells of the totals later by SyncCurrentAndRho, exactly
+            // as in the single-pass deposition path.
             for (int lev = 0; lev <= finest_level; ++lev) {
+                MultiFab::Add(*rho_fp[lev], *rho_spec[lev],
+                              0, 0, 1, rho_fp[lev]->nGrowVect());
                 for (int idim = 0; idim < 3; ++idim) {
                     MultiFab::Add(*current_fp[lev][idim], *J_spec[lev][idim],
                                   0, 0, 1, current_fp[lev][idim]->nGrowVect());
                 }
             }
-            // Fold the guard-cell deposits of J_spec into the valid cells of
-            // neighboring boxes. pc.DepositCurrent above is a local deposit:
-            // shape-spread contributions from particles near box edges land in
-            // guard cells and are only correct after a SumBoundary. The total
-            // current_fp gets this later via SyncCurrentAndRho (which is why the
-            // raw, unsummed J_spec is accumulated into it above), but the
-            // per-species fields are consumed directly (Vs = Js/rhos, per-species
-            // resistivity, resistive drag) and need their own sum here.
+            // The per-species fields themselves are consumed directly
+            // (Vs = Js/rhos, species fractions, per-species resistivity,
+            // resistive drag) and need their own guard-cell sum here.
             for (int lev = 0; lev <= finest_level; ++lev) {
+                ablastr::utils::communication::SumBoundary(
+                    *rho_spec[lev], 0, rho_spec[lev]->nComp(),
+                    rho_spec[lev]->nGrowVect(), rho_spec[lev]->nGrowVect(),
+                    WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 for (int idim = 0; idim < 3; ++idim) {
                     ablastr::utils::communication::SumBoundary(
                         *J_spec[lev][idim], 0, J_spec[lev][idim]->nComp(),
@@ -295,25 +309,28 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
             }
-            // Per-species charge density (used by the electron-energy-equation
-            // sources and to recover the species bulk velocity Vs = Js/rhos in
-            // CalculateIonFluidVelocity).
-            pc.DepositCharge(m_fields.get_mr_levels("rho_fp_" + spec, finest_level),
-                             /*local*/false, /*reset*/true,
-                             /*apply_boundary_and_scale_volume*/false,
-                             /*interpolate_across_levels*/false);
+            // Species-summed raw charge density (same form as the rho_fp_s
+            // numerators), shared by the electron-energy-equation and
+            // per-species-resistivity consumers. Accumulated AFTER the
+            // guard-cell sum so its valid and ghost cells are final.
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                MultiFab::Add(*rho_species_sum[lev], *rho_spec[lev],
+                              0, 0, 1, rho_species_sum[lev]->nGrowVect());
+            }
         }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         for (int lev = 0; lev <= finest_level; ++lev) {
+            ApplyInverseVolumeScalingToChargeDensity(rho_fp[lev], lev);
             ApplyInverseVolumeScalingToCurrentDensity(
                 current_fp[lev][0], current_fp[lev][1], current_fp[lev][2], lev);
         }
 #endif
     } else {
-        // Single-pass current deposition at t_{n-1/2}: no active feature
-        // consumes the per-species fields, so skip the extra per-species
-        // charge deposits and guard-cell sums entirely. Zeroing and the RZ
-        // inverse volume scaling are handled inside.
+        // Single-pass deposition (rho at t_{n+1}, J at t_{n-1/2}): no active
+        // feature consumes the per-species fields, so skip the per-species
+        // deposits and guard-cell sums entirely. Zeroing and the RZ inverse
+        // volume scaling are handled inside.
+        mypc->DepositCharge(rho_fp, 0._rt);
         mypc->DepositCurrent(current_fp, dt[0], -0.5_rt * dt[0]);
     }
 

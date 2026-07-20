@@ -2154,7 +2154,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Per-species resistivity overlays added on top of ``plasma_resistivity``,
         as a dictionary mapping a charged species name to a value or expression
         in Ohm*m. The expression may depend on ``rho_s`` (the species charge
-        density), ``rho`` (total charge density), ``Te`` (electron temperature
+        density), ``rho`` (total charge density which, by quasineutrality,
+        equals the electron charge density), ``Te`` (electron temperature
         in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the
         species current density magnitude), ``B`` (magnetic field magnitude)
         and ``t`` (time). The effective resistivity applied to species ``s``
@@ -2173,27 +2174,23 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Reduces to ``eta * J**2`` for a single ion species. Only used when
         ``solve_electron_energy_equation`` is True.
 
-    redirect_joule_to_ions: bool, default=False
-        Route the Joule heating of cells with
-        ``Te >= joule_redirect_Te_threshold`` to the ions (as an
-        energy-conserving stochastic kick) instead of the electrons, allowing
-        ``Ti > Te`` to develop. Requires ``include_joule_heating``.
+    joule_redirect_Te_threshold: float, optional
+        Electron temperature threshold in eV above which the Joule heating of
+        a cell is routed to the ions (as an energy-conserving stochastic kick)
+        instead of the electrons, allowing ``Ti > Te`` to develop. Specifying
+        a value >= 0 enables the redirect (off by default). Requires
+        ``include_joule_heating``.
 
-    joule_redirect_Te_threshold: float, default=100
-        Electron temperature threshold in eV for ``redirect_joule_to_ions``.
-
-    include_temperature_relaxation: bool, default=False
-        Add the electron-ion thermal equilibration ``Q_ei`` to the electron
-        temperature, with the conjugate ion heating applied as an
-        energy-conserving drag-diffusion kick on each ion. Requires
-        ``do_temperature_deposition`` on every charged ion species. Only used
-        when ``solve_electron_energy_equation`` is True.
-
-    electron_ion_relaxation_rate: float or str
+    electron_ion_relaxation_rate: float or str, optional
         Value or expression for the electron-ion energy-equilibration rate
-        ``nu_ei`` in 1/s used by ``include_temperature_relaxation``. The
-        expression may depend on ``rho`` (charge density in C/m^3), ``Te``
-        and ``Ti`` (temperatures in eV) and ``t`` (time).
+        ``nu_ei`` in 1/s. Specifying it enables the electron-ion thermal
+        equilibration ``Q_ei`` on the electron temperature, with the conjugate
+        ion heating applied as an energy-conserving drag-diffusion kick on
+        each ion (the required shape-aware ion temperature deposition is
+        enabled automatically on every charged species). The expression may
+        depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti``
+        (temperatures in eV) and ``t`` (time). Only used when
+        ``solve_electron_energy_equation`` is True.
 
     qdsmc_n_floor: float, optional
         Minimum electron number density (in m^-3) used when recovering the
@@ -2303,9 +2300,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         plasma_resistivity_species=None,
         solve_electron_energy_equation=None,
         include_joule_heating=None,
-        redirect_joule_to_ions=None,
         joule_redirect_Te_threshold=None,
-        include_temperature_relaxation=None,
         electron_ion_relaxation_rate=None,
         qdsmc_n_floor=None,
         substeps=None,
@@ -2336,9 +2331,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
         self.include_joule_heating = include_joule_heating
-        self.redirect_joule_to_ions = redirect_joule_to_ions
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
-        self.include_temperature_relaxation = include_temperature_relaxation
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
         self.qdsmc_n_floor = qdsmc_n_floor
 
@@ -2400,24 +2393,18 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                     f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
                     pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
                 )
-        # Only assign the electron-energy-equation attributes when given, so
-        # that scripts setting them directly on the hybridpicmodel bucket are
-        # not clobbered with None here.
+        # Only emit the electron-energy-equation attributes that were
+        # explicitly set, so the generated input deck contains only
+        # user-specified parameters.
         if self.solve_electron_energy_equation is not None:
             pywarpx.hybridpicmodel.solve_electron_energy_equation = (
                 self.solve_electron_energy_equation
             )
         if self.include_joule_heating is not None:
             pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
-        if self.redirect_joule_to_ions is not None:
-            pywarpx.hybridpicmodel.redirect_joule_to_ions = self.redirect_joule_to_ions
         if self.joule_redirect_Te_threshold is not None:
             pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
                 self.joule_redirect_Te_threshold
-            )
-        if self.include_temperature_relaxation is not None:
-            pywarpx.hybridpicmodel.include_temperature_relaxation = (
-                self.include_temperature_relaxation
             )
         if self.electron_ion_relaxation_rate is not None:
             pywarpx.hybridpicmodel.__setattr__(

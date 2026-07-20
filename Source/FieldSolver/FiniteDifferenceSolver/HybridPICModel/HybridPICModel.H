@@ -430,8 +430,11 @@ public:
      * V_e, then T_e is recovered from K_e and n_e via the polytropic
      * relation, then the Joule-heating source (if enabled) is added,
      * then Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. When
-     * false (default), Pe is computed from the algebraic adiabatic closure
-     * (FillElectronPressureMF) -- no temperature evolution. */
+     * false (default), Pe is computed from the algebraic polytropic closure
+     * (FillElectronPressureMF): T_e is not an evolved state variable, but
+     * the implied temperature Pe/(n_e k_B) still varies with density
+     * through the closure (with the chosen gamma, which need not be
+     * adiabatic). */
     bool m_solve_electron_energy_equation = false;
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
@@ -447,22 +450,26 @@ public:
      * is also true. */
     bool m_include_joule_heating = false;
 
-    /** Te-threshold Joule redirection. When true, the eta*J^2 Joule source in
+    /** Te-threshold Joule redirection. When active, the eta*J^2 Joule source in
      * QDSMCAddJouleHeating heats electrons in cells where Te < m_joule_redirect_Te_eV
      * and is instead deposited to the ions (as stochastic pure-diffusion heating in
      * QDSMCApplyIonHeating) where Te >= m_joule_redirect_Te_eV. This caps electron
      * heating at the threshold and routes the rest to the ions, so Ti can exceed Te.
      * The redirected energy is bookkept per charged ion species. Requires
-     * m_include_joule_heating. Default off. */
+     * m_include_joule_heating. Enabled by specifying a threshold >= 0 via
+     * joule_redirect_Te_threshold; default off (threshold < 0). The bool is
+     * derived from the threshold in ReadParameters, not a user input. */
     bool m_joule_redirect_to_ions = false;
-    amrex::Real m_joule_redirect_Te_eV = 100.0;   // threshold [eV]
+    amrex::Real m_joule_redirect_Te_eV = -1.0;   // threshold [eV]; < 0 -> off
 
     /** Electron-ion thermal equilibration (Q_ei) on T_e:
      *   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),   dU_e/dt += -Q_ei,
      * cooling T_e toward each ion species' T_i at the rate given by the
      * electron_ion_relaxation_rate(rho,Te,Ti,t) parser, with the matching ion
      * heating deposited conservatively (QDSMCApplyIonHeating) so the exchange
-     * conserves energy. Default off; only consulted when
+     * conserves energy. Enabled by specifying the
+     * electron_ion_relaxation_rate expression (the bool is derived in
+     * ReadParameters, not a separate user input); only consulted when
      * m_solve_electron_energy_equation is on. */
     bool m_include_temperature_relaxation = false;
 
@@ -523,6 +530,18 @@ public:
      *  gate the overlay fields) and confirmed in InitData when the parsers
      *  are compiled. */
     bool m_has_per_species_eta = false;
+
+    /** True when a hybrid_resistive_drag collision is present in the input
+     *  deck. Set in ReadParameters; used for the drag/Joule-heating
+     *  consistency warnings in InitData. */
+    bool m_has_resistive_drag = false;
+
+    /** False until the first AdvanceElectronEnergyQDSMC of the run has
+     *  filled hybrid_current_fp_plasma. On later steps J_plasma is already
+     *  valid from the previous step's final E-solve (B is unchanged in
+     *  between), so the QDSMC entry-point recompute is skipped. Mutable
+     *  because it is a lazily-set cache flag inside a const call chain. */
+    mutable bool m_qdsmc_J_plasma_valid = false;
 
     /** True when the gridded fluid velocities Ve_fp / Vs_fp_{spec} are
      *  needed, i.e. when a per-species resistivity parser is registered or

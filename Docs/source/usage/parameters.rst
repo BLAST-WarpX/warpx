@@ -3699,6 +3699,8 @@ Maxwell solver: kinetic-fluid hybrid
     the current-density magnitudes ``J`` and ``J_s`` (:math:`A/m^2`), the magnetic-field magnitude ``B`` (:math:`T`)
     and the time ``t`` (:math:`s`). The same effective per-species resistivity enters the Joule-heating source of the
     electron energy equation when :pp:param:`hybrid_pic_model.include_joule_heating` is on.
+    Species without their own overlay simply use the global
+    :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`, so existing single-resistivity input decks are unchanged.
 
 .. pp:param:: hybrid_pic_model.solve_electron_energy_equation
     :type: ``bool``
@@ -3728,44 +3730,31 @@ Maxwell solver: kinetic-fluid hybrid
     :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. For a single species this reduces to
     :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
 
-.. pp:param:: hybrid_pic_model.redirect_joule_to_ions
-    :type: ``bool``
-    :default: ``false``
+.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
+    :type: ``float``
+    :default: ``-1`` (off)
     :optional:
 
-    If :pp:param:`hybrid_pic_model.include_joule_heating` is on, cells with electron temperature at or above
-    :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold` deposit their Joule heat to the kinetic ions
+    Electron temperature threshold, in eV, above which the Joule heat is redirected to the ions.
+    If :pp:param:`hybrid_pic_model.include_joule_heating` is on and a threshold :math:`\geq 0` is specified,
+    cells with electron temperature at or above the threshold deposit their Joule heat to the kinetic ions
     (as stochastic thermal-velocity kicks, bookkept per species) instead of the electron fluid. This caps the
     electron heating at the threshold and allows :math:`T_i > T_e` to develop, mimicking regimes where the
     electrons radiate strongly.
 
-.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
-    :type: ``float``
-    :default: ``100``
-    :optional:
-
-    Electron temperature threshold, in eV, used by :pp:param:`hybrid_pic_model.redirect_joule_to_ions`.
-
-.. pp:param:: hybrid_pic_model.include_temperature_relaxation
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the electron-ion
-    thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})` as a sink on the
-    electron fluid, paired with matching (energy-conserving) heating of the ion macro-particles. Requires the
-    ion species to activate ``<species>.do_temperature_deposition`` so that the deposited ion temperature is
-    available on the grid.
-
 .. pp:param:: hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t)
     :type: ``float`` or ``str``
-    :default: ``0``
     :optional:
 
-    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`, used by
-    :pp:param:`hybrid_pic_model.include_temperature_relaxation`. The expression can depend on the total charge
-    density ``rho`` (:math:`C/m^3`), the electron and ion temperatures ``Te`` and ``Ti`` (both in eV) and the
-    time ``t`` (:math:`s`), which permits, e.g., the NRL-formulary Spitzer rate.
+    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`. If
+    :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, specifying this rate enables the
+    electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`
+    as a sink on the electron fluid, paired with matching (energy-conserving) heating of the ion
+    macro-particles. The required shape-aware ion temperature deposition
+    (``<species>.do_temperature_deposition``) is enabled automatically on every charged species.
+    The expression can depend on the total charge density ``rho`` (:math:`C/m^3`), the electron and ion
+    temperatures ``Te`` and ``Ti`` (both in eV) and the time ``t`` (:math:`s`), which permits, e.g., the
+    NRL-formulary Spitzer rate.
 
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``

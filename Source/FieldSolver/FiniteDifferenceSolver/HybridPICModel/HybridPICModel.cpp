@@ -109,19 +109,20 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("include_joule_heating", m_include_joule_heating);
 
     // Te-threshold Joule redirection: heat electrons where Te < threshold,
-    // deposit the Joule energy to ions where Te >= threshold.
-    pp_hybrid.query("redirect_joule_to_ions", m_joule_redirect_to_ions);
+    // deposit the Joule energy to ions where Te >= threshold. Off by default
+    // (threshold < 0); specifying a threshold >= 0 enables the redirect.
     utils::parser::queryWithParser(pp_hybrid, "joule_redirect_Te_threshold", m_joule_redirect_Te_eV);
+    m_joule_redirect_to_ions = (m_joule_redirect_Te_eV >= 0._rt);
 
     // Electron-ion thermal equilibration (Q_ei) on T_e:
     //   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),  applied per ion species weighted by
     //   n_s/n_e, cooling T_e toward T_i. nu_ei[1/s] comes from the
     //   electron_ion_relaxation_rate(rho,Te,Ti,t) parser (rho [C/m^3], Te,Ti [eV]).
     //   The matching ion heating is deposited conservatively, so the exchange
-    //   conserves energy. Default off; only consulted when
-    //   solve_electron_energy_equation is on.
-    pp_hybrid.query("include_temperature_relaxation", m_include_temperature_relaxation);
-    pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
+    //   conserves energy. Enabled by specifying the rate expression (only
+    //   consulted when solve_electron_energy_equation is on).
+    m_include_temperature_relaxation =
+        pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
 
     // Determine, from the input deck alone, which optional per-species
     // machinery is needed (the particle containers do not exist yet at
@@ -146,7 +147,6 @@ void HybridPICModel::ReadParameters ()
             }
         }
 
-        bool has_resistive_drag = false;
         std::vector<std::string> collision_names;
         const ParmParse pp_collisions("collisions");
         pp_collisions.queryarr("collision_names", collision_names);
@@ -154,10 +154,10 @@ void HybridPICModel::ReadParameters ()
             const ParmParse pp_coll(coll_name);
             std::string coll_type;
             pp_coll.query("type", coll_type);
-            if (coll_type == "hybrid_resistive_drag") { has_resistive_drag = true; }
+            if (coll_type == "hybrid_resistive_drag") { m_has_resistive_drag = true; }
         }
 
-        m_need_fluid_velocities   = m_has_per_species_eta || has_resistive_drag;
+        m_need_fluid_velocities   = m_has_per_species_eta || m_has_resistive_drag;
         m_need_per_species_fields = m_need_fluid_velocities
                                   || m_solve_electron_energy_equation;
     }
@@ -306,6 +306,15 @@ void HybridPICModel::AllocateLevelMFs (
                     lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
             }
         }
+        // Species-summed raw charge density Sigma_s rho_fp_s, filled once per
+        // step in HybridPICDepositRhoAndJ. Unlike rho_fp (which is filtered,
+        // boundary-applied and volume-scaled in RZ by SyncCurrentAndRho), this
+        // keeps the same raw-deposit form as the rho_fp_s numerators, so the
+        // species fraction f_s = rho_s / Sigma_t rho_t is well-defined (the
+        // RZ 2pi*r and filter factors cancel). Shared by the Joule, Q_ei and
+        // per-species-resistivity consumers.
+        fields.alloc_init("hybrid_rho_species_sum_fp",
+            lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
     }
 
     // Electron fluid velocity V_e on the grid, V_e = (J_i - J_plasma)/rho.
@@ -319,7 +328,8 @@ void HybridPICModel::AllocateLevelMFs (
             lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
 
-    // Per-species resistive overlay added to Ohm's-law E (see
+    // Species-summed resistive overlay added to Ohm's-law E: one vector
+    // field holding Sigma_s of the per-species friction contributions (see
     // ComputeResistiveOverlay). Computed once per step and read by every
     // (subcycled) E-solve; staggered like J (== E component staggering).
     if (m_has_per_species_eta) {
@@ -382,9 +392,12 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     // m_eta parser; the total per-species effective resistivity used by
     // Ohm's law, the Joule-heating source, and the resistive-drag operator
     // is the sum eta_global + eta_per_species_s (so existing single-eta
-    // input scripts keep their exact behaviour with eta_per_species_s = 0).
-    // Done here in InitData rather than ReadParameters because species
-    // names are not available at parameter-parse time.
+    // input scripts keep their exact behaviour with eta_per_species_s = 0;
+    // species without their own parser simply use eta_global). Done here in
+    // InitData rather than ReadParameters because the particle containers
+    // (needed to filter out uncharged species) do not exist at
+    // parameter-parse time -- only the species names do, which is what the
+    // allocation flags in ReadParameters are derived from.
     {
         const amrex::ParmParse pp_hybrid_init("hybrid_pic_model");
         auto const & mypc = WarpX::GetInstance().GetPartContainer();
@@ -403,7 +416,6 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
                 m_eta_per_species[spec_name] = parser->compile<7>();
                 m_per_species_resistivity_parser[spec_name] = std::move(parser);
                 species_with_per_eta.push_back(spec_name);
-                m_has_per_species_eta = true;
             }
         }
 
@@ -439,6 +451,46 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
             }
             amrex::Print() << "\n";
         }
+    }
+
+    // Consistency warnings between the particle-side resistive drag and the
+    // electron-side Joule heating: each is allowed on its own, but the
+    // resistive energy bookkeeping is only consistent when both are active
+    // (the drag removes ion momentum/energy, the Joule source heats the
+    // electrons by the corresponding dissipation).
+    if (m_has_resistive_drag &&
+        !(m_solve_electron_energy_equation && m_include_joule_heating)) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPICModel",
+            "A hybrid_resistive_drag collision is registered, but the resistive "
+            "(Joule) electron heating is not active (requires both "
+            "hybrid_pic_model.solve_electron_energy_equation and "
+            "hybrid_pic_model.include_joule_heating). The drag removes ion "
+            "momentum/energy without the corresponding electron heating being "
+            "tracked.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+    if (m_solve_electron_energy_equation && m_include_joule_heating &&
+        !m_has_resistive_drag) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPICModel",
+            "hybrid_pic_model.include_joule_heating is on, but no "
+            "hybrid_resistive_drag collision is registered on the ions, so the "
+            "ions feel no resistive friction back-reaction to the eta*J "
+            "dissipation heating the electrons.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+    // The Te-threshold Joule redirect only acts inside the Joule source.
+    if (m_joule_redirect_to_ions &&
+        !(m_solve_electron_energy_equation && m_include_joule_heating)) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPICModel",
+            "hybrid_pic_model.joule_redirect_Te_threshold is set, but the Joule "
+            "heating source is not active (requires both "
+            "hybrid_pic_model.solve_electron_energy_equation and "
+            "hybrid_pic_model.include_joule_heating), so the redirect has no "
+            "effect.",
+            ablastr::warn_manager::WarnPriority::medium);
     }
 
     m_include_hyper_resistivity_term = (m_eta_h_expression != "0.0");
@@ -781,9 +833,14 @@ void HybridPICModel::CalculateElectronFluidVelocity (const int lev) const
         Array4<Real const> const& Jz  = J[2]->const_array(mfi);
         Array4<Real const> const& rho = rho_field.const_array(mfi);
 
-        Box const& tx = mfi.tilebox(Ve[0]->ixType().toIntVect());
-        Box const& ty = mfi.tilebox(Ve[1]->ixType().toIntVect());
-        Box const& tz = mfi.tilebox(Ve[2]->ixType().toIntVect());
+        // Compute Ve in the first ghost layer as well: Ji and rho carry full
+        // valid ghost regions here and J_plasma is computed with one valid
+        // ghost layer (which sets the limit), so no FillBoundary is needed
+        // for the order-1 gather in the drag operator or the default
+        // single-pass binomial filter below.
+        Box const& tx = mfi.tilebox(Ve[0]->ixType().toIntVect(), IntVect(1));
+        Box const& ty = mfi.tilebox(Ve[1]->ixType().toIntVect(), IntVect(1));
+        Box const& tz = mfi.tilebox(Ve[2]->ixType().toIntVect(), IntVect(1));
 
         amrex::ParallelFor(tx, ty, tz,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
@@ -801,16 +858,19 @@ void HybridPICModel::CalculateElectronFluidVelocity (const int lev) const
         );
     }
 
-    // FillBoundary first so the filter sees valid ghost values, then apply
-    // the same binomial filter used on J (suppresses grid-scale noise that
-    // would otherwise be injected into particles by the gather inside the
-    // drag operator). Final FillBoundary refreshes ghosts after filtering.
-    for (int idim = 0; idim < 3; ++idim) {
-        ablastr::utils::communication::FillBoundary(
-            *Ve[idim], WarpX::do_single_precision_comms,
-            warpx.Geom(lev).periodicity(), true);
-    }
+    // Apply the same binomial filter used on J (suppresses grid-scale noise
+    // that would otherwise be injected into particles by the gather inside
+    // the drag operator). The filter only writes valid cells, so refresh the
+    // ghosts afterwards; a multi-pass filter also reads ghosts beyond the
+    // single computed layer and needs them communicated first.
     if (WarpX::use_filter) {
+        if (WarpX::filter_npass_each_dir.max() > 1) {
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *Ve[idim], WarpX::do_single_precision_comms,
+                    warpx.Geom(lev).periodicity(), true);
+            }
+        }
         warpx.ApplyFilterMF(
             warpx.m_fields.get_mr_levels_alldirs("Ve_fp", warpx.finestLevel()), lev);
         for (int idim = 0; idim < 3; ++idim) {
@@ -851,6 +911,15 @@ void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
         ablastr::fields::VectorField Js = warpx.m_fields.get_alldirs("current_fp_" + spec, lev);
         amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec, lev);
 
+        // Js and rho_s carry full valid ghost regions here (their deposits
+        // SumBoundary with dst_ng = nGrowVect()), so compute Vs directly in
+        // the ghost cells instead of communicating afterwards. The nodal ->
+        // staggered interpolation of rho_s reads one neighbor beyond the
+        // written cell, hence the -1 on its ghost extent.
+        amrex::IntVect ng_v = Vs[0]->nGrowVect();
+        ng_v.min(Js[0]->nGrowVect());
+        ng_v.min(rho_s.nGrowVect() - amrex::IntVect(1));
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -863,9 +932,9 @@ void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
             Array4<Real const> const& Jsz = Js[2]->const_array(mfi);
             Array4<Real const> const& rho = rho_s.const_array(mfi);
 
-            Box const& tx = mfi.tilebox(Vs[0]->ixType().toIntVect());
-            Box const& ty = mfi.tilebox(Vs[1]->ixType().toIntVect());
-            Box const& tz = mfi.tilebox(Vs[2]->ixType().toIntVect());
+            Box const& tx = mfi.tilebox(Vs[0]->ixType().toIntVect(), ng_v);
+            Box const& ty = mfi.tilebox(Vs[1]->ixType().toIntVect(), ng_v);
+            Box const& tz = mfi.tilebox(Vs[2]->ixType().toIntVect(), ng_v);
 
             amrex::ParallelFor(tx, ty, tz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
@@ -883,12 +952,9 @@ void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
             );
         }
 
-        for (int idim = 0; idim < 3; ++idim) {
-            ablastr::utils::communication::FillBoundary(
-                *Vs[idim], WarpX::do_single_precision_comms,
-                warpx.Geom(lev).periodicity(), true);
-        }
-        // Same J-style binomial filter as in CalculateElectronFluidVelocity.
+        // Same J-style binomial filter as in CalculateElectronFluidVelocity;
+        // the ghost cells were computed above, so only the post-filter
+        // refresh is needed (the filter writes valid cells only).
         if (WarpX::use_filter) {
             warpx.ApplyFilterMF(
                 warpx.m_fields.get_mr_levels_alldirs("Vs_fp_" + spec, warpx.finestLevel()),
@@ -945,20 +1011,12 @@ void HybridPICModel::ComputeResistiveOverlay (
 
     auto const rho_floor = PhysConst::q_e * m_n_floor;
 
-    // Precompute rho_sum = Sigma_t rho_fp_t over all charged species. This is
-    // the unscaled "raw deposit" sum, paired with rho_s_raw in the same
-    // form so the 2pi*r RZ factor cancels in the species-fraction ratio.
-    amrex::MultiFab rho_sum(rho_total.boxArray(), rho_total.DistributionMap(),
-                            1, rho_total.nGrowVect());
-    rho_sum.setVal(0.0_rt);
-    for (auto const & spec_name : species_names) {
-        if (mypc.GetParticleContainerFromName(spec_name).getCharge() == 0._prt) {
-            continue;
-        }
-        amrex::MultiFab const & rho_s =
-            *warpx.m_fields.get("rho_fp_" + spec_name, lev);
-        amrex::MultiFab::Add(rho_sum, rho_s, 0, 0, 1, rho_total.nGrowVect());
-    }
+    // rho_sum = Sigma_t rho_fp_t over all charged species: the unscaled
+    // "raw deposit" sum, paired with rho_s_raw in the same form so the
+    // 2pi*r RZ factor cancels in the species-fraction ratio. Filled once
+    // per step by HybridPICDepositRhoAndJ.
+    amrex::MultiFab const & rho_sum =
+        *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 
     amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
     amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
@@ -1063,10 +1121,8 @@ void HybridPICModel::ComputeResistiveOverlay (
         accumulate_one_direction(overlay_y, Jy_stag, 1);
         accumulate_one_direction(overlay_z, Jz_stag, 2);
     }
-
-    overlay_x.FillBoundary(warpx.Geom(lev).periodicity());
-    overlay_y.FillBoundary(warpx.Geom(lev).periodicity());
-    overlay_z.FillBoundary(warpx.Geom(lev).periodicity());
+    // No ghost exchange: the E-solve kernels only read the overlay at valid
+    // cells (the Yee E updates run on ungrown tileboxes).
 }
 
 
@@ -1193,7 +1249,6 @@ void HybridPICModel::QDSMCInitializeKe (int const lev) const
     ABLASTR_PROFILE("HybridPICModel::QDSMCInitializeKe()");
 
     auto & warpx = WarpX::GetInstance();
-    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
 
     amrex::MultiFab       & Ke  = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,                lev);
     amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp,   lev);
@@ -1203,8 +1258,8 @@ void HybridPICModel::QDSMCInitializeKe (int const lev) const
 
     auto const gamma     = m_gamma;
     auto const rho_floor = PhysConst::q_e * m_n_floor;
-    // Conversion factor used by helion to keep K_e numerically O(1): T_e in K
-    // is multiplied by (k_B / q_e) so K_e ends up scaled in eV-equivalent.
+    // Scale K_e to eV-equivalent (multiply T_e[K] by k_B/q_e) to keep it
+    // numerically O(1) for common plasma parameters.
     auto const kb_over_qe = PhysConst::kb / PhysConst::q_e;
 
 #ifdef AMREX_USE_OMP
@@ -1227,8 +1282,9 @@ void HybridPICModel::QDSMCInitializeKe (int const lev) const
             Ke_arr(i,j,k) = Te_arr(i,j,k) * std::pow(ne, 1.0_rt - gamma) * kb_over_qe;
         });
     }
-
-    Ke.FillBoundary(Ke.nGrowVect(), period);
+    // No ghost exchange: the kernel runs on the ghost-grown box and its
+    // inputs (Te, rho at n) already have valid ghosts, so Ke's ghost cells
+    // are consistent with the neighboring boxes' valid values.
 }
 
 
@@ -1238,7 +1294,6 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
 
     auto & warpx = WarpX::GetInstance();
     amrex::Geometry const & geom = warpx.Geom(lev);
-    amrex::Periodicity const & period = geom.periodicity();
 
     // After the QDSMC scatter, weights_fp ~= n_e (density) and entropy_fp ~=
     // K_e * N_e (entropy weighted by count, summed). Recover T_e_new:
@@ -1292,8 +1347,9 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
                           / kb_over_qe;
         });
     }
-
-    Te.FillBoundary(Te.nGrowVect(), period);
+    // No ghost exchange: the kernel runs on the ghost-grown box and its
+    // inputs already have valid ghosts (the QDSMC deposits SumBoundary with
+    // dst_ng = nGrowVect(), and rho_fp was FillBoundary'd after deposition).
 }
 
 
@@ -1374,18 +1430,11 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     // any dimensionality (in Cartesian the 2pi*r is just 1).
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Build Sigma_t rho_fp_t (unscaled per-species charge densities) so we
-    // can compute the species fraction f_s = rho_fp_s / rhos_sum per
-    // cell inside the species loop.
-    amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
-    rhos_sum.setVal(0.0_rt);
-    for (auto const & spec_name : species_names) {
-        auto & pc = mypc.GetParticleContainerFromName(spec_name);
-        if (pc.getCharge() == 0._prt) { continue; }
-        amrex::MultiFab const & rho_s =
-            *warpx.m_fields.get("rho_fp_" + spec_name, lev);
-        amrex::MultiFab::Add(rhos_sum, rho_s, 0, 0, 1, rho.nGrowVect());
-    }
+    // Sigma_t rho_fp_t (unscaled per-species charge densities), used for the
+    // species fraction f_s = rho_fp_s / rhos_sum per cell inside the species
+    // loop. Filled once per step by HybridPICDepositRhoAndJ.
+    amrex::MultiFab const & rhos_sum =
+        *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 
     // Charged-species component index for redirect_E (matches QDSMCApplyIonHeating).
     int ion_comp = -1;
@@ -1552,15 +1601,10 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     auto & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Sigma_t rho_fp_t (unscaled per-species charge densities) -> species fraction.
-    amrex::MultiFab rhos_sum(rho.boxArray(), rho.DistributionMap(), 1, rho.nGrowVect());
-    rhos_sum.setVal(0.0_rt);
-    for (auto const & spec_name : species_names) {
-        auto & pc = mypc.GetParticleContainerFromName(spec_name);
-        if (pc.getCharge() == 0._prt) { continue; }
-        amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec_name, lev);
-        amrex::MultiFab::Add(rhos_sum, rho_s, 0, 0, 1, rho.nGrowVect());
-    }
+    // Sigma_t rho_fp_t (unscaled per-species charge densities) -> species
+    // fraction. Filled once per step by HybridPICDepositRhoAndJ.
+    amrex::MultiFab const & rhos_sum =
+        *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 
     // Cell-centered field box array (for staging the deposited T_i with a guard
     // cell so it can be interpolated to the nodal T_e grid).
@@ -1843,13 +1887,18 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
 
     auto & warpx = WarpX::GetInstance();
 
-    // J_plasma at the current B (B^{n+1/2} from the last Faraday substep) is
-    // needed for V_e. The downstream final-state E-solve also recomputes
-    // J_plasma later, so this call is redundant work in some configurations
-    // but keeps the QDSMC sequence self-contained.
-    CalculatePlasmaCurrent(
-        warpx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, warpx.finestLevel()),
-        warpx.GetEBUpdateEFlag());
+    // J_plasma (at B^n) is needed for V_e. On all but the first step it is
+    // already valid: the previous step's final E-solve computed it from B^n
+    // (the external-field subtract at the top of this step exactly cancels
+    // the re-add at the end of the previous one), and B has not changed
+    // since. Only the first step of a run or restart arrives here with an
+    // unfilled J_plasma.
+    if (!m_qdsmc_J_plasma_valid) {
+        CalculatePlasmaCurrent(
+            warpx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, warpx.finestLevel()),
+            warpx.GetEBUpdateEFlag());
+        m_qdsmc_J_plasma_valid = true;
+    }
 
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
@@ -1939,8 +1988,10 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
                 auto & pc = mpc_ti.GetParticleContainerFromName(nm);
                 if (pc.getCharge() == 0._prt) { continue; }
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc.getTemperatureDepositionFlag(),
-                    "QDSMC include_temperature_relaxation requires the ion species to set "
-                    "do_temperature_deposition = 1 (for shape-consistent T_i).");
+                    "The Q_ei temperature relaxation requires do_temperature_deposition "
+                    "on every charged ion species; it is enabled automatically at species "
+                    "construction, so hitting this indicates the species was created "
+                    "before the hybrid_pic_model relaxation parameters were readable.");
 
                 // Shape-aware ion temperature (particle-shape order, consistent with
                 // charge/current) in the Yee-staggered 3-component T_<nm> vector field

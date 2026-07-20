@@ -189,11 +189,11 @@ per-species resistivities (see above). For a single species this reduces
 exactly to the familiar :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
 Above a user-set electron temperature threshold the heat can optionally be
 redirected to the kinetic ions instead of the electron fluid
-(``hybrid_pic_model.redirect_joule_to_ions``), which is useful to model
+(``hybrid_pic_model.joule_redirect_Te_threshold``), which is useful to model
 regimes where the electrons radiate strongly.
 
-The second source is the electron-ion temperature relaxation
-(``hybrid_pic_model.include_temperature_relaxation``),
+The second source is the electron-ion temperature relaxation, enabled by
+specifying the rate ``hybrid_pic_model.electron_ion_relaxation_rate``,
 
     .. math::
 

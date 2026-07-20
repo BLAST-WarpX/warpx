@@ -8,9 +8,9 @@
 # ---
 # ---     dU_e/dt = -Q_ei,   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),
 # ---
-# --- enabled by hybrid_pic_model.include_temperature_relaxation with the
-# --- parser hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t).  The
-# --- single flag enables BOTH the electron-side sink AND the conjugate ion
+# --- enabled by specifying the rate parser
+# --- hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t).  The single
+# --- parameter enables BOTH the electron-side sink AND the conjugate ion
 # --- heating, so the exchange is energy-conserving (ion gain == electron loss).
 # ---
 # --- Set-up: a uniform, unmagnetized (B=0), zero-resistivity (eta=0, so no
@@ -149,7 +149,6 @@ class QeiRelaxation(object):
             substeps=self.substeps,
             solve_electron_energy_equation=True,
             include_joule_heating=False,
-            include_temperature_relaxation=True,
             electron_ion_relaxation_rate=f"{self.nu_ei}",
         )
 
@@ -166,11 +165,13 @@ class QeiRelaxation(object):
 
         # Uniform density, ions at rest (thermal spread at Ti0 only). Uniform
         # n0 and Te0 -> uniform fields -> no flow; T_e relaxes purely via Q_ei.
+        # Note: do_temperature_deposition is NOT set here on purpose -- it is
+        # enabled automatically on charged species when the Q_ei relaxation is
+        # configured, which this test also exercises (T_ions is dumped below).
         self.ions = picmi.Species(
             name="ions",
             charge="q_e",
             mass=constants.m_p,
-            warpx_do_temperature_deposition=True,
             initial_distribution=picmi.AnalyticDistribution(
                 density_expression="n0",
                 momentum_expressions=["0", "0", "0"],
