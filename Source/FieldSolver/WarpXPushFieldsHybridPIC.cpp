@@ -60,16 +60,17 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
-    // Electron-pressure update. When solve_electron_energy_equation is on,
-    // run the QDSMC entropy-transport step (which also emits Pe = n_e k_B T_e
-    // at the end). Otherwise the legacy algebraic adiabatic closure is run
-    // below (at ~L213) -- Pe is recomputed each step from rho with no
-    // temperature evolution.
-    //
-    // QDSMC needs rho_fp = rho^{n+1} and hybrid_rho_fp_temp = rho^{n}, which
-    // the deposit just above has established.
+    // Electron pressure/temperature update at t=n+1, right after the
+    // deposition. With solve_electron_energy_equation on, the QDSMC
+    // entropy-transport step advances T_e and emits Pe = n_e k_B T_e at the
+    // end (it needs rho_fp = rho^{n+1} and hybrid_rho_fp_temp = rho^{n},
+    // which the deposit just above established). Otherwise the algebraic
+    // closure fills Pe (and mirrors the implied T_e for diagnostics) at
+    // this same point.
     if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
         m_hybrid_pic_model->AdvanceElectronEnergyQDSMC(dt[0]);
+    } else {
+        m_hybrid_pic_model->CalculateElectronPressure();
     }
 
     // Get the external current
@@ -185,13 +186,6 @@ void WarpX::HybridPICEvolveFields ()
         m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
             gett_new(0),
             0.5_rt*dt[0]);
-    }
-
-    // Calculate the electron pressure at t=n+1. When QDSMC is enabled, Pe was
-    // already emitted earlier in this function by AdvanceElectronEnergyQDSMC,
-    // so the legacy algebraic adiabatic closure must NOT overwrite it here.
-    if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
-        m_hybrid_pic_model->CalculateElectronPressure();
     }
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value

@@ -25,8 +25,8 @@ namespace warpx::fields
      */
     AMREX_ENUM(FieldType,
         None,
-        Efield_aux, /**< Field that the particles gather from. Obtained from Efield_fp (and Efield_cp when using MR); see UpdateAuxilaryData */
-        Bfield_aux, /**< Field that the particles gather from. Obtained from Bfield_fp (and Bfield_cp when using MR); see UpdateAuxilaryData */
+        Efield_aux, /**< Field that the particles gather from. Obtained from Efield_fp (and Efield_cp when using MR); see UpdateAuxiliaryData */
+        Bfield_aux, /**< Field that the particles gather from. Obtained from Bfield_fp (and Bfield_cp when using MR); see UpdateAuxiliaryData */
         Efield_fp,  /**< The field that is updated by the field solver at each timestep */
         Bfield_fp,  /**< The field that is updated by the field solver at each timestep */
         Efield_fp_external, /**< Stores grid particle fields provided by the user as  through an openPMD file */
@@ -46,7 +46,7 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
-        hybrid_electron_temperature_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron temperature T_e (Joules) as a state variable; updated each step from the entropy K_e after QDSMC scatter and used as input for the polytropic pressure relation. */
+        hybrid_electron_temperature_fp, /**< Used with Ohm's law solver. Stores the electron temperature T_e (K): implied by the electron-pressure closure by default, or the QDSMC electron-energy-equation state variable (updated each step from the entropy K_e) when that equation is solved. */
         hybrid_entropy_fp,           /**< Used with the QDSMC electron-energy equation. Stores the electron entropy K_e = T_e * n_e^(1-gamma) on the grid; the QDSMC fictitious particles read this at the start of each step and rewrite it after Lagrangian advection. */
         hybrid_qdsmc_weights_fp,     /**< Used with the QDSMC electron-energy equation. Scratch field for the per-cell weight (N_e) deposited by QDSMC particles after their push, used to recover K_e^{n+1} as (deposited K*N) / (deposited N). */
         hybrid_electron_velocity_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron fluid velocity V_e = -(J_plasma - J_i) / (q_e * n_e) on a NODAL grid (3 components); read by QDSMC SetV at the start of each step to advect the entropy-carrying particles. */

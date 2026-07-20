@@ -214,10 +214,11 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
-    // Electron temperature T_e (Kelvin). Allocated unconditionally (cheap)
-    // so the Te diagnostic functor can always read it: with the energy
-    // equation on it is the QDSMC state variable, otherwise it mirrors the
-    // algebraic closure's implied temperature (CalculateElectronPressure).
+    // Electron temperature T_e (Kelvin). Allocated unconditionally (one
+    // cheap scalar field) so the "Te" diagnostic can always read it: with
+    // the energy equation on it is the QDSMC state variable, otherwise it
+    // mirrors the closure's implied temperature T_e = P_e / (n_e k_B),
+    // filled alongside P_e in CalculateElectronPressure.
     fields.alloc_init(FieldType::hybrid_electron_temperature_fp,
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
@@ -592,13 +593,12 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     }
 
     // Seed T_e with the uniform value parsed from <hybrid>.elec_temp (in
-    // Joules after ReadParameters, so dividing by k_B gives Kelvin). Done
-    // unconditionally so the iter-0 diag dump -- which WarpX::InitData()
-    // flushes BEFORE the first call to HybridPICInitializeRhoJandB -- sees
-    // a meaningful T_e rather than the zero-initialized allocation. With
-    // the energy equation on, this is the starting K_e value the QDSMC
-    // particles will read on the first step; with it off, the diagnostic
-    // value gets overwritten each step by CalculateElectronPressure.
+    // Joules after ReadParameters, so dividing by k_B gives Kelvin). The
+    // iter-0 diagnostic dump -- which WarpX::InitData() flushes BEFORE the
+    // first field-solve -- then sees a meaningful T_e rather than the
+    // zero-initialized allocation. With the energy equation on, this is the
+    // starting K_e value the QDSMC particles will read on the first step;
+    // with it off, CalculateElectronPressure overwrites it each step.
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         amrex::MultiFab & Te_mf = *warpx.m_fields.get(
             FieldType::hybrid_electron_temperature_fp, lev);
@@ -755,12 +755,12 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
 
-    // Diagnostic-only: mirror the algebraic closure's implied electron
-    // temperature into hybrid_electron_temperature_fp so the Te diag dump
-    // is meaningful even when solve_electron_energy_equation is off. With
-    // the polytropic Pe = n0_ref^(-gamma) * (rho/q_e)^gamma * k_B * Te_ref,
-    // the per-cell implied T_e is just Pe / (n_e * k_B). When the energy
-    // equation is on, this path is skipped and T_e is owned by QDSMC.
+    // Mirror the closure's implied electron temperature,
+    // T_e = P_e / (n_e k_B), into hybrid_electron_temperature_fp so the "Te"
+    // diagnostic is meaningful. Diagnostic-only on this path: with
+    // solve_electron_energy_equation on, this function is not called and
+    // T_e is owned by the QDSMC entropy transport, which fills Te/Pe at
+    // this same point in the field loop.
     {
         amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
         amrex::MultiFab const & Pe  = *electron_pressure_fp;
@@ -2155,6 +2155,12 @@ void HybridPICModel::BfieldEvolve (
             amrex::ParallelDescriptor::ReduceBoolAnd(step_succeeded);
 
             if (!step_succeeded) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "HybridPIC",
+                    "NaN or Inf value encountered in the B-field during RK4 "
+                    "substepping. Restarting this step using RKF45.",
+                    ablastr::warn_manager::WarnPriority::medium);
+
                 // restart this full step and this time use RKF45
                 t = 0._rt;
                 n_accepted = 0;

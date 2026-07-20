@@ -9,7 +9,7 @@ using namespace amrex::literals;
 
 void ImplicitSolver::CreateParticleAttributes () const
 {
-    // Set comm to false to that the attributes are not communicated
+    // Set comm to false so that the attributes are not communicated
     // nor written to the checkpoint files
     int const comm = 0;
 
@@ -106,7 +106,7 @@ void ImplicitSolver::CumulateJ ()
 {
 
     // Add J0, which contains J from particles included in the mass matrices (MM) to current_fp, which
-    // is either zero or contains J from suborbit particles that are not inclued in the MM.
+    // is either zero or contains J from suborbit particles that are not included in the MM.
     // Do this BEFORE call to SyncCurrentAndRho().
     //
     // J during the linear stage of JFNK is computed as J(E=E0+dE) = J_suborbit + J0 + MM*(E - E0),
@@ -832,6 +832,10 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Apply the inverse volume scaling for radial geometries after the total
+    // current has been accumulated from all containers above. The charge
+    // density needs no such treatment here: rho is deposited directly and is
+    // scaled inside WarpX::PushParticlesandDeposit(), on the implicit path too.
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
