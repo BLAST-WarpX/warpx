@@ -908,8 +908,9 @@ MultiParticleContainer::RedistributeLocal (const amrex::IntVect& max_cells_trave
         // particle might have travelled outside its current tile / box. Passing
         // it per direction lets the local redistribute exchange particles only
         // as far as needed along each axis (the cell size, and hence the number
-        // of cells crossed, differs between dimensions).
-        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/0, /*nGrow=*/amrex::IntVect(0),
+        // of cells crossed, differs between dimensions). lev_max=-1 means the finest
+	// level in the hierarchy.
+        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/-1, /*nGrow=*/amrex::IntVect(0),
                          /*local=*/true, /*max_cells_moved=*/max_cells_travelled);
     }
 }
