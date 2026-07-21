@@ -4330,7 +4330,8 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :type: list of ``strings``
     :optional:
 
-    Additional fields written to output, beyond the standard defualt list as specified with :pp:param:`<diag_name>.fields_to_plot`.
+    Additional fields written to output, in addition to the standard default list as specified with :pp:param:`<diag_name>.fields_to_plot`.
+    This allows specification of fields to plot without having to also list the default fields when they are also desired.
     Any of the same fields can be listed here.
     Any MultiFab added to the internal registry can also be included in the list.
     If :pp:param:`<diag_name>.fields_to_plot` is set to ``none``, this input is ignored.
