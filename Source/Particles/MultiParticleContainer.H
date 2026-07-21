@@ -258,7 +258,7 @@ public:
 
     void deleteInvalidParticles ();
 
-    void RedistributeLocal (int max_cells_travelled);
+    void RedistributeLocal (const amrex::IntVect& max_cells_travelled);
 
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */
