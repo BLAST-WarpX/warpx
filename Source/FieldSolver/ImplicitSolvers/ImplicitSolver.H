@@ -204,15 +204,6 @@ protected:
     bool m_use_rho_non_suborbit = true;
 
     /**
-     * Diagnostic: on sampled linear-stage evaluations, compare the mass-matrix J
-     * (J0 + MM*dE) against the conventional particle-computed J for the same E,
-     * and print the mismatch versus radial index (including guard rows).
-     */
-    bool m_diag_mm_jacobian = false;
-    int m_diag_mm_interval = 100;
-    bool m_diag_first_matvec = false;
-
-    /**
      * When true, the evolve scheme saves E0 (Efield_fp_save) itself inside ComputeRHS,
      * at the point in the evaluation that the mass-matrix linear model actually uses,
      * and PreLinearSolve must not overwrite it. Needed by schemes (e.g. hybrid) for
@@ -320,13 +311,6 @@ protected:
      * suborbit-only linear stage of JFNK, where only suborbit particles deposit rho.
      */
     void CumulateRho ( bool a_include_old_comp );
-
-    /**
-     * \brief Diagnostic (diag_mm_jacobian): compare the mass-matrix J against the
-     * conventional particle-computed J for the same E and print the mismatch vs radius.
-     * Restores all overwritten field containers before returning.
-     */
-    void DiagCompareMMJacobian ( amrex::Real a_cur_time );
 
     /**
      * \brief Save E at start of each Newton step
