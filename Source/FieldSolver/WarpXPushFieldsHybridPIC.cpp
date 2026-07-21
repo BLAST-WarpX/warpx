@@ -276,11 +276,18 @@ void WarpX::HybridPICInitializeRhoJandB ()
     using warpx::fields::FieldType;
     using ablastr::fields::Direction;
 
-    if (restart_chkfile.empty()) {
-        // This is not a restart, so the rho_fp and current_fp multifabs are
-        // still empty.
-        HybridPICDepositRhoAndJ();
+    // Deposit rho^n and J_i^{n-1/2} from the particles. This must also run on
+    // restart: the checkpoint does not contain rho_fp (and contains current_fp
+    // only when written synchronized), while the particles are restored at
+    // exactly (x^n, v^{n-1/2}) on both paths, so the deposit deterministically
+    // reconstructs both fields. Without it the first restarted step runs the
+    // adaptive B integration with rho = 0 everywhere: every node falls into
+    // the below-n_floor branch of the Ohm's-law E-solve on top of the full
+    // mid-run curl(B), which is catastrophically stiff (or, with the vacuum
+    // treatment, silently wrong physics for one step).
+    HybridPICDepositRhoAndJ();
 
+    if (restart_chkfile.empty()) {
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {
             // Get the external fields
@@ -307,6 +314,11 @@ void WarpX::HybridPICInitializeRhoJandB ()
                 }
             }
         }
+    } else {
+        // Restore Pe(rho^n): mid-run, the electron pressure entering a step
+        // holds the previous end-of-step value, but it is not checkpointed
+        // and would otherwise be zero for the whole first restarted step.
+        m_hybrid_pic_model->CalculateElectronPressure();
     }
 
     // Copy the rho_fp values to rho_fp_temp and the current_fp values to
