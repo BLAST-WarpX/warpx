@@ -386,12 +386,12 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // still empty.
         HybridPICDepositRhoAndJ();
 
-        // Seed the electron pressure from the adiabatic closure using the
-        // freshly deposited rho. When solve_electron_energy_equation is off,
-        // this is also recomputed every step inside HybridPICEvolveFields
-        // and is harmless. When on, this provides Pe^0 for the first QDSMC
-        // step (which will overwrite it via QDSMCFillElectronPressureFromTe
-        // after the first entropy transport).
+        // Seed the electron pressure from the algebraic closure using the
+        // freshly deposited rho, so the iteration-0 diagnostics and the
+        // first step's B-substep E-solves see a valid Pe^0. From the first
+        // step onward, HybridPICEvolveFields refreshes Pe right after each
+        // deposition (via the closure, or via the QDSMC entropy transport
+        // when solve_electron_energy_equation is on).
         m_hybrid_pic_model->CalculateElectronPressure();
 
         // Handle field splitting for Hybrid field push
