@@ -4225,6 +4225,10 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "proc_number",
                     "part_per_cell",
                     "eb_covered",
+                    # Electron temperature/pressure of the hybrid-PIC
+                    # (Ohm's law) solver; only valid with that solver.
+                    "Te",
+                    "Pe",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:

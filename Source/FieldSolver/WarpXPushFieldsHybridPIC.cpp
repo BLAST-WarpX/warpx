@@ -60,6 +60,11 @@ void WarpX::HybridPICEvolveFields ()
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
     HybridPICDepositRhoAndJ();
 
+    // Calculate the electron pressure at t=n+1 (and mirror the implied
+    // electron temperature for diagnostics). Moved here, right after the
+    // deposition, from the end of this function.
+    m_hybrid_pic_model->CalculateElectronPressure();
+
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
 
@@ -161,9 +166,6 @@ void WarpX::HybridPICEvolveFields ()
             gett_new(0),
             0.5_rt*dt[0]);
     }
-
-    // Calculate the electron pressure at t=n+1
-    m_hybrid_pic_model->CalculateElectronPressure();
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculatePlasmaCurrent(
