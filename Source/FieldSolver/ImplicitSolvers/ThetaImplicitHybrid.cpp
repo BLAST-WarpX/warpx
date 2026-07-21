@@ -410,56 +410,6 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     m_WarpX->ApplyFillBoundaryE();
 
-#if defined(WARPX_DIM_1D_Z)
-    // TEMPORARY DEBUG (pe_advance_in_loop energy hunt): compare the Ohm output on
-    // z-edges against -UpwardDz(pe)/max(rho_edge, floor) computed from the same fields.
-    if (m_pe_advance_in_loop && !a_from_jacobian) {
-        static int s_probe_calls = 0;
-        if (++s_probe_calls % 200 == 0) {
-            const int lev = 0;
-            const amrex::MultiFab* pe = m_WarpX->m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
-            const amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
-            const amrex::MultiFab* Ez = Efield_fp[0][2];
-            const amrex::Real dxi = m_WarpX->Geom(lev).InvCellSize(0);
-            const amrex::Real rho_floor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
-            auto host = [] (const amrex::MultiFab& mf) {
-                amrex::MultiFab h(mf.boxArray(), mf.DistributionMap(), mf.nComp(),
-                                  mf.nGrowVect(), amrex::MFInfo().SetArena(amrex::The_Pinned_Arena()));
-                amrex::dtoh_memcpy(h, mf);
-                return h;
-            };
-            const amrex::MultiFab pe_h = host(*pe);
-            const amrex::MultiFab rho_h = host(*rho);
-            const amrex::MultiFab Ez_h = host(*Ez);
-            for (amrex::MFIter mfi(Ez_h, false); mfi.isValid(); ++mfi) {
-                const auto pa = pe_h.const_array(mfi);
-                const auto ra = rho_h.const_array(mfi);
-                const auto ea = Ez_h.const_array(mfi);
-                const amrex::Box bx = mfi.validbox();
-                amrex::Real worst = 0.0; int iw = 0;
-                for (int i = bx.smallEnd(0); i <= bx.bigEnd(0); ++i) {
-                    const amrex::Real gradpe = (pa(i+1,0,0) - pa(i,0,0)) * dxi;
-                    const amrex::Real rho_e = std::max(0.5_rt*(ra(i,0,0,0)+ra(i+1,0,0,0)), rho_floor);
-                    const amrex::Real formula = -gradpe / rho_e;
-                    const amrex::Real d = std::abs(ea(i,0,0) - formula);
-                    if (d > worst) { worst = d; iw = i; }
-                }
-                const int ilo = bx.smallEnd(0);
-                amrex::AllPrint() << "PEPROBE call " << s_probe_calls
-                    << " box [" << ilo << "," << bx.bigEnd(0) << "]"
-                    << " worst edge " << iw << " |Ez-formula|=" << worst << "\n";
-                const int ihi = bx.bigEnd(0);
-                for (int i : {ilo - 1, ilo, ilo + 1, ihi, ihi + 1}) {
-                    amrex::AllPrint() << "    i=" << i
-                        << " pe=" << pa(i,0,0)
-                        << " rho0=" << ra(i,0,0,0)
-                        << " Ez=" << ea(i,0,0) << "\n";
-                }
-            }
-        }
-    }
-#endif
-
     // Darwin split: always compute E_L from the current E_Ohm so that the JFNK
     // Jacobian (J·v = (F(x+εv) - F(x))/ε) includes ∂E_L/∂E_T and is exactly
     // consistent with the residual R = E_T_Ohm - E_T^n.  Freezing E_L only in
@@ -699,11 +649,20 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
     amrex::GpuArray<bool, 3> is_per = {true, true, true};
     for (int d = 0; d < AMREX_SPACEDIM; ++d) { is_per[d] = geom.isPeriodic(d); }
 
+    // Collocated grid: J, E and rho are all nodal and HybridPICSolveE builds the
+    // pressure field with CartesianNodalAlgorithm (centered difference at the node,
+    // nodal rho) instead of the Yee edge construction. The work pairing below must
+    // use the identical stencil or the electron side subtracts a different discrete
+    // work than the ions receive (J-correlated leak).
+    const bool J_nodal = J[2]->ixType().nodeCentered();
+
     // The update must be theta-centered in pe as well: an explicit (forward) pe in the
     // RHS integrates the pressure side of the ion-acoustic oscillation with forward
     // Euler and is numerically unstable (growth ~ exp(omega^2 dt t / 2)). The update is
     // linear in pe, so a short fixed-point iteration (contraction ~ theta*omega*dt)
     // converges the theta-centered value: pe_rhs = (1-theta)*pe^n + theta*pe_iter.
+    // Contraction per cycle is ~theta*k_max*Cs*dt; 4 cycles verified sufficient
+    // (8 cycles bit-reproduces the energy history on the cold-beam FGI test).
     const int n_pe_iters = 4;
     amrex::MultiFab::Copy(*m_pe_scratch, *m_pe_old, 0, 0, pe->nComp(), pe->nGrowVect());
     for (int pe_it = 0; pe_it < n_pe_iters; ++pe_it) {
@@ -764,13 +723,21 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
 #if defined(WARPX_DIM_1D_Z)
             if ((i <= dlo.x || i >= dhi.x) && !is_per[0]) { return; }
             divF += (Fz(i+1,j,k) - Fz(i-1,j,k)) * 0.5_rt * dxi[0];
-            auto EpeJ_z1d = [&] (int ie) {
-                const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
-                const amrex::Real rho_e = amrex::max(
-                    0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                return (-gradpe / rho_e) * Jz(ie,j,k);
-            };
-            W += 0.5_rt * (EpeJ_z1d(i-1) + EpeJ_z1d(i));
+            if (J_nodal) {
+                // E_pe exactly as CartesianNodalAlgorithm::UpwardDz + nodal rho
+                const amrex::Real gradpe =
+                    (pe_it_arr(i+1,j,k) - pe_it_arr(i-1,j,k)) * 0.5_rt * dxi[0];
+                const amrex::Real rho_n = amrex::max(rho_arr(i,j,k,0), rho_floor);
+                W += (-gradpe / rho_n) * Jz(i,j,k);
+            } else {
+                auto EpeJ_z1d = [&] (int ie) {
+                    const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                    return (-gradpe / rho_e) * Jz(ie,j,k);
+                };
+                W += 0.5_rt * (EpeJ_z1d(i-1) + EpeJ_z1d(i));
+            }
             {
                 const amrex::Real n_ = amrex::max(rho_arr(i,j,k,0), rho_floor);
                 const amrex::Real Jp_n = Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
@@ -782,20 +749,31 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                 ((j <= dlo.y || j >= dhi.y) && !is_per[1])) { return; }
             divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
                   + (Fz(i,j+1,k) - Fz(i,j-1,k)) * 0.5_rt * dxi[1];
-            auto EpeJ_x2d = [&] (int ie) {
-                const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
-                const amrex::Real rho_e = amrex::max(
-                    0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                return (-gradpe / rho_e) * Jx(ie,j,k);
-            };
-            auto EpeJ_z2d = [&] (int je) {
-                const amrex::Real gradpe = (pe_it_arr(i,je+1,k) - pe_it_arr(i,je,k)) * dxi[1];
-                const amrex::Real rho_e = amrex::max(
-                    0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
-                return (-gradpe / rho_e) * Jz(i,je,k);
-            };
-            W += 0.5_rt * (EpeJ_x2d(i-1) + EpeJ_x2d(i))
-               + 0.5_rt * (EpeJ_z2d(j-1) + EpeJ_z2d(j));
+            if (J_nodal) {
+                // E_pe exactly as CartesianNodalAlgorithm::UpwardDx/Dz + nodal rho
+                const amrex::Real rho_n = amrex::max(rho_arr(i,j,k,0), rho_floor);
+                const amrex::Real gradpe_x =
+                    (pe_it_arr(i+1,j,k) - pe_it_arr(i-1,j,k)) * 0.5_rt * dxi[0];
+                const amrex::Real gradpe_z =
+                    (pe_it_arr(i,j+1,k) - pe_it_arr(i,j-1,k)) * 0.5_rt * dxi[1];
+                W += (-gradpe_x / rho_n) * Jx(i,j,k)
+                   + (-gradpe_z / rho_n) * Jz(i,j,k);
+            } else {
+                auto EpeJ_x2d = [&] (int ie) {
+                    const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                    return (-gradpe / rho_e) * Jx(ie,j,k);
+                };
+                auto EpeJ_z2d = [&] (int je) {
+                    const amrex::Real gradpe = (pe_it_arr(i,je+1,k) - pe_it_arr(i,je,k)) * dxi[1];
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
+                    return (-gradpe / rho_e) * Jz(i,je,k);
+                };
+                W += 0.5_rt * (EpeJ_x2d(i-1) + EpeJ_x2d(i))
+                   + 0.5_rt * (EpeJ_z2d(j-1) + EpeJ_z2d(j));
+            }
             {
                 const amrex::Real n_ = amrex::max(rho_arr(i,j,k,0), rho_floor);
                 const amrex::Real Jpx_n = Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
@@ -831,27 +809,41 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
             divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
                   + (Fy(i,j+1,k) - Fy(i,j-1,k)) * 0.5_rt * dxi[1]
                   + (Fz(i,j,k+1) - Fz(i,j,k-1)) * 0.5_rt * dxi[2];
-            auto EpeJ_x3d = [&] (int ie) {
-                const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
-                const amrex::Real rho_e = amrex::max(
-                    0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                return (-gradpe / rho_e) * Jx(ie,j,k);
-            };
-            auto EpeJ_y3d = [&] (int je) {
-                const amrex::Real gradpe = (pe_it_arr(i,je+1,k) - pe_it_arr(i,je,k)) * dxi[1];
-                const amrex::Real rho_e = amrex::max(
-                    0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
-                return (-gradpe / rho_e) * Jy(i,je,k);
-            };
-            auto EpeJ_z3d = [&] (int ke) {
-                const amrex::Real gradpe = (pe_it_arr(i,j,ke+1) - pe_it_arr(i,j,ke)) * dxi[2];
-                const amrex::Real rho_e = amrex::max(
-                    0.5_rt*(rho_arr(i,j,ke,0) + rho_arr(i,j,ke+1,0)), rho_floor);
-                return (-gradpe / rho_e) * Jz(i,j,ke);
-            };
-            W += 0.5_rt * (EpeJ_x3d(i-1) + EpeJ_x3d(i))
-               + 0.5_rt * (EpeJ_y3d(j-1) + EpeJ_y3d(j))
-               + 0.5_rt * (EpeJ_z3d(k-1) + EpeJ_z3d(k));
+            if (J_nodal) {
+                // E_pe exactly as CartesianNodalAlgorithm::UpwardDx/Dy/Dz + nodal rho
+                const amrex::Real rho_n = amrex::max(rho_arr(i,j,k,0), rho_floor);
+                const amrex::Real gradpe_x =
+                    (pe_it_arr(i+1,j,k) - pe_it_arr(i-1,j,k)) * 0.5_rt * dxi[0];
+                const amrex::Real gradpe_y =
+                    (pe_it_arr(i,j+1,k) - pe_it_arr(i,j-1,k)) * 0.5_rt * dxi[1];
+                const amrex::Real gradpe_z =
+                    (pe_it_arr(i,j,k+1) - pe_it_arr(i,j,k-1)) * 0.5_rt * dxi[2];
+                W += (-gradpe_x / rho_n) * Jx(i,j,k)
+                   + (-gradpe_y / rho_n) * Jy(i,j,k)
+                   + (-gradpe_z / rho_n) * Jz(i,j,k);
+            } else {
+                auto EpeJ_x3d = [&] (int ie) {
+                    const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                    return (-gradpe / rho_e) * Jx(ie,j,k);
+                };
+                auto EpeJ_y3d = [&] (int je) {
+                    const amrex::Real gradpe = (pe_it_arr(i,je+1,k) - pe_it_arr(i,je,k)) * dxi[1];
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
+                    return (-gradpe / rho_e) * Jy(i,je,k);
+                };
+                auto EpeJ_z3d = [&] (int ke) {
+                    const amrex::Real gradpe = (pe_it_arr(i,j,ke+1) - pe_it_arr(i,j,ke)) * dxi[2];
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(i,j,ke,0) + rho_arr(i,j,ke+1,0)), rho_floor);
+                    return (-gradpe / rho_e) * Jz(i,j,ke);
+                };
+                W += 0.5_rt * (EpeJ_x3d(i-1) + EpeJ_x3d(i))
+                   + 0.5_rt * (EpeJ_y3d(j-1) + EpeJ_y3d(j))
+                   + 0.5_rt * (EpeJ_z3d(k-1) + EpeJ_z3d(k));
+            }
             {
                 const amrex::Real n_ = amrex::max(rho_arr(i,j,k,0), rho_floor);
                 const amrex::Real Jpx_n = Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
