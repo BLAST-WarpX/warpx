@@ -10,6 +10,8 @@
 
 #include "Utils/TextMsg.H"
 
+#include <algorithm>
+
 ScatteringProcess::ScatteringProcess (
                         const std::string& scattering_process,
                         const std::string& cross_section_file,
@@ -41,15 +43,24 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
                          const ScatteringAngleModel scattering_angle_model)
 {
     using namespace amrex::literals;
+    m_exe_h.m_energies_data = m_energies.data();
     m_exe_h.m_sigmas_data = m_sigmas_h.data();
 
     // save energy grid parameters for easy use
-    m_grid_size = static_cast<int>(m_energies.size());
+    const int grid_size = static_cast<int>(m_energies.size());
+    m_exe_h.m_grid_size = grid_size;
     m_exe_h.m_energy_lo = m_energies[0];
-    m_exe_h.m_energy_hi = m_energies[m_grid_size-1];
+    m_exe_h.m_energy_hi = m_energies[grid_size-1];
     m_exe_h.m_sigma_lo = m_sigmas_h[0];
-    m_exe_h.m_sigma_hi = m_sigmas_h[m_grid_size-1];
-    m_exe_h.m_dE = (m_exe_h.m_energy_hi - m_exe_h.m_energy_lo)/(m_grid_size - 1._prt);
+    m_exe_h.m_sigma_hi = m_sigmas_h[grid_size-1];
+    // The energy grid does not need to be evenly spaced; `m_dE` is only used as a
+    // representative energy step (e.g. to set the scan resolution when computing the
+    // maximum collision frequency). Use the smallest spacing so that finely resolved
+    // regions of a non-uniform grid are not skipped over.
+    m_exe_h.m_dE = m_energies[grid_size-1] - m_energies[0];
+    for (int i = 1; i < grid_size; i++) {
+        m_exe_h.m_dE = std::min(m_exe_h.m_dE, m_energies[i] - m_energies[i-1]);
+    }
     m_exe_h.m_energy_penalty = energy;
     m_exe_h.m_type = parseProcessType(scattering_process);
     m_exe_h.m_scattering_angle_model = scattering_angle_model;
@@ -59,7 +70,7 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
         m_exe_h.m_type == ScatteringProcessType::CHARGE_EXCHANGE);
 
     // sanity check cross-section energy grid
-    sanityCheckEnergyGrid(m_energies, m_exe_h.m_dE);
+    sanityCheckEnergyGrid(m_energies);
 
     // check that the cross-section is 0 at the energy cost if the energy
     // cost is > 0 - this is to prevent the possibility of negative left
@@ -73,8 +84,12 @@ ScatteringProcess::init (const std::string& scattering_process, const amrex::Par
 
 #ifdef AMREX_USE_GPU
     m_exe_d = m_exe_h;
+    m_energies_d.resize(m_energies.size());
     m_sigmas_d.resize(m_sigmas_h.size());
+    m_exe_d.m_energies_data = m_energies_d.data();
     m_exe_d.m_sigmas_data = m_sigmas_d.data();
+    amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_energies.begin(), m_energies.end(),
+                          m_energies_d.begin());
     amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, m_sigmas_h.begin(), m_sigmas_h.end(),
                           m_sigmas_d.begin());
     amrex::Gpu::streamSynchronize();
@@ -122,16 +137,17 @@ ScatteringProcess::readCrossSectionFile (
 
 void
 ScatteringProcess::sanityCheckEnergyGrid (
-                                   const amrex::Vector<amrex::ParticleReal>& energies,
-                                   amrex::ParticleReal dE
+                                   const amrex::Vector<amrex::ParticleReal>& energies
                                    )
 {
-    // confirm that the input data for the cross-section was provided with
-    // equal energy steps, otherwise the linear interpolation will fail
+    // The energy grid does not need to be evenly spaced, but it must be sorted in
+    // strictly increasing order for the bisection search and linear interpolation
+    // used in `Executor::getCrossSection` to work correctly.
     for (unsigned i = 1; i < energies.size(); i++) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                                         (std::abs(energies[i] - energies[i-1] - dE) < dE / 100.0),
-                                         "Energy grid not evenly spaced."
+                                         (energies[i] > energies[i-1]),
+                                         "Cross-section energy grid must be sorted in "
+                                         "strictly increasing order."
                                          );
     }
 }

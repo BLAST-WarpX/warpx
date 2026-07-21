@@ -218,6 +218,11 @@ public:
      */
     static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_hi;
 
+    /** Particle boundary condition at embedded boundaries.
+     *  Default is Absorbing
+     */
+    static inline ParticleBoundaryType eb_particle_boundary = ParticleBoundaryType::Absorbing;
+
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto time_dependency_J = TimeDependencyJ::Default;
@@ -804,7 +809,7 @@ public:
     [[nodiscard]] amrex::IntVect get_numprocs() const {return numprocs;}
 
     /** Electrostatic solve call */
-    void ComputeSpaceChargeField (bool reset_fields);
+    void ComputeSpaceChargeField (bool reset_E_field, bool reset_B_field);
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
