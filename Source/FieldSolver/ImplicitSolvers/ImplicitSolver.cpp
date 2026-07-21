@@ -9,7 +9,7 @@ using namespace amrex::literals;
 
 void ImplicitSolver::CreateParticleAttributes () const
 {
-    // Set comm to false to that the attributes are not communicated
+    // Set comm to false so that the attributes are not communicated
     // nor written to the checkpoint files
     int const comm = 0;
 
@@ -73,7 +73,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
             lbc[i] = LinOpBCType::Dirichlet;
         } else if (a_fbc[i] == FieldBoundaryType::Damped) {
             WARPX_ABORT_WITH_MESSAGE("LinOpBCType not set for this FieldBoundaryType");
-        } else if (a_fbc[i] == FieldBoundaryType::Absorbing_SilverMueller) {
+        } else if (a_fbc[i] == FieldBoundaryType::Absorbing_Silver_Mueller) {
             ablastr::warn_manager::WMRecordWarning("Implicit solver",
                 "With SilverMueller, in the Curl-Curl preconditioner Symmetry boundary will be used since the full boundary is not yet implemented.",
                 ablastr::warn_manager::WarnPriority::medium);
@@ -81,7 +81,7 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
         } else if (a_fbc[i] == FieldBoundaryType::Neumann) {
             // Also for FieldBoundaryType::PMC
             lbc[i] = LinOpBCType::symmetry;
-        } else if (a_fbc[i] == FieldBoundaryType::PECInsulator) {
+        } else if (a_fbc[i] == FieldBoundaryType::PEC_Insulator) {
             const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(i,bdry_side);
             if (voltage_driven) { // Dirichlet for E
                 lbc[i] = LinOpBCType::Dirichlet;
@@ -106,7 +106,7 @@ void ImplicitSolver::CumulateJ ()
 {
 
     // Add J0, which contains J from particles included in the mass matrices (MM) to current_fp, which
-    // is either zero or contains J from suborbit particles that are not inclued in the MM.
+    // is either zero or contains J from suborbit particles that are not included in the MM.
     // Do this BEFORE call to SyncCurrentAndRho().
     //
     // J during the linear stage of JFNK is computed as J(E=E0+dE) = J_suborbit + J0 + MM*(E - E0),
@@ -832,6 +832,10 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Apply the inverse volume scaling for radial geometries after the total
+    // current has been accumulated from all containers above. The charge
+    // density needs no such treatment here: rho is deposited directly and is
+    // scaled inside WarpX::PushParticlesandDeposit(), on the implicit path too.
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);

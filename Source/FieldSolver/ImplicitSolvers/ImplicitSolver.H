@@ -61,9 +61,9 @@ public:
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
-    virtual void OneStep ( amrex::Real  a_time,
-                           amrex::Real  a_dt,
-                           int          a_step ) = 0;
+    virtual int OneStep (amrex::Real  a_time,
+                         amrex::Real  a_dt,
+                         int          a_step) = 0;
 
     //
     // the following routines are called by the linear and nonlinear solvers

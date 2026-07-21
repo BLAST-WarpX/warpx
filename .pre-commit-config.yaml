@@ -76,7 +76,7 @@ repos:
 # Python: Ruff linter & formatter
 #   https://docs.astral.sh/ruff/
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.15.15
+  rev: v0.15.20
   hooks:
     # Run the linter
     - id: ruff-check
@@ -105,6 +105,6 @@ repos:
 
 # Scan for secret files that should not be committed
 - repo: https://github.com/gitleaks/gitleaks
-  rev: v8.30.1
+  rev: v8.30.0
   hooks:
   - id: gitleaks

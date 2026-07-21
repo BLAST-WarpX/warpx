@@ -429,8 +429,9 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
-            // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
-            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
+            // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
+            // for other collision types, 1 if particle creation occurs, 0 otherwise
+            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
             amrex::Gpu::DeviceVector<index_type> pair_indices_1(n_total_pairs);
@@ -614,9 +615,10 @@ public:
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // shuffle
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
             amrex::ParallelForRNG( n_cells,
                 [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
                 {
@@ -631,8 +633,7 @@ public:
                     ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
                 }
             );
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR_STOP(prof_shuffle);
 
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
@@ -696,6 +697,7 @@ public:
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::copyTransform", prof_copyTransform);
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_1,
@@ -706,6 +708,7 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_copyTransform);
 
             for (int i = 0; i < n_product_species; i++)
             {
@@ -915,7 +918,8 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
-            // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
+            // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
+            // for other collision types, 1 if particle creation occurs, 0 otherwise
             amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
@@ -1201,9 +1205,10 @@ public:
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
-        ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
             amrex::ParallelForRNG( 2*n_cells,
                 [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
                 {
@@ -1229,9 +1234,7 @@ public:
           }
                 }
             );
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
-
-        ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR_STOP(prof_shuffle);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
             // as possible (while avoiding race conditions): Instead of looping with one GPU
@@ -1302,6 +1305,7 @@ public:
 
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::copyTransform", prof_copyTransform);
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_2,
@@ -1312,6 +1316,7 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_copyTransform);
 
             for (int i = 0; i < n_product_species; i++)
             {

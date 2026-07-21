@@ -25,8 +25,8 @@ namespace warpx::fields
      */
     AMREX_ENUM(FieldType,
         None,
-        Efield_aux, /**< Field that the particles gather from. Obtained from Efield_fp (and Efield_cp when using MR); see UpdateAuxilaryData */
-        Bfield_aux, /**< Field that the particles gather from. Obtained from Bfield_fp (and Bfield_cp when using MR); see UpdateAuxilaryData */
+        Efield_aux, /**< Field that the particles gather from. Obtained from Efield_fp (and Efield_cp when using MR); see UpdateAuxiliaryData */
+        Bfield_aux, /**< Field that the particles gather from. Obtained from Bfield_fp (and Bfield_cp when using MR); see UpdateAuxiliaryData */
         Efield_fp,  /**< The field that is updated by the field solver at each timestep */
         Bfield_fp,  /**< The field that is updated by the field solver at each timestep */
         Efield_fp_external, /**< Stores grid particle fields provided by the user as  through an openPMD file */
@@ -46,6 +46,7 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
+        hybrid_electron_temperature_fp, /**< Used with Ohm's law solver. Stores the electron temperature (K) implied by the electron-pressure closure */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
