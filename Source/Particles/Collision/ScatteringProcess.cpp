@@ -221,7 +221,7 @@ ScatteringProcess::readCrossSectionFile (
             WARPX_ABORT_WITH_MESSAGE("Failed to open momentum-transfer cross-section data file");
         }
         amrex::ParticleReal energy_mt, sigma_mt;
-        std::size_t idx = 0;
+        amrex::Long idx = 0;
         while (infile_mt >> energy_mt >> sigma_mt) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 (idx < energies.size() &&
