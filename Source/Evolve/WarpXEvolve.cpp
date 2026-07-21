@@ -127,7 +127,7 @@ WarpX::SynchronizeVelocityWithPosition () {
             FillBoundaryE_avg(guard_cells.ng_FieldGather);
             FillBoundaryB_avg(guard_cells.ng_FieldGather);
         }
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
         for (int lev = 0; lev <= finest_level; ++lev) {
             mypc->PushP(
@@ -296,13 +296,17 @@ WarpX::Evolve (int numsteps)
 
             if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
                 // Electrostatic solver:
+                // The E-field is always reset to hold just the electrostatic component
+                bool const reset_E_field = true;
+                // The B-field is also reset unless the Darwin solver is used
+                bool const reset_B_field = true;
+
                 // For each species: deposit charge and add the associated space-charge
                 // E and B field to the grid ; this is done at the end of the PIC
                 // loop (i.e. immediately after a `Redistribute` and before particle
                 // positions are next pushed) so that the particles do not deposit out of bounds
                 // and so that the fields are at the correct time in the output.
-                bool const reset_fields = true;
-                ComputeSpaceChargeField( reset_fields );
+                ComputeSpaceChargeField( reset_E_field, reset_B_field );
                 if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
                     // Call Magnetostatic Solver to solve for the vector potential A and compute the
                     // B field.  Time varying A contribution to E field is neglected.
@@ -678,7 +682,7 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
         FillBoundaryE(guard_cells.ng_alloc_EB);
         FillBoundaryB(guard_cells.ng_alloc_EB);
 
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
         // on first step, push p by -0.5*dt
         for (int lev = 0; lev <= finest_level; ++lev)
@@ -712,12 +716,12 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
                 FillBoundaryE_avg(guard_cells.ng_FieldGather);
                 FillBoundaryB_avg(guard_cells.ng_FieldGather);
             }
-            // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
+            // TODO Remove call to FillBoundaryAux before UpdateAuxiliaryData?
             if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
                 FillBoundaryAux(guard_cells.ng_UpdateAux);
             }
         }
-        UpdateAuxilaryData();
+        UpdateAuxiliaryData();
         FillBoundaryAux(guard_cells.ng_UpdateAux);
     }
 }
@@ -792,8 +796,15 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->ScrapeParticlesAtEB(m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level));
         m_particle_boundary_buffer->gatherParticlesFromEmbeddedBoundaries(
             *mypc, m_fields.get_mr_levels(FieldType::distance_to_eb, finest_level), cur_time);
-        // Remove particles that have been flagged to be scraped
-        mypc->deleteInvalidParticles();
+        if (eb_particle_boundary == ParticleBoundaryType::Absorbing) {
+            // If particles are simply absorbed, no need for a full Redistribute.
+            // Instead: simply delete the absorbed particles
+            mypc->deleteInvalidParticles();
+        } else {
+            // For other particle boundary conditions (e.g. reflecting),
+            // particles can move to a different sub-domain, so we need a full Redistribute
+            mypc->Redistribute();
+        }
     }
 
     if (sort_intervals.contains(step+1)) {
@@ -1204,10 +1215,10 @@ WarpX::OneStep_sub1 (Real cur_time)
     EvolveE(coarse_lev, PatchType::fine, 0.5_rt*dt[coarse_lev], cur_time);
     FillBoundaryE(coarse_lev, PatchType::fine, guard_cells.ng_FieldGather);
 
-    // TODO Remove call to FillBoundaryAux before UpdateAuxilaryData?
+    // TODO Remove call to FillBoundaryAux before UpdateAuxiliaryData?
     FillBoundaryAux(guard_cells.ng_UpdateAux);
     // iii) Get auxiliary fields on the fine grid, at dt[fine_lev]
-    UpdateAuxilaryData();
+    UpdateAuxiliaryData();
     FillBoundaryAux(guard_cells.ng_UpdateAux);
 
     // iv) Push particles and fields on the fine patch (second fine step)
@@ -1424,21 +1435,29 @@ WarpX::PushParticlesandDeposit (
         implicit_options
     );
 
-    if (!skip_deposition && !implicit_options) {
+    if (!skip_deposition) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
-        ApplyInverseVolumeScalingToCurrentDensity(
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            lev);
-        if (m_fields.has_vector(FieldType::current_buf, lev)) {
+        if (!implicit_options) {
+            // Skip scaling J here for the implicit solvers: the total current is
+            // accumulated from multiple containers after this call (see CumulateJ()
+            // and ComputeJfromMassMatrices()), and is scaled in PreRHSOp().
             ApplyInverseVolumeScalingToCurrentDensity(
-                m_fields.get(FieldType::current_buf, Direction{0}, lev),
-                m_fields.get(FieldType::current_buf, Direction{1}, lev),
-                m_fields.get(FieldType::current_buf, Direction{2}, lev),
-                lev-1);
+                m_fields.get(FieldType::current_fp, Direction{0}, lev),
+                m_fields.get(FieldType::current_fp, Direction{1}, lev),
+                m_fields.get(FieldType::current_fp, Direction{2}, lev),
+                lev);
+            if (m_fields.has_vector(FieldType::current_buf, lev)) {
+                ApplyInverseVolumeScalingToCurrentDensity(
+                    m_fields.get(FieldType::current_buf, Direction{0}, lev),
+                    m_fields.get(FieldType::current_buf, Direction{1}, lev),
+                    m_fields.get(FieldType::current_buf, Direction{2}, lev),
+                    lev-1);
+            }
         }
+        // Unlike J, the charge density has no post-deposition accumulation step:
+        // rho is reset and fully deposited within this call on both the explicit
+        // and implicit paths, so it is scaled here in all cases.
         if (m_fields.has(FieldType::rho_fp, lev)) {
             ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_fp, lev), lev);
             if (m_fields.has(FieldType::rho_buf, lev)) {
@@ -1453,7 +1472,7 @@ WarpX::PushParticlesandDeposit (
         // of the filter to avoid incorrect results (moved to `SyncCurrentAndRho()`).
         // Might this be related to issue #1943?
 #endif
-        if (do_fluid_species) {
+        if (do_fluid_species && !implicit_options) {
             myfl->Evolve(m_fields,
                          lev,
                          current_fp_string,
