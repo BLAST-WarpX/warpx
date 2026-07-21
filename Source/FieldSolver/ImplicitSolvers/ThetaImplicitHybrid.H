@@ -86,6 +86,25 @@ public:
 
     // Hybrid model has no light waves, so return 0 for the PC theta parameter
     [[nodiscard]] amrex::Real GetThetaForPC () const override { return 0.0; }
+
+    /** Capture m_J_base / m_rho_base from the current (scaled, synced) fields */
+    void CaptureJRhoBase ();
+
+    /**
+     * \brief In-loop electron pressure advance (see m_pe_advance_in_loop): compute
+     * pe^{n+theta} from pe^n and the current iterate's electron flow, and write it to
+     * hybrid_electron_pressure_fp for the Ohm's-law solve. Public because the CUDA
+     * compiler requires the enclosing function of a device lambda to be public.
+     */
+    void AdvancePeInLoop ( bool a_from_jacobian );
+
+    /** Advance the stored pe^n to pe^{n+1} after the Newton solve converges */
+    void FinishPeUpdate ();
+
+    /** Rebuild rho from the base state and the divergence of the current response.
+     * Public because the CUDA compiler requires the enclosing function of an
+     * extended device lambda to have public access. */
+    void ApplyRhoResponseFromDivJ ();
     [[nodiscard]] const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const override;
 
     /**
@@ -120,6 +139,59 @@ private:
      * Derived from the hybrid Jacobian eigenvalue radius on the transverse (Er,Etheta) block.
      * Reduces to theta*dt*|B|/(mu0*rho) for eta=0. Refilled each Newton iteration.
      */
+    /**
+     * Ion current captured at the last nonlinear residual evaluation (same moment as
+     * SaveE). During mass-matrix linear-stage evaluations the push field is computed
+     * from this frozen J instead of current_fp, which holds the previous evaluation's
+     * (perturbation-dependent) current: with a lagged J input, the push field is not a
+     * pure function of the Newton variable and the MM linear model J0 + MM*(E - E0)
+     * acquires a finite base offset (fatal where 1/rho amplifies it, e.g. vacuum edges).
+     */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_Ji_save;
+
+    /**
+     * J and rho (scaled + synced) captured right after PreRHSOp of the last nonlinear
+     * residual evaluation. During mass-matrix linear-stage evaluations rho is rebuilt as
+     *   rho = rho_base - (dt/2) * div(J - J_base)
+     * (charge continuity applied to the mass-matrix current response): rho responds to E
+     * only through particle positions, dx = (dt/2) dv, so the discrete rho response is
+     * the divergence of the deposited current response. Without this term the linear
+     * model freezes rho entirely, which loses the drho/dE Jacobian channel -- fatal
+     * where 1/rho amplifies it (e.g. the plasma-vacuum edge of a compression).
+     */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_J_base;
+    mutable std::unique_ptr<amrex::MultiFab> m_rho_base;
+
+    /** Enable the continuity-based rho response in the MM linear stage (see m_J_base) */
+    bool m_use_rho_response_divj = true;
+
+    /**
+     * Evolve the electron pressure with its own gamma-law advection/compression
+     * equation, (gamma-1)^{-1} [d_t pe + div(ue pe)] + pe div(ue) = 0 (Stanier et al.
+     * JCP 2019 Eq. 15 with eta = qe = 0), advanced from pe^n to pe^{n+theta} INSIDE
+     * every residual evaluation using the current iterate's ue. This replaces the
+     * algebraic closure pe = n^gamma Te0, whose slaving of pe to the deposited
+     * (noisy, non-charge-conserving) density is an energy-injection channel for the
+     * implicit scheme; it also differs from the operator-split QDSMC energy equation,
+     * whose one-step-lagged pe destabilizes noise-driven problems.
+     */
+    bool m_pe_advance_in_loop = false;
+
+    /** pe^n and pe^{n+theta} state for the in-loop pressure advance */
+    mutable std::unique_ptr<amrex::MultiFab> m_pe_old;
+    mutable std::unique_ptr<amrex::MultiFab> m_pe_theta;
+    mutable std::unique_ptr<amrex::MultiFab> m_pe_scratch;
+
+    /**
+     * Push particles with the Newton iterate E itself instead of the resistivity-free
+     * Ohm's-law field recomputed from (B, lagged J_i, rho). Faithful to implicit-midpoint
+     * hybrid formulations for eta = 0, and required for the electrostatic (B = 0) limit,
+     * where the recomputed push field does not depend on the solver variable at all.
+     */
+    bool m_push_with_solver_E = false;
+
+
+
     mutable amrex::Vector<amrex::MultiFab>  m_alpha_mf;
     mutable amrex::Vector<amrex::MultiFab*> m_alpha_mfarrvec;
 
