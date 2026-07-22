@@ -62,12 +62,7 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         "theta parameter must be between 0.5 and 1.0");
     pp.query("use_darwin_split", m_use_darwin_split);
     pp.query("use_rho_response_divj", m_use_rho_response_divj);
-    pp.query("push_with_solver_E", m_push_with_solver_E);
     pp.query("pe_advance_in_loop", m_pe_advance_in_loop);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_pe_advance_in_loop || m_push_with_solver_E,
-        "implicit_evolve.pe_advance_in_loop requires implicit_evolve.push_with_solver_E=1: "
-        "the electron work pairing reads the solver iterate from Efield_fp");
 
     // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
     m_alpha_mf.resize(m_num_amr_levels);
@@ -310,19 +305,13 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         }
     }
 
-    if (!m_push_with_solver_E) {
-        m_hybrid_pic_model->HybridPICSolveE(
-            Efield_fp, current_fp, Bfield_fp, rho_fp,
-            m_WarpX->GetEBUpdateEFlag(),
-            false  // no resistivity; ∇Pe included
-        );
-    }
-    // else: push particles with the Newton iterate a_E itself (already copied into
-    // Efield_fp by UpdateWarpXFields). This matches implicit-midpoint hybrid schemes
-    // that advance particles with the same E being solved for (e.g. Stanier et al.
-    // JCP 2019, where E* = E for eta = 0), and gives the residual a true Jacobian
-    // through the particle response. In particular the electrostatic limit (B = 0)
-    // is degenerate without this: the evaluation would not depend on a_E at all.
+    // Particles are pushed with the Newton iterate itself, minus the resistive
+    // friction term: E* = a_E - eta*J_plasma (Stanier et al. JCP 2019, Eq. (1);
+    // E* = a_E for eta = 0). Pushing with the iterate gives the residual a true
+    // Jacobian through the particle response -- in particular the electrostatic
+    // limit (B = 0) is degenerate with any recomputed push field, which would
+    // not depend on the solver variable at all.
+    SubtractResistiveEFromPushField();
 
     m_WarpX->ApplyFillBoundaryE();
 
@@ -354,7 +343,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
 
-    if (m_push_with_solver_E) {
+    {
         // Make the Ohm's-law rho a pure function of the Newton iterate: component 0
         // (deposited at entry positions) carries the previous evaluation's particle
         // state, which pollutes the finite-difference Jacobian matvec at O(hysteresis/eps)
@@ -586,6 +575,77 @@ void ThetaImplicitHybrid::ApplyRhoResponseFromDivJ ()
     rho->FillBoundary(geom.periodicity());
 }
 
+void ThetaImplicitHybrid::SubtractResistiveEFromPushField ()
+{
+    // E* = a_E - eta*J_plasma: the eta*J term in Ohm's law is the electron-ion
+    // friction force on the electrons; the ions must not feel it. eta is
+    // evaluated exactly as HybridPICSolveE adds it (same rho/|J| interpolation
+    // to the E staggering), so a_E - E* == the resistive term of the residual
+    // field at the Newton fixed point. NOTE: a hyper-resistive contribution is
+    // currently NOT subtracted (TODO); its work pairing is likewise not
+    // implemented, which AdvancePeInLoop asserts on.
+    using namespace amrex::literals;
+    using warpx::fields::FieldType;
+    using namespace ablastr::coarsen::sample;
+
+    if (m_hybrid_pic_model->m_eta_expression == "0.0") { return; }
+
+    const int lev = 0;
+    const ablastr::fields::VectorField E =
+        m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+    const ablastr::fields::VectorField Jp =
+        m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    const amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+
+    const auto eta = m_hybrid_pic_model->m_eta;
+    const bool has_J_dep = m_hybrid_pic_model->m_resistivity_has_J_dependence;
+    const amrex::Real t_new = m_WarpX->gett_new(lev);
+
+    const amrex::Geometry& geom = m_WarpX->Geom(lev);
+    for (int d = 0; d < 3; ++d) { Jp[d]->FillBoundary(geom.periodicity()); }
+
+    const amrex::GpuArray<int, 3> nodal = {1, 1, 1};
+    const amrex::GpuArray<int, 3> coarsen = {1, 1, 1};
+    const amrex::GpuArray<int, 3> Jx_stag = m_hybrid_pic_model->Jx_IndexType;
+    const amrex::GpuArray<int, 3> Jy_stag = m_hybrid_pic_model->Jy_IndexType;
+    const amrex::GpuArray<int, 3> Jz_stag = m_hybrid_pic_model->Jz_IndexType;
+    const std::array<amrex::GpuArray<int, 3>, 3> E_stag = {
+        m_hybrid_pic_model->Ex_IndexType,
+        m_hybrid_pic_model->Ey_IndexType,
+        m_hybrid_pic_model->Ez_IndexType};
+
+    for (int d = 0; d < 3; ++d) {
+        const amrex::GpuArray<int, 3> Ed_stag = E_stag[d];
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*E[d], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Array4<amrex::Real>       const& Ed = E[d]->array(mfi);
+            amrex::Array4<amrex::Real const> const& Jpx = Jp[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& Jpy = Jp[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& Jpz = Jp[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& Jpd = Jp[d]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& rho_arr = rho->const_array(mfi);
+            const amrex::Box tb = mfi.tilebox(E[d]->ixType().toIntVect());
+            amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                const amrex::Real rho_val =
+                    Interp(rho_arr, nodal, Ed_stag, coarsen, i, j, k, 0);
+                amrex::Real jtot = 0._rt;
+                if (has_J_dep) {
+                    const amrex::Real jx =
+                        Interp(Jpx, Jx_stag, Ed_stag, coarsen, i, j, k, 0);
+                    const amrex::Real jy =
+                        Interp(Jpy, Jy_stag, Ed_stag, coarsen, i, j, k, 0);
+                    const amrex::Real jz =
+                        Interp(Jpz, Jz_stag, Ed_stag, coarsen, i, j, k, 0);
+                    jtot = std::sqrt(jx*jx + jy*jy + jz*jz);
+                }
+                Ed(i,j,k) -= eta(rho_val, jtot, t_new) * Jpd(i,j,k);
+            });
+        }
+    }
+}
+
 void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
 {
     // pe^{n+theta} = pe^n - theta*dt * [ div(ue pe^n) + (gamma-1) pe^n div(ue) ],
@@ -604,9 +664,10 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
         m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
     const ablastr::fields::VectorField Jp =
         m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    // The solver iterate a_E (with push_with_solver_E, Efield_fp holds it here:
-    // external-field contributions have already been subtracted again). This is the
-    // same field that pushed the particles and that theta-Faraday consumes.
+    // Efield_fp holds the push field E* = a_E - eta*J_plasma (external-field
+    // contributions have already been subtracted again): the exact field the
+    // ions were pushed with. theta-Faraday consumes a_E = E* + eta*J_plasma,
+    // whose resistive part enters the pairing as the Joule term below.
     const ablastr::fields::VectorField Efld =
         m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
 
@@ -623,6 +684,9 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
     }
 
     if (!m_pe_old) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_hybrid_pic_model->m_include_hyper_resistivity_term,
+            "pe_advance_in_loop: the hyper-resistivity work pairing is not implemented");
         // First use: initialize pe^n from the algebraic closure on the current density
         m_hybrid_pic_model->CalculateElectronPressure();
         m_pe_old = std::make_unique<amrex::MultiFab>(
@@ -651,6 +715,12 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
     const amrex::GpuArray<int, 3> nodal   = {1, 1, 1};
     const amrex::GpuArray<int, 3> coarsen = {1, 1, 1};
     amrex::ignore_unused(Jy_stag);
+
+    // Joule term of the pairing: eta evaluated with the same inputs as the
+    // push-field subtraction (nodal rho and |J_plasma| on the collocated grid)
+    const auto eta = m_hybrid_pic_model->m_eta;
+    const bool has_J_dep = m_hybrid_pic_model->m_resistivity_has_J_dependence;
+    const amrex::Real t_new = m_WarpX->gett_new(lev);
 
     const amrex::Box dom_nodal = amrex::convert(geom.Domain(), amrex::IntVect::TheNodeVector());
     const amrex::Dim3 dlo = amrex::lbound(dom_nodal);
@@ -746,10 +816,19 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
             if ((i <= dlo.x || i >= dhi.x) && !is_per[0]) { return; }
             divF += (Fz(i+1,j,k) - Fz(i-1,j,k)) * 0.5_rt * dxi[0];
             if (J_nodal) {
-                // -E.J_e over all three components (perp components do work at B != 0)
-                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
-                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
-                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k));
+                // -E*.J_e over all three components (perp components do work at
+                // B != 0), minus the Joule heating eta*|J_plasma|^2 that the
+                // resistive part of a_E = E* + eta*J_plasma deposits via Faraday
+                const amrex::Real jpx = Jpx(i,j,k);
+                const amrex::Real jpy = Jpy(i,j,k);
+                const amrex::Real jpz = Jpz(i,j,k);
+                const amrex::Real j2 = jpx*jpx + jpy*jpy + jpz*jpz;
+                const amrex::Real eta_val = eta(rho_arr(i,j,k,0),
+                    has_J_dep ? std::sqrt(j2) : 0._rt, t_new);
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - jpx)
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - jpy)
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - jpz)
+                   - eta_val * j2;
             } else {
                 auto EpeJ_z1d = [&] (int ie) {
                     const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
@@ -771,10 +850,19 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
             divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
                   + (Fz(i,j+1,k) - Fz(i,j-1,k)) * 0.5_rt * dxi[1];
             if (J_nodal) {
-                // -E.J_e over all three components (perp components do work at B != 0)
-                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
-                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
-                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k));
+                // -E*.J_e over all three components (perp components do work at
+                // B != 0), minus the Joule heating eta*|J_plasma|^2 that the
+                // resistive part of a_E = E* + eta*J_plasma deposits via Faraday
+                const amrex::Real jpx = Jpx(i,j,k);
+                const amrex::Real jpy = Jpy(i,j,k);
+                const amrex::Real jpz = Jpz(i,j,k);
+                const amrex::Real j2 = jpx*jpx + jpy*jpy + jpz*jpz;
+                const amrex::Real eta_val = eta(rho_arr(i,j,k,0),
+                    has_J_dep ? std::sqrt(j2) : 0._rt, t_new);
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - jpx)
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - jpy)
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - jpz)
+                   - eta_val * j2;
             } else {
                 auto EpeJ_x2d = [&] (int ie) {
                     const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
@@ -827,10 +915,19 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                   + (Fy(i,j+1,k) - Fy(i,j-1,k)) * 0.5_rt * dxi[1]
                   + (Fz(i,j,k+1) - Fz(i,j,k-1)) * 0.5_rt * dxi[2];
             if (J_nodal) {
-                // -E.J_e over all three components
-                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
-                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
-                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k));
+                // -E*.J_e over all three components (perp components do work at
+                // B != 0), minus the Joule heating eta*|J_plasma|^2 that the
+                // resistive part of a_E = E* + eta*J_plasma deposits via Faraday
+                const amrex::Real jpx = Jpx(i,j,k);
+                const amrex::Real jpy = Jpy(i,j,k);
+                const amrex::Real jpz = Jpz(i,j,k);
+                const amrex::Real j2 = jpx*jpx + jpy*jpy + jpz*jpz;
+                const amrex::Real eta_val = eta(rho_arr(i,j,k,0),
+                    has_J_dep ? std::sqrt(j2) : 0._rt, t_new);
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - jpx)
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - jpy)
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - jpz)
+                   - eta_val * j2;
             } else {
                 auto EpeJ_x3d = [&] (int ie) {
                     const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];

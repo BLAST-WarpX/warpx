@@ -98,6 +98,16 @@ public:
      */
     void AdvancePeInLoop ( bool a_from_jacobian );
 
+    /**
+     * \brief Turn Efield_fp (holding the Newton iterate a_E) into the particle push
+     * field E* = a_E - eta*J_plasma. The resistive term is electron-ion friction: it
+     * belongs to the electron momentum equation, so the ions must not feel it
+     * (Stanier et al. JCP 2019, Eq. (1)). eta is evaluated from the iterate's plasma
+     * current exactly as HybridPICSolveE adds it, keeping the push a pure function of
+     * the iterate. E* = a_E when eta = 0.
+     */
+    void SubtractResistiveEFromPushField ();
+
     /** Advance the stored pe^n to pe^{n+1} after the Newton solve converges */
     void FinishPeUpdate ();
 
@@ -182,13 +192,6 @@ private:
     mutable std::unique_ptr<amrex::MultiFab> m_pe_theta;
     mutable std::unique_ptr<amrex::MultiFab> m_pe_scratch;
 
-    /**
-     * Push particles with the Newton iterate E itself instead of the resistivity-free
-     * Ohm's-law field recomputed from (B, lagged J_i, rho). Faithful to implicit-midpoint
-     * hybrid formulations for eta = 0, and required for the electrostatic (B = 0) limit,
-     * where the recomputed push field does not depend on the solver variable at all.
-     */
-    bool m_push_with_solver_E = false;
 
 
 
