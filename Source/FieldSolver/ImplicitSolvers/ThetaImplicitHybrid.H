@@ -97,20 +97,25 @@ public:
      * hybrid_electron_pressure_fp for the Ohm's-law solve. Public because the CUDA
      * compiler requires the enclosing function of a device lambda to be public.
      */
-    void AdvancePeInLoop ( bool a_from_jacobian );
+    void AdvanceElectronPressure ( bool a_from_jacobian );
 
     /**
      * \brief Turn Efield_fp (holding the Newton iterate a_E) into the particle push
-     * field E* = a_E - eta*J_plasma. The resistive term is electron-ion friction: it
-     * belongs to the electron momentum equation, so the ions must not feel it
-     * (Stanier et al. JCP 2019, Eq. (1)). eta is evaluated from the iterate's plasma
-     * current exactly as HybridPICSolveE adds it, keeping the push a pure function of
-     * the iterate. E* = a_E when eta = 0.
+     * field E* = a_E - D, where D = eta*J_plasma - eta_h*nabla^2(J_plasma) is the
+     * dissipative part of Ohm's law. The dissipative terms are electron-ion friction
+     * and electron viscosity: they belong to the electron momentum equation, so the
+     * ions must not feel them (Stanier et al. JCP 2019, Eq. (1)). D is computed as
+     * the difference of two Ohm solves (with and without dissipation) from the same
+     * state, so it matches HybridPICSolveE exactly by construction, and is kept in
+     * m_D for the electron work pairing (dU_e gains +D.J_plasma). E* = a_E when
+     * eta = eta_h = 0.
      */
-    void SubtractResistiveEFromPushField ();
+    void SubtractDissipativeEFromPushField ();
 
-    /** Advance the stored pe^n to pe^{n+1} after the Newton solve converges */
-    void FinishPeUpdate ();
+    /** Advance the field state (E, B and the electron pressure) from t^{n+theta}
+     * to t^{n+1}. Public because the CUDA compiler requires the enclosing
+     * function of an extended device lambda to have public access. */
+    void FinishFieldUpdate ( amrex::Real end_time );
 
     /** Rebuild rho from the base state and the divergence of the current response.
      * Public because the CUDA compiler requires the enclosing function of an
@@ -159,6 +164,12 @@ private:
      * acquires a finite base offset (fatal where 1/rho amplifies it, e.g. vacuum edges).
      */
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_Ji_save;
+
+    /** Dissipative part of Ohm's law, D = eta*J_p - eta_h*nabla^2(J_p), captured each
+     * residual evaluation (see SubtractDissipativeEFromPushField); m_E_work is the
+     * scratch for the two Ohm solves that form it. */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_D;
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_E_work;
 
     /**
      * J and rho (scaled + synced) captured right after PreRHSOp of the last nonlinear
@@ -229,7 +240,6 @@ private:
      * Uses: F^{n+1} = (1/theta)*F^{n+theta} + (1 - 1/theta)*F^n
      * This is applied to both E and B fields.
      */
-    void FinishFieldUpdate ( amrex::Real end_time );
 
     /** Add E_L (hybrid_E_fp_long) to Efield_fp: E_fp += E_L */
     void AddLongitudinalE ();

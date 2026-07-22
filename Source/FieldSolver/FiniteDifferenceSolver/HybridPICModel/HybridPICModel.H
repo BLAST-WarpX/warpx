@@ -375,7 +375,7 @@ public:
      *        each QDSMC step so the existing Ohm's-law E-solver consumes
      *        the QDSMC-updated pressure without modification.
      */
-    void QDSMCFillElectronPressureFromTe (int lev) const;
+    void FillPeFromTe (int lev) const;
 
     /**
      * \brief Top-level orchestrator for the QDSMC electron-energy step.
@@ -388,7 +388,7 @@ public:
      *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
      *   6. QDSMCAddJouleHeating (if m_include_joule_heating is on):
      *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2 -> T_e
-     *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)
+     *   7. FillPeFromTe (Pe = n_e * k_B * T_e)
      *   8. Reset QDSMC particles to home positions for the next step
      *
      * Called from HybridPICEvolveFields when m_solve_electron_energy_equation is true.

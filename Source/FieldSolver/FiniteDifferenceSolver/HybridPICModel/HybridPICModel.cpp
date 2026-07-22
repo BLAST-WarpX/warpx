@@ -218,7 +218,7 @@ void HybridPICModel::AllocateLevelMFs (
     // The "hybrid_electron_pressure_fp" multifab stores the electron pressure
     // consumed by the Ohm's-law E-solve. With solve_electron_energy_equation
     // off, it is computed from the algebraic adiabatic closure each step. With
-    // it on, Pe = n_e k_B T_e is emitted by QDSMCFillElectronPressureFromTe
+    // it on, Pe = n_e k_B T_e is emitted by FillPeFromTe
     // at the end of each QDSMC entropy-transport step.
     fields.alloc_init(FieldType::hybrid_electron_pressure_fp,
         lev, amrex::convert(ba, rho_nodal_flag),
@@ -1870,9 +1870,9 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 }
 
 
-void HybridPICModel::QDSMCFillElectronPressureFromTe (int const lev) const
+void HybridPICModel::FillPeFromTe (int const lev) const
 {
-    ABLASTR_PROFILE("HybridPICModel::QDSMCFillElectronPressureFromTe()");
+    ABLASTR_PROFILE("HybridPICModel::FillPeFromTe()");
 
     auto & warpx = WarpX::GetInstance();
 
@@ -2114,7 +2114,7 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
             redirect_active ? &ion_redirect_E : nullptr);
 
         // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law solve.
-        QDSMCFillElectronPressureFromTe(lev);
+        FillPeFromTe(lev);
 
         // Step 8: reset particles to home positions (and zero velocity /
         // weight / entropy) so the next step starts with a clean grid.
