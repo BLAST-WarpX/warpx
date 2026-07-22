@@ -20,6 +20,9 @@
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
@@ -44,6 +47,9 @@ void HybridPICModel::ReadParameters ()
             ablastr::warn_manager::WarnPriority::medium);
         m_substeps += 1;
     }
+    // Adaptive updates may raise m_substeps under stress but never go below
+    // the user-requested floor.
+    m_substeps_min = m_substeps;
 
     // read rkf45 intervals
     std::vector<std::string> rkf45_intervals_string_vec = {"0"};
@@ -636,14 +642,30 @@ void HybridPICModel::BfieldEvolve (
         if (++n_attempts > m_max_substep_attempts) { break; }
     }
 
-    // Adjust the number of substeps. This affects both the next RKF45 or RK4 step.
-    // The adjustment is made to jump to more required substeps or slowly decrease
-    // if m_substeps is too large (using 95% of the current m_substeps value and
-    // 5% of the lower, new value).
-    if (m_substeps < 2*n_attempts) {
-        m_substeps = 2*n_attempts;
-    } else {
-        m_substeps = 2 * int(std::ceil(0.475 * m_substeps + 0.05 * n_attempts));
+    // Adjust the number of substeps for the next RKF45/RK4 half-step.
+    // Jump up immediately when this half needed more attempts; otherwise
+    // slowly relax toward target = 2*n_attempts (95% current + 5% target).
+    // Keep m_substeps even and never below m_substeps_min (user input).
+    // Previous update used 2*ceil(0.475*m + 0.05*n), which could trap m at
+    // the input value (e.g. 40) forever for typical n_attempts (ceil trap).
+    {
+        const int target = 2 * std::max(n_attempts, 1);
+        if (m_substeps < target) {
+            m_substeps = target;
+        } else {
+            const amrex::Real blended =
+                0.95_rt * static_cast<amrex::Real>(m_substeps)
+                + 0.05_rt * static_cast<amrex::Real>(target);
+            int relaxed = static_cast<int>(std::lround(static_cast<double>(blended)));
+            if (relaxed % 2 != 0) { ++relaxed; }
+            m_substeps = std::max(relaxed, std::max(m_substeps_min, 2));
+        }
+        // Stay within the abort budget so the controller cannot request more
+        // substeps than max_substep_attempts allows.
+        if (m_substeps > m_max_substep_attempts) {
+            m_substeps = m_max_substep_attempts - (m_max_substep_attempts % 2);
+            m_substeps = std::max(m_substeps, 2);
+        }
     }
 
     if (WarpX::GetInstance().Verbose()) {
@@ -651,7 +673,8 @@ void HybridPICModel::BfieldEvolve (
             << (subcycling_half == SubcyclingHalf::FirstHalf ? "1st" : "2nd") << " half"
             << ": " << n_accepted << " accepted, "
             << (n_attempts - n_accepted) << " rejected substeps"
-            << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
+            << " (dt_sub_final/dt_half = " << dt_sub / dt_half
+            << ", m_substeps = " << m_substeps << ")\n";
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         n_attempts <= m_max_substep_attempts,
