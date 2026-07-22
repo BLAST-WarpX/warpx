@@ -51,6 +51,23 @@ class constants:
 picmistandard.register_constants(constants)
 
 
+def _set_refined_region_inputs(refined_regions):
+    if refined_regions:
+        assert len(refined_regions) == 1, Exception(
+            "WarpX only supports one refined region."
+        )
+        assert refined_regions[0][0] == 1, Exception(
+            "The one refined region can only be level 1"
+        )
+        pywarpx.amr.max_level = 1
+        pywarpx.warpx.fine_tag_lo = refined_regions[0][1]
+        pywarpx.warpx.fine_tag_hi = refined_regions[0][2]
+        if len(refined_regions[0]) == 4:
+            pywarpx.amr.ref_ratio_vect = refined_regions[0][3]
+    else:
+        pywarpx.amr.max_level = 0
+
+
 class Species(picmistandard.PICMI_Species):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
@@ -1102,19 +1119,7 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
@@ -1217,19 +1222,7 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
@@ -1353,19 +1346,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
@@ -1510,19 +1491,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
@@ -1701,8 +1670,9 @@ class GMRESLinearSolver(LinearSolverBase):
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "amrex_gmres"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "amrex_gmres"
         amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         amrex_gmres.verbose_int = self.verbose_int
         amrex_gmres.restart_length = self.restart_length
@@ -1719,8 +1689,9 @@ class PETScKSPLinearSolver(LinearSolverBase):
     ----------
     """
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "petsc_ksp"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "petsc_ksp"
 
 
 class PreconditionerBase(picmistandard.base._ClassWithInit):
@@ -4254,6 +4225,10 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "proc_number",
                     "part_per_cell",
                     "eb_covered",
+                    # Electron temperature/pressure of the hybrid-PIC
+                    # (Ohm's law) solver; only valid with that solver.
+                    "Te",
+                    "Pe",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
