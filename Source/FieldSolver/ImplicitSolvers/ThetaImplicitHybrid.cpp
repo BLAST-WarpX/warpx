@@ -35,6 +35,12 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_hybrid_pic_model != nullptr,
         "ThetaImplicitHybrid solver requires hybrid PIC model to be defined");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_hybrid_pic_model->m_solve_electron_energy_equation,
+        "The QDSMC electron energy equation is not yet supported with the "
+        "theta-implicit hybrid solver (it is operator-split and has no in-loop "
+        "energy pairing). Use the gamma-law closure: the implicit scheme evolves "
+        "it as a discretely energy-conserving in-loop pressure advance.");
 
     /// Set flag for external fields from vector potentials
     m_add_external_fields = m_hybrid_pic_model->m_add_external_fields;
@@ -62,7 +68,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         "theta parameter must be between 0.5 and 1.0");
     pp.query("use_darwin_split", m_use_darwin_split);
     pp.query("use_rho_response_divj", m_use_rho_response_divj);
-    pp.query("pe_advance_in_loop", m_pe_advance_in_loop);
 
     // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
     m_alpha_mf.resize(m_num_amr_levels);
@@ -287,14 +292,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     ablastr::fields::MultiLevelScalarField rho_fp = 
         m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1);
 
-    // --- Compute resistivity-free E for particle push ---
     m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
-    // QDSMC on: Pe is set once per step by AdvanceElectronEnergyQDSMC -- do not
-    // overwrite it here with the adiabatic closure. Same when the in-loop pressure
-    // advance owns pe (it is refreshed after the particle push below).
-    if (!m_hybrid_pic_model->m_solve_electron_energy_equation && !m_pe_advance_in_loop) {
-        m_hybrid_pic_model->CalculateElectronPressure();
-    }
 
     if (m_use_mass_matrices_jacobian && a_from_jacobian && m_Ji_save[0]) {
         // Use the ion current frozen at the last nonlinear evaluation, so the push
@@ -384,16 +382,12 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     }
 
     // --- Compute full Ohm's law E for Faraday update ---
-    // J_plasma unchanged (same B), but Pe depends on newly deposited ρ
-    // QDSMC on: Pe is set once per step by AdvanceElectronEnergyQDSMC -- do not
-    // overwrite it here with the adiabatic closure.
-    if (m_pe_advance_in_loop) {
-        // gamma-law pressure advance to pe^{n+theta} from the iterate's electron flow
-        AdvancePeInLoop( a_from_jacobian );
-    }
-    else if (!m_hybrid_pic_model->m_solve_electron_energy_equation) {
-        m_hybrid_pic_model->CalculateElectronPressure();
-    }
+    // The gamma-law electron pressure is advanced to pe^{n+theta} inside every
+    // residual evaluation (in-loop), with its work terms discretely paired to
+    // the ion push and Faraday ledgers -- this IS the implicit scheme's
+    // implementation of the gamma-law closure (energy-conserving by
+    // construction, and the only pe model currently supported implicitly).
+    AdvancePeInLoop( a_from_jacobian );
 
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,
@@ -686,7 +680,11 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
     if (!m_pe_old) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !m_hybrid_pic_model->m_include_hyper_resistivity_term,
-            "pe_advance_in_loop: the hyper-resistivity work pairing is not implemented");
+            "implicit hybrid in-loop pe advance: the hyper-resistivity work pairing is not implemented");
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::n_rz_azimuthal_modes == 1,
+            "implicit hybrid in-loop pe advance: the RZ work pairing is implemented for m = 0 only");
+#endif
         // First use: initialize pe^n from the algebraic closure on the current density
         m_hybrid_pic_model->CalculateElectronPressure();
         m_pe_old = std::make_unique<amrex::MultiFab>(
@@ -716,8 +714,14 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
     const amrex::GpuArray<int, 3> coarsen = {1, 1, 1};
     amrex::ignore_unused(Jy_stag);
 
+    const amrex::GpuArray<int, 3> Ex_stag = m_hybrid_pic_model->Ex_IndexType;
+    const amrex::GpuArray<int, 3> Ey_stag = m_hybrid_pic_model->Ey_IndexType;
+    const amrex::GpuArray<int, 3> Ez_stag = m_hybrid_pic_model->Ez_IndexType;
+    amrex::ignore_unused(Ex_stag, Ey_stag, Ez_stag);
+
     // Joule term of the pairing: eta evaluated with the same inputs as the
-    // push-field subtraction (nodal rho and |J_plasma| on the collocated grid)
+    // push-field subtraction (nodal rho and |J_plasma| on the collocated grid,
+    // per staggered component in RZ)
     const auto eta = m_hybrid_pic_model->m_eta;
     const bool has_J_dep = m_hybrid_pic_model->m_resistivity_has_J_dependence;
     const amrex::Real t_new = m_WarpX->gett_new(lev);
@@ -764,9 +768,6 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
         amrex::Array4<amrex::Real const> const& Ex_arr = Efld[0]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Ey_arr = Efld[1]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Ez_arr = Efld[2]->const_array(mfi);
-#if defined(WARPX_DIM_RZ)
-        amrex::ignore_unused(Jy, Jpy, Ex_arr, Ey_arr, Ez_arr);
-#endif
 
         const amrex::Box tb = mfi.tilebox(amrex::IntVect::TheNodeVector());
 
@@ -889,18 +890,90 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                     (pe_it_arr(i,j+1,k) - pe_it_arr(i,j-1,k)) * 0.5_rt * dxi[1];
             }
 #elif defined(WARPX_DIM_RZ)
+            // m = 0, Yee-staggered RZ (asserted at first use). The enthalpy flux
+            // uses the conservative flux form, so the volume-weighted grid sum
+            // telescopes exactly (including through the axis, where [r F] -> 0).
+            // W carries the full-Ohm pairing -E*.J_e + eta*Jp^2 evaluated per
+            // staggered component at its own location (matching the push-field
+            // subtraction), volume-split from the edges to the nodes so that
+            // sum_nodes(A W) = sum_edges(A q). The Hall channel and the RZ
+            // Faraday ledger pair at interpolation order (not machine-exact,
+            // unlike the collocated Cartesian grid).
+            amrex::ignore_unused(Fx, Fz, ue_x, ue_z);
             if ((j <= dlo.y || j >= dhi.y) && !is_per[1]) { return; }
-            if (i >= dhi.x) { return; }
+            if (i >= dhi.x) { return; }                        // outer r boundary
             const amrex::Real r = rmin + i*dr;
-            if (i > dlo.x) {
-                divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0] + Fx(i,j,k)/r;
-                divu += (ue_x(i+1,j,k) - ue_x(i-1,j,k)) * 0.5_rt * dxi[0] + ue_x(i,j,k)/r;
-            } else {
-                divF += 2._rt * (Fx(i+1,j,k) - Fx(i,j,k)) * dxi[0];
-                divu += 2._rt * (ue_x(i+1,j,k) - ue_x(i,j,k)) * dxi[0];
+            const bool on_axis = (r < 0.5_rt*dr);
+            if (i <= dlo.x && !on_axis) { return; }            // annular inner boundary
+            const amrex::Real A_i  = on_axis ? 0.125_rt*dr*dr : r*dr;
+            const amrex::Real A_ip = (r + 0.5_rt*dr)*dr;       // r-edge at i+1/2
+            const amrex::Real A_im = (r - 0.5_rt*dr)*dr;       // r-edge at i-1/2
+
+            // enthalpy flux, conservative form
+            auto ue_redge = [&] (int ie) {
+                const amrex::Real rho_e = amrex::max(
+                    0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                return (Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e;
+            };
+            auto ue_zedge = [&] (int je) {
+                const amrex::Real rho_e = amrex::max(
+                    0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
+                return (Jz(i,je,k) - Jpz(i,je,k)) / rho_e;
+            };
+            {
+                const amrex::Real Frp =
+                    ue_redge(i) * 0.5_rt*(pe_it_arr(i,j,k) + pe_it_arr(i+1,j,k));
+                const amrex::Real rFrm = on_axis ? 0.0_rt :
+                    (r - 0.5_rt*dr) *
+                    ue_redge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k));
+                divF += ((r + 0.5_rt*dr)*Frp - rFrm) / A_i;
+                divF += (ue_zedge(j) * 0.5_rt*(pe_it_arr(i,j,k) + pe_it_arr(i,j+1,k))
+                       - ue_zedge(j-1) * 0.5_rt*(pe_it_arr(i,j-1,k) + pe_it_arr(i,j,k)))
+                      * dxi[1];
             }
-            divF += (Fz(i,j+1,k) - Fz(i,j-1,k)) * 0.5_rt * dxi[1];
-            divu += (ue_z(i,j+1,k) - ue_z(i,j-1,k)) * 0.5_rt * dxi[1];
+
+            // full-Ohm work pairing per staggered component
+            auto q_redge = [&] (int ie) {
+                const amrex::Real rho_v = Interp(rho_arr, nodal, Ex_stag, coarsen, ie, j, k, 0);
+                amrex::Real jtot = 0.0_rt;
+                if (has_J_dep) {
+                    const amrex::Real jr = Interp(Jpx, Jx_stag, Ex_stag, coarsen, ie, j, k, 0);
+                    const amrex::Real jt = Interp(Jpy, Jy_stag, Ex_stag, coarsen, ie, j, k, 0);
+                    const amrex::Real jz = Interp(Jpz, Jz_stag, Ex_stag, coarsen, ie, j, k, 0);
+                    jtot = std::sqrt(jr*jr + jt*jt + jz*jz);
+                }
+                return Ex_arr(ie,j,k) * (Jx(ie,j,k) - Jpx(ie,j,k))
+                     - eta(rho_v, jtot, t_new) * Jpx(ie,j,k) * Jpx(ie,j,k);
+            };
+            auto q_zedge = [&] (int je) {
+                const amrex::Real rho_v = Interp(rho_arr, nodal, Ez_stag, coarsen, i, je, k, 0);
+                amrex::Real jtot = 0.0_rt;
+                if (has_J_dep) {
+                    const amrex::Real jr = Interp(Jpx, Jx_stag, Ez_stag, coarsen, i, je, k, 0);
+                    const amrex::Real jt = Interp(Jpy, Jy_stag, Ez_stag, coarsen, i, je, k, 0);
+                    const amrex::Real jz = Interp(Jpz, Jz_stag, Ez_stag, coarsen, i, je, k, 0);
+                    jtot = std::sqrt(jr*jr + jt*jt + jz*jz);
+                }
+                return Ez_arr(i,je,k) * (Jz(i,je,k) - Jpz(i,je,k))
+                     - eta(rho_v, jtot, t_new) * Jpz(i,je,k) * Jpz(i,je,k);
+            };
+            {
+                const amrex::Real rho_v = Interp(rho_arr, nodal, Ey_stag, coarsen, i, j, k, 0);
+                amrex::Real jtot = 0.0_rt;
+                if (has_J_dep) {
+                    const amrex::Real jr = Interp(Jpx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const amrex::Real jt = Interp(Jpy, Jy_stag, Ey_stag, coarsen, i, j, k, 0);
+                    const amrex::Real jz = Interp(Jpz, Jz_stag, Ey_stag, coarsen, i, j, k, 0);
+                    jtot = std::sqrt(jr*jr + jt*jt + jz*jz);
+                }
+                const amrex::Real q_theta =
+                    Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
+                    - eta(rho_v, jtot, t_new) * Jpy(i,j,k) * Jpy(i,j,k);
+                W += (0.5_rt * q_redge(i) * A_ip
+                      + (on_axis ? 0.0_rt : 0.5_rt * q_redge(i-1) * A_im)) / A_i
+                   + 0.5_rt * (q_zedge(j-1) + q_zedge(j))
+                   + q_theta;
+            }
 #elif defined(WARPX_DIM_3D)
             auto ue_y = [&] (int ii, int jj, int kk) {
                 const amrex::Real n_ = amrex::max(rho_arr(ii,jj,kk,0), rho_floor);
@@ -963,14 +1036,9 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
 #else
             amrex::ignore_unused(Fx, Fz, divF, divu, dlo, dhi, is_per, dxi);
 #endif
-#if defined(WARPX_DIM_RZ)
-            const amrex::Real pe_new = pe0(i,j,k)
-                - theta_dt * (divF + (gamma - 1._rt) * pe_it_arr(i,j,k) * divu);
-#else
             const amrex::Real pe_new = pe0(i,j,k)
                 - theta_dt * (gamma * divF
                               + (gamma - 1._rt) * (W + Jnet_gradpe));
-#endif
             pe_arr(i,j,k) = amrex::max(pe_new, 0._rt);
         });
     }
@@ -992,7 +1060,7 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
 void ThetaImplicitHybrid::FinishPeUpdate ()
 {
     // pe^{n+1} = (pe^{n+theta} - (1-theta) pe^n) / theta, then roll the state
-    if (!m_pe_advance_in_loop || !m_pe_theta) { return; }
+    if (!m_pe_theta) { return; }
     using namespace amrex::literals;
     using warpx::fields::FieldType;
 

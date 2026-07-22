@@ -91,7 +91,8 @@ public:
     void CaptureJRhoBase ();
 
     /**
-     * \brief In-loop electron pressure advance (see m_pe_advance_in_loop): compute
+     * \brief In-loop electron pressure advance (the implicit implementation of the
+     * gamma-law closure): compute
      * pe^{n+theta} from pe^n and the current iterate's electron flow, and write it to
      * hybrid_electron_pressure_fp for the Ohm's-law solve. Public because the CUDA
      * compiler requires the enclosing function of a device lambda to be public.
@@ -185,7 +186,6 @@ private:
      * implicit scheme; it also differs from the operator-split QDSMC energy equation,
      * whose one-step-lagged pe destabilizes noise-driven problems.
      */
-    bool m_pe_advance_in_loop = false;
 
     /** pe^n and pe^{n+theta} state for the in-loop pressure advance */
     mutable std::unique_ptr<amrex::MultiFab> m_pe_old;
