@@ -214,7 +214,8 @@ computePhi (
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
     [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
+    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt, // only used for EB
+    [[maybe_unused]] amrex::MultiFab const* dielectric_epsilon = nullptr
 )
 {
     using namespace amrex::literals;
@@ -354,6 +355,11 @@ computePhi (
                 1._rt-beta_solver[0]*beta_solver[0],
                 1._rt-beta_solver[1]*beta_solver[1],
                 1._rt-beta_solver[2]*beta_solver[2])});
+#endif
+#if defined (AMREX_USE_EB)
+            if (eb_enabled && dielectric_sigma != nullptr) {
+                linop_nodelap->setSigma(lev, *dielectric_epsilon);
+            }
 #endif
 #if defined(AMREX_USE_EB)
             if (eb_enabled) {
