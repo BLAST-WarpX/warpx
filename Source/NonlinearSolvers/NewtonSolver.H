@@ -13,6 +13,8 @@
 #include "Preconditioner.H"
 #include "Utils/TextMsg.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 #include <AMReX_ParmParse.H>
 #include <AMReX_Config.H>
 

@@ -9,6 +9,9 @@
 #ifndef WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 #define WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_
 
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <AMReX_Algorithm.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Math.H>
 #include <AMReX_REAL.H>
@@ -20,12 +23,10 @@
 enum class ScatteringProcessType {
     INVALID,
     ELASTIC,
-    BACK,
     TWOPRODUCT_REACTION,
     CHARGE_EXCHANGE,
     EXCITATION,
     IONIZATION,
-    FORWARD,
 };
 
 class ScatteringProcess
@@ -34,7 +35,8 @@ public:
     ScatteringProcess (
                 const std::string& scattering_process,
                 const std::string& cross_section_file,
-                amrex::ParticleReal energy
+                amrex::ParticleReal energy,
+                ScatteringAngleModel scattering_angle_model
                 );
 
     template <typename InputVector>
@@ -42,7 +44,8 @@ public:
                 const std::string& scattering_process,
                 const InputVector&& energies,
                 const InputVector&& sigmas,
-                amrex::ParticleReal energy
+                amrex::ParticleReal energy,
+                ScatteringAngleModel scattering_angle_model
                 );
 
     ~ScatteringProcess() = default;
@@ -69,8 +72,7 @@ public:
 
     static
     void sanityCheckEnergyGrid (
-                                const amrex::Vector<amrex::ParticleReal>& energies,
-                                amrex::ParticleReal dE
+                                const amrex::Vector<amrex::ParticleReal>& energies
                                 );
 
     struct Executor {
@@ -90,23 +92,31 @@ public:
             } else if (E_coll > m_energy_hi) {
                 return m_sigma_hi;
             } else {
-                using amrex::Math::floor;
-                using amrex::Math::ceil;
-                // calculate index of bounding energy pairs
-                amrex::ParticleReal temp = (E_coll - m_energy_lo) / m_dE;
-                const int idx_1 = static_cast<int>(floor(temp));
-                const int idx_2 = static_cast<int>(ceil(temp));
+                // Locate the pair of energy grid points bracketing E_coll using a
+                // bisection search. This does not assume an evenly spaced energy grid.
+                // `amrex::bisect` returns idx_1 such that
+                // m_energies_data[idx_1] <= E_coll < m_energies_data[idx_1 + 1].
+                const int idx_1 = amrex::bisect(m_energies_data, 0, m_grid_size - 1, E_coll);
+                const int idx_2 = idx_1 + 1;
 
                 // linearly interpolate to the given energy value
-                temp -= idx_1;
+                const amrex::ParticleReal temp =
+                    (E_coll - m_energies_data[idx_1])
+                    / (m_energies_data[idx_2] - m_energies_data[idx_1]);
                 return m_sigmas_data[idx_1] + (m_sigmas_data[idx_2] - m_sigmas_data[idx_1]) * temp;
             }
         }
 
+        amrex::ParticleReal* m_energies_data = nullptr;
         amrex::ParticleReal* m_sigmas_data = nullptr;
+        int m_grid_size = 0;
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
+        ScatteringAngleModel m_scattering_angle_model;
+        /** True if this process creates new product particles (ionization, charge exchange,
+         *  two-product reaction); false for purely scattering processes (elastic, excitation). **/
+        bool m_produces_products = false;
     };
 
     [[nodiscard]]
@@ -130,23 +140,23 @@ public:
 
     [[nodiscard]] ScatteringProcessType type () const { return m_exe_h.m_type; }
 
-private:
-
     static
     ScatteringProcessType parseProcessType(const std::string& process);
 
-    void init (const std::string& scattering_process, amrex::ParticleReal energy);
+private:
+
+    void init (const std::string& scattering_process, amrex::ParticleReal energy,
+               ScatteringAngleModel scattering_angle_model);
 
     amrex::Vector<amrex::ParticleReal> m_energies;
 
 #ifdef AMREX_USE_GPU
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_energies_d;
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_sigmas_d;
     Executor m_exe_d;
 #endif
     amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_h;
     Executor m_exe_h;
-
-    int m_grid_size;
 };
 
 #endif // WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_

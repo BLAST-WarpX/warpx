@@ -51,6 +51,23 @@ class constants:
 picmistandard.register_constants(constants)
 
 
+def _set_refined_region_inputs(refined_regions):
+    if refined_regions:
+        assert len(refined_regions) == 1, Exception(
+            "WarpX only supports one refined region."
+        )
+        assert refined_regions[0][0] == 1, Exception(
+            "The one refined region can only be level 1"
+        )
+        pywarpx.amr.max_level = 1
+        pywarpx.warpx.fine_tag_lo = refined_regions[0][1]
+        pywarpx.warpx.fine_tag_hi = refined_regions[0][2]
+        if len(refined_regions[0]) == 4:
+            pywarpx.amr.ref_ratio_vect = refined_regions[0][3]
+    else:
+        pywarpx.amr.max_level = 0
+
+
 class Species(picmistandard.PICMI_Species):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
@@ -1102,19 +1119,7 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
@@ -1217,19 +1222,7 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
@@ -1353,19 +1346,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
@@ -1510,19 +1491,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
@@ -1701,8 +1670,9 @@ class GMRESLinearSolver(LinearSolverBase):
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "amrex_gmres"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "amrex_gmres"
         amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         amrex_gmres.verbose_int = self.verbose_int
         amrex_gmres.restart_length = self.restart_length
@@ -1719,8 +1689,9 @@ class PETScKSPLinearSolver(LinearSolverBase):
     ----------
     """
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "petsc_ksp"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "petsc_ksp"
 
 
 class PreconditionerBase(picmistandard.base._ClassWithInit):
@@ -2196,7 +2167,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Per-species resistivity overlays added on top of ``plasma_resistivity``,
         as a dictionary mapping a charged species name to a value or expression
         in Ohm*m. The expression may depend on ``rho_s`` (the species charge
-        density), ``rho`` (total charge density), ``Te`` (electron temperature
+        density), ``rho`` (total charge density which, by quasineutrality,
+        equals the electron charge density), ``Te`` (electron temperature
         in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the
         species current density magnitude), ``B`` (magnetic field magnitude)
         and ``t`` (time). The effective resistivity applied to species ``s``
@@ -2215,27 +2187,23 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Reduces to ``eta * J**2`` for a single ion species. Only used when
         ``solve_electron_energy_equation`` is True.
 
-    redirect_joule_to_ions: bool, default=False
-        Route the Joule heating of cells with
-        ``Te >= joule_redirect_Te_threshold`` to the ions (as an
-        energy-conserving stochastic kick) instead of the electrons, allowing
-        ``Ti > Te`` to develop. Requires ``include_joule_heating``.
+    joule_redirect_Te_threshold: float, optional
+        Electron temperature threshold in eV above which the Joule heating of
+        a cell is routed to the ions (as an energy-conserving stochastic kick)
+        instead of the electrons, allowing ``Ti > Te`` to develop. Specifying
+        a value >= 0 enables the redirect (off by default). Requires
+        ``include_joule_heating``.
 
-    joule_redirect_Te_threshold: float, default=100
-        Electron temperature threshold in eV for ``redirect_joule_to_ions``.
-
-    include_temperature_relaxation: bool, default=False
-        Add the electron-ion thermal equilibration ``Q_ei`` to the electron
-        temperature, with the conjugate ion heating applied as an
-        energy-conserving drag-diffusion kick on each ion. Requires
-        ``do_temperature_deposition`` on every charged ion species. Only used
-        when ``solve_electron_energy_equation`` is True.
-
-    electron_ion_relaxation_rate: float or str
+    electron_ion_relaxation_rate: float or str, optional
         Value or expression for the electron-ion energy-equilibration rate
-        ``nu_ei`` in 1/s used by ``include_temperature_relaxation``. The
-        expression may depend on ``rho`` (charge density in C/m^3), ``Te``
-        and ``Ti`` (temperatures in eV) and ``t`` (time).
+        ``nu_ei`` in 1/s. Specifying it enables the electron-ion thermal
+        equilibration ``Q_ei`` on the electron temperature, with the conjugate
+        ion heating applied as an energy-conserving drag-diffusion kick on
+        each ion (the required shape-aware ion temperature deposition is
+        enabled automatically on every charged species). The expression may
+        depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti``
+        (temperatures in eV) and ``t`` (time). Only used when
+        ``solve_electron_energy_equation`` is True.
 
     qdsmc_n_floor: float, optional
         Minimum electron number density (in m^-3) used when recovering the
@@ -2345,9 +2313,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         plasma_resistivity_species=None,
         solve_electron_energy_equation=None,
         include_joule_heating=None,
-        redirect_joule_to_ions=None,
         joule_redirect_Te_threshold=None,
-        include_temperature_relaxation=None,
         electron_ion_relaxation_rate=None,
         qdsmc_n_floor=None,
         substeps=None,
@@ -2378,9 +2344,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
         self.include_joule_heating = include_joule_heating
-        self.redirect_joule_to_ions = redirect_joule_to_ions
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
-        self.include_temperature_relaxation = include_temperature_relaxation
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
         self.qdsmc_n_floor = qdsmc_n_floor
 
@@ -2442,24 +2406,18 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                     f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
                     pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
                 )
-        # Only assign the electron-energy-equation attributes when given, so
-        # that scripts setting them directly on the hybridpicmodel bucket are
-        # not clobbered with None here.
+        # Only emit the electron-energy-equation attributes that were
+        # explicitly set, so the generated input deck contains only
+        # user-specified parameters.
         if self.solve_electron_energy_equation is not None:
             pywarpx.hybridpicmodel.solve_electron_energy_equation = (
                 self.solve_electron_energy_equation
             )
         if self.include_joule_heating is not None:
             pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
-        if self.redirect_joule_to_ions is not None:
-            pywarpx.hybridpicmodel.redirect_joule_to_ions = self.redirect_joule_to_ions
         if self.joule_redirect_Te_threshold is not None:
             pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
                 self.joule_redirect_Te_threshold
-            )
-        if self.include_temperature_relaxation is not None:
-            pywarpx.hybridpicmodel.include_temperature_relaxation = (
-                self.include_temperature_relaxation
             )
         if self.electron_ion_relaxation_rate is not None:
             pywarpx.hybridpicmodel.__setattr__(
@@ -4396,9 +4354,8 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "proc_number",
                     "part_per_cell",
                     "eb_covered",
-                    # Hybrid-PIC electron-energy-equation state. Both are
-                    # always allocated when the hybrid solver is selected,
-                    # zero-initialized otherwise.
+                    # Electron temperature/pressure of the hybrid-PIC
+                    # (Ohm's law) solver; only valid with that solver.
                     "Te",
                     "Pe",
                 ]:

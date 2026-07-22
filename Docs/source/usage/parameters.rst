@@ -1010,6 +1010,17 @@ additionally define the electric potential at the embedded boundary with an anal
     inside the embedded boundary. For this reason, it is important to define
     this function in such a way that it is constant inside the embedded boundary.
 
+.. pp:param:: boundary.particle_eb
+    :type: ``string``
+    :default: ``Absorbing``
+    :optional:
+
+    The boundary condition applied to the particles when they reach the surface of the embedded boundary. Options are:
+
+    * ``Absorbing``: Particles that reach the embedded boundary are deleted. This is the default behavior.
+
+    * ``Reflecting``: Particles that reach the embedded boundary are specularly reflected back into the simulation domain
+
 .. _param-particle-thermalizer:
 
 Particle thermalizer
@@ -1624,12 +1635,13 @@ Particle initialization
       It requires additional argument ``<species_name>.density_function(x,y,z)``, which is a
       mathematical expression for the density of the species, e.g.
       ``electrons.density_function(x,y,z) = "n0+n0*x**2*1.e12"`` where ``n0`` is a
-      user-defined constant, see above. WARNING: where ``density_function(x,y,z)`` is close to zero, particles will still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is undesirable because it results in useless computing. To avoid this, see option ``density_min`` below.
+      user-defined constant, see above.
 
     * ``read_from_file``: load the density profile from an openPMD file.
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
-      file must contain a field named ``density``. See
+      file must contain a field with the name given by ``<species_name>.density_mesh_name``
+      (default ``density``). See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
       for an example of how to prepare the openPMD data file. There is
       another optional parameter,
@@ -1660,6 +1672,10 @@ Particle initialization
     :optional:
 
     Minimum plasma density. No particle is injected where the density is below this value.
+    This is useful because, where the density is close to zero, particles would otherwise
+    still be injected between ``xmin`` and ``xmax`` etc., with a null weight. This is
+    undesirable because it results in useless computing. This option applies to all density
+    profiles (``constant``, ``parse_density_function`` and ``read_from_file``).
 
 .. pp:param:: <species_name>.density_max
     :type: ``float``
@@ -1667,6 +1683,7 @@ Particle initialization
     :optional:
 
     Maximum plasma density. The density at each point is the minimum between the value given in the profile, and ``density_max``.
+    This option applies to all density profiles (``constant``, ``parse_density_function`` and ``read_from_file``).
 
 .. pp:param:: <species_name>.radial_numpercell_power
     :type: ``float``
@@ -1926,7 +1943,7 @@ Particle initialization
     buffer for the specified boundary if they leave the simulation domain in
     the specified direction. **If USE_EB=TRUE** the ``save_particles_at_eb``
     flag can be set to ``1`` to also save particle data for the particles of this
-    species that impact the embedded boundary.
+    species that are absorbed at the embedded boundary.
     The scraped particle buffer can be used to track particle fluxes out of the
     simulation.
     The particle data can be written out by setting up a ``BoundaryScrapingDiagnostic``.
@@ -3049,28 +3066,52 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: ``strings`` separated by spaces
 
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, ``twoproduct_reaction`` and ``charge_exchange``
-    for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
-    Multiple excitation events can be included for electrons corresponding to
-    excitation to different levels, the ``X`` above can be changed to a unique
-    identifier for each excitation process. For each scattering process specified
+    included. Available options are ``elasticX``, ``excitationX``, ``twoproduct_reaction`` and ``charge_exchange``
+    for ions and ``elasticX``, ``excitationX`` and ``ionization`` for electrons.
+    Multiple elastic and excitation events can be included, corresponding e.g. to
+    excitation to different levels or to several elastic channels (with different
+    cross-sections and/or scattering angle models); the ``X`` above can be changed
+    to a unique identifier for each such process. For each scattering process specified
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
+
+    For ``elasticX``, ``excitationX``, ``charge_exchange`` and ``twoproduct_reaction``, the
+    angular distribution is controlled by the per-process
+    :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` argument.
 
 .. pp:param:: <collision_name>.<scattering_process>_cross_section
     :type: ``string``
 
     Only for ``dsmc`` and ``background_mcc``. Path to the file containing cross-section data
     for the given scattering processes. The cross-section file must have exactly
-    2 columns of data, the first containing equally spaced energies in eV and the
+    2 columns of data, the first containing energies in eV and the
     second the corresponding cross-section in :math:`m^2`. The energy column should
-    represent the kinetic energy of the colliding particles in the center-of-mass frame.
+    represent the kinetic energy of the center-of-mass frame. The energy values in this column
+    must be in strictly increasing order.
 
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
 
-    Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
-    ``excitationX``, ``ionization`` or ``twoproduct_reaction``, the energy cost of that process must be given in eV.
+    Only for ``dsmc`` and ``background_mcc``. The energy cost of the process, in eV. It is
+    required for ``excitationX`` and ``ionization``, optional for ``charge_exchange`` and
+    ``twoproduct_reaction`` (which may impose a fixed energy loss, defaulting to 0), and
+    ignored for ``elasticX`` processes (which have no energy cost).
+
+.. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
+    :type: ``string``
+    :optional:
+
+    Only for ``dsmc`` and ``background_mcc``, and only for ``elasticX``, ``excitationX``,
+    ``charge_exchange`` and ``twoproduct_reaction``.
+    The model used to determine the scattering angle of the products
+    in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
+    The default is ``isotropic`` for ``elasticX`` and ``excitationX``, and ``forward`` for
+    ``charge_exchange`` and ``twoproduct_reaction``.
+    With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
+    With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction
+    as the incident particle (in the center of mass frame).
+    With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in
+    the opposite direction of the incident particle (in the center of mass frame).
 
 .. pp:param:: <collision_name>.ionization_species
     :type: ``float``
@@ -3705,6 +3746,10 @@ Maxwell solver: kinetic-fluid hybrid
     the current-density magnitudes ``J`` and ``J_s`` (:math:`A/m^2`), the magnetic-field magnitude ``B`` (:math:`T`)
     and the time ``t`` (:math:`s`). The same effective per-species resistivity enters the Joule-heating source of the
     electron energy equation when :pp:param:`hybrid_pic_model.include_joule_heating` is on.
+    Species without their own overlay simply use the global
+    :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`, so existing single-resistivity input decks are unchanged.
+    Note that in RZ geometry ``J_s`` is the magnitude of the raw (not volume-scaled) species current deposit;
+    in Cartesian geometry it is the physical current-density magnitude.
 
 .. pp:param:: hybrid_pic_model.solve_electron_energy_equation
     :type: ``bool``
@@ -3734,44 +3779,31 @@ Maxwell solver: kinetic-fluid hybrid
     :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. For a single species this reduces to
     :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
 
-.. pp:param:: hybrid_pic_model.redirect_joule_to_ions
-    :type: ``bool``
-    :default: ``false``
+.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
+    :type: ``float``
+    :default: ``-1`` (off)
     :optional:
 
-    If :pp:param:`hybrid_pic_model.include_joule_heating` is on, cells with electron temperature at or above
-    :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold` deposit their Joule heat to the kinetic ions
+    Electron temperature threshold, in eV, above which the Joule heat is redirected to the ions.
+    If :pp:param:`hybrid_pic_model.include_joule_heating` is on and a threshold :math:`\geq 0` is specified,
+    cells with electron temperature at or above the threshold deposit their Joule heat to the kinetic ions
     (as stochastic thermal-velocity kicks, bookkept per species) instead of the electron fluid. This caps the
     electron heating at the threshold and allows :math:`T_i > T_e` to develop, mimicking regimes where the
     electrons radiate strongly.
 
-.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
-    :type: ``float``
-    :default: ``100``
-    :optional:
-
-    Electron temperature threshold, in eV, used by :pp:param:`hybrid_pic_model.redirect_joule_to_ions`.
-
-.. pp:param:: hybrid_pic_model.include_temperature_relaxation
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the electron-ion
-    thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})` as a sink on the
-    electron fluid, paired with matching (energy-conserving) heating of the ion macro-particles. Requires the
-    ion species to activate ``<species>.do_temperature_deposition`` so that the deposited ion temperature is
-    available on the grid.
-
 .. pp:param:: hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t)
     :type: ``float`` or ``str``
-    :default: ``0``
     :optional:
 
-    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`, used by
-    :pp:param:`hybrid_pic_model.include_temperature_relaxation`. The expression can depend on the total charge
-    density ``rho`` (:math:`C/m^3`), the electron and ion temperatures ``Te`` and ``Ti`` (both in eV) and the
-    time ``t`` (:math:`s`), which permits, e.g., the NRL-formulary Spitzer rate.
+    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`. If
+    :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, specifying this rate enables the
+    electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`
+    as a sink on the electron fluid, paired with matching (energy-conserving) heating of the ion
+    macro-particles. The required shape-aware ion temperature deposition
+    (``<species>.do_temperature_deposition``) is enabled automatically on every charged species.
+    The expression can depend on the total charge density ``rho`` (:math:`C/m^3`), the electron and ion
+    temperatures ``Te`` and ``Ti`` (both in eV) and the time ``t`` (:math:`s`), which permits, e.g., the
+    NRL-formulary Spitzer rate.
 
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``
@@ -4358,6 +4390,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
+    With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.
@@ -4749,9 +4782,9 @@ This can be important if a large number of particles are lost, avoiding filling 
 In addition to their usual attributes, the saved particles have
    an integer attribute ``stepScraped``, which indicates the PIC iteration at which each particle was absorbed at the boundary,
    a real attribute ``deltaTimeScraped``, which indicates the time between the time associated to ``stepScraped``
-   and the exact time when each particle hits the boundary,
-   a real attribute ``timeScraped``, which indicates the exact time when the paritcle hit the boundary,
-   3 real attributes ``nx``, ``ny``, ``nz``, which represents the three components of the normal to the boundary on the point of contact of the particles (not saved if they reach non-EB boundaries)
+   and the exact time when each particle is absorbed at the boundary,
+   a real attribute ``timeScraped``, which indicates the exact time when the particle is absorbed at the boundary,
+   3 real attributes ``nx``, ``ny``, ``nz``, which represents the three components of the normal to the boundary at the point where the particle is absorbed (not saved if they reach non-EB boundaries)
 
 ``BoundaryScrapingDiagnostics`` can be used with :pp:param:`<diag_name>.<species_name>.random_fraction`, :pp:param:`<diag_name>.<species_name>.uniform_stride`, and ``<diag_name>.<species_name>.plot_filter_function``, which have the same behavior as for ``FullDiagnostics``. For ``BoundaryScrapingDiagnostics``, these filters are applied at the time the data is written to file. An implication of this is that more particles may initially be accumulated in memory than are ultimately written. ``t`` in ``plot_filter_function`` refers to the time the diagnostic is written rather than the time the particle crossed the boundary.
 
