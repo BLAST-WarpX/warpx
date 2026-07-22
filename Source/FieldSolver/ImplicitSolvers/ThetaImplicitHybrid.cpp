@@ -64,6 +64,10 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     pp.query("use_rho_response_divj", m_use_rho_response_divj);
     pp.query("push_with_solver_E", m_push_with_solver_E);
     pp.query("pe_advance_in_loop", m_pe_advance_in_loop);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_pe_advance_in_loop || m_push_with_solver_E,
+        "implicit_evolve.pe_advance_in_loop requires implicit_evolve.push_with_solver_E=1: "
+        "the electron work pairing reads the solver iterate from Efield_fp");
 
     // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
     m_alpha_mf.resize(m_num_amr_levels);
@@ -600,6 +604,11 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
         m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
     const ablastr::fields::VectorField Jp =
         m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    // The solver iterate a_E (with push_with_solver_E, Efield_fp holds it here:
+    // external-field contributions have already been subtracted again). This is the
+    // same field that pushed the particles and that theta-Faraday consumes.
+    const ablastr::fields::VectorField Efld =
+        m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
 
     const amrex::Geometry& geom = m_WarpX->Geom(lev);
 
@@ -680,9 +689,13 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
         amrex::Array4<amrex::Real const> const& Jz  = J[2]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Jpx = Jp[0]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Jpz = Jp[2]->const_array(mfi);
-#if defined(WARPX_DIM_3D)
         amrex::Array4<amrex::Real const> const& Jy  = J[1]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Jpy = Jp[1]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Ex_arr = Efld[0]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Ey_arr = Efld[1]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Ez_arr = Efld[2]->const_array(mfi);
+#if defined(WARPX_DIM_RZ)
+        amrex::ignore_unused(Jy, Jpy, Ex_arr, Ey_arr, Ez_arr);
 #endif
 
         const amrex::Box tb = mfi.tilebox(amrex::IntVect::TheNodeVector());
@@ -708,27 +721,35 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
             auto Fx = [&] (int ii, int jj, int kk) { return ue_x(ii,jj,kk) * pec(ii,jj,kk); };
             auto Fz = [&] (int ii, int jj, int kk) { return ue_z(ii,jj,kk) * pec(ii,jj,kk); };
 
-            // Cartesian: enthalpy-flux transport plus the ion-work pairing term.
-            //   d_t pe = -gamma div(ue pe) + (gamma-1) ue.grad(pe),
-            // with (gamma-1) ue.grad(pe) replaced by
-            //   -(gamma-1) [ nodesplit(E_pe . J_i) + (J_net/(en)).grad(pe) ],
-            // where E_pe,edge = -UpwardD(pe)/max(rho_edge, floor) is the SAME discrete
-            // pressure field HybridPICSolveE builds and J_i is the deposited ion current
-            // on the same edges. Each edge's work is split half to each adjacent node,
-            // so summed over the (periodic) grid the electron energy change cancels the
-            // ion energy gain from the pressure channel exactly (the gather/deposit
-            // pairing on the ion side is already exact).
+            // Cartesian: enthalpy-flux transport plus the work pairing term,
+            //   d_t pe = -gamma div(ue pe) + (gamma-1) ue.grad(pe) + (gamma-1) Q.
+            //
+            // Collocated grid (J_nodal): full-Ohm pairing. The electrons absorb the
+            // exact complement of the discrete ion work (+sum E.J_i) and the
+            // magnetic-energy change (-sum E.J_amp for theta = 1/2 Faraday with
+            // mutually adjoint curls), so W carries -E.J_e = E.(J_i - J_amp) with E
+            // the solver iterate that pushed the particles and drives Faraday. This
+            // is the continuum (gamma-1)[ue.grad(pe) + Q_Joule] with the conservative
+            // Joule form Q = eta J_tot.J_e, and it holds for ANY Ohm's-law contents:
+            // the Hall term does no work pointwise at a node, and total energy
+            // K_i + U_e + W_B is conserved identically, independent of what E is.
+            //
+            // Yee grid: legacy pressure-channel-only pairing. E_pe,edge =
+            // -UpwardD(pe)/max(rho_edge, floor) is the SAME discrete field
+            // HybridPICSolveE builds; each edge's work is split half to each
+            // adjacent node so the periodic sum cancels the ion pressure-channel
+            // work exactly. The remaining J_net.grad(pe)/(en) term uses centered
+            // differences (B-channel pairing not exact on the staggered mesh).
             amrex::Real divF = 0._rt, divu = 0._rt, W = 0._rt, Jnet_gradpe = 0._rt;
             amrex::ignore_unused(divu);
 #if defined(WARPX_DIM_1D_Z)
             if ((i <= dlo.x || i >= dhi.x) && !is_per[0]) { return; }
             divF += (Fz(i+1,j,k) - Fz(i-1,j,k)) * 0.5_rt * dxi[0];
             if (J_nodal) {
-                // E_pe exactly as CartesianNodalAlgorithm::UpwardDz + nodal rho
-                const amrex::Real gradpe =
-                    (pe_it_arr(i+1,j,k) - pe_it_arr(i-1,j,k)) * 0.5_rt * dxi[0];
-                const amrex::Real rho_n = amrex::max(rho_arr(i,j,k,0), rho_floor);
-                W += (-gradpe / rho_n) * Jz(i,j,k);
+                // -E.J_e over all three components (perp components do work at B != 0)
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k));
             } else {
                 auto EpeJ_z1d = [&] (int ie) {
                     const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
@@ -738,7 +759,7 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                 };
                 W += 0.5_rt * (EpeJ_z1d(i-1) + EpeJ_z1d(i));
             }
-            {
+            if (!J_nodal) {
                 const amrex::Real n_ = amrex::max(rho_arr(i,j,k,0), rho_floor);
                 const amrex::Real Jp_n = Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
                 Jnet_gradpe += (Jp_n / n_) *
@@ -750,14 +771,10 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
             divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
                   + (Fz(i,j+1,k) - Fz(i,j-1,k)) * 0.5_rt * dxi[1];
             if (J_nodal) {
-                // E_pe exactly as CartesianNodalAlgorithm::UpwardDx/Dz + nodal rho
-                const amrex::Real rho_n = amrex::max(rho_arr(i,j,k,0), rho_floor);
-                const amrex::Real gradpe_x =
-                    (pe_it_arr(i+1,j,k) - pe_it_arr(i-1,j,k)) * 0.5_rt * dxi[0];
-                const amrex::Real gradpe_z =
-                    (pe_it_arr(i,j+1,k) - pe_it_arr(i,j-1,k)) * 0.5_rt * dxi[1];
-                W += (-gradpe_x / rho_n) * Jx(i,j,k)
-                   + (-gradpe_z / rho_n) * Jz(i,j,k);
+                // -E.J_e over all three components (perp components do work at B != 0)
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k));
             } else {
                 auto EpeJ_x2d = [&] (int ie) {
                     const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
@@ -774,7 +791,7 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                 W += 0.5_rt * (EpeJ_x2d(i-1) + EpeJ_x2d(i))
                    + 0.5_rt * (EpeJ_z2d(j-1) + EpeJ_z2d(j));
             }
-            {
+            if (!J_nodal) {
                 const amrex::Real n_ = amrex::max(rho_arr(i,j,k,0), rho_floor);
                 const amrex::Real Jpx_n = Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
                 const amrex::Real Jpz_n = Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
@@ -810,17 +827,10 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                   + (Fy(i,j+1,k) - Fy(i,j-1,k)) * 0.5_rt * dxi[1]
                   + (Fz(i,j,k+1) - Fz(i,j,k-1)) * 0.5_rt * dxi[2];
             if (J_nodal) {
-                // E_pe exactly as CartesianNodalAlgorithm::UpwardDx/Dy/Dz + nodal rho
-                const amrex::Real rho_n = amrex::max(rho_arr(i,j,k,0), rho_floor);
-                const amrex::Real gradpe_x =
-                    (pe_it_arr(i+1,j,k) - pe_it_arr(i-1,j,k)) * 0.5_rt * dxi[0];
-                const amrex::Real gradpe_y =
-                    (pe_it_arr(i,j+1,k) - pe_it_arr(i,j-1,k)) * 0.5_rt * dxi[1];
-                const amrex::Real gradpe_z =
-                    (pe_it_arr(i,j,k+1) - pe_it_arr(i,j,k-1)) * 0.5_rt * dxi[2];
-                W += (-gradpe_x / rho_n) * Jx(i,j,k)
-                   + (-gradpe_y / rho_n) * Jy(i,j,k)
-                   + (-gradpe_z / rho_n) * Jz(i,j,k);
+                // -E.J_e over all three components
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k));
             } else {
                 auto EpeJ_x3d = [&] (int ie) {
                     const amrex::Real gradpe = (pe_it_arr(ie+1,j,k) - pe_it_arr(ie,j,k)) * dxi[0];
@@ -844,7 +854,7 @@ void ThetaImplicitHybrid::AdvancePeInLoop ( const bool a_from_jacobian )
                    + 0.5_rt * (EpeJ_y3d(j-1) + EpeJ_y3d(j))
                    + 0.5_rt * (EpeJ_z3d(k-1) + EpeJ_z3d(k));
             }
-            {
+            if (!J_nodal) {
                 const amrex::Real n_ = amrex::max(rho_arr(i,j,k,0), rho_floor);
                 const amrex::Real Jpx_n = Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
                 const amrex::Real Jpy_n = Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
