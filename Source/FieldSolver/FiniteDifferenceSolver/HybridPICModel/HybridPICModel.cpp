@@ -644,20 +644,25 @@ void HybridPICModel::BfieldEvolve (
 
     // Adjust the number of substeps for the next RKF45/RK4 half-step.
     // Jump up immediately when this half needed more attempts; otherwise
-    // slowly relax toward target = 2*n_attempts (95% current + 5% target).
-    // Keep m_substeps even and never below m_substeps_min (user input).
-    // Previous update used 2*ceil(0.475*m + 0.05*n), which could trap m at
-    // the input value (e.g. 40) forever for typical n_attempts (ceil trap).
+    // slowly relax toward target = 2*n_attempts.
+    // Blend on the half-step counts M = m_substeps/2 and N = n_attempts, then
+    // 2*floor(...): that keeps m_substeps even and actually decays. Blending
+    // full m then lround + force-even re-traps at many even values (e.g.
+    // m=40, n=10 → 0.95*40+0.05*20=39 → round-up-even → 40).
+    // Old stock code used 2*ceil(0.475*m + 0.05*n), which also froze m at the
+    // user input for typical n_attempts.
     {
         const int target = 2 * std::max(n_attempts, 1);
         if (m_substeps < target) {
             m_substeps = target;
         } else {
-            const amrex::Real blended =
-                0.95_rt * static_cast<amrex::Real>(m_substeps)
-                + 0.05_rt * static_cast<amrex::Real>(target);
-            int relaxed = static_cast<int>(std::lround(static_cast<double>(blended)));
-            if (relaxed % 2 != 0) { ++relaxed; }
+            const amrex::Real M =
+                0.5_rt * static_cast<amrex::Real>(m_substeps);
+            const amrex::Real N =
+                static_cast<amrex::Real>(std::max(n_attempts, 1));
+            const amrex::Real blended_half = 0.95_rt * M + 0.05_rt * N;
+            const int relaxed =
+                2 * static_cast<int>(std::floor(static_cast<double>(blended_half)));
             m_substeps = std::max(relaxed, std::max(m_substeps_min, 2));
         }
         // Stay within the abort budget so the controller cannot request more
