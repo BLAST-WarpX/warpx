@@ -97,7 +97,8 @@ namespace warpx::fields
         Venl,
         global_debye_length,
         dA_fp,   /**< Used by the Darwin solver; the change in vector potential over one step */
-        effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
+        effective_potential_sigma,  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
+        dielectric_epsilon
     );
 
     /** these are vector fields */
