@@ -781,40 +781,41 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
 
-    // Mirror the closure's implied electron temperature,
-    // T_e = P_e / (n_e k_B), into hybrid_electron_temperature_fp so the "Te"
-    // diagnostic is meaningful. Diagnostic-only on this path: with
-    // solve_electron_energy_equation on, this function is not called and
-    // T_e is owned by the QDSMC entropy transport, which fills Te/Pe at
-    // this same point in the field loop.
-    {
-        amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
-        amrex::MultiFab const & Pe  = *electron_pressure_fp;
-        amrex::MultiFab const & rho = *rho_fp;
-        auto const rho_floor = PhysConst::q_e * m_n_floor;
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
-            amrex::Array4<amrex::Real const> const & Pe_arr  = Pe.const_array(mfi);
-            amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
-            amrex::Box const & tbox = mfi.tilebox();
-            amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
-                amrex::Real const ne      = rho_val / PhysConst::q_e;
-                Te_arr(i,j,k) = Pe_arr(i,j,k) / (ne * PhysConst::kb);
-            });
-        }
-    }
+    // Mirror the closure's implied electron temperature into
+    // hybrid_electron_temperature_fp so the "Te" diagnostic is meaningful.
+    FillTeFromPe(lev);
 
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
         WarpX::do_single_precision_comms,
         warpx.Geom(lev).periodicity(),
         true);
+}
+
+void HybridPICModel::FillTeFromPe (const int lev) const
+{
+    // T_e = P_e / (n_e k_B) from the current electron pressure and density.
+    auto & warpx = WarpX::GetInstance();
+    amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & Pe  = *warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
+        amrex::Array4<amrex::Real const> const & Pe_arr  = Pe.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+        amrex::Box const & tbox = mfi.tilebox();
+        amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
+            amrex::Real const ne      = rho_val / PhysConst::q_e;
+            Te_arr(i,j,k) = Pe_arr(i,j,k) / (ne * PhysConst::kb);
+        });
+    }
 }
 
 void HybridPICModel::CalculateElectronFluidVelocity () const
@@ -1901,6 +1902,128 @@ void HybridPICModel::QDSMCFillElectronPressureFromTe (int const lev) const
 }
 
 
+
+void HybridPICModel::ApplyIonElectronEnergyExchange (
+    const int lev, amrex::Real const dt, amrex::MultiFab* ion_redirect_E) const
+{
+    // Symmetric collisional energy exchange between the electron fluid and the
+    // ion particles: the Q_ei relaxation sinks/sources T_e and the stochastic
+    // drag-diffusion operator applies the exact conjugate to the ions (plus any
+    // staged redirected Joule energy). Total energy is conserved between the
+    // two sides by construction. Requires rho_fp, rho_fp_<species> and the
+    // per-species T_<species> deposits to be current.
+    auto & warpx = WarpX::GetInstance();
+    amrex::ignore_unused(warpx);
+    const bool redirect_active = (ion_redirect_E != nullptr);
+    if (!m_include_temperature_relaxation && !redirect_active) { return; }
+
+    // Steps 6b/6c both need each charged species' T_i when Q_ei relaxation is
+    // on. Deposit it ONCE here (the expensive per-particle NGP temperature
+    // reduction) and share it: the electron sink (6b) and the ion-heating
+    // operator (6c) run back-to-back with no intervening ion motion, so the
+    // deposited T_i is identical for both.
+    std::map<std::string, amrex::MultiFab*> Ti_dep_by_species;
+    // Owns the per-species cell-centered scalar T_i built from the shape-aware
+    // deposition below; must outlive the QDSMCAddTemperatureRelaxation /
+    // QDSMCApplyIonHeating calls that read it through Ti_dep_by_species.
+    std::map<std::string, std::unique_ptr<amrex::MultiFab>> Ti_scalar_owned;
+    if (m_include_temperature_relaxation) {
+        using ablastr::fields::Direction;
+        amrex::GpuArray<int, 3> const Tr_stag = Jx_IndexType;
+        amrex::GpuArray<int, 3> const Tt_stag = Jy_IndexType;
+        amrex::GpuArray<int, 3> const Tz_stag = Jz_IndexType;
+        amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+        // Cell-centered target in the real dimensions; in collapsed dimensions
+        // (index >= AMREX_SPACEDIM, e.g. theta in RZ or y in 2D) match the source
+        // staggering so Interp does not read the out-of-bounds neighbour there.
+        amrex::GpuArray<int, 3> cc_r = {0, 0, 0};
+        amrex::GpuArray<int, 3> cc_t = {0, 0, 0};
+        amrex::GpuArray<int, 3> cc_z = {0, 0, 0};
+        for (int d = AMREX_SPACEDIM; d < 3; ++d) {
+            cc_r[d] = Tr_stag[d]; cc_t[d] = Tt_stag[d]; cc_z[d] = Tz_stag[d];
+        }
+
+        auto & mpc_ti = warpx.GetPartContainer();
+        for (auto const & nm : mpc_ti.GetSpeciesNames()) {
+            auto & pc = mpc_ti.GetParticleContainerFromName(nm);
+            if (pc.getCharge() == 0._prt) { continue; }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc.getTemperatureDepositionFlag(),
+                "The Q_ei temperature relaxation requires do_temperature_deposition "
+                "on every charged ion species; it is enabled automatically at species "
+                "construction, so hitting this indicates the species was created "
+                "before the hybrid_pic_model relaxation parameters were readable.");
+
+            // Shape-aware ion temperature (particle-shape order, consistent with
+            // charge/current) in the Yee-staggered 3-component T_<nm> vector field
+            // (Tr,Tt,Tz), deposited in Kelvin by HybridPICDepositRhoAndJ ->
+            // mypc->DepositTemperatures earlier this step and read here. Fill guard
+            // cells so the cell-centered interpolation below reads finite
+            // neighbours at box/domain edges.
+            auto const T_vf = warpx.m_fields.get_mr_levels_alldirs("T_" + nm, warpx.finestLevel());
+            for (int idim = 0; idim < 3; ++idim) {
+                T_vf[lev][Direction{idim}]->FillBoundary(warpx.Geom(lev).periodicity());
+            }
+
+            // Collapse the staggered vector to a cell-centered scalar
+            // T_i = (Tr + Tt + Tz)/3 by interpolating each component to CC
+            // (Path A: accept the CC interpolation for shape consistency).
+            amrex::MultiFab const & Te_ref =
+                *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+            amrex::BoxArray const cc_ba =
+                amrex::convert(Te_ref.boxArray(), amrex::IntVect::TheCellVector());
+            auto Ti_s = std::make_unique<amrex::MultiFab>(
+                cc_ba, Te_ref.DistributionMap(), 1, 0);
+            Ti_s->setVal(0.0_rt);
+
+            // AccumulateVelocitiesAndComputeTemperature writes T_<nm> in Kelvin;
+            // the Q_ei consumers (and the nu_ei parser) expect T_i in eV, matching
+            // the previous NGP deposit. Convert K -> eV below.
+            amrex::Real const K_per_eV = PhysConst::q_e / PhysConst::kb;
+
+            amrex::MultiFab const & Tr = *T_vf[lev][Direction{0}];
+            amrex::MultiFab const & Tt = *T_vf[lev][Direction{1}];
+            amrex::MultiFab const & Tz = *T_vf[lev][Direction{2}];
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(*Ti_s, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                amrex::Box const & bx = mfi.tilebox();
+                amrex::Array4<amrex::Real>       const & Ti_arr = Ti_s->array(mfi);
+                amrex::Array4<amrex::Real const> const & Tr_arr = Tr.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Tt_arr = Tt.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Tz_arr = Tz.const_array(mfi);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                {
+                    amrex::Real const tr = ablastr::coarsen::sample::Interp(
+                        Tr_arr, Tr_stag, cc_r, coarsen, i, j, k, 0);
+                    amrex::Real const tt = ablastr::coarsen::sample::Interp(
+                        Tt_arr, Tt_stag, cc_t, coarsen, i, j, k, 0);
+                    amrex::Real const tz = ablastr::coarsen::sample::Interp(
+                        Tz_arr, Tz_stag, cc_z, coarsen, i, j, k, 0);
+                    Ti_arr(i, j, k) = (tr + tt + tz) / (3._rt * K_per_eV);  // K -> eV
+                });
+            }
+            Ti_dep_by_species[nm] = Ti_s.get();
+            Ti_scalar_owned[nm] = std::move(Ti_s);
+        }
+    }
+
+    // Step 6b: electron-ion thermal-equilibration (Q_ei) sink on T_e
+    // (cools T_e toward each ion species' T_i).
+    if (m_include_temperature_relaxation) {
+        QDSMCAddTemperatureRelaxation(lev, dt, Ti_dep_by_species);
+    }
+
+    // Step 6c: stochastic drag-diffusion ion-heating operator -- delivers the Q_ei
+    // conjugate (when relaxation is on) and/or the redirected Joule energy
+    // (when the redirect is on), so the ions are heated by one mechanism.
+    if (m_include_temperature_relaxation || redirect_active) {
+        QDSMCApplyIonHeating(lev, dt, ion_redirect_E,
+                             m_include_temperature_relaxation ? &Ti_dep_by_species : nullptr);
+    }
+
+}
+
 void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
 {
     ABLASTR_PROFILE("HybridPICModel::AdvanceElectronEnergyQDSMC()");
@@ -1983,110 +2106,12 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
             QDSMCAddJouleHeating(lev, dt, redirect_active ? &ion_redirect_E : nullptr);
         }
 
-        // Steps 6b/6c both need each charged species' T_i when Q_ei relaxation is
-        // on. Deposit it ONCE here (the expensive per-particle NGP temperature
-        // reduction) and share it: the electron sink (6b) and the ion-heating
-        // operator (6c) run back-to-back with no intervening ion motion, so the
-        // deposited T_i is identical for both.
-        std::map<std::string, amrex::MultiFab*> Ti_dep_by_species;
-        // Owns the per-species cell-centered scalar T_i built from the shape-aware
-        // deposition below; must outlive the QDSMCAddTemperatureRelaxation /
-        // QDSMCApplyIonHeating calls that read it through Ti_dep_by_species.
-        std::map<std::string, std::unique_ptr<amrex::MultiFab>> Ti_scalar_owned;
-        if (m_include_temperature_relaxation) {
-            using ablastr::fields::Direction;
-            amrex::GpuArray<int, 3> const Tr_stag = Jx_IndexType;
-            amrex::GpuArray<int, 3> const Tt_stag = Jy_IndexType;
-            amrex::GpuArray<int, 3> const Tz_stag = Jz_IndexType;
-            amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
-            // Cell-centered target in the real dimensions; in collapsed dimensions
-            // (index >= AMREX_SPACEDIM, e.g. theta in RZ or y in 2D) match the source
-            // staggering so Interp does not read the out-of-bounds neighbour there.
-            amrex::GpuArray<int, 3> cc_r = {0, 0, 0};
-            amrex::GpuArray<int, 3> cc_t = {0, 0, 0};
-            amrex::GpuArray<int, 3> cc_z = {0, 0, 0};
-            for (int d = AMREX_SPACEDIM; d < 3; ++d) {
-                cc_r[d] = Tr_stag[d]; cc_t[d] = Tt_stag[d]; cc_z[d] = Tz_stag[d];
-            }
-
-            auto & mpc_ti = warpx.GetPartContainer();
-            for (auto const & nm : mpc_ti.GetSpeciesNames()) {
-                auto & pc = mpc_ti.GetParticleContainerFromName(nm);
-                if (pc.getCharge() == 0._prt) { continue; }
-                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc.getTemperatureDepositionFlag(),
-                    "The Q_ei temperature relaxation requires do_temperature_deposition "
-                    "on every charged ion species; it is enabled automatically at species "
-                    "construction, so hitting this indicates the species was created "
-                    "before the hybrid_pic_model relaxation parameters were readable.");
-
-                // Shape-aware ion temperature (particle-shape order, consistent with
-                // charge/current) in the Yee-staggered 3-component T_<nm> vector field
-                // (Tr,Tt,Tz), deposited in Kelvin by HybridPICDepositRhoAndJ ->
-                // mypc->DepositTemperatures earlier this step and read here. Fill guard
-                // cells so the cell-centered interpolation below reads finite
-                // neighbours at box/domain edges.
-                auto const T_vf = warpx.m_fields.get_mr_levels_alldirs("T_" + nm, warpx.finestLevel());
-                for (int idim = 0; idim < 3; ++idim) {
-                    T_vf[lev][Direction{idim}]->FillBoundary(warpx.Geom(lev).periodicity());
-                }
-
-                // Collapse the staggered vector to a cell-centered scalar
-                // T_i = (Tr + Tt + Tz)/3 by interpolating each component to CC
-                // (Path A: accept the CC interpolation for shape consistency).
-                amrex::MultiFab const & Te_ref =
-                    *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
-                amrex::BoxArray const cc_ba =
-                    amrex::convert(Te_ref.boxArray(), amrex::IntVect::TheCellVector());
-                auto Ti_s = std::make_unique<amrex::MultiFab>(
-                    cc_ba, Te_ref.DistributionMap(), 1, 0);
-                Ti_s->setVal(0.0_rt);
-
-                // AccumulateVelocitiesAndComputeTemperature writes T_<nm> in Kelvin;
-                // the Q_ei consumers (and the nu_ei parser) expect T_i in eV, matching
-                // the previous NGP deposit. Convert K -> eV below.
-                amrex::Real const K_per_eV = PhysConst::q_e / PhysConst::kb;
-
-                amrex::MultiFab const & Tr = *T_vf[lev][Direction{0}];
-                amrex::MultiFab const & Tt = *T_vf[lev][Direction{1}];
-                amrex::MultiFab const & Tz = *T_vf[lev][Direction{2}];
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (amrex::MFIter mfi(*Ti_s, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    amrex::Box const & bx = mfi.tilebox();
-                    amrex::Array4<amrex::Real>       const & Ti_arr = Ti_s->array(mfi);
-                    amrex::Array4<amrex::Real const> const & Tr_arr = Tr.const_array(mfi);
-                    amrex::Array4<amrex::Real const> const & Tt_arr = Tt.const_array(mfi);
-                    amrex::Array4<amrex::Real const> const & Tz_arr = Tz.const_array(mfi);
-                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                    {
-                        amrex::Real const tr = ablastr::coarsen::sample::Interp(
-                            Tr_arr, Tr_stag, cc_r, coarsen, i, j, k, 0);
-                        amrex::Real const tt = ablastr::coarsen::sample::Interp(
-                            Tt_arr, Tt_stag, cc_t, coarsen, i, j, k, 0);
-                        amrex::Real const tz = ablastr::coarsen::sample::Interp(
-                            Tz_arr, Tz_stag, cc_z, coarsen, i, j, k, 0);
-                        Ti_arr(i, j, k) = (tr + tt + tz) / (3._rt * K_per_eV);  // K -> eV
-                    });
-                }
-                Ti_dep_by_species[nm] = Ti_s.get();
-                Ti_scalar_owned[nm] = std::move(Ti_s);
-            }
-        }
-
-        // Step 6b: electron-ion thermal-equilibration (Q_ei) sink on T_e
-        // (cools T_e toward each ion species' T_i).
-        if (m_include_temperature_relaxation) {
-            QDSMCAddTemperatureRelaxation(lev, dt, Ti_dep_by_species);
-        }
-
-        // Step 6c: stochastic drag-diffusion ion-heating operator -- delivers the Q_ei
-        // conjugate (when relaxation is on) and/or the redirected Joule energy
-        // (when the redirect is on), so the ions are heated by one mechanism.
-        if (m_include_temperature_relaxation || redirect_active) {
-            QDSMCApplyIonHeating(lev, dt, redirect_active ? &ion_redirect_E : nullptr,
-                                 m_include_temperature_relaxation ? &Ti_dep_by_species : nullptr);
-        }
+        // Steps 6b/6c: symmetric ion-electron collisional energy exchange
+        // (Q_ei electron sink + conjugate ion heating) and/or delivery of the
+        // redirected Joule energy. Shared with the implicit scheme, which calls
+        // it directly (its transport and Joule heating are handled in-loop).
+        ApplyIonElectronEnergyExchange(lev, dt,
+            redirect_active ? &ion_redirect_E : nullptr);
 
         // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law solve.
         QDSMCFillElectronPressureFromTe(lev);

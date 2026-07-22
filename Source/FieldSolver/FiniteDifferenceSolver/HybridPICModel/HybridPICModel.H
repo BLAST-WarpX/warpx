@@ -276,6 +276,24 @@ public:
      */
     void QDSMCUpdateTe (int lev) const;
 
+    /** \brief Fill hybrid_electron_temperature_fp with T_e = P_e/(n_e k_B) from the
+     * current electron pressure and rho_fp (component 0). */
+    void FillTeFromPe (int lev) const;
+
+    /**
+     * \brief Symmetric ion-electron collisional energy exchange: the Q_ei relaxation
+     * sinks/sources T_e and the stochastic drag-diffusion operator applies the exact
+     * conjugate to the ion particles, plus any staged redirected Joule energy.
+     * Requires rho_fp, rho_fp_<species> and the per-species T_<species> deposits to
+     * be current. Shared by the explicit QDSMC advance and the theta-implicit scheme
+     * (whose transport and Joule heating are handled in-loop instead).
+     *
+     * \param[in] ion_redirect_E per-charged-species staged Joule energy to deliver to
+     *            the ions (nullptr when the redirect is off).
+     */
+    void ApplyIonElectronEnergyExchange (int lev, amrex::Real dt,
+                                         amrex::MultiFab* ion_redirect_E = nullptr) const;
+
     /**
      * \brief Resistive electron-heating source (see Phys. Plasmas 31, 012902 (2024), Eq. 12).
      *        Adds, per cell and per charged ion species,

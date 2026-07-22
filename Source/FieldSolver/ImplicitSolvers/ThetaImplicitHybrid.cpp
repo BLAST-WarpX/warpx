@@ -35,12 +35,18 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_hybrid_pic_model != nullptr,
         "ThetaImplicitHybrid solver requires hybrid PIC model to be defined");
+    // With the electron energy equation on, the implicit scheme handles the
+    // transport, compression and Joule heating through the in-loop pe advance
+    // (discretely energy-paired); only the symmetric Q_ei ion-electron exchange
+    // is applied once per step (it must kick the ion particles). The
+    // include_joule_heating flag is therefore inert implicitly, and the
+    // Joule-redirect-to-ions option is not supported.
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_hybrid_pic_model->m_solve_electron_energy_equation,
-        "The QDSMC electron energy equation is not yet supported with the "
-        "theta-implicit hybrid solver (it is operator-split and has no in-loop "
-        "energy pairing). Use the gamma-law closure: the implicit scheme evolves "
-        "it as a discretely energy-conserving in-loop pressure advance.");
+        !(m_hybrid_pic_model->m_solve_electron_energy_equation &&
+          m_hybrid_pic_model->m_joule_redirect_to_ions),
+        "The Joule redirect-to-ions option is not supported with the "
+        "theta-implicit hybrid solver (Joule heating enters through the "
+        "in-loop energy pairing).");
 
     /// Set flag for external fields from vector potentials
     m_add_external_fields = m_hybrid_pic_model->m_add_external_fields;
@@ -123,27 +129,6 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // Save particle state at t^n
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // QDSMC electron-energy equation (operator-split): capture rho^n now, while
-    // the particles are still at t^n, into hybrid_rho_fp_temp. The end-of-step
-    // AdvanceElectronEnergyQDSMC reads it as the start-of-step density.
-    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
-        m_WarpX->GetPartContainer().DepositCharge(
-            m_WarpX->m_fields.get_mr_levels(FieldType::hybrid_rho_fp_temp, m_num_amr_levels - 1),
-            0._rt);
-        // DepositCharge does NOT sync boundaries; fold guard-cell deposits into
-        // the valid (incl. periodic) nodes, else n_e is biased at the domain
-        // edges and QDSMC T_e shows a systematic dip there.
-        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            amrex::MultiFab* rt = m_WarpX->m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
-            ablastr::utils::communication::SumBoundary(
-                *rt, 0, rt->nComp(), rt->nGrowVect(), rt->nGrowVect(),
-                WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
-            ablastr::utils::communication::FillBoundary(
-                *rt, rt->nGrowVect(), WarpX::do_single_precision_comms,
-                m_WarpX->Geom(lev).periodicity(), true);
-        }
-    }
-
     // Save E^n (or E_T^n if Darwin split)
     m_Eold.Copy(FieldType::Efield_fp);
 
@@ -185,14 +170,18 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // Advance the in-loop electron pressure state to t^{n+1}
     FinishPeUpdate();
 
-    // QDSMC electron-energy equation (operator-split): particles and fields are
-    // now at t^{n+1}. Deposit rho^{n+1}, then advance T_e^n -> T_e^{n+1}, which
-    // refills hybrid_electron_pressure_fp = n_e k_B T_e for the next step's
-    // Ohm's-law E-solve. The JFNK residual reads that field directly (the
-    // per-iteration adiabatic CalculateElectronPressure is skipped in ComputeRHS
-    // when m_solve_electron_energy_equation is true), so Pe is lagged one step --
-    // the standard operator split for the kinetic electron-energy closure.
-    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+    // Electron energy equation: the transport/compression/Joule part of the
+    // update already happened inside the Newton solve (in-loop pe advance,
+    // energy-paired). What remains is the symmetric Q_ei ion-electron
+    // collisional exchange, which must kick the ion particles and therefore
+    // runs once per step here, on the t^{n+1} state.
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation &&
+        m_hybrid_pic_model->m_include_temperature_relaxation) {
+        // Without the Q_ei relaxation there is nothing left to do: transport,
+        // compression and Joule heating are already handled by the in-loop pe
+        // advance, so the energy equation reduces exactly to the gamma-law
+        // closure path (no end-of-step redistribute/deposits needed).
+        //
         // FinishImplicitParticleUpdate moved particles to t^{n+1} but did not
         // Redistribute them into their valid cells. QDSMCApplyIonHeating does a
         // per-ion NGP lookup into a zero-guard coefficient MultiFab, so ions left
@@ -236,36 +225,25 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         // Deposit the per-species ion temperature T_<nm> for the Q_ei relaxation.
         // The explicit path fills it in HybridPICDepositRhoAndJ; the implicit path
         // does not call that, so it must deposit here (on the redistributed t^{n+1}
-        // particles) or AdvanceElectronEnergyQDSMC reads a stale T_i.
+        // particles) or the Q_ei exchange reads a stale T_i.
         m_WarpX->GetPartContainer().DepositTemperatures(m_WarpX->m_fields, 0._rt);
-        // Provide J_i (ion current) in hybrid_current_fp_temp, which
-        // QDSMCInitializeUe needs for V_e = -(J_plasma - J_i)/(q_e n_e).
-        // Deposit it fresh from the redistributed t^{n+1} particles rather
-        // than copying the solver's current_fp: that copy holds the ion
-        // current from the last Newton residual evaluation (theta-level
-        // positions, different deposit path), and mixing it with the t^{n+1}
-        // B-field in V_e feeds a systematic entropy drift into the QDSMC
-        // transport (electron temperature falls well below the adiabat).
-        // DepositCurrent zeroes the target and applies the RZ inverse-volume
-        // scaling internally; fold guard-cell deposits afterwards, matching
-        // the rho^{n+1} handling above.
-        m_WarpX->GetPartContainer().DepositCurrent(
-            m_WarpX->m_fields.get_mr_levels_alldirs(
-                FieldType::hybrid_current_fp_temp, m_num_amr_levels - 1),
-            m_dt, 0.0_rt);
+        // In-loop integration: transport, compression and Joule heating were
+        // advanced inside the Newton solve (energy-paired); only the symmetric
+        // Q_ei ion-electron exchange remains, applied on T_e^{n+1} synced from
+        // the in-loop pe^{n+1} and the freshly deposited rho^{n+1}.
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-            ablastr::fields::VectorField Jt =
-                m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
-            for (int n = 0; n < 3; ++n) {
-                ablastr::utils::communication::SumBoundary(
-                    *Jt[n], 0, Jt[n]->nComp(), Jt[n]->nGrowVect(), Jt[n]->nGrowVect(),
-                    WarpX::do_single_precision_comms, m_WarpX->Geom(lev).periodicity());
-                ablastr::utils::communication::FillBoundary(
-                    *Jt[n], Jt[n]->nGrowVect(), WarpX::do_single_precision_comms,
-                    m_WarpX->Geom(lev).periodicity(), true);
-            }
+            m_hybrid_pic_model->FillTeFromPe(lev);
+            m_hybrid_pic_model->ApplyIonElectronEnergyExchange(lev, m_dt);
+            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev);
         }
-        m_hybrid_pic_model->AdvanceElectronEnergyQDSMC( m_dt );
+        // Roll the in-loop pressure state so the next step starts from the
+        // relaxed pe^{n+1}.
+        if (m_pe_old) {
+            amrex::MultiFab* pe =
+                m_WarpX->m_fields.get(FieldType::hybrid_electron_pressure_fp, 0);
+            amrex::MultiFab::Copy(*m_pe_old, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
+            m_pe_old->FillBoundary(m_WarpX->Geom(0).periodicity());
+        }
     }
 
     return exit_status;
