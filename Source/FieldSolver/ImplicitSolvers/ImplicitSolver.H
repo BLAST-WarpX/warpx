@@ -134,6 +134,24 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
+    /**
+     * \brief Apply deposited mass matrices to a vector field.
+     * Computes a_out += a_scale * S * (a_in - a_in_ref) [+ a_baseline],
+     * where S is the mass matrix, accumulating into a_out.
+     * If a_in_ref is null, a_in is used directly.
+     * If a_baseline is null, no baseline term is added.
+     * If a_zero_out_first is true, a_out is set to zero before accumulating,
+     * so that it holds the result of this operation only; otherwise the result
+     * is added on top of the existing contents of a_out.
+     */
+    void ApplyMassMatrices (
+        ablastr::fields::MultiLevelVectorField& a_out,
+        const ablastr::fields::MultiLevelVectorField& a_in,
+        const ablastr::fields::MultiLevelVectorField* a_in_ref = nullptr,
+        const ablastr::fields::MultiLevelVectorField* a_baseline = nullptr,
+        amrex::Real a_scale = 1.0,
+        bool a_zero_out_first = false );
+
     void ComputeJfromMassMatrices (bool a_J_from_MM_only);
 
     /**
