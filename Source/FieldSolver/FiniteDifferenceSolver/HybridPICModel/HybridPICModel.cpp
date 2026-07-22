@@ -663,7 +663,7 @@ void HybridPICModel::BfieldEvolve (
             const amrex::Real blended_half = 0.95_rt * M + 0.05_rt * N;
             const int relaxed =
                 2 * static_cast<int>(std::floor(static_cast<double>(blended_half)));
-            m_substeps = std::max(relaxed, std::max(m_substeps_min, 2));
+            m_substeps = std::max({relaxed, m_substeps_min, 2});
         }
         // Stay within the abort budget so the controller cannot request more
         // substeps than max_substep_attempts allows.
