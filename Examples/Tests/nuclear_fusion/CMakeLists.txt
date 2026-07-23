@@ -36,8 +36,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_deuterium_tritium_fusion  # inputs
-    "analysis_two_product_fusion.py diags/diag1000001"  # analysis
-    "analysis_default_regression.py --path diags/diag1000001"  # checksum
+    "analysis_two_product_fusion.py diags/diag1000002"  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
     OFF  # dependency
 )
 
