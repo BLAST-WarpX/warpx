@@ -4350,10 +4350,21 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Possible vector field components in Cartesian geometry: ``Ex`` ``Ey`` ``Ez`` ``Bx`` ``By`` ``Bz`` ``jx`` ``jy`` ``jz``.
     Possible vector field components in RZ and RCYLINDER geometry: ``Er`` ``Et`` ``Ez`` ``Br`` ``Bt`` ``Bz`` ``jr`` ``jt`` ``jz``.
     Possible vector field components in RSPHERE geometry: ``Er`` ``Et`` ``Ep`` ``Br`` ``Bt`` ``Bp`` ``jr`` ``jt`` ``jp``.
+    Any MultiFab added to the internal registry can also be included in the list.
     The default :pp:param:`<diag_name>.fields_to_plot` is to write all possible field components for the geometry.
     When the special value ``none`` is specified, no fields are written out.
     Note that the fields are averaged on the cell centers before they are written to file.
     Otherwise, we reconstruct a 2D Cartesian slice of the fields for output at :math:`\theta=0`.
+
+.. pp:param:: <diag_name>.additional_fields_to_plot
+    :type: list of ``strings``
+    :optional:
+
+    Additional fields written to output, in addition to the standard default list as specified with :pp:param:`<diag_name>.fields_to_plot`.
+    This allows specification of fields to plot without having to also list the default fields when they are also desired.
+    Any of the same fields can be listed here.
+    Any MultiFab added to the internal registry can also be included in the list.
+    If :pp:param:`<diag_name>.fields_to_plot` is set to ``none``, this input is ignored.
 
 .. pp:param:: <diag_name>.dump_rz_modes
     :type: ``0`` or ``1``
