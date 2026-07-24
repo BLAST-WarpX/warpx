@@ -121,11 +121,9 @@ amrex::Real
 WarpX::ParticleGridSpeedMax ()
 {
     const amrex::Real* dx = geom[max_level].CellSize();
-    const amrex::Real dx_min = minDim(dx);
+    const amrex::ParticleReal max_dt_inv = mypc->maxParticleDtInv(dx);
 
-    const amrex::ParticleReal max_v = mypc->maxParticleVelocity();
-
-    return max_v/dx_min;
+    return max_dt_inv;
 }
 
 amrex::Real

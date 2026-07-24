@@ -92,7 +92,7 @@ public:
         return allcontainers[index]->meanParticleVelocity();
     }
 
-    amrex::ParticleReal maxParticleVelocity();
+    amrex::ParticleReal maxParticleDtInv(amrex::Real const * const dx);
 
     void TransformMomentumToCurvilinear (bool forward);
 

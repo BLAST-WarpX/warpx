@@ -479,7 +479,8 @@ public:
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
-    amrex::ParticleReal maxParticleVelocity(bool local = false);
+    amrex::ParticleReal maxParticleDtInv(amrex::Real const * const dx,
+                                         bool local = false);
 
     /**
      * \brief Map the momentum of the particles to and from the curvilinear frame.
