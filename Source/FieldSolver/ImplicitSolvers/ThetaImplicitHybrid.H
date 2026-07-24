@@ -141,6 +141,17 @@ private:
     HybridPICModel* m_hybrid_pic_model = nullptr;
 
     /**
+     * \brief RZ only: re-phase the axis-row electron pressure after each field
+     * solve as pe = sbar * n^gamma, with the entropy function sbar averaged over
+     * the first rows off axis. The axis-line J_e is deposition-noise dominated
+     * (tiny control volumes), which dephases pe from n on the axis row and
+     * drives an anti-restoring E_z (coherent axis density packets). Slaving the
+     * axis pe to the local adiabat removes the mode without touching the
+     * off-axis update.
+     */
+    bool m_pe_axis_entropy_slave = false;
+
+    /**
      * \brief When true, use Darwin split: JFNK solves only for E_T (transverse
      * part of E_Ohm). E_L = ∇φ (curl-free part) is computed via a Poisson solve
      * (∇²φ = ∇·E_Ohm) once per Newton step and frozen across GMRES matvecs.

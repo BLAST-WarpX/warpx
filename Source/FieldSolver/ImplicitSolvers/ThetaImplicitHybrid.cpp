@@ -74,6 +74,7 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         "theta parameter must be between 0.5 and 1.0");
     pp.query("use_darwin_split", m_use_darwin_split);
     pp.query("use_rho_response_divj", m_use_rho_response_divj);
+    pp.query("pe_axis_entropy_slave", m_pe_axis_entropy_slave);
 
     // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
     m_alpha_mf.resize(m_num_amr_levels);
@@ -336,6 +337,9 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
                     a(i,j,k,n) = a(i,j,k,c_new + n);
                 });
             }
+            // The deposit+SumBoundary leaves rho ghosts stale; the electron-pressure
+            // advance reads rho through ghosts at box faces, so refresh them here.
+            rho->FillBoundary(m_WarpX->Geom(lev).periodicity());
         }
     }
 
@@ -769,7 +773,23 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
             amrex::Real divF = 0._rt, W = 0._rt;
 #if defined(WARPX_DIM_1D_Z)
             if ((i <= dlo.x || i >= dhi.x) && !is_per[0]) { return; }
-            divF += (Fz(i+1,j,k) - Fz(i-1,j,k)) * 0.5_rt * dxi[0];
+            if (J_nodal) {
+                divF += (Fz(i+1,j,k) - Fz(i-1,j,k)) * 0.5_rt * dxi[0];
+            } else {
+                // Yee: conservative edge flux (matches the RZ construction). The
+                // central node form would interpolate J through the SECOND ghost
+                // ring at box-face nodes, which the deposited current does not
+                // have -- the reads land out of bounds and the seam nodes get
+                // garbage flux (observed as a box-seam energy leak).
+                auto ue_zedge = [&] (int ie) {
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                    return (Jz(ie,j,k) - Jpz(ie,j,k)) / rho_e;
+                };
+                divF += (ue_zedge(i)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i+1,j,k))
+                       - ue_zedge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k)))
+                      * dxi[0];
+            }
             if (J_nodal) {
                 // -E*.J_e over all three components (perp components do work at
                 // B != 0), minus the dissipative work D.J_p that Faraday drains
@@ -795,8 +815,29 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
 #elif defined(WARPX_DIM_XZ)
             if (((i <= dlo.x || i >= dhi.x) && !is_per[0]) ||
                 ((j <= dlo.y || j >= dhi.y) && !is_per[1])) { return; }
-            divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
-                  + (Fz(i,j+1,k) - Fz(i,j-1,k)) * 0.5_rt * dxi[1];
+            if (J_nodal) {
+                divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
+                      + (Fz(i,j+1,k) - Fz(i,j-1,k)) * 0.5_rt * dxi[1];
+            } else {
+                // Yee: conservative edge flux; see the 1D branch for why the
+                // central node form cannot be used with the deposited current.
+                auto ue_xedge = [&] (int ie) {
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                    return (Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e;
+                };
+                auto ue_zedge = [&] (int je) {
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
+                    return (Jz(i,je,k) - Jpz(i,je,k)) / rho_e;
+                };
+                divF += (ue_xedge(i)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i+1,j,k))
+                       - ue_xedge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k)))
+                      * dxi[0]
+                      + (ue_zedge(j)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i,j+1,k))
+                       - ue_zedge(j-1) * 0.5_rt*(pe_it_arr(i,j-1,k) + pe_it_arr(i,j,k)))
+                      * dxi[1];
+            }
             if (J_nodal) {
                 // -E*.J_e over all three components (perp components do work at
                 // B != 0), minus the dissipative work D.J_p that Faraday drains
@@ -877,8 +918,10 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
             {
                 const amrex::Real q_theta =
                     Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k)) - Dy(i,j,k) * Jpy(i,j,k);
-                W += (0.5_rt * q_redge(i) * A_ip
-                      + (on_axis ? 0.0_rt : 0.5_rt * q_redge(i-1) * A_im)) / A_i
+                const amrex::Real w_r =
+                    (0.5_rt * q_redge(i) * A_ip
+                     + (on_axis ? 0.0_rt : 0.5_rt * q_redge(i-1) * A_im)) / A_i;
+                W += w_r
                    + 0.5_rt * (q_zedge(j-1) + q_zedge(j))
                    + q_theta;
             }
@@ -892,9 +935,38 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
             if (((i <= dlo.x || i >= dhi.x) && !is_per[0]) ||
                 ((j <= dlo.y || j >= dhi.y) && !is_per[1]) ||
                 ((k <= dlo.z || k >= dhi.z) && !is_per[2])) { return; }
-            divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
-                  + (Fy(i,j+1,k) - Fy(i,j-1,k)) * 0.5_rt * dxi[1]
-                  + (Fz(i,j,k+1) - Fz(i,j,k-1)) * 0.5_rt * dxi[2];
+            if (J_nodal) {
+                divF += (Fx(i+1,j,k) - Fx(i-1,j,k)) * 0.5_rt * dxi[0]
+                      + (Fy(i,j+1,k) - Fy(i,j-1,k)) * 0.5_rt * dxi[1]
+                      + (Fz(i,j,k+1) - Fz(i,j,k-1)) * 0.5_rt * dxi[2];
+            } else {
+                // Yee: conservative edge flux; see the 1D branch for why the
+                // central node form cannot be used with the deposited current.
+                auto ue_xedge = [&] (int ie) {
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
+                    return (Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e;
+                };
+                auto ue_yedge = [&] (int je) {
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
+                    return (Jy(i,je,k) - Jpy(i,je,k)) / rho_e;
+                };
+                auto ue_zedge = [&] (int ke) {
+                    const amrex::Real rho_e = amrex::max(
+                        0.5_rt*(rho_arr(i,j,ke,0) + rho_arr(i,j,ke+1,0)), rho_floor);
+                    return (Jz(i,j,ke) - Jpz(i,j,ke)) / rho_e;
+                };
+                divF += (ue_xedge(i)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i+1,j,k))
+                       - ue_xedge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k)))
+                      * dxi[0]
+                      + (ue_yedge(j)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i,j+1,k))
+                       - ue_yedge(j-1) * 0.5_rt*(pe_it_arr(i,j-1,k) + pe_it_arr(i,j,k)))
+                      * dxi[1]
+                      + (ue_zedge(k)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i,j,k+1))
+                       - ue_zedge(k-1) * 0.5_rt*(pe_it_arr(i,j,k-1) + pe_it_arr(i,j,k)))
+                      * dxi[2];
+            }
             if (J_nodal) {
                 // -E*.J_e over all three components (perp components do work at
                 // B != 0), minus the dissipative work D.J_p that Faraday drains
@@ -941,6 +1013,48 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
         amrex::MultiFab::Copy(*m_pe_scratch, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
     }
     } // pe fixed-point iterations
+
+#if defined(WARPX_DIM_RZ)
+    if (m_pe_axis_entropy_slave) {
+        // Re-phase the axis-row pressure to the local density through a
+        // radially averaged entropy s = pe/rho^gamma (rings 0..2): the axis
+        // row's J_e is deposition-noise dominated and the advected pe there
+        // dephases from n, closing an anti-restoring feedback loop. Slaving
+        // the axis-row pe to n (QDSMC-style rebuild) preserves the entropy
+        // evolution while restoring the pressure-density phase lock.
+        const amrex::Real gam = m_hybrid_pic_model->m_gamma;
+        const amrex::Real rfloor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+        const amrex::MultiFab* rho_mf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+        const amrex::Box dom_n =
+            amrex::convert(geom.Domain(), amrex::IntVect::TheNodeVector());
+        const int iax = dom_n.smallEnd(0);
+        const bool has_axis = (std::abs(geom.ProbLo(0)) < 0.5_rt*geom.CellSize(0));
+        if (has_axis) {
+            for (amrex::MFIter mfi(*pe, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                const amrex::Box tb = mfi.tilebox(amrex::IntVect::TheNodeVector());
+                if (tb.smallEnd(0) > iax) { continue; }
+                auto const& pe_a = pe->array(mfi);
+                auto const& rh   = rho_mf->const_array(mfi);
+                const amrex::Box tb0(amrex::IntVect(iax, tb.smallEnd(1)),
+                                     amrex::IntVect(iax, tb.bigEnd(1)),
+                                     tb.ixType());
+                amrex::ParallelFor(tb0, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    amrex::Real sbar = 0._rt;
+                    for (int ii = 0; ii <= 2; ++ii) {
+                        const amrex::Real nr =
+                            amrex::max(rh(i+ii,j,k,0), rfloor);
+                        sbar += pe_a(i+ii,j,k) / std::pow(nr, gam);
+                    }
+                    sbar *= (1._rt/3._rt);
+                    const amrex::Real n0 = amrex::max(rh(i,j,k,0), rfloor);
+                    pe_a(i,j,k) = sbar * std::pow(n0, gam);
+                });
+            }
+            pe->OverrideSync(geom.periodicity());
+            pe->FillBoundary(geom.periodicity());
+        }
+    }
+#endif
 
     if (!a_from_jacobian) {
         amrex::MultiFab::Copy(*m_pe_theta, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
