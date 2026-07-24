@@ -15,25 +15,25 @@
     "particle_position_x": 4096177.5590849468,
     "particle_position_y": 4096353.028787281,
     "particle_position_z": 8192362.405430986,
-    "particle_weight": 1.0240001137651044e+30
+    "particle_weight": 1.0240001137714307e+30
   },
   "helium4_1": {
-    "particle_momentum_x": 3.4698101405461235e-15,
-    "particle_momentum_y": 3.4753362603935135e-15,
-    "particle_momentum_z": 3.487484072722811e-15,
-    "particle_position_x": 305000.79843852686,
-    "particle_position_y": 303852.93561253307,
-    "particle_position_z": 648841.5741897959,
-    "particle_weight": 8.694722923416612e-28
+    "particle_momentum_x": 1.7270063957926637e-15,
+    "particle_momentum_y": 1.7295255445271788e-15,
+    "particle_momentum_z": 1.7442619148907942e-15,
+    "particle_position_x": 151546.7150677448,
+    "particle_position_y": 151695.5086129642,
+    "particle_position_z": 323004.4593236664,
+    "particle_weight": 4.337788155202713e-28
   },
   "helium4_2": {
-    "particle_momentum_x": 3.0668761407476727e-15,
-    "particle_momentum_y": 3.0776317195516193e-15,
-    "particle_momentum_z": 3.558768696822838e-15,
-    "particle_position_x": 274511.0541452542,
-    "particle_position_y": 274142.8919019643,
-    "particle_position_z": 583481.4426357154,
-    "particle_weight": 1.267328960159223e+19
+    "particle_momentum_x": 1.5369063360838545e-15,
+    "particle_momentum_y": 1.5327717119671177e-15,
+    "particle_momentum_z": 1.7691665364886962e-15,
+    "particle_position_x": 136756.17264787608,
+    "particle_position_y": 136453.48037878488,
+    "particle_position_z": 290503.22456411575,
+    "particle_weight": 6.347081228434342e+18
   },
   "lev=0": {
     "DTF1_particle_production": 8.830482096683644e-28,
@@ -41,22 +41,22 @@
     "rho": 0.0
   },
   "neutron_1": {
-    "particle_momentum_x": 3.4698101405461235e-15,
-    "particle_momentum_y": 3.4753362603935135e-15,
-    "particle_momentum_z": 3.487484072722811e-15,
-    "particle_position_x": 305000.79843852686,
-    "particle_position_y": 303852.93561253307,
-    "particle_position_z": 648841.5741897959,
-    "particle_weight": 8.694722923416612e-28
+    "particle_momentum_x": 1.7270063957926637e-15,
+    "particle_momentum_y": 1.7295255445271788e-15,
+    "particle_momentum_z": 1.7442619148907942e-15,
+    "particle_position_x": 151546.7150677448,
+    "particle_position_y": 151695.5086129642,
+    "particle_position_z": 323004.4593236664,
+    "particle_weight": 4.337788155202713e-28
   },
   "neutron_2": {
-    "particle_momentum_x": 3.0668761407476727e-15,
-    "particle_momentum_y": 3.0776317195516193e-15,
-    "particle_momentum_z": 3.131658719785617e-15,
-    "particle_position_x": 274511.0541452542,
-    "particle_position_y": 274142.8919019643,
-    "particle_position_z": 583481.4426357154,
-    "particle_weight": 1.267328960159223e+19
+    "particle_momentum_x": 1.5369063360838545e-15,
+    "particle_momentum_y": 1.5327717119671177e-15,
+    "particle_momentum_z": 1.5632203763888702e-15,
+    "particle_position_x": 136756.17264787608,
+    "particle_position_y": 136453.48037878488,
+    "particle_position_z": 290503.22456411575,
+    "particle_weight": 6.347081228434342e+18
   },
   "tritium_1": {
     "particle_momentum_x": 0.0,
@@ -74,6 +74,6 @@
     "particle_position_x": 409665.26647015393,
     "particle_position_y": 409535.84596852644,
     "particle_position_z": 819126.8984535292,
-    "particle_weight": 1.0239999998732672e+29
+    "particle_weight": 1.0239999999365294e+29
   }
 }
