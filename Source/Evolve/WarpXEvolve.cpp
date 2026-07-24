@@ -737,8 +737,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
     if (m_do_subcycling) {
         // With subcycling, fine-level particles can take multiple pushes before
-        // this synchronization point. Use the global path until the local
-        // distance bound is made level-aware.
+        // this synchronization point.
         mypc->Redistribute();
     } else {
         // Redistribute: Estimate the maximum distance a particle may have
