@@ -74,7 +74,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         "theta parameter must be between 0.5 and 1.0");
     pp.query("use_darwin_split", m_use_darwin_split);
     pp.query("use_rho_response_divj", m_use_rho_response_divj);
-    pp.query("pe_axis_entropy_slave", m_pe_axis_entropy_slave);
 
     // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
     m_alpha_mf.resize(m_num_amr_levels);
@@ -1015,7 +1014,7 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
     } // pe fixed-point iterations
 
 #if defined(WARPX_DIM_RZ)
-    if (m_pe_axis_entropy_slave) {
+    {
         // Re-phase the axis-row pressure to the local density through a
         // radially averaged entropy s = pe/rho^gamma (rings 0..2): the axis
         // row's J_e is deposition-noise dominated and the advected pe there
