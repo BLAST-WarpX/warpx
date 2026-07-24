@@ -36,8 +36,8 @@
     "particle_weight": 6.347081228434342e+18
   },
   "lev=0": {
-    "DTF1_particle_production": 8.830482096683644e-28,
-    "DTF2_particle_production": 1.2589327354569667e+19,
+    "DTF1_particle_production": 4.415241048343040e-28,
+    "DTF2_particle_production": 6.295151973703336e+18,
     "rho": 0.0
   },
   "neutron_1": {
