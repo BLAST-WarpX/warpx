@@ -136,7 +136,8 @@ ElectrostaticSolver::computePhi (
     int const max_iters,
     int const verbosity,
     bool const is_igf_2d,
-    std::optional<ablastr::fields::MultiLevelVectorField> efield
+    std::optional<ablastr::fields::MultiLevelVectorField> efield,
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> epsilon_r
 ) const
 {
     // create a vector to our fields, sorted by level
@@ -202,6 +203,8 @@ ElectrostaticSolver::computePhi (
 
     bool const is_solver_igf_on_lev0 =
         WarpX::poisson_solver_id == PoissonSolverAlgo::IntegratedGreenFunction;
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> active_epsilon_r =
+        epsilon_r.has_value() ? epsilon_r : m_epsilon_r;
 
     ablastr::fields::computePhi(
         sorted_rho,
@@ -224,7 +227,8 @@ ElectrostaticSolver::computePhi (
         post_phi_calculation,
         *m_poisson_boundary_handler,
         warpx.gett_new(0),
-        eb_farray_box_factory
+        eb_farray_box_factory,
+        active_epsilon_r
     );
 
 }

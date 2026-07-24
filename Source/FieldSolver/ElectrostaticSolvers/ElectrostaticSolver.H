@@ -95,7 +95,8 @@ public:
         int max_iters,
         int verbosity,
         bool is_igf_2d_slices,
-        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
+        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt, // only used for EB
+        std::optional<ablastr::fields::ConstMultiLevelScalarField> epsilon_r = std::nullopt
     ) const;
 
     /**
@@ -162,6 +163,13 @@ public:
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)
     bool is_igf_2d_slices = false;
+
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> m_epsilon_r = std::nullopt;
+
+    /** Setter for the dielectric permittivity field */
+    void setEpsilonR (std::optional<ablastr::fields::ConstMultiLevelScalarField> const& eps) {
+        m_epsilon_r = eps;
+    }
 };
 
 #endif // WARPX_ELECTROSTATICSOLVER_H_

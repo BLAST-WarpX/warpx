@@ -249,6 +249,18 @@ void init_WarpX (py::module& m)
             py::arg("potential"),
             "Sets the EB potential string and updates the function parser."
         )
+        .def("set_epsilon_r",
+            [](WarpX& wx, py::list const& eps_list) {
+                amrex::Vector<amrex::MultiFab*> eps_vec;
+                eps_vec.reserve(eps_list.size());
+                for (auto item : eps_list) {
+                    eps_vec.push_back(item.cast<amrex::MultiFab*>());
+                }
+                wx.GetElectrostaticSolver().setEpsilonR(amrex::GetVecOfConstPtrs(eps_vec));
+            },
+            py::arg("epsilon_r"),
+            "Sets the multi-level spatial permittivity field for the electrostatic solver."
+        )
         .def("run_div_cleaner",
             [] (WarpX& wx) { wx.ProjectionCleanDivB(); },
             "Executes projection based divergence cleaner on loaded Bfield_fp_external."

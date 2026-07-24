@@ -217,7 +217,8 @@ computePhi (
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
     [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
+    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt, // only used for EB
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> epsilon_r = std::nullopt
 )
 {
     using namespace amrex::literals;
@@ -288,14 +289,12 @@ computePhi (
 #endif
         // Use the Multigrid (MLMG) solver if selected or on refined patches
         // but first scale rho appropriately
-        rho[lev]->mult(-1._rt / ablastr::constant::SI::epsilon_0);
-
+        rho[lev]->mult(-1._rt / ablastr::constant::SI::epsilon_0);  // if epsilon_r is defined, we can scale it by epsilon_0 once instead and bypass this step?
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
 #else
         constexpr bool is_rz = false;
 #endif
-
         if (!eb_enabled && !is_rz) {
             // Determine whether to use semi-coarsening
             int max_semicoarsening_level = 0;
@@ -314,9 +313,8 @@ computePhi (
                 info.setSemicoarseningDirection(semicoarsening_direction);
             }
         }
-
         std::unique_ptr<amrex::MLNodeLinOp> linop;
-        if (eb_enabled || is_rz) {
+        if (eb_enabled || is_rz || epsilon_r.has_value()) {
             // In the presence of EB or RZ: the solver assumes that the beam is
             // propagating along  one of the axes of the grid, i.e. that only *one*
             // of the components of `beta` is non-negligible.
@@ -351,12 +349,20 @@ computePhi (
             // components of `beta` is non-negligible. // we use this
 #if defined(WARPX_DIM_RZ)
             linop_nodelap->setRZ(true);
-            linop_nodelap->setSigma({0._rt, 1._rt-beta_solver[1]*beta_solver[1]});
+            if (epsilon_r.has_value()) {
+                linop_nodelap->setSigma(lev, *epsilon_r.value()[lev]); // no beta yet
+            } else {
+                linop_nodelap->setSigma({0._rt, 1._rt-beta_solver[1]*beta_solver[1]});
+            }
 #else
-            linop_nodelap->setSigma({AMREX_D_DECL(
-                1._rt-beta_solver[0]*beta_solver[0],
-                1._rt-beta_solver[1]*beta_solver[1],
-                1._rt-beta_solver[2]*beta_solver[2])});
+            if (epsilon_r.has_value()) {
+                linop_nodelap->setSigma(lev, *epsilon_r.value()[lev]);  // no beta yet
+            } else {
+                linop_nodelap->setSigma({AMREX_D_DECL(
+                    1._rt-beta_solver[0]*beta_solver[0],
+                    1._rt-beta_solver[1]*beta_solver[1],
+                    1._rt-beta_solver[2]*beta_solver[2])});
+            }
 #endif
 #if defined(AMREX_USE_EB)
             if (eb_enabled) {
