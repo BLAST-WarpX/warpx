@@ -2612,6 +2612,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
 amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::Real const * const dx,
                                                              bool local) {
 
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
     ReduceOps<ReduceOpMax> reduce_op;
     ReduceData<ParticleReal> reduce_data(reduce_op);
 
@@ -2642,7 +2643,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::Real const *
                 [=] AMREX_GPU_DEVICE (int ip)
                 {
 
-                const amrex::ParticleReal betasq = ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip];
+                const amrex::ParticleReal betasq = ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip] * inv_c2;
                 const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + betasq);
 
 #if defined(WARPX_DIM_3D)
@@ -2689,9 +2690,6 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::Real const *
 
     amrex::ParticleReal max_dt_inv = (np_total > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
     if (!local) { ParallelAllReduce::Max(max_dt_inv, ParallelDescriptor::Communicator()); }
-
-    // Need to scale the result by c since u in reduction above is actually beta
-    max_dt_inv *= PhysConst::c;
 
     return max_dt_inv;
 }
