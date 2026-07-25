@@ -479,7 +479,7 @@ public:
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
-    amrex::ParticleReal maxParticleDtInv(amrex::Real const * const dx,
+    amrex::ParticleReal maxParticleDtInv(amrex::Real const * dx,
                                          bool local = false);
 
     /**
