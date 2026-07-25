@@ -2643,8 +2643,8 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::Real const *
                 [=] AMREX_GPU_DEVICE (int ip)
                 {
 
-                const amrex::ParticleReal betasq = ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip] * inv_c2;
-                const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + betasq);
+                const amrex::ParticleReal usq = ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip];
+                const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + usq * inv_c2);
 
 #if defined(WARPX_DIM_3D)
                 const amrex::ParticleReal dt_inv = gaminv *
