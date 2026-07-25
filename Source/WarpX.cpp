@@ -1501,6 +1501,7 @@ WarpX::ReadParameters ()
             // These evolve schemes permit time steps that violate the CFL condition
             if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
                 evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid ||
+                evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
                 evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
