@@ -2649,7 +2649,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::Real const *
                 const amrex::ParticleReal dir0_dt_inv = gaminv * std::abs(ux[ip]) / dx[0];
                 const amrex::ParticleReal dir1_dt_inv = gaminv * std::abs(uy[ip]) / dx[1];
                 const amrex::ParticleReal dir2_dt_inv = gaminv * std::abs(uz[ip]) / dx[2];
-                const amrex::ParticleReal dt_inv = std::max(dir0_dt_inv, std::max(dir1_dt_inv, dir2_dt_inv));
+                const amrex::ParticleReal dt_inv = std::max({dir0_dt_inv, dir1_dt_inv, dir2_dt_inv});
 #elif defined(WARPX_DIM_XZ)
                 const amrex::ParticleReal dir0_dt_inv = gaminv * std::abs(ux[ip]) / dx[0];
                 const amrex::ParticleReal dir2_dt_inv = gaminv * std::abs(uz[ip]) / dx[2];
