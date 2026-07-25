@@ -2690,7 +2690,10 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::Real const *
     amrex::ParticleReal max_dt_inv = (np_total > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
     if (!local) { ParallelAllReduce::Max(max_dt_inv, ParallelDescriptor::Communicator()); }
 
-    return max_dt_inv * PhysConst::c;
+    // Need to scale the result by c since u in reduction above is actually beta
+    max_dt_inv *= PhysConst::c;
+
+    return max_dt_inv;
 }
 
 void
