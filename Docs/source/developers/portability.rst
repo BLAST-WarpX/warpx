@@ -22,7 +22,8 @@ Picking the wrong one compiles and runs, but can produce silently wrong results,
 
 * ``amrex::ParallelForRNG``: carries no SIMD pragma on CPU; used when random numbers are needed and also safe for non-independent iterations.
 
-* Reductions (sums, maxima over all iterations): use the ``amrex::Reduce`` functions (``amrex::Reduce::Sum``, ``ReduceOps``, ...) instead of accumulating into a shared scalar from a kernel.
+* Whole-loop reductions (sums, maxima) should use the ``amrex::ReduceSIMD`` (or ``amrex::Reduce``) functions instead of accumulating into a shared scalar from a kernel.
+  When compiled for GPU, the ``ReduceSIMD`` code path is inactive and the standard ``amrex::Reduce`` device reduction is used.
 
 .. warning::
 
@@ -30,6 +31,6 @@ Picking the wrong one compiles and runs, but can produce silently wrong results,
    They make scatter kernels safe between GPU threads, but they do *not* make a ``ParallelFor`` loop safe on CPU: under the SIMD pragma the compiler may still vectorize the loop, and vector lanes that hit the same address lose all but one update.
    A kernel that needs ``Gpu::Atomic`` because iterations collide almost always needs ``amrex::For`` (or ``ParallelForRNG``) rather than ``ParallelFor``.
 
-Getting this wrong is silent and compiler-dependent: the miscompilation only appears when a vectorizer decides to act on the pragma.
+Getting ``amrex::ParallelFor`` and atomics wrong is silent and compiler-dependent: the miscompilation only appears when a vectorizer decides to act on the pragma.
 For example, GCC 15 vectorized the charge deposition loop for cubic shape factors in 1D, which dropped three of every four contributions and produced a charge density four times too small, while GCC 13 left the same invalid code intact.
 See `issue #7097 <https://github.com/BLAST-WarpX/warpx/issues/7097>`__ for the full analysis.
