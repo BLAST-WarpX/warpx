@@ -1261,6 +1261,10 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
                         dt_lev, mass, WarpX::eb_particle_boundary, uth});
             }
         }
+    } else if(WarpX::eb_particle_boundary == ParticleBoundaryType::None) {
+        for (auto& pc : allcontainers) {
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::NoOp());
+        }
     } else {
         for (auto& pc : allcontainers) {
             scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
