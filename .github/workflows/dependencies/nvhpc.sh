@@ -35,16 +35,8 @@ VERSION_DASHED=${VERSION_DOTTED/./-}  # replace first occurence of "." with "-"
 # install nvhpc
 curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
 echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | sudo tee /etc/apt/sources.list.d/nvhpc.list
-sudo apt update -y
-# apt's Acquire::Retries does not retry HTTP 404 responses, so wrap the
-# install in an explicit retry loop to handle transient CDN routing issues.
-for attempt in 1 2 3 4 5; do
-    sudo apt install -y --no-install-recommends nvhpc-${VERSION_DASHED} && break
-    echo "Attempt ${attempt}: apt install failed, refreshing package lists and retrying in 60s..."
-    sudo apt-get clean
-    sudo apt-get update -y
-    [ "${attempt}" -lt 5 ] && sleep 60
-done
+sudo apt-get update -y
+sudo apt-get install -y nvhpc-${VERSION_DASHED}
 
 # clean up space
 sudo rm -rf /var/lib/apt/lists/*
