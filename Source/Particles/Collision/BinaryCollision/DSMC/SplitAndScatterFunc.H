@@ -18,7 +18,6 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include <array>
-#include <limits>
 
 /**
  * \brief This class defines an operator to create product particles from DSMC
@@ -436,12 +435,12 @@ public:
                 // subtract the energy cost for ionization (converted from eV to J)
                 amrex::ParticleReal E_out = E_coll - scattering_process.m_energy_penalty * PhysConst::q_e;
 
-                // clamp E_out to a tiny positive floor: CollisionFilterFunc.H selects this pair for
-                // ionization using a differently-computed (relativistic, whole-pair) collision
-                // energy, so E_out can come out (slightly) negative here even though the pair
-                // cleared the ionization threshold there; without the floor, the sqrt() calls
-                // below would produce a NaN velocity.
-                E_out = amrex::max(E_out, std::numeric_limits<amrex::ParticleReal>::min());
+                // clamp E_out to 0: CollisionFilterFunc.H selects this pair for ionization
+                // using  a differently-computed (relativistic, whole-pair) collision energy,
+                // so E_out can come out (slightly) negative here even though the pair cleared
+                // the ionization threshold there; without the floor, the sqrt() calls below
+                // would produce a NaN velocity in such cases.
+                E_out = amrex::max(E_out, 0.0);
 
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
                 // distributed among the products) depend on the nature of the incident particle
