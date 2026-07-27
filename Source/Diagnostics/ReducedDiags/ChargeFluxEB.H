@@ -20,11 +20,10 @@ public:
 
 private:
 
-    // matches species specific diags
-    // int m_selected_species_id = -1;
-    std::vector<std::string> m_selected_species_names;
+    // all simulation species, cached at construction; index 0 of m_data
+    // is the summed total, indices [1, N] map 1:1 to m_species_names
+    std::vector<std::string> m_species_names;
 
-    // matches ChargeOnEB naming
     bool m_do_parser_weighting = false;
     std::unique_ptr<amrex::Parser> m_parser_weighting;
 

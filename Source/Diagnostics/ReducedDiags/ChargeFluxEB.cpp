@@ -2,7 +2,7 @@
  *
  * This file is part of WarpX.
  *
- * Authors: AlexG
+ * Authors: AlexGlock
  * License: BSD-3-Clause-LBNL
  */
 #include "ChargeFluxEB.H"
@@ -41,7 +41,6 @@ ChargeFluxEB::ChargeFluxEB (const std::string& rd_name)
     }
 
     const amrex::ParmParse pp_rd_name(rd_name);
-    pp_rd_name.queryarr("species", m_selected_species_names);
 
     // optional weighting, same idiom as ChargeOnEB
     std::string buf;
@@ -57,9 +56,10 @@ ChargeFluxEB::ChargeFluxEB (const std::string& rd_name)
     m_eb_boundary_index = AMREX_SPACEDIM*2;
 
     auto& mypc = WarpX::GetInstance().GetPartContainer();
-    const auto& all_species = mypc.GetSpeciesNames();
-    const auto& tracked = m_selected_species_names.empty() ? all_species : m_selected_species_names;
-    m_data.resize(tracked.size(), 0.0_rt);
+    m_species_names = mypc.GetSpeciesNames();
+
+    // index 0 = total, then one column per species
+    m_data.resize(1 + m_species_names.size(), 0.0_rt);
 
     if (ParallelDescriptor::IOProcessor())
     {
@@ -71,7 +71,9 @@ ChargeFluxEB::ChargeFluxEB (const std::string& rd_name)
             ofs << "[" << c++ << "]step()";
             ofs << m_sep;
             ofs << "[" << c++ << "]time(s)";
-            for (auto const& name : tracked) {
+            ofs << m_sep;
+            ofs << "[" << c++ << "]total_charge_flux(C/s)";
+            for (auto const& name : m_species_names) {
                 ofs << m_sep;
                 ofs << "[" << c++ << "]" << name << "_charge_flux(C/s)";
             }
@@ -100,17 +102,17 @@ void ChargeFluxEB::ComputeDiags (const int step)
     const int current_step = warpx.getistep(0);
 
     const bool do_parser_weighting = m_do_parser_weighting;
-    auto fun_weightingparser = do_parser_weighting
-        ? utils::parser::compileParser<3>(m_parser_weighting.get())
-        : decltype(utils::parser::compileParser<3>(m_parser_weighting.get())){};
+    auto fun_weightingparser = utils::parser::compileParser<3>(m_parser_weighting.get());
 
-    const auto& all_species = mypc.GetSpeciesNames();
-    const auto& tracked = m_selected_species_names.empty() ? all_species : m_selected_species_names;
+    amrex::Real total_charge_flux = 0.0_rt;
 
-    for (int isp = 0; isp < static_cast<int>(tracked.size()); ++isp)
+    for (int isp = 0; isp < static_cast<int>(m_species_names.size()); ++isp)
     {
-        const std::string& species_name = tracked[isp];
-        m_data[isp] = 0.0_rt;
+        const std::string& species_name = m_species_names[isp];
+
+        // m_data[0] is reserved for the total; species columns start at 1
+        amrex::Real& species_slot = m_data[isp + 1];
+        species_slot = 0.0_rt;
 
         const int n_scraped = boundary_buffer.getNumParticlesInContainer(
             species_name, m_eb_boundary_index, /*local=*/false);
@@ -161,8 +163,12 @@ void ChargeFluxEB::ComputeDiags (const int step)
             }
         }
         amrex::ParallelDescriptor::ReduceRealSum(charge_this_species);
-        m_data[isp] = charge_this_species * charge / dt;
+
+        species_slot = charge_this_species * charge / dt;
+        total_charge_flux += species_slot;
     }
+
+    m_data[0] = total_charge_flux;
 #endif
 }
 // end void ChargeFluxEB::ComputeDiags

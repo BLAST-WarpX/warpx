@@ -5040,7 +5040,6 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             "ParticleHistogram",
             "ParticleHistogram2D",
             "ParticleExtrema",
-            "ChargeFluxEB",
         ]
 
         if self.type in self._simple_reduced_diagnostics:
@@ -5052,13 +5051,11 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
                 kw = self._handle_particle_histogram(**kw)
             elif self.type == "ParticleHistogram2D":
                 kw = self._handle_particle_histogram2d(**kw)
-            elif self.type == "ChargeFluxEB":
-                kw = self._handle_charge_on_eb(**kw)
         elif self.type == "FieldProbe":
             kw = self._handle_field_probe(**kw)
         elif self.type == "FieldReduction":
             kw = self._handle_field_reduction(**kw)
-        elif self.type == "ChargeOnEB":
+        elif self.type == "ChargeOnEB" or "ChargeFluxEB":
             kw = self._handle_charge_on_eb(**kw)
         else:
             raise RuntimeError(
