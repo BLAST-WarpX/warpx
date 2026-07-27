@@ -350,9 +350,9 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
                         kp = k;
                     }
 
-                    // Atomic add: different unstable faces can borrow area from
-                    // the same intruded face, i.e., different iterations can
-                    // update the same element (a data race on GPU without the atomic)
+                    // Atomic because different unstable faces can borrow area
+                    // from the same intruded face, i.e., different iterations can
+                    // update the same element.
                     amrex::Gpu::Atomic::AddNoRet(&Venl_dim(ip, jp, kp), rho_enl * borrowing_dim_area[ind]);
 
                 }

@@ -283,9 +283,6 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
     int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
     // Count how many particles did not converge.
-    // A proper reduction is used here: a shared counter updated with
-    // Gpu::Atomic::Add inside a ParallelFor is not thread/SIMD safe on CPU
-    // (see issue #7097).
     num_unconverged_particles = amrex::Reduce::Sum<amrex::Long>(
         np_to_push, [=] AMREX_GPU_DEVICE (long ip) -> amrex::Long
     {

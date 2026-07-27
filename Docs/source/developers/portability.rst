@@ -22,7 +22,7 @@ Picking the wrong one compiles and runs, but can produce silently wrong results,
 
 * ``amrex::ParallelForRNG``: carries no SIMD pragma on CPU; used when random numbers are needed and also safe for non-independent iterations.
 
-* Reductions (sums, maxima over all iterations): use the ``amrex::Reduce`` framework (``amrex::Reduce::Sum``, ``ReduceOps``, ...) instead of accumulating into a shared scalar from a kernel.
+* Reductions (sums, maxima over all iterations): use the ``amrex::Reduce`` functions (``amrex::Reduce::Sum``, ``ReduceOps``, ...) instead of accumulating into a shared scalar from a kernel.
 
 .. warning::
 
