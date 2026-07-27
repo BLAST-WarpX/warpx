@@ -4017,22 +4017,6 @@ Maxwell solver: kinetic-fluid hybrid
     piecewise-constant-per-cell decision field with no per-component half-shifts. Cartesian
     only.
 
-.. pp:param:: hybrid_pic_model.eta_nodal_interp
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    If ``true`` (opt-in), the resistivity and hyper-resistivity parsers are evaluated once per
-    NODE — from the nodal charge density and the Hall-consistent nodal current and magnetic
-    field — and the resulting resistivity fields are interpolated to the staggered electric-field
-    locations, exactly like the nodal Hall (:math:`\vec{J}\times\vec{B}`) term. The default
-    pointwise evaluation samples the resistivity at each staggered component location separately,
-    so across a steep :math:`\eta(\rho)` transition (the plasma/vacuum density-floor seam) the
-    three electric-field components see inconsistent resistivities within one cell — a source of
-    spurious electric-field structure at the plasma edge on staggered (Yee) grids. No effect on
-    collocated grids (already nodal) or for density/current-independent resistivities.
-    Cartesian geometries only.
-
 .. pp:param:: hybrid_pic_model.isotropic_hyper_resistivity
     :type: ``bool``
     :default: ``false``

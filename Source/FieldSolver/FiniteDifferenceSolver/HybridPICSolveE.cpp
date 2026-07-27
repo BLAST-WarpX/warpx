@@ -1166,15 +1166,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // never feed the B integration (see IsotropicOperators.H).
     const bool iso_gradient = hybrid_model->m_isotropic_gradient;
     const bool nodal_grid = std::is_same_v<T_Algo, CartesianNodalAlgorithm>;
-    // Nodal-eta interpolation: evaluate the (hyper-)resistivity parsers ONCE per
-    // node from the nodal rho and the Hall-consistent nodal J/B, then interpolate
-    // the resulting eta fields to the staggered E locations (exactly like the
-    // nodal enE/Hall term). The pointwise alternative samples a steep eta(rho)
-    // transition at three different locations per cell, giving the staggered
-    // components inconsistent resistivities across the plasma/vacuum seam -- a
-    // spurious-E source there. No-op on collocated grids (already nodal) and for
-    // rho/J-independent resistivities (interpolating a constant).
-    const bool eta_nodal = hybrid_model->m_eta_nodal_interp;
     // Smooth holmstrom vacuum blend, ABOVE-floor window form: below the floor
     // the legacy vacuum branch holds exactly (Hall fully off -- the binary
     // cutoff is what protects the sub-floor region from whistler stiffness);
@@ -1274,12 +1265,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // Also note that enE_nodal_mf does not need to have any guard cells since
     // these values will be interpolated to the Yee mesh which is contained
     // by the nodal mesh.
-    // With eta_nodal two extra components carry the single-valued nodal
-    // resistivity (comp 3) and hyper-resistivity (comp 4), interpolated to the
-    // staggered E locations by the same nodal->Yee gather as enE.
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
-    MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), eta_nodal ? 5 : 3,
-                          IntVect::TheZeroVector());
+    MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -1294,7 +1281,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         auto wt = static_cast<amrex::Real>(amrex::second());
 
         Array4<Real> const& enE_nodal = enE_nodal_mf.array(mfi);
-        Array4<Real const> const& rho_nodal = rhofield.const_array(mfi);
         Array4<Real const> const& Jx = Jfield[0]->const_array(mfi);
         Array4<Real const> const& Jy = Jfield[1]->const_array(mfi);
         Array4<Real const> const& Jz = Jfield[2]->const_array(mfi);
@@ -1374,29 +1360,6 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 (jx_interp - jix_interp) * By_interp
                 - (jy_interp - jiy_interp) * Bx_interp
             );
-
-            if (eta_nodal) {
-                // Single-valued nodal (hyper-)resistivity from the nodal rho and
-                // the Hall-consistent nodal J/B (|rho|: the EB rho mirror is
-                // negative inside the conductor, see the edge loops).
-                const Real rho_n = std::abs(rho_nodal(i, j, k));
-                Real jtot_n = 0._rt;
-                if (resistivity_has_J_dependence) {
-                    jtot_n = std::sqrt(jx_interp*jx_interp + jy_interp*jy_interp
-                                       + jz_interp*jz_interp);
-                }
-                enE_nodal(i, j, k, 3) = eta(rho_n, jtot_n, t_new);
-                Real etah_n = 0._rt;
-                if (include_hyper_resistivity_term) {
-                    Real btot_n = 0._rt;
-                    if (hyper_resistivity_has_B_dependence) {
-                        btot_n = std::sqrt(Bx_interp*Bx_interp + By_interp*By_interp
-                                           + Bz_interp*Bz_interp);
-                    }
-                    etah_n = eta_h(rho_n, btot_n);
-                }
-                enE_nodal(i, j, k, 4) = etah_n;
-            }
         });
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
@@ -1548,7 +1511,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // term and pump energy into the wall).
                 const Real rho_val_eta = std::abs(rho_val);
                 Real jtot_val = 0._rt;
-                if (resistivity_has_J_dependence && !eta_nodal) {
+                if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
                     const Real jx_val = Jx(i, j, k);
                     const Real jy_val = Interp(Jy, Jy_stag, Ex_stag, coarsen, i, j, k, 0);
@@ -1556,12 +1519,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                // eta: either interpolated from the single-valued nodal field
-                // (eta_nodal, comp 3) or evaluated pointwise at this staggered
-                // location. Reused below by the corner-curl (iso_resistivity) term.
-                const amrex::Real eta_val = eta_nodal
-                    ? Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 3)
-                    : eta(rho_val_eta, jtot_val, t_new);
+                // Evaluate the resistivity parser once: the same eta(rho,jtot,t)
+                // is reused below by the corner-curl (iso_resistivity) term.
+                const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
 
                 Ex(i, j, k) += eta_val * Jx(i, j, k);
 
@@ -1569,7 +1529,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
-                    if (hyper_resistivity_has_B_dependence && !eta_nodal) {
+                    if (hyper_resistivity_has_B_dependence) {
                         const Real bx_val = Interp(Bx, Bx_stag, Ex_stag, coarsen, i, j, k, 0);
                         const Real by_val = Interp(By, By_stag, Ex_stag, coarsen, i, j, k, 0);
                         const Real bz_val = Interp(Bz, Bz_stag, Ex_stag, coarsen, i, j, k, 0);
@@ -1589,10 +1549,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         + T_Algo::Dzz(Jx, coefs_z, n_coefs_z, i, j, k);
 #endif
 
-                    const amrex::Real eta_h_val = eta_nodal
-                        ? Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 4)
-                        : eta_h(rho_val_eta, btot_val);
-                    Ex(i, j, k) -= eta_h_val * nabla2Jx;
+                    Ex(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jx;
                 }
 
                 // Isotropize the in-plane resistive diffusion of the
@@ -1690,7 +1647,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // term and pump energy into the wall).
                 const Real rho_val_eta = std::abs(rho_val);
                 Real jtot_val = 0._rt;
-                if (resistivity_has_J_dependence && !eta_nodal) {
+                if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
                     const Real jx_val = Interp(Jx, Jx_stag, Ey_stag, coarsen, i, j, k, 0);
                     const Real jy_val = Jy(i, j, k);
@@ -1698,12 +1655,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                // eta: either interpolated from the single-valued nodal field
-                // (eta_nodal, comp 3) or evaluated pointwise at this staggered
-                // location. Reused below by the corner-curl (iso_resistivity) term.
-                const amrex::Real eta_val = eta_nodal
-                    ? Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 3)
-                    : eta(rho_val_eta, jtot_val, t_new);
+                // Evaluate the resistivity parser once: the same eta(rho,jtot,t)
+                // is reused below by the corner-curl (iso_resistivity) term.
+                const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
 
                 Ey(i, j, k) += eta_val * Jy(i, j, k);
 
@@ -1711,7 +1665,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
-                    if (hyper_resistivity_has_B_dependence && !eta_nodal) {
+                    if (hyper_resistivity_has_B_dependence) {
                         const Real bx_val = Interp(Bx, Bx_stag, Ey_stag, coarsen, i, j, k, 0);
                         const Real by_val = Interp(By, By_stag, Ey_stag, coarsen, i, j, k, 0);
                         const Real bz_val = Interp(Bz, Bz_stag, Ey_stag, coarsen, i, j, k, 0);
@@ -1731,10 +1685,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         + T_Algo::Dzz(Jy, coefs_z, n_coefs_z, i, j, k);
 #endif
 
-                    const amrex::Real eta_h_val = eta_nodal
-                        ? Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 4)
-                        : eta_h(rho_val_eta, btot_val);
-                    Ey(i, j, k) -= eta_h_val * nabla2Jy;
+                    Ey(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jy;
                 }
 
                 // Corner-curl isotropization of the resistive diffusion of
@@ -1828,7 +1779,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // term and pump energy into the wall).
                 const Real rho_val_eta = std::abs(rho_val);
                 Real jtot_val = 0._rt;
-                if (resistivity_has_J_dependence && !eta_nodal) {
+                if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
                     const Real jx_val = Interp(Jx, Jx_stag, Ez_stag, coarsen, i, j, k, 0);
                     const Real jy_val = Interp(Jy, Jy_stag, Ez_stag, coarsen, i, j, k, 0);
@@ -1836,12 +1787,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                // eta: either interpolated from the single-valued nodal field
-                // (eta_nodal, comp 3) or evaluated pointwise at this staggered
-                // location. Reused below by the corner-curl (iso_resistivity) term.
-                const amrex::Real eta_val = eta_nodal
-                    ? Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 3)
-                    : eta(rho_val_eta, jtot_val, t_new);
+                // Evaluate the resistivity parser once: the same eta(rho,jtot,t)
+                // is reused below by the corner-curl (iso_resistivity) term.
+                const amrex::Real eta_val = eta(rho_val_eta, jtot_val, t_new);
 
                 Ez(i, j, k) += eta_val * Jz(i, j, k);
 
@@ -1849,7 +1797,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
-                    if (hyper_resistivity_has_B_dependence && !eta_nodal) {
+                    if (hyper_resistivity_has_B_dependence) {
                         const Real bx_val = Interp(Bx, Bx_stag, Ez_stag, coarsen, i, j, k, 0);
                         const Real by_val = Interp(By, By_stag, Ez_stag, coarsen, i, j, k, 0);
                         const Real bz_val = Interp(Bz, Bz_stag, Ez_stag, coarsen, i, j, k, 0);
@@ -1869,10 +1817,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                         + T_Algo::Dzz(Jz, coefs_z, n_coefs_z, i, j, k);
 #endif
 
-                    const amrex::Real eta_h_val = eta_nodal
-                        ? Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 4)
-                        : eta_h(rho_val_eta, btot_val);
-                    Ez(i, j, k) -= eta_h_val * nabla2Jz;
+                    Ez(i, j, k) -= eta_h(rho_val_eta, btot_val) * nabla2Jz;
                 }
 
                 // Corner-curl isotropization of the resistive diffusion of

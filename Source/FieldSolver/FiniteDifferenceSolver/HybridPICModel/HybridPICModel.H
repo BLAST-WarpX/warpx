@@ -314,17 +314,6 @@ public:
      *  not pollute the near-wall J x B. Set false to recover the plain (polluting)
      *  averaging for A/B. Only affects conformal-EB staggered runs. */
     bool m_eb_hall_mask = true;
-    /** If true (opt-in), evaluate the resistivity and hyper-resistivity parsers
-     *  ONCE per node -- from the nodal rho and the Hall-consistent nodal J/B --
-     *  and interpolate the resulting eta fields to the staggered E locations
-     *  (like the nodal enE/Hall term), instead of evaluating the parsers
-     *  pointwise at each staggered component location. Pointwise evaluation
-     *  samples a steep eta(rho) transition at three different positions per
-     *  cell, giving the E components inconsistent resistivities across the
-     *  plasma/vacuum (n_floor) seam -- a spurious-E source there. No-op on
-     *  collocated grids and for rho/J-independent resistivities. Cartesian
-     *  only. */
-    bool m_eta_nodal_interp = false;
     /** If > 0 (opt-in), smooth the holmstrom vacuum switch with an
      *  above-floor power-law window: on rho in [rho_floor,
      *  holmstrom_blend_width*rho_floor] the Hall/pressure (divided-by-rho)

@@ -2258,17 +2258,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         field, no per-component half-shifts). The physics division by rho and
         the resistivity evaluation are unchanged. Cartesian only.
 
-    eta_nodal_interp: bool, default=False
-        Evaluate the resistivity and hyper-resistivity parsers once per NODE
-        (from the nodal rho and the Hall-consistent nodal J/B) and interpolate
-        the resulting eta fields to the staggered E locations, like the nodal
-        Hall term -- instead of evaluating the parsers pointwise at each
-        staggered component location, which samples a steep eta(rho) transition
-        at three different positions per cell and gives the E components
-        inconsistent resistivities across the plasma/vacuum (n_floor) seam.
-        No-op on collocated grids and for rho/J-independent resistivities.
-        Cartesian only.
-
     isotropic_hyper_resistivity: bool, default=False
         Evaluate the hyper-resistivity Laplacian with the isotropic
         Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of the
@@ -2367,7 +2356,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         eb_deposit_fold=None,
         eb_rho_dirichlet=None,
         eb_pe_dirichlet=None,
-        eta_nodal_interp=None,
         holmstrom_blend_pow=None,
         holmstrom_blend_width=None,
         holmstrom_switch_mode=None,
@@ -2410,7 +2398,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.eb_deposit_fold = eb_deposit_fold
         self.eb_rho_dirichlet = eb_rho_dirichlet
         self.eb_pe_dirichlet = eb_pe_dirichlet
-        self.eta_nodal_interp = eta_nodal_interp
         self.holmstrom_blend_pow = holmstrom_blend_pow
         self.holmstrom_blend_width = holmstrom_blend_width
         self.holmstrom_switch_mode = holmstrom_switch_mode
@@ -2477,7 +2464,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
         pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
         pywarpx.hybridpicmodel.eb_pe_dirichlet = self.eb_pe_dirichlet
-        pywarpx.hybridpicmodel.eta_nodal_interp = self.eta_nodal_interp
         pywarpx.hybridpicmodel.holmstrom_blend_pow = self.holmstrom_blend_pow
         pywarpx.hybridpicmodel.holmstrom_blend_width = self.holmstrom_blend_width
         pywarpx.hybridpicmodel.holmstrom_switch_mode = self.holmstrom_switch_mode

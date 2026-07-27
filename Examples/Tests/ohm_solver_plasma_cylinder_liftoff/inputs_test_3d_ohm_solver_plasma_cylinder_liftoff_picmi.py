@@ -125,7 +125,6 @@ def setup_simulation(
     use_conformal_eb=True,
     eb_b_straight_mirror=False,
     eta_hyper_mult=1.0,
-    eta_nodal=False,
     holmstrom_blend_pow=0.0,
     holmstrom_blend_width=2.0,
     holmstrom_switch_mode="edge",
@@ -230,7 +229,6 @@ def setup_simulation(
         isotropic_resistivity=isotropic_resistivity,
         isotropic_hyper_resistivity=isotropic_hyper,
         isotropic_gradient=isotropic_gradient if isotropic_gradient else None,
-        eta_nodal_interp=True if eta_nodal else None,
         holmstrom_blend_pow=holmstrom_blend_pow if holmstrom_blend_pow > 0 else None,
         holmstrom_blend_width=holmstrom_blend_width
         if holmstrom_blend_pow > 0
@@ -698,14 +696,6 @@ def main():
         "for the staggered (Yee) runs.",
     )
     parser.add_argument(
-        "--eta-nodal",
-        dest="eta_nodal",
-        action="store_true",
-        help="evaluate the (hyper-)resistivity once per node and interpolate "
-        "to the staggered E locations (hybrid_pic_model.eta_nodal_interp): a "
-        "single-valued eta across the plasma/vacuum seam on Yee grids.",
-    )
-    parser.add_argument(
         "--holmstrom-blend-pow",
         type=float,
         default=None,
@@ -896,7 +886,6 @@ def main():
         use_conformal_eb=args.conformal_eb,
         eb_b_straight_mirror=args.eb_b_straight_mirror,
         eta_hyper_mult=args.eta_hyper_mult,
-        eta_nodal=args.eta_nodal,
         holmstrom_blend_pow=args.holmstrom_blend_pow,
         holmstrom_blend_width=args.holmstrom_blend_width,
         holmstrom_switch_mode=args.holmstrom_switch_mode,
