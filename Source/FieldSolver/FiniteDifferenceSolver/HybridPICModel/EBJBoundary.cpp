@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 
 using namespace amrex;
@@ -415,9 +416,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     bool normal_odd,
     bool fill_covered_centers,
     EBFillStatus* status_cache,
-    amrex::Real band_cells,
-    bool divfree,
-    bool divfree_debug)
+    amrex::Real band_cells)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -425,6 +424,18 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     ABLASTR_PROFILE("warpx::hybrid::ApplyPECBoundaryToField()");
 
     if (!eb_update[0]) { return; }
+
+    // A magnetic fill on a collocated grid (normal-odd parities on a fully
+    // nodal field) always ends with the divergence-consistent covered-band
+    // correction: the pointwise mirror alone injects O(h) central-difference
+    // div(B) at every fluid node whose stencil reads a covered node (the seed
+    // of the sharp-corner divergence instability), and the closed-form
+    // correction removes it at the source. Edge fields (E, J) and staggered
+    // fills are unaffected.
+    bool const divfree = normal_odd
+        && field[0]->ixType().nodeCentered()
+        && field[1]->ixType().nodeCentered()
+        && field[2]->ixType().nodeCentered();
 
     auto const plo = geom.ProbLoArray();
     auto const dxi = geom.InvCellSizeArray();
@@ -681,10 +692,10 @@ void warpx::hybrid::ApplyPECBoundaryToField (
         }
 
         // Divergence-consistent correction of the covered band (collocated B
-        // only, hybrid_pic_model.eb_bc_divfree_fill): run after the fill and
-        // before the ghost sync so the ghosts carry the corrected values.
+        // only): run after the fill and before the ghost sync so the ghosts
+        // carry the corrected values.
         if (divfree) {
-            warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom, divfree_debug);
+            warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom);
         }
 
         // Leave ghost edges consistent for the stencils that consume the field
@@ -842,10 +853,10 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     }
 
     // Divergence-consistent correction of the covered band (collocated B
-    // only, hybrid_pic_model.eb_bc_divfree_fill): run after the fill and
-    // before the ghost sync so the ghosts carry the corrected values.
+    // only): run after the fill and before the ghost sync so the ghosts
+    // carry the corrected values.
     if (divfree) {
-        warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom, divfree_debug);
+        warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom);
     }
 
     // Leave ghost edges consistent with the final band values for the
@@ -856,15 +867,14 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 #else
     amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
                          direct_fill, normal_odd, fill_covered_centers, status_cache,
-                         band_cells, divfree, divfree_debug);
+                         band_cells);
 #endif
 }
 
 void warpx::hybrid::DivFreeFixCoveredB (
     ablastr::fields::VectorField const& field,
     amrex::MultiFab const& distance_to_eb,
-    amrex::Geometry const& geom,
-    bool debug_check)
+    amrex::Geometry const& geom)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
     using namespace amrex::literals;
@@ -984,11 +994,17 @@ void warpx::hybrid::DivFreeFixCoveredB (
         });
     }
 
-    // Invariant verification (hybrid_pic_model.eb_bc_divfree_debug = 1): the
+    // Invariant verification (WARPX_DIVFREE_DEBUG=1 in the environment): the
     // residual central-difference div at every constrained fluid row must be
     // round-off after the pass. Aborts on violation, which makes the CI test
-    // of this feature a plain run with the knob enabled. Costs one extra
-    // reduction sweep per fill; off by default.
+    // of this feature a plain run under the environment variable. Costs one
+    // extra reduction sweep per fill; off by default. An environment hook
+    // rather than an input parameter: it is a self-check of an always-on
+    // invariant, not a user-facing choice.
+    static const bool debug_check = [] {
+        const char* e = std::getenv("WARPX_DIVFREE_DEBUG");
+        return (e != nullptr) && (e[0] == '1');
+    }();
     if (debug_check) {
         amrex::ReduceOps<amrex::ReduceOpMax> rop;
         amrex::ReduceData<amrex::Real> rdata(rop);
@@ -1048,7 +1064,7 @@ void warpx::hybrid::DivFreeFixCoveredB (
             "exceeds round-off after the pass");
     }
 #else
-    amrex::ignore_unused(field, distance_to_eb, geom, debug_check);
+    amrex::ignore_unused(field, distance_to_eb, geom);
 #endif
 }
 

@@ -3830,7 +3830,14 @@ Maxwell solver: kinetic-fluid hybrid
     the level-set geometry (signed distance and boundary normal) by mirror-image interpolation
     (normal component odd, tangential components even), so the masked nodal curl that forms the
     next substep's plasma current sees wall-consistent values instead of a staircase-zeroed
-    conductor. Requires embedded boundaries and a 3D or 2D (XZ) Cartesian **collocated** grid
+    conductor. The mirror band is sized automatically to the deepest covered node any
+    solution-side stencil can read (``algo.particle_shape`` + 1 cells, covering the particle
+    field gather as well as the curl stencils), and every fill ends with a closed-form
+    single-pass correction that zeroes the central-difference :math:`\nabla \cdot \mathbf{B}`
+    at each fluid node whose stencil reads a covered node — only covered-band values are
+    adjusted, never solution values — so the wall fill injects no magnetic divergence and
+    needs no divergence cleaner (the sharp-corner :math:`\nabla \cdot \mathbf{B}` instability
+    never seeds). Requires embedded boundaries and a 3D or 2D (XZ) Cartesian **collocated** grid
     (``warpx.grid_type = collocated``); a staggered (Yee) grid aborts — on staggered grids run
     the staircase wall, optionally imposing the magnetic wall condition with
     :pp:param:`hybrid_pic_model.eb_b_straight_mirror`. Not compatible with RZ geometry or PML
@@ -3898,32 +3905,6 @@ Maxwell solver: kinetic-fluid hybrid
     calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
     :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
 
-.. pp:param:: hybrid_pic_model.eb_bc_divfree_fill
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Divergence-consistent covered-B fill (collocated grid only). After every covered-B mirror
-    fill, apply a closed-form one-pass correction that zeroes the central-difference
-    :math:`\nabla \cdot \mathbf{B}` at every fluid node whose stencil reads a covered node:
-    because each covered component is read by exactly one fluid divergence stencil, the
-    minimum-deviation divergence-constrained re-fill reduces to scattering
-    :math:`\delta = c\,(-\nabla\cdot\mathbf{B})/\lVert c\rVert^2` into the covered axis
-    neighbors of each fluid wall node (:math:`c` are the :math:`\pm 1/(2\Delta x_d)` stencil
-    coefficients). Since the collocated central-difference Faraday update is discretely
-    divergence-free, the wall fill then ceases to be a divergence source entirely: the
-    sharp-corner :math:`\nabla \cdot \mathbf{B}` instability never seeds and no divergence
-    cleaner is needed. Only covered-band values are modified, by an amount proportional to the
-    fill's own injected divergence.
-
-.. pp:param:: hybrid_pic_model.eb_bc_divfree_debug
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Verify the div-free fill invariant after every pass (one extra reduction sweep) and abort
-    if any constrained fluid node's divergence exceeds round-off. For tests and debugging.
-
 .. pp:param:: hybrid_pic_model.conformal_b_off
     :type: ``bool``
     :default: ``false``
@@ -3944,22 +3925,6 @@ Maxwell solver: kinetic-fluid hybrid
     faces staircase-zeroed. This is the recommended wall treatment for ``B`` on staggered
     embedded-boundary hybrid runs (``use_conformal_eb`` is collocated-only). Opt-in; the default
     (``false``) leaves the staggered staircase behavior unchanged.
-
-.. pp:param:: hybrid_pic_model.eb_b_fill_band_cells
-    :type: ``float``
-    :default: ``1`` (``sqrt(2)`` when :pp:param:`hybrid_pic_model.isotropic_resistivity` is enabled)
-    :optional:
-
-    Width, in cells, of the band of covered ``Bfield_fp`` nodes set by the direct level-set mirror fill
-    (collocated, non-ECT path). The filled ``B`` couples back into the solution only through the
-    plasma-current curl and the isotropic corner-curl correction — a reach of about two cells when
-    :pp:param:`hybrid_pic_model.isotropic_resistivity` is enabled — so widening this band pushes the
-    mirror's curved-wall divergence error deeper into the zeroed conductor interior, where it can no
-    longer reach a solution-domain stencil. The corner-curl correction reads the out-of-plane ``B``
-    at the in-plane diagonal neighbors (reach ``sqrt(2)`` cells), so when it is enabled the default
-    band is widened to that corner reach: with a 1-cell (axis-reach) band, any wall segment oblique
-    to the grid puts the diagonal tap in the zeroed deep interior, feeding a spurious
-    grid-diagonal-peaked (m=4) electric field along the wall on every substep.
 
 .. pp:param:: hybrid_pic_model.eb_deposit_fold
     :type: ``string``
@@ -4081,7 +4046,7 @@ Maxwell solver: kinetic-fluid hybrid
     the isotropic stencils cancel that term (their leading error is proportional to the
     isotropic biharmonic; fully isotropic on cubic cells, consistent on non-cubic cells).
     Near an embedded boundary the hybrid EB mirror fills are widened to the diagonal stencil
-    reach (see :pp:param:`hybrid_pic_model.eb_b_fill_band_cells`), so the operator keeps its
+    reach, so the operator keeps its
     isotropic form there. Cartesian geometries only; in RZ the standard cylindrical operator
     is used (with the on-axis radial term carrying its L'Hopital factor of two).
 
@@ -4135,7 +4100,7 @@ Maxwell solver: kinetic-fluid hybrid
     :pp:param:`hybrid_pic_model.isotropic_gradient`) to the standard compact ones within a
     corner reach (:math:`(\sqrt{d}+1/2)\,h`) of the level set. Defaults to off here because
     the hybrid EB boundary layer mirror-fills the wide-stencil bands to the diagonal reach
-    (:pp:param:`hybrid_pic_model.eb_b_fill_band_cells` and the plasma-current band), keeping
+    (the magnetic-field and plasma-current bands), keeping
     the diagonal reads valid near the wall; opt back in for A/B isolation.
 
 .. pp:param:: hybrid_pic_model.add_external_fields

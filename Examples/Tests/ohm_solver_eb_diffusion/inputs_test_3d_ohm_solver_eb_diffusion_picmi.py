@@ -254,17 +254,6 @@ def setup_simulation(
             implicit_function="sqrt(x*x+z*z)-rcyl",
             rcyl=R_CYL,
         )
-        if use_conformal_eb:
-            # TEMP (edge-order validation): widen the covered-B mirror/gather fill
-            # band to 3 cells so the near-wall B-curl-fill gather never reaches into
-            # the zeroed deep interior ("empty cells"); this isolates the spatial
-            # order from a band-width artifact. The HybridPICModel comment recommends
-            # >= 3 to push the mirror's div(B) jump past any solution stencil. Scoped
-            # to the cylinder diagnostic (the registered square test is unchanged);
-            # tighten back toward 1 once the order is established.
-            from pywarpx import hybridpicmodel
-
-            hybridpicmodel.eb_b_fill_band_cells = 3
     else:
         sim.embedded_boundary = picmi.EmbeddedBoundary(
             implicit_function=(

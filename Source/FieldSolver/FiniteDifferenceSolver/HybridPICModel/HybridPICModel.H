@@ -383,17 +383,6 @@ public:
      *  single-pass mirrored interpolation over unmasked (solution-domain)
      *  values; if false, the iterative Jacobi band relaxation */
     bool m_eb_bc_direct_fill = true;
-    /** Divergence-consistent covered-B fill (collocated only): after every
-     *  covered-B mirror fill, apply the closed-form one-pass correction that
-     *  zeroes the central-difference div(B) at every fluid node whose
-     *  stencil reads a covered node (see DivFreeFixCoveredB). Removes the
-     *  fill's divergence injection at the source -- including the
-     *  sharp-corner instability seed -- so no divergence cleaner is needed.
-     *  Runtime knob hybrid_pic_model.eb_bc_divfree_fill; default off. */
-    bool m_eb_bc_divfree_fill = false;
-    /** Verify the div-free fill invariant after every pass and abort on
-     *  violation (test/debug; one extra reduction sweep per fill). */
-    bool m_eb_bc_divfree_debug = false;
     /** Image parity of the embedded-boundary deposit fold: true (default)
      *  folds with the PEC image signs (charge and tangential current
      *  subtracted, normal current added); false uses the reflecting-wall
@@ -447,16 +436,19 @@ public:
      *  amplifies into a non-finite blow-up. So the E fill band must not exceed the
      *  J fill band; pinning them equal keeps E and J consistent at the wall. */
     amrex::Real m_eb_fill_band_cells = 1.0;
-    /** Mirror-fill band width (in cells) for the magnetic-field (Bfield_fp) EB
-     *  fill. The filled B couples back into the solution only through curl/B
-     *  reads; with the isotropic corner-curl E correction on, that composite
-     *  reach is 2 cells, so widening this band to >=3 pushes the level-set
-     *  mirror's div(B) jump out of the solution-coupling zone (into the zeroed
-     *  deep interior, where it is causally inert). Runtime knob
-     *  hybrid_pic_model.eb_b_fill_band_cells; default 1 (legacy behavior),
-     *  auto-widened to sqrt(2) on 3D/XZ when isotropic_resistivity is enabled
-     *  so the corner-curl's in-plane diagonal B taps read mirror values rather
-     *  than the zeroed deep interior (user query still overrides). */
+    /** Mirror-fill band width (in units of the max cell size) for the
+     *  magnetic-field (Bfield_fp) EB fill. Computed, not an input: the band
+     *  must cover every fluid-side stencil that reads covered B -- the 1-cell
+     *  curl(B) reach, the corner-curl's in-plane diagonal taps (sqrt(2)) when
+     *  isotropic_resistivity is on, and the particle field gather, whose
+     *  shape-nox stencil for a particle against the wall reads nodes up to
+     *  (nox+1)/2 cells away per axis, a level-set depth of at most
+     *  sqrt(AMREX_SPACEDIM)*(nox+1)/2 <= nox+1 cells. nox+1 dominates all
+     *  three, so the band is nox+1 (falling back to the corner-curl reach
+     *  when no particles are loaded). The mirror's div(B) injection at the
+     *  band is removed by the closed-form div-free correction that ends
+     *  every collocated fill (DivFreeFixCoveredB), so the band no longer
+     *  trades accuracy against divergence placement. */
     amrex::Real m_eb_b_fill_band_cells = 1.0;
 
     /** Gpu Vector with index type of the Jx multifab */

@@ -260,18 +260,17 @@ void init_WarpX (py::module& m)
                     hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
                     hybrid->m_eb_bc_direct_fill,
                     /*normal_odd=*/true, fill_covered_centers,
-                    &hybrid->m_eb_bc_status_B[lev], band_cells,
-                    hybrid->m_eb_bc_divfree_fill
-                        && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated,
-                    hybrid->m_eb_bc_divfree_debug);
+                    &hybrid->m_eb_bc_status_B[lev], band_cells);
             },
             py::arg("name"), py::arg("lev") = 0,
             py::arg("fill_covered_centers") = false,
             py::arg("band_cells") = 1.0,
             "Apply the hybrid embedded-boundary PEC fill with magnetic parity "
             "(normal odd / tangential even) to the registered face vector "
-            "field Bfield_fp. With fill_covered_centers the covered-center faces "
-            "are also extended (the mirror B a near-wall curl(B) read needs)."
+            "field Bfield_fp. On a collocated grid the fill always ends with "
+            "the divergence-consistent covered-band correction. With "
+            "fill_covered_centers the covered-center faces are also extended "
+            "(the mirror B a near-wall curl(B) read needs)."
         )
         .def("hybrid_fold_eb_deposit_to_edge_field",
             [](WarpX& wx, std::string const& name, int const lev, bool const pec) {

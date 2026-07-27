@@ -2234,16 +2234,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         relaxation controlled by ``eb_bc_rtol`` and ``eb_bc_max_iters``
         instead.
 
-    eb_bc_divfree_fill: bool, default=False
-        Divergence-consistent covered-B fill (collocated grid only). After
-        every covered-B mirror fill, apply a closed-form one-pass correction
-        that zeroes the central-difference div(B) at every fluid node whose
-        stencil reads a covered node, so the wall fill stops injecting
-        divergence entirely (the sharp-corner div(B) instability never
-        seeds) and no divergence cleaner is needed. Only the covered-band
-        values move, by an amount proportional to the fill's own injected
-        divergence.
-
     holmstrom_blend_pow: float, default=0 (off)
         If > 0, smooth the Holmstrom vacuum switch with an above-floor power
         window: on ``rho in [rho_floor, holmstrom_blend_width*rho_floor]`` the
@@ -2374,7 +2364,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
-        eb_bc_divfree_fill=None,
         eb_deposit_fold=None,
         eb_rho_dirichlet=None,
         eb_pe_dirichlet=None,
@@ -2418,7 +2407,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
-        self.eb_bc_divfree_fill = eb_bc_divfree_fill
         self.eb_deposit_fold = eb_deposit_fold
         self.eb_rho_dirichlet = eb_rho_dirichlet
         self.eb_pe_dirichlet = eb_pe_dirichlet
@@ -2486,7 +2474,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
-        pywarpx.hybridpicmodel.eb_bc_divfree_fill = self.eb_bc_divfree_fill
         pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
         pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
         pywarpx.hybridpicmodel.eb_pe_dirichlet = self.eb_pe_dirichlet

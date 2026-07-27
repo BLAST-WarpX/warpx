@@ -32,6 +32,7 @@
 # --- interpolated normals and uses sign/containment assertions.
 
 import argparse
+import os
 import sys
 
 import numpy as np
@@ -102,17 +103,17 @@ def setup_simulation(geometry, grid_type="staggered", div_free_fill=False):
         substeps=4,
         # The conformal wall treatment is collocated-only (staggered aborts);
         # the staggered batteries exercise the always-on staircase EB fills.
+        # On the collocated path every covered-B fill ends with the built-in
+        # divergence-consistent correction (no knob).
         use_conformal_eb=True if grid_type == "collocated" else None,
-        # Divergence-consistent covered-B fill (collocated only): the test
-        # variant also enables the in-solver invariant verification, which
-        # ABORTS if any constrained fluid node's div(B) exceeds round-off
-        # after a fill -- the abort is this variant's assertion.
-        eb_bc_divfree_fill=True if div_free_fill else None,
     )
     if div_free_fill:
-        from pywarpx import hybridpicmodel
-
-        hybridpicmodel.eb_bc_divfree_debug = 1
+        # Enable the in-solver invariant verification (env hook, read at the
+        # first fill): the solver ABORTS if any constrained fluid node's
+        # div(B) exceeds round-off after a fill -- the abort is this
+        # variant's assertion. Must be set before initialize_warpx (the
+        # initial fill latches the flag).
+        os.environ["WARPX_DIVFREE_DEBUG"] = "1"
 
     if geometry == "plane":
         sim.embedded_boundary = picmi.EmbeddedBoundary(
@@ -700,12 +701,13 @@ def run_eb_collocated_battery(sim):
 
 
 def run_divfree_battery(sim):
-    """Divergence-consistent covered-B fill (eb_bc_divfree_fill, collocated):
-    every fill call self-verifies the machine-zero invariant at constrained
-    fluid nodes (eb_bc_divfree_debug aborts on violation -- that abort is this
-    battery's primary assertion); the python-side checks add fill+fix
-    selectivity (fluid bit-identical), an independent divergence measurement
-    at the first fluid layer, and second-call convergence (no ratchet)."""
+    """Divergence-consistent covered-B fill (built into every collocated
+    covered-B fill): every fill call self-verifies the machine-zero invariant
+    at constrained fluid nodes (WARPX_DIVFREE_DEBUG=1 aborts on violation --
+    that abort is this battery's primary assertion); the python-side checks
+    add fill+fix selectivity (fluid bit-identical), an independent divergence
+    measurement at the first fluid layer, and second-call convergence (no
+    ratchet)."""
     wx = sim.extension.warpx
     ck = CheckSet()
     x_node = LO + np.arange(N_XY + 1) * H
@@ -736,8 +738,9 @@ def run_divfree_battery(sim):
     Bz[...] = -0.3 + 0.05 * ii - 0.13 * np.sin(py) + 0.25 * np.cos(pz)
     before = [np.array(F[...]) for F in (Bx, By, Bz)]
 
-    # Fill + div-free fix; eb_bc_divfree_debug makes the solver ABORT here if
-    # any constrained fluid node's div(B) exceeds round-off after the pass.
+    # Fill + built-in div-free fix; WARPX_DIVFREE_DEBUG makes the solver ABORT
+    # here if any constrained fluid node's div(B) exceeds round-off after the
+    # pass.
     wx.hybrid_apply_eb_boundary_to_face_field("Bfield_fp", 0)
     after1 = [np.array(F[...]) for F in (Bx, By, Bz)]
 
@@ -808,7 +811,8 @@ def main():
     parser.add_argument(
         "--div-free-fill",
         action="store_true",
-        help="enable the divergence-consistent covered-B fill plus its "
+        help="run the div-free covered-B fill battery (the correction itself "
+        "is built into every collocated fill) under the WARPX_DIVFREE_DEBUG "
         "abort-on-violation invariant check (collocated only)",
     )
     args, left = parser.parse_known_args()

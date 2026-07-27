@@ -107,14 +107,15 @@ namespace warpx::hybrid
      *            shared between calls with different band widths.
      * \param[in] band_cells width of the mirror-fill band in cells (default 1,
      *            the axis-aligned face reach). A field whose downstream stencil
-     *            is isotropic (reaches the diagonal/corner neighbors) passes
-     *            sqrt(AMREX_SPACEDIM) so the corner edges are mirror-filled
-     *            instead of left in the zeroed deep interior.
-     * \param[in] divfree apply the divergence-consistent covered-band
-     *            correction after the fill (collocated B only, see
-     *            DivFreeFixCoveredB)
-     * \param[in] divfree_debug verify the div-free invariant after the
-     *            correction and abort on violation (test/debug)
+     *            reaches deeper covered points (the isotropic diagonal taps,
+     *            the particle field gather) passes the corresponding reach so
+     *            those points are mirror-filled instead of left in the zeroed
+     *            deep interior.
+     *
+     * A magnetic fill on a collocated grid (\c normal_odd with a fully nodal
+     * field) always ends with the divergence-consistent covered-band
+     * correction (DivFreeFixCoveredB), so the mirror fill injects no
+     * central-difference div(B) at the fluid nodes that read the band.
      */
     void ApplyPECBoundaryToField (
         ablastr::fields::VectorField const& field,
@@ -127,9 +128,7 @@ namespace warpx::hybrid
         bool normal_odd = false,
         bool fill_covered_centers = false,
         EBFillStatus* status_cache = nullptr,
-        amrex::Real band_cells = 1.0,
-        bool divfree = false,
-        bool divfree_debug = false);
+        amrex::Real band_cells = 1.0);
 
     /** \brief One-pass divergence-consistent correction of the mirror-filled
      * covered B band (collocated grid only).
@@ -155,22 +154,25 @@ namespace warpx::hybrid
      * be a divergence source entirely -- the sharp-corner div(B) instability
      * never seeds and no divergence cleaner is needed.
      *
-     * Must run after every covered-B fill (the fill re-injects on each
-     * call). Rows within one node of a non-periodic domain boundary are
-     * skipped (their stencils read domain ghosts).
+     * Runs automatically at the end of every collocated covered-B fill
+     * (ApplyPECBoundaryToField re-injects the mirror's divergence on each
+     * call, so the correction must follow each one). Rows within one node of
+     * a non-periodic domain boundary are skipped (their stencils read domain
+     * ghosts).
+     *
+     * Setting WARPX_DIVFREE_DEBUG=1 in the environment verifies the
+     * invariant after every pass (one extra reduction sweep) and aborts if
+     * any constrained fluid row's |div B| exceeds a round-off tolerance
+     * (test/debug hook; the CI battery runs under it).
      *
      * \param[in,out] field the collocated (nodal) magnetic field
      * \param[in] distance_to_eb nodal signed distance (positive in fluid)
      * \param[in] geom level geometry
-     * \param[in] debug_check verify the invariant after the pass (one extra
-     *            reduction sweep): abort if any constrained fluid row's
-     *            |div B| exceeds an absolute round-off tolerance
      */
     void DivFreeFixCoveredB (
         ablastr::fields::VectorField const& field,
         amrex::MultiFab const& distance_to_eb,
-        amrex::Geometry const& geom,
-        bool debug_check = false);
+        amrex::Geometry const& geom);
 
     /** \brief Enforce an embedded-boundary condition on a nodal scalar field
      * (the hybrid solver's ion charge density and electron pressure).

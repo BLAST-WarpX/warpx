@@ -23,6 +23,9 @@
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
@@ -180,8 +183,6 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
-    pp_hybrid.query("eb_bc_divfree_fill", m_eb_bc_divfree_fill);
-    pp_hybrid.query("eb_bc_divfree_debug", m_eb_bc_divfree_debug);
     // Optionally disable the collocated conformal B wall treatment entirely (no
     // EB B fill) to recover the pre-treatment baseline (for A/B comparison).
     pp_hybrid.query("conformal_b_off", m_conformal_b_off);
@@ -220,30 +221,27 @@ void HybridPICModel::ReadParameters ()
         ? std::sqrt(static_cast<amrex::Real>(AMREX_SPACEDIM))
         : amrex::Real(1.0);
 
-    // Mirror-fill band width for the Bfield_fp EB fill. The level-set mirror
-    // injects a div(B) jump at the band/deep interface; the filled B couples
-    // into the solution only via curl/B reads (effective reach 2 cells with the
-    // isotropic corner-curl E correction on), so a band >= 3 pushes that jump
-    // into the zeroed deep interior where it cannot reach a solution stencil.
-    // Default 1 = legacy behavior.
-    //
-    // The corner-curl correction (isotropic_resistivity) reads the out-of-plane
-    // B at the IN-PLANE DIAGONAL neighbors (reach sqrt(2)*h), so with the
-    // default 1-cell (axis-reach) band a wall segment oblique to the grid
-    // (|cos t|+|sin t| > 1, i.e. everywhere but the axis crossings) puts that
-    // tap in the zeroed deep interior: an O(B) second-difference jump feeds a
-    // spurious eta/(mu0*h)-scaled E along the wall every substage, peaked at
-    // the grid diagonals (a C4/m=4 wall-ring source). Widen the band to the
-    // corner reach -- the B-field analogue of the sqrt(3) plasma-current band
-    // above.
+    // Mirror-fill band width for the Bfield_fp EB fill, computed from the
+    // stencils that read covered B rather than exposed as an input. The
+    // particle field gather sets the reach: a particle against the wall reads
+    // nodes up to (nox+1)/2 cells away per axis, a level-set depth of at most
+    // sqrt(AMREX_SPACEDIM)*(nox+1)/2 <= nox+1 cells (in units of the max cell
+    // size), so band = nox+1 keeps every gathered covered node mirror-filled
+    // rather than zeroed. That also dominates the 1-cell curl(B) reach and
+    // the isotropic corner-curl's in-plane diagonal B taps (sqrt(2)*h), which
+    // govern only when no particles are loaded (nox = 0). The mirror's div(B)
+    // injection is removed at the source by the div-free correction that ends
+    // every collocated fill (DivFreeFixCoveredB), so widening the band
+    // carries no divergence-placement penalty.
+    m_eb_b_fill_band_cells = std::max(
+        static_cast<amrex::Real>(WarpX::nox + 1), amrex::Real(1.0));
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
-    // Only where the corner-curl actually compiles (Cartesian); on RZ etc. the
-    // correction does not exist, so the band keeps its legacy default there.
+    // The corner-curl only compiles on Cartesian 3D/XZ; elsewhere the curl
+    // reach stays axis-aligned.
     if (m_isotropic_resistivity) {
-        m_eb_b_fill_band_cells = std::sqrt(2.0_rt);
+        m_eb_b_fill_band_cells = std::max(m_eb_b_fill_band_cells, std::sqrt(2.0_rt));
     }
 #endif
-    utils::parser::queryWithParser(pp_hybrid, "eb_b_fill_band_cells", m_eb_b_fill_band_cells);
 }
 
 void HybridPICModel::AllocateLevelMFs (
@@ -462,8 +460,7 @@ void HybridPICModel::InitialBEBFill ()
             warpx.Geom(lev),
             m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/true, /*fill_covered_centers=*/false,
-            &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells,
-            m_eb_bc_divfree_fill && collocated_fill, m_eb_bc_divfree_debug);
+            &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
     }
 #endif
 }
@@ -1514,8 +1511,7 @@ void HybridPICModel::FieldPush (
                 warpx.Geom(lev),
                 m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
                 /*normal_odd=*/true, /*fill_covered_centers=*/false,
-                &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells,
-                m_eb_bc_divfree_fill && collocated_fill, m_eb_bc_divfree_debug);
+                &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
         }
         warpx.FillBoundaryB(ng, nodal_sync);
     }
