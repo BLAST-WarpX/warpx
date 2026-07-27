@@ -269,7 +269,8 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // Fold the deposit collected by covered points back across the embedded
     // surface before the boundary-condition fills overwrite it; without the
     // fold, the shape-function charge and current of wall-adjacent particles
-    // would be discarded. The image parities follow eb_deposit_fold.
+    // would be discarded. The fold uses the PEC image parities (the embedded
+    // boundary is always a PEC).
     if (EB::enabled()) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             if (static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_E.size()) <= lev) {
@@ -280,8 +281,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 m_eb_update_E[lev],
                 *m_fields.get(FieldType::distance_to_eb, lev),
                 Geom(lev),
-                &m_hybrid_pic_model->m_eb_bc_status_E[lev],
-                m_hybrid_pic_model->m_eb_fold_pec);
+                &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
             warpx::hybrid::ApplyPECBoundaryToField(
                 m_fields.get_alldirs(FieldType::current_fp, lev),
                 m_eb_update_E[lev],
@@ -295,13 +295,12 @@ void WarpX::HybridPICDepositRhoAndJ ()
             warpx::hybrid::FoldEBDepositToNodalScalar(
                 *m_fields.get(FieldType::rho_fp, lev),
                 *m_fields.get(FieldType::distance_to_eb, lev),
-                Geom(lev),
-                m_hybrid_pic_model->m_eb_fold_pec);
+                Geom(lev));
             warpx::hybrid::ApplyEBBoundaryToNodalScalar(
                 *m_fields.get(FieldType::rho_fp, lev),
                 *m_fields.get(FieldType::distance_to_eb, lev),
                 Geom(lev),
-                /*odd=*/m_hybrid_pic_model->m_eb_rho_dirichlet);
+                /*odd=*/true);  // Dirichlet: rho -> 0 at the PEC wall
         }
     }
 }

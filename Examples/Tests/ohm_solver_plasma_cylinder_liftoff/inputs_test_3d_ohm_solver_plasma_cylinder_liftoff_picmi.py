@@ -224,8 +224,6 @@ def setup_simulation(
         plasma_hyper_resistivity=eta_hyper,
         substeps=substeps,
         holmstrom_vacuum_region=True if holmstrom else None,
-        eb_deposit_fold="pec",
-        eb_rho_dirichlet=True,
         isotropic_resistivity=isotropic_resistivity,
         isotropic_hyper_resistivity=isotropic_hyper,
         isotropic_gradient=isotropic_gradient if isotropic_gradient else None,

@@ -53,12 +53,13 @@ T_ION = 10.0  # eV
 N_PLASMA = 1.0e18  # m^-3
 PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 
-# Tolerance of the in-situ electron-pressure Neumann check in the --pec-j
-# variant: largest pressure jump across the wall (samples a quarter cell on
-# either side along the analytic wall normal) relative to the peak pressure.
-# Calibrated at resolution 32 with at least 2x margin; without the even
-# embedded-boundary reflection of the pressure the jump is order unity.
-TOL_PE_NEUMANN = 0.06
+# Tolerance of the in-situ electron-pressure Dirichlet check in the --pec-j
+# variant: largest of (a) the pressure sampled ON the analytic wall face and
+# (b) the odd-parity defect pe(+s) + pe(-s) sampled a quarter cell on either
+# side along the analytic wall normal, relative to the peak pressure.
+# Calibrated at resolution 32 with at least 2x margin; without the odd
+# embedded-boundary reflection of the pressure both are order unity.
+TOL_PE_DIRICHLET = 0.06
 
 
 def init_cylinder_bessel_by(resolution, grid_type):
@@ -239,12 +240,6 @@ def setup_simulation(
         # initialize_inputs writing the (None) PICMI value over it.
         eb_b_straight_mirror=True if eb_b_straight_mirror else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
-        # The pec_j battery's closed form asserts a CONTINUOUS electron
-        # pressure across the wall (the wall supports the plasma back-
-        # pressure), so it opts into the even/Neumann Pe mirror explicitly
-        # (default is the odd/Dirichlet mirror) -- also the only coverage of
-        # the non-default parity.
-        eb_pe_dirichlet=False if pec_j else None,
     )
 
     if geometry == "cylinder":
@@ -335,10 +330,10 @@ def setup_simulation(
     if pec_j:
         # In-situ check of the electron-pressure embedded-boundary condition
         # (the pressure field is internal to the solver and not written by
-        # any diagnostic): the wall supports the plasma back-pressure, so the
-        # even mirror across the embedded boundary must leave no pressure
-        # jump at the wall, and the pressure deep inside the conductor is
-        # exactly zero.
+        # any diagnostic): the wall is a PEC, so the odd (Dirichlet) mirror
+        # must interpolate the pressure to zero at the wall face and be
+        # antisymmetric across it, and the pressure deep inside the conductor
+        # is exactly zero.
         state = {"step": 0}
 
         def check_electron_pressure():
@@ -389,26 +384,33 @@ def setup_simulation(
                             v = v + w * arr[i0 + di, j0 + dj, k0 + dk]
                 return v
 
-            # pressure jump across the xr = +hw wall face, sampled a
-            # quarter cell on either side along the analytic outward
-            # normal (samples deeper inside would mix in the correctly
-            # zeroed deep-interior nodes past the one-cell mirror band)
+            # odd (Dirichlet) parity across the xr = +hw wall face: the sum
+            # pe(+s) + pe(-s), sampled a quarter cell on either side along
+            # the analytic outward normal, must cancel, and the pressure
+            # interpolated ON the wall face must vanish (samples deeper
+            # inside would mix in the correctly zeroed deep-interior nodes
+            # past the one-cell mirror band)
             zr_s = np.linspace(-0.6, 0.6, 13) * HALF_WIDTH
             y_s = np.zeros_like(zr_s)
-            jump = np.empty_like(zr_s)
+            odd_defect = np.empty_like(zr_s)
             for sign, buf in ((1.0, "plus"), (-1.0, "minus")):
                 xr_s = HALF_WIDTH + sign * 0.25 * h
                 px = xr_s * np.cos(THETA) + zr_s * np.sin(THETA)
                 pz = -xr_s * np.sin(THETA) + zr_s * np.cos(THETA)
                 if buf == "plus":
-                    jump = trilinear(pe, px, y_s, pz)
+                    odd_defect = trilinear(pe, px, y_s, pz)
                 else:
-                    jump = jump - trilinear(pe, px, y_s, pz)
-            resid = np.max(np.abs(jump)) / np.max(pe)
-            print(f"electron pressure wall jump (relative): {resid:.3e}")
-            assert resid < TOL_PE_NEUMANN, (
-                f"electron pressure jump at the wall {resid:.3e} exceeds "
-                f"{TOL_PE_NEUMANN} (Neumann embedded-boundary condition)"
+                    odd_defect = odd_defect + trilinear(pe, px, y_s, pz)
+            px = HALF_WIDTH * np.cos(THETA) + zr_s * np.sin(THETA)
+            pz = -HALF_WIDTH * np.sin(THETA) + zr_s * np.cos(THETA)
+            wall_val = trilinear(pe, px, y_s, pz)
+            resid = max(
+                float(np.max(np.abs(odd_defect))), float(np.max(np.abs(wall_val)))
+            ) / np.max(pe)
+            print(f"electron pressure Dirichlet wall residual (relative): {resid:.3e}")
+            assert resid < TOL_PE_DIRICHLET, (
+                f"electron pressure Dirichlet residual at the wall {resid:.3e} "
+                f"exceeds {TOL_PE_DIRICHLET} (odd embedded-boundary mirror)"
             )
 
         callbacks.installafterstep(check_electron_pressure)

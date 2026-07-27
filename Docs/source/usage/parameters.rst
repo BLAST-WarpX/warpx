@@ -3860,12 +3860,10 @@ Maxwell solver: kinetic-fluid hybrid
     prescribing ``hybrid_pic_model.J*_external_grid_function`` inside a conductor has no effect; use
     ``external_vector_potential`` to drive coils embedded in conductors.
 
-    In addition, the deposited ion charge density is mirrored oddly across the embedded surface
-    (a Dirichlet condition: the plasma density vanishes at the conducting wall and is zero deep
-    inside the conductor; see :pp:param:`hybrid_pic_model.eb_rho_dirichlet`), and the electron
-    pressure is by default also mirrored oddly (a Dirichlet condition, Pe → 0 at the wall; set
-    :pp:param:`hybrid_pic_model.eb_pe_dirichlet` = ``false`` for the even/Neumann
-    wall-supported-pressure variant), so that the Ohm's-law density interpolation and the
+    In addition, the deposited ion charge density and the electron pressure are mirrored oddly
+    across the embedded surface (Dirichlet conditions: both vanish at the conducting wall and
+    are zero deep inside the conductor -- the embedded boundary is always a PEC), so that the
+    Ohm's-law density interpolation and the
     pressure-gradient stencils that straddle the wall see boundary-consistent values. These
     scalar conditions are always active when the hybrid solver is used with embedded boundaries
     (also without ``use_conformal_eb``). Note that the mirrored charge density inside the conductor is negative by
@@ -3925,43 +3923,6 @@ Maxwell solver: kinetic-fluid hybrid
     faces staircase-zeroed. This is the recommended wall treatment for ``B`` on staggered
     embedded-boundary hybrid runs (``use_conformal_eb`` is collocated-only). Opt-in; the default
     (``false``) leaves the staggered staircase behavior unchanged.
-
-.. pp:param:: hybrid_pic_model.eb_deposit_fold
-    :type: ``string``
-    :default: ``pec``
-    :optional:
-
-    Image parity of the embedded-boundary deposit fold. Particles within a shape length of a
-    conducting wall deposit part of their charge and current onto covered points; before the
-    boundary fill rewrites those points, the deposit is folded back across the surface (each
-    near-wall fluid point gathers the covered-side deposit at its mirror image), matching the
-    domain-boundary treatment. With ``pec`` (default) the fold uses the PEC image signs — charge
-    and tangential current subtracted (image of the opposite sign, so the density vanishes at the
-    wall), normal current added. With ``reflect`` the parities are reversed and the deposit is
-    folded back with its own sign, which conserves the deposited mass and is appropriate when the
-    wall supports the plasma column (combine with ``hybrid_pic_model.eb_rho_dirichlet = false``).
-
-.. pp:param:: hybrid_pic_model.eb_rho_dirichlet
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    Parity of the embedded-boundary mirror fill of the deposited charge density. If ``true``
-    (default), the density is mirrored oddly and vanishes at the wall (Dirichlet, free plasma
-    edge). If ``false``, it is mirrored evenly (Neumann: zero normal gradient, for a column
-    supported by the wall; combine with ``hybrid_pic_model.eb_deposit_fold = reflect``).
-
-.. pp:param:: hybrid_pic_model.eb_pe_dirichlet
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    Parity of the embedded-boundary mirror fill of the electron pressure. If ``true`` (default),
-    the pressure is mirrored oddly and vanishes at the conducting wall (Dirichlet, consistent
-    with the odd density mirror: the electron pressure at a free plasma edge drops to zero, and
-    its normal gradient supplies the radial sheath-like electric field). If ``false``, it is
-    mirrored evenly (Neumann: the wall supports the plasma back-pressure with zero normal
-    pressure gradient).
 
 .. pp:param:: hybrid_pic_model.eb_hall_mask
     :type: ``bool``

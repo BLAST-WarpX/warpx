@@ -186,25 +186,6 @@ void HybridPICModel::ReadParameters ()
     // off). Opt-in, default off -> byte-identical.
     pp_hybrid.query("eb_b_straight_mirror", m_eb_b_straight_mirror);
 
-    // Image parity of charge deposited beyond the embedded boundary: "pec" folds it back
-    // with opposite sign (density vanishes at the wall), "reflect" folds it back with its
-    // own sign (mass-conserving when the wall supports the plasma column).
-    std::string fold = "pec";
-    pp_hybrid.query("eb_deposit_fold", fold);
-    if (fold == "pec") { m_eb_fold_pec = true; }
-    else if (fold == "reflect") { m_eb_fold_pec = false; }
-    else {
-        WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.eb_deposit_fold must be 'pec' or 'reflect'");
-    }
-    // Parity of the rho mirror fill across the wall: Dirichlet 0 (odd) by default,
-    // Neumann (even) when the wall supports the column.
-    pp_hybrid.query("eb_rho_dirichlet", m_eb_rho_dirichlet);
-    // Parity of the electron-pressure fill at a PEC wall: Dirichlet 0 (odd) by
-    // default (Pe -> 0 at the wall, grad(Pe) drives the radial E a PEC sustains),
-    // Neumann (even) to reflect the back-pressure with zero normal gradient.
-    pp_hybrid.query("eb_pe_dirichlet", m_eb_pe_dirichlet);
-
     // The isotropic hyper-resistivity Laplacian (parsed with the resistivity
     // options above) reads the plasma current at its
     // diagonal/corner neighbors (sqrt(2)*h in plane, sqrt(3)*h at a 3D cube
@@ -715,23 +696,23 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *electron_pressure_fp,
         *rho_fp
     );
-    // Electron-pressure embedded-boundary condition at a PEC wall. Default is
-    // Dirichlet (odd reflection -> Pe vanishes at the wall): a PEC supports a normal
+    // Electron-pressure embedded-boundary condition at a PEC wall: Dirichlet
+    // (odd reflection -> Pe vanishes at the wall). A PEC supports a normal
     // (radial) E via surface charge, and the resulting grad(Pe) across the wall
     // supplies that allowable radial field in Ohm's law -- unlike a Neumann (even,
     // zero-normal-gradient) reflection, which pins the pressure gradient to zero and
     // suppresses the near-wall radial E. NOTE: this is NOT a physical sheath model;
     // quasineutrality breaks down and a sub-grid sheath forms at the wall (a likely
     // near-wall instability driver), to be revisited with a wall function under the
-    // implicit solver. Either
+    // implicit solver. The odd
     // parity keeps grad(Pe) stencils straddling the wall off the nonpositive mirrored
-    // density inside the conductor. Toggle with hybrid_pic_model.eb_pe_dirichlet.
+    // density inside the conductor.
     if (EB::enabled()) {
         warpx::hybrid::ApplyEBBoundaryToNodalScalar(
             *electron_pressure_fp,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            /*odd=*/m_eb_pe_dirichlet);
+            /*odd=*/true);  // Dirichlet: Pe -> 0 at the PEC wall
     }
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
     ablastr::utils::communication::FillBoundary(

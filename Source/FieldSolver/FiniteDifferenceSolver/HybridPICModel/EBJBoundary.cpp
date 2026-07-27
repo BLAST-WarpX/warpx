@@ -1090,8 +1090,7 @@ void warpx::hybrid::DivFreeFixCoveredB (
 void warpx::hybrid::FoldEBDepositToNodalScalar (
     amrex::MultiFab& field,
     amrex::MultiFab const& distance_to_eb,
-    amrex::Geometry const& geom,
-    bool pec_images)
+    amrex::Geometry const& geom)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -1113,7 +1112,7 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
     // deposit shape functions reach one cell past the surface; fold targets
     // mirror that reach on the fluid side
     amrex::Real const fold_band = 1.5_rt * h_max;
-    amrex::Real const fold_sign = pec_images ? -1.0_rt : 1.0_rt;
+    amrex::Real constexpr fold_sign = -1.0_rt;  // PEC image parity (the EB is always a PEC)
 
     // covered-side ghosts must hold the guard-summed deposit
     field.FillBoundary(geom.periodicity());
@@ -1207,7 +1206,7 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
         });
     }
 #else
-    amrex::ignore_unused(field, distance_to_eb, geom, pec_images);
+    amrex::ignore_unused(field, distance_to_eb, geom);
 #endif
 }
 
@@ -1216,8 +1215,7 @@ void warpx::hybrid::FoldEBDepositToField (
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
     amrex::MultiFab const& distance_to_eb,
     amrex::Geometry const& geom,
-    EBFillStatus* status_cache,
-    bool pec_images)
+    EBFillStatus* status_cache)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -1238,7 +1236,7 @@ void warpx::hybrid::FoldEBDepositToField (
     amrex::Real const d_band = h_max;
     amrex::Real const d_img_min = 0.5_rt * h_max;
     amrex::Real const fold_band = 1.5_rt * h_max;
-    amrex::Real const fold_sign = pec_images ? -1.0_rt : 1.0_rt;
+    amrex::Real constexpr fold_sign = -1.0_rt;  // PEC image parity (the EB is always a PEC)
 
     std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> stag{};
     for (int c = 0; c < 3; ++c) {
@@ -1348,7 +1346,7 @@ void warpx::hybrid::FoldEBDepositToField (
         }
     }
 #else
-    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache, pec_images);
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache);
 #endif
 }
 

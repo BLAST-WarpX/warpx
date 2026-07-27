@@ -372,21 +372,6 @@ public:
      *  single-pass mirrored interpolation over unmasked (solution-domain)
      *  values; if false, the iterative Jacobi band relaxation */
     bool m_eb_bc_direct_fill = true;
-    /** Image parity of the embedded-boundary deposit fold: true (default)
-     *  folds with the PEC image signs (charge and tangential current
-     *  subtracted, normal current added); false uses the reflecting-wall
-     *  parities (mass-conserving for a wall-supported column) */
-    bool m_eb_fold_pec = true;
-    /** Parity of the embedded-boundary rho mirror fill: true (default) is
-     *  the odd reflection (Dirichlet 0 at the wall); false is the even
-     *  reflection (Neumann: the wall supports the column) */
-    bool m_eb_rho_dirichlet = true;
-    /** Parity of the electron-pressure embedded-boundary fill at a PEC wall:
-     *  true (default) is the odd reflection (Dirichlet 0 -> Pe vanishes at the
-     *  wall, so grad(Pe) supports the allowable radial E a PEC sustains via
-     *  surface charge); false is the even reflection (Neumann: zero normal
-     *  gradient). A physical sheath/wall-function is not modelled here. */
-    bool m_eb_pe_dirichlet = true;
     /** Latch so the near-wall plasma warning is emitted at most once. */
     mutable bool m_checked_plasma_at_wall = false;
 

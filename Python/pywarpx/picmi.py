@@ -2209,23 +2209,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Maximum number of Jacobi sweeps of the embedded-boundary PEC
         boundary-condition band relaxation.
 
-    eb_deposit_fold: str, default='pec'
-        Image parity of the embedded-boundary deposit fold: 'pec' subtracts
-        the covered-side deposit at its mirror (image charge of the opposite
-        sign, density vanishes at the wall); 'reflect' adds it back.
-
-    eb_rho_dirichlet: bool, default=True
-        Parity of the embedded-boundary charge-density mirror fill: True is
-        the odd reflection (Dirichlet 0 at the wall); False is the even
-        reflection (Neumann, for a wall-supported column).
-
-    eb_pe_dirichlet: bool, default=True
-        Parity of the electron-pressure embedded-boundary fill at a PEC wall:
-        True (default) is the odd reflection (Dirichlet 0 -> Pe vanishes at the
-        wall, so grad(Pe) supplies the radial E a PEC sustains via surface
-        charge); False is the even reflection (Neumann, zero normal gradient).
-        Not a physical sheath model (quasineutrality breaks down at the wall).
-
     eb_bc_direct_fill: bool, default=True
         If True (default), fill the embedded-boundary PEC boundary condition
         with a single-pass mirrored interpolation that uses only
@@ -2353,9 +2336,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
-        eb_deposit_fold=None,
-        eb_rho_dirichlet=None,
-        eb_pe_dirichlet=None,
         holmstrom_blend_pow=None,
         holmstrom_blend_width=None,
         holmstrom_switch_mode=None,
@@ -2395,9 +2375,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
-        self.eb_deposit_fold = eb_deposit_fold
-        self.eb_rho_dirichlet = eb_rho_dirichlet
-        self.eb_pe_dirichlet = eb_pe_dirichlet
         self.holmstrom_blend_pow = holmstrom_blend_pow
         self.holmstrom_blend_width = holmstrom_blend_width
         self.holmstrom_switch_mode = holmstrom_switch_mode
@@ -2461,9 +2438,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
-        pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
-        pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
-        pywarpx.hybridpicmodel.eb_pe_dirichlet = self.eb_pe_dirichlet
         pywarpx.hybridpicmodel.holmstrom_blend_pow = self.holmstrom_blend_pow
         pywarpx.hybridpicmodel.holmstrom_blend_width = self.holmstrom_blend_width
         pywarpx.hybridpicmodel.holmstrom_switch_mode = self.holmstrom_switch_mode
