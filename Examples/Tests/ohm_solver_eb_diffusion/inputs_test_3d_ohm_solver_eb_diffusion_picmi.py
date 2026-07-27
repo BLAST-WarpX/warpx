@@ -111,7 +111,6 @@ def setup_simulation(
     split_z=False,
     grid_type="staggered",
     geometry="square",
-    eb_b_straight_mirror=False,
 ):
     """Create the PICMI simulation object.
 
@@ -134,11 +133,6 @@ def setup_simulation(
         Add a uniform external current and a thermal proton fill, and output
         the current densities, to test the embedded-boundary PEC current
         boundary condition.
-    eb_b_straight_mirror: bool
-        Impose the wall condition on the staggered (Yee) B field with the
-        direct level-set mirror after each Faraday push (the staggered-grid
-        counterpart of use_conformal_eb), instead of leaving the covered
-        faces staircase-zeroed.
     verbose: int
         WarpX verbosity.
     """
@@ -238,7 +232,6 @@ def setup_simulation(
         # use_conformal_eb). Must be passed HERE (the PICMI kwarg): a raw
         # hybridpicmodel bucket attribute would be clobbered by
         # initialize_inputs writing the (None) PICMI value over it.
-        eb_b_straight_mirror=True if eb_b_straight_mirror else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
     )
 
@@ -470,13 +463,6 @@ def main():
         "circular wall -- the curved-wall edge-order diagnostic)",
     )
     parser.add_argument(
-        "--eb-b-straight-mirror",
-        action="store_true",
-        help="impose the wall condition on the staggered (Yee) B field with "
-        "the direct level-set mirror after each Faraday push (the "
-        "staggered-grid counterpart of --conformal; staggered grids only)",
-    )
-    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -495,7 +481,6 @@ def main():
         args.split_z,
         args.grid_type,
         args.geometry,
-        args.eb_b_straight_mirror,
     )
     sim.step()
 

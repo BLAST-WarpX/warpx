@@ -3839,8 +3839,8 @@ Maxwell solver: kinetic-fluid hybrid
     needs no divergence cleaner (the sharp-corner :math:`\nabla \cdot \mathbf{B}` instability
     never seeds). Requires embedded boundaries and a 3D or 2D (XZ) Cartesian **collocated** grid
     (``warpx.grid_type = collocated``); a staggered (Yee) grid aborts — on staggered grids run
-    the staircase wall, optionally imposing the magnetic wall condition with
-    :pp:param:`hybrid_pic_model.eb_b_straight_mirror`. Not compatible with RZ geometry or PML
+    the staircase wall (the conformal treatment for staggered grids is the enlarged-cell/ECT
+    wall of the follow-up work). Not compatible with RZ geometry or PML
     boundaries.
 
     With embedded boundaries the hybrid solver also enforces the PEC boundary condition on the
@@ -3911,18 +3911,6 @@ Maxwell solver: kinetic-fluid hybrid
     Diagnostic only. If ``true``, disables the embedded-boundary ``B``-field treatment entirely on the
     collocated path (the direct level-set mirror fill is not applied), reproducing the pre-treatment
     stair-step baseline. Intended for A/B comparison of the EB ``B`` treatment; not for production runs.
-
-.. pp:param:: hybrid_pic_model.eb_b_straight_mirror
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Staggered (Yee) grids only. If ``true``, impose the magnetic wall condition on the staggered
-    ``Bfield_fp`` after each Faraday push with the same direct level-set mirror fill the collocated
-    conformal path uses (normal component odd, tangential even), instead of leaving the covered
-    faces staircase-zeroed. This is the recommended wall treatment for ``B`` on staggered
-    embedded-boundary hybrid runs (``use_conformal_eb`` is collocated-only). Opt-in; the default
-    (``false``) leaves the staggered staircase behavior unchanged.
 
 .. pp:param:: hybrid_pic_model.eb_hall_mask
     :type: ``bool``

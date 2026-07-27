@@ -437,8 +437,7 @@ WarpX::WarpX ()
         WARPX_ABORT_WITH_MESSAGE(
             "hybrid_pic_model.use_conformal_eb is collocated-only in the hybrid "
             "solver. Either set warpx.grid_type = collocated, or run the staggered "
-            "(Yee) staircase wall without it (optionally imposing the wall on B "
-            "with hybrid_pic_model.eb_b_straight_mirror).");
+            "(Yee) staircase wall without it.");
     }
 
     // The conformal embedded-boundary field update is used by the ECT Maxwell

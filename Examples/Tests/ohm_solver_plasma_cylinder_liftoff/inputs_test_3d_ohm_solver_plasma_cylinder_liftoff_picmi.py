@@ -123,7 +123,6 @@ def setup_simulation(
     annulus_smooth_cells=ANNULUS_SMOOTH_CELLS,
     grid_type="collocated",
     use_conformal_eb=True,
-    eb_b_straight_mirror=False,
     eta_hyper_mult=1.0,
     holmstrom_blend_pow=0.0,
     holmstrom_blend_width=2.0,
@@ -239,9 +238,8 @@ def setup_simulation(
         substep_atol=1.0e-8,
         max_substep_attempts=1000,
         # The conformal wall treatment is collocated-only (staggered aborts);
-        # on a staggered grid use eb_b_straight_mirror for the B wall instead.
+        # staggered runs use the staircase wall.
         use_conformal_eb=use_conformal_eb if grid_type == "collocated" else None,
-        eb_b_straight_mirror=True if eb_b_straight_mirror else None,
         A_external=A_ext,
         **power_law_resistivity(
             ETA_PLASMA,
@@ -634,8 +632,7 @@ def main():
     parser.add_argument(
         "--grid-type",
         help="field grid staggering: 'collocated' (nodal, level-set conformal "
-        "EB) or 'staggered' (Yee, staircase EB; pair with "
-        "--eb-b-straight-mirror for the B wall)",
+        "EB) or 'staggered' (Yee, staircase EB)",
         choices=["staggered", "collocated"],
         default="collocated",
     )
@@ -647,17 +644,6 @@ def main():
         help="disable the conformal (ECT/level-set) EB wall solve "
         "(hybrid_pic_model.use_conformal_eb=0); falls back to the standard "
         "masked/staircase EB. Baseline for the 'cost of conformal walls' comparison.",
-    )
-    parser.add_argument(
-        "--eb-b-straight-mirror",
-        dest="eb_b_straight_mirror",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="impose the wall on the staggered (Yee) B with the collocated-style "
-        "direct level-set mirror after each Faraday push, instead of leaving the "
-        "covered faces staircase-zeroed (hybrid_pic_model.eb_b_straight_mirror). "
-        "Best with a standoff holding plasma off the wall. Default: ON on "
-        "staggered (inert on collocated).",
     )
     parser.add_argument(
         "--mc-gather",
@@ -806,8 +792,6 @@ def main():
         args.isotropic_hyper = True
     if args.isotropic_gradient is None:
         args.isotropic_gradient = True
-    if args.eb_b_straight_mirror is None:
-        args.eb_b_straight_mirror = staggered
     if args.holmstrom_switch_mode is None:
         args.holmstrom_switch_mode = "cell" if staggered else "edge"
     if args.holmstrom_blend_pow is None:
@@ -882,7 +866,6 @@ def main():
         annulus_smooth_cells=args.annulus_smooth_cells,
         grid_type=args.grid_type,
         use_conformal_eb=args.conformal_eb,
-        eb_b_straight_mirror=args.eb_b_straight_mirror,
         eta_hyper_mult=args.eta_hyper_mult,
         holmstrom_blend_pow=args.holmstrom_blend_pow,
         holmstrom_blend_width=args.holmstrom_blend_width,

@@ -350,16 +350,6 @@ public:
      *  the source of the grid-locked m = 4 perturbation. Diagnostic only -- it
      *  leaves spurious fields at the wall, so it is not for production runs. */
     bool m_conformal_b_off = false;
-    /** If true, apply the collocated-style direct level-set mirror wall fill to the
-     *  STAGGERED (Yee) Bfield_fp after each Faraday push, in place of the ECT
-     *  enlarged-cell face borrowing. Run with the standard masked Yee Faraday
-     *  (use_conformal_eb off) + this straight mirror to get the collocated wall
-     *  treatment on a staggered grid, avoiding the ECT face-extension / cross-box
-     *  seam. Opt-in (default off -> byte-identical); intended for staggered runs
-     *  with the plasma held off the wall (a standoff), which removes the dense
-     *  near-wall radial B that made the pointwise Yee mirror spike. */
-    bool m_eb_b_straight_mirror = false;
-
     /** Relative residual tolerance of the Jacobi band relaxation of the
      *  embedded-boundary PEC field fills (only used when eb_bc_direct_fill
      *  is false) */

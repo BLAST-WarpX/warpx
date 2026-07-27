@@ -2182,17 +2182,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         magnetic-field nodes are rewritten after each Faraday push by
         level-set mirror-image interpolation (normal odd, tangential even).
         Requires an embedded boundary and a 3D or 2D (XZ) Cartesian
-        **collocated** grid (a staggered grid aborts; use
-        ``eb_b_straight_mirror`` there).
-
-    eb_b_straight_mirror: bool, default=False
-        If True, impose the wall condition on the staggered (Yee) ``Bfield_fp``
-        with the collocated-style direct level-set mirror after each Faraday
-        push, instead of leaving the covered faces staircase-zeroed. This is
-        the staggered-grid counterpart of ``use_conformal_eb``. Best with the
-        plasma held off the wall (a standoff), which removes the dense
-        near-wall B that made the pointwise Yee mirror spike. Opt-in (default
-        off is byte-identical).
+        **collocated** grid (a staggered grid aborts).
 
     eb_bc_rtol: float, default=1e-4
         Relative residual tolerance of the embedded-boundary PEC
@@ -2332,7 +2322,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
-        eb_b_straight_mirror=None,
         eb_bc_rtol=None,
         eb_bc_max_iters=None,
         eb_bc_direct_fill=None,
@@ -2371,7 +2360,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
 
         self.use_conformal_eb = use_conformal_eb
-        self.eb_b_straight_mirror = eb_b_straight_mirror
         self.eb_bc_rtol = eb_bc_rtol
         self.eb_bc_max_iters = eb_bc_max_iters
         self.eb_bc_direct_fill = eb_bc_direct_fill
@@ -2434,7 +2422,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
-        pywarpx.hybridpicmodel.eb_b_straight_mirror = self.eb_b_straight_mirror
         pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
         pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
         pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
