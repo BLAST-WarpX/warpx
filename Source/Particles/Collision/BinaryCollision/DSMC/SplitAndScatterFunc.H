@@ -432,15 +432,16 @@ public:
                 // calculate kinetic energy of the collision
                 const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
                 const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
+
                 // subtract the energy cost for ionization (converted from eV to J)
-                // Clamped to a tiny positive floor: CollisionFilterFunc.H selects this pair for
+                amrex::ParticleReal E_out = E_coll - scattering_process.m_energy_penalty * PhysConst::q_e;
+
+                // clamp E_out to a tiny positive floor: CollisionFilterFunc.H selects this pair for
                 // ionization using a differently-computed (relativistic, whole-pair) collision
                 // energy, so E_out can come out (slightly) negative here even though the pair
                 // cleared the ionization threshold there; without the floor, the sqrt() calls
                 // below would produce a NaN velocity.
-                const amrex::ParticleReal E_out = amrex::max(
-                    E_coll - scattering_process.m_energy_penalty * PhysConst::q_e,
-                    std::numeric_limits<amrex::ParticleReal>::min());
+                E_out = amrex::max(E_out, std::numeric_limits<amrex::ParticleReal>::min());
 
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
                 // distributed among the products) depend on the nature of the incident particle
