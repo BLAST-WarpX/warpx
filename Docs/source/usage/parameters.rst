@@ -5168,6 +5168,38 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         so the time of the diagnostic may be long
         depending on the simulation size.
 
+    * ``ChargeFluxEB``
+        Computes the charge flux (charge per unit time, in C/s) deposited by
+        particles scraped onto a user-specified sub-area of the embedded
+        boundary. One column is written per selected species, using the
+        scraped-particle data already collected in the
+        :ref:`particle boundary buffer <running-cpp-parameters-boundary>` for
+        the ``eb`` boundary. Requires WarpX to be compiled with
+        ``WarpX_EB=TRUE``, and requires
+        :pp:param:`<species_name>.save_particles_at_xlo/ylo/zlo/xhi/yhi/zhi/eb`
+        (``save_particles_at_eb = 1``) to be set for every species you want
+        to include.
+
+        .. pp:param:: <reduced_diag_name>.species
+        :type: ``strings``, separated by spaces
+        :optional:
+
+        List of species names for which the charge flux is computed. If not
+        specified, all species with ``save_particles_at_eb = 1`` are included,
+        each written to its own column in the output file.
+
+        .. pp:param:: <reduced_diag_name>.area_function
+        :type: ``string``
+        :optional: no default -- must always be specified
+
+        A function of the coordinates ``x``, ``y``, ``z`` (using the
+        :ref:`WarpX parser <running-cpp-parameters-parser>`) that defines the
+        sub-area of the embedded boundary to integrate over: particles scraped
+        at a location where this expression evaluates to a positive value are
+        counted, and all others are ignored. For example,
+        ``(z > 0.1) * (z < 0.3)`` selects only the band of the EB between
+        ``z = 0.1`` and ``z = 0.3``.
+
     * ``ChargeOnEB``
         This type computes the total surface charge on the embedded boundary
         (in Coulombs), by using the formula

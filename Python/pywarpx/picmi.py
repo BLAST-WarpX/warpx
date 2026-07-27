@@ -4961,7 +4961,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
         For diagnostic type 'FieldReduction', the function of the fields to evaluate
 
     weighting_function: string, optional
-        For diagnostic type 'ChargeOnEB', the function to weight contributions to the total charge
+        For diagnostic type 'ChargeOnEB' and 'ChargeFluxEB', the function to weight contributions to the total charge
 
     reduction_type: {'Maximum', 'Minimum', or 'Integral'}
         For diagnostic type 'FieldReduction', the type of reduction
@@ -5040,6 +5040,7 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
             "ParticleHistogram",
             "ParticleHistogram2D",
             "ParticleExtrema",
+            "ChargeFluxEB",
         ]
 
         if self.type in self._simple_reduced_diagnostics:
@@ -5051,6 +5052,8 @@ class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
                 kw = self._handle_particle_histogram(**kw)
             elif self.type == "ParticleHistogram2D":
                 kw = self._handle_particle_histogram2d(**kw)
+            elif self.type == "ChargeFluxEB":
+                kw = self._handle_charge_on_eb(**kw)
         elif self.type == "FieldProbe":
             kw = self._handle_field_probe(**kw)
         elif self.type == "FieldReduction":
