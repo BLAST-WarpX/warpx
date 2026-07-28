@@ -171,10 +171,6 @@ void HybridPICModel::ReadParameters ()
         }
     }
 
-    // controls for the embedded-boundary PEC field boundary condition
-    utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
-    utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
-    pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
     // The isotropic hyper-resistivity Laplacian (parsed with the resistivity
     // options above) reads the plasma current at its
     // diagonal/corner neighbors (sqrt(2)*h in plane, sqrt(3)*h at a 3D cube
@@ -419,7 +415,6 @@ void HybridPICModel::InitialBEBFill ()
             eb_update_B[lev],
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/true, /*fill_covered_centers=*/false,
             &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
     }
@@ -502,7 +497,6 @@ void HybridPICModel::CalculatePlasmaCurrent (
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
             &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells);
     }
@@ -581,7 +575,6 @@ void HybridPICModel::HybridPICSolveE (
             Efield, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
             // E fill band is PINNED to the J fill band: E = eta*J in the cut/
             // covered region, so filling E beyond where J is filled leaves E != 0
@@ -1468,8 +1461,7 @@ void HybridPICModel::FieldPush (
                 eb_update_B[lev],
                 *warpx.m_fields.get(FieldType::distance_to_eb, lev),
                 warpx.Geom(lev),
-                m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
-                /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
                 &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
         }
         warpx.FillBoundaryB(ng, nodal_sync);

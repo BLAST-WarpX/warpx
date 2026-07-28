@@ -329,18 +329,6 @@ public:
      *  components of that index -- a single piecewise-constant-per-cell
      *  decision field with no per-component half-shifts. Cartesian only. */
     int m_holmstrom_switch_mode = 0;
-    /** Relative residual tolerance of the Jacobi band relaxation of the
-     *  embedded-boundary PEC field fills (only used when eb_bc_direct_fill
-     *  is false) */
-    amrex::Real m_eb_bc_rtol = 1.e-4;
-    /** Sweep cap of the embedded-boundary PEC field fills: maximum Jacobi
-     *  iterations of the band relaxation, and maximum cascade sweeps over
-     *  ill-posed targets in the direct fill */
-    int m_eb_bc_max_iters = 10;
-    /** If true (default), the embedded-boundary PEC field fills use a
-     *  single-pass mirrored interpolation over unmasked (solution-domain)
-     *  values; if false, the iterative Jacobi band relaxation */
-    bool m_eb_bc_direct_fill = true;
     /** Latch so the near-wall plasma warning is emitted at most once. */
     mutable bool m_checked_plasma_at_wall = false;
 

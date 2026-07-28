@@ -2184,29 +2184,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Requires an embedded boundary and a 3D or 2D (XZ) Cartesian
         **collocated** grid (a staggered grid aborts).
 
-    eb_bc_rtol: float, default=1e-4
-        Relative residual tolerance of the embedded-boundary PEC
-        boundary-condition band relaxation. With embedded boundaries the
-        hybrid solver rewrites the current density and the Ohm's-law electric
-        field on edges inside the conductor from the level-set geometry
-        (tangential component zero at the surface, normal component with zero
-        normal gradient, zero deep inside) using mirror-image interpolation;
-        the internal layer is relaxed with Jacobi sweeps until the largest
-        change, relative to the largest field magnitude in the boundary band,
-        drops below this tolerance (or ``eb_bc_max_iters`` is reached).
-
-    eb_bc_max_iters: int, default=10
-        Maximum number of Jacobi sweeps of the embedded-boundary PEC
-        boundary-condition band relaxation.
-
-    eb_bc_direct_fill: bool, default=True
-        If True (default), fill the embedded-boundary PEC boundary condition
-        with a single-pass mirrored interpolation that uses only
-        solution-domain (unmasked) values, with stencil weights renormalized
-        over the unmasked points. If False, use the iterative Jacobi band
-        relaxation controlled by ``eb_bc_rtol`` and ``eb_bc_max_iters``
-        instead.
-
     holmstrom_blend_pow: float, default=0 (off)
         If > 0, smooth the Holmstrom vacuum switch with an above-floor power
         window: on ``rho in [rho_floor, holmstrom_blend_width*rho_floor]`` the
@@ -2315,9 +2292,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
-        eb_bc_rtol=None,
-        eb_bc_max_iters=None,
-        eb_bc_direct_fill=None,
         holmstrom_blend_pow=None,
         holmstrom_blend_width=None,
         holmstrom_switch_mode=None,
@@ -2352,9 +2326,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
 
         self.use_conformal_eb = use_conformal_eb
-        self.eb_bc_rtol = eb_bc_rtol
-        self.eb_bc_max_iters = eb_bc_max_iters
-        self.eb_bc_direct_fill = eb_bc_direct_fill
         self.holmstrom_blend_pow = holmstrom_blend_pow
         self.holmstrom_blend_width = holmstrom_blend_width
         self.holmstrom_switch_mode = holmstrom_switch_mode
@@ -2413,9 +2384,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
-        pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
-        pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
-        pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
         pywarpx.hybridpicmodel.holmstrom_blend_pow = self.holmstrom_blend_pow
         pywarpx.hybridpicmodel.holmstrom_blend_width = self.holmstrom_blend_width
         pywarpx.hybridpicmodel.holmstrom_switch_mode = self.holmstrom_switch_mode

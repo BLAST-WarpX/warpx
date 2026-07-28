@@ -3871,38 +3871,6 @@ Maxwell solver: kinetic-fluid hybrid
     resistivity parsers and from the electron-pressure equation of state, but appears in the
     ``rho`` diagnostic as a thin negative band inside conducting walls.
 
-.. pp:param:: hybrid_pic_model.eb_bc_rtol
-    :type: ``float``
-    :default: ``1e-4``
-    :optional:
-
-    Residual tolerance of the embedded-boundary PEC boundary-condition band relaxation applied
-    to the current density and the Ohm's-law electric field by the hybrid solver: the relaxation stops
-    when the largest change in the band, relative to the largest field magnitude in the band, drops
-    below this value (see :pp:param:`hybrid_pic_model.use_conformal_eb` for a description of the
-    boundary condition).
-
-.. pp:param:: hybrid_pic_model.eb_bc_max_iters
-    :type: ``int``
-    :default: ``10``
-    :optional:
-
-    Maximum number of Jacobi sweeps of the embedded-boundary PEC boundary-condition band relaxation
-    used by the hybrid solver.
-
-.. pp:param:: hybrid_pic_model.eb_bc_direct_fill
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    If ``true`` (default), the embedded-boundary PEC boundary condition is filled with a single-pass
-    mirrored interpolation that uses only solution-domain values (stencil weights renormalized over
-    those points), followed, where the interpolation is ill posed, by a deterministic cascade that
-    locks the direct-pass values and fills the remaining points from them (capped at
-    :pp:param:`hybrid_pic_model.eb_bc_max_iters` sweeps). The fill classification is cached between
-    calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
-    :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
-
 .. pp:param:: hybrid_pic_model.holmstrom_blend_pow
     :type: ``float``
     :default: ``0`` (off)

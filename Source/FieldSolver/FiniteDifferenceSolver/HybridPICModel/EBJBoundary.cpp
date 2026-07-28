@@ -410,9 +410,6 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
     amrex::MultiFab const& distance_to_eb,
     amrex::Geometry const& geom,
-    amrex::Real rtol,
-    int max_iters,
-    bool direct_fill,
     bool normal_odd,
     bool fill_covered_centers,
     EBFillStatus* status_cache,
@@ -468,7 +465,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
         }
     }
 
-    if (direct_fill) {
+    // Single-pass deterministic mirror fill (the only strategy): well-posed
+    // targets in one pass, ill-posed ones via the bounded cascade below.
+    {
         warpx::hybrid::EBFillStatus local_status;
         warpx::hybrid::EBFillStatus& st = status_cache ? *status_cache : local_status;
         if (st.empty()) {
@@ -558,8 +557,12 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 }
             }
 
+            // Sweep cap of the ill-posed resolution cascade: each sweep
+            // locks at least one point or stalls, so this is a backstop,
+            // not a knob.
+            constexpr int max_cascade_sweeps = 10;
             int n_left = st.n_pending;
-            for (int sweep = 0; sweep < max_iters && n_left > 0; ++sweep) {
+            for (int sweep = 0; sweep < max_cascade_sweeps && n_left > 0; ++sweep) {
                 for (int c = 0; c < 3; ++c) {
                     field[c]->FillBoundary(geom.periodicity());
                     st.status[c]->FillBoundary(geom.periodicity());
@@ -705,169 +708,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
         return;
     }
 
-    // Scratch copies holding the previous Jacobi iterate
-    std::array<amrex::MultiFab, 3> Jold;
-    for (int c = 0; c < 3; ++c) {
-        Jold[c].define(field[c]->boxArray(), field[c]->DistributionMap(),
-                       field[c]->nComp(), field[c]->nGrowVect());
-    }
-
-    int iter = 0;
-    amrex::Real resid = std::numeric_limits<amrex::Real>::max();
-    while (iter < max_iters && resid > rtol) {
-
-        // Refresh ghost edges (image stencils can reach into neighbor boxes)
-        // and snapshot the previous iterate for a deterministic Jacobi sweep
-        for (int c = 0; c < 3; ++c) {
-            field[c]->FillBoundary(geom.periodicity());
-            amrex::MultiFab::Copy(Jold[c], *field[c], 0, 0,
-                                  field[c]->nComp(), field[c]->nGrowVect());
-        }
-
-        // Track the largest change and the largest band value so convergence
-        // is measured relative to the boundary-band field magnitude; a per-edge
-        // relative criterion can never be met by edges holding near-zero values.
-        amrex::ReduceOps<amrex::ReduceOpMax, amrex::ReduceOpMax> reduce_op;
-        amrex::ReduceData<amrex::Real, amrex::Real> reduce_data(reduce_op);
-        using ReduceTuple = typename decltype(reduce_data)::Type;
-
-        for (int c = 0; c < 3; ++c) {
-            auto const stag_own = stag[c];
-            auto const stag_x = stag[0];
-            auto const stag_y = stag[1];
-            auto const stag_z = stag[2];
-
-            for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
-                int const ncomp = field[c]->nComp();
-
-                auto const& Jc = field[c]->array(mfi);
-                auto const& Jx_o = Jold[0].const_array(mfi);
-                auto const& Jy_o = Jold[1].const_array(mfi);
-                auto const& Jz_o = Jold[2].const_array(mfi);
-                auto const& mask = eb_update[c]->const_array(mfi);
-                auto const& phi = distance_to_eb.const_array(mfi);
-
-                reduce_op.eval(tb, ncomp, reduce_data,
-                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) -> ReduceTuple
-                {
-                    if (mask(i, j, k) != 0) { return {0._rt, 0._rt}; }
-
-                    // edge-center position in physical coordinates
-                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
-#if defined(WARPX_DIM_3D)
-                    xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
-                    xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
-                    xe[2] = plo[2] + (k + stag_own[2])*dx_arr[2];
-                    amrex::Real const yq = xe[1];
-                    amrex::Real const zq = xe[2];
 #else
-                    xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
-                    xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
-                    amrex::Real const yq = 0._rt;
-                    amrex::Real const zq = xe[1];
-#endif
-
-                    // signed distance at the edge center (< 0 in the conductor)
-                    int ii, jj, kk;
-                    amrex::Real W[AMREX_SPACEDIM][2];
-                    ablastr::particles::compute_weights<amrex::IndexType::NODE>(
-                        xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
-                    amrex::Real const s = ablastr::particles::interp_field_nodal(ii, jj, kk, W, phi);
-
-                    amrex::Real const v_old = Jc(i, j, k, n);
-
-                    if (s < -d_band) {
-                        // deep inside the conductor: the field vanishes
-                        Jc(i, j, k, n) = 0._rt;
-                        return {std::abs(v_old), 0._rt};
-                    }
-
-                    // Boundary normal (toward the plasma) from the level
-                    // set (unit 3D Cartesian; yq = 0 makes the RZ rotation
-                    // the identity, so components 0/2 are the grid normal).
-                    auto const n3 =
-                        DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
-#if defined(WARPX_DIM_3D)
-                    amrex::RealVect const nv{
-                        amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2])};
-#else
-                    amrex::RealVect const nv{
-                        amrex::Real(n3[0]), amrex::Real(n3[2])};
-#endif
-                    amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-                    if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
-                        // degenerate level-set gradient (interp_normal
-                        // normalizes internally, so a vanishing gradient
-                        // arrives non-finite): treat as deep interior
-                        Jc(i, j, k, n) = 0._rt;
-                        return {std::abs(v_old), 0._rt};
-                    }
-
-                    // Image point at least one cell into the plasma so its
-                    // stencil decouples from the boundary band (fast Jacobi
-                    // convergence); d_im is its distance from the surface.
-                    amrex::Real const offset =
-                        amrex::max(amrex::max(std::abs(s), d_img_min) - s, h_max);
-                    amrex::Real const d_im = s + offset;
-                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim;
-                    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-                        xim[d] = xe[d] + offset*nv[d];
-                    }
-
-                    amrex::Real const Jx_im = gather_staggered(Jx_o, xim, stag_x, plo, dxi, n);
-                    amrex::Real const Jy_im = gather_staggered(Jy_o, xim, stag_y, plo, dxi, n);
-                    amrex::Real const Jz_im = gather_staggered(Jz_o, xim, stag_z, plo, dxi, n);
-
-                    // edge fields (E, J): normal even / tangential odd;
-                    // magnetic field: normal odd / tangential even.
-                    amrex::Real const w_n = normal_odd ? s/d_im : 1._rt;
-                    amrex::Real const w_t = normal_odd ? 1._rt : s/d_im;
-                    amrex::Real const v_new = ::mirror_combine(c, Jx_im, Jy_im, Jz_im,
-                        nv, w_n, w_t);
-
-                    Jc(i, j, k, n) = v_new;
-
-                    return {std::abs(v_new - v_old), std::abs(v_new)};
-                });
-            }
-        }
-
-        auto const result = reduce_data.value(reduce_op);
-        amrex::Real dmax = amrex::get<0>(result);
-        amrex::Real smax = amrex::get<1>(result);
-        amrex::ParallelDescriptor::ReduceRealMax(dmax);
-        amrex::ParallelDescriptor::ReduceRealMax(smax);
-        resid = dmax / amrex::max(smax, std::numeric_limits<amrex::Real>::min());
-        ++iter;
-    }
-
-    if (resid > rtol) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC",
-            "ApplyPECBoundaryToField: the embedded-boundary field band "
-            "relaxation did not reach the requested tolerance "
-            "(hybrid_pic_model.eb_bc_rtol) within "
-            "hybrid_pic_model.eb_bc_max_iters sweeps.",
-            ablastr::warn_manager::WarnPriority::low);
-    }
-
-    // Divergence-consistent correction of the covered band (collocated B
-    // only): run after the fill and before the ghost sync so the ghosts
-    // carry the corrected values.
-    if (divfree) {
-        warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom);
-    }
-
-    // Leave ghost edges consistent with the final band values for the
-    // stencils that consume J (nodal interpolation, hyper-resistivity)
-    for (int c = 0; c < 3; ++c) {
-        field[c]->FillBoundary(geom.periodicity());
-    }
-#else
-    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
-                         direct_fill, normal_odd, fill_covered_centers, status_cache,
-                         band_cells);
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, normal_odd,
+                         fill_covered_centers, status_cache, band_cells);
 #endif
 }
 

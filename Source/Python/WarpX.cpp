@@ -225,8 +225,6 @@ void init_WarpX (py::module& m)
                     wx.GetEBUpdateEFlag()[lev],
                     *wx.m_fields.get(FieldType::distance_to_eb, lev),
                     wx.Geom(lev),
-                    hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
-                    hybrid->m_eb_bc_direct_fill,
                     /*normal_odd=*/false, /*fill_covered_centers=*/true,
                     &hybrid->m_eb_bc_status_E[lev]);
             },
@@ -257,8 +255,6 @@ void init_WarpX (py::module& m)
                     wx.GetEBUpdateBFlag()[lev],
                     *wx.m_fields.get(FieldType::distance_to_eb, lev),
                     wx.Geom(lev),
-                    hybrid->m_eb_bc_rtol, hybrid->m_eb_bc_max_iters,
-                    hybrid->m_eb_bc_direct_fill,
                     /*normal_odd=*/true, fill_covered_centers,
                     &hybrid->m_eb_bc_status_B[lev], band_cells);
             },
