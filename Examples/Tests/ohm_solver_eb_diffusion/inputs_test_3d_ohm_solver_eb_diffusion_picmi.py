@@ -53,13 +53,16 @@ T_ION = 10.0  # eV
 N_PLASMA = 1.0e18  # m^-3
 PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 
-# Tolerance of the in-situ electron-pressure Dirichlet check in the --pec-j
-# variant: largest of (a) the pressure sampled ON the analytic wall face and
-# (b) the odd-parity defect pe(+s) + pe(-s) sampled a quarter cell on either
-# side along the analytic wall normal, relative to the peak pressure.
-# Calibrated at resolution 32 with at least 2x margin; without the odd
-# embedded-boundary reflection of the pressure both are order unity.
-TOL_PE_DIRICHLET = 0.06
+# Depth (as a fraction of the peak pressure) the covered mirror band of the
+# electron pressure must reach BELOW zero in the --pec-j variant: the odd
+# (Dirichlet) fill sets each covered band node to minus the masked
+# interpolation of the (nonnegative) fluid pressure at its mirror image, so
+# the band is nonpositive everywhere and genuinely negative where the pressed
+# plasma holds a finite wall pressure. The even mirror flips the sign of the
+# whole band, so the sign assertions are parameter-free discriminators; this
+# constant only sets how much of the wall pressure must visibly mirror.
+# Calibrated at resolution 32 with at least 4x margin.
+TOL_PE_MIRROR_DEPTH = 0.05
 
 
 def init_cylinder_bessel_by(resolution, grid_type):
@@ -377,33 +380,36 @@ def setup_simulation(
                             v = v + w * arr[i0 + di, j0 + dj, k0 + dk]
                 return v
 
-            # odd (Dirichlet) parity across the xr = +hw wall face: the sum
-            # pe(+s) + pe(-s), sampled a quarter cell on either side along
-            # the analytic outward normal, must cancel, and the pressure
-            # interpolated ON the wall face must vanish (samples deeper
-            # inside would mix in the correctly zeroed deep-interior nodes
-            # past the one-cell mirror band)
-            zr_s = np.linspace(-0.6, 0.6, 13) * HALF_WIDTH
-            y_s = np.zeros_like(zr_s)
-            odd_defect = np.empty_like(zr_s)
-            for sign, buf in ((1.0, "plus"), (-1.0, "minus")):
-                xr_s = HALF_WIDTH + sign * 0.25 * h
-                px = xr_s * np.cos(THETA) + zr_s * np.sin(THETA)
-                pz = -xr_s * np.sin(THETA) + zr_s * np.cos(THETA)
-                if buf == "plus":
-                    odd_defect = trilinear(pe, px, y_s, pz)
-                else:
-                    odd_defect = odd_defect + trilinear(pe, px, y_s, pz)
-            px = HALF_WIDTH * np.cos(THETA) + zr_s * np.sin(THETA)
-            pz = -HALF_WIDTH * np.sin(THETA) + zr_s * np.cos(THETA)
-            wall_val = trilinear(pe, px, y_s, pz)
-            resid = max(
-                float(np.max(np.abs(odd_defect))), float(np.max(np.abs(wall_val)))
-            ) / np.max(pe)
-            print(f"electron pressure Dirichlet wall residual (relative): {resid:.3e}")
-            assert resid < TOL_PE_DIRICHLET, (
-                f"electron pressure Dirichlet residual at the wall {resid:.3e} "
-                f"exceeds {TOL_PE_DIRICHLET} (odd embedded-boundary mirror)"
+            # odd (Dirichlet) parity of the covered mirror band, asserted
+            # NODE-wise (interpolated sampling would mix the mirror values
+            # with the zeroed deep interior in this rotated geometry): the
+            # fill sets each covered band node to MINUS the masked
+            # interpolation of the (nonnegative) fluid pressure at its
+            # image, so the band is nonpositive everywhere and genuinely
+            # negative where the pressed plasma holds a finite wall
+            # pressure. The even mirror flips the sign of the whole band.
+            # Margins keep the mask off the s ~ 0 discrete/analytic
+            # level-set mismatch, the deep-zeroed region past one cell, and
+            # the corner rings where two faces meet.
+            band2d = (s < -0.15 * h) & (s > -0.85 * h)
+            band2d &= HALF_WIDTH - np.minimum(np.abs(xr), np.abs(zr)) > 2.0 * h
+            band = np.broadcast_to(band2d[:, None, :], pe.shape)
+            pmax = float(np.max(pe))
+            band_max = float(np.max(pe[band]))
+            band_min = float(np.min(pe[band]))
+            print(
+                f"electron pressure mirror band: max={band_max:.3e} "
+                f"min={band_min:.3e} peak={pmax:.3e}"
+            )
+            assert band_max <= 1.0e-12 * pmax, (
+                f"positive electron pressure {band_max:.3e} in the covered "
+                "mirror band (the odd/Dirichlet fill makes it nonpositive; "
+                "an even mirror makes it positive)"
+            )
+            assert band_min < -TOL_PE_MIRROR_DEPTH * pmax, (
+                f"covered-band electron pressure minimum {band_min:.3e} "
+                f"never reaches -{TOL_PE_MIRROR_DEPTH}*peak: the odd mirror "
+                "does not appear to be active"
             )
 
         callbacks.installafterstep(check_electron_pressure)

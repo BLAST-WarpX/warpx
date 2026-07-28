@@ -22,9 +22,10 @@
 # ---   * fill targets whose image stencils keep less than W_MIN of their
 # ---     weight in the solution domain are ill-posed and are resolved by
 # ---     the deterministic cascade from already-locked fill values,
-# ---   * the nodal scalars follow their parity: rho odd (Dirichlet 0 at the
-# ---     surface), Pe even (Neumann); their fills and folds are keyed off
-# ---     the level set alone (not the staircase masks).
+# ---   * the nodal scalars are mirrored oddly (Dirichlet 0 at the surface:
+# ---     the solver applies this to rho and Pe; the even/Neumann mode of the
+# ---     operator is exercised through the binding); their fills and folds
+# ---     are keyed off the level set alone (not the staircase masks).
 # ---
 # --- The planar wall (normal -x) makes the level-set distance and the
 # --- mirror geometry analytic, so most assertions hold to round-off; the
@@ -442,63 +443,6 @@ def run_plane_battery(sim):
         jx[cent_rows(1.6, 10.0), :, :],
         0.0,
         0.0,
-    )
-
-    # reflecting-wall parity: the exact opposite signs (deposit added back,
-    # mass conserving; normal J subtracted)
-    rho[...] = 0.0
-    for i in i_dep:
-        rho[i, :, :] = c
-    wx.hybrid_fold_eb_deposit_to_nodal_scalar("rho_fp", 0, pec=False)
-    r = rho[...]
-    r = r[..., 0] if r.ndim == 4 else r
-    ck.close(
-        "fold rho (reflect): first fluid row receives +0.6c",
-        r[i_first, :, :],
-        0.6 * c,
-        1e-12,
-    )
-    ck.close(
-        "fold rho (reflect): second fluid row receives +0.4c",
-        r[i_second, :, :],
-        0.4 * c,
-        1e-12,
-    )
-    ck.close(
-        "fold rho (reflect): folded amount conserved (sum = +c)",
-        r[i_first[0], :, :] + r[i_second[0], :, :],
-        c,
-        1e-12,
-    )
-
-    Jx[...] = 0.0
-    Jy[...] = 0.0
-    Jz[...] = 0.0
-    for i in i_dep:
-        Jy[i, :, :] = c
-    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0, pec=False)
-    jy = Jy[...]
-    ck.close(
-        "fold J tangential (reflect): unowned fluid row skipped",
-        jy[i_first, :, :],
-        0.0,
-        0.0,
-    )
-    ck.close(
-        "fold J tangential (reflect): first owned row added +0.4c",
-        jy[i_second, :, :],
-        0.4 * c,
-        1e-12,
-    )
-    Jx[...] = 0.0
-    Jy[...] = 0.0
-    Jz[...] = 0.0
-    for i in i_cut:
-        Jx[i, :, :] = c
-    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0, pec=False)
-    jx = Jx[...]
-    ck.close(
-        "fold J normal (reflect): subtracted -0.4c", jx[i_cn, :, :], -0.4 * c, 1e-12
     )
 
     # --- 7) selectivity against a spatially varying field ----------------

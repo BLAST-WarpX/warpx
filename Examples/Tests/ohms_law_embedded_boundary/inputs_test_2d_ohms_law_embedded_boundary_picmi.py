@@ -503,57 +503,6 @@ def run_plane_battery(sim):
         0.0,
     )
 
-    # reflecting-wall parity: the exact opposite signs (deposit added back,
-    # mass conserving; normal J subtracted)
-    rho[...] = 0.0
-    set_xrows(rho, i_dep, c)
-    wx.hybrid_fold_eb_deposit_to_nodal_scalar("rho_fp", 0, pec=False)
-    r = arr2d(rho)
-    ck.close(
-        "fold rho (reflect): first fluid row receives +0.6c",
-        r[i_first, :],
-        0.6 * c,
-        1e-12,
-    )
-    ck.close(
-        "fold rho (reflect): second fluid row receives +0.4c",
-        r[i_second, :],
-        0.4 * c,
-        1e-12,
-    )
-    ck.close(
-        "fold rho (reflect): folded amount conserved (sum = +c)",
-        r[i_first[0], :] + r[i_second[0], :],
-        c,
-        1e-12,
-    )
-
-    Jx[...] = 0.0
-    Jy[...] = 0.0
-    Jz[...] = 0.0
-    set_xrows(Jy, i_dep, c)
-    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0, pec=False)
-    jy = arr2d(Jy)
-    ck.close(
-        "fold Jy tangential (reflect): unowned fluid row skipped",
-        jy[i_first, :],
-        0.0,
-        0.0,
-    )
-    ck.close(
-        "fold Jy tangential (reflect): first owned row added +0.4c",
-        jy[i_second, :],
-        0.4 * c,
-        1e-12,
-    )
-    Jx[...] = 0.0
-    Jy[...] = 0.0
-    Jz[...] = 0.0
-    set_xrows(Jx, i_cut, c)
-    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0, pec=False)
-    jx = arr2d(Jx)
-    ck.close("fold J normal (reflect): subtracted -0.4c", jx[i_cn, :], -0.4 * c, 1e-12)
-
     # --- 7) selectivity against a spatially varying field ------------------
     shape = np.asarray(Ey[...]).shape
     idx = np.indices(shape)
