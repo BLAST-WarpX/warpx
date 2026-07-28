@@ -2,6 +2,8 @@
 ####### GENERAL PARAMETERS ######
 #################################
 ## With these parameters, each cell has a size of exactly 1 by 1 by 1
+# Run two steps. The first step to check the fusion collisions, the
+# second step to provide a comparison for the rerun.
 max_step = 2
 amr.n_cell = 8 8 16
 amr.max_grid_size = 8

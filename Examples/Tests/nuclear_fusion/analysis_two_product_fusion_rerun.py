@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# Compare the results after two steps from the original simulation and from
+# the rerun.
+# Note that it is called "rerun" instead of "restart", since if it was
+# called "restart", the benchmark would compare the results of the rerun
+# with the benchmarks stored in the original benchmark file which are after
+# only one step.
 
 import os
 import sys
