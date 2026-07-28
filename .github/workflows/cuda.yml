@@ -178,7 +178,7 @@ jobs:
     - uses: actions/checkout@v7
     - name: Dependencies
       run: |
-        .github/workflows/dependencies/nvhpc.sh 26.5
+        .github/workflows/dependencies/nvhpc.sh 25.1
     - name: CCache Cache
       uses: actions/cache@v6
       with:
@@ -194,7 +194,7 @@ jobs:
         ccache -z
 
         source /etc/profile.d/modules.sh
-        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/26.5
+        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.1
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"
