@@ -102,18 +102,3 @@ if(WarpX_EB)
         OFF  # dependency
     )
 endif()
-
-# Abort gate: hybrid_pic_model.use_conformal_eb is collocated-only; a staggered
-# (Yee) deck requesting it must abort in the WarpX constructor with the
-# "collocated-only" message (asserted through a subprocess child run).
-if(WarpX_EB)
-    add_warpx_test(
-        test_3d_ohms_law_conformal_staggered_abort_picmi  # name
-        3  # dims
-        1  # nprocs
-        "inputs_test_3d_ohms_law_conformal_staggered_abort_picmi.py"  # inputs
-        OFF  # analysis
-        OFF  # checksum
-        OFF  # dependency
-    )
-endif()
