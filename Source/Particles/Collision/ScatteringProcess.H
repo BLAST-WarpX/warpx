@@ -11,6 +11,7 @@
 
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_Algorithm.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Math.H>
 #include <AMReX_REAL.H>
@@ -71,8 +72,7 @@ public:
 
     static
     void sanityCheckEnergyGrid (
-                                const amrex::Vector<amrex::ParticleReal>& energies,
-                                amrex::ParticleReal dE
+                                const amrex::Vector<amrex::ParticleReal>& energies
                                 );
 
     struct Executor {
@@ -92,20 +92,24 @@ public:
             } else if (E_coll > m_energy_hi) {
                 return m_sigma_hi;
             } else {
-                using amrex::Math::floor;
-                using amrex::Math::ceil;
-                // calculate index of bounding energy pairs
-                amrex::ParticleReal temp = (E_coll - m_energy_lo) / m_dE;
-                const int idx_1 = static_cast<int>(floor(temp));
-                const int idx_2 = static_cast<int>(ceil(temp));
+                // Locate the pair of energy grid points bracketing E_coll using a
+                // bisection search. This does not assume an evenly spaced energy grid.
+                // `amrex::bisect` returns idx_1 such that
+                // m_energies_data[idx_1] <= E_coll < m_energies_data[idx_1 + 1].
+                const int idx_1 = amrex::bisect(m_energies_data, 0, m_grid_size - 1, E_coll);
+                const int idx_2 = idx_1 + 1;
 
                 // linearly interpolate to the given energy value
-                temp -= idx_1;
+                const amrex::ParticleReal temp =
+                    (E_coll - m_energies_data[idx_1])
+                    / (m_energies_data[idx_2] - m_energies_data[idx_1]);
                 return m_sigmas_data[idx_1] + (m_sigmas_data[idx_2] - m_sigmas_data[idx_1]) * temp;
             }
         }
 
+        amrex::ParticleReal* m_energies_data = nullptr;
         amrex::ParticleReal* m_sigmas_data = nullptr;
+        int m_grid_size = 0;
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
@@ -147,13 +151,12 @@ private:
     amrex::Vector<amrex::ParticleReal> m_energies;
 
 #ifdef AMREX_USE_GPU
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_energies_d;
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_sigmas_d;
     Executor m_exe_d;
 #endif
     amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_h;
     Executor m_exe_h;
-
-    int m_grid_size;
 };
 
 #endif // WARPX_PARTICLES_COLLISION_SCATTERING_PROCESS_H_

@@ -879,8 +879,10 @@ WarpX::InitData ()
     }
     ::WriteUsedInputsFile();
 
-    // Run div cleaner here on loaded external fields
-    if (m_do_initial_div_cleaning) {
+    // Run div cleaner here on loaded external fields (fresh starts only: on
+    // restart the B field is the checkpoint-restored EVOLVED field, and
+    // re-running the t=0 projection would corrupt it)
+    if (m_do_initial_div_cleaning && restart_chkfile.empty()) {
         WarpX::ProjectionCleanDivB();
     }
 
