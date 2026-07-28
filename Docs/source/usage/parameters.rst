@@ -3903,26 +3903,6 @@ Maxwell solver: kinetic-fluid hybrid
     calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
     :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
 
-.. pp:param:: hybrid_pic_model.conformal_b_off
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Diagnostic only. If ``true``, disables the embedded-boundary ``B``-field treatment entirely on the
-    collocated path (the direct level-set mirror fill is not applied), reproducing the pre-treatment
-    stair-step baseline. Intended for A/B comparison of the EB ``B`` treatment; not for production runs.
-
-.. pp:param:: hybrid_pic_model.eb_hall_mask
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    If ``true`` (default), the Hall term's nodal :math:`\vec{J}\times\vec{B}` interpolation is
-    embedded-boundary aware: covered edges and faces are excluded from the nodal average (with
-    the interpolation weights renormalized over the remaining solver-owned points), so covered
-    values cannot pollute the near-wall Hall electric field. Set ``false`` to recover the plain
-    unmasked averaging for A/B comparison.
-
 .. pp:param:: hybrid_pic_model.holmstrom_blend_pow
     :type: ``float``
     :default: ``0`` (off)
@@ -4021,20 +4001,6 @@ Maxwell solver: kinetic-fluid hybrid
     entirely (its analytic curl is zero), so no spurious magnetic field can be generated.
     Near an embedded boundary the electron-pressure mirror fill maintains the transverse
     reads. Cartesian geometries only.
-
-.. pp:param:: hybrid_pic_model.isotropic_eb_compact_fallback
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Near an embedded boundary, fall back per point from the isotropic stencils
-    (:pp:param:`hybrid_pic_model.isotropic_hyper_resistivity`,
-    :pp:param:`hybrid_pic_model.isotropic_resistivity`,
-    :pp:param:`hybrid_pic_model.isotropic_gradient`) to the standard compact ones within a
-    corner reach (:math:`(\sqrt{d}+1/2)\,h`) of the level set. Defaults to off here because
-    the hybrid EB boundary layer mirror-fills the wide-stencil bands to the diagonal reach
-    (the magnetic-field and plasma-current bands), keeping
-    the diagonal reads valid near the wall; opt back in for A/B isolation.
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``

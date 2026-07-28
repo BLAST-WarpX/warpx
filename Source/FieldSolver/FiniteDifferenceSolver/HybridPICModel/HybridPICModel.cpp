@@ -83,7 +83,6 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("isotropic_hyper_resistivity", m_isotropic_hyper_resistivity);
     pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
     pp_hybrid.query("isotropic_gradient", m_isotropic_gradient);
-    pp_hybrid.query("isotropic_eb_compact_fallback", m_isotropic_eb_compact_fallback);
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_isotropic_hyper_resistivity && !m_isotropic_resistivity
@@ -119,7 +118,6 @@ void HybridPICModel::ReadParameters ()
 
     // conformal (level-set masked/mirrored) embedded-boundary wall treatment
     pp_hybrid.query("use_conformal_eb", m_use_conformal_eb);
-    pp_hybrid.query("eb_hall_mask", m_eb_hall_mask);
 
     utils::parser::queryWithParser(
         pp_hybrid, "holmstrom_blend_pow", m_holmstrom_blend_pow);
@@ -177,10 +175,6 @@ void HybridPICModel::ReadParameters ()
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
     utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
     pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
-    // Optionally disable the collocated conformal B wall treatment entirely (no
-    // EB B fill) to recover the pre-treatment baseline (for A/B comparison).
-    pp_hybrid.query("conformal_b_off", m_conformal_b_off);
-
     // The isotropic hyper-resistivity Laplacian (parsed with the resistivity
     // options above) reads the plasma current at its
     // diagonal/corner neighbors (sqrt(2)*h in plane, sqrt(3)*h at a 3D cube
@@ -413,7 +407,7 @@ void HybridPICModel::InitialBEBFill ()
     using ablastr::utils::enums::GridType;
     if (!EB::enabled()) { return; }
     // Collocated conformal fill: the direct level-set magnetic mirror below.
-    bool const collocated_fill = m_use_conformal_eb && !m_conformal_b_off
+    bool const collocated_fill = m_use_conformal_eb
         && WarpX::grid_type == GridType::Collocated;
     if (!collocated_fill) { return; }
     auto& warpx = WarpX::GetInstance();
@@ -1458,7 +1452,7 @@ void HybridPICModel::FieldPush (
     // curl(B) plasma current. (The FillBoundaryB above gives the gather stencils
     // valid ghost values; a second exchange below propagates the band/covered
     // values.)
-    bool const collocated_fill = m_use_conformal_eb && !m_conformal_b_off
+    bool const collocated_fill = m_use_conformal_eb
         && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated;
     if (EB::enabled() && collocated_fill) {
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {

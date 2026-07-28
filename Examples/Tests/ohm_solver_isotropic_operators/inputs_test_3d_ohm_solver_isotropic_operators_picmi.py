@@ -22,9 +22,6 @@
 # ---     asserts the mitigation: the solve_for_Faraday E is bitwise
 # ---     independent of the electron pressure, so the defect can never
 # ---     generate magnetic field,
-# ---   * with an embedded boundary present, the operators fall back to the
-# ---     standard stencils within a corner reach of the level set and stay
-# ---     isotropized in the deep fluid (eb_fallback battery).
 
 import argparse
 import os
@@ -41,12 +38,6 @@ N_Z = 8
 LO = -1.0
 HI = 1.0
 H = (HI - LO) / N_XY  # cubic cells
-
-# planar wall of the eb_fallback battery: conductor x > X_WALL; the 0.3 h
-# offset from a node puts the cut in the interior of cell X_WALL_NODE
-X_WALL_OFFSET = 0.3
-X_WALL_NODE = 24
-X_WALL = LO + (X_WALL_NODE + X_WALL_OFFSET) * H
 
 ETA_H = 1.0  # constant hyper-resistivity of the hyper battery
 ETA_R = 1.0  # constant resistivity of the resistive battery
@@ -79,9 +70,9 @@ def setup_simulation(battery, grid_type="staggered"):
     # Species-free deck: the plasma current is allocated with zero ghost
     # cells, so the isotropization stencils must not straddle a box seam --
     # force a single box.
-    hyper = battery.startswith("hyper") or battery == "eb_fallback"
+    hyper = battery.startswith("hyper")
     resistive = battery.startswith("resistive")
-    gradient = battery.startswith("gradient") or battery == "eb_fallback"
+    gradient = battery.startswith("gradient")
 
     grid = picmi.Cartesian3DGrid(
         number_of_cells=[N_XY, N_XY, N_Z],
@@ -118,18 +109,8 @@ def setup_simulation(battery, grid_type="staggered"):
         isotropic_hyper_resistivity=(True if hyper else None),
         isotropic_resistivity=(True if resistive else None),
         isotropic_gradient=(True if gradient else None),
-        # request the near-EB compact fallback explicitly: it is the default
-        # upstream, but branches whose EB boundary layer mirror-fills the
-        # wide-stencil bands flip that default -- this battery asserts the
-        # fallback itself, so pin it on
-        isotropic_eb_compact_fallback=(True if battery == "eb_fallback" else None),
         substeps=4,
     )
-
-    if battery == "eb_fallback":
-        sim.embedded_boundary = picmi.EmbeddedBoundary(
-            implicit_function="(x-xw)", xw=X_WALL
-        )
 
     sim.initialize_inputs()
     sim.initialize_warpx()
@@ -859,109 +840,16 @@ def run_gradient_collocated_battery(sim):
 # level set the isotropic operators fall back to the standard stencils; in
 # the deep fluid they stay isotropized.
 # ----------------------------------------------------------------------------
-def run_eb_fallback_battery(sim):
-    wx = sim.extension.warpx
-    ck = CheckSet()
-    zero_all_inputs()
-
-    d_iso_compact = (np.sqrt(3.0) + 0.5) * H  # must match HybridPICSolveE.cpp
-
-    # --- hyper-resistivity fallback on Ez (nodal x: phi sampled at nodes) --
-    Jpz = fields.JzFPPlasmaWrapper()
-    Ez = fields.EzFPWrapper()
-    shape = np.asarray(Jpz[...]).shape
-
-    rng = np.random.RandomState(2024)
-    jz = rng.rand(*shape) - 0.5
-    Jpz[...] = jz
-    wx.hybrid_solve_e(True)
-    ez = np.asarray(Ez[...])
-
-    exp_iso = -ETA_H * lap_iso(jz)
-    exp_cross = -ETA_H * lap_cross(jz)
-    xn = LO + np.arange(shape[0]) * H
-    phi = X_WALL - xn  # signed distance of the planar wall at the x-nodes
-    # staircase masks own everything at least two cells from the cut cell;
-    # restrict to rows that are BOTH solver-owned and mirror-valid
-    i_iso = [i for i in range(4, shape[0]) if phi[i] >= d_iso_compact]
-    i_compact = [i for i in range(4, shape[0]) if H <= phi[i] < d_iso_compact]
-    yy = slice(2, 31)
-    scale = float(np.max(np.abs(exp_iso[4:29, yy, :])))
-    ck.expect(
-        "eb_fallback: geometry provides both deep-fluid and near-wall rows",
-        len(i_iso) >= 10 and len(i_compact) >= 1,
-        f"iso rows = {len(i_iso)}, compact rows = {i_compact}",
-    )
-    ck.close(
-        "eb_fallback: deep fluid uses the isotropic Laplacian",
-        ez[i_iso, yy, :] / scale,
-        exp_iso[i_iso, yy, :] / scale,
-        1e-12,
-    )
-    ck.close(
-        "eb_fallback: near-wall band falls back to the cross stencil",
-        ez[i_compact, yy, :] / scale,
-        exp_cross[i_compact, yy, :] / scale,
-        1e-12,
-    )
-
-    # --- gradient fallback on Ex (cc x: phi sampled at the low node) ------
-    Pe = fields.ElectronPressureFPWrapper()
-    pe_shape = np.asarray(Pe[...]).shape
-    pe = rng.rand(*pe_shape) - 0.5
-    Pe[...] = pe
-    wx.hybrid_solve_e(False)
-    gx = -RHO0 * np.asarray(fields.ExFPWrapper()[...])
-
-    A_T = 1.0 / 24.0
-
-    def smooth(a, axes):
-        out = a.copy()
-        for ax in axes:
-            out = out + A_T * d2(a, ax)
-        return out
-
-    def grad_x(a):
-        return (a[1:, :, :] - a[:-1, :, :]) / H
-
-    gx_iso = grad_x(smooth(pe, (1, 2)))
-    gx_plain = grad_x(pe)
-    # Ex face i sits between nodes i and i+1; the solver samples phi at the
-    # kernel index (node i)
-    i_iso_f = [i for i in range(4, gx.shape[0]) if phi[i] >= d_iso_compact]
-    i_compact_f = [
-        i for i in range(4, gx.shape[0]) if H <= phi[i + 1] and phi[i] < d_iso_compact
-    ]
-    gscale = float(np.max(np.abs(gx_iso[4:28, yy, 1:N_Z])))
-    ck.close(
-        "eb_fallback: deep-fluid gradient is isotropized",
-        gx[i_iso_f, yy, 1:N_Z] / gscale,
-        gx_iso[i_iso_f, yy, 1:N_Z] / gscale,
-        1e-12,
-    )
-    if len(i_compact_f) > 0:
-        ck.close(
-            "eb_fallback: near-wall gradient falls back to the two-point stencil",
-            gx[i_compact_f, yy, 1:N_Z] / gscale,
-            gx_plain[i_compact_f, yy, 1:N_Z] / gscale,
-            1e-12,
-        )
-
-    ck.finish()
-
-
 BATTERIES = {
     "hyper": ("staggered", run_hyper_battery),
     "resistive": ("staggered", run_resistive_battery),
     "gradient": ("staggered", run_gradient_battery),
-    "eb_fallback": ("staggered", run_eb_fallback_battery),
     "hyper_nodal": ("collocated", run_hyper_collocated_battery),
     "resistive_nodal": ("collocated", run_resistive_collocated_battery),
     "gradient_nodal": ("collocated", run_gradient_collocated_battery),
 }
 
 SUITES = {
-    # eb_fallback is registered as its own CTest entry (it needs WarpX_EB)
     "staggered": ("hyper", "resistive", "gradient"),
     "collocated": ("hyper_nodal", "resistive_nodal", "gradient_nodal"),
 }

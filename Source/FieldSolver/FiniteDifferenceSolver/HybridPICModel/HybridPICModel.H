@@ -77,8 +77,8 @@ public:
      * INITIAL B field (call once after the initial grid B has been set). The
      * direct mirror fill sets the covered band to its Neumann value so the first
      * field-push substep does not see it jump from the staircase-masked zero
-     * (which stalls the RKF45 substepping). A no-op when the wall fill is
-     * disabled (conformal_b_off) or off the collocated embedded-boundary path.
+     * (which stalls the RKF45 substepping). A no-op off the collocated
+     * embedded-boundary path.
      */
     void InitialBEBFill ();
 
@@ -281,16 +281,6 @@ public:
      *  Faraday/B-integration path omits grad(Pe) entirely. */
     bool m_isotropic_gradient = false;
 
-    /** Near an embedded boundary, fall back per point from the isotropic
-     *  stencils to the standard compact ones within a corner reach of the
-     *  level set, where the diagonal reads are not maintained by the EB
-     *  update masks. Default true; a hybrid EB boundary layer that
-     *  mirror-fills the wide-stencil bands (so the diagonal reads stay
-     *  valid) may disable it. On this branch the hybrid EB boundary layer
-     *  mirror-fills the J/B/Pe bands to the diagonal stencil reach, so the
-     *  fallback defaults to OFF (opt back in for A/B isolation). */
-    bool m_isotropic_eb_compact_fallback = false;
-
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
     std::string m_Jy_ext_grid_function = "0.0";
@@ -309,11 +299,6 @@ public:
      *  instead of the stair-step approximation. Requires embedded boundaries
      *  and a 3D Cartesian staggered grid. */
     bool m_use_conformal_eb = false;
-    /** If true (default), the hybrid Hall term's nodal J x B interpolation excludes
-     *  covered edges/faces (EB-aware, mask-renormalized) so covered-cell field values do
-     *  not pollute the near-wall J x B. Set false to recover the plain (polluting)
-     *  averaging for A/B. Only affects conformal-EB staggered runs. */
-    bool m_eb_hall_mask = true;
     /** If > 0 (opt-in), smooth the holmstrom vacuum switch with an
      *  above-floor power-law window: on rho in [rho_floor,
      *  holmstrom_blend_width*rho_floor] the Hall/pressure (divided-by-rho)
@@ -344,12 +329,6 @@ public:
      *  components of that index -- a single piecewise-constant-per-cell
      *  decision field with no per-component half-shifts. Cartesian only. */
     int m_holmstrom_switch_mode = 0;
-    /** If true, skip the collocated conformal magnetic-field wall treatment
-     *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
-     *  This reproduces the pre-treatment baseline and isolates the wall fill as
-     *  the source of the grid-locked m = 4 perturbation. Diagnostic only -- it
-     *  leaves spurious fields at the wall, so it is not for production runs. */
-    bool m_conformal_b_off = false;
     /** Relative residual tolerance of the Jacobi band relaxation of the
      *  embedded-boundary PEC field fills (only used when eb_bc_direct_fill
      *  is false) */
