@@ -89,17 +89,15 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
     if (EB::enabled() &&
         WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
     {
-        auto const* hybrid = warpx.get_pointer_HybridPICModel();
         warpx::hybrid::FoldEBDepositToNodalScalar(
             *rho,
             *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),
-            warpx.Geom(m_lev),
-            hybrid->m_eb_fold_pec);
+            warpx.Geom(m_lev));
         warpx::hybrid::ApplyEBBoundaryToNodalScalar(
             *rho,
             *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),
             warpx.Geom(m_lev),
-            /*odd=*/hybrid->m_eb_rho_dirichlet);
+            /*odd=*/true);  // Dirichlet: rho -> 0 at the PEC wall
     }
 
     InterpolateMFForDiag(mf_dst, *rho, dcomp, warpx.DistributionMap(m_lev),

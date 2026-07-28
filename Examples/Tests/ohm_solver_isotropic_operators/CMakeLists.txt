@@ -44,17 +44,3 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
-
-# Near an embedded boundary the isotropized operators fall back to the
-# standard compact stencils; asserted against a planar conducting wall.
-if(WarpX_EB)
-    add_warpx_test(
-        test_3d_ohm_solver_isotropic_operators_eb_fallback_picmi  # name
-        3  # dims
-        1  # nprocs
-        "inputs_test_3d_ohm_solver_isotropic_operators_picmi.py --battery eb_fallback"  # inputs
-        OFF  # analysis
-        OFF  # checksum
-        OFF  # dependency
-    )
-endif()

@@ -1,20 +1,20 @@
 {
   "electrons": {
-    "particle_momentum_x": 1.4795067859309944e-21,
-    "particle_momentum_y": 1.4496438827994555e-21,
-    "particle_momentum_z": 1.658033060571157e-21,
-    "particle_position_x": 53.05629181960182,
-    "particle_weight": 3312312500000.0005
+    "particle_momentum_x": 1.4658501087810079e-21,
+    "particle_momentum_y": 1.3947582721049346e-21,
+    "particle_momentum_z": 1.5801892488204323e-21,
+    "particle_position_x": 52.133310411162746,
+    "particle_weight": 3264156250000.0005
   },
   "he_ions": {
-    "particle_momentum_x": 1.5917757092369855e-20,
-    "particle_momentum_y": 1.4938445449712642e-20,
-    "particle_momentum_z": 2.186096056643109e-19,
-    "particle_position_x": 82.86905399795968,
-    "particle_weight": 5169468750000.001
+    "particle_momentum_x": 1.4852643320168478e-20,
+    "particle_momentum_y": 1.4466644837605498e-20,
+    "particle_momentum_z": 2.0942543064387905e-19,
+    "particle_position_x": 82.08281665560685,
+    "particle_weight": 5098281250000.001
   },
   "lev=0": {
-    "rho_electrons": 0.00025346434349879994,
-    "rho_he_ions": 0.0003867722778712278
+    "rho_electrons": 0.00024977933724059997,
+    "rho_he_ions": 0.0003811208081333327
   }
 }

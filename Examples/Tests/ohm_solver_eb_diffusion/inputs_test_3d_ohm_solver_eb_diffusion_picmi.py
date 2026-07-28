@@ -53,12 +53,16 @@ T_ION = 10.0  # eV
 N_PLASMA = 1.0e18  # m^-3
 PEC_J_STEPS = 24  # the boundary-condition variant needs no decay time
 
-# Tolerance of the in-situ electron-pressure Neumann check in the --pec-j
-# variant: largest pressure jump across the wall (samples a quarter cell on
-# either side along the analytic wall normal) relative to the peak pressure.
-# Calibrated at resolution 32 with at least 2x margin; without the even
-# embedded-boundary reflection of the pressure the jump is order unity.
-TOL_PE_NEUMANN = 0.06
+# Depth (as a fraction of the peak pressure) the covered mirror band of the
+# electron pressure must reach BELOW zero in the --pec-j variant: the odd
+# (Dirichlet) fill sets each covered band node to minus the masked
+# interpolation of the (nonnegative) fluid pressure at its mirror image, so
+# the band is nonpositive everywhere and genuinely negative where the pressed
+# plasma holds a finite wall pressure. The even mirror flips the sign of the
+# whole band, so the sign assertions are parameter-free discriminators; this
+# constant only sets how much of the wall pressure must visibly mirror.
+# Calibrated at resolution 32 with at least 4x margin.
+TOL_PE_MIRROR_DEPTH = 0.05
 
 
 def init_cylinder_bessel_by(resolution, grid_type):
@@ -111,7 +115,6 @@ def setup_simulation(
     grid_type="staggered",
     divb_clean=False,
     geometry="square",
-    eb_b_straight_mirror=False,
 ):
     """Create the PICMI simulation object.
 
@@ -134,11 +137,6 @@ def setup_simulation(
         Add a uniform external current and a thermal proton fill, and output
         the current densities, to test the embedded-boundary PEC current
         boundary condition.
-    eb_b_straight_mirror: bool
-        Impose the wall condition on the staggered (Yee) B field with the
-        direct level-set mirror after each Faraday push (the staggered-grid
-        counterpart of use_conformal_eb), instead of leaving the covered
-        faces staircase-zeroed.
     verbose: int
         WarpX verbosity.
     """
@@ -238,14 +236,7 @@ def setup_simulation(
         # use_conformal_eb). Must be passed HERE (the PICMI kwarg): a raw
         # hybridpicmodel bucket attribute would be clobbered by
         # initialize_inputs writing the (None) PICMI value over it.
-        eb_b_straight_mirror=True if eb_b_straight_mirror else None,
         Jy_external_function=f"{J_EXT}" if pec_j else None,
-        # The pec_j battery's closed form asserts a CONTINUOUS electron
-        # pressure across the wall (the wall supports the plasma back-
-        # pressure), so it opts into the even/Neumann Pe mirror explicitly
-        # (default is the odd/Dirichlet mirror) -- also the only coverage of
-        # the non-default parity.
-        eb_pe_dirichlet=False if pec_j else None,
         # Diffusive near-wall div(B)/div(J) clean (edge-order diagnostic knob)
         # Production (annulus) wall-layer config: unbounded band + inner
         # cutoffs 0 so the clean reaches the first fluid layers where the
@@ -266,17 +257,6 @@ def setup_simulation(
             implicit_function="sqrt(x*x+z*z)-rcyl",
             rcyl=R_CYL,
         )
-        if use_conformal_eb:
-            # TEMP (edge-order validation): widen the covered-B mirror/gather fill
-            # band to 3 cells so the near-wall B-curl-fill gather never reaches into
-            # the zeroed deep interior ("empty cells"); this isolates the spatial
-            # order from a band-width artifact. The HybridPICModel comment recommends
-            # >= 3 to push the mirror's div(B) jump past any solution stencil. Scoped
-            # to the cylinder diagnostic (the registered square test is unchanged);
-            # tighten back toward 1 once the order is established.
-            from pywarpx import hybridpicmodel
-
-            hybridpicmodel.eb_b_fill_band_cells = 3
     else:
         sim.embedded_boundary = picmi.EmbeddedBoundary(
             implicit_function=(
@@ -358,10 +338,10 @@ def setup_simulation(
     if pec_j:
         # In-situ check of the electron-pressure embedded-boundary condition
         # (the pressure field is internal to the solver and not written by
-        # any diagnostic): the wall supports the plasma back-pressure, so the
-        # even mirror across the embedded boundary must leave no pressure
-        # jump at the wall, and the pressure deep inside the conductor is
-        # exactly zero.
+        # any diagnostic): the wall is a PEC, so the odd (Dirichlet) mirror
+        # must interpolate the pressure to zero at the wall face and be
+        # antisymmetric across it, and the pressure deep inside the conductor
+        # is exactly zero.
         state = {"step": 0}
 
         def check_electron_pressure():
@@ -412,26 +392,36 @@ def setup_simulation(
                             v = v + w * arr[i0 + di, j0 + dj, k0 + dk]
                 return v
 
-            # pressure jump across the xr = +hw wall face, sampled a
-            # quarter cell on either side along the analytic outward
-            # normal (samples deeper inside would mix in the correctly
-            # zeroed deep-interior nodes past the one-cell mirror band)
-            zr_s = np.linspace(-0.6, 0.6, 13) * HALF_WIDTH
-            y_s = np.zeros_like(zr_s)
-            jump = np.empty_like(zr_s)
-            for sign, buf in ((1.0, "plus"), (-1.0, "minus")):
-                xr_s = HALF_WIDTH + sign * 0.25 * h
-                px = xr_s * np.cos(THETA) + zr_s * np.sin(THETA)
-                pz = -xr_s * np.sin(THETA) + zr_s * np.cos(THETA)
-                if buf == "plus":
-                    jump = trilinear(pe, px, y_s, pz)
-                else:
-                    jump = jump - trilinear(pe, px, y_s, pz)
-            resid = np.max(np.abs(jump)) / np.max(pe)
-            print(f"electron pressure wall jump (relative): {resid:.3e}")
-            assert resid < TOL_PE_NEUMANN, (
-                f"electron pressure jump at the wall {resid:.3e} exceeds "
-                f"{TOL_PE_NEUMANN} (Neumann embedded-boundary condition)"
+            # odd (Dirichlet) parity of the covered mirror band, asserted
+            # NODE-wise (interpolated sampling would mix the mirror values
+            # with the zeroed deep interior in this rotated geometry): the
+            # fill sets each covered band node to MINUS the masked
+            # interpolation of the (nonnegative) fluid pressure at its
+            # image, so the band is nonpositive everywhere and genuinely
+            # negative where the pressed plasma holds a finite wall
+            # pressure. The even mirror flips the sign of the whole band.
+            # Margins keep the mask off the s ~ 0 discrete/analytic
+            # level-set mismatch, the deep-zeroed region past one cell, and
+            # the corner rings where two faces meet.
+            band2d = (s < -0.15 * h) & (s > -0.85 * h)
+            band2d &= HALF_WIDTH - np.minimum(np.abs(xr), np.abs(zr)) > 2.0 * h
+            band = np.broadcast_to(band2d[:, None, :], pe.shape)
+            pmax = float(np.max(pe))
+            band_max = float(np.max(pe[band]))
+            band_min = float(np.min(pe[band]))
+            print(
+                f"electron pressure mirror band: max={band_max:.3e} "
+                f"min={band_min:.3e} peak={pmax:.3e}"
+            )
+            assert band_max <= 1.0e-12 * pmax, (
+                f"positive electron pressure {band_max:.3e} in the covered "
+                "mirror band (the odd/Dirichlet fill makes it nonpositive; "
+                "an even mirror makes it positive)"
+            )
+            assert band_min < -TOL_PE_MIRROR_DEPTH * pmax, (
+                f"covered-band electron pressure minimum {band_min:.3e} "
+                f"never reaches -{TOL_PE_MIRROR_DEPTH}*peak: the odd mirror "
+                "does not appear to be active"
             )
 
         callbacks.installafterstep(check_electron_pressure)
@@ -498,13 +488,6 @@ def main():
         "circular wall -- the curved-wall edge-order diagnostic)",
     )
     parser.add_argument(
-        "--eb-b-straight-mirror",
-        action="store_true",
-        help="impose the wall condition on the staggered (Yee) B field with "
-        "the direct level-set mirror after each Faraday push (the "
-        "staggered-grid counterpart of --conformal; staggered grids only)",
-    )
-    parser.add_argument(
         "-v",
         "--verbose",
         help="WarpX verbosity",
@@ -524,7 +507,6 @@ def main():
         args.grid_type,
         args.divb_clean,
         args.geometry,
-        args.eb_b_straight_mirror,
     )
     sim.step()
 

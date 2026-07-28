@@ -112,9 +112,7 @@ def setup_simulation(
     r_outer=R_OUTER,
     wall_supported=True,
     n_floor_frac=N_FLOOR_FRAC,
-    isotropic_resistivity=True,
-    isotropic_hyper=True,
-    isotropic_gradient=False,
+    isotropic=True,
     substeps=SUBSTEPS,
     substep_rtol=1.0e-3,
     te=T_E0,
@@ -124,14 +122,12 @@ def setup_simulation(
     annulus_smooth_cells=ANNULUS_SMOOTH_CELLS,
     grid_type="collocated",
     use_conformal_eb=True,
-    eb_b_straight_mirror=False,
     conformal_ect_j=False,
     conformal_ect_curvature=False,
     conformal_pec_zero_ej=False,
     divb_clean=False,
     divb_clean_iters=3,
     eta_hyper_mult=1.0,
-    eta_nodal=False,
     holmstrom_blend_pow=0.0,
     holmstrom_blend_width=2.0,
     holmstrom_switch_mode="edge",
@@ -235,12 +231,7 @@ def setup_simulation(
         plasma_hyper_resistivity=eta_hyper,
         substeps=substeps,
         holmstrom_vacuum_region=True if holmstrom else None,
-        eb_deposit_fold="pec",
-        eb_rho_dirichlet=True,
-        isotropic_resistivity=isotropic_resistivity,
-        isotropic_hyper_resistivity=isotropic_hyper,
-        isotropic_gradient=isotropic_gradient if isotropic_gradient else None,
-        eta_nodal_interp=True if eta_nodal else None,
+        isotropic_operators=True if isotropic else None,
         holmstrom_blend_pow=holmstrom_blend_pow if holmstrom_blend_pow > 0 else None,
         holmstrom_blend_width=holmstrom_blend_width
         if holmstrom_blend_pow > 0
@@ -256,10 +247,8 @@ def setup_simulation(
         substep_atol=1.0e-8,
         max_substep_attempts=1000,
         # Conformal wall treatment: level-set masked/mirror fill on collocated,
-        # enlarged-cell (ECT) Faraday on staggered. On a staggered grid
-        # eb_b_straight_mirror is the level-set alternative to the ECT wall.
+        # enlarged-cell (ECT) Faraday on staggered.
         use_conformal_eb=use_conformal_eb if use_conformal_eb else None,
-        eb_b_straight_mirror=True if eb_b_straight_mirror else None,
         # Staggered-ECT companions (require use_conformal_eb on staggered):
         # flux-weighted Form-A Ampere curl (reads S*B, div-consistent at the
         # wall, skips the covered-J mirror) and the along-edge circulation
@@ -577,33 +566,14 @@ def main():
         "--no-holmstrom restores the raw Ohm's-law vacuum response.",
     )
     parser.add_argument(
-        "--isotropic-resistivity",
-        dest="isotropic_resistivity",
+        "--isotropic",
+        dest="isotropic",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="corner-curl isotropization of the resistive diffusion. "
-        "Default ON (both grids): the all-operators A/B (with the #7040 "
-        "isotropized grad Pe in the set) cut peak rho m4/m0 to 0.053 "
-        "collocated / 0.145 Yee vs the 0.344 / 0.466 baselines.",
-    )
-    parser.add_argument(
-        "--isotropic-hyper",
-        dest="isotropic_hyper",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="isotropic Mehrstellen/Patra-Karttunen hyper-resistivity "
-        "Laplacian. Default ON (both grids; see --isotropic-resistivity).",
-    )
-    parser.add_argument(
-        "--isotropic-gradient",
-        dest="isotropic_gradient",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="transverse-smoothed (isotropized) electron-pressure gradient "
-        "(PR #7040); removes the cos(4*theta) modulation of |grad Pe| that "
-        "feeds the particle push. Default ON (both grids; measured the "
-        "decisive piece of the all-operators m=4 reduction, and the "
-        "operator that finally makes isotropization a net win on Yee).",
+        help="isotropized Ohm's-law operators (hyper-resistivity Laplacian, "
+        "resistive corner-curl, grad Pe; hybrid_pic_model.isotropic_operators). "
+        "Default ON (both grids): the all-operators A/B cut peak rho m4/m0 to "
+        "0.053 collocated / 0.145 Yee vs the 0.344 / 0.466 baselines.",
     )
     parser.add_argument(
         "--nz",
@@ -680,8 +650,7 @@ def main():
     parser.add_argument(
         "--grid-type",
         help="field grid staggering: 'collocated' (nodal, level-set conformal "
-        "EB) or 'staggered' (Yee, staircase EB; pair with "
-        "--eb-b-straight-mirror for the B wall)",
+        "EB) or 'staggered' (Yee, staircase EB)",
         choices=["staggered", "collocated"],
         default="collocated",
     )
@@ -743,17 +712,6 @@ def main():
         "(default skips it); isolates the flux-weighted Ampere READ from the "
         "loss of the mirror's smoothing "
         "(hybrid_pic_model.conformal_ect_j_keep_mirror).",
-    )
-    parser.add_argument(
-        "--eb-b-straight-mirror",
-        dest="eb_b_straight_mirror",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="impose the wall on the staggered (Yee) B with the collocated-style "
-        "direct level-set mirror after each Faraday push, instead of leaving the "
-        "covered faces staircase-zeroed (hybrid_pic_model.eb_b_straight_mirror). "
-        "Best with a standoff holding plasma off the wall. Default: ON on "
-        "staggered (inert on collocated).",
     )
     parser.add_argument(
         "--mc-gather",
@@ -826,14 +784,6 @@ def main():
         help="multiplier on the Chacon-style hyper-resistivity floor "
         "(eta_hyper = mult * 0.2 * mu0 * l_i * vA * dL2). Stabilization knob "
         "for the staggered (Yee) runs.",
-    )
-    parser.add_argument(
-        "--eta-nodal",
-        dest="eta_nodal",
-        action="store_true",
-        help="evaluate the (hyper-)resistivity once per node and interpolate "
-        "to the staggered E locations (hybrid_pic_model.eta_nodal_interp): a "
-        "single-valued eta across the plasma/vacuum seam on Yee grids.",
     )
     parser.add_argument(
         "--holmstrom-blend-pow",
@@ -944,17 +894,8 @@ def main():
         args.conformal_eb = not staggered
     if args.deposition is None:
         args.deposition = "esirkepov" if staggered else "direct"
-    if args.isotropic_resistivity is None:
-        args.isotropic_resistivity = True
-    if args.isotropic_hyper is None:
-        args.isotropic_hyper = True
-    if args.isotropic_gradient is None:
-        args.isotropic_gradient = True
-    if args.eb_b_straight_mirror is None:
-        # Level-set mirror B wall by default on staggered -- but only when the
-        # conformal (ECT) Faraday is off: the two wall treatments would stack
-        # (the mirror overwrites the covered faces the ECT push just advanced).
-        args.eb_b_straight_mirror = staggered and not args.conformal_eb
+    if args.isotropic is None:
+        args.isotropic = True
     if args.holmstrom_switch_mode is None:
         args.holmstrom_switch_mode = "cell" if staggered else "edge"
     if args.holmstrom_blend_pow is None:
@@ -1018,9 +959,7 @@ def main():
         r_outer_eff,
         args.wall_supported,
         args.n_floor_frac,
-        args.isotropic_resistivity,
-        args.isotropic_hyper,
-        args.isotropic_gradient,
+        args.isotropic,
         args.substeps,
         args.substep_rtol,
         args.te,
@@ -1030,14 +969,12 @@ def main():
         annulus_smooth_cells=args.annulus_smooth_cells,
         grid_type=args.grid_type,
         use_conformal_eb=args.conformal_eb,
-        eb_b_straight_mirror=args.eb_b_straight_mirror,
         conformal_ect_j=args.conformal_ect_j,
         conformal_ect_curvature=args.conformal_ect_curvature,
         conformal_pec_zero_ej=args.pec_zero_ej,
         divb_clean=args.divb_clean,
         divb_clean_iters=args.divb_clean_iters,
         eta_hyper_mult=args.eta_hyper_mult,
-        eta_nodal=args.eta_nodal,
         holmstrom_blend_pow=args.holmstrom_blend_pow,
         holmstrom_blend_width=args.holmstrom_blend_width,
         holmstrom_switch_mode=args.holmstrom_switch_mode,

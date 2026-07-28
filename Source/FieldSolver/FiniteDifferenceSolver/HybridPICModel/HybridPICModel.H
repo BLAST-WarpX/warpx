@@ -77,8 +77,8 @@ public:
      * INITIAL B field (call once after the initial grid B has been set). The
      * direct mirror fill sets the covered band to its Neumann value so the first
      * field-push substep does not see it jump from the staircase-masked zero
-     * (which stalls the RKF45 substepping). A no-op when the wall fill is
-     * disabled (conformal_b_off) or off the collocated embedded-boundary path.
+     * (which stalls the RKF45 substepping). A no-op off the collocated
+     * embedded-boundary path.
      */
     void InitialBEBFill ();
 
@@ -335,7 +335,9 @@ public:
     /** Evaluate the hyper-resistivity Laplacian of the plasma current with the
      *  isotropic Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of
      *  the cross stencil, removing the cos(4*theta) grid anisotropy of its
-     *  damping rate (fully isotropic on cubic cells; Cartesian only). */
+     *  damping rate (fully isotropic on cubic cells; Cartesian only). Set,
+     *  together with the other two isotropized operators, by the single
+     *  hybrid_pic_model.isotropic_operators flag. */
     bool m_isotropic_hyper_resistivity = false;
     /** If true (default), on the staggered conformal (ECT) path the
      *  isotropic stencils are DOWNGRADED to the standard compact ones on
@@ -345,7 +347,7 @@ public:
      *  that the constitutive PEC zeroes (and that no mirror fill sets on
      *  this path), which would inject spurious wall-adjacent E. Engages the
      *  shared per-point fallback plumbing of the isotropic-operators PR
-     *  (see m_isotropic_eb_compact_fallback). No effect off the staggered
+     *  (the iso_phi guards in HybridPICSolveE). No effect off the staggered
      *  conformal path (the mirror-filled paths instead widen the fill bands
      *  to the corner reach; see m_eb_fill_band_cells). */
     bool m_isotropic_hyper_wall_compact = true;
@@ -365,16 +367,6 @@ public:
      *  affects the E used for the particle push and diagnostics: the
      *  Faraday/B-integration path omits grad(Pe) entirely. */
     bool m_isotropic_gradient = false;
-
-    /** Near an embedded boundary, fall back per point from the isotropic
-     *  stencils to the standard compact ones within a corner reach of the
-     *  level set, where the diagonal reads are not maintained by the EB
-     *  update masks. Default true; a hybrid EB boundary layer that
-     *  mirror-fills the wide-stencil bands (so the diagonal reads stay
-     *  valid) may disable it. On this branch the hybrid EB boundary layer
-     *  mirror-fills the J/B/Pe bands to the diagonal stencil reach, so the
-     *  fallback defaults to OFF (opt back in for A/B isolation). */
-    bool m_isotropic_eb_compact_fallback = false;
 
     /** External current */
     std::string m_Jx_ext_grid_function = "0.0";
@@ -458,22 +450,6 @@ public:
      *  cannot write. Takes precedence over conformal_e_geometric_pec and the
      *  covered-J mirror. */
     bool m_conformal_pec_zero_ej = false;
-    /** If true (default), the hybrid Hall term's nodal J x B interpolation excludes
-     *  covered edges/faces (EB-aware, mask-renormalized) so covered-cell field values do
-     *  not pollute the near-wall J x B. Set false to recover the plain (polluting)
-     *  averaging for A/B. Only affects conformal-EB staggered runs. */
-    bool m_eb_hall_mask = true;
-    /** If true (opt-in), evaluate the resistivity and hyper-resistivity parsers
-     *  ONCE per node -- from the nodal rho and the Hall-consistent nodal J/B --
-     *  and interpolate the resulting eta fields to the staggered E locations
-     *  (like the nodal enE/Hall term), instead of evaluating the parsers
-     *  pointwise at each staggered component location. Pointwise evaluation
-     *  samples a steep eta(rho) transition at three different positions per
-     *  cell, giving the E components inconsistent resistivities across the
-     *  plasma/vacuum (n_floor) seam -- a spurious-E source there. No-op on
-     *  collocated grids and for rho/J-independent resistivities. Cartesian
-     *  only. */
-    bool m_eta_nodal_interp = false;
     /** If > 0 (opt-in), smooth the holmstrom vacuum switch with an
      *  above-floor power-law window: on rho in [rho_floor,
      *  holmstrom_blend_width*rho_floor] the Hall/pressure (divided-by-rho)
@@ -513,49 +489,7 @@ public:
     /** Upper edge of the seam clean window in units of the density floor:
      *  the correction applies on edges with rho <= dive_seam_band*rho_floor. */
     amrex::Real m_dive_seam_band = 4.0;
-    /** If true, skip the collocated conformal magnetic-field wall treatment
-     *  entirely (no EB B fill): the unmasked nodal Faraday curl is left as-is.
-     *  This reproduces the pre-treatment baseline and isolates the wall fill as
-     *  the source of the grid-locked m = 4 perturbation. Diagnostic only -- it
-     *  leaves spurious fields at the wall, so it is not for production runs. */
-    bool m_conformal_b_off = false;
-    /** If true, apply the collocated-style direct level-set mirror wall fill to the
-     *  STAGGERED (Yee) Bfield_fp after each Faraday push, in place of the ECT
-     *  enlarged-cell face borrowing. Run with the standard masked Yee Faraday
-     *  (use_conformal_eb off) + this straight mirror to get the collocated wall
-     *  treatment on a staggered grid, avoiding the ECT face-extension / cross-box
-     *  seam. Opt-in (default off -> byte-identical); intended for staggered runs
-     *  with the plasma held off the wall (a standoff), which removes the dense
-     *  near-wall radial B that made the pointwise Yee mirror spike. */
-    bool m_eb_b_straight_mirror = false;
 
-    /** Relative residual tolerance of the Jacobi band relaxation of the
-     *  embedded-boundary PEC field fills (only used when eb_bc_direct_fill
-     *  is false) */
-    amrex::Real m_eb_bc_rtol = 1.e-4;
-    /** Sweep cap of the embedded-boundary PEC field fills: maximum Jacobi
-     *  iterations of the band relaxation, and maximum cascade sweeps over
-     *  ill-posed targets in the direct fill */
-    int m_eb_bc_max_iters = 10;
-    /** If true (default), the embedded-boundary PEC field fills use a
-     *  single-pass mirrored interpolation over unmasked (solution-domain)
-     *  values; if false, the iterative Jacobi band relaxation */
-    bool m_eb_bc_direct_fill = true;
-    /** Image parity of the embedded-boundary deposit fold: true (default)
-     *  folds with the PEC image signs (charge and tangential current
-     *  subtracted, normal current added); false uses the reflecting-wall
-     *  parities (mass-conserving for a wall-supported column) */
-    bool m_eb_fold_pec = true;
-    /** Parity of the embedded-boundary rho mirror fill: true (default) is
-     *  the odd reflection (Dirichlet 0 at the wall); false is the even
-     *  reflection (Neumann: the wall supports the column) */
-    bool m_eb_rho_dirichlet = true;
-    /** Parity of the electron-pressure embedded-boundary fill at a PEC wall:
-     *  true (default) is the odd reflection (Dirichlet 0 -> Pe vanishes at the
-     *  wall, so grad(Pe) supports the allowable radial E a PEC sustains via
-     *  surface charge); false is the even reflection (Neumann: zero normal
-     *  gradient). A physical sheath/wall-function is not modelled here. */
-    bool m_eb_pe_dirichlet = true;
     /** Latch so the near-wall plasma warning is emitted at most once. */
     mutable bool m_checked_plasma_at_wall = false;
 
@@ -594,16 +528,19 @@ public:
      *  amplifies into a non-finite blow-up. So the E fill band must not exceed the
      *  J fill band; pinning them equal keeps E and J consistent at the wall. */
     amrex::Real m_eb_fill_band_cells = 1.0;
-    /** Mirror-fill band width (in cells) for the magnetic-field (Bfield_fp) EB
-     *  fill. The filled B couples back into the solution only through curl/B
-     *  reads; with the isotropic corner-curl E correction on, that composite
-     *  reach is 2 cells, so widening this band to >=3 pushes the level-set
-     *  mirror's div(B) jump out of the solution-coupling zone (into the zeroed
-     *  deep interior, where it is causally inert). Runtime knob
-     *  hybrid_pic_model.eb_b_fill_band_cells; default 1 (legacy behavior),
-     *  auto-widened to sqrt(2) on 3D/XZ when isotropic_resistivity is enabled
-     *  so the corner-curl's in-plane diagonal B taps read mirror values rather
-     *  than the zeroed deep interior (user query still overrides). */
+    /** Mirror-fill band width (in units of the max cell size) for the
+     *  magnetic-field (Bfield_fp) EB fill. Computed, not an input: the band
+     *  must cover every fluid-side stencil that reads covered B -- the 1-cell
+     *  curl(B) reach, the corner-curl's in-plane diagonal taps (sqrt(2)) when
+     *  the isotropized operators are on, and the particle field gather, whose
+     *  shape-nox stencil for a particle against the wall reads nodes up to
+     *  (nox+1)/2 cells away per axis, a level-set depth of at most
+     *  sqrt(AMREX_SPACEDIM)*(nox+1)/2 <= nox+1 cells. nox+1 dominates all
+     *  three, so the band is nox+1 (falling back to the corner-curl reach
+     *  when no particles are loaded). The mirror's div(B) injection at the
+     *  band is removed by the closed-form div-free correction that ends
+     *  every collocated fill (DivFreeFixCoveredB), so the band no longer
+     *  trades accuracy against divergence placement. */
     amrex::Real m_eb_b_fill_band_cells = 1.0;
 
     /** Marder-like diffusive div(B) clean coefficient (fraction of the explicit

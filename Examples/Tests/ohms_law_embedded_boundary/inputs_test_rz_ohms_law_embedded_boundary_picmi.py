@@ -472,48 +472,6 @@ def run_plane_battery(sim):
         0.0,
     )
 
-    # reflecting-wall parity: the exact opposite signs (deposit added back,
-    # mass conserving; normal J subtracted)
-    rho[...] = 0.0
-    set_zrows(rho, j_dep, c)
-    wx.hybrid_fold_eb_deposit_to_nodal_scalar("rho_fp", 0, pec=False)
-    r = arr2d(rho)
-    ck.close(
-        "fold rho (reflect): first fluid row receives +0.6c",
-        r[:, j_first],
-        0.6 * c,
-        1e-12,
-    )
-    ck.close(
-        "fold rho (reflect): second fluid row receives +0.4c",
-        r[:, j_second],
-        0.4 * c,
-        1e-12,
-    )
-    ck.close(
-        "fold rho (reflect): folded amount conserved (sum = +c)",
-        r[:, j_first[0]] + r[:, j_second[0]],
-        c,
-        1e-12,
-    )
-
-    Jr[...] = 0.0
-    Jt[...] = 0.0
-    Jz[...] = 0.0
-    set_zrows(Jt, j_dep, c)
-    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0, pec=False)
-    jt = arr2d(Jt)
-    ck.close(
-        "fold J tangential (reflect): added +0.4c", jt[:, j_second], 0.4 * c, 1e-12
-    )
-    Jr[...] = 0.0
-    Jt[...] = 0.0
-    Jz[...] = 0.0
-    set_zrows(Jz, j_cut, c)
-    wx.hybrid_fold_eb_deposit_to_edge_field("current_fp", 0, pec=False)
-    jz = arr2d(Jz)
-    ck.close("fold J normal (reflect): subtracted -0.4c", jz[:, j_cn], -0.4 * c, 1e-12)
-
     # --- 7) selectivity against a spatially varying field -----------------
     shape = np.asarray(Et[...]).shape
     idx = np.indices(shape)
@@ -660,10 +618,10 @@ def run_hyper_battery(sim):
     ez = np.asarray(Ez[...])
 
     # interior: away from the z wall (node 24.3), the z domain rows and the
-    # outer-r domain row; the axis row i=0 is the point of the test
-    interior = (slice(0, N_R - 1), slice(2, 20))
+    # outer-r domain row; the axis row i=0 has its own dedicated assert below
+    interior = (slice(1, N_R - 1), slice(2, 20))
     ck.close(
-        "hyper RZ: parabola gives -4*C2 at every radius (axis included)",
+        "hyper RZ: parabola gives -4*C2 at every off-axis radius",
         ez[interior],
         ETA_H * 4.0 * C2,
         1e-9,

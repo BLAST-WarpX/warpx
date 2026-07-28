@@ -1004,6 +1004,17 @@ additionally define the electric potential at the embedded boundary with an anal
     inside the embedded boundary. For this reason, it is important to define
     this function in such a way that it is constant inside the embedded boundary.
 
+.. pp:param:: boundary.particle_eb
+    :type: ``string``
+    :default: ``Absorbing``
+    :optional:
+
+    The boundary condition applied to the particles when they reach the surface of the embedded boundary. Options are:
+
+    * ``Absorbing``: Particles that reach the embedded boundary are deleted. This is the default behavior.
+
+    * ``Reflecting``: Particles that reach the embedded boundary are specularly reflected back into the simulation domain
+
 .. pp:param:: warpx.eb_ect_balanced_borrow
     :type: ``integer``
     :default: ``0``
@@ -1015,6 +1026,8 @@ additionally define the electric potential at the embedded boundary with an anal
     enlarged with the symmetric, area-proportional eight-way split instead of the one-way
     face-extension pass, whose fixed borrowing order is not wall-normal aware. The default
     (``0``) keeps the historical one-way pass, bit-identical to previous behavior.
+
+.. _param-particle-thermalizer:
 
 .. pp:param:: particle_thermalizer.normal
     :type: ``string``
@@ -1612,7 +1625,8 @@ Particle initialization
     * ``read_from_file``: load the density profile from an openPMD file.
       An additional parameter, indicating the path of an openPMD data file,
       ``<species_name>.read_density_from_path`` must be specified. The openPMD
-      file must contain a field named ``density``. See
+      file must contain a field with the name given by ``<species_name>.density_mesh_name``
+      (default ``density``). See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
       for an example of how to prepare the openPMD data file. There is
       another optional parameter,
@@ -1909,7 +1923,7 @@ Particle initialization
     buffer for the specified boundary if they leave the simulation domain in
     the specified direction. **If USE_EB=TRUE** the ``save_particles_at_eb``
     flag can be set to ``1`` to also save particle data for the particles of this
-    species that impact the embedded boundary.
+    species that are absorbed at the embedded boundary.
     The scraped particle buffer can be used to track particle fluxes out of the
     simulation.
     The particle data can be written out by setting up a ``BoundaryScrapingDiagnostic``.
@@ -3032,13 +3046,18 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: ``strings`` separated by spaces
 
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elastic``, ``excitationX``, ``forward``, ``back``, ``twoproduct_reaction`` and ``charge_exchange``
-    for ions and ``elastic``, ``excitationX``, ``ionization`` & ``forward`` for electrons.
-    Multiple excitation events can be included for electrons corresponding to
-    excitation to different levels, the ``X`` above can be changed to a unique
-    identifier for each excitation process. For each scattering process specified
+    included. Available options are ``elasticX``, ``excitationX``, ``twoproduct_reaction`` and ``charge_exchange``
+    for ions and ``elasticX``, ``excitationX`` and ``ionization`` for electrons.
+    Multiple elastic and excitation events can be included, corresponding e.g. to
+    excitation to different levels or to several elastic channels (with different
+    cross-sections and/or scattering angle models); the ``X`` above can be changed
+    to a unique identifier for each such process. For each scattering process specified
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
+
+    For ``elasticX``, ``excitationX``, ``charge_exchange`` and ``twoproduct_reaction``, the
+    angular distribution is controlled by the per-process
+    :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` argument.
 
 .. pp:param:: <collision_name>.<scattering_process>_cross_section
     :type: ``string``
@@ -3052,8 +3071,26 @@ Details about the collision models can be found in the :ref:`theory section <mul
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
 
-    Only for ``dsmc`` and ``background_mcc``. If the scattering process is either
-    ``excitationX``, ``ionization`` or ``twoproduct_reaction``, the energy cost of that process must be given in eV.
+    Only for ``dsmc`` and ``background_mcc``. The energy cost of the process, in eV. It is
+    required for ``excitationX`` and ``ionization``, optional for ``charge_exchange`` and
+    ``twoproduct_reaction`` (which may impose a fixed energy loss, defaulting to 0), and
+    ignored for ``elasticX`` processes (which have no energy cost).
+
+.. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
+    :type: ``string``
+    :optional:
+
+    Only for ``dsmc`` and ``background_mcc``, and only for ``elasticX``, ``excitationX``,
+    ``charge_exchange`` and ``twoproduct_reaction``.
+    The model used to determine the scattering angle of the products
+    in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
+    The default is ``isotropic`` for ``elasticX`` and ``excitationX``, and ``forward`` for
+    ``charge_exchange`` and ``twoproduct_reaction``.
+    With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
+    With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction
+    as the incident particle (in the center of mass frame).
+    With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in
+    the opposite direction of the incident particle (in the center of mass frame).
 
 .. pp:param:: <collision_name>.ionization_species
     :type: ``float``
@@ -3784,7 +3821,14 @@ Maxwell solver: kinetic-fluid hybrid
     magnetic-field nodes are rewritten from the level-set geometry (signed distance and
     boundary normal) by mirror-image interpolation (normal component odd, tangential
     components even), so the masked nodal curl that forms the next substep's plasma current
-    sees wall-consistent values instead of a staircase-zeroed conductor. On a **staggered**
+    sees wall-consistent values instead of a staircase-zeroed conductor. The mirror band is
+    sized automatically to the deepest covered node any solution-side stencil can read
+    (``algo.particle_shape`` + 1 cells, covering the particle field gather as well as the
+    curl stencils), and every fill ends with a closed-form single-pass correction that zeroes
+    the central-difference :math:`\nabla \cdot \mathbf{B}` at each fluid node whose stencil
+    reads a covered node — only covered-band values are adjusted, never solution values — so
+    the wall fill injects no magnetic divergence and needs no divergence cleaner (the
+    sharp-corner :math:`\nabla \cdot \mathbf{B}` instability never seeds). On a **staggered**
     (Yee) grid the magnetic-field push instead uses the conformal enlarged-cell technique
     (ECT) Faraday update on the cut faces and edges (the same machinery as the ECT Maxwell
     solver), with the face-centered circulations recomputed from the Ohm's-law electric field
@@ -3808,12 +3852,10 @@ Maxwell solver: kinetic-fluid hybrid
     prescribing ``hybrid_pic_model.J*_external_grid_function`` inside a conductor has no effect; use
     ``external_vector_potential`` to drive coils embedded in conductors.
 
-    In addition, the deposited ion charge density is mirrored oddly across the embedded surface
-    (a Dirichlet condition: the plasma density vanishes at the conducting wall and is zero deep
-    inside the conductor; see :pp:param:`hybrid_pic_model.eb_rho_dirichlet`), and the electron
-    pressure is by default also mirrored oddly (a Dirichlet condition, Pe → 0 at the wall; set
-    :pp:param:`hybrid_pic_model.eb_pe_dirichlet` = ``false`` for the even/Neumann
-    wall-supported-pressure variant), so that the Ohm's-law density interpolation and the
+    In addition, the deposited ion charge density and the electron pressure are mirrored oddly
+    across the embedded surface (Dirichlet conditions: both vanish at the conducting wall and
+    are zero deep inside the conductor -- the embedded boundary is always a PEC), so that the
+    Ohm's-law density interpolation and the
     pressure-gradient stencils that straddle the wall see boundary-consistent values. These
     scalar conditions are always active when the hybrid solver is used with embedded boundaries
     (also without ``use_conformal_eb``). Note that the mirrored charge density inside the conductor is negative by
@@ -3884,124 +3926,6 @@ Maxwell solver: kinetic-fluid hybrid
     explicit update diverges at small-open-area cut cells; use
     :pp:param:`hybrid_pic_model.conformal_pec_zero_ej` for the stable wall. No effect off
     the staggered conformal path.
-
-.. pp:param:: hybrid_pic_model.eb_bc_rtol
-    :type: ``float``
-    :default: ``1e-4``
-    :optional:
-
-    Residual tolerance of the embedded-boundary PEC boundary-condition band relaxation applied
-    to the current density and the Ohm's-law electric field by the hybrid solver: the relaxation stops
-    when the largest change in the band, relative to the largest field magnitude in the band, drops
-    below this value (see :pp:param:`hybrid_pic_model.use_conformal_eb` for a description of the
-    boundary condition).
-
-.. pp:param:: hybrid_pic_model.eb_bc_max_iters
-    :type: ``int``
-    :default: ``10``
-    :optional:
-
-    Maximum number of Jacobi sweeps of the embedded-boundary PEC boundary-condition band relaxation
-    used by the hybrid solver.
-
-.. pp:param:: hybrid_pic_model.eb_bc_direct_fill
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    If ``true`` (default), the embedded-boundary PEC boundary condition is filled with a single-pass
-    mirrored interpolation that uses only solution-domain values (stencil weights renormalized over
-    those points), followed, where the interpolation is ill posed, by a deterministic cascade that
-    locks the direct-pass values and fills the remaining points from them (capped at
-    :pp:param:`hybrid_pic_model.eb_bc_max_iters` sweeps). The fill classification is cached between
-    calls. If ``false``, the iterative Jacobi band relaxation is used instead, controlled by
-    :pp:param:`hybrid_pic_model.eb_bc_rtol` and :pp:param:`hybrid_pic_model.eb_bc_max_iters`.
-
-.. pp:param:: hybrid_pic_model.conformal_b_off
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Diagnostic only. If ``true``, disables the embedded-boundary ``B``-field treatment entirely on the
-    collocated path (the direct level-set mirror fill is not applied), reproducing the pre-treatment
-    stair-step baseline. Intended for A/B comparison of the EB ``B`` treatment; not for production runs.
-
-.. pp:param:: hybrid_pic_model.eb_b_straight_mirror
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Staggered (Yee) grids only. If ``true``, impose the magnetic wall condition on the staggered
-    ``Bfield_fp`` after each Faraday push with the same direct level-set mirror fill the collocated
-    conformal path uses (normal component odd, tangential even), instead of leaving the covered
-    faces staircase-zeroed. Use with ``use_conformal_eb = false`` (the standard masked Yee
-    Faraday) as a level-set alternative to the staggered ECT wall treatment, avoiding the ECT
-    face-extension / cross-box seam machinery. Opt-in; the default (``false``) leaves the
-    staggered staircase behavior unchanged.
-
-.. pp:param:: hybrid_pic_model.eb_b_fill_band_cells
-    :type: ``float``
-    :default: ``1`` (``sqrt(2)`` when :pp:param:`hybrid_pic_model.isotropic_resistivity` is enabled)
-    :optional:
-
-    Width, in cells, of the band of covered ``Bfield_fp`` nodes set by the direct level-set mirror fill
-    (collocated, non-ECT path). The filled ``B`` couples back into the solution only through the
-    plasma-current curl and the isotropic corner-curl correction — a reach of about two cells when
-    :pp:param:`hybrid_pic_model.isotropic_resistivity` is enabled — so widening this band pushes the
-    mirror's curved-wall divergence error deeper into the zeroed conductor interior, where it can no
-    longer reach a solution-domain stencil. The corner-curl correction reads the out-of-plane ``B``
-    at the in-plane diagonal neighbors (reach ``sqrt(2)`` cells), so when it is enabled the default
-    band is widened to that corner reach: with a 1-cell (axis-reach) band, any wall segment oblique
-    to the grid puts the diagonal tap in the zeroed deep interior, feeding a spurious
-    grid-diagonal-peaked (m=4) electric field along the wall on every substep.
-
-.. pp:param:: hybrid_pic_model.eb_deposit_fold
-    :type: ``string``
-    :default: ``pec``
-    :optional:
-
-    Image parity of the embedded-boundary deposit fold. Particles within a shape length of a
-    conducting wall deposit part of their charge and current onto covered points; before the
-    boundary fill rewrites those points, the deposit is folded back across the surface (each
-    near-wall fluid point gathers the covered-side deposit at its mirror image), matching the
-    domain-boundary treatment. With ``pec`` (default) the fold uses the PEC image signs — charge
-    and tangential current subtracted (image of the opposite sign, so the density vanishes at the
-    wall), normal current added. With ``reflect`` the parities are reversed and the deposit is
-    folded back with its own sign, which conserves the deposited mass and is appropriate when the
-    wall supports the plasma column (combine with ``hybrid_pic_model.eb_rho_dirichlet = false``).
-
-.. pp:param:: hybrid_pic_model.eb_rho_dirichlet
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    Parity of the embedded-boundary mirror fill of the deposited charge density. If ``true``
-    (default), the density is mirrored oddly and vanishes at the wall (Dirichlet, free plasma
-    edge). If ``false``, it is mirrored evenly (Neumann: zero normal gradient, for a column
-    supported by the wall; combine with ``hybrid_pic_model.eb_deposit_fold = reflect``).
-
-.. pp:param:: hybrid_pic_model.eb_pe_dirichlet
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    Parity of the embedded-boundary mirror fill of the electron pressure. If ``true`` (default),
-    the pressure is mirrored oddly and vanishes at the conducting wall (Dirichlet, consistent
-    with the odd density mirror: the electron pressure at a free plasma edge drops to zero, and
-    its normal gradient supplies the radial sheath-like electric field). If ``false``, it is
-    mirrored evenly (Neumann: the wall supports the plasma back-pressure with zero normal
-    pressure gradient).
-
-.. pp:param:: hybrid_pic_model.eb_hall_mask
-    :type: ``bool``
-    :default: ``true``
-    :optional:
-
-    If ``true`` (default), the Hall term's nodal :math:`\vec{J}\times\vec{B}` interpolation is
-    embedded-boundary aware: covered edges and faces are excluded from the nodal average (with
-    the interpolation weights renormalized over the remaining solver-owned points), so covered
-    values cannot pollute the near-wall Hall electric field. Set ``false`` to recover the plain
-    unmasked averaging for A/B comparison.
 
 .. pp:param:: hybrid_pic_model.holmstrom_blend_pow
     :type: ``float``
@@ -4075,38 +3999,33 @@ Maxwell solver: kinetic-fluid hybrid
 
     Upper edge of the seam clean window, in units of the density floor.
 
-.. pp:param:: hybrid_pic_model.eta_nodal_interp
+.. pp:param:: hybrid_pic_model.isotropic_operators
     :type: ``bool``
     :default: ``false``
     :optional:
 
-    If ``true`` (opt-in), the resistivity and hyper-resistivity parsers are evaluated once per
-    NODE — from the nodal charge density and the Hall-consistent nodal current and magnetic
-    field — and the resulting resistivity fields are interpolated to the staggered electric-field
-    locations, exactly like the nodal Hall (:math:`\vec{J}\times\vec{B}`) term. The default
-    pointwise evaluation samples the resistivity at each staggered component location separately,
-    so across a steep :math:`\eta(\rho)` transition (the plasma/vacuum density-floor seam) the
-    three electric-field components see inconsistent resistivities within one cell — a source of
-    spurious electric-field structure at the plasma edge on staggered (Yee) grids. No effect on
-    collocated grids (already nodal) or for density/current-independent resistivities.
-    Cartesian geometries only.
+    If ``true`` (opt-in), the dissipative and gradient operators of the hybrid Ohm's law are
+    evaluated with their isotropized stencils, together:
 
-.. pp:param:: hybrid_pic_model.isotropic_hyper_resistivity
-    :type: ``bool``
-    :default: ``false``
-    :optional:
+    * the **hyper-resistivity Laplacian** uses the isotropic Mehrstellen 9-point (2D XZ) or
+      Patra-Karttunen 27-point (3D) stencil instead of the cross stencil;
+    * the **resistive term** gains a corner-curl correction so that, after the (unchanged)
+      Faraday curl, the emergent in-plane resistive diffusion of the out-of-plane magnetic
+      field uses the isotropic Laplacian — the correction enters only through the electric
+      field, so :math:`\nabla\cdot\vec{B}` is preserved exactly;
+    * the **electron-pressure gradient** uses the transverse-smoothed staggered difference
+      instead of the plain two-point stencil (only in the electric field used for the
+      particle push and diagnostics; the Faraday/B-integration path omits
+      :math:`\nabla P_e` entirely).
 
-    If ``true`` (opt-in), the hyper-resistivity Laplacian of the hybrid Ohm's law is evaluated
-    with the isotropic Mehrstellen 9-point (2D XZ) or Patra-Karttunen 27-point (3D) stencil
-    instead of the cross stencil. The cross stencil's leading truncation error modulates the
-    hyper-resistive damping rate as :math:`\cos 4\theta` between the grid axes and the
-    diagonals, which imprints fourfold structure on diffusing fields at grid-scale wavenumbers;
-    the isotropic stencils cancel that term (their leading error is proportional to the
-    isotropic biharmonic; fully isotropic on cubic cells, consistent on non-cubic cells).
-    Near an embedded boundary the hybrid EB mirror fills are widened to the diagonal stencil
-    reach (see :pp:param:`hybrid_pic_model.eb_b_fill_band_cells`), so the operator keeps its
-    isotropic form there. Cartesian geometries only; in RZ the standard cylindrical operator
-    is used (with the on-axis radial term carrying its L'Hopital factor of two).
+    The cross stencils' leading truncation errors all modulate as :math:`\cos 4\theta`
+    between the grid axes and the diagonals, imprinting fourfold (m=4) structure on
+    diffusing or pinching fields at grid-scale wavenumbers; the isotropic forms cancel that
+    term (fully isotropic on cubic cells, consistent on non-cubic cells). Near an embedded
+    boundary the hybrid EB boundary layer mirror-fills the wide-stencil bands to the
+    diagonal reach, so the operators keep their isotropic form at the wall. Cartesian
+    geometries only; in RZ the standard cylindrical operators are used (the axisymmetric
+    resistive operator has no such anisotropy).
 
 .. pp:param:: hybrid_pic_model.isotropic_hyper_wall_compact
     :type: ``bool``
@@ -4118,64 +4037,8 @@ Maxwell solver: kinetic-fluid hybrid
     on edges within :math:`\sqrt{D} + 1/2` cells (:math:`D` the dimensionality) of the
     embedded surface, where the isotropic stencil's diagonal reads would land on
     EB-touching edges that carry no valid current on this path. Only meaningful together
-    with :pp:param:`hybrid_pic_model.isotropic_hyper_resistivity`; no effect off the
+    with :pp:param:`hybrid_pic_model.isotropic_operators`; no effect off the
     staggered conformal path.
-
-.. pp:param:: hybrid_pic_model.isotropic_resistivity
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    If ``true`` (opt-in), a corner-curl correction is added to the resistive electric field so
-    that, after the (unchanged) Faraday curl, the emergent in-plane resistive diffusion of the
-    out-of-plane magnetic field (:math:`B_z` in 3D, :math:`B_y` in 2D XZ) uses the isotropic
-    Mehrstellen Laplacian rather than the cross stencil. The plain resistive term
-    :math:`\eta\,\vec{J}` advanced by Faraday produces, for divergence-free :math:`\vec{B}`, the
-    cross-stencil Laplacian, whose :math:`\cos 4\theta` damping anisotropy drives a grid m=4 mode
-    (visible inside conducting cavities where :math:`\eta` is large). Because the correction
-    enters only through :math:`\vec{E}`, the Faraday curl is untouched and :math:`\nabla\cdot\vec{B}`
-    is preserved exactly; it is a pure O(h^2) truncation-error canceller (zero for fields of
-    degree :math:`\leq 3`). Cartesian geometries only; the RZ resistive operator is axisymmetric
-    and has no such anisotropy.
-
-.. pp:param:: hybrid_pic_model.isotropic_gradient
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    If ``true`` (opt-in), the electron-pressure gradient of the hybrid Ohm's law is evaluated
-    with a transverse-smoothed (isotropized) staggered difference instead of the plain two-point
-    stencil. The two-point stencil's leading truncation error modulates :math:`|\nabla P_e|` as
-    :math:`\cos 4\theta` between the grid axes and the diagonals; pre-smoothing the scalar along
-    each transverse direction :math:`t` with weight :math:`\Delta x^2/(24\,\Delta t^2)`
-    (:math:`\Delta x^2/(6\,\Delta t^2)` for the wide centered difference on collocated grids)
-    turns the leading error into the corresponding component of
-    :math:`(h^2/24)\,\nabla(\nabla^2 P_e)`, which is isotropic. The on-axis stencil is
-    unchanged: isotropization equalizes the diagonal error to the axis error rather than adding
-    accuracy. Note that, unlike the plain staggered gradient, the isotropized gradient is not
-    discretely curl-free (its Yee curl is :math:`O(h^2)` small rather than identically zero);
-    this is benign because the term is only evaluated for the electric field used in the
-    particle push and diagnostics — the Faraday/B-integration path omits :math:`\nabla P_e`
-    entirely (its analytic curl is zero), so no spurious magnetic field can be generated.
-    Near an embedded boundary the electron-pressure mirror fill maintains the transverse
-    reads. Cartesian geometries only.
-
-.. pp:param:: hybrid_pic_model.isotropic_eb_compact_fallback
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    Near an embedded boundary, fall back per point from the isotropic stencils
-    (:pp:param:`hybrid_pic_model.isotropic_hyper_resistivity`,
-    :pp:param:`hybrid_pic_model.isotropic_resistivity`,
-    :pp:param:`hybrid_pic_model.isotropic_gradient`) to the standard compact ones within a
-    corner reach (:math:`(\sqrt{d}+1/2)\,h`) of the level set. Defaults to off here because
-    the hybrid EB boundary layer mirror-fills the wide-stencil bands to the diagonal reach
-    (:pp:param:`hybrid_pic_model.eb_b_fill_band_cells` and the plasma-current band), keeping
-    the diagonal reads valid near the wall; opt back in for A/B isolation. On the
-    staggered-conformal constitutive-PEC path the fallback engages regardless via
-    :pp:param:`hybrid_pic_model.isotropic_hyper_wall_compact` (default on there), because
-    that wall zeroes EB-touching edges instead of filling them.
 
 .. pp:param:: hybrid_pic_model.divb_clean_alpha
     :type: ``float``
@@ -4251,6 +4114,7 @@ Maxwell solver: kinetic-fluid hybrid
     fight the ECT Faraday update. In this mode covered faces are never read or written and
     the per-sweep mirror re-fill is skipped. Set ``false`` to force the raw uniform-metric
     clean everywhere. No effect off the staggered conformal path.
+
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
@@ -5132,9 +4996,9 @@ This can be important if a large number of particles are lost, avoiding filling 
 In addition to their usual attributes, the saved particles have
    an integer attribute ``stepScraped``, which indicates the PIC iteration at which each particle was absorbed at the boundary,
    a real attribute ``deltaTimeScraped``, which indicates the time between the time associated to ``stepScraped``
-   and the exact time when each particle hits the boundary,
-   a real attribute ``timeScraped``, which indicates the exact time when the paritcle hit the boundary,
-   3 real attributes ``nx``, ``ny``, ``nz``, which represents the three components of the normal to the boundary on the point of contact of the particles (not saved if they reach non-EB boundaries)
+   and the exact time when each particle is absorbed at the boundary,
+   a real attribute ``timeScraped``, which indicates the exact time when the particle is absorbed at the boundary,
+   3 real attributes ``nx``, ``ny``, ``nz``, which represents the three components of the normal to the boundary at the point where the particle is absorbed (not saved if they reach non-EB boundaries)
 
 ``BoundaryScrapingDiagnostics`` can be used with :pp:param:`<diag_name>.<species_name>.random_fraction`, :pp:param:`<diag_name>.<species_name>.uniform_stride`, and ``<diag_name>.<species_name>.plot_filter_function``, which have the same behavior as for ``FullDiagnostics``. For ``BoundaryScrapingDiagnostics``, these filters are applied at the time the data is written to file. An implication of this is that more particles may initially be accumulated in memory than are ultimately written. ``t`` in ``plot_filter_function`` refers to the time the diagnostic is written rather than the time the particle crossed the boundary.
 

@@ -18,7 +18,7 @@
 # --- the wall (the plasma density vanishes at a conducting surface): rho is
 # --- mirrored oddly across the embedded boundary, so it crosses zero at the
 # --- surface, carries a negative mirror band just inside the conductor, and
-# --- is exactly zero deeper in. (The matching Neumann condition on the
+# --- is exactly zero deeper in. (The matching Dirichlet condition on the
 # --- electron pressure is asserted in situ by the simulation script, since
 # --- the pressure field is not written by any diagnostic.)
 

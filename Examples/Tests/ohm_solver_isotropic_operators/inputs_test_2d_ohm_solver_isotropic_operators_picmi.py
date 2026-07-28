@@ -56,7 +56,6 @@ def setup_simulation(battery, grid_type="staggered"):
     # species-free single-box deck (the stencils must not straddle box seams)
     hyper = battery.startswith("hyper")
     resistive = battery.startswith("resistive")
-    gradient = battery.startswith("gradient")
 
     grid = picmi.Cartesian2DGrid(
         number_of_cells=[N, N],
@@ -87,9 +86,9 @@ def setup_simulation(battery, grid_type="staggered"):
         n_floor=1.0e16,
         plasma_resistivity=(ETA_R if resistive else 0.0),
         plasma_hyper_resistivity=(ETA_H if hyper else None),
-        isotropic_hyper_resistivity=(True if hyper else None),
-        isotropic_resistivity=(True if resistive else None),
-        isotropic_gradient=(True if gradient else None),
+        # every battery runs with the isotropized operators enabled; the
+        # other terms are inert through their zero coefficients above
+        isotropic_operators=True,
         substeps=4,
     )
 

@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 
 using namespace amrex;
@@ -228,19 +229,25 @@ namespace
             return g;
         }
 
-        // boundary normal (toward the plasma) from the level set
-        int ic, jc, kc;
-        amrex::Real Wc[AMREX_SPACEDIM][2];
-        ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-            xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-        g.nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+        // Boundary normal (toward the plasma) from the level set. The
+        // post-#7051 interp_normal returns a unit 3D Cartesian normal for
+        // every dimensionality; with yq = 0 the RZ azimuthal rotation is the
+        // identity, so components 0 and 2 are the (x,z)/(r,z) grid normal.
+        auto const n3 = DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+        g.nv = amrex::RealVect(
+            amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2]));
+#else
+        g.nv = amrex::RealVect(amrex::Real(n3[0]), amrex::Real(n3[2]));
+#endif
         amrex::Real const nv2 = DistanceToEB::dot_product(g.nv, g.nv);
-        if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
-            // degenerate level-set gradient: treat as deep interior
+        if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
+            // degenerate level-set gradient (interp_normal normalizes
+            // internally, so a vanishing gradient arrives non-finite):
+            // treat as deep interior
             g.band = false;
             return g;
         }
-        DistanceToEB::normalize(g.nv);
 
         // image point in the plasma, at least one cell away from this point
         // so that the interpolation stencil decouples from the fill band;
@@ -403,9 +410,6 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
     amrex::MultiFab const& distance_to_eb,
     amrex::Geometry const& geom,
-    amrex::Real rtol,
-    int max_iters,
-    bool direct_fill,
     bool normal_odd,
     bool fill_covered_centers,
     EBFillStatus* status_cache,
@@ -417,6 +421,18 @@ void warpx::hybrid::ApplyPECBoundaryToField (
     ABLASTR_PROFILE("warpx::hybrid::ApplyPECBoundaryToField()");
 
     if (!eb_update[0]) { return; }
+
+    // A magnetic fill on a collocated grid (normal-odd parities on a fully
+    // nodal field) always ends with the divergence-consistent covered-band
+    // correction: the pointwise mirror alone injects O(h) central-difference
+    // div(B) at every fluid node whose stencil reads a covered node (the seed
+    // of the sharp-corner divergence instability), and the closed-form
+    // correction removes it at the source. Edge fields (E, J) and staggered
+    // fills are unaffected.
+    bool const divfree = normal_odd
+        && field[0]->ixType().nodeCentered()
+        && field[1]->ixType().nodeCentered()
+        && field[2]->ixType().nodeCentered();
 
     auto const plo = geom.ProbLoArray();
     auto const dxi = geom.InvCellSizeArray();
@@ -449,7 +465,9 @@ void warpx::hybrid::ApplyPECBoundaryToField (
         }
     }
 
-    if (direct_fill) {
+    // Single-pass deterministic mirror fill (the only strategy): well-posed
+    // targets in one pass, ill-posed ones via the bounded cascade below.
+    {
         warpx::hybrid::EBFillStatus local_status;
         warpx::hybrid::EBFillStatus& st = status_cache ? *status_cache : local_status;
         if (st.empty()) {
@@ -539,8 +557,12 @@ void warpx::hybrid::ApplyPECBoundaryToField (
                 }
             }
 
+            // Sweep cap of the ill-posed resolution cascade: each sweep
+            // locks at least one point or stalls, so this is a backstop,
+            // not a knob.
+            constexpr int max_cascade_sweeps = 10;
             int n_left = st.n_pending;
-            for (int sweep = 0; sweep < max_iters && n_left > 0; ++sweep) {
+            for (int sweep = 0; sweep < max_cascade_sweeps && n_left > 0; ++sweep) {
                 for (int c = 0; c < 3; ++c) {
                     field[c]->FillBoundary(geom.periodicity());
                     st.status[c]->FillBoundary(geom.periodicity());
@@ -672,6 +694,13 @@ void warpx::hybrid::ApplyPECBoundaryToField (
             }
         }
 
+        // Divergence-consistent correction of the covered band (collocated B
+        // only): run after the fill and before the ghost sync so the ghosts
+        // carry the corrected values.
+        if (divfree) {
+            warpx::hybrid::DivFreeFixCoveredB(field, distance_to_eb, geom);
+        }
+
         // Leave ghost edges consistent for the stencils that consume the field
         for (int c = 0; c < 3; ++c) {
             field[c]->FillBoundary(geom.periodicity());
@@ -679,156 +708,206 @@ void warpx::hybrid::ApplyPECBoundaryToField (
         return;
     }
 
-    // Scratch copies holding the previous Jacobi iterate
-    std::array<amrex::MultiFab, 3> Jold;
-    for (int c = 0; c < 3; ++c) {
-        Jold[c].define(field[c]->boxArray(), field[c]->DistributionMap(),
-                       field[c]->nComp(), field[c]->nGrowVect());
-    }
-
-    int iter = 0;
-    amrex::Real resid = std::numeric_limits<amrex::Real>::max();
-    while (iter < max_iters && resid > rtol) {
-
-        // Refresh ghost edges (image stencils can reach into neighbor boxes)
-        // and snapshot the previous iterate for a deterministic Jacobi sweep
-        for (int c = 0; c < 3; ++c) {
-            field[c]->FillBoundary(geom.periodicity());
-            amrex::MultiFab::Copy(Jold[c], *field[c], 0, 0,
-                                  field[c]->nComp(), field[c]->nGrowVect());
-        }
-
-        // Track the largest change and the largest band value so convergence
-        // is measured relative to the boundary-band field magnitude; a per-edge
-        // relative criterion can never be met by edges holding near-zero values.
-        amrex::ReduceOps<amrex::ReduceOpMax, amrex::ReduceOpMax> reduce_op;
-        amrex::ReduceData<amrex::Real, amrex::Real> reduce_data(reduce_op);
-        using ReduceTuple = typename decltype(reduce_data)::Type;
-
-        for (int c = 0; c < 3; ++c) {
-            auto const stag_own = stag[c];
-            auto const stag_x = stag[0];
-            auto const stag_y = stag[1];
-            auto const stag_z = stag[2];
-
-            for (amrex::MFIter mfi(*field[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
-                int const ncomp = field[c]->nComp();
-
-                auto const& Jc = field[c]->array(mfi);
-                auto const& Jx_o = Jold[0].const_array(mfi);
-                auto const& Jy_o = Jold[1].const_array(mfi);
-                auto const& Jz_o = Jold[2].const_array(mfi);
-                auto const& mask = eb_update[c]->const_array(mfi);
-                auto const& phi = distance_to_eb.const_array(mfi);
-
-                reduce_op.eval(tb, ncomp, reduce_data,
-                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n) -> ReduceTuple
-                {
-                    if (mask(i, j, k) != 0) { return {0._rt, 0._rt}; }
-
-                    // edge-center position in physical coordinates
-                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;
-#if defined(WARPX_DIM_3D)
-                    xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
-                    xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
-                    xe[2] = plo[2] + (k + stag_own[2])*dx_arr[2];
-                    amrex::Real const yq = xe[1];
-                    amrex::Real const zq = xe[2];
 #else
-                    xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
-                    xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
-                    amrex::Real const yq = 0._rt;
-                    amrex::Real const zq = xe[1];
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, normal_odd,
+                         fill_covered_centers, status_cache, band_cells);
 #endif
+}
 
-                    // signed distance at the edge center (< 0 in the conductor)
-                    int ii, jj, kk;
-                    amrex::Real W[AMREX_SPACEDIM][2];
-                    ablastr::particles::compute_weights<amrex::IndexType::NODE>(
-                        xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
-                    amrex::Real const s = ablastr::particles::interp_field_nodal(ii, jj, kk, W, phi);
+void warpx::hybrid::DivFreeFixCoveredB (
+    ablastr::fields::VectorField const& field,
+    amrex::MultiFab const& distance_to_eb,
+    amrex::Geometry const& geom)
+{
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+    using namespace amrex::literals;
 
-                    amrex::Real const v_old = Jc(i, j, k, n);
+    ABLASTR_PROFILE("warpx::hybrid::DivFreeFixCoveredB()");
 
-                    if (s < -d_band) {
-                        // deep inside the conductor: the field vanishes
-                        Jc(i, j, k, n) = 0._rt;
-                        return {std::abs(v_old), 0._rt};
-                    }
+    // Collocated (fully nodal) fields only: the closed form relies on the
+    // central-difference nodal divergence whose stencil reads one covered
+    // component per axis neighbor.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        field[0]->ixType().nodeCentered() && field[2]->ixType().nodeCentered(),
+        "DivFreeFixCoveredB requires a collocated (nodal) field");
 
-                    // boundary normal (toward the plasma) from the level set
-                    int ic, jc, kc;
-                    amrex::Real Wc[AMREX_SPACEDIM][2];
-                    ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                        xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-                    amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
-                    amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-                    if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
-                        // degenerate level-set gradient (e.g. saturated far
-                        // field): treat as deep interior
-                        Jc(i, j, k, n) = 0._rt;
-                        return {std::abs(v_old), 0._rt};
-                    }
-                    DistanceToEB::normalize(nv);
+    auto const dx = geom.CellSizeArray();
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> inv2dx{};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { inv2dx[d] = 0.5_rt/dx[d]; }
 
-                    // Image point at least one cell into the plasma so its
-                    // stencil decouples from the boundary band (fast Jacobi
-                    // convergence); d_im is its distance from the surface.
-                    amrex::Real const offset =
-                        amrex::max(amrex::max(std::abs(s), d_img_min) - s, h_max);
-                    amrex::Real const d_im = s + offset;
-                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim;
-                    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-                        xim[d] = xe[d] + offset*nv[d];
-                    }
-
-                    amrex::Real const Jx_im = gather_staggered(Jx_o, xim, stag_x, plo, dxi, n);
-                    amrex::Real const Jy_im = gather_staggered(Jy_o, xim, stag_y, plo, dxi, n);
-                    amrex::Real const Jz_im = gather_staggered(Jz_o, xim, stag_z, plo, dxi, n);
-
-                    // edge fields (E, J): normal even / tangential odd;
-                    // magnetic field: normal odd / tangential even.
-                    amrex::Real const w_n = normal_odd ? s/d_im : 1._rt;
-                    amrex::Real const w_t = normal_odd ? 1._rt : s/d_im;
-                    amrex::Real const v_new = ::mirror_combine(c, Jx_im, Jy_im, Jz_im,
-                        nv, w_n, w_t);
-
-                    Jc(i, j, k, n) = v_new;
-
-                    return {std::abs(v_new - v_old), std::abs(v_new)};
-                });
-            }
+    // Skip rows whose divergence stencil reads beyond a non-periodic
+    // physical domain boundary (one nodal layer).
+    const amrex::Box nodal_domain =
+        amrex::convert(geom.Domain(), amrex::IntVect::TheNodeVector());
+    amrex::GpuArray<int, 3> dom_lo{INT_MIN, INT_MIN, INT_MIN};
+    amrex::GpuArray<int, 3> dom_hi{INT_MAX, INT_MAX, INT_MAX};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        if (!geom.isPeriodic(d)) {
+            dom_lo[d] = nodal_domain.smallEnd(d) + 1;
+            dom_hi[d] = nodal_domain.bigEnd(d) - 1;
         }
-
-        auto const result = reduce_data.value(reduce_op);
-        amrex::Real dmax = amrex::get<0>(result);
-        amrex::Real smax = amrex::get<1>(result);
-        amrex::ParallelDescriptor::ReduceRealMax(dmax);
-        amrex::ParallelDescriptor::ReduceRealMax(smax);
-        resid = dmax / amrex::max(smax, std::numeric_limits<amrex::Real>::min());
-        ++iter;
     }
 
-    if (resid > rtol) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC",
-            "ApplyPECBoundaryToField: the embedded-boundary field band "
-            "relaxation did not reach the requested tolerance "
-            "(hybrid_pic_model.eb_bc_rtol) within "
-            "hybrid_pic_model.eb_bc_max_iters sweeps.",
-            ablastr::warn_manager::WarnPriority::low);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*field[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        // Grow one node at BOX boundaries only (growntilebox never overlaps
+        // neighbouring tiles, which would double-apply the correction
+        // concurrently): ghost-adjacent rows are then evaluated consistently
+        // on every rank that sees them, from FillBoundary-consistent B and
+        // phi.
+        amrex::Box const tb = mfi.growntilebox(1);
+        auto const& Bx = field[0]->array(mfi);
+        auto const& By = field[1]->array(mfi);
+        auto const& Bz = field[2]->array(mfi);
+        auto const& phi = distance_to_eb.const_array(mfi);
+
+        amrex::ParallelFor(tb,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            if (!(phi(i, j, k) > 0.0_rt)) { return; }  // fluid rows only
+            if (i < dom_lo[0] || i > dom_hi[0]
+                || j < dom_lo[1] || j > dom_hi[1]
+                || k < dom_lo[2] || k > dom_hi[2]) { return; }
+
+            // Unknown selection per axis neighbor: the covered component is a
+            // free DOF of THIS row unless the node on the far side of that
+            // covered neighbor is also fluid (a one-node "fin": the component
+            // is then read by two opposing rows whose demands are generically
+            // incompatible -- skip it; the symmetric test makes both rows
+            // skip it consistently, so no covered component is ever written
+            // by more than one row and the pass needs no atomics).
+#if defined(WARPX_DIM_3D)
+            const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+            const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+            const bool uym = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+            const bool uyp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+            const bool uzm = (phi(i, j, k-1) <= 0.0_rt) && !(phi(i, j, k-2) > 0.0_rt);
+            const bool uzp = (phi(i, j, k+1) <= 0.0_rt) && !(phi(i, j, k+2) > 0.0_rt);
+            if (!(uxm || uxp || uym || uyp || uzm || uzp)) { return; }
+
+            amrex::Real const r =
+                  (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                + (By(i, j+1, k) - By(i, j-1, k))*inv2dx[1]
+                + (Bz(i, j, k+1) - Bz(i, j, k-1))*inv2dx[2];
+
+            amrex::Real c2 = 0.0_rt;
+            if (uxm) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uxp) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uym) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (uyp) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (uzm) { c2 += inv2dx[2]*inv2dx[2]; }
+            if (uzp) { c2 += inv2dx[2]*inv2dx[2]; }
+            if (!(c2 > 0.0_rt)) { return; }
+            amrex::Real const lam = -r / c2;
+
+            // delta_u = c_u * lam with c_u = +/- 1/(2 dx_d)
+            if (uxm) { Bx(i-1, j, k) += (-inv2dx[0])*lam; }
+            if (uxp) { Bx(i+1, j, k) += ( inv2dx[0])*lam; }
+            if (uym) { By(i, j-1, k) += (-inv2dx[1])*lam; }
+            if (uyp) { By(i, j+1, k) += ( inv2dx[1])*lam; }
+            if (uzm) { Bz(i, j, k-1) += (-inv2dx[2])*lam; }
+            if (uzp) { Bz(i, j, k+1) += ( inv2dx[2])*lam; }
+#elif defined(WARPX_DIM_XZ)
+            amrex::ignore_unused(By);
+            const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+            const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+            const bool uzm = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+            const bool uzp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+            if (!(uxm || uxp || uzm || uzp)) { return; }
+
+            amrex::Real const r =
+                  (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                + (Bz(i, j+1, k) - Bz(i, j-1, k))*inv2dx[1];
+
+            amrex::Real c2 = 0.0_rt;
+            if (uxm) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uxp) { c2 += inv2dx[0]*inv2dx[0]; }
+            if (uzm) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (uzp) { c2 += inv2dx[1]*inv2dx[1]; }
+            if (!(c2 > 0.0_rt)) { return; }
+            amrex::Real const lam = -r / c2;
+
+            if (uxm) { Bx(i-1, j, k) += (-inv2dx[0])*lam; }
+            if (uxp) { Bx(i+1, j, k) += ( inv2dx[0])*lam; }
+            if (uzm) { Bz(i, j-1, k) += (-inv2dx[1])*lam; }
+            if (uzp) { Bz(i, j+1, k) += ( inv2dx[1])*lam; }
+#endif
+        });
     }
 
-    // Leave ghost edges consistent with the final band values for the
-    // stencils that consume J (nodal interpolation, hyper-resistivity)
-    for (int c = 0; c < 3; ++c) {
-        field[c]->FillBoundary(geom.periodicity());
+    // Invariant verification (WARPX_DIVFREE_DEBUG=1 in the environment): the
+    // residual central-difference div at every constrained fluid row must be
+    // round-off after the pass. Aborts on violation, which makes the CI test
+    // of this feature a plain run under the environment variable. Costs one
+    // extra reduction sweep per fill; off by default. An environment hook
+    // rather than an input parameter: it is a self-check of an always-on
+    // invariant, not a user-facing choice.
+    static const bool debug_check = [] {
+        const char* e = std::getenv("WARPX_DIVFREE_DEBUG");
+        return (e != nullptr) && (e[0] == '1');
+    }();
+    if (debug_check) {
+        amrex::ReduceOps<amrex::ReduceOpMax> rop;
+        amrex::ReduceData<amrex::Real> rdata(rop);
+        using RTuple = typename decltype(rdata)::Type;
+        amrex::Real bmax = 0.0_rt;
+        for (int c = 0; c < 3; ++c) {
+            bmax = std::max(bmax, field[c]->norminf());  // collective
+        }
+        for (amrex::MFIter mfi(*field[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const tbv = mfi.tilebox(amrex::IntVect::TheNodeVector());
+            auto const& Bx = field[0]->const_array(mfi);
+            auto const& By = field[1]->const_array(mfi);
+            auto const& Bz = field[2]->const_array(mfi);
+            auto const& phi = distance_to_eb.const_array(mfi);
+            rop.eval(tbv, rdata,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) -> RTuple
+            {
+                if (!(phi(i, j, k) > 0.0_rt)) { return {0.0_rt}; }
+                if (i < dom_lo[0] || i > dom_hi[0]
+                    || j < dom_lo[1] || j > dom_hi[1]
+                    || k < dom_lo[2] || k > dom_hi[2]) { return {0.0_rt}; }
+#if defined(WARPX_DIM_3D)
+                const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+                const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+                const bool uym = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+                const bool uyp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+                const bool uzm = (phi(i, j, k-1) <= 0.0_rt) && !(phi(i, j, k-2) > 0.0_rt);
+                const bool uzp = (phi(i, j, k+1) <= 0.0_rt) && !(phi(i, j, k+2) > 0.0_rt);
+                if (!(uxm || uxp || uym || uyp || uzm || uzp)) { return {0.0_rt}; }
+                amrex::Real const r =
+                      (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                    + (By(i, j+1, k) - By(i, j-1, k))*inv2dx[1]
+                    + (Bz(i, j, k+1) - Bz(i, j, k-1))*inv2dx[2];
+#elif defined(WARPX_DIM_XZ)
+                amrex::ignore_unused(By);
+                const bool uxm = (phi(i-1, j, k) <= 0.0_rt) && !(phi(i-2, j, k) > 0.0_rt);
+                const bool uxp = (phi(i+1, j, k) <= 0.0_rt) && !(phi(i+2, j, k) > 0.0_rt);
+                const bool uzm = (phi(i, j-1, k) <= 0.0_rt) && !(phi(i, j-2, k) > 0.0_rt);
+                const bool uzp = (phi(i, j+1, k) <= 0.0_rt) && !(phi(i, j+2, k) > 0.0_rt);
+                if (!(uxm || uxp || uzm || uzp)) { return {0.0_rt}; }
+                amrex::Real const r =
+                      (Bx(i+1, j, k) - Bx(i-1, j, k))*inv2dx[0]
+                    + (Bz(i, j+1, k) - Bz(i, j-1, k))*inv2dx[1];
+#endif
+                return {std::abs(r)};
+            });
+        }
+        amrex::Real rmax = amrex::get<0>(rdata.value(rop));
+        amrex::ParallelDescriptor::ReduceRealMax(rmax);
+        // Round-off scale: a handful of ulps of the field scale over a cell.
+        amrex::Real h_min = dx[0];
+        for (int d = 1; d < AMREX_SPACEDIM; ++d) { h_min = std::min(h_min, dx[d]); }
+        amrex::Real const tol =
+            1.0e-11_rt * std::max(bmax, 1.0e-30_rt) / h_min + 1.0e-300_rt;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rmax <= tol,
+            "DivFreeFixCoveredB invariant violated: constrained-row div(B) "
+            "exceeds round-off after the pass");
     }
 #else
-    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, rtol, max_iters,
-                         direct_fill, normal_odd, fill_covered_centers, status_cache,
-                         band_cells);
+    amrex::ignore_unused(field, distance_to_eb, geom);
 #endif
 }
 
@@ -854,8 +933,7 @@ void warpx::hybrid::ApplyPECBoundaryToField (
 void warpx::hybrid::FoldEBDepositToNodalScalar (
     amrex::MultiFab& field,
     amrex::MultiFab const& distance_to_eb,
-    amrex::Geometry const& geom,
-    bool pec_images)
+    amrex::Geometry const& geom)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -877,7 +955,7 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
     // deposit shape functions reach one cell past the surface; fold targets
     // mirror that reach on the fluid side
     amrex::Real const fold_band = 1.5_rt * h_max;
-    amrex::Real const fold_sign = pec_images ? -1.0_rt : 1.0_rt;
+    amrex::Real constexpr fold_sign = -1.0_rt;  // PEC image parity (the EB is always a PEC)
 
     // covered-side ghosts must hold the guard-summed deposit
     field.FillBoundary(geom.periodicity());
@@ -938,14 +1016,17 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
             amrex::Real W[AMREX_SPACEDIM][2];
             ablastr::particles::compute_weights<amrex::IndexType::NODE>(
                 xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
-            int ic, jc, kc;
-            amrex::Real Wc[AMREX_SPACEDIM][2];
-            ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-            amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+            auto const n3 =
+                DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2])};
+#else
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[2])};
+#endif
             amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-            if (!(nv2 > 0._rt) || !std::isfinite(nv2)) { return; }
-            DistanceToEB::normalize(nv);
+            if (!std::isfinite(nv2) || !(nv2 > 0._rt)) { return; }
 
             // exact mirror image of this point inside the conductor
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xm;
@@ -968,7 +1049,7 @@ void warpx::hybrid::FoldEBDepositToNodalScalar (
         });
     }
 #else
-    amrex::ignore_unused(field, distance_to_eb, geom, pec_images);
+    amrex::ignore_unused(field, distance_to_eb, geom);
 #endif
 }
 
@@ -977,8 +1058,7 @@ void warpx::hybrid::FoldEBDepositToField (
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
     amrex::MultiFab const& distance_to_eb,
     amrex::Geometry const& geom,
-    EBFillStatus* status_cache,
-    bool pec_images)
+    EBFillStatus* status_cache)
 {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     using namespace amrex::literals;
@@ -999,7 +1079,7 @@ void warpx::hybrid::FoldEBDepositToField (
     amrex::Real const d_band = h_max;
     amrex::Real const d_img_min = 0.5_rt * h_max;
     amrex::Real const fold_band = 1.5_rt * h_max;
-    amrex::Real const fold_sign = pec_images ? -1.0_rt : 1.0_rt;
+    amrex::Real constexpr fold_sign = -1.0_rt;  // PEC image parity (the EB is always a PEC)
 
     std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> stag{};
     for (int c = 0; c < 3; ++c) {
@@ -1109,7 +1189,7 @@ void warpx::hybrid::FoldEBDepositToField (
         }
     }
 #else
-    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache, pec_images);
+    amrex::ignore_unused(field, eb_update, distance_to_eb, geom, status_cache);
 #endif
 }
 
@@ -1187,18 +1267,23 @@ void warpx::hybrid::ApplyEBBoundaryToNodalScalar (
             amrex::Real W[AMREX_SPACEDIM][2];
             ablastr::particles::compute_weights<amrex::IndexType::NODE>(
                 xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
-            int ic, jc, kc;
-            amrex::Real Wc[AMREX_SPACEDIM][2];
-            ablastr::particles::compute_weights<amrex::IndexType::CELL>(
-                xe[0], yq, zq, plo, dxi, ic, jc, kc, Wc);
-            amrex::RealVect nv = DistanceToEB::interp_normal(ii, jj, kk, W, ic, jc, kc, Wc, phi, dxi);
+            auto const n3 =
+                DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2])};
+#else
+            amrex::RealVect const nv{
+                amrex::Real(n3[0]), amrex::Real(n3[2])};
+#endif
             amrex::Real const nv2 = DistanceToEB::dot_product(nv, nv);
-            if (!(nv2 > 0._rt) || !std::isfinite(nv2)) {
-                // degenerate level-set gradient: treat as deep interior
+            if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
+                // degenerate level-set gradient (interp_normal normalizes
+                // internally, so a vanishing gradient arrives non-finite):
+                // treat as deep interior
                 f(i, j, k, n) = 0._rt;
                 return;
             }
-            DistanceToEB::normalize(nv);
 
             // Image point at the exact mirror distance, regularized near the
             // surface so the stencil retains fluid nodes; the gather never

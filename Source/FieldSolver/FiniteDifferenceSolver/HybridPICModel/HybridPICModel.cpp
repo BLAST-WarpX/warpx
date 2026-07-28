@@ -23,6 +23,9 @@
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
 
+#include <algorithm>
+#include <cmath>
+
 using namespace amrex;
 using warpx::fields::FieldType;
 
@@ -76,18 +79,22 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
     // isotropized stencil upgrades of the dissipative/gradient terms
-    // (Cartesian 2D/3D only; see IsotropicOperators.H)
-    pp_hybrid.query("isotropic_hyper_resistivity", m_isotropic_hyper_resistivity);
-    pp_hybrid.query("isotropic_resistivity", m_isotropic_resistivity);
-    pp_hybrid.query("isotropic_gradient", m_isotropic_gradient);
-    pp_hybrid.query("isotropic_eb_compact_fallback", m_isotropic_eb_compact_fallback);
+    // (Cartesian 2D/3D only; see IsotropicOperators.H). One flag enables the
+    // isotropic hyper-resistivity Laplacian, the resistive corner-curl
+    // correction, and the isotropized pressure gradient together: they cancel
+    // the same cos(4*theta) grid anisotropy and are meant to travel as a set.
+    {
+        bool isotropic_operators = false;
+        pp_hybrid.query("isotropic_operators", isotropic_operators);
+        m_isotropic_hyper_resistivity = isotropic_operators;
+        m_isotropic_resistivity = isotropic_operators;
+        m_isotropic_gradient = isotropic_operators;
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_isotropic_hyper_resistivity && !m_isotropic_resistivity
-            && !m_isotropic_gradient,
-        "hybrid_pic_model.isotropic_* options are only implemented for the "
-        "Cartesian 2D (XZ) and 3D geometries");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!isotropic_operators,
+            "hybrid_pic_model.isotropic_operators is only implemented for "
+            "the Cartesian 2D (XZ) and 3D geometries");
 #endif
+    }
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
@@ -147,11 +154,7 @@ void HybridPICModel::ReadParameters ()
             "fluxes).",
             ablastr::warn_manager::WarnPriority::medium);
     }
-    pp_hybrid.query("eb_hall_mask", m_eb_hall_mask);
 
-    // nodal (hyper-)resistivity evaluation + interpolation to the staggered
-    // E locations (single-valued eta across the plasma/vacuum seam)
-    pp_hybrid.query("eta_nodal_interp", m_eta_nodal_interp);
     utils::parser::queryWithParser(
         pp_hybrid, "holmstrom_blend_pow", m_holmstrom_blend_pow);
     utils::parser::queryWithParser(
@@ -188,9 +191,6 @@ void HybridPICModel::ReadParameters ()
         }
     }
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_eta_nodal_interp,
-        "hybrid_pic_model.eta_nodal_interp is only supported in 3D and 2D (XZ) "
-        "Cartesian geometry");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_holmstrom_switch_mode == 0,
         "hybrid_pic_model.holmstrom_switch_mode is only supported in 3D and "
         "2D (XZ) Cartesian geometry");
@@ -223,50 +223,6 @@ void HybridPICModel::ReadParameters ()
         }
     }
 
-    // controls for the embedded-boundary PEC field boundary condition
-    utils::parser::queryWithParser(pp_hybrid, "eb_bc_rtol", m_eb_bc_rtol);
-    utils::parser::queryWithParser(pp_hybrid, "eb_bc_max_iters", m_eb_bc_max_iters);
-    pp_hybrid.query("eb_bc_direct_fill", m_eb_bc_direct_fill);
-    // Optionally disable the collocated conformal B wall treatment entirely (no
-    // EB B fill) to recover the pre-treatment baseline (for A/B comparison).
-    pp_hybrid.query("conformal_b_off", m_conformal_b_off);
-
-    // Collocated-style direct level-set mirror B fill on the staggered (Yee) grid,
-    // in place of the ECT enlarged-cell wall handling (use with use_conformal_eb
-    // off). Opt-in, default off -> byte-identical.
-    pp_hybrid.query("eb_b_straight_mirror", m_eb_b_straight_mirror);
-    if (m_eb_b_straight_mirror && m_use_conformal_eb
-        && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated) {
-        m_eb_b_straight_mirror = false;
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPIC",
-            "hybrid_pic_model.eb_b_straight_mirror is the level-set alternative to "
-            "the staggered conformal (ECT) wall: with use_conformal_eb it would "
-            "repopulate the covered near-wall B band with raw level-set mirror "
-            "values on top of the ECT update every substep, mixing the two wall "
-            "metrics; it is ignored here (use it with use_conformal_eb = false).",
-            ablastr::warn_manager::WarnPriority::medium);
-    }
-
-    // Image parity of charge deposited beyond the embedded boundary: "pec" folds it back
-    // with opposite sign (density vanishes at the wall), "reflect" folds it back with its
-    // own sign (mass-conserving when the wall supports the plasma column).
-    std::string fold = "pec";
-    pp_hybrid.query("eb_deposit_fold", fold);
-    if (fold == "pec") { m_eb_fold_pec = true; }
-    else if (fold == "reflect") { m_eb_fold_pec = false; }
-    else {
-        WARPX_ABORT_WITH_MESSAGE(
-            "hybrid_pic_model.eb_deposit_fold must be 'pec' or 'reflect'");
-    }
-    // Parity of the rho mirror fill across the wall: Dirichlet 0 (odd) by default,
-    // Neumann (even) when the wall supports the column.
-    pp_hybrid.query("eb_rho_dirichlet", m_eb_rho_dirichlet);
-    // Parity of the electron-pressure fill at a PEC wall: Dirichlet 0 (odd) by
-    // default (Pe -> 0 at the wall, grad(Pe) drives the radial E a PEC sustains),
-    // Neumann (even) to reflect the back-pressure with zero normal gradient.
-    pp_hybrid.query("eb_pe_dirichlet", m_eb_pe_dirichlet);
-
     // Near-wall downgrade of the isotropic stencils to the compact ones
     // (staggered conformal path; see the header docs).
     pp_hybrid.query("isotropic_hyper_wall_compact", m_isotropic_hyper_wall_compact);
@@ -281,31 +237,27 @@ void HybridPICModel::ReadParameters ()
         ? std::sqrt(static_cast<amrex::Real>(AMREX_SPACEDIM))
         : amrex::Real(1.0);
 
-    // Mirror-fill band width for the Bfield_fp EB fill. The level-set mirror
-    // injects a div(B) jump at the band/deep interface; the filled B couples
-    // into the solution only via curl/B reads (effective reach 2 cells with the
-    // isotropic corner-curl E correction on), so a band >= 3 pushes that jump
-    // into the zeroed deep interior where it cannot reach a solution stencil.
-    // Default 1 = legacy behavior.
-    //
-    // The corner-curl correction (isotropic_resistivity) reads the out-of-plane
-    // B at the IN-PLANE DIAGONAL neighbors (reach sqrt(2)*h), so with the
-    // default 1-cell (axis-reach) band a wall segment oblique to the grid
-    // (|cos t|+|sin t| > 1, i.e. everywhere but the axis crossings) puts that
-    // tap in the zeroed deep interior: an O(B) second-difference jump feeds a
-    // spurious eta/(mu0*h)-scaled E along the wall every substage, peaked at
-    // the grid diagonals (a C4/m=4 wall-ring source). Widen the band to the
-    // corner reach -- the B-field analogue of the sqrt(3) plasma-current band
-    // above.
+    // Mirror-fill band width for the Bfield_fp EB fill, computed from the
+    // stencils that read covered B rather than exposed as an input. The
+    // particle field gather sets the reach: a particle against the wall reads
+    // nodes up to (nox+1)/2 cells away per axis, a level-set depth of at most
+    // sqrt(AMREX_SPACEDIM)*(nox+1)/2 <= nox+1 cells (in units of the max cell
+    // size), so band = nox+1 keeps every gathered covered node mirror-filled
+    // rather than zeroed. That also dominates the 1-cell curl(B) reach and
+    // the isotropic corner-curl's in-plane diagonal B taps (sqrt(2)*h), which
+    // govern only when no particles are loaded (nox = 0). The mirror's div(B)
+    // injection is removed at the source by the div-free correction that ends
+    // every collocated fill (DivFreeFixCoveredB), so widening the band
+    // carries no divergence-placement penalty.
+    m_eb_b_fill_band_cells = std::max(
+        static_cast<amrex::Real>(WarpX::nox + 1), amrex::Real(1.0));
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
-    // Only where the corner-curl actually compiles (Cartesian); on RZ etc. the
-    // correction does not exist, so the band keeps its legacy default there.
+    // The corner-curl only compiles on Cartesian 3D/XZ; elsewhere the curl
+    // reach stays axis-aligned.
     if (m_isotropic_resistivity) {
-        m_eb_b_fill_band_cells = std::sqrt(2.0_rt);
+        m_eb_b_fill_band_cells = std::max(m_eb_b_fill_band_cells, std::sqrt(2.0_rt));
     }
 #endif
-    utils::parser::queryWithParser(pp_hybrid, "eb_b_fill_band_cells", m_eb_b_fill_band_cells);
-
     // Marder-like diffusive divergence clean of B / the total Ampere current in
     // a near-wall band (MarderCleanDivergence), applied once per step from the
     // hybrid field advance. Both alphas default to 0 = off (byte-identical).
@@ -527,13 +479,10 @@ void HybridPICModel::InitialBEBFill ()
 #ifdef AMREX_USE_EB
     using ablastr::utils::enums::GridType;
     if (!EB::enabled()) { return; }
-    // Collocated conformal fill, OR the opt-in staggered straight mirror (Yee, in
-    // place of ECT). Both use the same direct level-set magnetic mirror below.
-    bool const collocated_fill = m_use_conformal_eb && !m_conformal_b_off
+    // Collocated conformal fill: the direct level-set magnetic mirror below.
+    bool const collocated_fill = m_use_conformal_eb
         && WarpX::grid_type == GridType::Collocated;
-    bool const staggered_straight = m_eb_b_straight_mirror
-        && WarpX::grid_type != GridType::Collocated;
-    if (!collocated_fill && !staggered_straight) { return; }
+    if (!collocated_fill) { return; }
     auto& warpx = WarpX::GetInstance();
     auto const& eb_update_B = warpx.GetEBUpdateBFlag();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
@@ -543,7 +492,6 @@ void HybridPICModel::InitialBEBFill ()
             eb_update_B[lev],
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/true, /*fill_covered_centers=*/false,
             &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
     }
@@ -736,7 +684,6 @@ void HybridPICModel::CalculatePlasmaCurrent (
             current_fp_plasma, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/true,
             &m_eb_bc_status_Jplasma[lev], m_eb_fill_band_cells);
     }
@@ -833,7 +780,6 @@ void HybridPICModel::HybridPICSolveE (
             Efield, eb_update_E,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
             /*normal_odd=*/false, /*fill_covered_centers=*/fill_cut_centers,
             // E fill band is PINNED to the J fill band: E = eta*J in the cut/
             // covered region, so filling E beyond where J is filled leaves E != 0
@@ -934,23 +880,23 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *electron_pressure_fp,
         *rho_fp
     );
-    // Electron-pressure embedded-boundary condition at a PEC wall. Default is
-    // Dirichlet (odd reflection -> Pe vanishes at the wall): a PEC supports a normal
+    // Electron-pressure embedded-boundary condition at a PEC wall: Dirichlet
+    // (odd reflection -> Pe vanishes at the wall). A PEC supports a normal
     // (radial) E via surface charge, and the resulting grad(Pe) across the wall
     // supplies that allowable radial field in Ohm's law -- unlike a Neumann (even,
     // zero-normal-gradient) reflection, which pins the pressure gradient to zero and
     // suppresses the near-wall radial E. NOTE: this is NOT a physical sheath model;
     // quasineutrality breaks down and a sub-grid sheath forms at the wall (a likely
     // near-wall instability driver), to be revisited with a wall function under the
-    // implicit solver. Either
+    // implicit solver. The odd
     // parity keeps grad(Pe) stencils straddling the wall off the nonpositive mirrored
-    // density inside the conductor. Toggle with hybrid_pic_model.eb_pe_dirichlet.
+    // density inside the conductor.
     if (EB::enabled()) {
         warpx::hybrid::ApplyEBBoundaryToNodalScalar(
             *electron_pressure_fp,
             *warpx.m_fields.get(FieldType::distance_to_eb, lev),
             warpx.Geom(lev),
-            /*odd=*/m_eb_pe_dirichlet);
+            /*odd=*/true);  // Dirichlet: Pe -> 0 at the PEC wall
     }
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
     ablastr::utils::communication::FillBoundary(
@@ -1077,6 +1023,12 @@ void HybridPICModel::BfieldEvolve (
             amrex::ParallelDescriptor::ReduceBoolAnd(step_succeeded);
 
             if (!step_succeeded) {
+                ablastr::warn_manager::WMRecordWarning(
+                    "HybridPIC",
+                    "NaN or Inf value encountered in the B-field during RK4 "
+                    "substepping. Restarting this step using RKF45.",
+                    ablastr::warn_manager::WarnPriority::medium);
+
                 // restart this full step and this time use RKF45
                 t = 0._rt;
                 n_accepted = 0;
@@ -1741,11 +1693,9 @@ void HybridPICModel::FieldPush (
     // curl(B) plasma current. (The FillBoundaryB above gives the gather stencils
     // valid ghost values; a second exchange below propagates the band/covered
     // values.)
-    bool const collocated_fill = m_use_conformal_eb && !m_conformal_b_off
+    bool const collocated_fill = m_use_conformal_eb
         && WarpX::grid_type == ablastr::utils::enums::GridType::Collocated;
-    bool const staggered_straight = m_eb_b_straight_mirror
-        && WarpX::grid_type != ablastr::utils::enums::GridType::Collocated;
-    if (EB::enabled() && (collocated_fill || staggered_straight)) {
+    if (EB::enabled() && collocated_fill) {
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
             // The direct level-set mirror fill (magnetic parity, normal odd /
             // tangential even, flux-excluding PEC). It is self-consistent with
@@ -1759,8 +1709,7 @@ void HybridPICModel::FieldPush (
                 eb_update_B[lev],
                 *warpx.m_fields.get(FieldType::distance_to_eb, lev),
                 warpx.Geom(lev),
-                m_eb_bc_rtol, m_eb_bc_max_iters, m_eb_bc_direct_fill,
-                /*normal_odd=*/true, /*fill_covered_centers=*/false,
+                    /*normal_odd=*/true, /*fill_covered_centers=*/false,
                 &m_eb_bc_status_B[lev], m_eb_b_fill_band_cells);
         }
         warpx.FillBoundaryB(ng, nodal_sync);

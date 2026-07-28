@@ -1670,8 +1670,9 @@ class GMRESLinearSolver(LinearSolverBase):
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "amrex_gmres"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "amrex_gmres"
         amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         amrex_gmres.verbose_int = self.verbose_int
         amrex_gmres.restart_length = self.restart_length
@@ -1688,8 +1689,9 @@ class PETScKSPLinearSolver(LinearSolverBase):
     ----------
     """
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "petsc_ksp"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "petsc_ksp"
 
 
 class PreconditionerBase(picmistandard.base._ClassWithInit):
@@ -2178,20 +2180,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         the stair-step approximation. On a **collocated** grid the update masks
         are keyed off the nodal signed level set and the covered magnetic-field
         nodes are rewritten after each Faraday push by level-set mirror-image
-        interpolation (normal odd, tangential even). On a **staggered** (Yee)
+        interpolation (normal odd, tangential even); the mirror band is sized
+        automatically to the particle-shape gather reach and every fill ends
+        with a built-in correction that zeroes the central-difference div(B)
+        at the fluid nodes reading the covered band. On a **staggered** (Yee)
         grid the B-field push uses the enlarged-cell technique (ECT) Faraday
         update on cut faces/edges instead. Requires an embedded boundary and a
         3D or 2D (XZ) Cartesian grid.
-
-    eb_b_straight_mirror: bool, default=False
-        If True, impose the wall condition on the staggered (Yee) ``Bfield_fp``
-        with the collocated-style direct level-set mirror after each Faraday
-        push, instead of leaving the covered faces staircase-zeroed. Run with
-        ``use_conformal_eb=False`` (standard masked Yee Faraday) + this to get
-        the collocated wall treatment on a staggered grid, avoiding the ECT
-        face-extension / cross-box seam. Best with the plasma held off the wall
-        (a standoff), which removes the dense near-wall B that made the
-        pointwise Yee mirror spike. Opt-in (default off is byte-identical).
 
     conformal_ect_curvature: bool, default=False
         If True, apply the along-edge curvature correction to the conformal-ECT
@@ -2223,45 +2218,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         likewise zeroed inside the conductor. The stable, recommended wall for
         this path; requires ``use_conformal_eb`` on a staggered (Yee) grid.
 
-    eb_bc_rtol: float, default=1e-4
-        Relative residual tolerance of the embedded-boundary PEC
-        boundary-condition band relaxation. With embedded boundaries the
-        hybrid solver rewrites the current density and the Ohm's-law electric
-        field on edges inside the conductor from the level-set geometry
-        (tangential component zero at the surface, normal component with zero
-        normal gradient, zero deep inside) using mirror-image interpolation;
-        the internal layer is relaxed with Jacobi sweeps until the largest
-        change, relative to the largest field magnitude in the boundary band,
-        drops below this tolerance (or ``eb_bc_max_iters`` is reached).
-
-    eb_bc_max_iters: int, default=10
-        Maximum number of Jacobi sweeps of the embedded-boundary PEC
-        boundary-condition band relaxation.
-
-    eb_deposit_fold: str, default='pec'
-        Image parity of the embedded-boundary deposit fold: 'pec' subtracts
-        the covered-side deposit at its mirror (image charge of the opposite
-        sign, density vanishes at the wall); 'reflect' adds it back.
-
-    eb_rho_dirichlet: bool, default=True
-        Parity of the embedded-boundary charge-density mirror fill: True is
-        the odd reflection (Dirichlet 0 at the wall); False is the even
-        reflection (Neumann, for a wall-supported column).
-
-    eb_pe_dirichlet: bool, default=True
-        Parity of the electron-pressure embedded-boundary fill at a PEC wall:
-        True (default) is the odd reflection (Dirichlet 0 -> Pe vanishes at the
-        wall, so grad(Pe) supplies the radial E a PEC sustains via surface
-        charge); False is the even reflection (Neumann, zero normal gradient).
-        Not a physical sheath model (quasineutrality breaks down at the wall).
-
-    eb_bc_direct_fill: bool, default=True
-        If True (default), fill the embedded-boundary PEC boundary condition
-        with a single-pass mirrored interpolation that uses only
-        solution-domain (unmasked) values, with stencil weights renormalized
-        over the unmasked points. If False, use the iterative Jacobi band
-        relaxation controlled by ``eb_bc_rtol`` and ``eb_bc_max_iters``
-        instead.
 
     divb_clean_alpha: float, default=0
         Coefficient of the Marder-like diffusive div(B) clean applied once per
@@ -2335,51 +2291,20 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     dive_seam_band: float, default=4
         Upper edge of the seam clean window in units of the density floor.
 
-    eta_nodal_interp: bool, default=False
-        Evaluate the resistivity and hyper-resistivity parsers once per NODE
-        (from the nodal rho and the Hall-consistent nodal J/B) and interpolate
-        the resulting eta fields to the staggered E locations, like the nodal
-        Hall term -- instead of evaluating the parsers pointwise at each
-        staggered component location, which samples a steep eta(rho) transition
-        at three different positions per cell and gives the E components
-        inconsistent resistivities across the plasma/vacuum (n_floor) seam.
-        No-op on collocated grids and for rho/J-independent resistivities.
-        Cartesian only.
 
-    isotropic_hyper_resistivity: bool, default=False
-        Evaluate the hyper-resistivity Laplacian with the isotropic
-        Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of the
-        cross stencil, removing the fourfold (cos 4*theta) anisotropy of
-        its damping rate (fully isotropic on cubic cells; Cartesian
-        geometries; near an embedded boundary the hybrid EB fill layer
-        maintains the wide stencil reads).
-
-    isotropic_resistivity: bool, default=False
-        Add an isotropizing corner-curl correction to the resistive electric
-        field so the emergent in-plane diffusion of the out-of-plane magnetic
-        field uses the isotropic (Mehrstellen) Laplacian instead of the cross
-        stencil, removing the cos 4*theta anisotropy that drives a grid m=4
-        mode. Applied through E, so the Faraday curl is unchanged and div(B)
-        stays exactly zero (Cartesian geometries; the RZ resistive operator
-        is axisymmetric and has no such anisotropy).
-
-    isotropic_gradient: bool, default=False
-        Evaluate the electron-pressure gradient in Ohm's law with the
-        transverse-smoothed (isotropized) staggered difference instead of
-        the plain two-point stencil, removing the cos 4*theta anisotropy of
-        the pressure-gradient magnitude (fully isotropic on cubic cells;
-        Cartesian geometries).
-        Only affects the E used for the particle push and diagnostics: the
-        Faraday/B-integration path omits grad(Pe) entirely, which is also
-        what keeps the (only O(h^2)-small, not identically zero) discrete
-        curl of the isotropized gradient out of the B update.
-
-    isotropic_eb_compact_fallback: bool, default=False
-        Near an embedded boundary, fall back per point from the isotropic
-        stencils to the standard compact ones within a corner reach of the
-        level set. Defaults to off here because the hybrid EB boundary layer
-        mirror-fills the wide-stencil bands to the diagonal reach, keeping
-        the reads valid near the wall; opt back in for A/B isolation.
+    isotropic_operators: bool, default=False
+        Evaluate the dissipative/gradient operators of the Ohm's law with
+        their isotropized stencils: the hyper-resistivity Laplacian uses the
+        isotropic Mehrstellen (2D) / Patra-Karttunen (3D) stencil, the
+        resistive term gains the corner-curl correction (applied through E,
+        so the Faraday curl is unchanged and div(B) stays exactly zero), and
+        the electron-pressure gradient uses the transverse-smoothed staggered
+        difference. All three cancel the same fourfold (cos 4*theta) grid
+        anisotropy, which otherwise imprints an m=4 mode on diffusing or
+        pinching fields; they are enabled together (fully isotropic on cubic
+        cells; Cartesian geometries). Near an embedded boundary the hybrid EB
+        boundary layer mirror-fills the wide-stencil bands to the diagonal
+        reach, so the operators keep their isotropic form at the wall.
 
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
@@ -2437,33 +2362,22 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         use_conformal_eb=None,
-        eb_b_straight_mirror=None,
         conformal_ect_curvature=None,
         conformal_ect_j=None,
         conformal_pec_zero_ej=None,
-        eb_bc_rtol=None,
-        eb_bc_max_iters=None,
-        eb_bc_direct_fill=None,
-        eb_deposit_fold=None,
-        eb_rho_dirichlet=None,
-        eb_pe_dirichlet=None,
         divb_clean_alpha=None,
         divj_clean_alpha=None,
         divb_clean_iters=None,
         divb_clean_band_cells=None,
         divb_clean_inner_div_cells=None,
         divb_clean_inner_corr_cells=None,
-        eta_nodal_interp=None,
         holmstrom_blend_pow=None,
         holmstrom_blend_width=None,
         holmstrom_switch_mode=None,
         dive_seam_alpha=None,
         dive_seam_iters=None,
         dive_seam_band=None,
-        isotropic_hyper_resistivity=None,
-        isotropic_resistivity=None,
-        isotropic_gradient=None,
-        isotropic_eb_compact_fallback=None,
+        isotropic_operators=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2492,33 +2406,22 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
 
         self.use_conformal_eb = use_conformal_eb
-        self.eb_b_straight_mirror = eb_b_straight_mirror
         self.conformal_ect_curvature = conformal_ect_curvature
         self.conformal_ect_j = conformal_ect_j
         self.conformal_pec_zero_ej = conformal_pec_zero_ej
-        self.eb_bc_rtol = eb_bc_rtol
-        self.eb_bc_max_iters = eb_bc_max_iters
-        self.eb_bc_direct_fill = eb_bc_direct_fill
-        self.eb_deposit_fold = eb_deposit_fold
-        self.eb_rho_dirichlet = eb_rho_dirichlet
-        self.eb_pe_dirichlet = eb_pe_dirichlet
         self.divb_clean_alpha = divb_clean_alpha
         self.divj_clean_alpha = divj_clean_alpha
         self.divb_clean_iters = divb_clean_iters
         self.divb_clean_band_cells = divb_clean_band_cells
         self.divb_clean_inner_div_cells = divb_clean_inner_div_cells
         self.divb_clean_inner_corr_cells = divb_clean_inner_corr_cells
-        self.eta_nodal_interp = eta_nodal_interp
         self.holmstrom_blend_pow = holmstrom_blend_pow
         self.holmstrom_blend_width = holmstrom_blend_width
         self.holmstrom_switch_mode = holmstrom_switch_mode
         self.dive_seam_alpha = dive_seam_alpha
         self.dive_seam_iters = dive_seam_iters
         self.dive_seam_band = dive_seam_band
-        self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
-        self.isotropic_resistivity = isotropic_resistivity
-        self.isotropic_gradient = isotropic_gradient
-        self.isotropic_eb_compact_fallback = isotropic_eb_compact_fallback
+        self.isotropic_operators = isotropic_operators
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2571,16 +2474,9 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
-        pywarpx.hybridpicmodel.eb_b_straight_mirror = self.eb_b_straight_mirror
         pywarpx.hybridpicmodel.conformal_ect_curvature = self.conformal_ect_curvature
         pywarpx.hybridpicmodel.conformal_ect_j = self.conformal_ect_j
         pywarpx.hybridpicmodel.conformal_pec_zero_ej = self.conformal_pec_zero_ej
-        pywarpx.hybridpicmodel.eb_bc_rtol = self.eb_bc_rtol
-        pywarpx.hybridpicmodel.eb_bc_max_iters = self.eb_bc_max_iters
-        pywarpx.hybridpicmodel.eb_bc_direct_fill = self.eb_bc_direct_fill
-        pywarpx.hybridpicmodel.eb_deposit_fold = self.eb_deposit_fold
-        pywarpx.hybridpicmodel.eb_rho_dirichlet = self.eb_rho_dirichlet
-        pywarpx.hybridpicmodel.eb_pe_dirichlet = self.eb_pe_dirichlet
         pywarpx.hybridpicmodel.divb_clean_alpha = self.divb_clean_alpha
         pywarpx.hybridpicmodel.divj_clean_alpha = self.divj_clean_alpha
         pywarpx.hybridpicmodel.divb_clean_iters = self.divb_clean_iters
@@ -2591,21 +2487,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.divb_clean_inner_corr_cells = (
             self.divb_clean_inner_corr_cells
         )
-        pywarpx.hybridpicmodel.eta_nodal_interp = self.eta_nodal_interp
         pywarpx.hybridpicmodel.holmstrom_blend_pow = self.holmstrom_blend_pow
         pywarpx.hybridpicmodel.holmstrom_blend_width = self.holmstrom_blend_width
         pywarpx.hybridpicmodel.holmstrom_switch_mode = self.holmstrom_switch_mode
         pywarpx.hybridpicmodel.dive_seam_alpha = self.dive_seam_alpha
         pywarpx.hybridpicmodel.dive_seam_iters = self.dive_seam_iters
         pywarpx.hybridpicmodel.dive_seam_band = self.dive_seam_band
-        pywarpx.hybridpicmodel.isotropic_hyper_resistivity = (
-            self.isotropic_hyper_resistivity
-        )
-        pywarpx.hybridpicmodel.isotropic_resistivity = self.isotropic_resistivity
-        pywarpx.hybridpicmodel.isotropic_gradient = self.isotropic_gradient
-        pywarpx.hybridpicmodel.isotropic_eb_compact_fallback = (
-            self.isotropic_eb_compact_fallback
-        )
+        pywarpx.hybridpicmodel.isotropic_operators = self.isotropic_operators
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
