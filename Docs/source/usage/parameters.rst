@@ -3914,61 +3914,33 @@ Maxwell solver: kinetic-fluid hybrid
     piecewise-constant-per-cell decision field with no per-component half-shifts. Cartesian
     only.
 
-.. pp:param:: hybrid_pic_model.isotropic_hyper_resistivity
+.. pp:param:: hybrid_pic_model.isotropic_operators
     :type: ``bool``
     :default: ``false``
     :optional:
 
-    If ``true`` (opt-in), the hyper-resistivity Laplacian of the hybrid Ohm's law is evaluated
-    with the isotropic Mehrstellen 9-point (2D XZ) or Patra-Karttunen 27-point (3D) stencil
-    instead of the cross stencil. The cross stencil's leading truncation error modulates the
-    hyper-resistive damping rate as :math:`\cos 4\theta` between the grid axes and the
-    diagonals, which imprints fourfold structure on diffusing fields at grid-scale wavenumbers;
-    the isotropic stencils cancel that term (their leading error is proportional to the
-    isotropic biharmonic; fully isotropic on cubic cells, consistent on non-cubic cells).
-    Near an embedded boundary the hybrid EB mirror fills are widened to the diagonal stencil
-    reach, so the operator keeps its
-    isotropic form there. Cartesian geometries only; in RZ the standard cylindrical operator
-    is used (with the on-axis radial term carrying its L'Hopital factor of two).
+    If ``true`` (opt-in), the dissipative and gradient operators of the hybrid Ohm's law are
+    evaluated with their isotropized stencils, together:
 
-.. pp:param:: hybrid_pic_model.isotropic_resistivity
-    :type: ``bool``
-    :default: ``false``
-    :optional:
+    * the **hyper-resistivity Laplacian** uses the isotropic Mehrstellen 9-point (2D XZ) or
+      Patra-Karttunen 27-point (3D) stencil instead of the cross stencil;
+    * the **resistive term** gains a corner-curl correction so that, after the (unchanged)
+      Faraday curl, the emergent in-plane resistive diffusion of the out-of-plane magnetic
+      field uses the isotropic Laplacian — the correction enters only through the electric
+      field, so :math:`\nabla\cdot\vec{B}` is preserved exactly;
+    * the **electron-pressure gradient** uses the transverse-smoothed staggered difference
+      instead of the plain two-point stencil (only in the electric field used for the
+      particle push and diagnostics; the Faraday/B-integration path omits
+      :math:`\nabla P_e` entirely).
 
-    If ``true`` (opt-in), a corner-curl correction is added to the resistive electric field so
-    that, after the (unchanged) Faraday curl, the emergent in-plane resistive diffusion of the
-    out-of-plane magnetic field (:math:`B_z` in 3D, :math:`B_y` in 2D XZ) uses the isotropic
-    Mehrstellen Laplacian rather than the cross stencil. The plain resistive term
-    :math:`\eta\,\vec{J}` advanced by Faraday produces, for divergence-free :math:`\vec{B}`, the
-    cross-stencil Laplacian, whose :math:`\cos 4\theta` damping anisotropy drives a grid m=4 mode
-    (visible inside conducting cavities where :math:`\eta` is large). Because the correction
-    enters only through :math:`\vec{E}`, the Faraday curl is untouched and :math:`\nabla\cdot\vec{B}`
-    is preserved exactly; it is a pure O(h^2) truncation-error canceller (zero for fields of
-    degree :math:`\leq 3`). Cartesian geometries only; the RZ resistive operator is axisymmetric
-    and has no such anisotropy.
-
-.. pp:param:: hybrid_pic_model.isotropic_gradient
-    :type: ``bool``
-    :default: ``false``
-    :optional:
-
-    If ``true`` (opt-in), the electron-pressure gradient of the hybrid Ohm's law is evaluated
-    with a transverse-smoothed (isotropized) staggered difference instead of the plain two-point
-    stencil. The two-point stencil's leading truncation error modulates :math:`|\nabla P_e|` as
-    :math:`\cos 4\theta` between the grid axes and the diagonals; pre-smoothing the scalar along
-    each transverse direction :math:`t` with weight :math:`\Delta x^2/(24\,\Delta t^2)`
-    (:math:`\Delta x^2/(6\,\Delta t^2)` for the wide centered difference on collocated grids)
-    turns the leading error into the corresponding component of
-    :math:`(h^2/24)\,\nabla(\nabla^2 P_e)`, which is isotropic. The on-axis stencil is
-    unchanged: isotropization equalizes the diagonal error to the axis error rather than adding
-    accuracy. Note that, unlike the plain staggered gradient, the isotropized gradient is not
-    discretely curl-free (its Yee curl is :math:`O(h^2)` small rather than identically zero);
-    this is benign because the term is only evaluated for the electric field used in the
-    particle push and diagnostics — the Faraday/B-integration path omits :math:`\nabla P_e`
-    entirely (its analytic curl is zero), so no spurious magnetic field can be generated.
-    Near an embedded boundary the electron-pressure mirror fill maintains the transverse
-    reads. Cartesian geometries only.
+    The cross stencils' leading truncation errors all modulate as :math:`\cos 4\theta`
+    between the grid axes and the diagonals, imprinting fourfold (m=4) structure on
+    diffusing or pinching fields at grid-scale wavenumbers; the isotropic forms cancel that
+    term (fully isotropic on cubic cells, consistent on non-cubic cells). Near an embedded
+    boundary the hybrid EB boundary layer mirror-fills the wide-stencil bands to the
+    diagonal reach, so the operators keep their isotropic form at the wall. Cartesian
+    geometries only; in RZ the standard cylindrical operators are used (the axisymmetric
+    resistive operator has no such anisotropy).
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``

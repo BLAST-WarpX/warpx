@@ -11,7 +11,7 @@ if(WarpX_EB)
         test_3d_ohm_solver_plasma_cylinder_liftoff_picmi  # name
         3  # dims
         2  # nprocs
-        "inputs_test_3d_ohm_solver_plasma_cylinder_liftoff_picmi.py --test --particle-shape 1 --no-mc-gather --fill-frac 0.10 --no-isotropic-gradient"  # inputs
+        "inputs_test_3d_ohm_solver_plasma_cylinder_liftoff_picmi.py --test --particle-shape 1 --no-mc-gather --fill-frac 0.10"  # inputs
         "analysis.py --path diags/field_diag000010"  # analysis
         "analysis_default_regression.py --path diags/field_diag000010"  # checksum
         OFF  # dependency
@@ -29,7 +29,7 @@ if(WarpX_EB)
         test_3d_ohm_solver_plasma_cylinder_liftoff_yee_picmi  # name
         3  # dims
         2  # nprocs
-        "inputs_test_3d_ohm_solver_plasma_cylinder_liftoff_picmi.py --test --grid-type staggered --particle-shape 1 --deposition direct --no-mc-gather --fill-frac 0.10 --isotropic-resistivity --isotropic-hyper --holmstrom-switch-mode edge --holmstrom-blend-pow 0 --no-isotropic-gradient"  # inputs
+        "inputs_test_3d_ohm_solver_plasma_cylinder_liftoff_picmi.py --test --grid-type staggered --particle-shape 1 --deposition direct --no-mc-gather --fill-frac 0.10 --holmstrom-switch-mode edge --holmstrom-blend-pow 0"  # inputs
         "analysis.py --path diags/field_diag000010"  # analysis
         "analysis_default_regression.py --path diags/field_diag000010"  # checksum
         test_3d_ohm_solver_plasma_cylinder_liftoff_picmi  # dependency

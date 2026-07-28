@@ -262,7 +262,9 @@ public:
     /** Evaluate the hyper-resistivity Laplacian of the plasma current with the
      *  isotropic Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of
      *  the cross stencil, removing the cos(4*theta) grid anisotropy of its
-     *  damping rate (fully isotropic on cubic cells; Cartesian only). */
+     *  damping rate (fully isotropic on cubic cells; Cartesian only). Set,
+     *  together with the other two isotropized operators, by the single
+     *  hybrid_pic_model.isotropic_operators flag. */
     bool m_isotropic_hyper_resistivity = false;
 
     /** Isotropize the in-plane resistive diffusion of the out-of-plane B
@@ -371,7 +373,7 @@ public:
      *  magnetic-field (Bfield_fp) EB fill. Computed, not an input: the band
      *  must cover every fluid-side stencil that reads covered B -- the 1-cell
      *  curl(B) reach, the corner-curl's in-plane diagonal taps (sqrt(2)) when
-     *  isotropic_resistivity is on, and the particle field gather, whose
+     *  the isotropized operators are on, and the particle field gather, whose
      *  shape-nox stencil for a particle against the wall reads nodes up to
      *  (nox+1)/2 cells away per axis, a level-set depth of at most
      *  sqrt(AMREX_SPACEDIM)*(nox+1)/2 <= nox+1 cells. nox+1 dominates all

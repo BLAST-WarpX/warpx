@@ -111,9 +111,7 @@ def setup_simulation(
     r_outer=R_OUTER,
     wall_supported=True,
     n_floor_frac=N_FLOOR_FRAC,
-    isotropic_resistivity=True,
-    isotropic_hyper=True,
-    isotropic_gradient=False,
+    isotropic=True,
     substeps=SUBSTEPS,
     substep_rtol=1.0e-3,
     te=T_E0,
@@ -223,9 +221,7 @@ def setup_simulation(
         plasma_hyper_resistivity=eta_hyper,
         substeps=substeps,
         holmstrom_vacuum_region=True if holmstrom else None,
-        isotropic_resistivity=isotropic_resistivity,
-        isotropic_hyper_resistivity=isotropic_hyper,
-        isotropic_gradient=isotropic_gradient if isotropic_gradient else None,
+        isotropic_operators=True if isotropic else None,
         holmstrom_blend_pow=holmstrom_blend_pow if holmstrom_blend_pow > 0 else None,
         holmstrom_blend_width=holmstrom_blend_width
         if holmstrom_blend_pow > 0
@@ -529,33 +525,14 @@ def main():
         "--no-holmstrom restores the raw Ohm's-law vacuum response.",
     )
     parser.add_argument(
-        "--isotropic-resistivity",
-        dest="isotropic_resistivity",
+        "--isotropic",
+        dest="isotropic",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="corner-curl isotropization of the resistive diffusion. "
-        "Default ON (both grids): the all-operators A/B (with the #7040 "
-        "isotropized grad Pe in the set) cut peak rho m4/m0 to 0.053 "
-        "collocated / 0.145 Yee vs the 0.344 / 0.466 baselines.",
-    )
-    parser.add_argument(
-        "--isotropic-hyper",
-        dest="isotropic_hyper",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="isotropic Mehrstellen/Patra-Karttunen hyper-resistivity "
-        "Laplacian. Default ON (both grids; see --isotropic-resistivity).",
-    )
-    parser.add_argument(
-        "--isotropic-gradient",
-        dest="isotropic_gradient",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="transverse-smoothed (isotropized) electron-pressure gradient "
-        "(PR #7040); removes the cos(4*theta) modulation of |grad Pe| that "
-        "feeds the particle push. Default ON (both grids; measured the "
-        "decisive piece of the all-operators m=4 reduction, and the "
-        "operator that finally makes isotropization a net win on Yee).",
+        help="isotropized Ohm's-law operators (hyper-resistivity Laplacian, "
+        "resistive corner-curl, grad Pe; hybrid_pic_model.isotropic_operators). "
+        "Default ON (both grids): the all-operators A/B cut peak rho m4/m0 to "
+        "0.053 collocated / 0.145 Yee vs the 0.344 / 0.466 baselines.",
     )
     parser.add_argument(
         "--nz",
@@ -786,12 +763,8 @@ def main():
     staggered = args.grid_type == "staggered"
     if args.deposition is None:
         args.deposition = "esirkepov" if staggered else "direct"
-    if args.isotropic_resistivity is None:
-        args.isotropic_resistivity = True
-    if args.isotropic_hyper is None:
-        args.isotropic_hyper = True
-    if args.isotropic_gradient is None:
-        args.isotropic_gradient = True
+    if args.isotropic is None:
+        args.isotropic = True
     if args.holmstrom_switch_mode is None:
         args.holmstrom_switch_mode = "cell" if staggered else "edge"
     if args.holmstrom_blend_pow is None:
@@ -854,9 +827,7 @@ def main():
         r_outer_eff,
         args.wall_supported,
         args.n_floor_frac,
-        args.isotropic_resistivity,
-        args.isotropic_hyper,
-        args.isotropic_gradient,
+        args.isotropic,
         args.substeps,
         args.substep_rtol,
         args.te,

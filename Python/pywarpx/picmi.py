@@ -2208,33 +2208,19 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         field, no per-component half-shifts). The physics division by rho and
         the resistivity evaluation are unchanged. Cartesian only.
 
-    isotropic_hyper_resistivity: bool, default=False
-        Evaluate the hyper-resistivity Laplacian with the isotropic
-        Mehrstellen (2D) / Patra-Karttunen (3D) stencils instead of the
-        cross stencil, removing the fourfold (cos 4*theta) anisotropy of
-        its damping rate (fully isotropic on cubic cells; Cartesian
-        geometries; near an embedded boundary the hybrid EB fill layer
-        maintains the wide stencil reads).
-
-    isotropic_resistivity: bool, default=False
-        Add an isotropizing corner-curl correction to the resistive electric
-        field so the emergent in-plane diffusion of the out-of-plane magnetic
-        field uses the isotropic (Mehrstellen) Laplacian instead of the cross
-        stencil, removing the cos 4*theta anisotropy that drives a grid m=4
-        mode. Applied through E, so the Faraday curl is unchanged and div(B)
-        stays exactly zero (Cartesian geometries; the RZ resistive operator
-        is axisymmetric and has no such anisotropy).
-
-    isotropic_gradient: bool, default=False
-        Evaluate the electron-pressure gradient in Ohm's law with the
-        transverse-smoothed (isotropized) staggered difference instead of
-        the plain two-point stencil, removing the cos 4*theta anisotropy of
-        the pressure-gradient magnitude (fully isotropic on cubic cells;
-        Cartesian geometries).
-        Only affects the E used for the particle push and diagnostics: the
-        Faraday/B-integration path omits grad(Pe) entirely, which is also
-        what keeps the (only O(h^2)-small, not identically zero) discrete
-        curl of the isotropized gradient out of the B update.
+    isotropic_operators: bool, default=False
+        Evaluate the dissipative/gradient operators of the Ohm's law with
+        their isotropized stencils: the hyper-resistivity Laplacian uses the
+        isotropic Mehrstellen (2D) / Patra-Karttunen (3D) stencil, the
+        resistive term gains the corner-curl correction (applied through E,
+        so the Faraday curl is unchanged and div(B) stays exactly zero), and
+        the electron-pressure gradient uses the transverse-smoothed staggered
+        difference. All three cancel the same fourfold (cos 4*theta) grid
+        anisotropy, which otherwise imprints an m=4 mode on diffusing or
+        pinching fields; they are enabled together (fully isotropic on cubic
+        cells; Cartesian geometries). Near an embedded boundary the hybrid EB
+        boundary layer mirror-fills the wide-stencil bands to the diagonal
+        reach, so the operators keep their isotropic form at the wall.
 
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
@@ -2295,9 +2281,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         holmstrom_blend_pow=None,
         holmstrom_blend_width=None,
         holmstrom_switch_mode=None,
-        isotropic_hyper_resistivity=None,
-        isotropic_resistivity=None,
-        isotropic_gradient=None,
+        isotropic_operators=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2329,9 +2313,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.holmstrom_blend_pow = holmstrom_blend_pow
         self.holmstrom_blend_width = holmstrom_blend_width
         self.holmstrom_switch_mode = holmstrom_switch_mode
-        self.isotropic_hyper_resistivity = isotropic_hyper_resistivity
-        self.isotropic_resistivity = isotropic_resistivity
-        self.isotropic_gradient = isotropic_gradient
+        self.isotropic_operators = isotropic_operators
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2387,11 +2369,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.holmstrom_blend_pow = self.holmstrom_blend_pow
         pywarpx.hybridpicmodel.holmstrom_blend_width = self.holmstrom_blend_width
         pywarpx.hybridpicmodel.holmstrom_switch_mode = self.holmstrom_switch_mode
-        pywarpx.hybridpicmodel.isotropic_hyper_resistivity = (
-            self.isotropic_hyper_resistivity
-        )
-        pywarpx.hybridpicmodel.isotropic_resistivity = self.isotropic_resistivity
-        pywarpx.hybridpicmodel.isotropic_gradient = self.isotropic_gradient
+        pywarpx.hybridpicmodel.isotropic_operators = self.isotropic_operators
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
