@@ -578,6 +578,12 @@ void ThetaImplicitHybrid::SubtractDissipativeEFromPushField ()
                 E[n]->boxArray(), E[n]->DistributionMap(), E[n]->nComp(), E[n]->nGrowVect());
             m_E_work[n] = std::make_unique<amrex::MultiFab>(
                 E[n]->boxArray(), E[n]->DistributionMap(), E[n]->nComp(), E[n]->nGrowVect());
+            // The masked Ohm solves below skip EB-covered (flag = 0) locations,
+            // which therefore retain their allocation-time content forever:
+            // without this initialization, D at covered nodes is uninitialized
+            // arena memory that pollutes E* = a_E - D and the Newton residual.
+            m_D[n]->setVal(0.0_rt);
+            m_E_work[n]->setVal(0.0_rt);
         }
     }
     const ablastr::fields::VectorField D    = {m_D[0].get(), m_D[1].get(), m_D[2].get()};
