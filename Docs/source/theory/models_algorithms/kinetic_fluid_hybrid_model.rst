@@ -183,8 +183,9 @@ Two source terms can be enabled on the right-hand side. The first is the Joule
         \frac{d T_e}{d t} = (\gamma - 1) \sum_s \frac{Z_s e^2\, \eta_{s,\mathrm{eff}}\, n_s |\Delta\vec{V}|^2}{k_B},
 
 where :math:`\Delta\vec{V} = \vec{J}/(e n_e)` is the electron-ion relative
-drift, :math:`Z_s` the charge state and :math:`\eta_{s,\mathrm{eff}} = \eta`
-the Ohm's-law resistivity. For a single species this reduces
+drift, :math:`Z_s` the charge state and
+:math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s` the sum of the global and
+per-species resistivities (see above). For a single species this reduces
 exactly to the familiar :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
 Above a user-set electron temperature threshold the heat can optionally be
 redirected to the kinetic ions instead of the electron fluid
@@ -273,6 +274,31 @@ Ohm's law:
     .. math::
 
         \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
+
+Multi-species resistivity
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The single resistivity :math:`\eta` above assumes the electron drag is the
+same against every ion species. Following :cite:t:`kfhm-Belyaev2024`, the drag
+can instead be resolved per species by adding to Ohm's law the overlay
+
+    .. math::
+
+        \vec{E} \mathrel{+}= \sum_s \eta_s\, f_s\, e n_e \left( \vec{V}_s - \vec{V}_e \right),
+        \qquad f_s = \frac{\rho_s}{\sum_t \rho_t},
+
+where :math:`f_s` is the charge-density fraction of species :math:`s`,
+:math:`\vec{V}_s` its fluid velocity, and each :math:`\eta_s` is a user
+expression of :math:`(\rho_s, \rho, T_e, |\vec{J}|, |\vec{J}_s|, |\vec{B}|, t)`
+(``hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)``).
+This permits, for example, a temperature-dependent Spitzer drag against one
+species on top of a constant background resistivity. When all ion species
+drift together the overlay reduces to
+:math:`\left(\sum_s f_s \eta_s\right)\vec{J}`, i.e. an effective resistivity
+:math:`\eta_{\mathrm{eff}} = \eta + \sum_s f_s \eta_s`. The same
+:math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s` enters the per-species Joule
+heating of the :ref:`electron energy equation
+<theory-hybrid-model-electron-energy-eq>`.
 
 Lastly, if an electron temperature is given from which the electron pressure can
 be calculated, the model is fully constrained and can be evolved given initial

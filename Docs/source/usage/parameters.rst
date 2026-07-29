@@ -3744,6 +3744,23 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
+.. pp:param:: hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)
+    :type: ``float`` or ``str``
+    :default: ``0``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this adds a per-species resistivity overlay in :math:`\Omega m`
+    for the named charged species, on top of :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`
+    (see the :ref:`theory section <theory-kinetic-fluid-hybrid-model>`). The expression can depend on the species
+    charge density ``rho_s`` and total charge density ``rho`` (:math:`C/m^3`), the electron temperature ``Te`` (:math:`K`),
+    the current-density magnitudes ``J`` and ``J_s`` (:math:`A/m^2`), the magnetic-field magnitude ``B`` (:math:`T`)
+    and the time ``t`` (:math:`s`). The same effective per-species resistivity enters the Joule-heating source of the
+    electron energy equation when :pp:param:`hybrid_pic_model.include_joule_heating` is on.
+    Species without their own overlay simply use the global
+    :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`, so existing single-resistivity input decks are unchanged.
+    Note that in RZ geometry ``J_s`` is the magnitude of the raw (not volume-scaled) species current deposit;
+    in Cartesian geometry it is the physical current-density magnitude.
+
 .. pp:param:: hybrid_pic_model.solve_electron_energy_equation
     :type: ``bool``
     :default: ``false``

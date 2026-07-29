@@ -193,6 +193,24 @@ public:
     void CalculateElectronPressure (int lev) const;
 
     /**
+     * \brief Compute the electron fluid velocity V_e on the grid from the
+     * deposited ion current and the plasma current: V_e = (J_i - J_plasma)/rho,
+     * with rho floored at m_n_floor * q_e. Used by the resistive-drag operator.
+     */
+    void CalculateElectronFluidVelocity () const;
+    void CalculateElectronFluidVelocity (int lev) const;
+
+    /**
+     * \brief Compute the per-species ion bulk velocity Vs = Js/rhos on the
+     * grid for every charged species. Output is stored in Vs_fp_{species}
+     * (face-staggered like J). Used by the resistive-drag operator to
+     * apply a per-cell uniform shift (V_s - V_e)(1 - exp(-nu dt)) to every
+     * particle, leaving the thermal moment intact.
+     */
+    void CalculateIonFluidVelocity () const;
+    void CalculateIonFluidVelocity (int lev) const;
+
+    /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
      * specified electron equation of state.
@@ -339,6 +357,44 @@ public:
      */
     void AdvanceElectronEnergyQDSMC (amrex::Real dt) const;
 
+    /**
+     * \brief Compute the per-species resistive overlay vector field added to
+     *        Ohm's-law E alongside the existing +eta_global * J term:
+     *
+     *           overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
+     *                                       * (V_s_d - V_e_d) ]
+     *
+     *        summed over charged species that have a per-species
+     *        resistivity parser registered. The total friction term that
+     *        Ohm's law sees becomes
+     *
+     *           E_friction = +eta_global * J + overlay
+     *                      = +e * Sigma_s Z_s * (eta_global + eta_s_per) * n_s
+     *                                       * (V_s - V_e)
+     *
+     *        i.e. effectively eta_s_eff = eta_global + eta_s_per per species.
+     *
+     *        Output multifabs are at the Jx/Jy/Jz staggering (== E
+     *        component staggering). When m_has_per_species_eta is false
+     *        the overlay is set to zero and the function returns early
+     *        (single-eta behaviour is exactly recovered when callers add
+     *        a field of zeros to E).
+     *
+     *        Computed once per step (from HybridPICEvolveFields, into the
+     *        registered hybrid_eta_overlay_fp fields) and held frozen across
+     *        the subcycled E-solves, which only read it. Its inputs (Vs_fp,
+     *        Ve_fp, rho_fp_{spec}, T_e) are per-step quantities anyway; only
+     *        the |J| and |B| parser arguments would vary per substep, and
+     *        those are frozen along with the rest. Caller passes
+     *        pre-allocated Yee-staggered MultiFabs (one per direction) sized
+     *        to match Jx/Jy/Jz at this level.
+     */
+    void ComputeResistiveOverlay (
+        int lev,
+        amrex::MultiFab & overlay_x,
+        amrex::MultiFab & overlay_y,
+        amrex::MultiFab & overlay_z) const;
+
     /** Check if rkf45 should be used */
     [[nodiscard]] bool DoRKF45(int step) const { return m_rkf45_intervals.contains(step); }
 
@@ -383,12 +439,15 @@ public:
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as
-     *     S_e = Sigma_s nu_{s,e} n_s m_s |dV|^2,
-     *         nu_{s,e} = Z_s e^2 eta n_e / m_s,   dV = J_plasma / (e n_e),
-     * from the nodal plasma current, the per-species charge densities and
-     * the Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
-     * eta J^2 in single species. Only consulted when
-     * m_solve_electron_energy_equation is also true. */
+     *     S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,
+     *         nu_{s,e} = Z_s e^2 eta n_e / m_s,
+     * from the gridded Vs_fp_s, Ve_fp, rho_fp(_s) fields and the
+     * Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
+     * eta J^2 in single species; resolves inter-species drift-dispersion
+     * heating in multispecies. Orthogonal to whether HybridResistiveDrag
+     * is registered on ions (that controls particle dynamics, not the
+     * T_e source). Only consulted when m_solve_electron_energy_equation
+     * is also true. */
     bool m_include_joule_heating = false;
 
     /** Te-threshold Joule redirection. When active, the eta*J^2 Joule source in
@@ -435,6 +494,48 @@ public:
     amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
 
+    /** Per-species resistivity overlay (see Phys. Plasmas 31, 012902 (2024), Eq. 10).
+     *  Optional. For any charged species {spec} for which the user provides
+     *
+     *      hybrid_pic_model.plasma_resistivity_{spec}(rho_s,rho,Te,J,J_s,B,t) = "..."
+     *
+     *  the parser is compiled and stored here. The total per-species
+     *  effective resistivity used by Ohm's law, the Joule-heating source,
+     *  and the resistive-drag operator is
+     *
+     *      eta_s_eff = eta_global(rho, |J|, t)              [the global m_eta]
+     *                + eta_per_species_s(rho_s, rho, Te,    [this map]
+     *                                    |J|, |J_s|, |B|, t)
+     *
+     *  so the global parser remains the shared anomalous (e.g. Chodura)
+     *  layer and the per-species parser overlays species-resolved physics
+     *  (e.g. classical Spitzer with Z^2 scaling). Species without a
+     *  per-species parser registered fall back to the global parser only.
+     *  Parser variables, in order, are:
+     *    rho_s : per-species charge density        (C/m^3, unscaled in RZ)
+     *    rho   : total plasma charge density       (C/m^3, volume-scaled)
+     *    Te    : electron temperature              (Kelvin)
+     *    J     : |J_plasma|                        (A/m^2)
+     *    J_s   : |J_{species}|                     (A/m^2, unscaled in RZ)
+     *    B     : |B|                               (Tesla)
+     *    t     : time                              (seconds)
+     */
+    std::map<std::string, std::unique_ptr<amrex::Parser>> m_per_species_resistivity_parser;
+    std::map<std::string, amrex::ParserExecutor<7>>       m_eta_per_species;
+    /** Fast-path flag: true if at least one charged species has a
+     *  registered per-species resistivity parser. When false the
+     *  per-species code paths short-circuit to the global parser only,
+     *  preserving the existing single-eta behaviour with zero overhead.
+     *  Set from the input deck in ReadParameters (so AllocateLevelMFs can
+     *  gate the overlay fields) and confirmed in InitData when the parsers
+     *  are compiled. */
+    bool m_has_per_species_eta = false;
+
+    /** True when a hybrid_resistive_drag collision is present in the input
+     *  deck. Set in ReadParameters; used for the drag/Joule-heating
+     *  consistency warnings in InitData. */
+    bool m_has_resistive_drag = false;
+
     /** False until the first AdvanceElectronEnergyQDSMC of the run has
      *  filled hybrid_current_fp_plasma. On later steps J_plasma is already
      *  valid from the previous step's final E-solve (B is unchanged in
@@ -442,10 +543,19 @@ public:
      *  because it is a lazily-set cache flag inside a const call chain. */
     mutable bool m_qdsmc_J_plasma_valid = false;
 
-    /** True when the per-species deposited charge densities rho_fp_{spec}
-     *  are needed, i.e. when the electron-energy equation is solved (its
-     *  Joule and Q_ei sources read the per-species charge densities).
-     *  Gates their allocation and the per-species deposition path in
+    /** True when the gridded fluid velocities Ve_fp / Vs_fp_{spec} are
+     *  needed, i.e. when a per-species resistivity parser is registered or
+     *  a hybrid_resistive_drag collision is present in the input deck.
+     *  Gates their allocation and the once-per-step
+     *  CalculateElectronFluidVelocity / CalculateIonFluidVelocity calls.
+     *  Set in ReadParameters. */
+    bool m_need_fluid_velocities = false;
+
+    /** True when the per-species deposited fields current_fp_{spec} /
+     *  rho_fp_{spec} are needed, i.e. when m_need_fluid_velocities is true
+     *  or the electron-energy equation is solved (its Joule and Q_ei
+     *  sources read the per-species charge densities). Gates their
+     *  allocation and the per-species deposition path in
      *  HybridPICDepositRhoAndJ; when false, the deposition falls back to
      *  the single-pass MultiParticleContainer path with zero extra cost.
      *  Set in ReadParameters. */
