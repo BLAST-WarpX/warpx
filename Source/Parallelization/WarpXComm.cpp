@@ -1619,10 +1619,8 @@ amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amr
                         ? 0._rt : 0.5_rt*(point_weight(i-1) + w0);
                     amrex::Real w_hi = (r_hi_face <= 0._rt)
                         ? 0._rt : 0.5_rt*(w0 + point_weight(i+1));
-                    if (!dir_periodic) {
-                        if (i >= dom_hi) { w_hi = 0._rt; }
-                        if (i > dom_hi)  { w_lo = 0._rt; }
-                    }
+                    if (i >= dom_hi) { w_hi = 0._rt; }
+                    if (i > dom_hi)  { w_lo = 0._rt; }
                     v(i,j,k,n) = u(i,j,k,n) + 0.25_rt/w0 *
                         ( w_hi*(u(i+1,j,k,n) - u(i,j,k,n))
                         - w_lo*(u(i,j,k,n) - u(i-1,j,k,n)) );
