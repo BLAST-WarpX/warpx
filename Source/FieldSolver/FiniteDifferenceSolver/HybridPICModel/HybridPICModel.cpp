@@ -47,9 +47,6 @@ void HybridPICModel::ReadParameters ()
             ablastr::warn_manager::WarnPriority::medium);
         m_substeps += 1;
     }
-    // Adaptive updates may raise m_substeps under stress but never go below
-    // the user-requested floor.
-    m_substeps_min = m_substeps;
 
     // read rkf45 intervals
     std::vector<std::string> rkf45_intervals_string_vec = {"0"};
@@ -645,25 +642,23 @@ void HybridPICModel::BfieldEvolve (
     // Adjust the number of substeps for the next RKF45/RK4 half-step.
     // Jump up immediately when this half needed more attempts; otherwise
     // slowly relax toward target = 2*n_attempts.
-    // Blend on the half-step counts M = m_substeps/2 and N = n_attempts, then
-    // 2*floor(...): that keeps m_substeps even and actually decays. Blending
-    // full m then lround + force-even re-traps at many even values (e.g.
-    // m=40, n=10 → 0.95*40+0.05*20=39 → round-up-even → 40).
-    // Old stock code used 2*ceil(0.475*m + 0.05*n), which also froze m at the
-    // user input for typical n_attempts.
+    // Blend on the half-step counts M = m_substeps/2 and N = n_attempts via
+    // integer arithmetic: relaxed = 2*((19*M + N)/20). That is exactly the
+    // 95/5 blend, stays even, holds when N == M, and actually decays when
+    // N < M (e.g. m=40, n_attempts=10 → 38 → … → 20). Floating-point
+    // 0.95*M+0.05*N can undershoot M slightly so floor would leak even at
+    // equilibrium. Old stock code used 2*ceil(0.475*m + 0.05*n), which froze
+    // m at the user input for typical n_attempts. No hard floor at the user
+    // input: hybrid_pic_model.substeps remains an initial estimate only.
     {
         const int target = 2 * std::max(n_attempts, 1);
         if (m_substeps < target) {
             m_substeps = target;
         } else {
-            const amrex::Real M =
-                0.5_rt * static_cast<amrex::Real>(m_substeps);
-            const amrex::Real N =
-                static_cast<amrex::Real>(std::max(n_attempts, 1));
-            const amrex::Real blended_half = 0.95_rt * M + 0.05_rt * N;
-            const int relaxed =
-                2 * static_cast<int>(std::floor(static_cast<double>(blended_half)));
-            m_substeps = std::max({relaxed, m_substeps_min, 2});
+            const int M = m_substeps / 2;
+            const int N = std::max(n_attempts, 1);
+            const int relaxed = 2 * ((19 * M + N) / 20);
+            m_substeps = std::max(relaxed, 2);
         }
         // Stay within the abort budget so the controller cannot request more
         // substeps than max_substep_attempts allows.

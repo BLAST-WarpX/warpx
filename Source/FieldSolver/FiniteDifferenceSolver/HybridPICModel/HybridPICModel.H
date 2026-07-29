@@ -198,11 +198,8 @@ public:
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
      *  count guess when RKF45 adaptive stepping is active). May increase under
-     *  stress and slowly decay, but never below m_substeps_min. */
+     *  stress and slowly decay toward 2*n_attempts (absolute minimum 2). */
     int m_substeps = 10;
-    /** Floor for adaptive m_substeps (= user hybrid_pic_model.substeps after
-     *  even-rounding). Keeps the input as a minimum, not only an initial guess. */
-    int m_substeps_min = 10;
 
     /** Intervals to use RKF45 integrator and to update substeps parameter */
     ablastr::utils::text::IntervalsParser m_rkf45_intervals;
