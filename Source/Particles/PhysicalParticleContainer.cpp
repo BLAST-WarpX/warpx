@@ -1876,12 +1876,9 @@ PhysicalParticleContainer::DepositTemperature (
     if (!m_do_temperature_deposition) { return; }
 
     // The temperature deposit runs its own shape-N moment kernels
-    // (doVarianceDepositionShapeN) from AccumulateVelocitiesAndComputeTemperature,
-    // sharing no code or particle staging with the current-deposition algorithm,
-    // and the T_<species> fields inherit current_fp's guard cells (which only
-    // grow for the non-direct algorithms). The current-deposition algorithm is
-    // therefore not restricted here; implicit pushers and shared-memory
-    // deposition change the u/x staging assumptions and remain unsupported.
+    // (doVarianceDepositionShapeN) and works with any current-deposition
+    // algorithm; implicit pushers and shared-memory deposition change the
+    // u/x staging assumptions and are not supported.
     if (push_type != PushType::Explicit
         || WarpX::do_shared_mem_current_deposition
         )

@@ -92,6 +92,7 @@ void HybridPICModel::ReadParameters ()
     // preserves the legacy algebraic adiabatic closure.
     pp_hybrid.query("solve_electron_energy_equation",
                     m_solve_electron_energy_equation);
+    m_qdsmc_n_floor = m_n_floor;
     pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

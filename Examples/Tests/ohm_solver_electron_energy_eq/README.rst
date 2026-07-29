@@ -37,17 +37,17 @@ measured :math:`T_e` is compared against the adiabat.
 Run
 ^^^
 
-.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_adiabat_picmi.py``
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_picmi.py``
 
-   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_adiabat_picmi.py
+   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_adiabat_picmi.py``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all three cases; select this one with ``--case adiabat``.
 
 Execute:
 
 .. code-block:: bash
 
-   python3 inputs_test_2d_ohm_solver_electron_energy_adiabat_picmi.py
+   python3 inputs_test_2d_ohm_solver_electron_energy_picmi.py --case adiabat
 
 Analyze
 ^^^^^^^
@@ -87,17 +87,17 @@ The analysis fits the input resistivity from both signatures independently.
 Run
 ^^^
 
-.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_joule_picmi.py``
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_picmi.py``
 
-   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_joule_picmi.py
+   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_joule_picmi.py``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all three cases; select this one with ``--case joule``.
 
 Execute:
 
 .. code-block:: bash
 
-   python3 inputs_test_2d_ohm_solver_electron_energy_joule_picmi.py --eta-scale 20
+   python3 inputs_test_2d_ohm_solver_electron_energy_picmi.py --case joule --eta-scale 20
 
 Analyze
 ^^^^^^^
@@ -140,17 +140,17 @@ conserved; for :math:`\gamma_e = 5/3` both species meet at
 Run
 ^^^
 
-.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_qei_picmi.py``
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_picmi.py``
 
-   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_qei_picmi.py
+   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_qei_picmi.py``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all three cases; select this one with ``--case qei``.
 
 Execute:
 
 .. code-block:: bash
 
-   python3 inputs_test_2d_ohm_solver_electron_energy_qei_picmi.py
+   python3 inputs_test_2d_ohm_solver_electron_energy_picmi.py --case qei
 
 Analyze
 ^^^^^^^
