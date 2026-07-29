@@ -76,11 +76,14 @@ void WarpX::HybridPICEvolveFields ()
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
 
-    // Compute the per-species resistive overlay once per step into the
-    // registered hybrid_eta_overlay_fp fields; the (subcycled) E-solves
-    // below only read it. Its inputs (Vs_fp, Ve_fp, rho_fp_<spec>, T_e) are
-    // per-step quantities, so recomputing it inside every E-solve would be
-    // pure overhead.
+    // Compute the per-species resistive overlay once per step, from the
+    // start-of-step fields, into the registered hybrid_eta_overlay_fp
+    // fields; the E-solves below (subcycled Faraday and, with the drag
+    // active, the push-field solve) only read it. Ve does change during the
+    // B-substeps (through J = curl B / mu0), but the overlay is deliberately
+    // evaluated once and held fixed across the step -- a lagged
+    // approximation, consistent with the per-step evaluation of its other
+    // inputs (Vs, rho_s, T_e).
     if (m_hybrid_pic_model->m_has_per_species_eta) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             auto eta_overlay = m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);

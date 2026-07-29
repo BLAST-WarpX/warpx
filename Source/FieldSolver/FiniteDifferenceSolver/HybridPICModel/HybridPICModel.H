@@ -382,11 +382,12 @@ public:
      *        a field of zeros to E).
      *
      *        Computed once per step (from HybridPICEvolveFields, into the
-     *        registered hybrid_eta_overlay_fp fields) and held frozen across
-     *        the subcycled E-solves, which only read it. Its inputs (Vs_fp,
-     *        Ve_fp, rho_fp_{spec}, T_e) are per-step quantities anyway; only
-     *        the |J| and |B| parser arguments would vary per substep, and
-     *        those are frozen along with the rest. Caller passes
+     *        registered hybrid_eta_overlay_fp fields) from the start-of-step
+     *        fields and held frozen across the E-solves, which only read it.
+     *        Ve (and the |J|, |B| parser arguments) do vary during the
+     *        B-substeps; the once-per-step evaluation is a deliberate lagged
+     *        approximation, consistent with the per-step evaluation of the
+     *        other inputs (Vs_fp, rho_fp_{spec}, T_e). Caller passes
      *        pre-allocated Yee-staggered MultiFabs (one per direction) sized
      *        to match Jx/Jy/Jz at this level.
      */
