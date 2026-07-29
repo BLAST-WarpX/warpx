@@ -1525,12 +1525,6 @@ amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amr
     const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt);
 #endif
 
-    const amrex::IntVect ng = src_mf.nGrowVect();
-    amrex::MultiFab tmp_a(src_mf.boxArray(), src_mf.DistributionMap(), ncomp, ng);
-    amrex::MultiFab tmp_b(src_mf.boxArray(), src_mf.DistributionMap(), ncomp, ng);
-    tmp_b.setVal(0.0_rt);
-    amrex::MultiFab::Copy(tmp_a, src_mf, scomp, 0, ncomp, ng);
-
     const auto& bf = bilinear_filter;
     const int npass_r = static_cast<int>(bf.npass_each_dir[0]);
 #if defined(WARPX_DIM_RZ)
@@ -1539,6 +1533,23 @@ amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amr
     const int npass_z = 0;
 #endif
 
+    // Each pass consumes one defined guard layer from the outside while
+    // pushing mass one layer outward. This runs before any guard-cell
+    // sum, so source guard layers hold only local deposits, bounded by
+    // the source guard width -- layers beyond it are genuinely zero.
+    // Extending the working arrays by 2*npass keeps the defined region
+    // at src.ng + npass after all passes, which covers the final mass
+    // reach, so every layer a subsequent guard-cell sum folds holds
+    // filtered data rather than a stale deposit.
+    const amrex::IntVect ng = src_mf.nGrowVect();
+    const amrex::IntVect npass_vec(AMREX_D_DECL(npass_r, npass_z, 0));
+    const amrex::IntVect ng_tmp = ng + 2*npass_vec;
+    amrex::MultiFab tmp_a(src_mf.boxArray(), src_mf.DistributionMap(), ncomp, ng_tmp);
+    amrex::MultiFab tmp_b(src_mf.boxArray(), src_mf.DistributionMap(), ncomp, ng_tmp);
+    tmp_a.setVal(0.0_rt);
+    tmp_b.setVal(0.0_rt);
+    amrex::MultiFab::Copy(tmp_a, src_mf, scomp, 0, ncomp, ng);
+
     // One binomial pass in flux form. Written as the divergence of a
     // diffusive two-point flux with face weights w_f, it conserves the
     // volume integral of u exactly, leaves constants untouched, reduces to
@@ -1546,10 +1557,10 @@ amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amr
     // uniform, and has zero flux through the axis face by construction.
     // dir = 0 sweeps radially with the geometric volume factors; dir = 1
     // sweeps axially where the volumes are uniform.
-    // Each pass consumes one valid guard layer of its input in the sweep
-    // direction; ng_avail tracks how many layers of the working arrays
-    // still hold meaningful data.
-    amrex::IntVect ng_avail = ng;
+    // ng_avail tracks how many guard layers of the working arrays still
+    // hold meaningful data; each pass lowers it by one in its sweep
+    // direction, ending at src.ng + npass.
+    amrex::IntVect ng_avail = ng_tmp;
 
     // Physical (non-periodic) domain boundaries: no smoothing flux crosses
     // them, so the filter never exchanges with guard cells that nothing
