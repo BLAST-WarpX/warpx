@@ -2121,18 +2121,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
 
-    plasma_resistivity_species: dict, optional
-        Per-species resistivity overlays added on top of ``plasma_resistivity``,
-        as a dictionary mapping a charged species name to a value or expression
-        in Ohm*m. The expression may depend on ``rho_s`` (the species charge
-        density), ``rho`` (total charge density which, by quasineutrality,
-        equals the electron charge density), ``Te`` (electron temperature
-        in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the
-        species current density magnitude), ``B`` (magnetic field magnitude)
-        and ``t`` (time). The effective resistivity applied to species ``s``
-        in Ohm's law, the Joule heating source and the resistive drag is
-        ``plasma_resistivity + plasma_resistivity_species[s]``.
-
     solve_electron_energy_equation: bool, default=False
         Solve the electron energy equation instead of the algebraic adiabatic
         pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is
@@ -2268,7 +2256,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         n_floor=None,
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
-        plasma_resistivity_species=None,
         solve_electron_energy_equation=None,
         include_joule_heating=None,
         joule_redirect_Te_threshold=None,
@@ -2298,7 +2285,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
-        self.plasma_resistivity_species = plasma_resistivity_species
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
         self.include_joule_heating = include_joule_heating
@@ -2358,12 +2344,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_hyper_resistivity, self.mangle_dict
             ),
         )
-        if self.plasma_resistivity_species is not None:
-            for name, expr in self.plasma_resistivity_species.items():
-                pywarpx.hybridpicmodel.__setattr__(
-                    f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
-                    pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
-                )
         # Only emit the electron-energy-equation attributes that were
         # explicitly set, so the generated input deck contains only
         # user-specified parameters.
