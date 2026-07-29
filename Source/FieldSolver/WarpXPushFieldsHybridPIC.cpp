@@ -347,19 +347,28 @@ void WarpX::HybridPICInitializeRhoJandB ()
     using warpx::fields::FieldType;
     using ablastr::fields::Direction;
 
+    // Deposit rho^n and J_i^{n-1/2} from the particles. This must also run on
+    // restart: the checkpoint does not contain rho_fp (and contains current_fp
+    // only when written synchronized), while the particles are restored at
+    // exactly (x^n, v^{n-1/2}) on both paths, so the deposit deterministically
+    // reconstructs both fields. Without it the first restarted step runs the
+    // adaptive B integration with rho = 0 everywhere: every node falls into
+    // the below-n_floor branch of the Ohm's-law E-solve on top of the full
+    // mid-run curl(B), which is catastrophically stiff (or, with the vacuum
+    // treatment, silently wrong physics for one step).
+    HybridPICDepositRhoAndJ();
+
+    // Fill the electron pressure from the algebraic closure using the freshly
+    // deposited rho. On a fresh start this seeds Pe^0 for the iteration-0
+    // diagnostics and the first step's B-substep E-solves; on restart it
+    // restores Pe(rho^n), which is not checkpointed and would otherwise be
+    // zero for the whole first restarted step. From the first step onward,
+    // HybridPICEvolveFields refreshes Pe right after each deposition (via the
+    // closure, or via the QDSMC entropy transport when
+    // solve_electron_energy_equation is on).
+    m_hybrid_pic_model->CalculateElectronPressure();
+
     if (restart_chkfile.empty()) {
-        // This is not a restart, so the rho_fp and current_fp multifabs are
-        // still empty.
-        HybridPICDepositRhoAndJ();
-
-        // Seed the electron pressure from the algebraic closure using the
-        // freshly deposited rho, so the iteration-0 diagnostics and the
-        // first step's B-substep E-solves see a valid Pe^0. From the first
-        // step onward, HybridPICEvolveFields refreshes Pe right after each
-        // deposition (via the closure, or via the QDSMC entropy transport
-        // when solve_electron_energy_equation is on).
-        m_hybrid_pic_model->CalculateElectronPressure();
-
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {
             // Get the external fields
