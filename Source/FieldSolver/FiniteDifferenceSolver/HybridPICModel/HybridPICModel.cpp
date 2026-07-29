@@ -155,7 +155,13 @@ void HybridPICModel::ReadParameters ()
             const ParmParse pp_coll(coll_name);
             std::string coll_type;
             pp_coll.query("type", coll_type);
-            if (coll_type == "hybrid_resistive_drag") { m_has_resistive_drag = true; }
+            if (coll_type == "hybrid_resistive_drag") {
+                m_has_resistive_drag = true;
+                std::vector<std::string> coll_species;
+                pp_coll.queryarr("species", coll_species);
+                m_resistive_drag_species.insert(
+                    coll_species.begin(), coll_species.end());
+            }
         }
 
         m_need_fluid_velocities   = m_has_per_species_eta || m_has_resistive_drag;
@@ -455,11 +461,32 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
         }
     }
 
-    // Consistency warnings between the particle-side resistive drag and the
-    // electron-side Joule heating: each is allowed on its own, but the
-    // resistive energy bookkeeping is only consistent when both are active
-    // (the drag removes ion momentum/energy, the Joule source heats the
-    // electrons by the corresponding dissipation).
+    // The resistive-drag collision and the resistive push-field E are the two
+    // halves of the electron-ion friction (-R_s on each species from the
+    // drag, +(rho_s/rho) Sum_t R_t from the Lorentz force); only their sum
+    // conserves momentum. The push-field E acts on every charged species, so
+    // the drag must be registered on every charged species as well -- a
+    // species without it would feel an uncompensated resistive force.
+    if (m_has_resistive_drag) {
+        auto const & mypc_drag = WarpX::GetInstance().GetPartContainer();
+        for (auto const & spec_name : mypc_drag.GetSpeciesNames()) {
+            if (mypc_drag.GetParticleContainerFromName(spec_name).getCharge() == 0._prt) {
+                continue;
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_resistive_drag_species.count(spec_name) != 0,
+                "A hybrid_resistive_drag collision is registered, but not on "
+                "charged species '" + spec_name + "'. The drag must be "
+                "registered on every charged species: with the drag active "
+                "the resistive terms of Ohm's law are included in the "
+                "particle-push E-field, and a species without the drag would "
+                "feel that force with no compensating friction.");
+        }
+    }
+    // Without the Joule source the resistive dissipation is not returned to
+    // the electrons (same bookkeeping as running plain eta without the
+    // energy equation); note it since the drag user is clearly tracking the
+    // friction channel.
     if (m_has_resistive_drag &&
         !(m_solve_electron_energy_equation && m_include_joule_heating)) {
         ablastr::warn_manager::WMRecordWarning(
@@ -467,19 +494,8 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
             "A hybrid_resistive_drag collision is registered, but the resistive "
             "(Joule) electron heating is not active (requires both "
             "hybrid_pic_model.solve_electron_energy_equation and "
-            "hybrid_pic_model.include_joule_heating). The drag removes ion "
-            "momentum/energy without the corresponding electron heating being "
-            "tracked.",
-            ablastr::warn_manager::WarnPriority::medium);
-    }
-    if (m_solve_electron_energy_equation && m_include_joule_heating &&
-        !m_has_resistive_drag) {
-        ablastr::warn_manager::WMRecordWarning(
-            "HybridPICModel",
-            "hybrid_pic_model.include_joule_heating is on, but no "
-            "hybrid_resistive_drag collision is registered on the ions, so the "
-            "ions feel no resistive friction back-reaction to the eta*J "
-            "dissipation heating the electrons.",
+            "hybrid_pic_model.include_joule_heating), so the eta*J^2 "
+            "dissipation is not returned to the electron fluid.",
             ablastr::warn_manager::WarnPriority::medium);
     }
     // The Te-threshold Joule redirect only acts inside the Joule source.

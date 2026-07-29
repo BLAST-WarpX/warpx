@@ -41,10 +41,14 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
     // via a uniform per-cell shift, applied identically to every particle so
     // the thermal spread (T_i) is preserved:
     //     v_p -= (V_s - V_e)(1 - exp(-nu dt)).
-    // No heat is deposited here; the eta J^2 source on T_e is the separate
-    // gridded HybridPICModel::QDSMCAddJouleHeating call. Registering this
-    // operator gives ions the back-reaction to the eta*J term in Ohm's law
-    // (cancels the anti-friction), independently of include_joule_heating.
+    // This is the species-resolved -R_s half of the electron-ion friction;
+    // the +(rho_s/rho) Sum_t R_t half reaches the ions through the resistive
+    // terms of Ohm's law, which are included in the particle-push E-field
+    // whenever this operator is registered (see HybridPICSolveE). For a
+    // global eta the two halves cancel per species, recovering the plain
+    // eta*J behaviour; a per-species overlay makes them differ, which is the
+    // physics this operator adds. No heat is deposited here; the eta J^2
+    // source on T_e is the separate gridded QDSMCAddJouleHeating call.
 
     auto & warpx = WarpX::GetInstance();
     auto & species = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -186,8 +190,8 @@ HybridResistiveDrag::doCollisions (amrex::Real /*cur_time*/, amrex::Real dt, Mul
                 // Per-species overlay: add eta_s_per(rho_s, rho, Te, |J|,
                 // |J_s|, |B|, t) to eta_s_eff when registered for this
                 // species. When not registered, eta_s_eff stays at the
-                // global eta and the drag rate matches the pre-Phase-4
-                // path exactly.
+                // global eta and the drag rate reduces to the one implied
+                // by the global resistivity alone.
                 if (has_eta_per) {
                     amrex::Real const rhos_val = ablastr::particles::doGatherScalarFieldNodal(
                         xp, yp, zp, rhos_arr, dxi, plo);

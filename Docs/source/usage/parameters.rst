@@ -2863,6 +2863,19 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``background_stopping`` for slowing of ions due to collisions with electrons or ions.
       This implements the approximate formulae as derived in Introduction to Plasma Physics,
       from Goldston and Rutherford, section 14.2.
+    - ``hybrid_resistive_drag`` for the ion side of the electron-ion friction in the
+      hybrid-PIC (Ohm's law) solver (requires :pp:param:`algo.maxwell_solver` = ``hybrid``).
+      Each species' bulk velocity is relaxed toward the electron fluid velocity at the rate
+      :math:`\nu_{s,e} = Z_s e^2 \eta_{s,\mathrm{eff}} n_e / m_s` implied by the Ohm's-law
+      resistivity (global plus the optional per-species overlay,
+      :pp:param:`hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)`),
+      via a per-cell uniform shift that preserves the ion temperature. When this collision
+      is registered the resistive terms of Ohm's law are also included in the E-field that
+      pushes the particles (not only in the Faraday solves), because the drag and the
+      resistive push-field force are the two halves of the friction and only their sum
+      conserves momentum; for a global resistivity the two cancel exactly, recovering the
+      plain-``eta`` behavior. For that reason the collision must be registered on every
+      charged species. It takes exactly one species and no further parameters.
     - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
       This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
     - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions of electrons and ions.
@@ -3758,6 +3771,8 @@ Maxwell solver: kinetic-fluid hybrid
     electron energy equation when :pp:param:`hybrid_pic_model.include_joule_heating` is on.
     Species without their own overlay simply use the global
     :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`, so existing single-resistivity input decks are unchanged.
+    The species-resolved friction back-reaction on the ions is applied by the ``hybrid_resistive_drag``
+    collision (see :pp:param:`\<collision_name\>.type`), which should accompany any per-species overlay.
     Note that in RZ geometry ``J_s`` is the magnitude of the raw (not volume-scaled) species current deposit;
     in Cartesian geometry it is the physical current-density magnitude.
 

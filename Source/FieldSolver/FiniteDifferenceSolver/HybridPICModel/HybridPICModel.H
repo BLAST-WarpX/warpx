@@ -37,6 +37,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 
 /**
  * \brief This class contains the parameters needed to evaluate hybrid field
@@ -532,9 +533,20 @@ public:
     bool m_has_per_species_eta = false;
 
     /** True when a hybrid_resistive_drag collision is present in the input
-     *  deck. Set in ReadParameters; used for the drag/Joule-heating
-     *  consistency warnings in InitData. */
+     *  deck. Set in ReadParameters. When true, the resistive terms of Ohm's
+     *  law (eta*J and the per-species overlay) are included in EVERY E-solve,
+     *  including the particle-push field: the drag supplies the
+     *  species-resolved -R_s half of the electron-ion friction and the
+     *  resistive push-field E supplies the +(rho_s/rho) Sum_t R_t half; only
+     *  their sum conserves momentum. */
     bool m_has_resistive_drag = false;
+
+    /** Names of the species that have a hybrid_resistive_drag collision
+     *  registered. Filled in ReadParameters; InitData requires this to cover
+     *  every charged species when the drag is used at all (a species without
+     *  the drag would feel the resistive push-field force with no
+     *  compensating friction). */
+    std::set<std::string> m_resistive_drag_species;
 
     /** False until the first AdvanceElectronEnergyQDSMC of the run has
      *  filled hybrid_current_fp_plasma. On later steps J_plasma is already
