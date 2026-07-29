@@ -440,6 +440,8 @@ public:
                 // so E_out can come out (slightly) negative here even though the pair cleared
                 // the ionization threshold there; without the floor, the sqrt() calls below
                 // would produce a NaN velocity in such cases.
+                // TODO: update the E_coll calculation above to match the calculation in
+                // CollisionFilterFunc.H
                 E_out = amrex::max(E_out, 0.0_prt);
 
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
