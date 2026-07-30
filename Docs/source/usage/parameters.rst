@@ -1031,6 +1031,20 @@ additionally define the electric potential at the embedded boundary with an anal
 
     * ``Reflecting``: Particles that reach the embedded boundary are specularly reflected back into the simulation domain
 
+.. pp:param:: warpx.eb_ect_balanced_borrow
+    :type: ``integer``
+    :default: ``0``
+
+    Only used with the ECT (enlarged cell technique) Maxwell solver
+    (:pp:param:`algo.maxwell_solver = ect`). When nonzero, the one-way
+    face-extension pass is skipped and every unstable cut face is enlarged with
+    the symmetric, area-proportional eight-way split. The one-way pass borrows
+    the entire area deficit from the first stable cardinal neighbor in a fixed
+    lattice order, which is not wall-normal aware and displaces the enlarged-face
+    area centroid off the wall normal (a :math:`\cos(4\theta)` symmetry-breaking
+    seed on curved walls). The default (``0``) keeps the historical one-way pass
+    and is bit-identical to previous behavior.
+
 .. _param-particle-thermalizer:
 
 Particle thermalizer
@@ -3839,6 +3853,18 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
+
+.. pp:param:: hybrid_pic_model.use_conformal_eb
+    :type: ``0`` or ``1``
+    :default: ``0``
+
+    Use the conformal (enlarged-cell technique) embedded-boundary wall for the
+    hybrid-PIC B push instead of the stair-step approximation, with a
+    constitutive perfect-conductor closure: the Ohm's-law E and the Ampere
+    current are zeroed on every covered and cut edge, and cut faces evolve
+    through their fully-open edges. Second-order at curved walls where the
+    stair-step degrades to first order. Requires embedded boundaries, a
+    staggered (Yee) grid, and 3D or 2D (XZ) Cartesian geometry.
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``

@@ -15,6 +15,7 @@
 
 #include "Fields.H"
 
+#include "EBJBoundary.H"
 #include "ExternalVectorPotential.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
@@ -124,6 +125,21 @@ public:
         amrex::MultiFab const& rhofield,
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev, PatchType patch_type, bool solve_for_Faraday) const;
+
+    /** Constitutive-PEC zeroing of an edge-staggered field on the conformal
+     *  (ECT) wall: zero every masked (fully covered) edge and every cut edge.
+     *  Applied to the Ohm's-law E and the Ampere current. */
+    void ZeroConductorEdges (
+        ablastr::fields::VectorField const& field,
+        std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update,
+        int lev) const;
+
+    /** Zero fully covered faces (open area = 0) of a face-staggered field on
+     *  the conformal (ECT) wall; cut faces keep their open-part flux. Applied
+     *  to the external B so the conductor excludes the time-varying flux. */
+    void ZeroCoveredFaces (
+        ablastr::fields::VectorField const& field,
+        int lev) const;
 
     void BfieldEvolve (
         ablastr::fields::MultiLevelVectorField const& Bfield,
@@ -250,6 +266,17 @@ public:
     /** External E/B fields */
     bool m_add_external_fields = false;
     std::unique_ptr<ExternalVectorPotential> m_external_vector_potential;
+
+    /** Opt-in conformal embedded-boundary wall: the enlarged-cell (ECT)
+     *  Faraday update on cut faces with a constitutive-PEC closure (E and J
+     *  zeroed on covered and cut edges). Requires embedded boundaries, a
+     *  staggered (Yee) grid, and 3D or 2D (XZ) Cartesian geometry. */
+    bool m_use_conformal_eb = false;
+
+    /** Cached EB fill classification for the deposited edge fields (ion
+     *  current fill + deposit fold), one entry per level; reset on regrid.
+     *  Mutable: (re)built inside const solver calls. */
+    mutable amrex::Vector<warpx::hybrid::EBFillStatus> m_eb_bc_status_E;
 
     /** Gpu Vector with index type of the Jx multifab */
     amrex::GpuArray<int, 3> Jx_IndexType;

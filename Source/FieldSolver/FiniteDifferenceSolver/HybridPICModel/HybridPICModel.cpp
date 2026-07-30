@@ -57,6 +57,27 @@ void HybridPICModel::ReadParameters ()
 
     utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
 
+    // Opt-in conformal (enlarged-cell/ECT) embedded-boundary wall.
+    pp_hybrid.query("use_conformal_eb", m_use_conformal_eb);
+    if (m_use_conformal_eb) {
+#if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ)
+        WARPX_ABORT_WITH_MESSAGE(
+            "hybrid_pic_model.use_conformal_eb is only supported in 3D and 2D (XZ) "
+            "Cartesian geometry");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
+            "hybrid_pic_model.use_conformal_eb requires embedded boundaries to be enabled");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::grid_type == ablastr::utils::enums::GridType::Staggered,
+            "hybrid_pic_model.use_conformal_eb requires warpx.grid_type = staggered");
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::field_boundary_lo[idim] != FieldBoundaryType::PML &&
+                WarpX::field_boundary_hi[idim] != FieldBoundaryType::PML,
+                "hybrid_pic_model.use_conformal_eb is not compatible with PML boundaries");
+        }
+    }
+
     // The hybrid model requires an electron temperature, reference density
     // and exponent to be given. These values will be used to calculate the
     // electron pressure according to p = n0 * Te * (n/n0)^gamma
@@ -328,6 +349,90 @@ void HybridPICModel::GetCurrentExternal ()
     }
 }
 
+void HybridPICModel::ZeroConductorEdges (
+    ablastr::fields::VectorField const& field,
+    std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update,
+    const int lev) const
+{
+    // Constitutive PEC on the conformal (ECT) wall: zero every masked (fully
+    // covered) edge and every cut edge (open length < full). There is no wall
+    // physics on the zeroed set -- E = 0 in a perfect conductor and the
+    // hybrid carries no surface currents.
+    auto& warpx = WarpX::GetInstance();
+    const auto dx = warpx.Geom(lev).CellSizeArray();
+    const ablastr::fields::VectorField edge_lengths =
+        warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev);
+    // Full edges carry exactly their cell size after ScaleEdges; anything
+    // shorter is cut. The tolerance absorbs EB-geometry round-off.
+    amrex::GpuArray<amrex::Real, 3> l_full{0.0_rt, 0.0_rt, 0.0_rt};
+    for (int d = 0; d < 3; ++d) {
+        const int gd = amrex::min(d, AMREX_SPACEDIM - 1);
+        l_full[d] = (1.0_rt - 1.e-6_rt) * dx[gd];
+    }
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*field[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        amrex::Array4<amrex::Real> const& Fx = field[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fy = field[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fz = field[2]->array(mfi);
+        amrex::Array4<amrex::Real const> const& lx = edge_lengths[0]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& ly = edge_lengths[1]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& lz = edge_lengths[2]->const_array(mfi);
+        amrex::Array4<int const> const& ux = eb_update[0]->const_array(mfi);
+        amrex::Array4<int const> const& uy = eb_update[1]->const_array(mfi);
+        amrex::Array4<int const> const& uz = eb_update[2]->const_array(mfi);
+        const amrex::Box tx = mfi.tilebox(field[0]->ixType().toIntVect());
+        const amrex::Box ty = mfi.tilebox(field[1]->ixType().toIntVect());
+        const amrex::Box tz = mfi.tilebox(field[2]->ixType().toIntVect());
+        amrex::ParallelFor(tx, ty, tz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                if (ux(i,j,k) == 0 || lx(i,j,k) < l_full[0]) { Fx(i,j,k) = 0.0_rt; }
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                if (uy(i,j,k) == 0 || ly(i,j,k) < l_full[1]) { Fy(i,j,k) = 0.0_rt; }
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                if (uz(i,j,k) == 0 || lz(i,j,k) < l_full[2]) { Fz(i,j,k) = 0.0_rt; }
+            });
+    }
+}
+
+void HybridPICModel::ZeroCoveredFaces (
+    ablastr::fields::VectorField const& field,
+    const int lev) const
+{
+    // Zero fully covered faces (open area = 0); cut faces keep their value,
+    // since their open part carries real flux.
+    auto& warpx = WarpX::GetInstance();
+    const ablastr::fields::VectorField face_areas =
+        warpx.m_fields.get_alldirs(FieldType::face_areas, lev);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(*field[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        amrex::Array4<amrex::Real> const& Fx = field[0]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fy = field[1]->array(mfi);
+        amrex::Array4<amrex::Real> const& Fz = field[2]->array(mfi);
+        amrex::Array4<amrex::Real const> const& Sx = face_areas[0]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Sy = face_areas[1]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Sz = face_areas[2]->const_array(mfi);
+        const amrex::Box tx = mfi.tilebox(field[0]->ixType().toIntVect());
+        const amrex::Box ty = mfi.tilebox(field[1]->ixType().toIntVect());
+        const amrex::Box tz = mfi.tilebox(field[2]->ixType().toIntVect());
+        amrex::ParallelFor(tx, ty, tz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                if (Sx(i,j,k) <= 0.0_rt) { Fx(i,j,k) = 0.0_rt; }
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                if (Sy(i,j,k) <= 0.0_rt) { Fy(i,j,k) = 0.0_rt; }
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                if (Sz(i,j,k) <= 0.0_rt) { Fz(i,j,k) = 0.0_rt; }
+            });
+    }
+}
+
 void HybridPICModel::CalculatePlasmaCurrent (
     ablastr::fields::MultiLevelVectorField const& Bfield,
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& eb_update_E) const
@@ -360,6 +465,13 @@ void HybridPICModel::CalculatePlasmaCurrent (
         for (int i=0; i<3; i++) {
             current_fp_plasma[i]->minus(*current_fp_external[i], 0, 1, 1);
         }
+    }
+
+    // Conformal wall, constitutive PEC: the hybrid carries no wall (surface)
+    // currents, so J = 0 on every covered and cut edge; cut faces evolve only
+    // through their fully-open edges.
+    if (EB::enabled() && m_use_conformal_eb) {
+        ZeroConductorEdges(current_fp_plasma, eb_update_E, lev);
     }
 }
 
@@ -425,6 +537,13 @@ void HybridPICModel::HybridPICSolveE (
     );
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
+
+    // Conformal wall, constitutive PEC: the Ohm E is algebraic in B, so the
+    // wall condition is imposed directly -- E = 0 on every covered and cut
+    // edge (tangential E vanishes at the wall at the cut-edge level).
+    if (EB::enabled() && m_use_conformal_eb) {
+        ZeroConductorEdges(Efield, eb_update_E, lev);
+    }
 }
 
 void HybridPICModel::CalculateElectronPressure() const
@@ -449,6 +568,16 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         *electron_pressure_fp,
         *rho_fp
     );
+    // Conformal wall: Dirichlet Pe at the PEC surface (odd reflection). The
+    // resulting grad(Pe) across the wall supplies the allowable normal E in
+    // Ohm's law, unlike a Neumann fill, which would pin it to zero.
+    if (EB::enabled() && m_use_conformal_eb) {
+        warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+            *electron_pressure_fp,
+            *warpx.m_fields.get(FieldType::distance_to_eb, lev),
+            warpx.Geom(lev),
+            /*odd=*/true);
+    }
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
 
     // Mirror the closure's implied electron temperature,
@@ -509,8 +638,10 @@ void HybridPICModel::FillElectronPressureMF (
         const Box& tilebox  = mfi.tilebox();
 
         ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            // The wall's odd rho reflection mirrors the density negative
+            // inside the conductor: clamp the equation-of-state input.
             Pe(i, j, k) = ElectronPressure::get_pressure(
-                n0_ref, elec_temp, gamma, rho(i, j, k)
+                n0_ref, elec_temp, gamma, amrex::max(rho(i, j, k), 0._rt)
             );
         });
     }
@@ -1208,10 +1339,27 @@ void HybridPICModel::FieldPush (
     CalculatePlasmaCurrent(Bfield, eb_update_E);
     // Calculate the E-field from Ohm's law
     HybridPICSolveE(Efield, Jfield, Bfield, rhofield, eb_update_E, true);
-    // Call FillBoundary if a collocated grid is used
-    if (Bz_IndexType[0] == Ez_IndexType[0]) {
+    // Refresh E ghosts before the Faraday push reads them: always on a
+    // collocated grid (the nodal curl reads ghost E), and on the conformal
+    // wall path, whose ECT circulation reads cross-box ghost E edges.
+    if (Bz_IndexType[0] == Ez_IndexType[0] || m_use_conformal_eb) {
         warpx.FillBoundaryE(ng, nodal_sync);
     }
+
+#ifdef AMREX_USE_EB
+    // Conformal wall: recompute the per-face EMF circulations (ECTRhofield)
+    // from the new Ohm E so the Faraday push is consistent with Ohm's law.
+    if (m_use_conformal_eb) {
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            warpx.get_pointer_fdtd_solver_fp(lev)->EvolveECTRho(
+                Efield[lev],
+                warpx.m_fields.get_alldirs(FieldType::edge_lengths, lev),
+                warpx.m_fields.get_alldirs(FieldType::face_areas, lev),
+                warpx.m_fields.get_alldirs(FieldType::ECTRhofield, lev),
+                lev);
+        }
+    }
+#endif
 
     // Push forward the B-field using Faraday's law
     warpx.EvolveB(dt, subcycling_half, t_old);

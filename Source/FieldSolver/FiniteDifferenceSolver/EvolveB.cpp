@@ -22,6 +22,8 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -105,6 +107,14 @@ void FiniteDifferenceSolver::EvolveB (
 
         EvolveBCartesian <CartesianNodalAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
 
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT ||
+               (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+                WarpX::UseConformalEBSolve())) {
+        // The conformal-wall check precedes the Yee-family branch: the hybrid
+        // solver matches both, and with use_conformal_eb its B push is the
+        // enlarged-cell (ECT) update.
+        EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
+                            borrowing, lev, dt);
     } else if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee) ||
                (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)) {
 
@@ -113,9 +123,6 @@ void FiniteDifferenceSolver::EvolveB (
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
         EvolveBCartesian <CartesianCKCAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
-    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
-        EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
-                            borrowing, lev, dt);
 #endif
     } else {
         WARPX_ABORT_WITH_MESSAGE("EvolveB: Unknown algorithm");
@@ -243,10 +250,22 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
     amrex::LayoutData<amrex::Real> *cost = WarpX::getCosts(lev);
 
+    auto& warpx = WarpX::GetInstance();
+    // With cut cells at fab seams (multi-box or periodic layouts), the
+    // enlarged-cell gather/scatter crosses boxes: the B update is then
+    // deferred until the scattered Venl contributions have been summed to
+    // the owners. Single-box non-periodic layouts take the fused
+    // communication-free path below, bit-identical to the historical one.
+    const bool seam_sync = warpx.ECTNeedsSeamSync();
+    AMREX_ALWAYS_ASSERT(lev == warpx.maxLevel());
+
     Venl[0]->setVal(0.);
     Venl[1]->setVal(0.);
     Venl[2]->setVal(0.);
 
+    // Phase 1: assemble the enlarged-face accumulator and scatter the
+    // borrowed contributions (owner-gated when syncing across seams);
+    // in the fused path this also applies the unstable-face B update.
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -268,8 +287,13 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
             amrex::Array4<Real> const &S = face_areas[idim]->array(mfi);
             amrex::Array4<Real> const &S_mod = area_mod[idim]->array(mfi);
 
+            amrex::Array4<int const> owner;
+            if (seam_sync) {
+                owner = warpx.GetECTFaceOwnerMask()[lev][idim]->const_array(mfi);
+            }
+
             auto & borrowing_dim = (*borrowing[idim])[mfi];
-            auto * borrowing_dim_neigh_faces = borrowing_dim.neigh_faces.data();
+            auto * borrowing_dim_neighbor_faces = borrowing_dim.neighbor_faces.data();
             auto * borrowing_dim_area = borrowing_dim.area.data();
 
             auto const &borrowing_inds = (*borrowing[idim])[mfi].inds.data();
@@ -286,13 +310,17 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
                 if (!(flag_info_cell_dim(i, j, k) == 0)) { return; }
 
+                // Owner-unique assembly: faces on shared nodal planes are
+                // assembled once so the Venl sum across copies is exact
+                if (owner && owner(i, j, k) == 0) { return; }
+
                 Venl_dim(i, j, k) = Rho(i, j, k) * S(i, j, k);
                 amrex::Real rho_enl;
 
                 // First we compute the rho of the enlarged face
                 for (int offset = 0; offset<borrowing_size(i, j, k); offset++) {
                     int const ind = borrowing_inds[*borrowing_inds_pointer(i, j, k) + offset];
-                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neigh_faces[ind]);
+                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neighbor_faces[ind]);
                     int ip, jp, kp;
                     if (idim == 0) {
                         ip = i;
@@ -324,7 +352,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
                 for (int offset = 0; offset < borrowing_size(i, j, k); offset++) {
                     int const ind = borrowing_inds[*borrowing_inds_pointer(i, j, k) + offset];
-                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neigh_faces[ind]);
+                    auto vec = FaceInfoBox::uint8_to_inds(borrowing_dim_neighbor_faces[ind]);
                     int ip, jp, kp;
                     if (idim == 0) {
                         ip = i;
@@ -348,19 +376,83 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
                         kp = k;
                     }
 
-                    Venl_dim(ip, jp, kp) += rho_enl * borrowing_dim_area[ind];
+                    // Several enlarged faces can intrude the same neighbor:
+                    // the scatter into the intruded face must be atomic on GPU
+                    // (lost updates here feed first-order errors into the
+                    // intruded faces' B push at every substep)
+                    amrex::Gpu::Atomic::AddNoRet(
+                        &Venl_dim(ip, jp, kp), rho_enl * borrowing_dim_area[ind]);
 
                 }
 
-                B(i, j, k) = B(i, j, k) - dt * rho_enl;
+                // In the seam-sync path the unstable-face B update is
+                // deferred to phase 2 (after the Venl reduction); the fused
+                // path applies it here, as it always has
+                if (!owner) {
+                    B(i, j, k) = B(i, j, k) - dt * rho_enl;
+                }
 
             });
+
+        }
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
+            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+        }
+    }
+
+    // Phase 1.5: reduce the scattered borrowed contributions across fab
+    // seams (ghost entries and shared nodal-plane copies) to the owners,
+    // then make all copies bit-equal. Without seams this is skipped and the
+    // ghost-scatter behavior matches the historical single-box path.
+    if (seam_sync) {
+        const auto& period = warpx.Geom(lev).periodicity();
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            ablastr::utils::communication::SumBoundary(
+                *Venl[idim], 0, 1, amrex::IntVect(1), amrex::IntVect(0),
+                WarpX::do_single_precision_comms, period);
+            Venl[idim]->OverrideSync(period);
+        }
+    }
+
+    // Phase 2: apply the B updates. In the fused path only the stable faces
+    // remain; in the seam-sync path the unstable faces are updated here too,
+    // from the now-complete Venl (Venl/S_mod is the same expression the
+    // fused path evaluates as rho_enl).
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(*Bfield[0]); mfi.isValid(); ++mfi) {
+
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
+            amrex::Gpu::synchronize();
+        }
+        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            Array4<Real> const &B = Bfield[idim]->array(mfi);
+            Array4<Real> const &Rho = ECTRhofield[idim]->array(mfi);
+            Array4<Real> const &Venl_dim = Venl[idim]->array(mfi);
+            amrex::Array4<int> const &flag_info_cell_dim = flag_info_cell[idim]->array(mfi);
+            amrex::Array4<Real> const &S = face_areas[idim]->array(mfi);
+            amrex::Array4<Real> const &S_mod = area_mod[idim]->array(mfi);
+
+            const bool sync = seam_sync;
+
+            Box const &tb = mfi.tilebox(Bfield[idim]->ixType().toIntVect());
 
             //Take care of the stable cells
             amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
                 if (S(i, j, k) <= 0) { return; }
 
                 if (flag_info_cell_dim(i, j, k) == 0) {
+                    // Unstable face: deferred update of the seam-sync path
+                    // (the fused path already updated it in phase 1)
+                    if (sync) {
+                        B(i, j, k) = B(i, j, k) - dt * Venl_dim(i, j, k) / S_mod(i, j, k);
+                    }
                     return;
                 }
                 else if (flag_info_cell_dim(i, j, k) == 1) {

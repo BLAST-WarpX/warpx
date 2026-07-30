@@ -7,7 +7,9 @@
  *
  * License: BSD-3-Clause-LBNL
  */
+#include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/EBJBoundary.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
@@ -262,6 +264,39 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 Geom(lev).periodicity(),
                 true
             );
+        }
+    }
+
+    // With the conformal wall, fold the shape-function deposit collected by
+    // covered points back across the PEC surface, then apply the PEC image
+    // fills (J: image parities; rho: Dirichlet, rho -> 0 at the wall).
+    if (EB::enabled() && m_hybrid_pic_model->m_use_conformal_eb) {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            if (static_cast<int>(m_hybrid_pic_model->m_eb_bc_status_E.size()) <= lev) {
+                m_hybrid_pic_model->m_eb_bc_status_E.resize(lev+1);
+            }
+            warpx::hybrid::FoldEBDepositToField(
+                m_fields.get_alldirs(FieldType::current_fp, lev),
+                m_eb_update_E[lev],
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev),
+                &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
+            warpx::hybrid::ApplyPECBoundaryToField(
+                m_fields.get_alldirs(FieldType::current_fp, lev),
+                m_eb_update_E[lev],
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev),
+                /*normal_odd=*/false, /*fill_covered_centers=*/true,
+                &m_hybrid_pic_model->m_eb_bc_status_E[lev]);
+            warpx::hybrid::FoldEBDepositToNodalScalar(
+                *m_fields.get(FieldType::rho_fp, lev),
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev));
+            warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+                *m_fields.get(FieldType::rho_fp, lev),
+                *m_fields.get(FieldType::distance_to_eb, lev),
+                Geom(lev),
+                /*odd=*/true);
         }
     }
 }

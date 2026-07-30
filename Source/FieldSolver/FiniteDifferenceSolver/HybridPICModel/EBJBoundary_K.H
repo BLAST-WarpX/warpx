@@ -1,0 +1,391 @@
+/* Copyright 2026 The WarpX Community
+ *
+ * This file is part of WarpX.
+ *
+ * Authors: S. Eric Clark (Helion Energy)
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+#ifndef WARPX_EBJBOUNDARY_K_H_
+#define WARPX_EBJBOUNDARY_K_H_
+
+#include "EBJBoundary.H"
+
+#include "EmbeddedBoundary/DistanceToEB.H"
+
+#include <ablastr/particles/NodalFieldGather.H>
+
+#include <AMReX_Array4.H>
+#include <AMReX_BLassert.H>
+#include <AMReX_GpuContainers.H>
+#include <AMReX_GpuControl.H>
+#include <AMReX_MFIter.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_RealVect.H>
+#include <AMReX_Reduce.H>
+
+namespace warpx::hybrid::detail
+{
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    /** Trilinear (bilinear in 2D) gather of component n of a staggered field
+     *  at an arbitrary physical position, clamping the stencil to the array
+     *  bounds. Hand-rolled: no ablastr gather supports per-direction
+     *  staggering with ghost clamping today. */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real gather_staggered (
+        amrex::Array4<amrex::Real const> const& a,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+        int n) noexcept
+    {
+        using namespace amrex::literals;
+
+        amrex::Real const lx = (pos[0] - plo[0])*dxi[0] - stag[0];
+        int i0 = static_cast<int>(std::floor(lx));
+        i0 = amrex::min(amrex::max(i0, a.begin[0]), a.end[0] - 2);
+        amrex::Real const wx = amrex::min(amrex::max(lx - i0, 0._rt), 1._rt);
+
+#if defined(WARPX_DIM_3D)
+        amrex::Real const ly = (pos[1] - plo[1])*dxi[1] - stag[1];
+        amrex::Real const lz = (pos[2] - plo[2])*dxi[2] - stag[2];
+        int j0 = static_cast<int>(std::floor(ly));
+        int k0 = static_cast<int>(std::floor(lz));
+        j0 = amrex::min(amrex::max(j0, a.begin[1]), a.end[1] - 2);
+        k0 = amrex::min(amrex::max(k0, a.begin[2]), a.end[2] - 2);
+        amrex::Real const wy = amrex::min(amrex::max(ly - j0, 0._rt), 1._rt);
+        amrex::Real const wz = amrex::min(amrex::max(lz - k0, 0._rt), 1._rt);
+
+        return (1._rt-wx)*(1._rt-wy)*(1._rt-wz)*a(i0  , j0  , k0  , n)
+             +        wx *(1._rt-wy)*(1._rt-wz)*a(i0+1, j0  , k0  , n)
+             + (1._rt-wx)*       wy *(1._rt-wz)*a(i0  , j0+1, k0  , n)
+             +        wx *       wy *(1._rt-wz)*a(i0+1, j0+1, k0  , n)
+             + (1._rt-wx)*(1._rt-wy)*       wz *a(i0  , j0  , k0+1, n)
+             +        wx *(1._rt-wy)*       wz *a(i0+1, j0  , k0+1, n)
+             + (1._rt-wx)*       wy *       wz *a(i0  , j0+1, k0+1, n)
+             +        wx *       wy *       wz *a(i0+1, j0+1, k0+1, n);
+#else
+        amrex::Real const lz = (pos[1] - plo[1])*dxi[1] - stag[1];
+        int j0 = static_cast<int>(std::floor(lz));
+        j0 = amrex::min(amrex::max(j0, a.begin[1]), a.end[1] - 2);
+        amrex::Real const wz = amrex::min(amrex::max(lz - j0, 0._rt), 1._rt);
+
+        return (1._rt-wx)*(1._rt-wz)*a(i0  , j0  , 0, n)
+             +        wx *(1._rt-wz)*a(i0+1, j0  , 0, n)
+             + (1._rt-wx)*       wz *a(i0  , j0+1, 0, n)
+             +        wx *       wz *a(i0+1, j0+1, 0, n);
+#endif
+    }
+
+    /** Like gather_staggered, but using only stencil points accepted by the
+     *  \c fluid predicate: rejected points get zero weight and the result is
+     *  renormalized by the remaining weight, which is also returned (zero if
+     *  the entire stencil is rejected). */
+    template <typename FluidPred>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::GpuTuple<amrex::Real, amrex::Real> gather_staggered_pred (
+        amrex::Array4<amrex::Real const> const& a,
+        FluidPred const& fluid,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& pos,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+        int n) noexcept
+    {
+        using namespace amrex::literals;
+
+        amrex::Real const lx = (pos[0] - plo[0])*dxi[0] - stag[0];
+        int i0 = static_cast<int>(std::floor(lx));
+        i0 = amrex::min(amrex::max(i0, a.begin[0]), a.end[0] - 2);
+        amrex::Real const wx = amrex::min(amrex::max(lx - i0, 0._rt), 1._rt);
+
+        amrex::Real vsum = 0._rt;
+        amrex::Real wsum = 0._rt;
+#if defined(WARPX_DIM_3D)
+        amrex::Real const ly = (pos[1] - plo[1])*dxi[1] - stag[1];
+        amrex::Real const lz = (pos[2] - plo[2])*dxi[2] - stag[2];
+        int j0 = static_cast<int>(std::floor(ly));
+        int k0 = static_cast<int>(std::floor(lz));
+        j0 = amrex::min(amrex::max(j0, a.begin[1]), a.end[1] - 2);
+        k0 = amrex::min(amrex::max(k0, a.begin[2]), a.end[2] - 2);
+        amrex::Real const wy = amrex::min(amrex::max(ly - j0, 0._rt), 1._rt);
+        amrex::Real const wz = amrex::min(amrex::max(lz - k0, 0._rt), 1._rt);
+
+        for (int dk = 0; dk < 2; ++dk) {
+            for (int dj = 0; dj < 2; ++dj) {
+                for (int di = 0; di < 2; ++di) {
+                    amrex::Real const w = (di ? wx : 1._rt-wx)
+                                        * (dj ? wy : 1._rt-wy)
+                                        * (dk ? wz : 1._rt-wz);
+                    if (fluid(i0+di, j0+dj, k0+dk)) {
+                        vsum += w*a(i0+di, j0+dj, k0+dk, n);
+                        wsum += w;
+                    }
+                }
+            }
+        }
+#else
+        amrex::Real const lz = (pos[1] - plo[1])*dxi[1] - stag[1];
+        int j0 = static_cast<int>(std::floor(lz));
+        j0 = amrex::min(amrex::max(j0, a.begin[1]), a.end[1] - 2);
+        amrex::Real const wz = amrex::min(amrex::max(lz - j0, 0._rt), 1._rt);
+
+        for (int dj = 0; dj < 2; ++dj) {
+            for (int di = 0; di < 2; ++di) {
+                amrex::Real const w = (di ? wx : 1._rt-wx) * (dj ? wz : 1._rt-wz);
+                if (fluid(i0+di, j0+dj, 0)) {
+                    vsum += w*a(i0+di, j0+dj, 0, n);
+                    wsum += w;
+                }
+            }
+        }
+#endif
+        amrex::Real const v = (wsum > 0._rt) ? vsum/wsum : 0._rt;
+        return {v, wsum};
+    }
+
+    // Classification of every staggered point for the embedded-boundary fill
+    constexpr int S_SOLUTION = 0;  //!< solution domain: gather source, never written
+    constexpr int S_FILL     = 1;  //!< fill target with a well-posed image stencil
+    constexpr int S_PENDING  = 2;  //!< fill target with an ill-posed image stencil
+    constexpr int S_DEEP     = 3;  //!< deep inside the conductor (or degenerate normal): zeroed
+    constexpr int S_RESOLVED = 4;  //!< well-posed target written and locked during this call
+    constexpr int S_JUSTDONE = 5;  //!< pending target written in the current cascade sweep
+    constexpr int S_RESOLVED_P = 6; //!< pending target written and locked during this call
+
+    // A fill target is well-posed when at least this fraction of every
+    // component's image-interpolation weight lies in the solution domain
+    constexpr amrex::Real W_MIN = 0.5;
+
+    /** Mirror-image geometry of one staggered point: signed distance,
+     *  image-point position and its distance from the surface. */
+    struct MirrorGeom
+    {
+        bool band;        //!< in the fill band with a usable boundary normal
+        amrex::Real s;    //!< signed distance of the point (< 0 in the conductor)
+        amrex::Real d_im; //!< distance of the image point from the surface
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xe;  //!< point position
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xim; //!< image position
+        amrex::RealVect nv; //!< unit boundary normal (toward the plasma)
+    };
+
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    MirrorGeom mirror_geom (
+        int i, int j, int k,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& stag_own,
+        amrex::Array4<amrex::Real const> const& phi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx_arr,
+        amrex::Real d_band, amrex::Real d_img_min, amrex::Real h_max) noexcept
+    {
+        using namespace amrex::literals;
+
+        MirrorGeom g{};
+
+        // point position in physical coordinates
+        auto& xe = g.xe;
+#if defined(WARPX_DIM_3D)
+        xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
+        xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
+        xe[2] = plo[2] + (k + stag_own[2])*dx_arr[2];
+        amrex::Real const yq = xe[1];
+        amrex::Real const zq = xe[2];
+#else
+        amrex::ignore_unused(k);
+        xe[0] = plo[0] + (i + stag_own[0])*dx_arr[0];
+        xe[1] = plo[1] + (j + stag_own[1])*dx_arr[1];
+        amrex::Real const yq = 0._rt;
+        amrex::Real const zq = xe[1];
+#endif
+
+        // signed distance at the point (< 0 in the conductor)
+        int ii, jj, kk;
+        amrex::Real W[AMREX_SPACEDIM][2];
+        ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+            xe[0], yq, zq, plo, dxi, ii, jj, kk, W);
+        g.s = ablastr::particles::interp_field_nodal(ii, jj, kk, W, phi);
+
+        if (g.s < -d_band) {
+            g.band = false;
+            return g;
+        }
+
+        // Boundary normal (toward the plasma) from the level set. The
+        // post-#7051 interp_normal returns a unit 3D Cartesian normal for
+        // every dimensionality; with yq = 0 the RZ azimuthal rotation is the
+        // identity, so components 0 and 2 are the (x,z)/(r,z) grid normal.
+        auto const n3 = DistanceToEB::interp_normal(xe[0], yq, zq, plo, dxi, phi);
+#if defined(WARPX_DIM_3D)
+        g.nv = amrex::RealVect(
+            amrex::Real(n3[0]), amrex::Real(n3[1]), amrex::Real(n3[2]));
+#else
+        g.nv = amrex::RealVect(amrex::Real(n3[0]), amrex::Real(n3[2]));
+#endif
+        amrex::Real const nv2 = DistanceToEB::dot_product(g.nv, g.nv);
+        if (!std::isfinite(nv2) || !(nv2 > 0._rt)) {
+            // degenerate level-set gradient (interp_normal normalizes
+            // internally, so a vanishing gradient arrives non-finite):
+            // treat as deep interior
+            g.band = false;
+            return g;
+        }
+
+        // image point in the plasma, at least one cell away from this point
+        // so that the interpolation stencil decouples from the fill band;
+        // d_im is its distance from the surface (linear tangential profile)
+        amrex::Real const offset =
+            amrex::max(amrex::max(std::abs(g.s), d_img_min) - g.s, h_max);
+        g.d_im = g.s + offset;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            g.xim[d] = xe[d] + offset*g.nv[d];
+        }
+        g.band = true;
+        return g;
+    }
+
+    /** Parity-correct mirror value of component \c c built from the image-point
+     *  field (Jx_im, Jy_im, Jz_im) and the unit boundary normal \c nv, with the
+     *  normal weight \c w_n and the tangential weight \c w_t: the planar
+     *  reflection w_n*(n.J)n_c + w_t*(J_c - (n.J)n_c). */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real mirror_combine (
+        int c,
+        amrex::Real Jx_im, amrex::Real Jy_im, amrex::Real Jz_im,
+        amrex::RealVect const& nv, amrex::Real w_n, amrex::Real w_t) noexcept
+    {
+        using namespace amrex::literals;
+#if defined(WARPX_DIM_3D)
+        amrex::Real const ndotJ = nv[0]*Jx_im + nv[1]*Jy_im + nv[2]*Jz_im;
+        amrex::Real const J_im_e = (c == 0) ? Jx_im : ((c == 1) ? Jy_im : Jz_im);
+        amrex::Real const rad_c = ndotJ * nv[c];   // radial (normal) part along c
+        return w_n*rad_c + w_t*(J_im_e - rad_c);
+#else
+        amrex::ignore_unused(Jy_im);
+        amrex::Real const ndotJ = nv[0]*Jx_im + nv[1]*Jz_im;
+        amrex::Real const e_dot_n = (c == 0) ? nv[0] : ((c == 2) ? nv[1] : 0._rt);
+        amrex::Real const J_im_e = (c == 0) ? Jx_im : ((c == 1) ? Jy_im : Jz_im);
+        amrex::Real const rad_c = ndotJ * e_dot_n;
+        return w_n*rad_c + w_t*(J_im_e - rad_c);
+#endif
+    }
+
+    /** Build the fill classification of every staggered point of the three
+     *  field components (see the status codes above). Depends only on the
+     *  embedded-boundary geometry and the update masks, so the result is
+     *  cacheable until the grids change. */
+    inline void build_fill_status (
+        warpx::hybrid::EBFillStatus& st,
+        ablastr::fields::VectorField const& field,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update,
+        amrex::MultiFab const& distance_to_eb,
+        amrex::Geometry const& geom,
+        std::array<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 3> const& stag,
+        amrex::Real d_band, amrex::Real d_img_min, amrex::Real h_max,
+        bool fill_covered_centers)
+    {
+        using namespace amrex::literals;
+
+        auto const plo = geom.ProbLoArray();
+        auto const dxi = geom.InvCellSizeArray();
+        auto const dx_arr = geom.CellSizeArray();
+
+        for (int c = 0; c < 3; ++c) {
+            st.status[c] = std::make_unique<amrex::iMultiFab>(
+                field[c]->boxArray(), field[c]->DistributionMap(), 1,
+                field[c]->nGrowVect());
+        }
+
+        // First pass: solution domain vs fill target vs deep interior
+        for (int c = 0; c < 3; ++c) {
+            auto const stag_own = stag[c];
+            for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+                auto const& stat = st.status[c]->array(mfi);
+                auto const& mask = eb_update[c]->const_array(mfi);
+                auto const& phi = distance_to_eb.const_array(mfi);
+
+                amrex::ParallelFor(tb,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                {
+                    auto const g = mirror_geom(i, j, k, stag_own, phi,
+                        plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                    if (mask(i, j, k) != 0) {
+                        // Updated by the solver. With fill_covered_centers, cut
+                        // points whose centers are on or inside the surface are
+                        // fill targets anyway (the solver evaluates them there).
+                        stat(i, j, k) = (fill_covered_centers && g.s <= 0._rt)
+                            ? (g.band ? S_FILL : S_DEEP) : S_SOLUTION;
+                    } else {
+                        stat(i, j, k) = g.band ? S_FILL : S_DEEP;
+                    }
+                });
+            }
+            st.status[c]->FillBoundary(geom.periodicity());
+        }
+
+        // Second pass: a fill target is well-posed only if every component
+        // of its mirror-image interpolation keeps at least W_MIN of its
+        // stencil weight in the solution domain
+        amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
+        amrex::ReduceData<int> reduce_data(reduce_op);
+        using ReduceTuple = typename decltype(reduce_data)::Type;
+
+        for (int c = 0; c < 3; ++c) {
+            auto const stag_own = stag[c];
+            auto const stag_x = stag[0];
+            auto const stag_y = stag[1];
+            auto const stag_z = stag[2];
+            for (amrex::MFIter mfi(*st.status[c], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                amrex::Box const tb = mfi.tilebox(field[c]->ixType().toIntVect());
+                auto const& stat = st.status[c]->array(mfi);
+                auto const& stat_x = st.status[0]->const_array(mfi);
+                auto const& stat_y = st.status[1]->const_array(mfi);
+                auto const& stat_z = st.status[2]->const_array(mfi);
+                auto const& Jx_l = field[0]->const_array(mfi);
+                auto const& Jy_l = field[1]->const_array(mfi);
+                auto const& Jz_l = field[2]->const_array(mfi);
+                auto const& phi = distance_to_eb.const_array(mfi);
+
+                reduce_op.eval(tb, reduce_data,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+                {
+                    if (stat(i, j, k) != S_FILL) { return {0}; }
+
+                    auto const g = mirror_geom(i, j, k, stag_own, phi,
+                        plo, dxi, dx_arr, d_band, d_img_min, h_max);
+                    auto const in_solution_x =
+                        [&] (int ig, int jg, int kg) { return stat_x(ig, jg, kg) == S_SOLUTION; };
+                    auto const in_solution_y =
+                        [&] (int ig, int jg, int kg) { return stat_y(ig, jg, kg) == S_SOLUTION; };
+                    auto const in_solution_z =
+                        [&] (int ig, int jg, int kg) { return stat_z(ig, jg, kg) == S_SOLUTION; };
+                    auto const [vx, wx] = gather_staggered_pred(Jx_l, in_solution_x, g.xim, stag_x, plo, dxi, 0);
+                    auto const [vy, wy] = gather_staggered_pred(Jy_l, in_solution_y, g.xim, stag_y, plo, dxi, 0);
+                    auto const [vz, wz] = gather_staggered_pred(Jz_l, in_solution_z, g.xim, stag_z, plo, dxi, 0);
+                    amrex::ignore_unused(vx, vy, vz);
+
+                    if (amrex::min(wx, amrex::min(wy, wz)) < W_MIN) {
+                        stat(i, j, k) = S_PENDING;
+                        return {1};
+                    }
+                    return {0};
+                });
+            }
+        }
+
+        auto const result = reduce_data.value(reduce_op);
+        int n_pending = amrex::get<0>(result);
+        amrex::ParallelDescriptor::ReduceIntSum(n_pending);
+        st.n_pending = n_pending;
+
+        for (int c = 0; c < 3; ++c) {
+            st.status[c]->FillBoundary(geom.periodicity());
+        }
+    }
+#endif
+
+}
+
+#endif // WARPX_EBJBOUNDARY_K_H_

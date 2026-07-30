@@ -1600,7 +1600,9 @@ void WarpX::InitializeEBGridData (int lev)
         {
             using warpx::fields::FieldType;
 
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+            // ECT geometry and face extensions: for the ECT Maxwell solver and
+            // for the hybrid-PIC conformal wall (hybrid_pic_model.use_conformal_eb).
+            if (WarpX::UseConformalEBSolve()) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
                 warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
@@ -1617,6 +1619,19 @@ void WarpX::InitializeEBGridData (int lev)
                     m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel()),
                     face_areas_lev,
                     edge_lengths_lev, area_mod);
+
+                // Face owner masks: borrowing decisions are owner-unique so
+                // that multi-box layouts make each physical face's decision
+                // exactly once (rebuilt here on init, restart and regrid)
+                if (static_cast<int>(m_ect_face_owner_mask.size()) <= maxLevel()) {
+                    m_ect_face_owner_mask.resize(maxLevel()+1);
+                }
+                for (int idim = 0; idim < 3; ++idim) {
+                    m_ect_face_owner_mask[maxLevel()][idim] = amrex::OwnerMask(
+                        *m_fields.get(FieldType::Bfield_fp, ablastr::fields::Direction{idim}, maxLevel()),
+                        Geom(maxLevel()).periodicity());
+                }
+
                 ComputeFaceExtensions();
 
                 // Mark on which grid points E should be updated

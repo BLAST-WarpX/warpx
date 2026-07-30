@@ -2175,6 +2175,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
         This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor.
 
+    use_conformal_eb: bool, default=False
+        If True, use the conformal (enlarged-cell technique) embedded-boundary
+        wall for the B push, with a constitutive perfect-conductor closure
+        (Ohm's-law E and the Ampere current are zeroed on covered and cut
+        edges). Requires embedded boundaries, a staggered (Yee) grid, and 3D
+        or 2D Cartesian geometry.
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
@@ -2230,6 +2237,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         substep_max_growth=None,
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
+        use_conformal_eb=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2256,6 +2264,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.max_substep_attempts = max_substep_attempts
 
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
+
+        self.use_conformal_eb = use_conformal_eb
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2307,6 +2317,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.substep_max_growth = self.substep_max_growth
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
+        pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(

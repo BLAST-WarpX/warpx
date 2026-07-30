@@ -1,0 +1,5 @@
+# base input parameters
+FILE = inputs_test_2d_embedded_boundary_rotated_cube
+
+# test input parameters
+amr.n_cell = 64 64

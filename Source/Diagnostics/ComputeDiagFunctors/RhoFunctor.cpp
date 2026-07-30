@@ -6,10 +6,14 @@
     #include "FieldSolver/SpectralSolver/SpectralSolverRZ.H"
     #include "Utils/WarpXAlgorithmSelection.H"
 #endif
+#include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/EBJBoundary.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpX.H"
 
 #include <AMReX.H>
@@ -75,6 +79,24 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
 #else
     amrex::ignore_unused(m_apply_rz_psatd_filter);
 #endif
+
+    // Match the conformal wall's rho treatment in HybridPICDepositRhoAndJ:
+    // fold covered-point deposit back across the PEC surface and apply the
+    // Dirichlet fill (rho -> 0 at the wall) to the diagnosed density.
+    if (EB::enabled() &&
+        WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC &&
+        warpx.get_pointer_HybridPICModel()->m_use_conformal_eb)
+    {
+        warpx::hybrid::FoldEBDepositToNodalScalar(
+            *rho,
+            *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),
+            warpx.Geom(m_lev));
+        warpx::hybrid::ApplyEBBoundaryToNodalScalar(
+            *rho,
+            *warpx.m_fields.get(warpx::fields::FieldType::distance_to_eb, m_lev),
+            warpx.Geom(m_lev),
+            /*odd=*/true);
+    }
 
     InterpolateMFForDiag(mf_dst, *rho, dcomp, warpx.DistributionMap(m_lev),
                          m_convertRZmodes2cartesian);
