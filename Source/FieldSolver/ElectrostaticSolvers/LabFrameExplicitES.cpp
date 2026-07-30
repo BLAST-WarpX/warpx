@@ -9,6 +9,7 @@
 #include "LabFrameExplicitES.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "Fields.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Python/callbacks.H"
@@ -49,6 +50,19 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     auto & warpx = WarpX::GetInstance();
     warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
 
+    // get epsilon from macroscopic properties if it exists
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> active_epsilon = std::nullopt;
+    auto* mac_props = const_cast<MacroscopicProperties*>(warpx.GetMacroscopicProperties());
+    if (mac_props != nullptr) {
+        amrex::Vector<amrex::MultiFab const*> macro_epsilon;
+        for (int lev = 0; lev <= max_level; ++lev) {
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(lev == 0,
+                "Macroscopic properties are currently only supported for single-level (no AMR) simulations.");
+            macro_epsilon.push_back(&mac_props->getepsilon_mf());
+        }
+        active_epsilon = macro_epsilon;
+    }
+
 #ifndef WARPX_DIM_RZ
     for (int lev = 0; lev < num_levels; lev++) {
         // Reflect density over PEC boundaries, if needed.
@@ -77,7 +91,8 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
         computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
                    self_fields_absolute_tolerance, self_fields_max_iters,
-                   self_fields_verbosity, is_igf_2d_slices, Efield_fp);
+                   self_fields_verbosity, is_igf_2d_slices, Efield_fp,
+                   active_epsilon);
 #endif
 
     }
