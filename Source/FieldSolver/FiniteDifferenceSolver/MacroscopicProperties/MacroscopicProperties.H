@@ -95,6 +95,8 @@ public:
 
 private:
 
+    /** Option to use with electrostatic, defaults to Faxwell */
+    bool m_do_electrostatic = false;
     /** Conductivity, sigma, of the medium */
     amrex::Real m_sigma = 0.0;
     /** Permittivity, epsilon, of the medium */
