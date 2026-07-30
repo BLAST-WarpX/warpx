@@ -5,6 +5,9 @@
  */
 #include "pyWarpX.H"
 
+#include <WarpX.H>
+
+#include <AMReX.H>
 #include <AMReX_SIMD.H>
 
 #ifdef WARPX_USE_OPENPMD
@@ -86,6 +89,7 @@ void init_Config (py::module& m)
 
     std::shared_ptr<ConfigMap const> const config = std::make_shared<ConfigMap>(
         ConfigMap{
+            {"amrex_version", amrex::Version()},
             {"gpu_backend", gpu_backend},
             {"have_fft",
 #ifdef WARPX_USE_FFT
@@ -151,9 +155,26 @@ void init_Config (py::module& m)
 #endif
             },
             {"simd_size",
-                static_cast<int>(amrex::simd::native_simd_size_particlereal)}
+                static_cast<int>(amrex::simd::native_simd_size_particlereal)},
+            {"warpx_version", WarpX::Version()}
         }
     );
+
+    std::map<std::string, char const *> const doc = {
+        {"amrex_version", "AMReX library version used to build WarpX"},
+        {"gpu_backend", "GPU backend ('CUDA', 'HIP' or 'SYCL'), None without GPU support"},
+        {"have_fft", "Build supports FFT-based (spectral) solvers and features"},
+        {"have_gpu", "Build supports GPUs"},
+        {"have_mpi", "Build supports MPI"},
+        {"have_omp", "Build supports OpenMP"},
+        {"have_openpmd", "Build supports openPMD I/O"},
+        {"have_simd", "Build supports explicit SIMD vectorization"},
+        {"openpmd_backends", "Available openPMD-api backends and if they are enabled"},
+        {"precision", "Floating point precision of amrex::Real ('SINGLE' or 'DOUBLE')"},
+        {"precision_particles", "Floating point precision of amrex::ParticleReal ('SINGLE' or 'DOUBLE')"},
+        {"simd_size", "Number of amrex::ParticleReal elements in a native SIMD vector"},
+        {"warpx_version", "WarpX version"}
+    };
 
     // create a custom metaclass deriving from pybind11's metaclass, so that
     // repr(Config) prints the full build configuration in interactive use
@@ -181,7 +202,8 @@ void init_Config (py::module& m)
             entry.first.c_str(),
             [config, name = entry.first](py::object const &) {
                 return config->at(name);
-            }
+            },
+            doc.at(entry.first)
         );
     }
     pyWarpXConfig.def_static(
