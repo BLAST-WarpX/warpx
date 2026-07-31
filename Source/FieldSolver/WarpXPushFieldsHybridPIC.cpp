@@ -260,6 +260,18 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 MultiFab::Add(*rho_fp[lev], *rho_spec[lev],
                               0, 0, 1, rho_fp[lev]->nGrowVect());
             }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Radial geometries: apply the inverse-volume scaling to the
+            // per-species deposit so it carries a physical charge density,
+            // with the same scale-then-guard-sum processing as the totals
+            // below. The Joule and Q_ei sources compare the species sum
+            // against the physical rho_floor (and recover n_s from it), so
+            // a raw radial deposit would engage the floor at healthy
+            // densities near the axis and corrupt the species fractions.
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
+            }
+#endif
             // The per-species charge densities themselves are consumed
             // directly (species fractions in the Joule and Q_ei sources) and
             // need their own guard-cell sum here.
@@ -269,10 +281,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
                     rho_spec[lev]->nGrowVect(), rho_spec[lev]->nGrowVect(),
                     WarpX::do_single_precision_comms, Geom(lev).periodicity());
             }
-            // Species-summed raw charge density (same form as the rho_fp_s
-            // numerators), shared by the electron-energy-equation and
-            // per-species-resistivity consumers. Accumulated AFTER the
-            // guard-cell sum so its valid and ghost cells are final.
+            // Species-summed physical charge density (same form as the
+            // rho_fp_s numerators), shared by the electron-energy-equation
+            // consumers. Accumulated AFTER the guard-cell sum so its valid
+            // and ghost cells are final.
             for (int lev = 0; lev <= finest_level; ++lev) {
                 MultiFab::Add(*rho_species_sum[lev], *rho_spec[lev],
                               0, 0, 1, rho_species_sum[lev]->nGrowVect());
