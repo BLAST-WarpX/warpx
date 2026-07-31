@@ -31,6 +31,9 @@ Picking the wrong one compiles and runs, but can produce silently wrong results,
    They make scatter kernels safe between GPU threads, but they do *not* make a ``ParallelFor`` loop safe on CPU: under the SIMD pragma the compiler may still vectorize the loop, and vector lanes that hit the same address lose all but one update.
    A kernel that needs ``Gpu::Atomic`` because iterations collide almost always needs ``amrex::For`` (or ``ParallelForRNG``) rather than ``ParallelFor``.
 
+   ``amrex::HostDevice::Atomic`` (``Add``, ``FetchAdd``) is atomic on GPU *and* across OpenMP threads on CPU, so prefer it over ``Gpu::Atomic`` in host-device code.
+   It still does not make a ``ParallelFor`` safe: the SIMD pragma's independence promise remains violated, and in non-OpenMP builds the update is a plain ``+=``.
+
 Getting ``amrex::ParallelFor`` and atomics wrong is silent and compiler-dependent: the miscompilation only appears when a vectorizer decides to act on the pragma.
 For example, GCC 15 vectorized the charge deposition loop for cubic shape factors in 1D, which dropped three of every four contributions and produced a charge density four times too small, while GCC 13 left the same invalid code intact.
 See `issue #7097 <https://github.com/BLAST-WarpX/warpx/issues/7097>`__ for the full analysis.
