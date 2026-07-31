@@ -875,14 +875,6 @@ WarpX::ReadParameters ()
                 // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
                     "In cylindrical and spherical geometry with FDTD, filtering can not be done in the radial direction. This can be controlled by setting warpx.filter_npass_each_dir");
-            } else {
-                if (use_filter && filter_npass_each_dir[0] > 0) {
-                    ablastr::warn_manager::WMRecordWarning(
-                        "HybridPIC ElectromagneticSolver",
-                        "Radial Filtering in cylindrical and spherical geometry is not currently using radial geometric weighting to conserve charge. Use at your own risk.",
-                        ablastr::warn_manager::WarnPriority::low
-                    );
-                }
             }
         }
 #endif
