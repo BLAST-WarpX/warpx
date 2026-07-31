@@ -129,7 +129,7 @@ public:
      *\f]
      *(this represents the term \f$\vec{\nabla} \times \vec{A}\f$, in the case of a moving source)
      *
-     *\param[inout] B Electric field on the grid
+     *\param[inout] B Magnetic field on the grid
      *\param[in] phi The potential from which to compute the electric field
      *\param[in] beta Represents the velocity of the source of `phi`
      */
@@ -156,6 +156,8 @@ public:
      *  2 : convergence progress at every MLMG iteration
      */
     int self_fields_verbosity = 2;
+    /** MLGM number of smoothing sweeps */
+    int self_fields_num_final_sweeps = 8;
 
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)
