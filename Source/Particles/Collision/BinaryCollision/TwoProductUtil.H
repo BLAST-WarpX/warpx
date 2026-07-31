@@ -121,7 +121,7 @@ namespace {
             (static_cast<double>(m1_in) + static_cast<double>(m2_in))*c2_d;
         const double E_rest_out_d =
             (static_cast<double>(m1_out) + static_cast<double>(m2_out))*c2_d;
-        const double E_reaction_d = static_cast<double>(E_reaction);
+        const auto E_reaction_d = static_cast<double>(E_reaction);
         const double E_star_f_d =
             std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d;
         const double E_star_f_sq_d = std::max(E_star_f_d*E_star_f_d, 0.0);
@@ -130,8 +130,8 @@ namespace {
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
-        const double m1_out_d = static_cast<double>(m1_out);
-        const double m2_out_d = static_cast<double>(m2_out);
+        const auto m1_out_d = static_cast<double>(m1_out);
+        const auto m2_out_d = static_cast<double>(m2_out);
         const double E_ratio_d =
             std::sqrt(E_star_f_sq_d) / ((m1_out_d + m2_out_d) * c2_d);
         double p_star_f_sq_d = 0.0;

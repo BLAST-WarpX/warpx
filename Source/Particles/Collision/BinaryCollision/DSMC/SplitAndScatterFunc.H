@@ -430,8 +430,8 @@ public:
 
                 // Calculate the kinetic energy of the collision. Squared SI momenta
                 // underflow in single precision, so keep these intermediates in double.
-                const double m0_d = static_cast<double>(m0);
-                const double m1_d = static_cast<double>(m1);
+                const auto m0_d = static_cast<double>(m0);
+                const auto m1_d = static_cast<double>(m1);
                 const double p_non_target_in_d = m0_d * std::sqrt(
                     static_cast<double>(ux0)*static_cast<double>(ux0)
                     + static_cast<double>(uy0)*static_cast<double>(uy0)
@@ -480,7 +480,7 @@ public:
                         std::sqrt(2.0*E_out_d / (1.0/m0_d + 1.0/products_mass_d));
 
                     // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
-                    const amrex::ParticleReal reduce_factor =
+                    const auto reduce_factor =
                         static_cast<amrex::ParticleReal>(
                             p_non_target_out_d/p_non_target_in_d);
                     ux0 *= reduce_factor;
@@ -534,9 +534,9 @@ public:
                         / (1.0/m0_d
                            + 0.5*static_cast<double>(scaled_u2_ion)
                                / static_cast<double>(m_ion)));
-                    const amrex::ParticleReal u_e =
+                    const auto u_e =
                         static_cast<amrex::ParticleReal>(p_e_d/m0_d);
-                    const amrex::ParticleReal u_ion =
+                    const auto u_ion =
                         static_cast<amrex::ParticleReal>(
                             p_e_d/static_cast<double>(m_ion));
 
