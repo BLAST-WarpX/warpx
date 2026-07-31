@@ -806,6 +806,18 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
         WarpX::do_single_precision_comms,
         warpx.Geom(lev).periodicity(),
         true);
+
+    // The resistive-drag operator gathers T_e at particle positions (for the
+    // per-species resistivity parser), so its ghosts must be exchanged too.
+    // On the energy-equation path this happens where T_e is evolved; here on
+    // the closure path it is only needed (and paid) when the drag is active.
+    if (m_need_fluid_velocities) {
+        amrex::MultiFab & Te = *warpx.m_fields.get(
+            FieldType::hybrid_electron_temperature_fp, lev);
+        ablastr::utils::communication::FillBoundary(
+            Te, WarpX::do_single_precision_comms,
+            warpx.Geom(lev).periodicity(), true);
+    }
 }
 
 void HybridPICModel::CalculateElectronFluidVelocity () const

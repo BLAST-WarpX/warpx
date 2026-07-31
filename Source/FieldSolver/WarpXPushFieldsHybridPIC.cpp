@@ -319,6 +319,24 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
             }
+            // The resistive-drag operator gathers rho_fp_<spec> and
+            // current_fp_<spec> at particle positions, so their ghost cells
+            // must hold the neighbor's values (SumBoundary above folds ghost
+            // contributions into the valid cells but leaves the ghosts
+            // stale). The grid-side consumers only read valid cells, so this
+            // exchange is needed (and paid) only when the drag is active.
+            if (m_hybrid_pic_model->m_has_resistive_drag) {
+                for (int lev = 0; lev <= finest_level; ++lev) {
+                    ablastr::utils::communication::FillBoundary(
+                        *rho_spec[lev], rho_spec[lev]->nGrowVect(),
+                        WarpX::do_single_precision_comms, Geom(lev).periodicity());
+                    for (int idim = 0; idim < 3; ++idim) {
+                        ablastr::utils::communication::FillBoundary(
+                            *J_spec[lev][idim], J_spec[lev][idim]->nGrowVect(),
+                            WarpX::do_single_precision_comms, Geom(lev).periodicity());
+                    }
+                }
+            }
             // Species-summed physical charge density (same form as the
             // rho_fp_s numerators), shared by the electron-energy-equation
             // and per-species-resistivity consumers. Accumulated AFTER the
