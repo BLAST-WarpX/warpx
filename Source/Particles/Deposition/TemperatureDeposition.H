@@ -480,8 +480,9 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     const amrex::IntVect & vary_type = vary_fab.box().type();
     const amrex::IntVect & varz_type = varz_fab.box().type();
 
-    // Loop over particles and deposit into the deposition buffers
-    amrex::ParallelFor(
+    // Loop over particles and deposit into the deposition buffers.
+    // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long ip) {
             amrex::ParticleReal xp, yp, zp;

@@ -182,8 +182,9 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
     amrex::ParticleReal * const AMREX_RESTRICT uy_electrons = soa_electrons.m_rdata[PIdx::uy];
     amrex::ParticleReal * const AMREX_RESTRICT uz_electrons = soa_electrons.m_rdata[PIdx::uz];
 
-    // Loop over photons
-    amrex::ParallelFor(np_photons,
+    // Loop over photons.
+    // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+    amrex::For(np_photons,
         [=] AMREX_GPU_DEVICE (int ip) noexcept
         {
             const int i_cell = bins_photons_ptr[ip];
@@ -236,16 +237,18 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
 
         });
 
-    // Need total electron weight to determine how much momentum is given to each electron
-    amrex::ParallelFor(np_electrons,
+    // Need total electron weight to determine how much momentum is given to each electron.
+    // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+    amrex::For(np_electrons,
         [=] AMREX_GPU_DEVICE (int ie) noexcept
         {
             const int i_cell = bins_electrons_ptr[ie];
             amrex::Gpu::Atomic::AddNoRet(&w_sum_electrons_in_each_cell[i_cell], w_electrons[ie]);
         });
 
-    // Distribute momentum absorbed from photons to electrons
-    amrex::ParallelFor(np_electrons,
+    // Distribute momentum absorbed from photons to electrons.
+    // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+    amrex::For(np_electrons,
         [=] AMREX_GPU_DEVICE (int ie) noexcept
         {
             const int i_cell = bins_electrons_ptr[ie];
@@ -292,8 +295,10 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
     const amrex::ParticleReal energy_fraction = m_energy_fraction;
 
     // Distribute any remaining energy to the electrons using the pairwise
-    // operation (that does not affect the total momentum)
-    amrex::ParallelFor(n_cells,
+    // operation (that does not affect the total momentum).
+    // amrex::For: iterations share the failed-corrections counter, which gates
+    // the fallback below (no SIMD pragma, see issue #7097)
+    amrex::For(n_cells,
         [=] AMREX_GPU_DEVICE (int i_cell) noexcept
         {
 
