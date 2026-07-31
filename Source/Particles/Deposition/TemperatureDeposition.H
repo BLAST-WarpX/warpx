@@ -209,7 +209,12 @@ void doVarianceDepositionShapeNKernel(
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
     const amrex::Real zpmid = zp + relative_time*vz;
+    const amrex::Real rpxymid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
+    const amrex::Real costheta_mid = (rpxymid > 0._rt) ? xpmid/rpxymid : 1._rt;
+    const amrex::Real sintheta_mid = (rpxymid > 0._rt) ? ypmid/rpxymid : 0._rt;
+    const amrex::Real cosphi_mid = (rpmid > 0._rt) ? rpxymid/rpmid : 1._rt;
+    const amrex::Real sinphi_mid = (rpmid > 0._rt) ? zpmid/rpmid : 0._rt;
 
     const double xmid = (rpmid - xyzmin.x)*dinv.x;
 #else
@@ -308,11 +313,15 @@ void doVarianceDepositionShapeNKernel(
     // Deposit velocity moments in the cylindrical basis used by the mesh.
     const amrex::ParticleReal v1 = vx*costheta_mid + vy*sintheta_mid;
     const amrex::ParticleReal v2 = -vx*sintheta_mid + vy*costheta_mid;
-#else
-    const amrex::ParticleReal v1 = vx;
-    const amrex::ParticleReal v2 = vy;
-#endif
     const amrex::ParticleReal v3 = vz;
+#elif defined(WARPX_DIM_RSPHERE)
+    // Deposit velocity moments in the spherical basis used by the mesh.
+    const amrex::ParticleReal v1 = vx*costheta_mid*cosphi_mid
+                                 + vy*sintheta_mid*cosphi_mid + vz*sinphi_mid;
+    const amrex::ParticleReal v2 = -vx*sintheta_mid + vy*costheta_mid;
+    const amrex::ParticleReal v3 = -vx*costheta_mid*sinphi_mid
+                                 - vy*sintheta_mid*sinphi_mid + vz*cosphi_mid;
+#endif
 
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
@@ -325,7 +334,7 @@ void doVarianceDepositionShapeNKernel(
         const amrex::IntVectND<3> izv{lo.z+l_jz+iz, 0, 0};
 
         varianceDepositionSubKernel(
-            v1, v2, v3,
+            vx, vy, vz,
             ixv, iyv, izv,
             wpx_var, wpy_var, wpz_var,
             nx_arr, ny_arr, nz_arr,
@@ -368,7 +377,11 @@ void doVarianceDepositionShapeNKernel(
             const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.z+l_jz+iz, 0};
 
             varianceDepositionSubKernel(
+#if defined(WARPX_DIM_RZ)
                 v1, v2, v3,
+#else
+                vx, vy, vz,
+#endif
                 ixv, iyv, izv,
                 wpx_var, wpy_var, wpz_var,
                 nx_arr, ny_arr, nz_arr,
@@ -392,7 +405,7 @@ void doVarianceDepositionShapeNKernel(
                 const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz};
 
                 varianceDepositionSubKernel(
-                    v1, v2, v3,
+                    vx, vy, vz,
                     ixv, iyv, izv,
                     wpx_var, wpy_var, wpz_var,
                     nx_arr, ny_arr, nz_arr,
