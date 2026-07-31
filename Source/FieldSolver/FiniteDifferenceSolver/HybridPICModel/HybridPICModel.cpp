@@ -647,16 +647,14 @@ void HybridPICModel::BfieldEvolve (
     // 95/5 blend, stays even, holds when N == M, and actually decays when
     // N < M (e.g. m=40, n_attempts=10 → 38 → … → 20). Floating-point
     // 0.95*M+0.05*N can undershoot M slightly so floor would leak even at
-    // equilibrium. Old stock code used 2*ceil(0.475*m + 0.05*n), which froze
-    // m at the user input for typical n_attempts. No hard floor at the user
-    // input: hybrid_pic_model.substeps remains an initial estimate only.
+    // equilibrium.
     {
-        const int target = 2 * std::max(n_attempts, 1);
+        const int target = 2 * n_attempts;
         if (m_substeps < target) {
             m_substeps = target;
         } else {
             const int M = m_substeps / 2;
-            const int N = std::max(n_attempts, 1);
+            const int N = n_attempts;
             const int relaxed = 2 * ((19 * M + N) / 20);
             m_substeps = std::max(relaxed, 2);
         }
