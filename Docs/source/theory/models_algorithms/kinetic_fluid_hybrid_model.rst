@@ -131,6 +131,82 @@ input parameters, :math:`T_{e0}`, :math:`n_0` and :math:`\gamma` using
 The isothermal limit is given by :math:`\gamma = 1` while :math:`\gamma = 5/3`
 (default) produces the adiabatic limit.
 
+Alternatively, the electron temperature entering the pressure can be evolved
+in space and time with the electron energy equation, as described in the next
+section.
+
+.. _theory-hybrid-model-electron-energy-eq:
+
+Electron energy equation
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Instead of evaluating the polytropic closure with the constant reference state
+:math:`(n_0, T_{e0})`, WarpX can evolve the electron temperature
+:math:`T_e(\vec{x}, t)` with the electron internal-energy equation
+(``hybrid_pic_model.solve_electron_energy_equation``),
+
+    .. math::
+
+        \frac{\partial U_e}{\partial t} + \nabla\cdot(U_e \vec{V}_e) + P_e \nabla\cdot\vec{V}_e = S_e,
+
+where :math:`U_e = n_e k_B T_e/(\gamma - 1)` is the electron internal energy
+density, :math:`\vec{V}_e = \vec{J}_e/(-e n_e)` is the electron fluid velocity
+and :math:`S_e` collects the source and sink terms. The local electron
+pressure :math:`P_e = n_e k_B T_e` then feeds back into Ohm's law.
+
+The homogeneous part of the equation (the left-hand side) is solved with the
+QDSMC kinetic-enslavement scheme of :cite:t:`kfhm-Belyaev2024`: the electron
+entropy function :math:`K_e = T_e\, n_e^{1-\gamma}`, which the transport terms
+conserve along electron-fluid characteristics, is advected by fictitious
+Lagrangian markers. Each PIC step one marker is initialized at every cell
+center carrying the local :math:`K_e N_e` and :math:`N_e` (with :math:`N_e`
+the electron count of the cell), is pushed by one timestep with
+:math:`\vec{V}_e` interpolated at its position, and both quantities are
+deposited back to the grid with the standard (linear) particle shape factors.
+The updated temperature is recovered from the deposited quantities and the
+ion-derived density as
+
+    .. math::
+
+        T_e = \frac{\sum K_e N_e}{\sum N_e}\, n_e^{\gamma - 1}.
+
+Since the scheme only advects the electron entropy, thermal conduction is
+neglected (:math:`\nabla\cdot\vec{q}_e = 0`).
+
+Two source terms can be enabled on the right-hand side. The first is the Joule
+(Ohmic) heating consistent with the resistive friction in Ohm's law
+(``hybrid_pic_model.include_joule_heating``), applied per ion species
+:math:`s`:
+
+    .. math::
+
+        \frac{d T_e}{d t} = (\gamma - 1) \sum_s \frac{Z_s e^2\, \eta_{s,\mathrm{eff}}\, n_s |\Delta\vec{V}|^2}{k_B},
+
+where :math:`\Delta\vec{V} = \vec{J}/(e n_e)` is the electron-ion relative
+drift, :math:`Z_s` the charge state and :math:`\eta_{s,\mathrm{eff}} = \eta`
+the Ohm's-law resistivity. For a single species this reduces
+exactly to the familiar :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
+Above a user-set electron temperature threshold the heat can optionally be
+redirected to the kinetic ions instead of the electron fluid
+(``hybrid_pic_model.joule_redirect_Te_threshold``), which is useful to model
+regimes where the electrons radiate strongly.
+
+The second source is the electron-ion temperature relaxation, enabled by
+specifying the rate ``hybrid_pic_model.electron_ion_relaxation_rate``,
+
+    .. math::
+
+        Q_{ei} = \sum_s 3\, n_s k_B\, \nu_{ei}\, (T_e - T_{i,s}),
+
+with the rate :math:`\nu_{ei}(\rho, T_e, T_i, t)` given by a user expression.
+The sink on the electron fluid is paired with a matching thermal-velocity
+kick on the ion macro-particles of each species so that the exchange
+conserves energy exactly.
+
+Verification tests of the transport terms (adiabatic compression), the Joule
+source (force-free field decay) and the :math:`Q_{ei}` exchange are described
+in the :ref:`examples section <examples-ohm-solver-electron-energy-eq>`.
+
 Electron current
 ^^^^^^^^^^^^^^^^
 

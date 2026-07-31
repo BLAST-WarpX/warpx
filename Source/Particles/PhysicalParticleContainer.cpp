@@ -204,6 +204,21 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
 
+    // The hybrid-PIC electron-ion temperature relaxation (Q_ei) needs the
+    // shape-aware ion temperature of every charged species, so turn the
+    // deposition on automatically when it is configured. Done here (rather
+    // than in HybridPICModel) because the flag must be known by AllocData.
+    if (!m_do_temperature_deposition && m_charge != 0._prt) {
+        const ParmParse pp_hybrid("hybrid_pic_model");
+        bool solve_electron_energy_equation = false;
+        pp_hybrid.query("solve_electron_energy_equation", solve_electron_energy_equation);
+        std::string nu_ei_expression;
+        if (solve_electron_energy_equation &&
+            pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", nu_ei_expression)) {
+            m_do_temperature_deposition = true;
+        }
+    }
+
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -1860,13 +1875,16 @@ PhysicalParticleContainer::DepositTemperature (
     // Return if we are not depositing temperature.
     if (!m_do_temperature_deposition) { return; }
 
-    if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
-        || push_type != PushType::Explicit
+    // The temperature deposit runs its own shape-N moment kernels
+    // (doVarianceDepositionShapeN) and works with any current-deposition
+    // algorithm; implicit pushers and shared-memory deposition change the
+    // u/x staging assumptions and are not supported.
+    if (push_type != PushType::Explicit
         || WarpX::do_shared_mem_current_deposition
         )
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "Temperature Deposition only works with explicit solvers, direct current deposition, "
+            "Temperature Deposition only works with explicit solvers "
             "and non-shared memory deposition."
         );
     }
