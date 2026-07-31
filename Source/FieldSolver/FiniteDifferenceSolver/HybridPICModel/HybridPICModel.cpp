@@ -474,7 +474,7 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
                 continue;
             }
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                m_resistive_drag_species.count(spec_name) != 0,
+                m_resistive_drag_species.contains(spec_name),
                 "A hybrid_resistive_drag collision is registered, but not on "
                 "charged species '" + spec_name + "'. The drag must be "
                 "registered on every charged species: with the drag active "
