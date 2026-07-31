@@ -314,8 +314,12 @@ void HybridPICModel::AllocateLevelMFs (
                     lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
             }
         }
-        // Species-summed physical charge density Sigma_s rho_fp_s, filled once
-        // per step in HybridPICDepositRhoAndJ. Shared by the Joule, Q_ei and
+        // Species-summed physical charge density Sigma_s rho_fp_s, filled
+        // once per step in HybridPICDepositRhoAndJ (volume-scaled in radial
+        // geometries like the totals, but unfiltered: the same processing as
+        // the rho_fp_s numerators, so the species fraction
+        // f_s = rho_s / Sigma_t rho_t is well-defined and the physical
+        // rho_floor applies to it). Shared by the Joule, Q_ei and
         // per-species-resistivity consumers.
         fields.alloc_init("hybrid_rho_species_sum_fp",
             lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
@@ -1421,21 +1425,25 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
 
     // Loop over every charged ion species and accumulate its per-cell
     // contribution to S_e into T_e directly. Each species contributes
-    //   dT_e_s = dt (gamma-1) * Z_s e^2 eta n_s |V_s - V_e|^2 / k_B
+    //   dT_e_s = dt (gamma-1) * Z_s e^2 eta n_s |dV|^2 / k_B
     // (the n_e factor in nu_{s,e} cancels the 1/n_e from the T_e update).
-    // V_s is computed inline from THIS STEP's physical current_fp_s /
-    // rho_fp_s. The species number density is recovered from the charge
-    // fraction
     //
-    //   f_s = rho_fp_s / Sigma_t rho_fp_t   =   Z_s n_s / n_e   (unitless,
-    //                                            in physical units)
+    // n_s is recovered from the species charge fraction rather than from
+    // rho_fp_s/q_e directly: the per-species deposits are physical (volume-
+    // scaled in radial geometries) but unfiltered and not boundary-treated,
+    // while n_e comes from the fully processed total rho_fp used by the
+    // E-solve. Taking
+    //
+    //   f_s = rho_fp_s / Sigma_t rho_fp_t   =   Z_s n_s / n_e   (unitless)
     //   n_s = f_s * n_e / Z_s
     //
-    // where n_e comes from the total rho_fp.
+    // keeps n_s consistent with that n_e in any dimensionality (numerator
+    // and denominator of f_s share identical processing).
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Sigma_t rho_fp_t, used for the species fraction
-    // f_s = rho_fp_s / rhos_sum per cell inside the species loop.
+    // Sigma_t rho_fp_t (physical per-species charge densities), used for the
+    // species fraction f_s = rho_fp_s / rhos_sum per cell inside the species
+    // loop. Filled once per step by HybridPICDepositRhoAndJ.
     amrex::MultiFab const & rhos_sum =
         *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 
@@ -1494,9 +1502,9 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 // n_e (m^-3) from the total rho_fp.
                 amrex::Real const ne = rho_val / PhysConst::q_e;
                 // Species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
-                // = Z_s n_s / n_e (unitless). Then
-                // the true per-species number density:
-                //   n_s = f_s * n_e / Z_s
+                // = Z_s n_s / n_e (unitless; both sides physical and
+                // identically processed). Then the per-species number
+                // density: n_s = f_s * n_e / Z_s
                 amrex::Real const rhos_val      = rhos_arr(i,j,k);
                 amrex::Real const rhos_sum_val  = std::max(rhosum_arr(i,j,k), rho_floor);
                 amrex::Real const f_s           = rhos_val / rhos_sum_val;
@@ -1604,8 +1612,8 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     auto & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Sigma_t rho_fp_t in physical charge-density units -> species fraction.
-    // Filled once per step by HybridPICDepositRhoAndJ.
+    // Sigma_t rho_fp_t (physical per-species charge densities) -> species
+    // fraction. Filled once per step by HybridPICDepositRhoAndJ.
     amrex::MultiFab const & rhos_sum =
         *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 

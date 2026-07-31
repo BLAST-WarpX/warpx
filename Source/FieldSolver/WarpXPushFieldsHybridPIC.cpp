@@ -289,6 +289,21 @@ void WarpX::HybridPICDepositRhoAndJ ()
                                   0, 0, 1, current_fp[lev][idim]->nGrowVect());
                 }
             }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Radial geometries: apply the inverse-volume scaling to the
+            // per-species deposits so they carry physical charge/current
+            // densities, with the same scale-then-guard-sum processing as
+            // the totals below. The per-species fields are compared with
+            // the physical rho_floor (species fractions, Vs = Js/rhos) and
+            // exposed to SI-unit parsers, so raw radial weights would
+            // engage the floors at healthy densities near the axis and
+            // break the drag/Ohm push-field cancellation there.
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
+                ApplyInverseVolumeScalingToCurrentDensity(
+                    J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
+            }
+#endif
             // The per-species fields themselves are consumed directly
             // (Vs = Js/rhos, species fractions, per-species resistivity,
             // resistive drag) and need their own guard-cell sum here.
@@ -304,22 +319,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
             }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            // Particle deposition in radial geometries omits the annular or
-            // spherical inverse-volume factor. Apply it to the per-species
-            // fields as well as the totals. These fields are compared with
-            // physical density floors and passed to SI-unit parser functions,
-            // so retaining their raw radial weights corrupts the species
-            // fraction and drag/Ohm cancellation, especially near the axis.
-            for (int lev = 0; lev <= finest_level; ++lev) {
-                ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
-                ApplyInverseVolumeScalingToCurrentDensity(
-                    J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
-            }
-#endif
-            // Species-summed physical charge density, shared by the
-            // electron-energy-equation and per-species-resistivity consumers.
-            // Accumulate after synchronization and radial volume scaling.
+            // Species-summed physical charge density (same form as the
+            // rho_fp_s numerators), shared by the electron-energy-equation
+            // and per-species-resistivity consumers. Accumulated AFTER the
+            // guard-cell sum so its valid and ghost cells are final.
             for (int lev = 0; lev <= finest_level; ++lev) {
                 MultiFab::Add(*rho_species_sum[lev], *rho_spec[lev],
                               0, 0, 1, rho_species_sum[lev]->nGrowVect());
