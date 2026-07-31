@@ -44,6 +44,7 @@
 #include <AMReX_ParticleContainerBase.H>
 #include <AMReX_AmrParticles.H>
 #include <AMReX_ParticleTile.H>
+#include <AMReX_Reduce.H>
 #include <AMReX_Scan.H>
 #include <AMReX_Utility.H>
 
@@ -279,26 +280,18 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
     // If no particles, do not do anything
     if (np_to_push == 0) { return; }
 
-    amrex::Gpu::Buffer<amrex::Long> unconverged_particles({0});
-    amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
     int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
-    amrex::ParallelFor(
-        np_to_push, [=] AMREX_GPU_DEVICE (long ip)
+    // Count how many particles did not converge.
+    num_unconverged_particles = amrex::Reduce::Sum<amrex::Long>(
+        np_to_push, [=] AMREX_GPU_DEVICE (long ip) -> amrex::Long
     {
-
-        if (nsuborbits && nsuborbits[ip] > 1) {
-            // write signaling flag: how many particles did not converge?
-            amrex::Gpu::Atomic::Add(unconverged_particles_ptr, amrex::Long(1));
-            return;
-        }
-
+        return (nsuborbits && nsuborbits[ip] > 1) ? 1 : 0;
     });
 
     // Setup for handling the suborbit particles. A list of their indices is
     // gathered, their weights saved, and their weight set to zero (so they
     // don't contribute to the current density).
-    num_unconverged_particles = *(unconverged_particles.copyToHost());
     SetupSuborbitParticles(pti, offset, np_to_push, num_unconverged_particles,
                            unconverged_indices, saved_weights);
 
@@ -556,14 +549,16 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     amrex::Long* unconverged_particles_ptr = unconverged_particles.data();
     int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset: nullptr);
 
-    // Using this version of ParallelFor with compile time options
+    // Using this version of For with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
-    amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
-                                       amrex::CompileTimeOptions<no_qed  ,has_qed>>{},
-                       {exteb_runtime_flag, qed_runtime_flag},
-                       np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
-                                                         auto qed_control)
+    // amrex::For: iterations share the unconverged-particles counter
+    // (no SIMD pragma, see issue #7097)
+    amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
+                               amrex::CompileTimeOptions<no_qed  ,has_qed>>{},
+               {exteb_runtime_flag, qed_runtime_flag},
+               np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
+                                                 auto qed_control)
     {
 
         // Skip any particles that require suborbits
@@ -916,14 +911,16 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     long * unconverged_i = unconverged_indices.data() + index_offset;
     amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;
 
-    // Using this version of ParallelFor with compile time options
+    // Using this version of For with compile time options
     // improves performance when qed or external EB are not used by reducing
     // register pressure.
-    amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
-                                       amrex::CompileTimeOptions<no_qed  ,has_qed>,
-                                       amrex::CompileTimeOptions<order_one, order_two, order_three, order_four >>{},
-                       {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
-                       num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
+    // amrex::For: iterations scatter-add into shared J/Sigma nodes
+    // (no SIMD pragma, see issue #7097)
+    amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
+                               amrex::CompileTimeOptions<no_qed  ,has_qed>,
+                               amrex::CompileTimeOptions<order_one, order_two, order_three, order_four >>{},
+               {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
+               num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
                                                                  auto exteb_control, auto qed_control, auto depos_order_control)
     {
 
