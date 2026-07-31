@@ -20,9 +20,6 @@
 #include "ExternalVectorPotential.H"
 #include "WarpX.H"
 
-#include <algorithm>
-#include <cmath>
-
 using namespace amrex;
 using warpx::fields::FieldType;
 
