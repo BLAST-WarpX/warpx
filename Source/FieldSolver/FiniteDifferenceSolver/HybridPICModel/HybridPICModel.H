@@ -514,11 +514,11 @@ public:
      *  (e.g. classical Spitzer with Z^2 scaling). Species without a
      *  per-species parser registered fall back to the global parser only.
      *  Parser variables, in order, are:
-     *    rho_s : per-species charge density        (C/m^3, unscaled in RZ)
-     *    rho   : total plasma charge density       (C/m^3, volume-scaled)
+     *    rho_s : per-species charge density        (C/m^3)
+     *    rho   : total plasma charge density       (C/m^3)
      *    Te    : electron temperature              (Kelvin)
      *    J     : |J_plasma|                        (A/m^2)
-     *    J_s   : |J_{species}|                     (A/m^2, unscaled in RZ)
+     *    J_s   : |J_{species}|                     (A/m^2)
      *    B     : |B|                               (Tesla)
      *    t     : time                              (seconds)
      */

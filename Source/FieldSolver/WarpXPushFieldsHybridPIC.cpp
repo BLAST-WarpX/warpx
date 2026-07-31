@@ -254,12 +254,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
     if (m_hybrid_pic_model->m_need_per_species_fields) {
         // Per-species deposition at t_{n+1} (rho) and t_{n-1/2} (J): each
         // charged species deposits once into its own MultiFabs and the raw
-        // deposits are accumulated into the totals rho_fp / current_fp (which
-        // get their guard-cell sum, filtering, boundaries and RZ volume
-        // scaling later, via SyncCurrentAndRho). The per-species fields are
-        // kept on the grid for downstream coupling (electron-energy-equation
-        // sources, per-species resistivity, resistive-drag collision
-        // operator).
+        // deposits are accumulated into the totals rho_fp / current_fp. The
+        // per-species fields are synchronized and converted to physical
+        // density units below for downstream coupling (electron-energy
+        // sources, per-species resistivity and resistive drag).
         auto rho_species_sum = m_fields.get_mr_levels("hybrid_rho_species_sum_fp", finest_level);
         for (int lev = 0; lev <= finest_level; ++lev) {
             rho_fp[lev]->setVal(0._rt);
@@ -306,10 +304,22 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
             }
-            // Species-summed raw charge density (same form as the rho_fp_s
-            // numerators), shared by the electron-energy-equation and
-            // per-species-resistivity consumers. Accumulated AFTER the
-            // guard-cell sum so its valid and ghost cells are final.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Particle deposition in radial geometries omits the annular or
+            // spherical inverse-volume factor. Apply it to the per-species
+            // fields as well as the totals. These fields are compared with
+            // physical density floors and passed to SI-unit parser functions,
+            // so retaining their raw radial weights corrupts the species
+            // fraction and drag/Ohm cancellation, especially near the axis.
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
+                ApplyInverseVolumeScalingToCurrentDensity(
+                    J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
+            }
+#endif
+            // Species-summed physical charge density, shared by the
+            // electron-energy-equation and per-species-resistivity consumers.
+            // Accumulate after synchronization and radial volume scaling.
             for (int lev = 0; lev <= finest_level; ++lev) {
                 MultiFab::Add(*rho_species_sum[lev], *rho_spec[lev],
                               0, 0, 1, rho_species_sum[lev]->nGrowVect());

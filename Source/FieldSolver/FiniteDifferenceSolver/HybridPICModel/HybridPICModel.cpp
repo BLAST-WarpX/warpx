@@ -314,12 +314,8 @@ void HybridPICModel::AllocateLevelMFs (
                     lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
             }
         }
-        // Species-summed raw charge density Sigma_s rho_fp_s, filled once per
-        // step in HybridPICDepositRhoAndJ. Unlike rho_fp (which is filtered,
-        // boundary-applied and volume-scaled in RZ by SyncCurrentAndRho), this
-        // keeps the same raw-deposit form as the rho_fp_s numerators, so the
-        // species fraction f_s = rho_s / Sigma_t rho_t is well-defined (the
-        // RZ 2pi*r and filter factors cancel). Shared by the Joule, Q_ei and
+        // Species-summed physical charge density Sigma_s rho_fp_s, filled once
+        // per step in HybridPICDepositRhoAndJ. Shared by the Joule, Q_ei and
         // per-species-resistivity consumers.
         fields.alloc_init("hybrid_rho_species_sum_fp",
             lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
@@ -1028,10 +1024,8 @@ void HybridPICModel::ComputeResistiveOverlay (
 
     auto const rho_floor = PhysConst::q_e * m_n_floor;
 
-    // rho_sum = Sigma_t rho_fp_t over all charged species: the unscaled
-    // "raw deposit" sum, paired with rho_s_raw in the same form so the
-    // 2pi*r RZ factor cancels in the species-fraction ratio. Filled once
-    // per step by HybridPICDepositRhoAndJ.
+    // rho_sum = Sigma_t rho_fp_t over all charged species in physical charge
+    // density units. Filled once per step by HybridPICDepositRhoAndJ.
     amrex::MultiFab const & rho_sum =
         *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 
@@ -1429,27 +1423,19 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     // contribution to S_e into T_e directly. Each species contributes
     //   dT_e_s = dt (gamma-1) * Z_s e^2 eta n_s |V_s - V_e|^2 / k_B
     // (the n_e factor in nu_{s,e} cancels the 1/n_e from the T_e update).
-    // V_s is computed inline from THIS STEP's current_fp_s / rho_fp_s;
-    // these are both deposited WITHOUT RZ volume scaling (per
-    // HybridPICDepositRhoAndJ -- apply_boundary_and_scale_volume=false),
-    // so their ratio V_s = J_s/rho_s gives correct m/s with the 2pi*r
-    // factors cancelling.
-    //
-    // n_s in the heating coefficient, however, must be a TRUE density
-    // (1/m^3). Reading rho_fp_s/q_e directly gives (2pi*r) x n_s_true
-    // in RZ. We recover the correct n_s from the species charge fraction
+    // V_s is computed inline from THIS STEP's physical current_fp_s /
+    // rho_fp_s. The species number density is recovered from the charge
+    // fraction
     //
     //   f_s = rho_fp_s / Sigma_t rho_fp_t   =   Z_s n_s / n_e   (unitless,
-    //                                            2pi*r factor cancels)
+    //                                            in physical units)
     //   n_s = f_s * n_e / Z_s
     //
-    // where n_e comes from the volume-scaled total rho_fp. Works in
-    // any dimensionality (in Cartesian the 2pi*r is just 1).
+    // where n_e comes from the total rho_fp.
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Sigma_t rho_fp_t (unscaled per-species charge densities), used for the
-    // species fraction f_s = rho_fp_s / rhos_sum per cell inside the species
-    // loop. Filled once per step by HybridPICDepositRhoAndJ.
+    // Sigma_t rho_fp_t, used for the species fraction
+    // f_s = rho_fp_s / rhos_sum per cell inside the species loop.
     amrex::MultiFab const & rhos_sum =
         *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 
@@ -1505,15 +1491,15 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
             {
                 amrex::Real const rho_val = rho_arr(i,j,k);
                 if (rho_val <= rho_floor) { return; }
-                // n_e (m^-3) from the volume-scaled total rho_fp.
+                // n_e (m^-3) from the total rho_fp.
                 amrex::Real const ne = rho_val / PhysConst::q_e;
                 // Species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
-                // = Z_s n_s / n_e (unitless; RZ 2pi*r factor cancels). Then
+                // = Z_s n_s / n_e (unitless). Then
                 // the true per-species number density:
                 //   n_s = f_s * n_e / Z_s
-                amrex::Real const rhos_val_raw  = rhos_arr(i,j,k);
+                amrex::Real const rhos_val      = rhos_arr(i,j,k);
                 amrex::Real const rhos_sum_val  = std::max(rhosum_arr(i,j,k), rho_floor);
-                amrex::Real const f_s           = rhos_val_raw / rhos_sum_val;
+                amrex::Real const f_s           = rhos_val / rhos_sum_val;
                 amrex::Real const ns            = f_s * ne / Z_s;
 
                 // |J| at the nodal grid (where Te lives). Used by the
@@ -1553,7 +1539,7 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                     auto const by = ablastr::coarsen::sample::Interp(By_arr, By_stag, nodal, coarsen, i, j, k, 0);
                     auto const bz = ablastr::coarsen::sample::Interp(Bz_arr, Bz_stag, nodal, coarsen, i, j, k, 0);
                     amrex::Real const Bmag = std::sqrt(bx*bx + by*by + bz*bz);
-                    eta_s_eff += eta_s_per(rhos_val_raw, rho_val, Te_K_val,
+                    eta_s_eff += eta_s_per(rhos_val, rho_val, Te_K_val,
                                            Jmag, Jsmag, Bmag, t_new);
                 }
 
@@ -1618,8 +1604,8 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     auto & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
 
-    // Sigma_t rho_fp_t (unscaled per-species charge densities) -> species
-    // fraction. Filled once per step by HybridPICDepositRhoAndJ.
+    // Sigma_t rho_fp_t in physical charge-density units -> species fraction.
+    // Filled once per step by HybridPICDepositRhoAndJ.
     amrex::MultiFab const & rhos_sum =
         *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
 

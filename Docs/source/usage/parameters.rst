@@ -3773,8 +3773,7 @@ Maxwell solver: kinetic-fluid hybrid
     :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`, so existing single-resistivity input decks are unchanged.
     The species-resolved friction back-reaction on the ions is applied by the ``hybrid_resistive_drag``
     collision (see :pp:param:`\<collision_name\>.type`), which should accompany any per-species overlay.
-    Note that in RZ geometry ``J_s`` is the magnitude of the raw (not volume-scaled) species current deposit;
-    in Cartesian geometry it is the physical current-density magnitude.
+    In all geometries, ``rho_s`` and ``J_s`` are expressed in physical SI units.
 
 .. pp:param:: hybrid_pic_model.solve_electron_energy_equation
     :type: ``bool``
