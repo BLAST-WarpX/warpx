@@ -3744,6 +3744,60 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
+.. pp:param:: hybrid_pic_model.solve_electron_energy_equation
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this evolves the electron temperature used for the
+    electron pressure with the electron energy equation, solved with the QDSMC scheme
+    (see the :ref:`theory section <theory-hybrid-model-electron-energy-eq>`), instead of evaluating the polytropic
+    closure with the constant reference state :math:`(n_0, T_{e0})`.
+
+.. pp:param:: hybrid_pic_model.qdsmc_n_floor
+    :type: ``float``
+    :default: :pp:param:`hybrid_pic_model.n_floor`
+    :optional:
+
+    Density floor, in :math:`m^{-3}`, below which cells are excluded from the QDSMC electron-energy-equation
+    update (the electron temperature is left unchanged there). Defaults to :pp:param:`hybrid_pic_model.n_floor`.
+
+.. pp:param:: hybrid_pic_model.include_joule_heating
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the Joule-heating source
+    consistent with the resistive friction in Ohm's law, applied per ion species with the effective resistivity
+    :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. For a single species this reduces to
+    :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
+
+.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
+    :type: ``float``
+    :default: ``-1`` (off)
+    :optional:
+
+    Electron temperature threshold, in eV, above which the Joule heat is redirected to the ions.
+    If :pp:param:`hybrid_pic_model.include_joule_heating` is on and a threshold :math:`\geq 0` is specified,
+    cells with electron temperature at or above the threshold deposit their Joule heat to the kinetic ions
+    (as stochastic thermal-velocity kicks, bookkept per species) instead of the electron fluid. This caps the
+    electron heating at the threshold and allows :math:`T_i > T_e` to develop, mimicking regimes where the
+    electrons radiate strongly.
+
+.. pp:param:: hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t)
+    :type: ``float`` or ``str``
+    :optional:
+
+    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`. If
+    :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, specifying this rate enables the
+    electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`
+    as a sink on the electron fluid, paired with matching (energy-conserving) heating of the ion
+    macro-particles. The required shape-aware ion temperature deposition
+    (``<species>.do_temperature_deposition``) is enabled automatically on every charged species.
+    The expression can depend on the total charge density ``rho`` (:math:`C/m^3`), the electron and ion
+    temperatures ``Te`` and ``Ti`` (both in eV) and the time ``t`` (:math:`s`), which permits, e.g., the
+    NRL-formulary Spitzer rate.
+
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``
     :default: ``0``
@@ -4329,7 +4383,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
-    With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K, as implied by the electron-pressure closure) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
+    With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.

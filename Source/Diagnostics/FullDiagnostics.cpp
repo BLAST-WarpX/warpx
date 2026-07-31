@@ -504,8 +504,9 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 AddRZModesToOutputNames(std::string("F"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "Te" ){
-            // Electron temperature [K] implied by the hybrid-PIC
-            // electron-pressure closure.
+            // Electron temperature [K]: closure-implied by default, the
+            // QDSMC electron-energy-equation state variable when that
+            // equation is solved.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
                 "The 'Te' diagnostic output requires the hybrid-PIC solver "
@@ -958,8 +959,9 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "F" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "Te" ){
-            // Electron temperature [K] implied by the hybrid-PIC
-            // electron-pressure closure.
+            // Electron temperature [K]: closure-implied by default, the
+            // QDSMC electron-energy-equation state variable when that
+            // equation is solved.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
                 "The 'Te' diagnostic output requires the hybrid-PIC solver "
