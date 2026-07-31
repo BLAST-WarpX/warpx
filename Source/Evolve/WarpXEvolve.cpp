@@ -860,7 +860,7 @@ void WarpX::SyncCurrentAndRho ()
                 // TODO This works only without mesh refinement
                 const int lev = 0;
                 if (use_filter) {
-                    ApplyFilterMF(m_fields.get_mr_levels_alldirs(FieldType::current_fp_vay, finest_level), lev);
+                    ApplyFilterJ(m_fields.get_mr_levels_alldirs(FieldType::current_fp_vay, finest_level), lev);
                 }
             }
         }
@@ -1150,7 +1150,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch), fine_lev);
     RestrictRhoFromFineToCoarsePatch(fine_lev);
     if (use_filter) {
-        ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
+        ApplyFilterJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
@@ -1236,7 +1236,7 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch), fine_lev);
     RestrictRhoFromFineToCoarsePatch(fine_lev);
     if (use_filter) {
-        ApplyFilterMF( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
+        ApplyFilterJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev, Geom(fine_lev).periodicity());
 
