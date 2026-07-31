@@ -1994,6 +1994,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uxp = pti.GetAttribs(PIdx::ux).dataPtr();
         amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        amrex::ParticleReal const * thetap = pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
 
         amrex::Array4<amrex::Real> const& N_array = particle_number.array(pti);
         amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(pti);
@@ -2007,9 +2010,19 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w  = wp[ip];
-                const amrex::ParticleReal ux = uxp[ip];
-                const amrex::ParticleReal uy = uyp[ip];
+                amrex::ParticleReal ux = uxp[ip];
+                amrex::ParticleReal uy = uyp[ip];
                 const amrex::ParticleReal uz = uzp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                // Particle momenta are Cartesian, while particles at different
+                // azimuths share a cell whose velocity moments are cylindrical.
+                const amrex::ParticleReal theta = thetap[ip];
+                const amrex::ParticleReal costheta = std::cos(theta);
+                const amrex::ParticleReal sintheta = std::sin(theta);
+                const amrex::ParticleReal ux_cartesian = ux;
+                ux = ux_cartesian*costheta + uy*sintheta;
+                uy = -ux_cartesian*sintheta + uy*costheta;
+#endif
                 amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), (amrex::Real)(w));
                 amrex::Gpu::Atomic::AddNoRet(&ux_array(ii, jj, kk), (amrex::Real)(w*ux));
                 amrex::Gpu::Atomic::AddNoRet(&uy_array(ii, jj, kk), (amrex::Real)(w*uy));
@@ -2052,6 +2065,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uxp = pti.GetAttribs(PIdx::ux).dataPtr();
         amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        amrex::ParticleReal const * thetap = pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
 
         amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(pti);
         amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(pti);
@@ -2065,9 +2081,17 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w = wp[ip];
-                const amrex::ParticleReal ux = uxp[ip];
-                const amrex::ParticleReal uy = uyp[ip];
+                amrex::ParticleReal ux = uxp[ip];
+                amrex::ParticleReal uy = uyp[ip];
                 const amrex::ParticleReal uz = uzp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                const amrex::ParticleReal theta = thetap[ip];
+                const amrex::ParticleReal costheta = std::cos(theta);
+                const amrex::ParticleReal sintheta = std::sin(theta);
+                const amrex::ParticleReal ux_cartesian = ux;
+                ux = ux_cartesian*costheta + uy*sintheta;
+                uy = -ux_cartesian*sintheta + uy*costheta;
+#endif
                 const amrex::ParticleReal uxr = ux - ux_array(ii, jj, kk);
                 const amrex::ParticleReal uyr = uy - uy_array(ii, jj, kk);
                 const amrex::ParticleReal uzr = uz - uz_array(ii, jj, kk);

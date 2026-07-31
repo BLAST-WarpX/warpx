@@ -200,6 +200,8 @@ void doVarianceDepositionShapeNKernel(
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+    const amrex::Real costheta_mid = (rpmid > 0._rt) ? xpmid/rpmid : 1._rt;
+    const amrex::Real sintheta_mid = (rpmid > 0._rt) ? ypmid/rpmid : 0._rt;
 
     const double xmid = (rpmid - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
@@ -302,6 +304,16 @@ void doVarianceDepositionShapeNKernel(
     int const l_jz = ((varz_type[zdir] == NODE) ? l_node : l_cell);
 #endif
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    // Deposit velocity moments in the cylindrical basis used by the mesh.
+    const amrex::ParticleReal v1 = vx*costheta_mid + vy*sintheta_mid;
+    const amrex::ParticleReal v2 = -vx*sintheta_mid + vy*costheta_mid;
+#else
+    const amrex::ParticleReal v1 = vx;
+    const amrex::ParticleReal v2 = vy;
+#endif
+    const amrex::ParticleReal v3 = vz;
+
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
         const amrex::Real wpx_var = static_cast<amrex::Real>(wp)*sz_jx[iz];
@@ -313,7 +325,7 @@ void doVarianceDepositionShapeNKernel(
         const amrex::IntVectND<3> izv{lo.z+l_jz+iz, 0, 0};
 
         varianceDepositionSubKernel(
-            vx, vy, vz,
+            v1, v2, v3,
             ixv, iyv, izv,
             wpx_var, wpy_var, wpz_var,
             nx_arr, ny_arr, nz_arr,
@@ -334,7 +346,7 @@ void doVarianceDepositionShapeNKernel(
         amrex::IntVectND<3> const izv{lo.x+j_jz+ix, 0, 0};
 
         varianceDepositionSubKernel(
-            vx, vy, vz,
+            v1, v2, v3,
             ixv, iyv, izv,
             wpx_var, wpy_var, wpz_var,
             nx_arr, ny_arr, nz_arr,
@@ -356,7 +368,7 @@ void doVarianceDepositionShapeNKernel(
             const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.z+l_jz+iz, 0};
 
             varianceDepositionSubKernel(
-                vx, vy, vz,
+                v1, v2, v3,
                 ixv, iyv, izv,
                 wpx_var, wpy_var, wpz_var,
                 nx_arr, ny_arr, nz_arr,
@@ -380,7 +392,7 @@ void doVarianceDepositionShapeNKernel(
                 const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz};
 
                 varianceDepositionSubKernel(
-                    vx, vy, vz,
+                    v1, v2, v3,
                     ixv, iyv, izv,
                     wpx_var, wpy_var, wpz_var,
                     nx_arr, ny_arr, nz_arr,
