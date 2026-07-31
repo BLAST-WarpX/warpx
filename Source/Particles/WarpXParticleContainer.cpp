@@ -2010,8 +2010,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w  = wp[ip];
-                amrex::ParticleReal ux = uxp[ip];
-                amrex::ParticleReal uy = uyp[ip];
+                const amrex::ParticleReal ux_cartesian = uxp[ip];
+                const amrex::ParticleReal uy_cartesian = uyp[ip];
                 const amrex::ParticleReal uz = uzp[ip];
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 // Particle momenta are Cartesian, while particles at different
@@ -2019,9 +2019,11 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal theta = thetap[ip];
                 const amrex::ParticleReal costheta = std::cos(theta);
                 const amrex::ParticleReal sintheta = std::sin(theta);
-                const amrex::ParticleReal ux_cartesian = ux;
-                ux = ux_cartesian*costheta + uy*sintheta;
-                uy = -ux_cartesian*sintheta + uy*costheta;
+                const amrex::ParticleReal ux = ux_cartesian*costheta + uy_cartesian*sintheta;
+                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+#else
+                const amrex::ParticleReal ux = ux_cartesian;
+                const amrex::ParticleReal uy = uy_cartesian;
 #endif
                 amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), (amrex::Real)(w));
                 amrex::Gpu::Atomic::AddNoRet(&ux_array(ii, jj, kk), (amrex::Real)(w*ux));
@@ -2081,16 +2083,18 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w = wp[ip];
-                amrex::ParticleReal ux = uxp[ip];
-                amrex::ParticleReal uy = uyp[ip];
+                const amrex::ParticleReal ux_cartesian = uxp[ip];
+                const amrex::ParticleReal uy_cartesian = uyp[ip];
                 const amrex::ParticleReal uz = uzp[ip];
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 const amrex::ParticleReal theta = thetap[ip];
                 const amrex::ParticleReal costheta = std::cos(theta);
                 const amrex::ParticleReal sintheta = std::sin(theta);
-                const amrex::ParticleReal ux_cartesian = ux;
-                ux = ux_cartesian*costheta + uy*sintheta;
-                uy = -ux_cartesian*sintheta + uy*costheta;
+                const amrex::ParticleReal ux = ux_cartesian*costheta + uy_cartesian*sintheta;
+                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+#else
+                const amrex::ParticleReal ux = ux_cartesian;
+                const amrex::ParticleReal uy = uy_cartesian;
 #endif
                 const amrex::ParticleReal uxr = ux - ux_array(ii, jj, kk);
                 const amrex::ParticleReal uyr = uy - uy_array(ii, jj, kk);
