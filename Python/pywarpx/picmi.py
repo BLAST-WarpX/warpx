@@ -3527,6 +3527,7 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
             )
             pywarpx.warpx.__setattr__("eb_potential(x,y,z,t)", expression)
 
+
 class MacroscopicProperty(picmistandard.base._ClassWithInit):
     """
     Custom class to handle set up of material property specific to WarpX.
@@ -3573,7 +3574,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     def __init__(
         self,
-        parameter='epsilon',
+        parameter="epsilon",
         implicit_function=None,
         value=None,
         method=None,
@@ -3583,7 +3584,12 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
         stl_reverse_normal=False,
         **kw,
     ):
-        assert sum([stl_file is not None, implicit_function is not None, value is not None])==1, Exception(
+        assert (
+            sum(
+                [stl_file is not None, implicit_function is not None, value is not None]
+            )
+            == 1
+        ), Exception(
             "Exactly one one of implicit_function, stl_file, and value must be specified"
         )
         self.parameter = parameter
@@ -3607,9 +3613,9 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
         # Validate method for conductivity (sigma)
         if method is not None:
-            if self.parameter != 'sigma':
+            if self.parameter != "sigma":
                 raise ValueError("Input 'method' can only be used with 'sigma'")
-            if method not in ['backwardeuler', 'laxwendroff']:
+            if method not in ["backwardeuler", "laxwendroff"]:
                 raise ValueError(
                     "Input 'method' must be one of 'backwardeuler' or 'laxwendroff'"
                 )
@@ -3619,9 +3625,8 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
         for k in list(kw.keys()):
-            if (
-                implicit_function is not None
-                and re.search(r"\b%s\b" % k, implicit_function)
+            if implicit_function is not None and re.search(
+                r"\b%s\b" % k, implicit_function
             ):
                 self.user_defined_kw[k] = kw[k]
                 del kw[k]
@@ -3638,16 +3643,24 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
             expression = pywarpx.my_constants.mangle_expression(
                 self.implicit_function, self.mangle_dict
             )
-            setattr(pywarpx.macroscopic,self.parameter + '_function(x,y,z)',expression)
+            setattr(
+                pywarpx.macroscopic, self.parameter + "_function(x,y,z)", expression
+            )
 
         if self.value is not None:
-            setattr(pywarpx.macroscopic,self.parameter,self.value)
+            setattr(pywarpx.macroscopic, self.parameter, self.value)
 
         if self.stl_file is not None:
-            raise NotImplementedError('material property definition with stl file is not implemented yet')
+            raise NotImplementedError(
+                "material property definition with stl file is not implemented yet"
+            )
 
         if self.method is not None:
-            setattr(pywarpx.macroscopic,"macroscopic_" + self.parameter + "_method",value)
+            setattr(
+                pywarpx.macroscopic,
+                "macroscopic_" + self.parameter + "_method",
+                self.value,
+            )
 
 
 class PlasmaLens(picmistandard.base._ClassWithInit):
@@ -4158,7 +4171,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self.do_device_synchronize is not None:
             pywarpx.warpx.do_device_synchronize = self.do_device_synchronize
 
-        if len(self.macroscopic_properties)>0:
+        if len(self.macroscopic_properties) > 0:
             pywarpx.algo.em_solver_medium = "macroscopic"
         for prop in self.macroscopic_properties:
             if hasattr(prop, "initialize_inputs"):
