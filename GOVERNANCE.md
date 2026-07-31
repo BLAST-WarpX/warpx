@@ -7,9 +7,9 @@ WarpX is led in an open governance model, described in this file.
 
 ### Current Roster
 
-- Jean-Luc Vay (chair)
-- Remi Lehe
-- Axel Huebl
+- Jean-Luc Vay ([@jlvay](https://github.com/jlvay)) (chair)
+- Remi Lehe ([@RemiLehe](https://github.com/RemiLehe))
+- Axel Huebl ([@ax3l](https://github.com/ax3l))
 
 See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-steering-committee)
 
@@ -44,19 +44,19 @@ SC members can resign or be removed by majority vote, e.g., due to inactivity, b
 
 ### Current Roster
 
-- Justin Ray Angus
-- Luca Fedeli
-- Arianna Formenti
-- Roelof Groenewald
-- David Grote
-- Axel Huebl
-- Revathi Jambunathan
-- Remi Lehe
-- Andrew Myers
-- Maxence Thévenet
-- Jean-Luc Vay
-- Weiqun Zhang
-- Edoardo Zoni
+- Justin Ray Angus ([@JustinRayAngus](https://github.com/JustinRayAngus))
+- Luca Fedeli ([@lucafedeli88](https://github.com/lucafedeli88))
+- Arianna Formenti ([@aeriforme](https://github.com/aeriforme))
+- Roelof Groenewald ([@roelof-groenewald](https://github.com/roelof-groenewald))
+- David Grote ([@dpgrote](https://github.com/dpgrote))
+- Axel Huebl ([@ax3l](https://github.com/ax3l))
+- Revathi Jambunathan ([@RevathiJambunathan](https://github.com/RevathiJambunathan))
+- Remi Lehe ([@RemiLehe](https://github.com/RemiLehe))
+- Andrew Myers ([@atmyers](https://github.com/atmyers))
+- Maxence Thévenet ([@MaxThevenet](https://github.com/MaxThevenet))
+- Jean-Luc Vay ([@jlvay](https://github.com/jlvay))
+- Weiqun Zhang ([@WeiqunZhang](https://github.com/WeiqunZhang))
+- Edoardo Zoni ([@EZoni](https://github.com/EZoni))
 
 See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-technical-committee)
 
