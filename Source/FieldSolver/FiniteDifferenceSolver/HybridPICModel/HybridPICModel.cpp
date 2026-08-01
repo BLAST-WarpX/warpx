@@ -1638,14 +1638,31 @@ void HybridPICModel::BfieldEvolve (
         if (++n_attempts > m_max_substep_attempts) { break; }
     }
 
-    // Adjust the number of substeps. This affects both the next RKF45 or RK4 step.
-    // The adjustment is made to jump to more required substeps or slowly decrease
-    // if m_substeps is too large (using 95% of the current m_substeps value and
-    // 5% of the lower, new value).
-    if (m_substeps < 2*n_attempts) {
-        m_substeps = 2*n_attempts;
-    } else {
-        m_substeps = 2 * int(std::ceil(0.475 * m_substeps + 0.05 * n_attempts));
+    // Adjust the number of substeps for the next RKF45/RK4 half-step.
+    // Jump up immediately when this half needed more attempts; otherwise
+    // slowly relax toward target = 2*n_attempts.
+    // Blend on the half-step counts M = m_substeps/2 and N = n_attempts via
+    // integer arithmetic: relaxed = 2*((19*M + N)/20). That is exactly the
+    // 95/5 blend, stays even, holds when N == M, and actually decays when
+    // N < M (e.g. m=40, n_attempts=10 → 38 → … → 20). Floating-point
+    // 0.95*M+0.05*N can undershoot M slightly so floor would leak even at
+    // equilibrium.
+    {
+        const int target = 2 * n_attempts;
+        if (m_substeps < target) {
+            m_substeps = target;
+        } else {
+            const int M = m_substeps / 2;
+            const int N = n_attempts;
+            const int relaxed = 2 * ((19 * M + N) / 20);
+            m_substeps = std::max(relaxed, 2);
+        }
+        // Stay within the abort budget so the controller cannot request more
+        // substeps than max_substep_attempts allows.
+        if (m_substeps > m_max_substep_attempts) {
+            m_substeps = m_max_substep_attempts - (m_max_substep_attempts % 2);
+            m_substeps = std::max(m_substeps, 2);
+        }
     }
 
     if (WarpX::GetInstance().Verbose()) {
@@ -1653,7 +1670,8 @@ void HybridPICModel::BfieldEvolve (
             << (subcycling_half == SubcyclingHalf::FirstHalf ? "1st" : "2nd") << " half"
             << ": " << n_accepted << " accepted, "
             << (n_attempts - n_accepted) << " rejected substeps"
-            << " (dt_sub_final/dt_half = " << dt_sub / dt_half << ")\n";
+            << " (dt_sub_final/dt_half = " << dt_sub / dt_half
+            << ", m_substeps = " << m_substeps << ")\n";
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         n_attempts <= m_max_substep_attempts,
