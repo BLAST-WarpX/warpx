@@ -164,7 +164,8 @@ void HybridPICModel::ReadParameters ()
             }
         }
 
-        m_need_fluid_velocities   = m_has_per_species_eta || m_has_resistive_drag;
+        m_need_fluid_velocities   = m_has_per_species_eta || m_has_resistive_drag
+                                  || m_include_temperature_relaxation;
         m_need_per_species_fields = m_need_fluid_velocities
                                   || m_solve_electron_energy_equation;
     }
@@ -1705,9 +1706,10 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 
     // Stochastic Ornstein-Uhlenbeck ion-heating operator delivering both e-i energy
     // channels per particle over dt:
-    //   v_p <- u_e + (v_p - u_e) exp(-nu_ei dt) + sig R,   R ~ N(0,1) per component.
-    // Q_ei (when do_relax) sets the drag toward the electron fluid u_e and the thermal
-    // diffusion sig^2 = k_B T_e/m_i (1 - exp(-2 nu_ei dt)). The Te-threshold redirect
+    //   v_p <- u_i + (v_p - u_i) exp(-nu_ei dt) + sig R,   R ~ N(0,1) per component.
+    // Q_ei (when do_relax) acts on the random velocity about the ion bulk u_i, so it
+    // exchanges thermal energy without adding an ion momentum source. Its thermal
+    // diffusion is sig^2 = k_B T_e/m_i (1 - exp(-2 nu_ei dt)). The Te-threshold redirect
     // (when do_redir) adds pure-diffusion heating E_s/m_i, with the per-species
     // redirected energy E_s [J] read from redirect_E. Both channels are per-species
     // correct (own mass, own T_i, own redirect_E comp).
@@ -1717,11 +1719,12 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
     bool const do_redir = (redirect_E != nullptr);
     if (!do_relax && !do_redir) { return; }
 
+    // Use the current step's freshly deposited ion moments as the center of
+    // the thermal update. The regular end-of-step refresh is too late here.
+    if (do_relax) { CalculateIonFluidVelocity(lev); }
+
     amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
-    ablastr::fields::VectorField Ve =
-        warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
-
     auto const rho_floor = PhysConst::q_e * m_n_floor;
     auto const nu_ei     = m_nu_ei;
     auto const t_new     = warpx.gett_new(0);
@@ -1734,6 +1737,17 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
     for (int d = AMREX_SPACEDIM; d < 3; ++d) { nodal_src[d] = 0; }
     amrex::GpuArray<int, 3> const cc_dst  = {0, 0, 0};
     amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    amrex::GpuArray<int, 3> const Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> cc_x = cc_dst;
+    amrex::GpuArray<int, 3> cc_y = cc_dst;
+    amrex::GpuArray<int, 3> cc_z = cc_dst;
+    for (int d = AMREX_SPACEDIM; d < 3; ++d) {
+        cc_x[d] = Jx_stag[d];
+        cc_y[d] = Jy_stag[d];
+        cc_z[d] = Jz_stag[d];
+    }
 
     amrex::BoxArray const cc_ba = amrex::convert(Te.boxArray(), amrex::IntVect::TheCellVector());
 
@@ -1749,6 +1763,10 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         ++ion_comp;
         auto const m_i = pc.getMass();
         if (m_i <= 0._prt) { continue; }
+        ablastr::fields::VectorField Vs{};
+        if (do_relax) {
+            Vs = warpx.m_fields.get_alldirs("Vs_fp_" + spec_name, lev);
+        }
 
         // Ion temperature [eV] (NGP) -- only needed as the nu_ei parser argument
         // (Q_ei drag/diffusion). Skipped when only the redirect is active. When
@@ -1764,7 +1782,7 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         }
 
         // Per-cell drag-diffusion coefficients on the cc field grid:
-        //   0 = nu_ei [1/s], 1-3 = u_e [m/s], 4 = T_e [K], 5 = redirected dTe [K].
+        //   0 = nu_ei [1/s], 1-3 = u_i [m/s], 4 = T_e [K], 5 = redirected dTe [K].
         // Defaults (0) leave inactive / below-floor cells as no-ops.
         amrex::MultiFab coef(cc_ba, Te.DistributionMap(), 6, 0);
         coef.setVal(0.0_rt);
@@ -1778,9 +1796,14 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             amrex::Array4<amrex::Real const> const & rho_arr  = rho.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Te_arr   = Te.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Ti_arr   = Ti_cc.const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vex_arr  = Ve[0]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vey_arr  = Ve[1]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vez_arr  = Ve[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> Vsx_arr;
+            amrex::Array4<amrex::Real const> Vsy_arr;
+            amrex::Array4<amrex::Real const> Vsz_arr;
+            if (do_relax) {
+                Vsx_arr = Vs[0]->const_array(mfi);
+                Vsy_arr = Vs[1]->const_array(mfi);
+                Vsz_arr = Vs[2]->const_array(mfi);
+            }
             amrex::Array4<amrex::Real const> redirect_arr;
             if (do_redir) { redirect_arr = redirect_E->const_array(mfi); }
 
@@ -1798,11 +1821,11 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                     amrex::Real const Ti_eV = Ti_arr(i,j,k);
                     coef_arr(i,j,k,0) = nu_ei(rho_val, amrex::max(Te_K / K_per_eV, Te_floor_eV), Ti_eV, t_new);
                     coef_arr(i,j,k,1) = ablastr::coarsen::sample::Interp(
-                        Vex_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                        Vsx_arr, Jx_stag, cc_x, coarsen, i, j, k, 0);
                     coef_arr(i,j,k,2) = ablastr::coarsen::sample::Interp(
-                        Vey_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                        Vsy_arr, Jy_stag, cc_y, coarsen, i, j, k, 0);
                     coef_arr(i,j,k,3) = ablastr::coarsen::sample::Interp(
-                        Vez_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                        Vsz_arr, Jz_stag, cc_z, coarsen, i, j, k, 0);
                 }
                 if (do_redir) {
                     // E_s for this species = redirect_E component ion_comp.
@@ -1834,6 +1857,10 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             amrex::ParticleReal* AMREX_RESTRICT uxp = pti.GetAttribs(PIdx::ux).dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT uyp = pti.GetAttribs(PIdx::uy).dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            amrex::ParticleReal const* AMREX_RESTRICT thetap =
+                pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
 
             amrex::Array4<amrex::Real const> const & coef_arr = coef_p.const_array(pti);
 
@@ -1853,13 +1880,20 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                     (-kb * Te_K * std::expm1(-2._prt * nu_dt) + E_s) / m_i;
                 if (drag <= 0._prt && sig2 <= 0._prt) { return; }
 
-                amrex::ParticleReal const uex = coef_arr(ii,jj,kk,1);
-                amrex::ParticleReal const uey = coef_arr(ii,jj,kk,2);
-                amrex::ParticleReal const uez = coef_arr(ii,jj,kk,3);
+                amrex::ParticleReal uix = coef_arr(ii,jj,kk,1);
+                amrex::ParticleReal uiy = coef_arr(ii,jj,kk,2);
+                amrex::ParticleReal const uiz = coef_arr(ii,jj,kk,3);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::ParticleReal const costheta = std::cos(thetap[ip]);
+                amrex::ParticleReal const sintheta = std::sin(thetap[ip]);
+                amrex::ParticleReal const uir = uix;
+                uix = uir*costheta - uiy*sintheta;
+                uiy = uir*sintheta + uiy*costheta;
+#endif
                 amrex::ParticleReal const sig = std::sqrt(amrex::max(0._prt, sig2));
-                uxp[ip] += -drag*(uxp[ip]-uex) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
-                uyp[ip] += -drag*(uyp[ip]-uey) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
-                uzp[ip] += -drag*(uzp[ip]-uez) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uxp[ip] += -drag*(uxp[ip]-uix) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uyp[ip] += -drag*(uyp[ip]-uiy) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uzp[ip] += -drag*(uzp[ip]-uiz) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
             });
         }
     }

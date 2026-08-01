@@ -308,12 +308,13 @@ public:
      * \brief Ion-heating operator: a stochastic drag-diffusion applied to
      *        every ion. It delivers both electron-ion energy channels:
      *
-     *   dv_p = -nu_ei (v_p - u_e) dt + sqrt(2 D dt) R,   D = D_qei + D_redir,
+     *   dv_p = -nu_ei (v_p - u_i) dt + sqrt(2 D dt) R,   D = D_qei + D_redir,
      *
      * with R a unit-variance Gaussian vector. The Q_ei conjugate (when
-     * m_include_temperature_relaxation) supplies the drag toward the electron
-     * fluid u_e and the thermal diffusion D_qei = nu_ei k_B T_e / m_i, relaxing
-     * the ions toward a Maxwellian at T_e (T_i -> T_e at rate 2 nu_ei). The
+     * m_include_temperature_relaxation) acts about the ion bulk u_i and supplies
+     * thermal diffusion D_qei = nu_ei k_B T_e / m_i, relaxing the ions toward a
+     * Maxwellian at T_e (T_i -> T_e at rate 2 nu_ei) without changing the ion
+     * bulk momentum. The
      * Te-threshold Joule redirection (when \c redirect_E is non-null) supplies
      * an additional pure-diffusion heating sig_redir^2 = E_s/m_i that injects,
      * in expectation, the redirected electron energy per cell. Either or both
@@ -557,8 +558,9 @@ public:
     mutable bool m_qdsmc_J_plasma_valid = false;
 
     /** True when the gridded fluid velocities Ve_fp / Vs_fp_{spec} are
-     *  needed, i.e. when a per-species resistivity parser is registered or
-     *  a hybrid_resistive_drag collision is present in the input deck.
+     *  needed, i.e. when a per-species resistivity parser is registered,
+     *  a hybrid_resistive_drag collision is present, or electron-ion thermal
+     *  relaxation is enabled in the input deck.
      *  Gates their allocation and the once-per-step
      *  CalculateElectronFluidVelocity / CalculateIonFluidVelocity calls.
      *  Set in ReadParameters. */
