@@ -201,8 +201,8 @@ specifying the rate ``hybrid_pic_model.electron_ion_relaxation_rate``,
 
 with the rate :math:`\nu_{ei}(\rho, T_e, T_i, t)` given by a user expression.
 The sink on the electron fluid is paired with a matching thermal-velocity
-kick on the ion macro-particles of each species so that the exchange
-conserves energy exactly.
+kick about each ion species' bulk velocity so that the exchange conserves
+thermal energy without changing the ion bulk momentum.
 
 Verification tests of the transport terms (adiabatic compression), the Joule
 source (force-free field decay) and the :math:`Q_{ei}` exchange are described

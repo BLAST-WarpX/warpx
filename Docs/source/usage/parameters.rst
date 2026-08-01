@@ -3822,8 +3822,9 @@ Maxwell solver: kinetic-fluid hybrid
     The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`. If
     :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, specifying this rate enables the
     electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`
-    as a sink on the electron fluid, paired with matching (energy-conserving) heating of the ion
-    macro-particles. The required shape-aware ion temperature deposition
+    as a sink on the electron fluid, paired with matching heating of the ion macro-particles about
+    each species' bulk velocity. This exchanges thermal energy without changing the ion bulk momentum.
+    The required shape-aware ion temperature deposition
     (``<species>.do_temperature_deposition``) is enabled automatically on every charged species.
     The expression can depend on the total charge density ``rho`` (:math:`C/m^3`), the electron and ion
     temperatures ``Te`` and ``Ti`` (both in eV) and the time ``t`` (:math:`s`), which permits, e.g., the

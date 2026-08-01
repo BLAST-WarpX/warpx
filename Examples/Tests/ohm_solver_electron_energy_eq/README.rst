@@ -127,7 +127,7 @@ Execute:
 Electron-ion temperature relaxation
 -----------------------------------
 
-A uniform, unmagnetized, zero-resistivity plasma with hot electrons
+A uniform, zero-resistivity plasma with hot electrons
 (:math:`T_{e0} \gg T_{i0}`) relaxes purely through the electron-ion
 thermal-equilibration exchange
 :math:`Q_{ei} = 3 n_e k_B \nu_{ei} (T_e - T_i)`, which cools the electron
@@ -136,6 +136,13 @@ fluid and heats the kinetic ions by exactly the same amount. For a constant
 :math:`[3(\gamma_e - 1) + 2]\,\nu_{ei}` while the total thermal energy is
 conserved; for :math:`\gamma_e = 5/3` both species meet at
 :math:`(T_{e0} + T_{i0})/2`.
+
+A linear force-free magnetic field supplies an electron-ion relative drift
+without a :math:`\mathbf{J}\times\mathbf{B}` force. Since :math:`Q_{ei}` is a
+thermal-energy exchange, it acts on each ion's velocity relative to the ion
+bulk and must not relax that bulk toward the electron flow. The analysis also
+projects the deposited ion current onto the force-free mode and verifies that
+it remains at the particle-noise level.
 
 Run
 ^^^
