@@ -178,6 +178,9 @@ guardCellManager::Init (
         for (int i = 0; i < AMREX_SPACEDIM; i++) {
             ng_alloc_Rho[i] = nox + particle_max_grid_crossings - 1;
             ng_alloc_J[i]   = nox + particle_max_grid_crossings - 1;
+            // The mass-matrix Jacobian contracts E over J-sized banded windows,
+            // which requires E guards to be at least as large as J guards.
+            ng_alloc_EB[i]  = std::max(ng_alloc_EB[i], ng_alloc_J[i]);
         }
     }
 

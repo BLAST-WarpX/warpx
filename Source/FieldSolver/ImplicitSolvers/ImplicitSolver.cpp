@@ -531,9 +531,11 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             "Using mass matrices is not setup for DIM = RSPHERE!");
 #endif
 #if defined(WARPX_DIM_3D)
+        // 3D full mass matrices are implemented for Direct deposition only.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices_jacobian,
-            "Using mass matrices for jacobian can not be used for DIM = 3");
+            !m_use_mass_matrices_jacobian ||
+            WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct,
+            "Mass matrices for jacobian in 3D require direct current deposition");
 #endif
         if ( (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
               WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&

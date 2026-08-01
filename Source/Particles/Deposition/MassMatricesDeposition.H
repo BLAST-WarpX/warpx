@@ -556,7 +556,98 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
 
                 // Deposit mass matrices
                 if constexpr (full_mass_matrices) {
-                    // Should not be here. Full mass matrices not yet implemented in 3D
+
+                    // Per-dimension staggering corrections for the mixed blocks.
+                    // For dim d and block (row a, col b) with different stagger
+                    // along d, the extra band slot sits on the side selected by
+                    // the particle half-cell (shift[d]); the correction is
+                    // (1 - shift[d]) when the ROW component is CELL along d and
+                    // shift[d] when it is NODE (cf. the 1D/2D branches).
+                    constexpr int NODE_ = amrex::IndexType::NODE;
+                    int stag_xy[3], stag_xz[3], stag_yx[3], stag_yz[3], stag_zx[3], stag_zy[3];
+                    for (int d = 0; d < 3; ++d) {
+                        stag_xy[d] = offset_xy[d] ? ((jx_type[d] == NODE_) ? shift[d] : 1 - shift[d]) : 0;
+                        stag_xz[d] = offset_xz[d] ? ((jx_type[d] == NODE_) ? shift[d] : 1 - shift[d]) : 0;
+                        stag_yx[d] = offset_xy[d] ? ((jy_type[d] == NODE_) ? shift[d] : 1 - shift[d]) : 0;
+                        stag_yz[d] = offset_yz[d] ? ((jy_type[d] == NODE_) ? shift[d] : 1 - shift[d]) : 0;
+                        stag_zx[d] = offset_xz[d] ? ((jz_type[d] == NODE_) ? shift[d] : 1 - shift[d]) : 0;
+                        stag_zy[d] = offset_yz[d] ? ((jz_type[d] == NODE_) ? shift[d] : 1 - shift[d]) : 0;
+                    }
+                    const int base_offset = 1 + 2*depos_order;
+                    // Band widths per dim (x-fastest linearization, cf. ComputeJfromMassMatrices)
+                    const int wxy0 = base_offset + offset_xy[0], wxy1 = base_offset + offset_xy[1];
+                    const int wxz0 = base_offset + offset_xz[0], wxz1 = base_offset + offset_xz[1];
+                    const int wyz0 = base_offset + offset_yz[0], wyz1 = base_offset + offset_yz[1];
+
+                    for (int cc = 0; cc <= depos_order; cc++){
+                        const int rz = depos_order + cc - iz;   // z-relative index
+                        for (int bb = 0; bb <= depos_order; bb++){
+                            const int ry = depos_order + bb - iy;
+                            for (int aa = 0; aa <= depos_order; aa++){
+                                const int rx = depos_order + aa - ix;
+
+                                const amrex::Real weight_Ex = sx_jx[aa]*sy_jx[bb]*sz_jx[cc];
+                                const amrex::Real weight_Ey = sx_jy[aa]*sy_jy[bb]*sz_jy[cc];
+                                const amrex::Real weight_Ez = sx_jz[aa]*sy_jz[bb]*sz_jz[cc];
+
+                                int Nc;
+
+                                // Diagonal blocks (full band, no reduced/symmetric storage)
+                                Nc = rx + base_offset*(ry + base_offset*rz);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Sxx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, Nc),
+                                    weight_Jx*weight_Ex*fpxx);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Syy_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, Nc),
+                                    weight_Jy*weight_Ey*fpyy);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Szz_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, Nc),
+                                    weight_Jz*weight_Ez*fpzz);
+
+                                // X-current off-diagonal blocks
+                                Nc =  (rx + stag_xy[0])
+                                   + wxy0*( (ry + stag_xy[1])
+                                   + wxy1*(  rz + stag_xy[2] ) );
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Sxy_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, Nc),
+                                    weight_Jx*weight_Ey*fpxy);
+                                Nc =  (rx + stag_xz[0])
+                                   + wxz0*( (ry + stag_xz[1])
+                                   + wxz1*(  rz + stag_xz[2] ) );
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Sxz_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, Nc),
+                                    weight_Jx*weight_Ez*fpxz);
+
+                                // Y-current off-diagonal blocks
+                                Nc =  (rx + stag_yx[0])
+                                   + wxy0*( (ry + stag_yx[1])
+                                   + wxy1*(  rz + stag_yx[2] ) );
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Syx_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, Nc),
+                                    weight_Jy*weight_Ex*fpyx);
+                                Nc =  (rx + stag_yz[0])
+                                   + wyz0*( (ry + stag_yz[1])
+                                   + wyz1*(  rz + stag_yz[2] ) );
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Syz_arr(lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz, Nc),
+                                    weight_Jy*weight_Ez*fpyz);
+
+                                // Z-current off-diagonal blocks
+                                Nc =  (rx + stag_zx[0])
+                                   + wxz0*( (ry + stag_zx[1])
+                                   + wxz1*(  rz + stag_zx[2] ) );
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Szx_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, Nc),
+                                    weight_Jz*weight_Ex*fpzx);
+                                Nc =  (rx + stag_zy[0])
+                                   + wyz0*( (ry + stag_zy[1])
+                                   + wyz1*(  rz + stag_zy[2] ) );
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    &Szy_arr(lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz, Nc),
+                                    weight_Jz*weight_Ey*fpzy);
+                            }
+                        }
+                    }
                 }
                 else { // Deposit mass matrices for diagonal PC only
                     amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz, 0), weight_Jx*fpxx);

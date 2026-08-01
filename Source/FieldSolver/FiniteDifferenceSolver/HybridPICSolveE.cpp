@@ -761,7 +761,19 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                // Smoothed Holmstrom vacuum handling: C1 smoothstep ramp of the
+                // Ohm E to zero across [rho_floor, 2*rho_floor]. The original
+                // hard on/off is non-differentiable in rho and breaks the JFNK
+                // residual (threshold cells flicker between branches within a
+                // Newton iteration). holm_scale = 0 below rho_floor recovers
+                // the exact Holmstrom limit.
+                Real holm_scale = 1._rt;
+                if (holmstrom_vacuum_region) {
+                    const Real hs = amrex::min(amrex::max(
+                        (rho_val - rho_floor) / rho_floor, 0._rt), 1._rt);
+                    holm_scale = hs*hs*(3._rt - 2._rt*hs);
+                }
+                if (holmstrom_vacuum_region && holm_scale == 0._rt) {
                     Er(i, j, 0) = 0._rt;
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
@@ -776,7 +788,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // safety condition since we divide by rho
                     const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                    Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
+                    Er(i, j, 0) = holm_scale * (enE_r - grad_Pe) / rho_val_limited;
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -837,7 +849,19 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Etheta_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                // Smoothed Holmstrom vacuum handling: C1 smoothstep ramp of the
+                // Ohm E to zero across [rho_floor, 2*rho_floor]. The original
+                // hard on/off is non-differentiable in rho and breaks the JFNK
+                // residual (threshold cells flicker between branches within a
+                // Newton iteration). holm_scale = 0 below rho_floor recovers
+                // the exact Holmstrom limit.
+                Real holm_scale = 1._rt;
+                if (holmstrom_vacuum_region) {
+                    const Real hs = amrex::min(amrex::max(
+                        (rho_val - rho_floor) / rho_floor, 0._rt), 1._rt);
+                    holm_scale = hs*hs*(3._rt - 2._rt*hs);
+                }
+                if (holmstrom_vacuum_region && holm_scale == 0._rt) {
                     Etheta(i, j, 0) = 0._rt;
                 } else {
                     // Get the gradient of the electron pressure
@@ -850,7 +874,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // safety condition since we divide by rho
                     const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                    Etheta(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
+                    Etheta(i, j, 0) = holm_scale * (enE_t - grad_Pe) / rho_val_limited;
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -904,7 +928,19 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
+                // Smoothed Holmstrom vacuum handling: C1 smoothstep ramp of the
+                // Ohm E to zero across [rho_floor, 2*rho_floor]. The original
+                // hard on/off is non-differentiable in rho and breaks the JFNK
+                // residual (threshold cells flicker between branches within a
+                // Newton iteration). holm_scale = 0 below rho_floor recovers
+                // the exact Holmstrom limit.
+                Real holm_scale = 1._rt;
+                if (holmstrom_vacuum_region) {
+                    const Real hs = amrex::min(amrex::max(
+                        (rho_val - rho_floor) / rho_floor, 0._rt), 1._rt);
+                    holm_scale = hs*hs*(3._rt - 2._rt*hs);
+                }
+                if (holmstrom_vacuum_region && holm_scale == 0._rt) {
                     Ez(i, j, 0) = 0._rt;
                 } else {
                     // Get the gradient of the electron pressure if the longitudinal part of
@@ -919,7 +955,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // safety condition since we divide by rho
                     const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                    Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
+                    Ez(i, j, 0) = holm_scale * (enE_z - grad_Pe) / rho_val_limited;
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -1229,7 +1265,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            // Smoothed Holmstrom vacuum handling: C1 smoothstep ramp of the
+                // Ohm E to zero across [rho_floor, 2*rho_floor]. The original
+                // hard on/off is non-differentiable in rho and breaks the JFNK
+                // residual (threshold cells flicker between branches within a
+                // Newton iteration). holm_scale = 0 below rho_floor recovers
+                // the exact Holmstrom limit.
+                Real holm_scale = 1._rt;
+                if (holmstrom_vacuum_region) {
+                    const Real hs = amrex::min(amrex::max(
+                        (rho_val - rho_floor) / rho_floor, 0._rt), 1._rt);
+                    holm_scale = hs*hs*(3._rt - 2._rt*hs);
+                }
+                if (holmstrom_vacuum_region && holm_scale == 0._rt) {
                 Ex(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1244,7 +1292,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // safety condition since we divide by rho
                 const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+                Ex(i, j, k) = holm_scale * (enE_x - grad_Pe) / rho_val_limited;
             }
 
             // Add resistivity only if E field value is used to update B
@@ -1294,7 +1342,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            // Smoothed Holmstrom vacuum handling: C1 smoothstep ramp of the
+                // Ohm E to zero across [rho_floor, 2*rho_floor]. The original
+                // hard on/off is non-differentiable in rho and breaks the JFNK
+                // residual (threshold cells flicker between branches within a
+                // Newton iteration). holm_scale = 0 below rho_floor recovers
+                // the exact Holmstrom limit.
+                Real holm_scale = 1._rt;
+                if (holmstrom_vacuum_region) {
+                    const Real hs = amrex::min(amrex::max(
+                        (rho_val - rho_floor) / rho_floor, 0._rt), 1._rt);
+                    holm_scale = hs*hs*(3._rt - 2._rt*hs);
+                }
+                if (holmstrom_vacuum_region && holm_scale == 0._rt) {
                 Ey(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1309,7 +1369,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // safety condition since we divide by rho
                 const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
+                Ey(i, j, k) = holm_scale * (enE_y - grad_Pe) / rho_val_limited;
             }
 
             // Add resistivity only if E field value is used to update B
@@ -1359,7 +1419,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            // Smoothed Holmstrom vacuum handling: C1 smoothstep ramp of the
+                // Ohm E to zero across [rho_floor, 2*rho_floor]. The original
+                // hard on/off is non-differentiable in rho and breaks the JFNK
+                // residual (threshold cells flicker between branches within a
+                // Newton iteration). holm_scale = 0 below rho_floor recovers
+                // the exact Holmstrom limit.
+                Real holm_scale = 1._rt;
+                if (holmstrom_vacuum_region) {
+                    const Real hs = amrex::min(amrex::max(
+                        (rho_val - rho_floor) / rho_floor, 0._rt), 1._rt);
+                    holm_scale = hs*hs*(3._rt - 2._rt*hs);
+                }
+                if (holmstrom_vacuum_region && holm_scale == 0._rt) {
                 Ez(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1374,7 +1446,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // safety condition since we divide by rho
                 const auto rho_val_limited = std::max(rho_val, rho_floor);
 
-                Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
+                Ez(i, j, k) = holm_scale * (enE_z - grad_Pe) / rho_val_limited;
             }
 
             // Add resistivity only if E field value is used to update B

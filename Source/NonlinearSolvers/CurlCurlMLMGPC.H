@@ -104,9 +104,13 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
          */
         [[nodiscard]] inline bool IsDefined () const override { return m_is_defined; }
 
-    protected:
-
         using MFArr = amrex::Array<amrex::MultiFab,3>;
+
+        /** Hall-Schur PC application (public: CUDA requires the enclosing
+         *  function of extended device lambdas to have public access). */
+        void ApplyHallSchur (MFArr& a_sol, MFArr& a_rhs);
+
+    protected:
 
         bool m_is_defined = false;
 
@@ -121,6 +125,18 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         int m_max_coarsening_level = 30;
 
         bool m_beta_scalar = true;
+
+        /** Hall-Schur variant (input pc_curl_curl_mlmg.hall_schur): precondition the
+         *  skew Hall block A = I + S, S v = (curl(alpha curl v)) x b-hat, using the
+         *  factorization A^{-1} ~ (I - S)(I - S^2)^{-1} with (I - S^2)^{-1}
+         *  approximated by two nested (I + alpha curl curl) MLMG solves, applied to
+         *  the perpendicular-to-B projection of the residual (identity on the
+         *  parallel part, where the Hall response vanishes). 3D Yee only. */
+        bool m_hall_schur = false;
+        bool m_ws_defined = false;
+        MFArr m_ws_rperp, m_ws_t, m_ws_u, m_ws_w;
+        amrex::MultiFab m_ws_na, m_ws_nb;
+        const amrex::Vector<amrex::MultiFab*>* m_bunit = nullptr;
 
         bool m_alpha_scalar = true; // For hybrid solver, we need spatially varying alpha
 
@@ -186,6 +202,7 @@ void CurlCurlMLMGPC<T,Ops>::readParameters()
     pp.query("verbose", m_verbose);
     pp.query("bottom_verbose", m_bottom_verbose);
     pp.query("max_iter", m_max_iter);
+    pp.query("hall_schur", m_hall_schur);
     pp.query("agglomeration", m_agglomeration);
     pp.query("consolidation", m_consolidation);
     pp.query("max_coarsening_level", m_max_coarsening_level);
@@ -269,6 +286,8 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 
     m_acoefs_pc = m_ops->GetAlphaCoeff();
     if (m_acoefs_pc != nullptr) { m_alpha_scalar = false; }
+
+    m_bunit = m_ops->GetBUnitCoeff();
 
     m_is_defined = true;
 }
@@ -407,6 +426,11 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
                                      MultiFab(*b_mfarrvec[n][2], make_alias, 0, 1) };
 #endif
 
+        if (m_hall_schur) {
+            ApplyHallSchur(solution, rhs);
+            continue;
+        }
+
         m_curl_curl->prepareRHS({&rhs});
         if (m_use_gmres) {
             m_gmres_solver->solve(solution, rhs, m_rtol, m_atol);
@@ -414,6 +438,180 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
             m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
         }
     }
+}
+
+template <class T, class Ops>
+void CurlCurlMLMGPC<T,Ops>::ApplyHallSchur (MFArr& a_sol, MFArr& a_rhs)
+{
+    BL_PROFILE("CurlCurlMLMGPC::ApplyHallSchur()");
+    using namespace amrex;
+
+#if !defined(WARPX_DIM_3D)
+    amrex::ignore_unused(a_sol, a_rhs);
+    WARPX_ABORT_WITH_MESSAGE("pc_curl_curl_mlmg.hall_schur is only implemented in 3D");
+#else
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_num_amr_levels == 1,
+        "hall_schur: single level only");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_alpha_scalar && m_bunit != nullptr,
+        "hall_schur requires spatially varying alpha and a b-unit field (hybrid solver)");
+
+    // Lazily allocate workspaces matching the (edge-staggered) rhs layout and a
+    // nodal 3-component scratch pair (1 ghost for the edge<->node interpolations).
+    if (!m_ws_defined) {
+        for (int d = 0; d < 3; ++d) {
+            m_ws_rperp[d].define(a_rhs[d].boxArray(), a_rhs[d].DistributionMap(), 1, 1);
+            m_ws_t[d].define(a_rhs[d].boxArray(), a_rhs[d].DistributionMap(), 1, 1);
+            m_ws_u[d].define(a_rhs[d].boxArray(), a_rhs[d].DistributionMap(), 1, 1);
+            m_ws_w[d].define(a_rhs[d].boxArray(), a_rhs[d].DistributionMap(), 1, 1);
+        }
+        const MultiFab& bu = *(*m_bunit)[0];
+        m_ws_na.define(bu.boxArray(), bu.DistributionMap(), 3, 1);
+        m_ws_nb.define(bu.boxArray(), bu.DistributionMap(), 3, 1);
+        m_ws_defined = true;
+    }
+
+    const auto& period = m_geom[0].periodicity();
+    const MultiFab& bu = *(*m_bunit)[0];
+
+    // edge -> node average of a 3-component edge set into a nodal 3-comp MF
+    auto edge2node = [&](const MFArr& e, MultiFab& n_mf) {
+        for (MFIter mfi(n_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            const Box tb = mfi.tilebox();
+            auto const& nda = n_mf.array(mfi);
+            auto const& ex = e[0].const_array(mfi);
+            auto const& ey = e[1].const_array(mfi);
+            auto const& ez = e[2].const_array(mfi);
+            ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                nda(i,j,k,0) = 0.5_rt*(ex(i-1,j,k) + ex(i,j,k));
+                nda(i,j,k,1) = 0.5_rt*(ey(i,j-1,k) + ey(i,j,k));
+                nda(i,j,k,2) = 0.5_rt*(ez(i,j,k-1) + ez(i,j,k));
+            });
+        }
+        n_mf.FillBoundary(period);
+    };
+
+    // node -> edge average of a nodal 3-comp MF, SUBTRACTED from (src) into (dst):
+    // dst_c = src_c - interp(n_mf[c])
+    auto sub_node2edge = [&](const MFArr& src, const MultiFab& n_mf, MFArr& dst) {
+        for (int d = 0; d < 3; ++d) {
+            for (MFIter mfi(dst[d], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                const Box tb = mfi.tilebox();
+                auto const& out = dst[d].array(mfi);
+                auto const& in  = src[d].const_array(mfi);
+                auto const& nda = n_mf.const_array(mfi);
+                if (d == 0) {
+                    ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        out(i,j,k) = in(i,j,k) - 0.5_rt*(nda(i,j,k,0) + nda(i+1,j,k,0));
+                    });
+                } else if (d == 1) {
+                    ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        out(i,j,k) = in(i,j,k) - 0.5_rt*(nda(i,j,k,1) + nda(i,j+1,k,1));
+                    });
+                } else {
+                    ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        out(i,j,k) = in(i,j,k) - 0.5_rt*(nda(i,j,k,2) + nda(i,j,k+1,2));
+                    });
+                }
+            }
+            dst[d].FillBoundary(period);
+        }
+    };
+
+    // add node -> edge interp of n_mf into dst (dst_c += interp(n_mf[c]))
+    auto add_node2edge = [&](const MultiFab& n_mf, MFArr& dst) {
+        for (int d = 0; d < 3; ++d) {
+            for (MFIter mfi(dst[d], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                const Box tb = mfi.tilebox();
+                auto const& out = dst[d].array(mfi);
+                auto const& nda = n_mf.const_array(mfi);
+                if (d == 0) {
+                    ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        out(i,j,k) += 0.5_rt*(nda(i,j,k,0) + nda(i+1,j,k,0));
+                    });
+                } else if (d == 1) {
+                    ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        out(i,j,k) += 0.5_rt*(nda(i,j,k,1) + nda(i,j+1,k,1));
+                    });
+                } else {
+                    ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        out(i,j,k) += 0.5_rt*(nda(i,j,k,2) + nda(i,j,k+1,2));
+                    });
+                }
+            }
+        }
+    };
+
+    // ---- 1. rn = edge->node(rhs); rpar_n = b (b . rn)  (stored in m_ws_nb) ----
+    for (int d = 0; d < 3; ++d) {
+        MultiFab::Copy(m_ws_rperp[d], a_rhs[d], 0, 0, 1, 0);
+        m_ws_rperp[d].FillBoundary(period);
+    }
+    edge2node(m_ws_rperp, m_ws_na);
+    for (MFIter mfi(m_ws_nb, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const Box tb = mfi.tilebox();
+        auto const& rp = m_ws_nb.array(mfi);
+        auto const& rn = m_ws_na.const_array(mfi);
+        auto const& b  = bu.const_array(mfi);
+        ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            const Real dot = b(i,j,k,0)*rn(i,j,k,0)
+                           + b(i,j,k,1)*rn(i,j,k,1)
+                           + b(i,j,k,2)*rn(i,j,k,2);
+            rp(i,j,k,0) = b(i,j,k,0)*dot;
+            rp(i,j,k,1) = b(i,j,k,1)*dot;
+            rp(i,j,k,2) = b(i,j,k,2)*dot;
+        });
+    }
+    m_ws_nb.FillBoundary(period);
+
+    // ---- 2. r_perp = rhs - node->edge(rpar_n) ----
+    sub_node2edge(m_ws_rperp, m_ws_nb, m_ws_u);   // m_ws_u = r_perp
+    for (int d = 0; d < 3; ++d) {
+        MultiFab::Copy(m_ws_rperp[d], m_ws_u[d], 0, 0, 1, 1);
+    }
+
+    // ---- 3. t = curl(alpha curl r_perp) = A_mlmg(r_perp) - beta*r_perp ----
+    m_curl_curl->apply(0, 0, m_ws_t, m_ws_u,
+                       MLLinOpT<MFArr>::BCMode::Homogeneous,
+                       MLLinOpT<MFArr>::StateMode::Correction);
+    for (int d = 0; d < 3; ++d) {
+        MultiFab::Subtract(m_ws_t[d], m_ws_rperp[d], 0, 0, 1, 0);
+        m_ws_t[d].FillBoundary(period);
+    }
+
+    // ---- 4. sweep u = r_perp - (t x b-hat) ----
+    edge2node(m_ws_t, m_ws_na);
+    for (MFIter mfi(m_ws_na, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const Box tb = mfi.tilebox();
+        auto const& tn = m_ws_na.array(mfi);
+        auto const& b  = bu.const_array(mfi);
+        ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+            const Real tx = tn(i,j,k,0), ty = tn(i,j,k,1), tz = tn(i,j,k,2);
+            const Real bx = b(i,j,k,0),  by = b(i,j,k,1),  bz = b(i,j,k,2);
+            tn(i,j,k,0) = ty*bz - tz*by;
+            tn(i,j,k,1) = tz*bx - tx*bz;
+            tn(i,j,k,2) = tx*by - ty*bx;
+        });
+    }
+    m_ws_na.FillBoundary(period);
+    sub_node2edge(m_ws_rperp, m_ws_na, m_ws_u);   // u = r_perp - S r_perp
+
+    // ---- 5. two nested (I + alpha curl curl) solves: w ~ (I - S^2)^{-1} u ----
+    for (int d = 0; d < 3; ++d) { m_ws_w[d].setVal(0.0_rt); }
+    m_curl_curl->prepareRHS({&m_ws_u});
+    m_solver->solve({&m_ws_w}, {&m_ws_u}, m_rtol, m_atol);
+    for (int d = 0; d < 3; ++d) {
+        MultiFab::Copy(m_ws_u[d], m_ws_w[d], 0, 0, 1, 0);
+        m_ws_w[d].setVal(0.0_rt);
+    }
+    m_curl_curl->prepareRHS({&m_ws_u});
+    m_solver->solve({&m_ws_w}, {&m_ws_u}, m_rtol, m_atol);
+
+    // ---- 6. sol = w + node->edge(rpar_n) ----
+    for (int d = 0; d < 3; ++d) {
+        MultiFab::Copy(a_sol[d], m_ws_w[d], 0, 0, 1, 0);
+    }
+    add_node2edge(m_ws_nb, a_sol);
+#endif
 }
 
 #endif
