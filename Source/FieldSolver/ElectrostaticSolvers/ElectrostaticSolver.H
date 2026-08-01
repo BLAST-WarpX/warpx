@@ -95,8 +95,8 @@ public:
         int max_iters,
         int verbosity,
         bool is_igf_2d_slices,
-        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt, // only used for EB
-        std::optional<ablastr::fields::ConstMultiLevelScalarField> epsilon = std::nullopt
+        std::optional<ablastr::fields::MultiLevelVectorField> const& efield = std::nullopt, // only used for EB
+        std::optional<ablastr::fields::ConstMultiLevelScalarField> const& epsilon = std::nullopt
     ) const;
 
     /**

@@ -136,8 +136,8 @@ ElectrostaticSolver::computePhi (
     int const max_iters,
     int const verbosity,
     bool const is_igf_2d,
-    std::optional<ablastr::fields::MultiLevelVectorField> efield,
-    std::optional<ablastr::fields::ConstMultiLevelScalarField> epsilon
+    std::optional<ablastr::fields::MultiLevelVectorField> const& efield, // only used for EB
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> const& epsilon
 ) const
 {
     // create a vector to our fields, sorted by level
