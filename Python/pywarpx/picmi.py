@@ -4171,10 +4171,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         if len(self.macroscopic_properties) > 0:
             pywarpx.algo.em_solver_medium = "macroscopic"
-        for prop in self.macroscopic_properties:
-            if hasattr(prop, "initialize_inputs"):
-                prop.initialize_inputs()
-            elif hasattr(prop, "material_property_initialize_inputs"):
+            for prop in self.macroscopic_properties:
                 prop.material_property_initialize_inputs(self.solver)
 
     def initialize_warpx(self, mpi_comm=None):
