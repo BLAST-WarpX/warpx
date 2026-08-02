@@ -3541,6 +3541,9 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     Parameters
     ----------
+    parameter: string
+        the macroscopic property name to set. One of "sigma", "epsilon", or "mu"
+
     implicit_function: string
         Analytic expression f(x,y,z) describing the sigma, epsilon, or mu
 
