@@ -192,9 +192,8 @@ PrescribedCurrentParticleContainer::interpolate (
 {
     if (tv.size() < 2) { return 0._rt; }
     if (tt < tv.front() || tt > tv.back()) { return 0._rt; }
-    if (tt == tv.front()) { return Iv.front(); }
-    if (tt == tv.back()) { return Iv.back(); }
     const auto it  = std::lower_bound(tv.begin(), tv.end(), tt);
+    if (it == tv.begin()) { return Iv.front(); }
     const auto idx = static_cast<std::size_t>(std::distance(tv.begin(), it));
     const Real t0 = tv[idx-1], t1 = tv[idx];
     const Real I0 = Iv[idx-1], I1 = Iv[idx];
