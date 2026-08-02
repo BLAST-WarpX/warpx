@@ -50,9 +50,9 @@ sim = picmi.Simulation(
 )
 
 # Define epsilon
-epsilon = picmi.MacroscopicProperty(parameter="epsilon", value=epsilon)
-sigma = picmi.MacroscopicProperty(parameter="sigma", value=0.0)
-mu = picmi.MacroscopicProperty(parameter="mu", value=picmi.constants.mu0)
+epsilon = picmi.MacroscopicProperty(name="epsilon", value=epsilon)
+sigma = picmi.MacroscopicProperty(name="sigma", value=0.0)
+mu = picmi.MacroscopicProperty(name="mu", value=picmi.constants.mu0)
 
 # Define diagnostics
 field_diag = picmi.FieldDiagnostic(

@@ -3541,7 +3541,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     Parameters
     ----------
-    parameter: string
+    name: string
         the macroscopic property name to set. One of "sigma", "epsilon", or "mu"
 
     implicit_function: string
@@ -3552,7 +3552,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     method: string
         The algorithm for updating electric field when algo.em_solver_medium is macroscopic.
-        Available options for parameter = sigma are: backwardeuler and laxwendroff
+        Available options for name = sigma are: backwardeuler and laxwendroff
 
     Parameters used in the analytic expressions should be given as additional keyword arguments.
 
@@ -3574,7 +3574,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     def __init__(
         self,
-        parameter="epsilon",
+        name="epsilon",
         implicit_function=None,
         value=None,
         method=None,
@@ -3592,7 +3592,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
         ), Exception(
             "Exactly one one of implicit_function, stl_file, and value must be specified"
         )
-        self.parameter = parameter
+        self.name = name
         self.implicit_function = implicit_function
         self.stl_file = stl_file
         self.value = value
@@ -3613,7 +3613,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
         # Validate method for conductivity (sigma)
         if method is not None:
-            if self.parameter != "sigma":
+            if self.name != "sigma":
                 raise ValueError("Input 'method' can only be used with 'sigma'")
             if method not in ["backwardeuler", "laxwendroff"]:
                 raise ValueError(
@@ -3643,12 +3643,10 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
             expression = pywarpx.my_constants.mangle_expression(
                 self.implicit_function, self.mangle_dict
             )
-            setattr(
-                pywarpx.macroscopic, self.parameter + "_function(x,y,z)", expression
-            )
+            setattr(pywarpx.macroscopic, self.name + "_function(x,y,z)", expression)
 
         if self.value is not None:
-            setattr(pywarpx.macroscopic, self.parameter, self.value)
+            setattr(pywarpx.macroscopic, self.name, self.value)
 
         if self.stl_file is not None:
             raise NotImplementedError(
@@ -3658,7 +3656,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
         if self.method is not None:
             setattr(
                 pywarpx.macroscopic,
-                "macroscopic_" + self.parameter + "_method",
+                "macroscopic_" + self.name + "_method",
                 self.value,
             )
 
