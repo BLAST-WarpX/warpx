@@ -3541,18 +3541,15 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     Parameters
     ----------
-    solver_medium: string
-        Available options: vacuum, macroscopic
-
-    sigma/epsilon/mu_function: string
+    implicit_function: string
         Analytic expression f(x,y,z) describing the sigma, epsilon, or mu
 
-    sigma/epsilon/mu: float
+    value: float
         Value of sigma, epsilon, or mu if it is a constant
 
-    macroscopic_sigma_method: string
+    method: string
         The algorithm for updating electric field when algo.em_solver_medium is macroscopic.
-        Available options are: backwardeuler and laxwendroff
+        Available options for parameter = sigma are: backwardeuler and laxwendroff
 
     Parameters used in the analytic expressions should be given as additional keyword arguments.
 
