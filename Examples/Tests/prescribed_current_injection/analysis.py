@@ -22,7 +22,9 @@ def check_extremum(ad, name, expected, rtol=2.0e-6):
     values = get_field(ad, name)
     actual = values.max() if expected >= 0.0 else values.min()
     error = abs(actual - expected) / max(abs(expected), 1.0)
-    print(f"{name}: expected={expected:.12e}, actual={actual:.12e}, rel_error={error:.3e}")
+    print(
+        f"{name}: expected={expected:.12e}, actual={actual:.12e}, rel_error={error:.3e}"
+    )
     assert error < rtol
 
 
@@ -59,7 +61,9 @@ def main():
     parser.add_argument("--rz-current", type=float)
     args = parser.parse_args()
 
-    plotfiles = sorted(path for path in glob.glob("diags/diag1*") if ".old." not in path)
+    plotfiles = sorted(
+        path for path in glob.glob("diags/diag1*") if ".old." not in path
+    )
     assert plotfiles, "No prescribed-current plotfile found"
     ds = yt.load(plotfiles[-1])
     ad = ds.all_data()
