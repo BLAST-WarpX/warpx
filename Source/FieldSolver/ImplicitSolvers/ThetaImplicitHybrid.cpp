@@ -86,19 +86,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
                                1, amrex::IntVect::TheZeroVector());
         m_alpha_mfarrvec[lev] = &m_alpha_mf[lev];
     }
-    // Nodal unit-B direction for the Hall-Schur curl-curl PC (1 ghost cell:
-    // the PC interpolates b-hat to edge locations).
-    m_bunit_mf.resize(m_num_amr_levels);
-    m_bunit_mfarrvec.resize(m_num_amr_levels);
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const auto* rho_mf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
-        auto const& ba = amrex::convert(rho_mf->boxArray(),
-                                        amrex::IntVect::TheNodeVector());
-        m_bunit_mf[lev].define(ba, rho_mf->DistributionMap(),
-                               3, amrex::IntVect::TheUnitVector());
-        m_bunit_mf[lev].setVal(0.0_rt);
-        m_bunit_mfarrvec[lev] = &m_bunit_mf[lev];
-    }
 
     parseNonlinearSolverParams( pp );
     m_nlsolver->Define(m_E, this);
@@ -1093,11 +1080,6 @@ void ThetaImplicitHybrid::SetMassMatricesForPC ( const amrex::Real /*a_theta_dt*
     // operator is singular in vacuum and GMRES stagnates.
     const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
     if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
-        // Research probe (env WARPX_MM_PC_SCALED): scale the raw MM diagonal
-        // (a conductivity, sigma) by the factor with which the ion-current
-        // response actually enters the E-residual, sqrt((|B|/rho)^2 + eta^2),
-        // so that beta = 1 + dimensionless plasma response.
-        const bool mm_pc_scaled = (std::getenv("WARPX_MM_PC_SCALED") != nullptr);
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
             amrex::MultiFab* MMxx_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
             amrex::MultiFab* MMyy_PC = m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);
@@ -1105,53 +1087,9 @@ void ThetaImplicitHybrid::SetMassMatricesForPC ( const amrex::Real /*a_theta_dt*
             const int diag_Mxx = (MMxx_PC->nComp()-1)/2;
             const int diag_Myy = (MMyy_PC->nComp()-1)/2;
             const int diag_Mzz = (MMzz_PC->nComp()-1)/2;
-            if (mm_pc_scaled) {
-                using namespace amrex;
-                using namespace ablastr::coarsen::sample;
-                const ablastr::fields::VectorField Bf =
-                    m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
-                const MultiFab& rho_mf = *m_WarpX->m_fields.get(FieldType::rho_fp, lev);
-                const GpuArray<int,3> Bx_stag = m_hybrid_pic_model->Bx_IndexType;
-                const GpuArray<int,3> By_stag = m_hybrid_pic_model->By_IndexType;
-                const GpuArray<int,3> Bz_stag = m_hybrid_pic_model->Bz_IndexType;
-                const GpuArray<int,3> nodal = {1,1,1};
-                const GpuArray<int,3> coarsen = {1,1,1};
-                const Real rho_floor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
-                const auto eta = m_hybrid_pic_model->m_eta;
-                const Real t_new = m_WarpX->gett_new(lev);
-                std::array<amrex::MultiFab*,3> MMs = {MMxx_PC, MMyy_PC, MMzz_PC};
-                std::array<int,3> diags = {diag_Mxx, diag_Myy, diag_Mzz};
-                for (int d = 0; d < 3; ++d) {
-                    const auto MM_stag_iv = MMs[d]->ixType().toIntVect();
-                    const GpuArray<int,3> MM_stag =
-                        {MM_stag_iv[0], MM_stag_iv[1], MM_stag_iv[2]};
-                    const int diag = diags[d];
-                    for (MFIter mfi(*MMs[d], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                        auto const& mm = MMs[d]->array(mfi);
-                        auto const& Bx = Bf[0]->const_array(mfi);
-                        auto const& By = Bf[1]->const_array(mfi);
-                        auto const& Bz = Bf[2]->const_array(mfi);
-                        auto const& rho = rho_mf.const_array(mfi);
-                        amrex::ParallelFor(mfi.tilebox(),
-                        [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                            const Real Bx_ = Interp(Bx, Bx_stag, MM_stag, coarsen, i, j, k, 0);
-                            const Real By_ = Interp(By, By_stag, MM_stag, coarsen, i, j, k, 0);
-                            const Real Bz_ = Interp(Bz, Bz_stag, MM_stag, coarsen, i, j, k, 0);
-                            const Real Bmag = std::sqrt(Bx_*Bx_ + By_*By_ + Bz_*Bz_);
-                            const Real rho_ = amrex::max(
-                                Interp(rho, nodal, MM_stag, coarsen, i, j, k, 0), rho_floor);
-                            const Real eta_v = eta(rho_, 0.0_rt, t_new);
-                            const Real bor = Bmag/rho_;
-                            const Real scale = std::sqrt(bor*bor + eta_v*eta_v);
-                            mm(i,j,k,diag) = 1.0_rt + mm(i,j,k,diag)*scale;
-                        });
-                    }
-                }
-            } else {
-                MMxx_PC->plus(1.0_rt, diag_Mxx, 1, 0);
-                MMyy_PC->plus(1.0_rt, diag_Myy, 1, 0);
-                MMzz_PC->plus(1.0_rt, diag_Mzz, 1, 0);
-            }
+            MMxx_PC->plus(1.0_rt, diag_Mxx, 1, 0);
+            MMyy_PC->plus(1.0_rt, diag_Myy, 1, 0);
+            MMzz_PC->plus(1.0_rt, diag_Mzz, 1, 0);
         }
     }
 }
@@ -1362,7 +1300,6 @@ ThetaImplicitHybrid::GetAlphaCoeff () const
         for (MFIter mfi(m_alpha_mf[lev], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
 
             Array4<Real>       const& alpha = m_alpha_mf[lev].array(mfi);
-            Array4<Real>       const& bunit = m_bunit_mf[lev].array(mfi);
             Array4<Real const> const& Bx    = Bfield_fp[0]->const_array(mfi);
             Array4<Real const> const& By    = Bfield_fp[1]->const_array(mfi);
             Array4<Real const> const& Bz    = Bfield_fp[2]->const_array(mfi);
@@ -1396,28 +1333,9 @@ ThetaImplicitHybrid::GetAlphaCoeff () const
                 alpha(i, j, k) = theta_dt * one_over_mu0
                                 //  * std::sqrt(Bmag_over_rho*Bmag_over_rho + eta_val*eta_val);
                                  * std::sqrt(Bmag_over_rho*Bmag_over_rho);
-
-                // Unit-B direction for the Hall-Schur PC (0 where |B| ~ 0,
-                // which correctly reduces the Hall sweep to the identity).
-                const Real Binv = (Bmag > 1.0e-12_rt) ? 1.0_rt/Bmag : 0.0_rt;
-                bunit(i, j, k, 0) = Bx_n * Binv;
-                bunit(i, j, k, 1) = By_n * Binv;
-                bunit(i, j, k, 2) = Bz_n * Binv;
             });
         }
     }
 
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        m_bunit_mf[lev].FillBoundary(m_WarpX->Geom(lev).periodicity());
-    }
-
     return &m_alpha_mfarrvec;
-}
-
-const amrex::Vector<amrex::MultiFab*>*
-ThetaImplicitHybrid::GetBUnitCoeff () const
-{
-    // Filled by GetAlphaCoeff(), which the preconditioner calls first on
-    // every update.
-    return &m_bunit_mfarrvec;
 }

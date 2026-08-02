@@ -122,7 +122,6 @@ public:
      * extended device lambda to have public access. */
     void ApplyRhoResponseFromDivJ ();
     [[nodiscard]] const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const override;
-    [[nodiscard]] const amrex::Vector<amrex::MultiFab*>* GetBUnitCoeff () const override;
 
     /**
      * \brief Override: skip the c²μ₀θΔt EM scaling from the base class (derived
@@ -208,10 +207,6 @@ private:
 
 
     mutable amrex::Vector<amrex::MultiFab>  m_alpha_mf;
-    /** Nodal unit-B direction (3 comps) for the Hall-Schur curl-curl PC;
-     *  filled alongside m_alpha_mf in GetAlphaCoeff(). */
-    mutable amrex::Vector<amrex::MultiFab>  m_bunit_mf;
-    mutable amrex::Vector<amrex::MultiFab*> m_bunit_mfarrvec;
     mutable amrex::Vector<amrex::MultiFab*> m_alpha_mfarrvec;
 
     /**

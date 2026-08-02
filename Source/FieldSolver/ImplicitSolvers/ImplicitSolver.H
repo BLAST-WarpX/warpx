@@ -114,15 +114,6 @@ public:
     [[nodiscard]] virtual const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const {
         return nullptr;
     }
-
-    /**
-     * \brief Return pointer to nodal 3-component MultiFab vector holding the unit
-     * magnetic-field direction b-hat (zero where |B| ~ 0). Used by the Hall-Schur
-     * variant of the curl-curl preconditioner.
-     */
-    [[nodiscard]] virtual const amrex::Vector<amrex::MultiFab*>* GetBUnitCoeff () const {
-        return nullptr;
-    }
     
     /**
      * \brief Return reference to the multifabs for curl curl mask
