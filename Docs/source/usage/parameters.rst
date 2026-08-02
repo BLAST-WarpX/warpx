@@ -3701,9 +3701,11 @@ both the explicit and implicit field solvers and with the ``vacuum`` and ``macro
 media, and it appears in the ``jx/jy/jz`` diagnostics.  A particle shape and a current
 deposition algorithm must therefore be set: ``algo.particle_shape >= 1`` and
 ``algo.current_deposition`` (``direct`` or a charge-conserving scheme).
+The artificial antenna contributes current but is excluded from charge-density deposition.
 
 The waveform is read from a plain-text two-column file (time [s], current [A]) with linear
-interpolation in time.
+interpolation in time. Sample times must be finite and strictly increasing. The tabulated
+values are used at both endpoints, and the current is zero outside the tabulated interval.
 
 .. note::
 
@@ -3712,6 +3714,12 @@ interpolation in time.
    ``macroscopic.sigma_function``.  Driving an open conductor with widely separated
    terminals does not work (the current cannot establish across the conductor on EM-PIC
    time scales), independent of how the current is injected.
+
+.. note::
+
+   The current injector currently supports a single mesh level in 2D XZ, 3D, and RZ
+   geometry. It aborts for AMR and 1D Z geometry instead of silently producing an
+   incorrectly normalized source.
 
 * ``warpx.current_injection`` (`bool`, optional, default: ``0``)
     Enable prescribed current injection.  Must be ``1`` to activate all parameters below.
@@ -3734,11 +3742,15 @@ For each index ``N`` (starting from 0):
 
 * ``warpx.current_injection.pair_N.drive.A`` (`float`)
     Cross-sectional area of the drive face [m^2] used to convert total current :math:`I(t)`
-    to current density :math:`J = I(t)/A`.
+    to current density :math:`J = I(t)/A`. In RZ, this parameter is optional and unused
+    for a radial (``dir = 0``) drive: WarpX instead applies the coaxial profile
+    :math:`J_r = I(t)/(2\pi r L_z)`, where :math:`L_z` is the discrete axial extent of
+    the drive box.
 
 * ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
     Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
-    Set independently per face.
+    In RZ these values denote r, theta, and z. Set independently per face. Drive boxes may
+    overlap; every drive retains its own waveform, direction, area, and sign.
 
 * ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
     Sign of the injected current: :math:`J = \mathrm{sign}\, I(t)/A`.  Use ``-1`` to define a
@@ -3752,6 +3764,8 @@ via ``pywarpx.picmi.PrescribedCurrentDrive`` and
 and the :ref:`PICMI Python documentation <usage-picmi-parameters>`.
 Set ``particle_shape`` (and a current deposition algorithm) on the simulation, since
 injection uses the particle deposition path.
+Add at most one ``PrescribedCurrentInjection`` object to a simulation and put all source
+faces in its ``drives`` list.
 
 .. _running-cpp-parameters-hybrid-model:
 

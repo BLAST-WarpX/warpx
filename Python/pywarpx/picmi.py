@@ -2771,6 +2771,7 @@ class PrescribedCurrentInjection(picmistandard.base._ClassWithInit):
     drives: list of PrescribedCurrentDrive
         One or more drive faces. A return path is a second drive with
         ``sign=-1`` (or a separate face with opposite direction as needed).
+        Drive boxes may overlap; each drive retains its own waveform and direction.
     file: str, optional
         Global two-column waveform file (``t [s]``, ``I [A]``) used by every
         drive that does not set its own ``file``. Required if any drive omits
@@ -4030,6 +4031,11 @@ class Simulation(picmistandard.PICMI_Simulation):
             raise TypeError(
                 "add_prescribed_current_injection expects a "
                 "PrescribedCurrentInjection instance."
+            )
+        if self.prescribed_current_injections:
+            raise ValueError(
+                "Only one PrescribedCurrentInjection can be added to a Simulation; "
+                "put all drive faces in its drives list."
             )
         self.prescribed_current_injections.append(injection)
 

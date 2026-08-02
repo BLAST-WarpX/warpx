@@ -1,0 +1,50 @@
+# Quantitative RZ regression for radial total-current and axial J normalization.
+
+max_step = 1
+amr.n_cell = 12 16
+amr.max_grid_size = 16
+amr.blocking_factor = 4
+amr.max_level = 0
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -0.5
+geometry.prob_hi = 1.0  0.5
+boundary.field_lo = none periodic
+boundary.field_hi = none periodic
+warpx.n_rz_azimuthal_modes = 2
+
+warpx.const_dt = 1.0e-12
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+warpx.current_injection = 1
+warpx.current_injection.file = current_profile.txt
+warpx.current_injection.n_pairs = 2
+
+# Jr carries 1000 A in total across the selected axial extent.
+warpx.current_injection.pair_0.drive.xlo = 0.25
+warpx.current_injection.pair_0.drive.xhi = 0.75
+warpx.current_injection.pair_0.drive.ylo = -0.5
+warpx.current_injection.pair_0.drive.yhi =  0.5
+warpx.current_injection.pair_0.drive.zlo = -0.25
+warpx.current_injection.pair_0.drive.zhi =  0.25
+warpx.current_injection.pair_0.drive.dir = 0
+
+# The same box also carries Jz = -I/[pi*(ro^2-ri^2)].
+warpx.current_injection.pair_1.drive.xlo = 0.25
+warpx.current_injection.pair_1.drive.xhi = 0.75
+warpx.current_injection.pair_1.drive.ylo = -0.5
+warpx.current_injection.pair_1.drive.yhi =  0.5
+warpx.current_injection.pair_1.drive.zlo = -0.25
+warpx.current_injection.pair_1.drive.zhi =  0.25
+warpx.current_injection.pair_1.drive.A = 1.5707963267948966
+warpx.current_injection.pair_1.drive.dir = 2
+warpx.current_injection.pair_1.drive.sign = -1
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = -1
+diag1.fields_to_plot = jr jt jz rho
+diag1.format = plotfile
+diag1.file_prefix = diags/diag1

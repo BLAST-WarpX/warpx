@@ -32,7 +32,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -48,20 +47,32 @@ namespace
                         std::vector<Real>& tvec,
                         std::vector<Real>& ivec)
     {
-        std::ifstream wf_stream(path);
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            wf_stream.is_open(),
-            "warpx.current_injection: cannot open waveform file '" + path + "'");
+        Vector<char> file_chars;
+        ParallelDescriptor::ReadAndBcastFile(path, file_chars);
+        const std::string file_contents(file_chars.dataPtr());
+        std::istringstream wf_stream(file_contents);
         std::string line;
+        int line_number = 0;
         while (std::getline(wf_stream, line)) {
+            ++line_number;
             const auto first = line.find_first_not_of(" \t\r\n");
             if (first == std::string::npos || line[first] == '#') { continue; }
             std::istringstream iss(line);
             Real t_val, I_val;
-            if (iss >> t_val >> I_val) {
-                tvec.push_back(t_val);
-                ivec.push_back(I_val);
-            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                static_cast<bool>(iss >> t_val >> I_val),
+                "warpx.current_injection: malformed waveform row " +
+                    std::to_string(line_number) + " in '" + path + "'");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::isfinite(t_val) && std::isfinite(I_val),
+                "warpx.current_injection: non-finite value on waveform row " +
+                    std::to_string(line_number) + " in '" + path + "'");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                tvec.empty() || t_val > tvec.back(),
+                "warpx.current_injection: waveform times must be strictly increasing in '" +
+                    path + "'");
+            tvec.push_back(t_val);
+            ivec.push_back(I_val);
         }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             tvec.size() >= 2,
@@ -85,6 +96,7 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
 {
     m_charge = 1.0;
     m_mass = std::numeric_limits<Real>::max();
+    AddIntComp("face_id");
 
     const ParmParse pp_warpx("warpx");
 
@@ -97,7 +109,7 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
     // --- Drive faces (one per pair) ------------------------------------------
     // A "return" is just a drive face with sign = -1, so no dedicated return
     // block is needed: use another pair_N.drive.* with sign = -1 if ever wanted.
-    int n_pairs = 0;
+    int n_pairs = 1;
     pp_warpx.query("current_injection.n_pairs", n_pairs);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         n_pairs >= 1, "warpx.current_injection.n_pairs must be >= 1");
@@ -114,6 +126,12 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
         utils::parser::getWithParser(pp_warpx, (base + ".drive.zhi").c_str(), f.hi[2]);
         pp_warpx.query(base + ".drive.dir",  f.dir);
         pp_warpx.query(base + ".drive.sign", f.sign);
+
+        for (int d = 0; d < 3; ++d) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::isfinite(f.lo[d]) && std::isfinite(f.hi[d]) && f.lo[d] < f.hi[d],
+                "current_injection drive bounds must be finite and satisfy lo < hi");
+        }
 
         // Area A is the physical cross-section perpendicular to the current.
         // In RZ with dir = 0 (Jr) the imposed profile is the conserved-total-I
@@ -146,6 +164,8 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             f.dir >= 0 && f.dir < 3, "current_injection drive.dir must be 0, 1 or 2");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            f.sign == -1 || f.sign == 1, "current_injection drive.sign must be -1 or 1");
 #if defined(WARPX_DIM_RZ)
         if (f.dir == 0) {
             // Jr coaxial drive: box must lie off-axis (r > 0); Jr ~ 1/r diverges
@@ -171,7 +191,9 @@ PrescribedCurrentParticleContainer::interpolate (
     const std::vector<Real>& tv, const std::vector<Real>& Iv, Real tt)
 {
     if (tv.size() < 2) { return 0._rt; }
-    if (tt <= tv.front() || tt >= tv.back()) { return 0._rt; }
+    if (tt < tv.front() || tt > tv.back()) { return 0._rt; }
+    if (tt == tv.front()) { return Iv.front(); }
+    if (tt == tv.back()) { return Iv.back(); }
     const auto it  = std::lower_bound(tv.begin(), tv.end(), tt);
     const auto idx = static_cast<std::size_t>(std::distance(tv.begin(), it));
     const Real t0 = tv[idx-1], t1 = tv[idx];
@@ -180,13 +202,30 @@ PrescribedCurrentParticleContainer::interpolate (
 }
 
 void
+PrescribedCurrentParticleContainer::compute_velocity_scale ()
+{
+    Real I_peak = 0._rt;
+    for (const Face& f : m_faces) {
+        for (const Real I : f.I) { I_peak = std::max(I_peak, std::abs(I)); }
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        I_peak > 0._rt, "warpx.current_injection: all waveforms are identically zero.");
+    m_vel_coeff = 0.05_rt * PhysConst::c / I_peak;
+}
+
+void
 PrescribedCurrentParticleContainer::InitData ()
 {
     if (!m_enabled) { return; }
 
 #if defined(WARPX_DIM_1D_Z)
-    m_enabled = false;
+    WARPX_ABORT_WITH_MESSAGE(
+        "Prescribed current injection is not implemented in 1D_Z geometry.");
 #else
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        maxLevel() == 0,
+        "Prescribed current injection currently supports only a single mesh level.");
+
     const int lev = 0;
     const auto& geom    = Geom(lev);
     const auto problo   = geom.ProbLoArray();
@@ -214,33 +253,26 @@ PrescribedCurrentParticleContainer::InitData ()
         "PrescribedCurrentParticleContainer is only implemented in 3D, 2D (XZ) and RZ.");
 #endif
 
-    // Peak |I| over ALL faces' waveforms -> velocity scale so the fastest
-    // particle stays well below c: speed = m_vel_coeff * I(t), peak = 0.05 c.
-    Real I_peak = 0._rt;
-    for (const Face& f : m_faces) {
-        for (const Real I : f.I) { I_peak = std::max(I_peak, std::abs(I)); }
-    }
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        I_peak > 0._rt, "warpx.current_injection: all waveforms are identically zero.");
-    const Real u_max = 0.05_rt * PhysConst::c;
-    m_vel_coeff = u_max / I_peak;
+    // Peak |I| over all faces sets a target velocity scale with max |v|=0.05c.
+    compute_velocity_scale();
 
     // One signed-weight particle per filled cell (only on rank 0; Redistribute
     // scatters them). Charge=1, and with DIRECT current deposition the antenna
     // deposits only J (no charge), so a single particle reproduces the
     // current_fp box injection: J = charge * w * v / dV = sign * I_f(t)/A with
-    //   v_f = m_vel_coeff * I_f(t)               (per-face; Evolve box-tests pos)
+    //   v_f = m_vel_coeff * I_f(t)               (per-face)
     //   w_f = sign_f * dV / (m_vel_coeff * A_f)  (carries the per-face sign/A).
-    // No per-particle waveform tag is needed: the particle never leaves its
-    // drive box (positions are reset each step), so Evolve recovers the face
-    // by box-testing the position.
+    // A persistent face_id attribute selects the waveform and direction even
+    // when multiple drive boxes overlap.
     Vector<ParticleReal> xs, ys, zs, ws;
+    Vector<int> face_ids;
     if (ParallelDescriptor::MyProc() == 0)
     {
         const auto lo = domain.smallEnd();
         const auto hi = domain.bigEnd();
-        for (const Face& f : m_faces)
+        for (int face_id = 0; face_id < static_cast<int>(m_faces.size()); ++face_id)
         {
+            const Face& f = m_faces[face_id];
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
             const Real W = f.sign * dV / (m_vel_coeff * f.A);
 #endif
@@ -257,6 +289,7 @@ PrescribedCurrentParticleContainer::InitData ()
                 {
                     xs.push_back(xc); ys.push_back(yc); zs.push_back(zc);
                     ws.push_back(W);
+                    face_ids.push_back(face_id);
                 }
             }}}
 #elif defined(WARPX_DIM_XZ)
@@ -271,6 +304,7 @@ PrescribedCurrentParticleContainer::InitData ()
                 {
                     xs.push_back(xc); ys.push_back(0._rt); zs.push_back(zc);
                     ws.push_back(W);
+                    face_ids.push_back(face_id);
                 }
             }}
 #elif defined(WARPX_DIM_RZ)
@@ -284,12 +318,17 @@ PrescribedCurrentParticleContainer::InitData ()
             // Density divides the raw deposit by 2*pi*r, the physical current
             // density is the prescribed profile:
             //   dir = 0 (Jr, conserved total I): uniform weight
-            //       W = sign * dr / vel_coeff
-            //     -> Jr = I(t) / (2*pi*r*dz)   (the 1/r coaxial profile; total
-            //        radial current I conserved across every cylindrical shell)
+            //       W = sign * dr / (Nz * vel_coeff)
+            //     -> Jr = I(t) / (2*pi*r*Nz*dz) (the 1/r coaxial profile; total
+            //        radial current I is distributed across the box in z)
             //   dir = 1,2 (Jtheta/Jz, uniform J): weight ~ r
             //       W = sign * (2*pi*r*dr*dz) / (vel_coeff * A)
             //     -> J = sign * I(t) / A        (uniform over the r-z box)
+            int n_axial_cells = 0;
+            for (int j = lo[1]; j <= hi[1]; ++j) {
+                const Real zc = problo[1] + (j + 0.5_rt) * dx[1];
+                if (zc >= f.lo[2] && zc < f.hi[2]) { ++n_axial_cells; }
+            }
             for (int j = lo[1]; j <= hi[1]; ++j) {
             for (int i = lo[0]; i <= hi[0]; ++i) {
                 const Real rc = problo[0] + (i + 0.5_rt) * dx[0];
@@ -299,7 +338,7 @@ PrescribedCurrentParticleContainer::InitData ()
                 {
                     const int n_spokes = std::max(1, WarpX::n_rz_azimuthal_modes);
                     const Real W = (f.dir == 0)
-                         ? f.sign * dr / (n_spokes * m_vel_coeff)
+                         ? f.sign * dr / (n_spokes * n_axial_cells * m_vel_coeff)
                          : f.sign * (two_pi * rc * dr * dz) / (n_spokes * m_vel_coeff * f.A);
 
                     for (int spoke = 0; spoke < n_spokes; spoke++) {
@@ -308,6 +347,7 @@ PrescribedCurrentParticleContainer::InitData ()
                         ys.push_back(rc * std::sin(phase));
                         zs.push_back(zc);
                         ws.push_back(W);
+                        face_ids.push_back(face_id);
                     }
                 }
             }}
@@ -318,9 +358,9 @@ PrescribedCurrentParticleContainer::InitData ()
     const auto np = static_cast<long>(xs.size());
     const Vector<ParticleReal> ux(np, 0.0), uy(np, 0.0), uz(np, 0.0);
     Vector<Vector<ParticleReal>> attr;     attr.push_back(ws);
-    const Vector<Vector<int>>    attr_int;
+    const Vector<Vector<int>>    attr_int{face_ids};
     AddNParticles(lev, np, xs, ys, zs, ux, uy, uz,
-                  1, attr, 0, attr_int, 1);
+                  1, attr, 1, attr_int, 1);
 
     if (Verbose()) {
         amrex::Print() << Utils::TextMsg::Info(
@@ -336,6 +376,14 @@ PrescribedCurrentParticleContainer::InitData ()
         m_enabled = false;
     }
 #endif
+}
+
+void
+PrescribedCurrentParticleContainer::PostRestart ()
+{
+    // This deterministic antenna is not checkpointed with physical species.
+    // Recreate it from the input boxes and waveform after loading a checkpoint.
+    InitData();
 }
 
 void
@@ -356,30 +404,25 @@ PrescribedCurrentParticleContainer::Evolve (
 
     const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
-    // Per-face speed this step (speed_f = m_vel_coeff * I_f(t)) and the face
-    // bounding boxes, copied to device. Each particle picks its face by
-    // box-testing its (fixed) position -- no per-particle tag needed.
+    // Per-face target velocity this step, copied to device. Each particle keeps
+    // the ID of the face that created it, so overlapping source boxes are valid.
     const int nfaces = static_cast<int>(m_faces.size());
-    Gpu::DeviceVector<Real> d_speed(nfaces), d_lo(3*nfaces), d_hi(3*nfaces);
+    Gpu::DeviceVector<Real> d_velocity(nfaces);
     Gpu::DeviceVector<int>  d_dir(nfaces);
     {
-        Vector<Real> h_speed(nfaces), hlo(3*nfaces), hhi(3*nfaces);
+        Vector<Real> h_velocity(nfaces);
         Vector<int>  hdir(nfaces);
         for (int f = 0; f < nfaces; ++f) {
-            h_speed[f] = m_vel_coeff * interpolate(m_faces[f].t, m_faces[f].I, t);
-            hdir[f]    = m_faces[f].dir;
-            for (int d = 0; d < 3; ++d) { hlo[3*f+d] = m_faces[f].lo[d]; hhi[3*f+d] = m_faces[f].hi[d]; }
+            h_velocity[f] = m_vel_coeff * interpolate(m_faces[f].t, m_faces[f].I, t);
+            hdir[f] = m_faces[f].dir;
         }
-        Gpu::copyAsync(Gpu::hostToDevice, h_speed.begin(), h_speed.end(), d_speed.begin());
+        Gpu::copyAsync(
+            Gpu::hostToDevice, h_velocity.begin(), h_velocity.end(), d_velocity.begin());
         Gpu::copyAsync(Gpu::hostToDevice, hdir.begin(), hdir.end(), d_dir.begin());
-        Gpu::copyAsync(Gpu::hostToDevice, hlo.begin(), hlo.end(), d_lo.begin());
-        Gpu::copyAsync(Gpu::hostToDevice, hhi.begin(), hhi.end(), d_hi.begin());
         Gpu::streamSynchronize();
     }
-    const Real* const AMREX_RESTRICT speed_f = d_speed.dataPtr();
-    const int*  const AMREX_RESTRICT dir_f   = d_dir.dataPtr();
-    const Real* const AMREX_RESTRICT lo_p    = d_lo.dataPtr();
-    const Real* const AMREX_RESTRICT hi_p    = d_hi.dataPtr();
+    const Real* const AMREX_RESTRICT velocity_f = d_velocity.dataPtr();
+    const int* const AMREX_RESTRICT dir_f = d_dir.dataPtr();
     const Real c2    = PhysConst::c * PhysConst::c;
 
     const int thread_num = 0;
@@ -400,36 +443,21 @@ PrescribedCurrentParticleContainer::Evolve (
         ParticleReal* const AMREX_RESTRICT ux_ptr = uxp.dataPtr();
         ParticleReal* const AMREX_RESTRICT uy_ptr = uyp.dataPtr();
         ParticleReal* const AMREX_RESTRICT uz_ptr = uzp.dataPtr();
+        const int* const AMREX_RESTRICT face_id_ptr =
+            pti.GetStructOfArrays().GetIntData("face_id").dataPtr();
 
-        // Set momenta from this cell's face (found by box-testing the position):
-        // its waveform sets the speed and its dir sets the component. Push
+        // Set momenta from this particle's source face: its waveform sets the
+        // velocity and its dir sets the component. Push
         // positions by v*dt so the (possibly charge-conserving) deposition sees
         // the right displacement; the per-face sign of J is in the signed weight.
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip) noexcept
         {
             ParticleReal x, y, z;
             GetPosition(ip, x, y, z);
-            int fc = 0;
-            for (int f = 0; f < nfaces; ++f) {
-#if defined(WARPX_DIM_3D)
-                if (x >= lo_p[3*f] && x < hi_p[3*f] &&
-                    y >= lo_p[3*f+1] && y < hi_p[3*f+1] &&
-                    z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
-#else   // 2D XZ and RZ: the invariant coordinate is dropped. GetPosition
-                // returns y = 0 for XZ. For RZ, particles are placed at spokes with
-                // x = r*cos(theta) and y = r*sin(theta), so we test r = sqrt(x*x + y*y).
-#if defined(WARPX_DIM_RZ)
-                const Real r = std::sqrt(x*x + y*y);
-                if (r >= lo_p[3*f] && r < hi_p[3*f] &&
-                    z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
-#else
-                if (x >= lo_p[3*f] && x < hi_p[3*f] &&
-                    z >= lo_p[3*f+2] && z < hi_p[3*f+2]) { fc = f; break; }
-#endif
-#endif
-            }
+            const int fc = face_id_ptr[ip];
             const int  fdir = dir_f[fc];
-            const Real u    = speed_f[fc];
+            const Real v = velocity_f[fc];
+            const Real u = v / std::sqrt(1._rt - v*v/c2);
 #if defined(WARPX_DIM_RZ)
             if (fdir == 0) {
                 const Real r = std::sqrt(x*x + y*y);

@@ -29,10 +29,10 @@
  * diagnostics and (b) is handled identically by the explicit and implicit
  * field solvers.
  *
- * Each filled cell carries a single charge=1 particle of signed weight; with
- * DIRECT current deposition the antenna deposits only J (no charge), so it
- * reproduces the current_fp box injection exactly. Particle positions are
- * reset every step, so the antenna does not drift for a sustained waveform.
+ * Each filled cell carries a single charge=1 particle of signed weight. Charge
+ * deposition is explicitly disabled for this current-only source. Particle
+ * positions are reset every step, so the antenna does not drift for a
+ * sustained waveform.
  *
  * NOTE: this does NOT remove the need for a closed current path. The injected
  * J is localized, so div(J) != 0 at the box faces and charge conservation
@@ -58,11 +58,12 @@
  *    so the Cartesian push is a radial/azimuthal/axial step. The RZ current
  *    path deposits a raw J that ApplyInverseVolumeScalingToCurrentDensity later
  *    divides by 2*pi*r, so the per-cell weight is set to give the physical
- *    profile: dir = 0 (Jr) uses a uniform weight -> Jr = I(t)/(2*pi*r*dz), the
- *    1/r coaxial profile with total radial current I conserved across shells
- *    (A is unused/optional); dir = 1,2 (Jtheta/Jz) use a weight ~ r -> uniform
- *    J = sign * I(t) / A over the r-z box (A is the physical cross-section,
- *    e.g. pi*(r_o^2-r_i^2) for Jz, (r_o-r_i)*dz for Jtheta).
+ *    profile: dir = 0 (Jr) uses a uniform weight ->
+ *    Jr = I(t)/(2*pi*r*Nz*dz), the 1/r coaxial profile with total radial
+ *    current I conserved across shells and distributed across the axial extent
+ *    of the box (A is unused/optional); dir = 1,2 (Jtheta/Jz) use a weight ~ r
+ *    -> uniform J = sign * I(t) / A over the r-z box (A is the physical
+ *    cross-section, e.g. pi*(r_o^2-r_i^2) for Jz, (r_o-r_i)*dz for Jtheta).
  */
 class PrescribedCurrentParticleContainer
     : public WarpXParticleContainer
@@ -100,7 +101,20 @@ public:
                 const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
                 MomentumPushType /*momentum_push_type*/ = MomentumPushType::Full) final {}
 
-    void PostRestart () final {}
+    void PostRestart () final;
+
+    void DepositCharge (
+        WarpXParIter& /*pti*/,
+        RealVector const& /*wp*/,
+        int const* /*ion_lev*/,
+        amrex::MultiFab* /*rho*/,
+        int /*icomp*/,
+        long /*offset*/,
+        long /*np_to_deposit*/,
+        int /*thread_num*/,
+        int /*lev*/,
+        int /*depos_lev*/) final
+    {}
 
     /** Whether `warpx.current_injection = 1` is set in the inputs. */
     static bool is_enabled ();
@@ -122,6 +136,9 @@ private:
 
     amrex::Real m_vel_coeff = 0.;  //!< C such that speed = C * I(t) [m/s/A]
     bool       m_enabled    = true;
+
+    //! Set the velocity scale from the largest waveform sample.
+    void compute_velocity_scale ();
 
     //! Linear interpolation of a (t,I) table; returns 0 outside the table.
     [[nodiscard]] static amrex::Real interpolate (
