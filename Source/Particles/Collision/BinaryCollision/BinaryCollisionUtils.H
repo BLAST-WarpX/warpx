@@ -10,9 +10,11 @@
 
 #include <string>
 
+#include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
 
 #include <AMReX_Math.H>
+#include <AMReX_Vector.H>
 
 enum struct CollisionType { DeuteriumTritiumToNeutronHeliumFusion,
                             DeuteriumDeuteriumToProtonTritiumFusion,
@@ -45,6 +47,21 @@ namespace BinaryCollisionUtils{
 
     CollisionType get_collision_type (const std::string& collision_name,
                                       MultiParticleContainer const * mypc);
+
+    /**
+     * \brief Parse the list of scattering processes of a ``dsmc`` or ``background_mcc``
+     * collision and build the corresponding ``ScatteringProcess`` objects.
+     *
+     * For each name in ``<collision_name>.scattering_processes``, this reads the
+     * associated cross-section file (``<process>_cross_section``) and energy cost
+     * (``<process>_energy``). The energy is required for ``excitation`` and ``ionization``
+     * processes, and optional (defaulting to 0) for all other processes.
+     *
+     * @param[in] collision_name the name of the collision
+     * @return a vector of the parsed ``ScatteringProcess`` objects
+     */
+    amrex::Vector<ScatteringProcess>
+    parse_scattering_processes (const std::string& collision_name);
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type)

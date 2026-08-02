@@ -7,8 +7,11 @@
 
 #include "BinaryCollisionUtils.H"
 
+#include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
@@ -99,6 +102,59 @@ namespace BinaryCollisionUtils{
             return CollisionType::LinearCompton;
         }
         return CollisionType::Undefined;
+    }
+
+    amrex::Vector<ScatteringProcess>
+    parse_scattering_processes (const std::string& collision_name)
+    {
+        using namespace amrex::literals;
+
+        const amrex::ParmParse pp_collision_name(collision_name);
+
+        amrex::Vector<std::string> scattering_process_names;
+        pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+
+        // create a vector of ScatteringProcess objects from each scattering
+        // process name
+        amrex::Vector<ScatteringProcess> scattering_processes;
+        for (const auto& scattering_process : scattering_process_names) {
+            const std::string kw_cross_section = scattering_process + "_cross_section";
+            std::string cross_section_file;
+            pp_collision_name.query(kw_cross_section, cross_section_file);
+
+            const auto process_type = ScatteringProcess::parseProcessType(scattering_process);
+
+            // The energy cost (penalty) of the process, in eV. It is required for excitation
+            // and ionization, optional for charge exchange and two-product reactions (which may
+            // impose a fixed energy loss), and not read for elastic processes.
+            amrex::ParticleReal energy = 0._prt;
+            const std::string kw_energy = scattering_process + "_energy";
+            if (process_type == ScatteringProcessType::EXCITATION ||
+                process_type == ScatteringProcessType::IONIZATION) {
+                utils::parser::getWithParser(
+                    pp_collision_name, kw_energy.c_str(), energy);
+            } else if (process_type != ScatteringProcessType::ELASTIC) {
+                utils::parser::queryWithParser(
+                    pp_collision_name, kw_energy.c_str(), energy);
+            }
+
+            // The angular behavior of a process is controlled by the per-process
+            // `<process>_scattering_angle_model` argument.
+            // The default angle model depends on the process: product-producing processes
+            // (charge exchange and two-product reactions) default to forward scattering, while
+            // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
+            auto scattering_angle_model =
+                (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
+                 process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
+                ? ScatteringAngleModel::Forward : ScatteringAngleModel::Isotropic;
+            pp_collision_name.query_enum_case_insensitive(
+                scattering_process + "_scattering_angle_model", scattering_angle_model);
+
+            scattering_processes.push_back(ScatteringProcess(
+                scattering_process, cross_section_file, energy, scattering_angle_model));
+        }
+
+        return scattering_processes;
     }
 
     NuclearFusionType get_nuclear_fusion_type (const std::string& collision_name,

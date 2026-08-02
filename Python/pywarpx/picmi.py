@@ -51,6 +51,23 @@ class constants:
 picmistandard.register_constants(constants)
 
 
+def _set_refined_region_inputs(refined_regions):
+    if refined_regions:
+        assert len(refined_regions) == 1, Exception(
+            "WarpX only supports one refined region."
+        )
+        assert refined_regions[0][0] == 1, Exception(
+            "The one refined region can only be level 1"
+        )
+        pywarpx.amr.max_level = 1
+        pywarpx.warpx.fine_tag_lo = refined_regions[0][1]
+        pywarpx.warpx.fine_tag_hi = refined_regions[0][2]
+        if len(refined_regions[0]) == 4:
+            pywarpx.amr.ref_ratio_vect = refined_regions[0][3]
+    else:
+        pywarpx.amr.max_level = 0
+
+
 class Species(picmistandard.PICMI_Species):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
@@ -157,6 +174,10 @@ class Species(picmistandard.PICMI_Species):
     warpx_resampling_trigger_max_avg_ppc: int, default=infinity
         Resampling will be done when the average number of
         particles per cell exceeds this number
+
+    warpx_resampling_algorithm_target_ratio: float, default=1.5
+        Roughly corresponds to the ratio between the number of particles before
+        and after resampling. Only used with the `leveling_thinning` algorithm.
 
     warpx_resampling_algorithm: str, default="leveling_thinning"
         Resampling algorithm to use.
@@ -287,6 +308,9 @@ class Species(picmistandard.PICMI_Species):
         self.resampling_triggering_max_avg_ppc = kw.pop(
             "warpx_resampling_trigger_max_avg_ppc", None
         )
+        self.resampling_algorithm_target_ratio = kw.pop(
+            "warpx_resampling_algorithm_target_ratio", None
+        )
         self.resampling_algorithm_target_weight = kw.pop(
             "warpx_resampling_algorithm_target_weight", None
         )
@@ -364,6 +388,7 @@ class Species(picmistandard.PICMI_Species):
             resampling_min_ppc=self.resampling_min_ppc,
             resampling_trigger_intervals=self.resampling_trigger_intervals,
             resampling_trigger_max_avg_ppc=self.resampling_triggering_max_avg_ppc,
+            resampling_algorithm_target_ratio=self.resampling_algorithm_target_ratio,
             resampling_algorithm_target_weight=self.resampling_algorithm_target_weight,
             resampling_algorithm_velocity_grid_type=self.resampling_algorithm_velocity_grid_type,
             resampling_algorithm_delta_ur=self.resampling_algorithm_delta_ur,
@@ -1094,19 +1119,7 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
@@ -1209,19 +1222,7 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
@@ -1345,19 +1346,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
@@ -1502,19 +1491,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
             pywarpx.warpx.start_moving_window_step = self.start_moving_window_step
             pywarpx.warpx.end_moving_window_step = self.end_moving_window_step
 
-        if self.refined_regions:
-            assert len(self.refined_regions) == 1, Exception(
-                "WarpX only supports one refined region."
-            )
-            assert self.refined_regions[0][0] == 1, Exception(
-                "The one refined region can only be level 1"
-            )
-            pywarpx.amr.max_level = 1
-            pywarpx.warpx.fine_tag_lo = self.refined_regions[0][1]
-            pywarpx.warpx.fine_tag_hi = self.refined_regions[0][2]
-            # The refinement_factor is ignored (assumed to be [2,2,2])
-        else:
-            pywarpx.amr.max_level = 0
+        _set_refined_region_inputs(self.refined_regions)
 
 
 class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
@@ -1693,8 +1670,9 @@ class GMRESLinearSolver(LinearSolverBase):
         self.relative_tolerance = relative_tolerance
         self.max_iterations = max_iterations
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "amrex_gmres"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "amrex_gmres"
         amrex_gmres = pywarpx.warpx.get_bucket("amrex_gmres")
         amrex_gmres.verbose_int = self.verbose_int
         amrex_gmres.restart_length = self.restart_length
@@ -1711,8 +1689,9 @@ class PETScKSPLinearSolver(LinearSolverBase):
     ----------
     """
 
-    def linear_solver_initialize_inputs(self, nonlinear_solver):
-        nonlinear_solver.liner_solver = "petsc_ksp"
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "petsc_ksp"
 
 
 class PreconditionerBase(picmistandard.base._ClassWithInit):
@@ -1768,7 +1747,9 @@ class CurlCurlMLMGPreconditioner(PreconditionerBase):
         self.relative_tolerance = relative_tolerance
         self.absolute_tolerance = absolute_tolerance
 
-    def preconditioner_type_initialize_inputs(self):
+    def preconditioner_type_initialize_inputs(self, jacobian=None):
+        if jacobian is not None:
+            jacobian.pc_type = "pc_curl_curl_mlmg"
         pc_curl_curl_mlmg = pywarpx.warpx.get_bucket("pc_curl_curl_mlmg")
         pc_curl_curl_mlmg.verbose = self.verbose
         pc_curl_curl_mlmg.bottom_verbose = self.bottom_verbose
@@ -1811,7 +1792,9 @@ class JacobiPreconditioner(PreconditionerBase):
         self.relative_tolerance = relative_tolerance
         self.absolute_tolerance = absolute_tolerance
 
-    def preconditioner_type_initialize_inputs(self):
+    def preconditioner_type_initialize_inputs(self, jacobian=None):
+        if jacobian is not None:
+            jacobian.pc_type = "pc_jacobi"
         pc_jacobi = pywarpx.warpx.get_bucket("pc_jacobi")
         pc_jacobi.verbose = self.verbose
         pc_jacobi.max_iter = self.max_iter
@@ -1860,7 +1843,9 @@ class PETScPreconditioner(PreconditionerBase):
         self.hypre_type = hypre_type
         self.euclid_factor_levels = euclid_factor_levels
 
-    def preconditioner_type_initialize_inputs(self):
+    def preconditioner_type_initialize_inputs(self, jacobian=None):
+        if jacobian is not None:
+            jacobian.pc_type = "pc_petsc"
         pc_petsc = pywarpx.warpx.get_bucket("pc_petsc")
         pc_petsc.type = self.type
         pc_petsc.asm_overlap = self.asm_overlap
@@ -2002,7 +1987,8 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
             self.linear_solver.linear_solver_initialize_inputs(newton)
 
         if self.pc_type is not None:
-            self.pc_type.preconditioner_type_initialize_inputs()
+            jacobian = pywarpx.warpx.get_bucket("jacobian")
+            self.pc_type.preconditioner_type_initialize_inputs(jacobian)
 
 
 class PicardNonlinearSolver(NonlinearSolverBase):
@@ -2142,43 +2128,90 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
 
+    solve_electron_energy_equation: bool, default=False
+        Solve the electron energy equation instead of the algebraic adiabatic
+        pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is
+        transported each step by QDSMC markers advected with the electron
+        fluid velocity, the source terms below are applied per cell, and
+        ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve.
+
+    include_joule_heating: bool, default=False
+        Add the resistive (Joule) heating source to the electron temperature.
+        Reduces to ``eta * J**2`` for a single ion species. Only used when
+        ``solve_electron_energy_equation`` is True.
+
+    joule_redirect_Te_threshold: float, optional
+        Electron temperature threshold in eV above which the Joule heating of
+        a cell is routed to the ions (as an energy-conserving stochastic kick)
+        instead of the electrons, allowing ``Ti > Te`` to develop. Specifying
+        a value >= 0 enables the redirect (off by default). Requires
+        ``include_joule_heating``.
+
+    electron_ion_relaxation_rate: float or str, optional
+        Value or expression for the electron-ion energy-equilibration rate
+        ``nu_ei`` in 1/s. Specifying it enables the electron-ion thermal
+        equilibration ``Q_ei`` on the electron temperature, with the conjugate
+        ion heating applied as an energy-conserving drag-diffusion kick on
+        each ion (the required shape-aware ion temperature deposition is
+        enabled automatically on every charged species). The expression may
+        depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti``
+        (temperatures in eV) and ``t`` (time). Only used when
+        ``solve_electron_energy_equation`` is True.
+
+    qdsmc_n_floor: float, optional
+        Minimum electron number density (in m^-3) used when recovering the
+        electron temperature from the QDSMC entropy deposit. Defaults to
+        ``n_floor``.
+
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full
         timestep (split evenly between the two half-steps, so ``substeps/2``
         RK4 steps are taken per half-step, each of duration
         ``dt / substeps``). Must be divisible by 2; if not, the value is
         automatically rounded up to the next even number.
-        When ``use_rkf45=True``, this is instead used only as the initial
-        substep count estimate for the adaptive solver.
+        When ``use_rkf45`` is active (True or a non-empty interval string),
+        this is instead used only as the initial substep count estimate for
+        the adaptive solver. After each timestep on which ``use_rkf45`` is
+        active, this value is updated based on ``n_attempts``, the total number
+        of RKF45 sub-step attempts (accepted and rejected) taken in the most
+        recent half-step: if the current value is less than ``2 * n_attempts``,
+        it jumps immediately to ``2 * n_attempts``; otherwise it decays slowly
+        toward that target via exponential smoothing (95% old, 5% of
+        ``2 * n_attempts``). This warm-start guess also carries over to
+        RK4 steps on timesteps where ``use_rkf45`` is not active.
 
-    use_rkf45: bool, default=False
-        If True, use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45)
-        integrator (Fehlberg 1969, NASA Technical Report R-315,
+    use_rkf45: bool or str, default=False
+        If True (or the WarpX time-interval string ``"::"``), use the
+        adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) integrator (Fehlberg
+        1969, NASA Technical Report R-315,
         https://ntrs.nasa.gov/citations/19690021375) for the B-field substep
         advance, with step-size control governed by ``substep_rtol`` and
         ``substep_atol``. If False, use the fixed-step classical RK4
         integrator with ``substeps`` total substeps per timestep.
+        A WarpX time-interval string (e.g. ``"1::5"`` to enable from step
+        every 5 steps starting from step 1) may also be passed to activate
+        RKF45 only on specific timesteps.
 
     substep_rtol: float, default=1e-4
         Relative tolerance for the RKF45 adaptive step-size control.
-        Only used when ``use_rkf45=True``.
+        Only used when ``use_rkf45`` is active.
 
     substep_atol: float, default=1e-8
         Absolute tolerance for the RKF45 adaptive step-size control.
-        Only used when ``use_rkf45=True``.
+        Only used when ``use_rkf45`` is active.
 
     substep_safety: float, default=0.9
         Safety factor applied to the step-size adjustment formula.
-        Only used when ``use_rkf45=True``.
+        Only used when ``use_rkf45`` is active.
 
     substep_max_growth: float, default=5.0
         Maximum factor by which the substep size may grow after an accepted
-        step. Only used when ``use_rkf45=True``.
+        step. Only used when ``use_rkf45`` is active.
 
     max_substep_attempts: int, default=250
         Maximum number of substep attempts (accepted + rejected combined) per
         half-step before the simulation aborts. Only used when
-        ``use_rkf45=True``.
+        ``use_rkf45`` is active.
 
     holmstrom_vacuum_region: bool, default=False
         Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
@@ -2231,6 +2264,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         n_floor=None,
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
+        solve_electron_energy_equation=None,
+        include_joule_heating=None,
+        joule_redirect_Te_threshold=None,
+        electron_ion_relaxation_rate=None,
+        qdsmc_n_floor=None,
         substeps=None,
         use_rkf45=None,
         substep_rtol=None,
@@ -2255,6 +2293,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
+
+        self.solve_electron_energy_equation = solve_electron_energy_equation
+        self.include_joule_heating = include_joule_heating
+        self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
+        self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
+        self.qdsmc_n_floor = qdsmc_n_floor
 
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
@@ -2308,6 +2352,28 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_hyper_resistivity, self.mangle_dict
             ),
         )
+        # Only emit the electron-energy-equation attributes that were
+        # explicitly set, so the generated input deck contains only
+        # user-specified parameters.
+        if self.solve_electron_energy_equation is not None:
+            pywarpx.hybridpicmodel.solve_electron_energy_equation = (
+                self.solve_electron_energy_equation
+            )
+        if self.include_joule_heating is not None:
+            pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
+        if self.joule_redirect_Te_threshold is not None:
+            pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
+                self.joule_redirect_Te_threshold
+            )
+        if self.electron_ion_relaxation_rate is not None:
+            pywarpx.hybridpicmodel.__setattr__(
+                "electron_ion_relaxation_rate(rho,Te,Ti,t)",
+                pywarpx.my_constants.mangle_expression(
+                    self.electron_ion_relaxation_rate, self.mangle_dict
+                ),
+            )
+        if self.qdsmc_n_floor is not None:
+            pywarpx.hybridpicmodel.qdsmc_n_floor = self.qdsmc_n_floor
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
@@ -2975,7 +3041,12 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
         Defaults to ``"1.0"`` if not given.
 
     warpx_do_initial_div_cleaning : bool, optional
-        If True, run the projection-based B-field divergence cleaner after loading.
+        If True, run the projection-based divergence cleaner on the loaded B field
+        after loading, scrubbing any spurious divergence from the applied-field map(s).
+        This is opt-in (it is not enabled automatically for applied particle fields) and
+        is supported for the electromagnetic, electrostatic (labframe) and magnetostatic
+        (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
+        When several applied B-field maps are stacked, each map is cleaned independently.
         (global setting; last value wins).
 
     warpx_projection_div_cleaner_atol : float, optional
@@ -4391,6 +4462,10 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "proc_number",
                     "part_per_cell",
                     "eb_covered",
+                    # Electron temperature/pressure of the hybrid-PIC
+                    # (Ohm's law) solver; only valid with that solver.
+                    "Te",
+                    "Pe",
                 ]:
                     fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:

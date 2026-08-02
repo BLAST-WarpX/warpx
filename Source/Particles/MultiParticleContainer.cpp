@@ -334,8 +334,10 @@ MultiParticleContainer::ReadParameters ()
                 bool species_type_is_photon = false;
                 const ParmParse pp_species(name);
                 if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
-                    const auto physical_species =
-                        species::from_string(type_string);
+                    const auto physical_species = species::from_string(type_string);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        physical_species.has_value(),
+                        "'" + type_string + "' is not a valid species_type");
                     species_type_is_photon =
                         (physical_species.value() == PhysicalSpecies::photon);
                 }
@@ -910,12 +912,17 @@ MultiParticleContainer::deleteInvalidParticles ()
 }
 
 void
-MultiParticleContainer::RedistributeLocal (const int max_cells_travelled)
+MultiParticleContainer::RedistributeLocal (const amrex::IntVect& max_cells_travelled)
 {
+    ABLASTR_PROFILE("MultiParticleContainer::RedistributeLocal");
     for (auto& pc : allcontainers) {
-        // The local argument specifies the number of cells a particle
-        // might have travelled outside its current tile / box.
-        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/0, /*nGrow=*/0, /*local=*/max_cells_travelled);
+        // max_cells_travelled specifies, per direction, the number of cells a
+        // particle might have travelled outside its current tile / box. Passing
+        // it per direction lets the local redistribute exchange particles only
+        // as far as needed along each axis (the cell size, and hence the number
+        // of cells crossed, differs between dimensions).
+        pc->Redistribute(/*lev_min=*/0, /*lev_max=*/0, /*nGrow=*/amrex::IntVect(0),
+                         /*local=*/true, /*max_cells_moved=*/max_cells_travelled);
     }
 }
 
@@ -1251,8 +1258,20 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
-    for (auto& pc : allcontainers) {
-        scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+    if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting) {
+        auto& warpx = WarpX::GetInstance();
+        for (auto& pc : allcontainers) {
+            amrex::ParticleReal const mass = pc->getMass();
+            for (int lev = 0; lev <= pc->finestLevel(); ++lev) {
+                amrex::Real const dt_lev = warpx.getdt(lev);
+                scrapeParticlesAtEB(*pc, distance_to_eb, lev,
+                    ParticleBoundaryProcess::Reflect{dt_lev, mass});
+            }
+        }
+    } else {
+        for (auto& pc : allcontainers) {
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+        }
     }
 }
 

@@ -74,9 +74,9 @@ public:
      * \param[in] a_dt The time step size
      * \param[in] a_step The time step number
      */
-    void OneStep ( amrex::Real  start_time,
-                   amrex::Real  a_dt,
-                   int          a_step ) override;
+    int OneStep (amrex::Real  start_time,
+                 amrex::Real  a_dt,
+                 int          a_step) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,

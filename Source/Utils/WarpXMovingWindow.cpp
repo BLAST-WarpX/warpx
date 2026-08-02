@@ -92,6 +92,10 @@ namespace
 
         AMREX_ALWAYS_ASSERT(ng[dir] >= std::abs(num_shift));
 
+        // The temporary copy is required for correctness (not just convenience):
+        // the shifted copy below reads from tmpmf while writing to mf, both under
+        // AMREX_PARALLEL_FOR_4D whose CPU SIMD pragma asserts iteration
+        // independence. An in-place shift of mf would violate that (see issue #7097).
         amrex::MultiFab tmpmf(ba, dm, nc, ng);
         amrex::MultiFab::Copy(tmpmf, mf, 0, 0, nc, ng);
 

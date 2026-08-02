@@ -758,14 +758,14 @@ PEC::ApplyReflectiveBoundarytoRhofield (
                                ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
                                ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC)
                                ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC)
-                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PECInsulator) );
+                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator) );
 
         // Check if boundary is reflective on hi side
         is_reflective[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
                                ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
                                ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC)
                                ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC)
-                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PECInsulator) );
+                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator) );
 
         // Set psign on lo side
         psign[idim][0] = ( (particle_boundary_lo[idim] == ParticleBoundaryType::Reflecting)
@@ -784,8 +784,8 @@ PEC::ApplyReflectiveBoundarytoRhofield (
         mirrorfac[idim][1] = 2*domain_hi[idim] - (1 - rho_nodal[idim]);
 
         // Whether the J-parallel in the guard cells is summed on the boundary
-        sum_on_boundary[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PECInsulator);
-        sum_on_boundary[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PECInsulator);
+        sum_on_boundary[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator);
+        sum_on_boundary[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator);
 
     }
 
@@ -935,14 +935,14 @@ PEC::ApplyReflectiveBoundarytoJfield (
                                ||  (particle_boundary_lo[idim] == ParticleBoundaryType::Thermal)
                                ||  (field_boundary_lo[idim] == FieldBoundaryType::PMC)
                                ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC)
-                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PECInsulator) );
+                               ||  (field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator) );
 
         // Check if boundary is reflective on hi side
         is_reflective[idim][1] = ( (particle_boundary_hi[idim] == ParticleBoundaryType::Reflecting)
                                ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
                                ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC)
                                ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC)
-                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PECInsulator) );
+                               ||  (field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator) );
 
         for (int icomp = 0; icomp < 3; ++icomp) {
             // Set the psign value for each component of J for each direction
@@ -984,8 +984,8 @@ PEC::ApplyReflectiveBoundarytoJfield (
         mirrorfac[idim][2][1] = 2*domain_hi[idim] - (1 - Jz_nodal[idim]);
 
         // Whether the J-parallel in the guard cells is summed on the boundary
-        sum_on_boundary[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PECInsulator);
-        sum_on_boundary[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PECInsulator);
+        sum_on_boundary[idim][0] = (field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator);
+        sum_on_boundary[idim][1] = (field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator);
 
     }
 

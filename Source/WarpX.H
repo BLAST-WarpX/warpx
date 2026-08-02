@@ -218,6 +218,11 @@ public:
      */
     static inline amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM> particle_boundary_hi;
 
+    /** Particle boundary condition at embedded boundaries.
+     *  Default is Absorbing
+     */
+    static inline ParticleBoundaryType eb_particle_boundary = ParticleBoundaryType::Absorbing;
+
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto time_dependency_J = TimeDependencyJ::Default;
@@ -655,9 +660,9 @@ public:
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
-    void UpdateAuxilaryData ();
-    void UpdateAuxilaryDataStagToNodal ();
-    void UpdateAuxilaryDataSameType ();
+    void UpdateAuxiliaryData ();
+    void UpdateAuxiliaryDataStagToNodal ();
+    void UpdateAuxiliaryDataSameType ();
 
     // Fill boundary cells including coarse/fine boundaries
     void FillBoundaryB   (amrex::IntVect ng, std::optional<bool> nodal_sync = std::nullopt);
@@ -804,7 +809,7 @@ public:
     [[nodiscard]] amrex::IntVect get_numprocs() const {return numprocs;}
 
     /** Electrostatic solve call */
-    void ComputeSpaceChargeField (bool reset_fields);
+    void ComputeSpaceChargeField (bool reset_E_field, bool reset_B_field);
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
@@ -890,6 +895,36 @@ public:
 
     void ApplyFilterMF (
         const ablastr::fields::MultiLevelVectorField& mfvec,
+        int lev);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    /** Charge/current-conserving binomial smoothing in radial geometry.
+     *
+     * Filtering a density with the plain index-space binomial stencil does
+     * not conserve its volume integral on cells of unequal volume (and an
+     * extensive-quantity variant piles charge onto the small axis cells
+     * instead). This applies the binomial passes in flux form -- the
+     * discrete divergence of a two-point diffusive flux with face-averaged
+     * volume factors (conventions of the inverse-volume-scaling routines),
+     * which conserves the volume integral exactly, leaves constants
+     * untouched, has zero flux through the axis, and reduces to the
+     * standard bilinear filter where the volumes are uniform. */
+    /** \returns the guard-cell width over which dst holds filtered data. */
+    amrex::IntVect ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
+                                    int lev, int scomp, int dcomp, int ncomp);
+#endif
+
+    /** Filter a current density. In radial geometries this dispatches to
+     * the volume-weighted (charge/current conserving) filter; in Cartesian
+     * geometries the cell volumes are uniform and it reduces to
+     * ApplyFilterMF. */
+    void ApplyFilterJ (
+        const ablastr::fields::MultiLevelVectorField& current,
+        int lev,
+        int idim);
+
+    void ApplyFilterJ (
+        const ablastr::fields::MultiLevelVectorField& current,
         int lev);
 
     // Device vectors of stencil coefficients used for finite-order centering of fields

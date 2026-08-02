@@ -82,6 +82,10 @@ Diagnostics::BaseReadParameters ()
         }
     }
 
+    amrex::Vector< std::string > additional_varnames_fields;
+    pp_diag_name.queryarr("additional_fields_to_plot", additional_varnames_fields);
+    m_varnames_fields.insert(m_varnames_fields.end(), additional_varnames_fields.begin(), additional_varnames_fields.end());
+
     // Sanity check if user requests to plot phi
     if (utils::algorithms::is_in(m_varnames_fields, "phi") && (
             WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrame &&
@@ -272,7 +276,7 @@ Diagnostics::BaseReadParameters ()
     // Loop over all fields stored in m_varnames
     for (const auto& var : m_varnames) {
         // Check if m_varnames contains a string of the form rho_<species_name>
-        if (var.rfind("rho_", 0) == 0) {
+        if (var.starts_with("rho_")) {
             // Extract species name from the string rho_<species_name>
             const std::string species = var.substr(var.find("rho_") + 4);
             // Boolean used to check if species name was misspelled
@@ -296,7 +300,7 @@ Diagnostics::BaseReadParameters ()
             );
         }
         // Check if m_varnames contains a string of the form T_<species_name>
-        if (var.rfind("T_", 0) == 0) {
+        if (var.starts_with("T_")) {
             // Extract species name from the string T_<species_name>
             const std::string species = var.substr(var.find("T_") + 2);
             // Boolean used to check if species name was misspelled
@@ -321,7 +325,7 @@ Diagnostics::BaseReadParameters ()
         }
 
         // Check if m_varnames contains a string of the form T_<species_name>
-        if (var.rfind("Tx_", 0) == 0 || var.rfind("Ty_", 0) == 0 || var.rfind("Tz_", 0) == 0) {
+        if (var.starts_with("Tx_") || var.starts_with("Ty_") || var.starts_with("Tz_")) {
             // Extract species name from the string T_<species_name>
             const std::string species = var.substr(var.find("T") + 3);
 
