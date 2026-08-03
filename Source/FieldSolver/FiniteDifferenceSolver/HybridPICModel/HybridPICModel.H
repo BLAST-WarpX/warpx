@@ -329,6 +329,20 @@ public:
     void QDSMCFillElectronPressureFromTe (int lev) const;
 
     /**
+     * \brief Seed T_e = T_e0 * (max(n_e, n_floor)/n0)^(gamma-1): the
+     *        algebraic adiabat evaluated on the floored density.
+     *
+     * This is the QDSMC transport's zero-gradient state (K_e uniform
+     * everywhere, floored halo included), so an energy-equation run starts
+     * free of spurious entropy mixing and from the same electron pressure as
+     * the algebraic closure. Called from HybridPICInitializeRhoJandB when
+     * m_solve_electron_energy_equation is true (a uniform-T_e seed is NOT
+     * usable: its K_e contrast across a plasma-vacuum edge is mixed by the
+     * remap within ~100 steps, artificially heating the dense regions).
+     */
+    void SeedTeAdiabat (int lev) const;
+
+    /**
      * \brief Top-level orchestrator for the QDSMC electron-energy step.
      *
      * Performs the full entropy transport over one PIC step (see Phys. Plasmas 31, 012902 (2024)):
