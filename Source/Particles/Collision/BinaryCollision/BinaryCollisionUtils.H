@@ -177,8 +177,9 @@ namespace BinaryCollisionUtils{
                                        + KE1_lab * KE2_lab;
 
         // s_minus_threshold = E_star^2 - (m1 + m2)^2 c^4, in J^2.
-        const double s_minus_threshold =
-            2.0 * (E1E2_minus_m1m2c4 - c2 * p1_dot_p2);
+        // Floor roundoff negative values to keep the squared COM momentum non-negative.
+        const double s_minus_threshold = amrex::max(
+            2.0 * (E1E2_minus_m1m2c4 - c2 * p1_dot_p2), 0.0);
         const double m_sum_c2 = (m1_dbl + m2_dbl) * c2;
         const double E_star_sq = m_sum_c2 * m_sum_c2 + s_minus_threshold;
         const double E_star = std::sqrt(E_star_sq);
