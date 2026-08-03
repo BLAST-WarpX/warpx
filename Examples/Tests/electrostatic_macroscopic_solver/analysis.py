@@ -25,10 +25,10 @@ Esim = Esim[:, 4]
 
 constants = picmi.constants
 nz = 128
-voltage = -1000
+voltage = -1000.0
 gap = 0.1
-tVac = gap / 2
-epsilon_r = 10
+tVac = gap / 2.0
+epsilon_r = 10.0
 
 Ediel = voltage / (epsilon_r * (gap - tVac) + tVac)
 Evac = voltage / ((gap - tVac) + tVac / epsilon_r)
@@ -53,5 +53,5 @@ print(f"Max relative error: {rel_err.max():0.2e}")
 print(f"RMS relative error: {rms_rel_err:0.2e}")
 tolerance = 1e-6
 assert rms_rel_err < tolerance, (
-    f"RMS relative error {rms_rel_err} % exceeds tolerance {tolerance}"
+    f"RMS relative error {rms_rel_err} exceeds tolerance {tolerance}"
 )

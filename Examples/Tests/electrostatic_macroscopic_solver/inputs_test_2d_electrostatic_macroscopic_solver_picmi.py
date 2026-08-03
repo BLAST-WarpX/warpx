@@ -6,8 +6,8 @@ from pywarpx import picmi
 constants = picmi.constants
 
 gap = 0.1  # m
-tVacuum = gap / 2
-voltage = 1000
+tVacuum = gap / 2.0
+voltage = 1000.0
 
 ##########################
 # numerics parameters
@@ -48,8 +48,7 @@ grid = picmi.Cartesian2DGrid(
 solver = picmi.ElectrostaticSolver(
     grid=grid,
     method="Multigrid",
-    required_precision=1e-5,
-    warpx_absolute_tolerance=1e2,
+    required_precision=1e-6,
     warpx_self_fields_verbosity=0,
 )
 
