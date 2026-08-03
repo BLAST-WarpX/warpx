@@ -189,6 +189,7 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] current_time the current time; required for embedded boundaries (default: none)
  * \param[in] eb_farray_box_factory a factory for field data, @see amrex::EBFArrayBoxFactory; required for embedded boundaries (default: none)
+ * \param[in] epsilon optional spatially-varying relative permittivity field. If not provided, vacuum permittivity is assumed.
  */
 template<
     typename T_PostPhiCalculationFunctor = std::nullopt_t,
