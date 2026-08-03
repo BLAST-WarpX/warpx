@@ -16,7 +16,7 @@ public:
 
     explicit ChargeFluxEB (const std::string& rd_name);
 
-    void ComputeDiags (const int step) final;
+    void ComputeDiags (int step) final;
 
 private:
 

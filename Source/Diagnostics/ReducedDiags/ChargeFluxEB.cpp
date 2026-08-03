@@ -118,7 +118,7 @@ void ChargeFluxEB::ComputeDiags (const int step)
             species_name, m_eb_boundary_index, /*local=*/false);
         if (n_scraped == 0) { continue; }
 
-        WarpXParticleContainer& pc = mypc.GetParticleContainerFromName(species_name);
+        const WarpXParticleContainer& pc = mypc.GetParticleContainerFromName(species_name);
         const amrex::Real charge = pc.getCharge();
 
         WarpXParticleContainer::Base& scraped_pc =
