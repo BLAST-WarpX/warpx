@@ -339,9 +339,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                               if (amrex::Random(engine) > total_collision_prob) { return; }
 
                               // The background density and temperature parsers take Cartesian
-                              // coordinates as arguments, in all geometries. (In RZ, this
-                              // matches the convention used by the ionization functors in
-                              // ImpactIonization.H, which call `get_particle_position`.)
+                              // coordinates as arguments, in all geometries.
                               amrex::ParticleReal x, y, z;
                               GetPosition(ip, x, y, z);
 
