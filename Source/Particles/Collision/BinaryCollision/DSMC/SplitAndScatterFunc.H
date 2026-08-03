@@ -448,7 +448,7 @@ public:
                 // would produce a NaN velocity in such cases.
                 // TODO: update the E_coll calculation above to match the calculation in
                 // CollisionFilterFunc.H
-                E_out_d = std::max(E_out_d, 0.0);
+                E_out_d = amrex::max(E_out_d, 0.0);
 
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
                 // distributed among the products) depend on the nature of the incident particle

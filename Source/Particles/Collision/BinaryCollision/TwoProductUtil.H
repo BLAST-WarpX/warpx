@@ -110,7 +110,7 @@ namespace {
         // Total energy squared of the reactants in the center of mass frame, calculated using the
         // Lorentz invariance of the four-momentum norm
         const double E_star_sq_d = E_lab_d*E_lab_d - c2_d*p_total_sq_d;
-        const double E_star_sq_pos_d = std::max(E_star_sq_d, 0.0);
+        const double E_star_sq_pos_d = amrex::max(E_star_sq_d, 0.0);
         // Total energy squared of the products in the center of mass frame
         // In principle, the term - E_rest_in + E_rest_out + E_reaction is not needed and equal to
         // zero (i.e. the energy liberated during the reaction is equal to the mass difference). However,
@@ -121,7 +121,7 @@ namespace {
         const double E_rest_out_d = (static_cast<double>(m1_out) + static_cast<double>(m2_out))*c2_d;
         const auto E_reaction_d = static_cast<double>(E_reaction);
         const double E_star_f_d = std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d;
-        const double E_star_f_sq_d = std::max(E_star_f_d*E_star_f_d, 0.0);
+        const double E_star_f_sq_d = amrex::max(E_star_f_d*E_star_f_d, 0.0);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -135,7 +135,7 @@ namespace {
         {
             p_star_f_sq_d = m1_out_d*m2_out_d*c2_d * (powi<2>(E_ratio_d) - 1.0) + powi<2>(m1_out_d - m2_out_d)*c2_d*0.25 * powi<2>(E_ratio_d - 1.0/E_ratio_d);
         }
-        const double p_star_f_d = std::sqrt(std::max(p_star_f_sq_d, 0.0));
+        const double p_star_f_d = std::sqrt(amrex::max(p_star_f_sq_d, 0.0));
 
         // Preliminary calculation: compute center of mass velocity
         const double pt_d = p1t_in + p2t_in;
@@ -149,7 +149,7 @@ namespace {
             vcz_d = (static_cast<double>(p1z_in) + static_cast<double>(p2z_in)) * c_d / pt_d;
         }
         const double vc_sq_d = vcx_d*vcx_d + vcy_d*vcy_d + vcz_d*vcz_d;
-        const double one_minus_beta_sq_d = std::max(1.0 - vc_sq_d*inv_c2_d, std::numeric_limits<double>::epsilon());
+        const double one_minus_beta_sq_d = amrex::max(1.0 - vc_sq_d*inv_c2_d, std::numeric_limits<double>::epsilon());
         const double gc_d = 1.0 / std::sqrt(one_minus_beta_sq_d);
 
         // Compute momentum of first product in the center of mass frame
