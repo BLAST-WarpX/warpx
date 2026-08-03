@@ -1263,7 +1263,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
 
     warpx_particle_eb: string, default="Absorbing", optional
        The boundary condition applied to the particles when they reach the surface
-       of the embedded boundary. Absorbing, Reflecting, or Transparent
+       of the embedded boundary. Absorbing, Reflecting, or None
 
     warpx_start_moving_window_step: int, default=0
        The timestep at which the moving window starts
@@ -1405,7 +1405,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 
     warpx_particle_eb: string, default="Absorbing", optional
        The boundary condition applied to the particles when they reach the surface
-       of the embedded boundary. Absorbing, Reflecting, or Transparent
+       of the embedded boundary. Absorbing, Reflecting, or None
 
     warpx_start_moving_window_step: int, default=0
        The timestep at which the moving window starts
