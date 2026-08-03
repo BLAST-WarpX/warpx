@@ -1262,9 +1262,7 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
             }
         }
     } else if(WarpX::eb_particle_boundary == ParticleBoundaryType::None) {
-        for (auto& pc : allcontainers) {
-            // scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::NoOp()); # do nothing
-        }
+        // No particle scraping required for ParticleBoundaryType::None.
     } else {
         for (auto& pc : allcontainers) {
             scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
