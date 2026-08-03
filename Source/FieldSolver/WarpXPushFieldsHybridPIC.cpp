@@ -386,13 +386,33 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // still empty.
         HybridPICDepositRhoAndJ();
 
-        // Seed the electron pressure from the algebraic closure using the
-        // freshly deposited rho, so the iteration-0 diagnostics and the
-        // first step's B-substep E-solves see a valid Pe^0. From the first
-        // step onward, HybridPICEvolveFields refreshes Pe right after each
-        // deposition (via the closure, or via the QDSMC entropy transport
-        // when solve_electron_energy_equation is on).
-        m_hybrid_pic_model->CalculateElectronPressure();
+        // Seed the electron pressure using the freshly deposited rho, so the
+        // iteration-0 diagnostics and the first step's B-substep E-solves
+        // see a valid Pe^0. From the first step onward,
+        // HybridPICEvolveFields refreshes Pe right after each deposition.
+        //
+        // With the energy equation on, seed T_e on the floored adiabat
+        // T_e0 (max(n,n_floor)/n0)^(gamma-1) -- the QDSMC transport's
+        // zero-gradient (uniform K_e) state, matching the algebraic
+        // closure's electron pressure -- and emit P_e = n_e k_B T_e from
+        // it. Seeding a uniform (isothermal) T_e instead would put a large
+        // K_e contrast across the density edge, which the remap diffusion
+        // mixes within ~100 steps, artificially heating the dense regions
+        // and cooling the dilute ones.
+        if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                m_hybrid_pic_model->SeedTeAdiabat(lev);
+                m_hybrid_pic_model->FillPeFromTe(lev);
+                ApplyElectronPressureBoundary(lev, PatchType::fine);
+                ablastr::utils::communication::FillBoundary(
+                    *m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+                    do_single_precision_comms,
+                    Geom(lev).periodicity(),
+                    true);
+            }
+        } else {
+            m_hybrid_pic_model->CalculateElectronPressure();
+        }
 
         // Handle field splitting for Hybrid field push
         if (m_hybrid_pic_model->m_add_external_fields) {

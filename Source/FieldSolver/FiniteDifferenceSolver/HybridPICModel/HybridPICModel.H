@@ -377,6 +377,13 @@ public:
      */
     void FillPeFromTe (int lev) const;
 
+    /** Seed T_e = T_e0 (max(n_e, n_floor)/n0)^(gamma-1): the algebraic
+     * adiabat evaluated on the floored density. This is the QDSMC transport's
+     * zero-gradient state (K_e uniform everywhere, halo included), so the
+     * energy-equation run starts free of spurious entropy mixing and from the
+     * same electron pressure as the algebraic closure. */
+    void SeedTeAdiabat (int lev) const;
+
     /**
      * \brief Top-level orchestrator for the QDSMC electron-energy step.
      *

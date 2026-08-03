@@ -241,6 +241,15 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
             amrex::MultiFab::Copy(*m_pe_old, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
             m_pe_old->FillBoundary(m_WarpX->Geom(0).periodicity());
         }
+    } else {
+        // No Q_ei step: still mirror T_e = P_e/(n_e k_B) from the in-loop
+        // pe^{n+1} so the "Te" diagnostic tracks the evolving pressure --
+        // it is otherwise only filled at initialization and would dump as a
+        // stale uniform value. Diagnostic-only (rho_fp here is the last
+        // solver-state deposit, an O(theta dt) old density).
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            m_hybrid_pic_model->FillTeFromPe(lev);
+        }
     }
 
     return exit_status;
