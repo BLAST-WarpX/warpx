@@ -4222,7 +4222,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     "G",
                     "divE",
                     "divB",
-                    "proc_number",
+                    "proc_num",
                     "part_per_cell",
                     "eb_covered",
                     # Electron temperature/pressure of the hybrid-PIC
