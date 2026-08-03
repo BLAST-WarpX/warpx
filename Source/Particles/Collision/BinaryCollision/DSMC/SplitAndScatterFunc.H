@@ -436,13 +436,10 @@ public:
                     static_cast<double>(ux0)*static_cast<double>(ux0)
                     + static_cast<double>(uy0)*static_cast<double>(uy0)
                     + static_cast<double>(uz0)*static_cast<double>(uz0));
-                const double E_coll_d = 0.5 * p_non_target_in_d*p_non_target_in_d
-                    * (1.0/m0_d + 1.0/m1_d);
+                const double E_coll_d = 0.5 * p_non_target_in_d*p_non_target_in_d * (1.0/m0_d + 1.0/m1_d);
 
                 // subtract the energy cost for ionization (converted from eV to J)
-                double E_out_d = E_coll_d
-                    - static_cast<double>(scattering_process.m_energy_penalty)
-                        * PhysConst::q_e_v<double>;
+                double E_out_d = E_coll_d - static_cast<double>(scattering_process.m_energy_penalty) * PhysConst::q_e_v<double>;
 
                 // clamp E_out to 0: CollisionFilterFunc.H selects this pair for ionization
                 // using  a differently-computed (relativistic, whole-pair) collision energy,
@@ -474,15 +471,11 @@ public:
                     // (with m1 = mass_slot2 + mass_slot3, by conservation of mass)
 
                     // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
-                    const double products_mass_d =
-                        static_cast<double>(mass_slot2) + static_cast<double>(mass_slot3);
-                    const double p_non_target_out_d =
-                        std::sqrt(2.0*E_out_d / (1.0/m0_d + 1.0/products_mass_d));
+                    const double products_mass_d = static_cast<double>(mass_slot2) + static_cast<double>(mass_slot3);
+                    const double p_non_target_out_d = std::sqrt(2.0*E_out_d / (1.0/m0_d + 1.0/products_mass_d));
 
                     // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
-                    const auto reduce_factor =
-                        static_cast<amrex::ParticleReal>(
-                            p_non_target_out_d/p_non_target_in_d);
+                    const auto reduce_factor = static_cast<amrex::ParticleReal>(p_non_target_out_d/p_non_target_in_d);
                     ux0 *= reduce_factor;
                     uy0 *= reduce_factor;
                     uz0 *= reduce_factor;
@@ -529,16 +522,9 @@ public:
                     // of energy in the center-of-mass frame (both electrons are assumed
                     // to carry an equal share of the energy):
                     //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
-                    const double p_e_d = std::sqrt(
-                        E_out_d
-                        / (1.0/m0_d
-                           + 0.5*static_cast<double>(scaled_u2_ion)
-                               / static_cast<double>(m_ion)));
-                    const auto u_e =
-                        static_cast<amrex::ParticleReal>(p_e_d/m0_d);
-                    const auto u_ion =
-                        static_cast<amrex::ParticleReal>(
-                            p_e_d/static_cast<double>(m_ion));
+                    const double p_e_d = std::sqrt(E_out_d / (1.0/m0_d + 0.5*static_cast<double>(scaled_u2_ion) / static_cast<double>(m_ion)));
+                    const auto u_e = static_cast<amrex::ParticleReal>(p_e_d/m0_d);
+                    const auto u_ion = static_cast<amrex::ParticleReal>(p_e_d/static_cast<double>(m_ion));
 
                     // Assign the normalized momenta (still in the COM frame; the surrounding code
                     // transforms them back to the lab frame). The incident electron is in

@@ -117,13 +117,10 @@ namespace {
         // due to possible inconsistencies in how the mass is defined in the code, it is
         // probably more robust to subtract the rest masses and to add the reaction energy to the
         // total kinetic energy.
-        const double E_rest_in_d =
-            (static_cast<double>(m1_in) + static_cast<double>(m2_in))*c2_d;
-        const double E_rest_out_d =
-            (static_cast<double>(m1_out) + static_cast<double>(m2_out))*c2_d;
+        const double E_rest_in_d = (static_cast<double>(m1_in) + static_cast<double>(m2_in))*c2_d;
+        const double E_rest_out_d = (static_cast<double>(m1_out) + static_cast<double>(m2_out))*c2_d;
         const auto E_reaction_d = static_cast<double>(E_reaction);
-        const double E_star_f_d =
-            std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d;
+        const double E_star_f_d = std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d;
         const double E_star_f_sq_d = std::max(E_star_f_d*E_star_f_d, 0.0);
 
         // Square of the norm of the momentum of the products in the center of mass frame
@@ -132,15 +129,11 @@ namespace {
         // small negative numbers due to machine precision errors, for low-energy particles
         const auto m1_out_d = static_cast<double>(m1_out);
         const auto m2_out_d = static_cast<double>(m2_out);
-        const double E_ratio_d =
-            std::sqrt(E_star_f_sq_d) / ((m1_out_d + m2_out_d) * c2_d);
+        const double E_ratio_d = std::sqrt(E_star_f_sq_d) / ((m1_out_d + m2_out_d) * c2_d);
         double p_star_f_sq_d = 0.0;
         if (E_ratio_d > std::numeric_limits<double>::min())
         {
-            p_star_f_sq_d =
-                m1_out_d*m2_out_d*c2_d * (powi<2>(E_ratio_d) - 1.0)
-                + powi<2>(m1_out_d - m2_out_d)*c2_d*0.25
-                    * powi<2>(E_ratio_d - 1.0/E_ratio_d);
+            p_star_f_sq_d = m1_out_d*m2_out_d*c2_d * (powi<2>(E_ratio_d) - 1.0) + powi<2>(m1_out_d - m2_out_d)*c2_d*0.25 * powi<2>(E_ratio_d - 1.0/E_ratio_d);
         }
         const double p_star_f_d = std::sqrt(std::max(p_star_f_sq_d, 0.0));
 
@@ -151,17 +144,12 @@ namespace {
         double vcz_d = 0.0;
         if (pt_d > std::numeric_limits<double>::min())
         {
-            vcx_d = (static_cast<double>(p1x_in) + static_cast<double>(p2x_in))
-                * c_d / pt_d;
-            vcy_d = (static_cast<double>(p1y_in) + static_cast<double>(p2y_in))
-                * c_d / pt_d;
-            vcz_d = (static_cast<double>(p1z_in) + static_cast<double>(p2z_in))
-                * c_d / pt_d;
+            vcx_d = (static_cast<double>(p1x_in) + static_cast<double>(p2x_in)) * c_d / pt_d;
+            vcy_d = (static_cast<double>(p1y_in) + static_cast<double>(p2y_in)) * c_d / pt_d;
+            vcz_d = (static_cast<double>(p1z_in) + static_cast<double>(p2z_in)) * c_d / pt_d;
         }
         const double vc_sq_d = vcx_d*vcx_d + vcy_d*vcy_d + vcz_d*vcz_d;
-        const double one_minus_beta_sq_d =
-            std::max(1.0 - vc_sq_d*inv_c2_d,
-                     std::numeric_limits<double>::epsilon());
+        const double one_minus_beta_sq_d = std::max(1.0 - vc_sq_d*inv_c2_d, std::numeric_limits<double>::epsilon());
         const double gc_d = 1.0 / std::sqrt(one_minus_beta_sq_d);
 
         // Compute momentum of first product in the center of mass frame
@@ -170,9 +158,7 @@ namespace {
         amrex::ParticleReal pz_star_out = 0.0_prt;
         if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
             // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
-            ParticleUtils::RandomizeVelocity(
-                px_star_out, py_star_out, pz_star_out,
-                static_cast<amrex::ParticleReal>(p_star_f_d), engine);
+            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, static_cast<amrex::ParticleReal>(p_star_f_d), engine);
         }
         else if (scattering_angle_model == ScatteringAngleModel::Forward ||
                  scattering_angle_model == ScatteringAngleModel::Backward) {
@@ -200,25 +186,18 @@ namespace {
                 p1y_star_in_d = static_cast<double>(p1y_in);
                 p1z_star_in_d = static_cast<double>(p1z_in);
             }
-            const double p1_star_in_d = std::sqrt(
-                p1x_star_in_d*p1x_star_in_d
-                + p1y_star_in_d*p1y_star_in_d
-                + p1z_star_in_d*p1z_star_in_d);
+            const double p1_star_in_d = std::sqrt(p1x_star_in_d*p1x_star_in_d + p1y_star_in_d*p1y_star_in_d + p1z_star_in_d*p1z_star_in_d);
 
             // Momentum of the first product in the center of mass frame:
             // same (forward) or opposite (backward) direction as the incident, scaled to have
             // the magnitude sqrt(p_star_f_sq)
-            const double sign_d = (scattering_angle_model == ScatteringAngleModel::Backward)
-                                      ? -1.0 : 1.0;
+            const double sign_d = (scattering_angle_model == ScatteringAngleModel::Backward) ? -1.0 : 1.0;
             if (p1_star_in_d > std::numeric_limits<double>::min())
             {
                 const double scaling_d = sign_d*p_star_f_d/p1_star_in_d;
-                px_star_out =
-                    static_cast<amrex::ParticleReal>(p1x_star_in_d*scaling_d);
-                py_star_out =
-                    static_cast<amrex::ParticleReal>(p1y_star_in_d*scaling_d);
-                pz_star_out =
-                    static_cast<amrex::ParticleReal>(p1z_star_in_d*scaling_d);
+                px_star_out = static_cast<amrex::ParticleReal>(p1x_star_in_d*scaling_d);
+                py_star_out = static_cast<amrex::ParticleReal>(p1y_star_in_d*scaling_d);
+                pz_star_out = static_cast<amrex::ParticleReal>(p1z_star_in_d*scaling_d);
             }
             else
             {
@@ -236,8 +215,7 @@ namespace {
         // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
         if ( vc_sq_d > std::numeric_limits<double>::min() )
         {
-            const double p1t_out_d =
-                std::sqrt(m1_out_d*m1_out_d*c2_d + p_star_f_d*p_star_f_d);
+            const double p1t_out_d = std::sqrt(m1_out_d*m1_out_d*c2_d + p_star_f_d*p_star_f_d);
             const double vcDps_d = vcx_d*static_cast<double>(px_star_out)
                                    + vcy_d*static_cast<double>(py_star_out)
                                    + vcz_d*static_cast<double>(pz_star_out);
@@ -255,12 +233,9 @@ namespace {
         }
 
         // Compute momentum of the second product in lab frame, using total momentum conservation
-        const double p2x_out_d =
-            static_cast<double>(p1x_in) + static_cast<double>(p2x_in) - p1x_out_d;
-        const double p2y_out_d =
-            static_cast<double>(p1y_in) + static_cast<double>(p2y_in) - p1y_out_d;
-        const double p2z_out_d =
-            static_cast<double>(p1z_in) + static_cast<double>(p2z_in) - p1z_out_d;
+        const double p2x_out_d = static_cast<double>(p1x_in) + static_cast<double>(p2x_in) - p1x_out_d;
+        const double p2y_out_d = static_cast<double>(p1y_in) + static_cast<double>(p2y_in) - p1y_out_d;
+        const double p2z_out_d = static_cast<double>(p1z_in) + static_cast<double>(p2z_in) - p1z_out_d;
 
         // Compute the momentum of the product macroparticles
         // Note: for massless particles, the momentum is normalized to the electron mass

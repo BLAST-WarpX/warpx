@@ -159,27 +159,22 @@ namespace BinaryCollisionUtils{
         // for low-energy collisions.
         //
         // Starting from the Lorentz-invariant
-        //     E_star^2 = E_lab^2 - c^2 p_total^2
-        //              = (E1 + E2)^2 - c^2 (p1 + p2)^2
+        //     E_star^2 = E_lab^2 - c^2 p_total^2 = (E1 + E2)^2 - c^2 (p1 + p2)^2
         // and expanding using E_i^2 = m_i^2 c^4 + c^2 p_i^2, one gets
         //     E_star^2 = m1^2 c^4 + m2^2 c^4 + 2 ( E1 E2 - c^2 p1.p2 )
         // and therefore
-        //     E_star^2 - (m1 + m2)^2 c^4 =
-        //         2 ( E1 E2 - m1 m2 c^4 - c^2 p1.p2 ).
+        //     E_star^2 - (m1 + m2)^2 c^4 = 2 ( E1 E2 - m1 m2 c^4 - c^2 p1.p2 ).
         //
         // Compute E1 E2 - m1 m2 c^4 without cancellation by using
         //     E1 E2 - m1 m2 c^4 = m2 c^2 KE1 + m1 c^2 KE2 + KE1 KE2,
         // where KE_i = E_i - m_i c^2 is itself evaluated without cancellation.
         const double KE1_lab = p1_sq * c2 / (E1_lab + m1_dbl * c2);
         const double KE2_lab = p2_sq * c2 / (E2_lab + m2_dbl * c2);
-        const double E1E2_minus_m1m2c4 = m2_dbl * c2 * KE1_lab
-                                       + m1_dbl * c2 * KE2_lab
-                                       + KE1_lab * KE2_lab;
+        const double E1E2_minus_m1m2c4 = m2_dbl * c2 * KE1_lab + m1_dbl * c2 * KE2_lab + KE1_lab * KE2_lab;
 
         // s_minus_threshold = E_star^2 - (m1 + m2)^2 c^4, in J^2.
         // Floor roundoff negative values to keep the squared COM momentum non-negative.
-        const double s_minus_threshold = amrex::max(
-            2.0 * (E1E2_minus_m1m2c4 - c2 * p1_dot_p2), 0.0);
+        const double s_minus_threshold = amrex::max(2.0 * (E1E2_minus_m1m2c4 - c2 * p1_dot_p2), 0.0);
         const double m_sum_c2 = (m1_dbl + m2_dbl) * c2;
         const double E_star_sq = m_sum_c2 * m_sum_c2 + s_minus_threshold;
         const double E_star = std::sqrt(E_star_sq);
@@ -189,9 +184,7 @@ namespace BinaryCollisionUtils{
         if (m_sum_c2 == 0.0) {
             E_kin_COM = static_cast<amrex::ParticleReal>(E_star);
         } else {
-            E_kin_COM = static_cast<amrex::ParticleReal>(
-                s_minus_threshold / (E_star + m_sum_c2)
-            );
+            E_kin_COM = static_cast<amrex::ParticleReal>(s_minus_threshold / (E_star + m_sum_c2));
         }
 
         // Find the squared COM momentum from the factored Kallen form, obtaining
@@ -200,9 +193,7 @@ namespace BinaryCollisionUtils{
         if (m1_dbl + m2_dbl == 0) {
             p_star_sq = powi<2>( 0.5 * E_star * inv_c );
         } else {
-            p_star_sq = s_minus_threshold
-                      * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2)
-                      / (4.0 * E_star_sq * c2);
+            p_star_sq = s_minus_threshold * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2) / (4.0 * E_star_sq * c2);
         }
 
         // Energy of each particle in the center of mass frame
@@ -210,8 +201,7 @@ namespace BinaryCollisionUtils{
         const double E2_star = std::sqrt(m2_sq*c2 + p_star_sq) * c;
 
         // relative velocity in the center of mass frame, cast back to chosen precision
-        v_rel_COM = static_cast<amrex::ParticleReal>(
-            c * std::sqrt(p_star_sq) * c * (1.0/E1_star + 1.0/E2_star));
+        v_rel_COM = static_cast<amrex::ParticleReal>(c * std::sqrt(p_star_sq) * c * (1.0/E1_star + 1.0/E2_star));
 
         // Cross sections and relative velocity are computed in the center of mass frame.
         // On the other hand, the particle densities (weight over volume) in the lab frame are used.
