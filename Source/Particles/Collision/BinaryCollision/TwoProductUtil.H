@@ -135,7 +135,8 @@ namespace {
         {
             p_star_f_sq_d = m1_out_d*m2_out_d*c2_d * (powi<2>(E_ratio_d) - 1.0) + powi<2>(m1_out_d - m2_out_d)*c2_d*0.25 * powi<2>(E_ratio_d - 1.0/E_ratio_d);
         }
-        const double p_star_f_d = std::sqrt(amrex::max(p_star_f_sq_d, 0.0));
+        const double p_star_f_sq_clamped_d = amrex::max(p_star_f_sq_d, 0.0);
+        const double p_star_f_d = std::sqrt(p_star_f_sq_clamped_d);
 
         // Preliminary calculation: compute center of mass velocity
         const double pt_d = p1t_in + p2t_in;
@@ -215,7 +216,7 @@ namespace {
         // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
         if ( vc_sq_d > std::numeric_limits<double>::min() )
         {
-            const double p1t_out_d = std::sqrt(m1_out_d*m1_out_d*c2_d + p_star_f_d*p_star_f_d);
+            const double p1t_out_d = std::sqrt(m1_out_d*m1_out_d*c2_d + p_star_f_sq_clamped_d);
             const double vcDps_d = vcx_d*static_cast<double>(px_star_out)
                                    + vcy_d*static_cast<double>(py_star_out)
                                    + vcz_d*static_cast<double>(pz_star_out);
