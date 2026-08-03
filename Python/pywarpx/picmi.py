@@ -2159,9 +2159,11 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         ``solve_electron_energy_equation`` is True.
 
     qdsmc_n_floor: float, optional
-        Minimum electron number density (in m^-3) used when recovering the
-        electron temperature from the QDSMC entropy deposit. Defaults to
-        ``n_floor``.
+        Deposited-weight threshold (in m^-3) for the QDSMC electron
+        temperature update: cells whose deposited marker weight is at or
+        below this value are skipped and keep their previous temperature
+        (the density floor used in the entropy <-> temperature conversion
+        itself is ``n_floor``). Defaults to ``n_floor``.
 
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full

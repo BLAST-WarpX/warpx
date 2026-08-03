@@ -3765,8 +3765,11 @@ Maxwell solver: kinetic-fluid hybrid
     :default: :pp:param:`hybrid_pic_model.n_floor`
     :optional:
 
-    Density floor, in :math:`m^{-3}`, below which cells are excluded from the QDSMC electron-energy-equation
-    update (the electron temperature is left unchanged there). Defaults to :pp:param:`hybrid_pic_model.n_floor`.
+    Deposited-weight threshold, in :math:`m^{-3}`, for the QDSMC electron-energy-equation update: cells whose
+    deposited marker weight is at or below this value are skipped and keep their previous electron temperature
+    (guarding the division by the deposited weight in cells no QDSMC marker reached). The density floor used in
+    the :math:`K_e \leftrightarrow T_e` conversion itself is :pp:param:`hybrid_pic_model.n_floor`.
+    Defaults to :pp:param:`hybrid_pic_model.n_floor`.
 
 .. pp:param:: hybrid_pic_model.include_joule_heating
     :type: ``bool``

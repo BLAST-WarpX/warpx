@@ -9,10 +9,11 @@ so entropy-conserving transport requires, at every cell and time,
     T_e(x,t) = T_e0 * ( n(x,t) / n0 )^(gamma - 1),
 
 exactly -- a uniform K_e is invariant under any mass-weighted mixing, so the
-check holds even through the CIC-mixed drifting slab edge. The absorbing-halo
-bug (K_e left at 0 in below-floor cells) instead dilutes and erases the slab's
-entropy at the edge: T_e falls off the adiabat within tens of steps and the
-slab's electron thermal energy drains away.
+check holds even through the CIC-mixed drifting slab edge. If the transport
+instead left K_e = 0 in below-floor cells (an absorbing halo), the halo would
+dilute and erase the slab's entropy at the edge: T_e would fall off the
+adiabat within tens of steps and the slab's electron thermal energy would
+drain away.
 
 Scored on slab cells (n > 0.5 n0). Also reports the slab-mean T_e retention
 between the first and last dump.
@@ -56,7 +57,7 @@ def main(argv=None):
         type=float,
         default=0.02,
         help="allowed max pointwise relative error on the adiabat "
-        "(the fixed transport stays below ~0.2%%; the absorbing-halo bug "
+        "(correct transport stays below ~0.2%%; an absorbing K_e = 0 halo "
         "reaches ~8%% within the 80-step CI run)",
     )
     ap.add_argument("--out", default="vacuum_check.png")
@@ -101,8 +102,11 @@ def main(argv=None):
     med = float(np.median(rel[slab]))
     mx = float(np.max(rel[slab]))
 
-    # Slab-mean retention (density-weighted): 1.0 for entropy-conserving
-    # transport of a translating slab; well below 1 with the absorbing halo.
+    # Slab-mean retention (density-weighted), reported for context only (not
+    # asserted): edge rarefaction moves scored cells down the adiabat, so it
+    # sits below 1 even for exact transport (~0.82 over the 80-step CI run),
+    # and an absorbing halo shows up in the pointwise max error long before
+    # it moves this mean.
     slab_end = n_x[-1] > args.slab_frac * n0
     Te_mean0 = float(np.sum((Te_x[0] * n_x[0])[slab0]) / np.sum(n_x[0][slab0]))
     Te_mean1 = float(np.sum((Te_x[-1] * n_x[-1])[slab_end]) / np.sum(n_x[-1][slab_end]))

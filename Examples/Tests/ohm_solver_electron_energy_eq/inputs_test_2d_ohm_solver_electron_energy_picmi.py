@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # --- Test suite for the hybrid-PIC (Ohm's law) electron energy equation.
-# --- One script, three cases (selected with --case), each isolating one
+# --- One script, four cases (selected with --case), each isolating one
 # --- term of the equation in a 2D Cartesian (x,z) periodic box:
 # ---
 # ---   adiabat : transport terms only (B=0, eta=0, all sources off),
@@ -35,6 +35,16 @@
 # ---                 rate = [3(gamma_e-1) + 2] nu_ei,
 # ---             and C_e T_e + C_i T_i is conserved.  Analyse with
 # ---             analysis_qei.py (difference rate + budget).
+# ---
+# ---   vacuum  : transport through a below-floor halo (B=0, eta=0, all
+# ---             sources off).  A slab (n = n0) drifts at c_s through a
+# ---             halo with n = 0.02 n0, below the solver's n_floor,
+# ---             starting from uniform entropy K_e, so entropy-conserving
+# ---             transport must keep
+# ---                 T_e(x,t) = T_e0 (n(x,t)/n0)^(gamma_e-1)
+# ---             pointwise at all times: the below-floor halo must act as
+# ---             an insulating boundary, not a heat sink.  Analyse with
+# ---             analysis_vacuum.py.
 
 import argparse
 import shutil
@@ -292,10 +302,10 @@ class VacuumSlabTransport(ElectronEnergyCase):
     pointwise at all times -- exactly, even through the CIC-mixed slab edge,
     because a uniform K_e is invariant under any mass-weighted mixing.
 
-    This is the regression test for the absorbing-halo bug: when the QDSMC
-    transport leaves K_e = 0 in below-floor cells (instead of flooring the
-    density in the K_e <-> T_e conversion), the halo dilutes and erases the
-    slab's entropy at the drifting edge and T_e falls off the adiabat within
+    This guards the insulating treatment of below-floor cells: if the QDSMC
+    transport left K_e = 0 there (instead of flooring the density in the
+    K_e <-> T_e conversion), the halo would dilute and erase the slab's
+    entropy at the drifting edge and T_e would fall off the adiabat within
     tens of steps.
     """
 

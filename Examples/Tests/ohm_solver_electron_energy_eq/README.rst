@@ -14,10 +14,11 @@ equation
 where :math:`U_e = n_e k_B T_e/(\gamma_e - 1)` is the electron internal energy
 density, solved with the QDSMC kinetic-enslaving scheme of
 :cite:t:`ex-Belyaev2024` (``hybrid_pic_model.solve_electron_energy_equation``).
-Each of the three tests below isolates one piece of the equation with an exact
+Each of the four tests below isolates one piece of the equation with an exact
 analytic solution: the transport terms on the left-hand side (adiabatic
-compression), the Joule-heating source (force-free field decay), and the
-electron-ion temperature-relaxation sink :math:`Q_{ei}`.
+compression, and slab transport through a below-floor halo), the Joule-heating
+source (force-free field decay), and the electron-ion temperature-relaxation
+sink :math:`Q_{ei}`.
 
 Adiabatic compression
 ---------------------
@@ -41,7 +42,7 @@ Run
 
    .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all three cases; select this one with ``--case adiabat``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all four cases; select this one with ``--case adiabat``.
 
 Execute:
 
@@ -65,6 +66,43 @@ Analyze
    Measured :math:`T_e` profiles against the analytic adiabat (left) and the
    collapse of all cells and times onto :math:`T_e/T_{e0} = (n/n_0)^{\gamma_e-1}`
    (right).
+
+Vacuum-slab transport
+---------------------
+
+A plasma slab (:math:`n = n_0`) drifts at the electron-pressure sound speed
+:math:`c_s` through a tenuous halo whose density lies below the solver's
+density floor ``hybrid_pic_model.n_floor``. The run starts from uniform
+electron entropy (:math:`T_e` on the floored adiabat) with no sources
+(:math:`\mathbf{B} = 0`, :math:`\eta = 0`), so entropy-conserving transport
+must keep the same pointwise adiabat as in the adiabatic-compression case at
+every cell and time -- here even through the below-floor halo, which must act
+as an insulating boundary rather than a heat sink for the drifting slab's
+electron thermal energy.
+
+Run
+^^^
+
+.. dropdown:: Script ``inputs_test_2d_ohm_solver_electron_energy_picmi.py``
+
+   .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
+      :language: python3
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all four cases; select this one with ``--case vacuum``.
+
+Execute:
+
+.. code-block:: bash
+
+   python3 inputs_test_2d_ohm_solver_electron_energy_picmi.py --case vacuum
+
+Analyze
+^^^^^^^
+
+.. dropdown:: Script ``analysis_vacuum.py``
+
+   .. literalinclude:: analysis_vacuum.py
+      :language: python3
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/analysis_vacuum.py``.
 
 Joule heating
 -------------
@@ -91,7 +129,7 @@ Run
 
    .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all three cases; select this one with ``--case joule``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all four cases; select this one with ``--case joule``.
 
 Execute:
 
@@ -144,7 +182,7 @@ Run
 
    .. literalinclude:: inputs_test_2d_ohm_solver_electron_energy_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all three cases; select this one with ``--case qei``.
+      :caption: You can copy this file from ``Examples/Tests/ohm_solver_electron_energy_eq/inputs_test_2d_ohm_solver_electron_energy_picmi.py``. One script covers all four cases; select this one with ``--case qei``.
 
 Execute:
 

@@ -371,20 +371,23 @@ void WarpX::HybridPICInitializeRhoJandB ()
     HybridPICDepositRhoAndJ();
 
     // Fill the electron pressure using the freshly deposited rho. On a fresh
-    // start this seeds Pe^0 for the iteration-0 diagnostics and the first
-    // step's B-substep E-solves; on restart it restores Pe(rho^n), which is
-    // not checkpointed and would otherwise be zero for the whole first
-    // restarted step. From the first step onward, HybridPICEvolveFields
-    // refreshes Pe right after each deposition (via the closure, or via the
-    // QDSMC entropy transport when solve_electron_energy_equation is on).
+    // start this seeds Pe^0 for the first step's B-substep E-solves (the
+    // iteration-0 diagnostics were already written at the end of InitData,
+    // before this runs); on restart it restores Pe(rho^n), which is not
+    // checkpointed and would otherwise be zero for the whole first restarted
+    // step. From the first step onward, HybridPICEvolveFields refreshes Pe
+    // right after each deposition (via the closure, or via the QDSMC entropy
+    // transport when solve_electron_energy_equation is on).
     //
     // With the energy equation on, seed T_e itself on the floored adiabat
     // (uniform K_e -- the transport's zero-gradient state) and emit
     // Pe = n_e k_B T_e from it, with the same boundary treatment
     // CalculateElectronPressure applies. Calling the algebraic closure here
-    // instead would leave K_e = 0 across the floored halo (its T_e mirror
+    // instead would leave K_e ~ 0 across the floored halo (its T_e mirror
     // divides by the floored density while the pressure uses the raw one),
-    // re-creating the absorbing edge on the first step.
+    // re-creating the absorbing edge on the first step. Note that T_e is not
+    // checkpointed either, so on restart the seed re-derives T_e from the
+    // restored rho: evolved T_e structure is not preserved across a restart.
     if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             m_hybrid_pic_model->SeedTeAdiabat(lev);

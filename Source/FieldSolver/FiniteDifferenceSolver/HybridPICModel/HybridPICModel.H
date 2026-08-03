@@ -225,8 +225,10 @@ public:
 
     /**
      * \brief Fill the nodal K_e = T_e * n_e^(1-gamma) * (k_B / q_e) MultiFab
-     *        from the current T_e and rho_fp_temp (= rho at n+1/2). Cells with
-     *        rho <= rho_floor are left at 0.
+     *        from the current T_e and rho_fp_temp (= rho at n+1/2), using the
+     *        floored density max(n_e, n_floor) so below-floor (halo) cells
+     *        carry a valid K_e instead of acting as an absorbing K_e = 0
+     *        boundary.
      *
      *        Reads hybrid_electron_temperature_fp (T_e in K) and
      *        hybrid_rho_fp_temp; writes hybrid_entropy_fp.
@@ -237,9 +239,11 @@ public:
      * \brief After the QDSMC scatter, recover T_e^{n+1} from
      *           T_e = (deposited K*N) / (deposited N) / n_e^(1-gamma)
      *                 / (k_B / q_e)
-     *        using rho at n+1 (rho_fp), the deposited entropy field
-     *        (hybrid_entropy_fp), and the deposited weight field
-     *        (hybrid_qdsmc_weights_fp).
+     *        using the floored density max(n_e, n_floor) from rho at n+1
+     *        (rho_fp), the deposited entropy field (hybrid_entropy_fp), and
+     *        the deposited weight field (hybrid_qdsmc_weights_fp). Cells
+     *        whose deposited weight is at or below m_qdsmc_n_floor keep
+     *        their previous T_e.
      *
      *        Writes hybrid_electron_temperature_fp.
      */
@@ -335,7 +339,9 @@ public:
      * This is the QDSMC transport's zero-gradient state (K_e uniform
      * everywhere, floored halo included), so an energy-equation run starts
      * free of spurious entropy mixing and from the same electron pressure as
-     * the algebraic closure. Called from HybridPICInitializeRhoJandB when
+     * the algebraic closure wherever n_e >= n_floor (below the floor the
+     * emitted pressure is the floored-adiabat value, not the closure's
+     * raw-density one). Called from HybridPICInitializeRhoJandB when
      * m_solve_electron_energy_equation is true (a uniform-T_e seed is NOT
      * usable: its K_e contrast across a plasma-vacuum edge is mixed by the
      * remap within ~100 steps, artificially heating the dense regions).
@@ -384,7 +390,8 @@ public:
 
     bool m_holmstrom_vacuum_region = false;
 
-    /** Electron temperature in eV */
+    /** Electron temperature: read from the input in eV, converted to
+     * k_B T_e in J at the end of ReadParameters. */
     amrex::Real m_elec_temp;
     /** Reference electron density */
     amrex::Real m_n0_ref = 1.0;
@@ -442,9 +449,10 @@ public:
     std::unique_ptr<amrex::Parser> m_nu_ei_parser;
     amrex::ParserExecutor<4> m_nu_ei;
 
-    /** Density floor used when dividing by the deposited QDSMC weight to
-     * recover K_e^{n+1} from (K*N) / N. Avoids divide-by-zero in cells
-     * that no QDSMC particle reached during the push. Defaults to the
+    /** Deposited-weight threshold (density units, m^-3) for the QDSMC T_e
+     * update: cells whose deposited marker weight is at or below this value
+     * are skipped and keep their previous T_e, guarding the division by the
+     * deposited weight in cells no QDSMC marker reached. Defaults to the
      * same floor as the rest of the hybrid solver. */
     amrex::Real m_qdsmc_n_floor = 1.0;
 
