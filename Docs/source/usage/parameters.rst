@@ -5169,28 +5169,53 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         depending on the simulation size.
 
     * ``ChargeFluxEB``
-        Computes the charge flux (charge per unit time, in C/s) deposited by
-        scraped particle species onto a user-specified sub-area of the embedded 
-        boundary. One column is written for each available particle species, 
-        using the scraped-particle data already collected in the
+        This type computes the charge flux (charge per unit time, in C/s)
+        deposited by scraped particle species onto the embedded boundary,
+        by using the formula
+
+        .. math::
+
+            I_i = \frac{1}{\Delta t} \sum_{p \in \mathcal{S}_i} q_p
+
+        where :math:`\mathcal{S}_i` is the set of macroparticles of species
+        :math:`i` scraped onto the embedded boundary during the current
+        timestep :math:`\Delta t`, and :math:`q_p` is the charge of
+        macroparticle :math:`p`.
+
+        The output columns are the charge flux for each available particle
+        species, using the scraped-particle data already collected in the
         :ref:`particle boundary buffer <running-cpp-parameters-boundary>` for
-        the ``eb`` boundary. Requires WarpX to be compiled with
-        ``WarpX_EB=TRUE``, and requires
+        the ``eb`` boundary.
+
+        When providing ``<reduced_diags_name>.weighting_function(x,y,z)``,
+        the computed sum is restricted to particles scraped at a location
+        where the weighting function is positive:
+
+        .. math::
+
+            I_i = \frac{1}{\Delta t} \sum_{p \in \mathcal{S}_i}
+                q_p \; \mathbb{1}\left[ weighting(x_p, y_p, z_p) > 0 \right]
+
+        where :math:`(x_p, y_p, z_p)` is the position at which macroparticle
+        :math:`p` was scraped, and :math:`\mathbb{1}[\cdot]` is the indicator
+        function (1 if the condition is true, 0 otherwise). In particular,
+        by choosing a weighting function which returns either 1 or 0, it is
+        possible to compute the charge flux through only some part of the
+        embedded boundary.
+
+        * ``<reduced_diags_name>.weighting_function(x,y,z)`` (``string``, no default -- must always be specified)
+            A function of the coordinates ``x``, ``y``, ``z`` (using the
+            :ref:`WarpX parser <running-cpp-parameters-parser>`) that defines
+            the sub-area of the embedded boundary to integrate over:
+            particles scraped at a location where this expression evaluates
+            to a positive value are counted, and all others are ignored.
+            For example, ``(z > 0.1) * (z < 0.3)`` selects only the band of
+            the EB between ``z = 0.1`` and ``z = 0.3``.
+
+        Requires WarpX to be compiled with ``WarpX_EB=TRUE``, and requires
         :pp:param:`<species_name>.save_particles_at_xlo/ylo/zlo/xhi/yhi/zhi/eb`
         (``save_particles_at_eb = 1``) to be set for every species you want
         to include.
-
-        .. pp:param:: <reduced_diag_name>.area_function
-        :type: ``string``
-        :optional: no default -- must always be specified
-
-        A function of the coordinates ``x``, ``y``, ``z`` (using the
-        :ref:`WarpX parser <running-cpp-parameters-parser>`) that defines the
-        sub-area of the embedded boundary to integrate over: particles scraped
-        at a location where this expression evaluates to a positive value are
-        counted, and all others are ignored. For example,
-        ``(z > 0.1) * (z < 0.3)`` selects only the band of the EB between
-        ``z = 0.1`` and ``z = 0.3``.
 
     * ``ChargeOnEB``
         This type computes the total surface charge on the embedded boundary
