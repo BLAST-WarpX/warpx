@@ -28,7 +28,7 @@ The magnetic field is advanced in time using Faraday's law,
 
     .. math::
 
-        \frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E},
+        \frac{\partial\boldsymbol{B}}{\partial t} = -\boldsymbol{\nabla}\times\boldsymbol{E},
 
 where the electric field is calculated from Ohm's law which involves the currents,
 the magnetic field, and the electron pressure (for which an additional closure is required,
@@ -36,20 +36,20 @@ see :ref:`here <theory-hybrid-model-elec-temp>`),
 
     .. math::
 
-        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
+        \boldsymbol{E} = -\frac{1}{en_e}\left( \boldsymbol{J}_e\times\boldsymbol{B} + \boldsymbol{\nabla} P_e \right)+\eta\boldsymbol{J}-\eta_h \nabla^2\boldsymbol{J}.
 
 The electron current is in turn obtained by subtracting the ion current (obtained from
 kinetic ion macro-particles) from the total current (obtained from Ampere's law):
 
     .. math::
 
-        \vec{J}_e = \vec{J} - \sum_{s\neq e}\vec{J}_s - \vec{J}_{ext}
+        \boldsymbol{J}_e = \boldsymbol{J} - \sum_{s\neq e}\boldsymbol{J}_s - \boldsymbol{J}_{ext}
 
 where
 
     .. math::
 
-        \mu_0\vec{J} = \vec{\nabla}\times\vec{B}.
+        \mu_0\boldsymbol{J} = \boldsymbol{\nabla}\times\boldsymbol{B}.
 
 Algorithm details
 -----------------
@@ -64,8 +64,8 @@ PIC algorithm with the only exception that the E-field is calculated from Ohm's 
 rather than it being updated from the full Maxwell-Ampere equation. The E-field update occurs
 after particle pushing and deposition (charge and current density) has been completed. Therefore, based
 on the usual time-staggering in the PIC algorithm, when the E-field is updated
-at timestep :math:`t=t_n`, the quantities :math:`\rho^n`, :math:`\rho^{n+1}`, :math:`\vec{J}_i^{n-1/2}`
-and  :math:`\vec{J}_i^{n+1/2}` are all known.
+at timestep :math:`t=t_n`, the quantities :math:`\rho^n`, :math:`\rho^{n+1}`, :math:`\boldsymbol{J}_i^{n-1/2}`
+and  :math:`\boldsymbol{J}_i^{n+1/2}` are all known.
 
 Field update
 ^^^^^^^^^^^^
@@ -76,34 +76,34 @@ First half step
 """""""""""""""
 
 Firstly the E-field at :math:`t=t_n` is calculated for which the current density needs to
-be interpolated to the correct time, using :math:`\vec{J}_i^n = 1/2(\vec{J}_i^{n-1/2}+ \vec{J}_i^{n+1/2})`.
+be interpolated to the correct time, using :math:`\boldsymbol{J}_i^n = 1/2(\boldsymbol{J}_i^{n-1/2}+ \boldsymbol{J}_i^{n+1/2})`.
 The electron pressure is simply calculated using :math:`\rho^n` and the B-field is also already
 known at the correct time since it was calculated for :math:`t=t_n` at the end of the last step.
-Once :math:`\vec{E}^n` is calculated, it is used to push :math:`\vec{B}^n` forward in time
-(using the Maxwell-Faraday equation) to :math:`\vec{B}^{n+1/2}`.
+Once :math:`\boldsymbol{E}^n` is calculated, it is used to push :math:`\boldsymbol{B}^n` forward in time
+(using the Maxwell-Faraday equation) to :math:`\boldsymbol{B}^{n+1/2}`.
 
 Second half step
 """"""""""""""""
 
-Next, the E-field is recalculated to get :math:`\vec{E}^{n+1/2}`. This is done
-using the known fields :math:`\vec{B}^{n+1/2}`, :math:`\vec{J}_i^{n+1/2}` and
+Next, the E-field is recalculated to get :math:`\boldsymbol{E}^{n+1/2}`. This is done
+using the known fields :math:`\boldsymbol{B}^{n+1/2}`, :math:`\boldsymbol{J}_i^{n+1/2}` and
 interpolated charge density :math:`\rho^{n+1/2}=1/2(\rho^n+\rho^{n+1})` (which is
 also used to calculate the electron pressure). Similarly as before, the B-field
-is then pushed forward to get :math:`\vec{B}^{n+1}` using the newly calculated
-:math:`\vec{E}^{n+1/2}` field.
+is then pushed forward to get :math:`\boldsymbol{B}^{n+1}` using the newly calculated
+:math:`\boldsymbol{E}^{n+1/2}` field.
 
 Extrapolation step
 """"""""""""""""""
 
 Obtaining the E-field at timestep :math:`t=t_{n+1}` is a well documented issue for
 the hybrid model. Currently the approach in WarpX is to simply extrapolate
-:math:`\vec{J}_i` forward in time, using
+:math:`\boldsymbol{J}_i` forward in time, using
 
     .. math::
 
-        \vec{J}_i^{n+1} = \frac{3}{2}\vec{J}_i^{n+1/2} - \frac{1}{2}\vec{J}_i^{n-1/2}.
+        \boldsymbol{J}_i^{n+1} = \frac{3}{2}\boldsymbol{J}_i^{n+1/2} - \frac{1}{2}\boldsymbol{J}_i^{n-1/2}.
 
-With this extrapolation all fields required to calculate :math:`\vec{E}^{n+1}`
+With this extrapolation all fields required to calculate :math:`\boldsymbol{E}^{n+1}`
 are known and the simulation can proceed.
 
 Sub-stepping
@@ -226,12 +226,12 @@ neglecting the displacement current term :cite:p:`kfhm-Nielson1976`, giving,
 
     .. math::
 
-        \mu_0\vec{J} = \vec{\nabla}\times\vec{B},
+        \mu_0\boldsymbol{J} = \boldsymbol{\nabla}\times\boldsymbol{B},
 
-where :math:`\vec{J} = \sum_{s\neq e}\vec{J}_s + \vec{J}_e + \vec{J}_{ext}` is the total electrical current,
+where :math:`\boldsymbol{J} = \sum_{s\neq e}\boldsymbol{J}_s + \boldsymbol{J}_e + \boldsymbol{J}_{ext}` is the total electrical current,
 i.e. the sum of electron and ion currents as well as any external current (not captured through plasma
 particles). Since ions are treated in the regular
-PIC manner, the ion current, :math:`\sum_{s\neq e}\vec{J}_s`, is known during a simulation. Therefore,
+PIC manner, the ion current, :math:`\sum_{s\neq e}\boldsymbol{J}_s`, is known during a simulation. Therefore,
 given the magnetic field, the electron current can be calculated.
 
 The electron momentum transport equation (obtained from multiplying the Vlasov equation by mass and
@@ -239,40 +239,40 @@ integrating over velocity), also called the generalized Ohm's law, is given by:
 
     .. math::
 
-        en_e\vec{E} = \frac{m}{e}\frac{\partial \vec{J}_e}{\partial t} + \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e
+        en_e\boldsymbol{E} = \frac{m}{e}\frac{\partial \boldsymbol{J}_e}{\partial t} + \frac{m}{e}\left( \boldsymbol{U}_e\cdot\boldsymbol{\nabla} \right) \boldsymbol{J}_e - \boldsymbol{\nabla}\cdot {\overleftrightarrow P}_e - \boldsymbol{J}_e\times\boldsymbol{B}+\boldsymbol{R}_e
 
-where :math:`\vec{U}_e = \vec{J}_e/(en_e)` is the electron fluid velocity,
+where :math:`\boldsymbol{U}_e = \boldsymbol{J}_e/(en_e)` is the electron fluid velocity,
 :math:`{\overleftrightarrow P}_e` is the electron pressure tensor and
-:math:`\vec{R}_e` is the drag force due to collisions between electrons and ions.
-Applying the above momentum equation to the Maxwell-Faraday equation (:math:`\frac{\partial\vec{B}}{\partial t} = -\nabla\times\vec{E}`)
-and substituting in :math:`\vec{J}` calculated from the Maxwell-Ampere equation, gives,
+:math:`\boldsymbol{R}_e` is the drag force due to collisions between electrons and ions.
+Applying the above momentum equation to the Maxwell-Faraday equation (:math:`\frac{\partial\boldsymbol{B}}{\partial t} = -\boldsymbol{\nabla}\times\boldsymbol{E}`)
+and substituting in :math:`\boldsymbol{J}` calculated from the Maxwell-Ampere equation, gives,
 
     .. math::
 
-        \frac{\partial\vec{J}_e}{\partial t} = -\frac{1}{\mu_0}\nabla\times\left(\nabla\times\vec{E}\right) - \frac{\partial\vec{J}_{ext}}{\partial t} - \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t}.
+        \frac{\partial\boldsymbol{J}_e}{\partial t} = -\frac{1}{\mu_0}\boldsymbol{\nabla}\times\left(\boldsymbol{\nabla}\times\boldsymbol{E}\right) - \frac{\partial\boldsymbol{J}_{ext}}{\partial t} - \sum_{s\neq e}\frac{\partial\boldsymbol{J}_s}{\partial t}.
 
 Plugging this back into the generalized Ohm's law gives:
 
     .. math::
 
-        \left(en_e +\frac{m}{e\mu_0}\nabla\times\nabla\times\right)\vec{E} =&
-        - \frac{m}{e}\left( \frac{\partial\vec{J}_{ext}}{\partial t} + \sum_{s\neq e}\frac{\partial\vec{J}_s}{\partial t} \right) \\
-        &+ \frac{m}{e}\left( \vec{U}_e\cdot\nabla \right) \vec{J}_e - \nabla\cdot {\overleftrightarrow P}_e - \vec{J}_e\times\vec{B}+\vec{R}_e.
+        \left(en_e +\frac{m}{e\mu_0}\boldsymbol{\nabla}\times\boldsymbol{\nabla}\times\right)\boldsymbol{E} =&
+        - \frac{m}{e}\left( \frac{\partial\boldsymbol{J}_{ext}}{\partial t} + \sum_{s\neq e}\frac{\partial\boldsymbol{J}_s}{\partial t} \right) \\
+        &+ \frac{m}{e}\left( \boldsymbol{U}_e\cdot\boldsymbol{\nabla} \right) \boldsymbol{J}_e - \boldsymbol{\nabla}\cdot {\overleftrightarrow P}_e - \boldsymbol{J}_e\times\boldsymbol{B}+\boldsymbol{R}_e.
 
 If we now further assume electrons are inertialess (i.e. :math:`m=0`), the above equation simplifies to,
 
     .. math::
 
-        en_e\vec{E} = -\vec{J}_e\times\vec{B}-\nabla\cdot{\overleftrightarrow P}_e+\vec{R}_e.
+        en_e\boldsymbol{E} = -\boldsymbol{J}_e\times\boldsymbol{B}-\boldsymbol{\nabla}\cdot{\overleftrightarrow P}_e+\boldsymbol{R}_e.
 
 Making the further simplifying assumptions that the electron pressure is isotropic and that
 the electron drag term can be written using a simple resistivity (:math:`\eta`) and hyper-resistivity (:math:`\eta_h`)
-i.e. :math:`\vec{R}_e = en_e(\eta-\eta_h \nabla^2)\vec{J}`, brings us to the implemented form of
+i.e. :math:`\boldsymbol{R}_e = en_e(\eta-\eta_h \nabla^2)\boldsymbol{J}`, brings us to the implemented form of
 Ohm's law:
 
     .. math::
 
-        \vec{E} = -\frac{1}{en_e}\left( \vec{J}_e\times\vec{B} + \nabla P_e \right)+\eta\vec{J}-\eta_h \nabla^2\vec{J}.
+        \boldsymbol{E} = -\frac{1}{en_e}\left( \boldsymbol{J}_e\times\boldsymbol{B} + \boldsymbol{\nabla} P_e \right)+\eta\boldsymbol{J}-\eta_h \nabla^2\boldsymbol{J}.
 
 Lastly, if an electron temperature is given from which the electron pressure can
 be calculated, the model is fully constrained and can be evolved given initial
