@@ -50,7 +50,7 @@ sim = picmi.Simulation(
 )
 
 # Define epsilon
-epsilon = picmi.MacroscopicProperty(name="epsilon", value=epsilon)
+epsilon = picmi.MacroscopicProperty(name="epsilon", implicit_function="1.5*epsilon0")
 sigma = picmi.MacroscopicProperty(name="sigma", value=0.0)
 mu = picmi.MacroscopicProperty(name="mu", value=picmi.constants.mu0)
 
