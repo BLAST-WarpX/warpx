@@ -202,9 +202,10 @@ namespace {
             }
             else
             {
-                px_star_out = 0.0_prt;
-                py_star_out = 0.0_prt;
-                pz_star_out = 0.0_prt;
+                // Incident direction is undefined in the COM frame; fall back to an
+                // isotropic direction while conserving the outgoing COM momentum magnitude.
+                ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out,
+                    static_cast<amrex::ParticleReal>(p_star_f_d), engine);
             }
         }
 
