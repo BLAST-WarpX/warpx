@@ -103,21 +103,14 @@ namespace {
 
         // Compute 0th component of the 4-momentum of the incident particles
         const double p1t_in = std::sqrt(
-            m1_in_d*m1_in_d*c2_d
-            + p1x_in_d*p1x_in_d
-            + p1y_in_d*p1y_in_d
-            + p1z_in_d*p1z_in_d);
+            m1_in_d*m1_in_d*c2_d + p1x_in_d*p1x_in_d + p1y_in_d*p1y_in_d + p1z_in_d*p1z_in_d);
         const double p2t_in = std::sqrt(
-            m2_in_d*m2_in_d*c2_d
-            + p2x_in_d*p2x_in_d
-            + p2y_in_d*p2y_in_d
-            + p2z_in_d*p2z_in_d);
+            m2_in_d*m2_in_d*c2_d + p2x_in_d*p2x_in_d + p2y_in_d*p2y_in_d + p2z_in_d*p2z_in_d);
 
         // Square norm of the total (sum between the two particles) momenta in the lab frame
-        const double p_total_sq_d =
-            powi<2>(p1x_in_d+p2x_in_d)
-            + powi<2>(p1y_in_d+p2y_in_d)
-            + powi<2>(p1z_in_d+p2z_in_d);
+        const double p_total_sq_d =  powi<2>(p1x_in_d+p2x_in_d) +
+                                     powi<2>(p1y_in_d+p2y_in_d) +
+                                     powi<2>(p1z_in_d+p2z_in_d);
 
         // Total energy of incident macroparticles in the lab frame
         const double E_lab_d = (p1t_in + p2t_in) * c_d;
@@ -183,14 +176,12 @@ namespace {
             {
                 // Convert momentum of first incident particle to lab frame, using equation (2)
                 // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
-                const double vcDps_d = vcx_d*p1x_in_d
-                                       + vcy_d*p1y_in_d
-                                       + vcz_d*p1z_in_d;
+                const double vcDps_d = vcx_d*p1x_in_d + vcy_d*p1y_in_d + vcz_d*p1z_in_d;
                 const double factor0_d = (gc_d-1.0)/vc_sq_d;
                 const double factor_d = factor0_d*vcDps_d - p1t_in*gc_d/c_d;
-                p1x_star_in_d = p1x_in_d + vcx_d*factor_d;
-                p1y_star_in_d = p1y_in_d + vcy_d*factor_d;
-                p1z_star_in_d = p1z_in_d + vcz_d*factor_d;
+                p1x_star_in_d = p1x_in_d + vcx_d * factor_d;
+                p1y_star_in_d = p1y_in_d + vcy_d * factor_d;
+                p1z_star_in_d = p1z_in_d + vcz_d * factor_d;
             }
             else // If center of mass velocity is zero, we are already in the lab frame
             {
@@ -233,14 +224,12 @@ namespace {
         if ( vc_sq_d > std::numeric_limits<double>::min() )
         {
             const double p1t_out_d = std::sqrt(m1_out_d*m1_out_d*c2_d + p_star_f_sq_clamped_d);
-            const double vcDps_d = vcx_d*px_star_out_d
-                                   + vcy_d*py_star_out_d
-                                   + vcz_d*pz_star_out_d;
+            const double vcDps_d = vcx_d*px_star_out_d + vcy_d*py_star_out_d + vcz_d*pz_star_out_d;
             const double factor0_d = (gc_d-1.0)/vc_sq_d;
             const double factor_d = factor0_d*vcDps_d + p1t_out_d*gc_d/c_d;
-            p1x_out_d = px_star_out_d + vcx_d*factor_d;
-            p1y_out_d = py_star_out_d + vcy_d*factor_d;
-            p1z_out_d = pz_star_out_d + vcz_d*factor_d;
+            p1x_out_d = px_star_out_d + vcx_d * factor_d;
+            p1y_out_d = py_star_out_d + vcy_d * factor_d;
+            p1z_out_d = pz_star_out_d + vcz_d * factor_d;
         }
         else // If center of mass velocity is zero, we are already in the lab frame
         {

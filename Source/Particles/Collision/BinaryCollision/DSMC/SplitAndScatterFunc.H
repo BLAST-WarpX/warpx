@@ -435,8 +435,7 @@ public:
                 const auto ux0_d = static_cast<double>(ux0);
                 const auto uy0_d = static_cast<double>(uy0);
                 const auto uz0_d = static_cast<double>(uz0);
-                const double p_non_target_in_d = m0_d * std::sqrt(
-                    ux0_d*ux0_d + uy0_d*uy0_d + uz0_d*uz0_d);
+                const double p_non_target_in_d = m0_d * std::sqrt(ux0_d*ux0_d + uy0_d*uy0_d + uz0_d*uz0_d);
                 const double E_coll_d = 0.5 * p_non_target_in_d*p_non_target_in_d * (1.0/m0_d + 1.0/m1_d);
 
                 // subtract the energy cost for ionization (converted from eV to J)
