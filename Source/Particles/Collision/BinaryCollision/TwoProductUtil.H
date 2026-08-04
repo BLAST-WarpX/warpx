@@ -133,7 +133,7 @@ namespace {
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
-        const double E_ratio_d = std::sqrt(E_star_f_sq_d) / ((m1_out_d + m2_out_d) * c2_d);
+        const double E_ratio_d = std::sqrt(E_star_f_sq_d)/((m1_out_d + m2_out_d)*c2_d);
         double p_star_f_sq_d = 0.0;
         if (E_ratio_d > std::numeric_limits<double>::min())
         {
@@ -163,7 +163,8 @@ namespace {
         amrex::ParticleReal pz_star_out = 0.0_prt;
         if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
             // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
-            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, static_cast<amrex::ParticleReal>(p_star_f_d), engine);
+            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, static_cast<amrex::ParticleReal>(p_star_f_d),
+                                             engine);
         }
         else if (scattering_angle_model == ScatteringAngleModel::Forward ||
                  scattering_angle_model == ScatteringAngleModel::Backward) {
@@ -198,9 +199,9 @@ namespace {
             if (p1_star_in_d > std::numeric_limits<double>::min())
             {
                 const double scaling_d = sign_d*p_star_f_d/p1_star_in_d;
-                px_star_out = static_cast<amrex::ParticleReal>(p1x_star_in_d*scaling_d);
-                py_star_out = static_cast<amrex::ParticleReal>(p1y_star_in_d*scaling_d);
-                pz_star_out = static_cast<amrex::ParticleReal>(p1z_star_in_d*scaling_d);
+                px_star_out = static_cast<amrex::ParticleReal>(p1x_star_in_d * scaling_d);
+                py_star_out = static_cast<amrex::ParticleReal>(p1y_star_in_d * scaling_d);
+                pz_star_out = static_cast<amrex::ParticleReal>(p1z_star_in_d * scaling_d);
             }
             else
             {

@@ -436,7 +436,7 @@ public:
                 const auto uy0_d = static_cast<double>(uy0);
                 const auto uz0_d = static_cast<double>(uz0);
                 const double p_non_target_in_d = m0_d * std::sqrt(ux0_d*ux0_d + uy0_d*uy0_d + uz0_d*uz0_d);
-                const double E_coll_d = 0.5 * p_non_target_in_d*p_non_target_in_d * (1.0/m0_d + 1.0/m1_d);
+                const double E_coll_d = 0.5 * p_non_target_in_d * p_non_target_in_d * (1.0/m0_d + 1.0/m1_d);
 
                 // subtract the energy cost for ionization (converted from eV to J)
                 double E_out_d = E_coll_d - static_cast<double>(scattering_process.m_energy_penalty) * PhysConst::q_e_v<double>;
@@ -474,10 +474,10 @@ public:
                     const auto mass_slot2_d = static_cast<double>(mass_slot2);
                     const auto mass_slot3_d = static_cast<double>(mass_slot3);
                     const double products_mass_d = mass_slot2_d + mass_slot3_d;
-                    const double p_non_target_out_d = std::sqrt(2.0*E_out_d / (1.0/m0_d + 1.0/products_mass_d));
+                    const double p_non_target_out_d = std::sqrt( 2.0 * E_out_d / (1.0 / m0_d + 1.0 / products_mass_d ) );
 
                     // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
-                    const auto reduce_factor = static_cast<amrex::ParticleReal>(p_non_target_out_d/p_non_target_in_d);
+                    const auto reduce_factor = static_cast<amrex::ParticleReal>(p_non_target_out_d / p_non_target_in_d);
                     ux0 *= reduce_factor;
                     uy0 *= reduce_factor;
                     uz0 *= reduce_factor;
@@ -526,7 +526,8 @@ public:
                     // of energy in the center-of-mass frame (both electrons are assumed
                     // to carry an equal share of the energy):
                     //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
-                    const double p_e_d = std::sqrt(E_out_d / (1.0/m0_d + 0.5*scaled_u2_ion_d / m_ion_d));
+                    const double p_e_d = std::sqrt(
+                        E_out_d / (1.0/m0_d + 0.5*scaled_u2_ion_d/m_ion_d) );
                     const auto u_e = static_cast<amrex::ParticleReal>(p_e_d/m0_d);
                     const auto u_ion = static_cast<amrex::ParticleReal>(p_e_d/m_ion_d);
 
