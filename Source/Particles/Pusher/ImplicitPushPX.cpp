@@ -280,13 +280,18 @@ PhysicalParticleContainer::FindSuborbitParticles (WarpXParIter & pti,
     // If no particles, do not do anything
     if (np_to_push == 0) { return; }
 
-    int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
+    // This routine is only called when suborbits are in use, in which case
+    // the "nsuborbits" attribute was added to the container.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(HasiAttrib("nsuborbits"),
+        "FindSuborbitParticles: the particle attribute nsuborbits is not defined");
+
+    int const * const nsuborbits = pti.GetiAttribs("nsuborbits").dataPtr() + offset;
 
     // Count how many particles did not converge.
     num_unconverged_particles = amrex::Reduce::Sum<amrex::Long>(
         np_to_push, [=] AMREX_GPU_DEVICE (long ip) -> amrex::Long
     {
-        return (nsuborbits && nsuborbits[ip] > 1) ? 1 : 0;
+        return (nsuborbits[ip] > 1) ? 1 : 0;
     });
 
     // Setup for handling the suborbit particles. A list of their indices is
