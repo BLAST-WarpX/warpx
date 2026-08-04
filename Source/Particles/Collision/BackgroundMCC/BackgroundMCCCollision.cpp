@@ -338,8 +338,10 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                               // determine if this particle should collide
                               if (amrex::Random(engine) > total_collision_prob) { return; }
 
+                              // The background density and temperature parsers take Cartesian
+                              // coordinates as arguments, in all geometries.
                               amrex::ParticleReal x, y, z;
-                              GetPosition.AsStored(ip, x, y, z);
+                              GetPosition(ip, x, y, z);
 
                               const amrex::ParticleReal n_a = n_a_func(x, y, z, t);
                               const amrex::ParticleReal T_a = T_a_func(x, y, z, t);

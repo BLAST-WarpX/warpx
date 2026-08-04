@@ -214,7 +214,11 @@ void DifferentialLuminosity::ComputeDiags (int step)
             // pair of macroparticles, it samples max(NI1,NI2) pairs
             // and scales the resulting number by multiplying by min(NI1,NI2).
             // The parallelization strategy follows: https://dl.acm.org/doi/10.1145/3732775.3733578
-            amrex::ParallelFor( n_independent_pairs, [=] AMREX_GPU_DEVICE (int i_coll) noexcept
+            // amrex::For: iterations accumulate into shared luminosity bins;
+            // in serial (non-OpenMP) builds HostDevice::Atomic::Add is a plain
+            // +=, which is unsafe under the SIMD pragma of ParallelFor
+            // (see issue #7097)
+            amrex::For( n_independent_pairs, [=] AMREX_GPU_DEVICE (int i_coll) noexcept
             {
                 // to avoid type mismatch errors
                 auto ui_coll = (index_type)i_coll;

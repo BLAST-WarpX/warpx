@@ -471,6 +471,22 @@ Overall simulation parameters
     verbose output. When using ``labframe-electromagnetostatic``, this value
     is also used as the default for ``magnetostatic_solver_verbosity``.
 
+.. pp:param:: warpx.self_fields_num_final_sweeps
+    :type: ``integer``
+    :default: 8
+
+    Number of relaxation (smoothing) sweeps performed during the final smoothing
+    stage of the AMReX MLMG Poisson solve for electrostatic self fields.
+
+    Final smoothing is applied by AMReX when the smoother is used as the bottom
+    solver of the multigrid solve.
+
+    Increasing this value can improve residual reduction per MLMG iteration,
+    which may help convergence, but it also increases the work performed in each
+    MLMG iteration, so the most efficient value is problem-dependent.
+
+    Must be greater than zero when specified.
+
 .. pp:param:: warpx.magnetostatic_solver_required_precision
     :type: ``float``
     :default: value of ``self_fields_required_precision``
@@ -3002,12 +3018,18 @@ Details about the collision models can be found in the :ref:`theory section <mul
     is used for the background density, the input parameter ``<collision_name>.max_background_density``
     must also be provided to calculate the maximum collision probability.
 
+    The arguments ``x``, ``y`` and ``z`` are the Cartesian coordinates of the macroparticle, in every
+    geometry. In ``RZ``, ``RCYLINDER`` and ``RSPHERE`` geometry this means that the radius must be
+    written as ``sqrt(x**2+y**2)`` (``RZ``, ``RCYLINDER``) or ``sqrt(x**2+y**2+z**2)`` (``RSPHERE``),
+    and in 2D (``XZ``) geometry ``y`` is always 0.
+
 .. pp:param:: <collision_name>.background_temperature
     :type: ``float``
 
     Only for ``background_mcc`` and ``background_stopping``. The temperature of the background in Kelvin.
     Can also provide ``<collision_name>.background_temperature(x,y,z,t)`` using the parser
-    initialization style for spatially and temporally varying temperature.
+    initialization style for spatially and temporally varying temperature. The arguments follow the
+    same convention as for :pp:param:`<collision_name>.background_density`.
 
 .. pp:param:: <collision_name>.background_mass
     :type: ``float``
@@ -3476,7 +3498,7 @@ Two families of Maxwell solvers are implemented in WarpX, based on the Finite-Di
      - ``ckc``: (not available in ``RZ``, ``RCYLINDER``, and ``RSPHERE`` geometries) Cole-Karkkainen solver with Cowan
        coefficients (see :cite:t:`param-CowanPRSTAB13`).
      - ``psatd``: Pseudo-spectral solver (see :ref:`theory <theory-mwsolve-psatd>`).
-     - ``ect``: Enlarged cell technique (conformal finite difference solver. See :cite:t:`param-XiaoIEEE2005`).
+     - ``ect``: Enlarged cell technique (conformal finite difference solver. See :cite:t:`param-XiaoIEEE2004`).
      - ``hybrid``: The E-field will be solved using Ohm's law and a kinetic-fluid hybrid model (see :ref:`theory <theory-kinetic-fluid-hybrid-model>`).
      - ``none``: No field solve will be performed.
 
@@ -3768,6 +3790,60 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
+
+.. pp:param:: hybrid_pic_model.solve_electron_energy_equation
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this evolves the electron temperature used for the
+    electron pressure with the electron energy equation, solved with the QDSMC scheme
+    (see the :ref:`theory section <theory-hybrid-model-electron-energy-eq>`), instead of evaluating the polytropic
+    closure with the constant reference state :math:`(n_0, T_{e0})`.
+
+.. pp:param:: hybrid_pic_model.qdsmc_n_floor
+    :type: ``float``
+    :default: :pp:param:`hybrid_pic_model.n_floor`
+    :optional:
+
+    Density floor, in :math:`m^{-3}`, below which cells are excluded from the QDSMC electron-energy-equation
+    update (the electron temperature is left unchanged there). Defaults to :pp:param:`hybrid_pic_model.n_floor`.
+
+.. pp:param:: hybrid_pic_model.include_joule_heating
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the Joule-heating source
+    consistent with the resistive friction in Ohm's law, applied per ion species with the effective resistivity
+    :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. For a single species this reduces to
+    :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
+
+.. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
+    :type: ``float``
+    :default: ``-1`` (off)
+    :optional:
+
+    Electron temperature threshold, in eV, above which the Joule heat is redirected to the ions.
+    If :pp:param:`hybrid_pic_model.include_joule_heating` is on and a threshold :math:`\geq 0` is specified,
+    cells with electron temperature at or above the threshold deposit their Joule heat to the kinetic ions
+    (as stochastic thermal-velocity kicks, bookkept per species) instead of the electron fluid. This caps the
+    electron heating at the threshold and allows :math:`T_i > T_e` to develop, mimicking regimes where the
+    electrons radiate strongly.
+
+.. pp:param:: hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t)
+    :type: ``float`` or ``str``
+    :optional:
+
+    The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`. If
+    :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, specifying this rate enables the
+    electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`
+    as a sink on the electron fluid, paired with matching (energy-conserving) heating of the ion
+    macro-particles. The required shape-aware ion temperature deposition
+    (``<species>.do_temperature_deposition``) is enabled automatically on every charged species.
+    The expression can depend on the total charge density ``rho`` (:math:`C/m^3`), the electron and ion
+    temperatures ``Te`` and ``Ti`` (both in eV) and the time ``t`` (:math:`s`), which permits, e.g., the
+    NRL-formulary Spitzer rate.
 
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``
@@ -4354,17 +4430,28 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
-    With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K, as implied by the electron-pressure closure) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
+    With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.
     Possible vector field components in Cartesian geometry: ``Ex`` ``Ey`` ``Ez`` ``Bx`` ``By`` ``Bz`` ``jx`` ``jy`` ``jz``.
     Possible vector field components in RZ and RCYLINDER geometry: ``Er`` ``Et`` ``Ez`` ``Br`` ``Bt`` ``Bz`` ``jr`` ``jt`` ``jz``.
     Possible vector field components in RSPHERE geometry: ``Er`` ``Et`` ``Ep`` ``Br`` ``Bt`` ``Bp`` ``jr`` ``jt`` ``jp``.
+    Any MultiFab added to the internal registry can also be included in the list.
     The default :pp:param:`<diag_name>.fields_to_plot` is to write all possible field components for the geometry.
     When the special value ``none`` is specified, no fields are written out.
     Note that the fields are averaged on the cell centers before they are written to file.
     Otherwise, we reconstruct a 2D Cartesian slice of the fields for output at :math:`\theta=0`.
+
+.. pp:param:: <diag_name>.additional_fields_to_plot
+    :type: list of ``strings``
+    :optional:
+
+    Additional fields written to output, in addition to the standard default list as specified with :pp:param:`<diag_name>.fields_to_plot`.
+    This allows specification of fields to plot without having to also list the default fields when they are also desired.
+    Any of the same fields can be listed here.
+    Any MultiFab added to the internal registry can also be included in the list.
+    If :pp:param:`<diag_name>.fields_to_plot` is set to ``none``, this input is ignored.
 
 .. pp:param:: <diag_name>.dump_rz_modes
     :type: ``0`` or ``1``
