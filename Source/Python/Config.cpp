@@ -94,10 +94,6 @@ void init_Config (py::module& m)
 
     std::shared_ptr<ConfigMap const> const config = std::make_shared<ConfigMap>(
         ConfigMap{
-            {"amrex_version", {
-                amrex::Version(),
-                "AMReX library version used to build WarpX"}},
-
             {"gpu_backend", {
                 gpu_backend,
                 "GPU backend ('CUDA', 'HIP' or 'SYCL'), None without GPU support"}},
@@ -177,10 +173,6 @@ void init_Config (py::module& m)
             {"simd_size", {
                 static_cast<int>(amrex::simd::native_simd_size_particlereal),
                 "Number of amrex::ParticleReal elements in a native SIMD vector"}},
-
-            {"warpx_version", {
-                WarpX::Version(),
-                "WarpX version"}}
         }
     );
 
