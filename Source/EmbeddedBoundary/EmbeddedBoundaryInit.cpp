@@ -129,9 +129,6 @@ web::MarkUpdateCellsStairCase (
     const amrex::Periodicity& periodicity )
 {
 
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
     // Extract structures for embedded boundaries
     amrex::FabArray<amrex::EBCellFlagFab> const& eb_flag = eb_fact.getMultiEBCellFlagFab();
 

@@ -80,7 +80,6 @@ namespace warpx::fields
         pml_j_cp,
         pml_F_cp,
         pml_G_cp,
-        pml_edge_lengths,
         Efield_avg_fp,
         Bfield_avg_fp,
         Efield_avg_cp,
