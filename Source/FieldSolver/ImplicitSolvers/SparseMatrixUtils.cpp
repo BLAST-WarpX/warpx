@@ -84,6 +84,11 @@ void SparseMatrixUtils::BuildExtendedDOFVector (
                 const int nl = ndofs_l;
                 const int ng = nghost;
 
+                // Scatter into ext_ptr with data-dependent indices, but
+                // iterations stay independent as ParallelFor requires (see
+                // issue #7097): the DOF numbering is injective over owned
+                // cells, and repeat ghost writes store the same
+                // FillBoundary'd value, so they are idempotent.
                 amrex::ParallelFor(gbx,
                     [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
