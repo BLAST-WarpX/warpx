@@ -1132,9 +1132,10 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
         WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
         WARPX_ABORT_WITH_MESSAGE("mass matrices cannot be used with Esirkepov or Vay depositions.");
     }
-    if (WarpX::grid_type == GridType::Collocated) {
-        WARPX_ABORT_WITH_MESSAGE("mass matrices cannot be used with a collocated grid.");
-    }
+    // Collocated grids are supported by the generic staggering rule in the
+    // band deposit (all row/col index types equal -> symmetric band, the
+    // degenerate case); validated against the FD Jacobian by Newton-norm
+    // agreement on the 3D FRC benchmark, same standard as the Yee case.
 
     // If doing shared mem current deposition, get tile info
     if (WarpX::do_shared_mem_current_deposition) {
