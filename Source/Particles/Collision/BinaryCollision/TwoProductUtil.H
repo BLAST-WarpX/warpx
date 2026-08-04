@@ -80,7 +80,7 @@ namespace {
         // Compute momenta
         // Note: for massless particles, the momentum is normalized to the electron mass
         constexpr amrex::ParticleReal me = PhysConst::m_e;
-        constexpr double me_d = static_cast<double>(me);
+        constexpr auto me_d = static_cast<double>(me);
         const amrex::ParticleReal p1x_in = (m1_in == 0) ? me*u1x_in : m1_in*u1x_in;
         const amrex::ParticleReal p1y_in = (m1_in == 0) ? me*u1y_in : m1_in*u1y_in;
         const amrex::ParticleReal p1z_in = (m1_in == 0) ? me*u1z_in : m1_in*u1z_in;
