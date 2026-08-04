@@ -357,7 +357,7 @@ computePhi (
                 1._rt-beta_solver[2]*beta_solver[2])});
 #endif
 #if defined (AMREX_USE_EB)
-            if (eb_enabled && dielectric_sigma != nullptr) {
+            if (eb_enabled && dielectric_epsilon != nullptr) {
                 linop_nodelap->setSigma(lev, *dielectric_epsilon);
             }
 #endif

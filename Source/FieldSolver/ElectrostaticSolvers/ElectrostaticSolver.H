@@ -96,6 +96,7 @@ public:
         int verbosity,
         bool is_igf_2d_slices,
         std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
+        amrex::MultiFab const* dielectric_epsilon = nullptr
     ) const;
 
     /**
@@ -160,6 +161,9 @@ public:
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)
     bool is_igf_2d_slices = false;
+
+    bool m_has_dielectric_function = false;
+    std::string m_dielectric_function_str;
 };
 
 #endif // WARPX_ELECTROSTATICSOLVER_H_

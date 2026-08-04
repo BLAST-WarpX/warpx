@@ -26,7 +26,7 @@ void LabFrameExplicitES::InitData() {
 void LabFrameExplicitES::InitializeDielectricEpsilon ()
 {
 
-
+    if (!m_has_dielectric_function) {return;}
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
         "warpx.dielectric_function(x,y,z) is only supported with embedded "
         "boundaries enabled (set warpx.eb_implicit_function or eb2.geom_type).");
