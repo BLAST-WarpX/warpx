@@ -80,6 +80,7 @@ namespace {
         // Compute momenta
         // Note: for massless particles, the momentum is normalized to the electron mass
         constexpr amrex::ParticleReal me = PhysConst::m_e;
+        constexpr double me_d = static_cast<double>(me);
         const amrex::ParticleReal p1x_in = (m1_in == 0) ? me*u1x_in : m1_in*u1x_in;
         const amrex::ParticleReal p1y_in = (m1_in == 0) ? me*u1y_in : m1_in*u1y_in;
         const amrex::ParticleReal p1z_in = (m1_in == 0) ? me*u1z_in : m1_in*u1z_in;
@@ -87,23 +88,36 @@ namespace {
         const amrex::ParticleReal p2y_in = (m2_in == 0) ? me*u2y_in : m2_in*u2y_in;
         const amrex::ParticleReal p2z_in = (m2_in == 0) ? me*u2z_in : m2_in*u2z_in;
 
+        // Keep dimensionful kinematic intermediates in double precision.
+        const auto m1_in_d = static_cast<double>(m1_in);
+        const auto m2_in_d = static_cast<double>(m2_in);
+        const auto m1_out_d = static_cast<double>(m1_out);
+        const auto m2_out_d = static_cast<double>(m2_out);
+        const auto p1x_in_d = static_cast<double>(p1x_in);
+        const auto p1y_in_d = static_cast<double>(p1y_in);
+        const auto p1z_in_d = static_cast<double>(p1z_in);
+        const auto p2x_in_d = static_cast<double>(p2x_in);
+        const auto p2y_in_d = static_cast<double>(p2y_in);
+        const auto p2z_in_d = static_cast<double>(p2z_in);
+        const auto E_reaction_d = static_cast<double>(E_reaction);
+
         // Compute 0th component of the 4-momentum of the incident particles
         const double p1t_in = std::sqrt(
-            static_cast<double>(m1_in)*static_cast<double>(m1_in)*c2_d
-            + static_cast<double>(p1x_in)*static_cast<double>(p1x_in)
-            + static_cast<double>(p1y_in)*static_cast<double>(p1y_in)
-            + static_cast<double>(p1z_in)*static_cast<double>(p1z_in));
+            m1_in_d*m1_in_d*c2_d
+            + p1x_in_d*p1x_in_d
+            + p1y_in_d*p1y_in_d
+            + p1z_in_d*p1z_in_d);
         const double p2t_in = std::sqrt(
-            static_cast<double>(m2_in)*static_cast<double>(m2_in)*c2_d
-            + static_cast<double>(p2x_in)*static_cast<double>(p2x_in)
-            + static_cast<double>(p2y_in)*static_cast<double>(p2y_in)
-            + static_cast<double>(p2z_in)*static_cast<double>(p2z_in));
+            m2_in_d*m2_in_d*c2_d
+            + p2x_in_d*p2x_in_d
+            + p2y_in_d*p2y_in_d
+            + p2z_in_d*p2z_in_d);
 
         // Square norm of the total (sum between the two particles) momenta in the lab frame
         const double p_total_sq_d =
-            powi<2>(static_cast<double>(p1x_in)+static_cast<double>(p2x_in))
-            + powi<2>(static_cast<double>(p1y_in)+static_cast<double>(p2y_in))
-            + powi<2>(static_cast<double>(p1z_in)+static_cast<double>(p2z_in));
+            powi<2>(p1x_in_d+p2x_in_d)
+            + powi<2>(p1y_in_d+p2y_in_d)
+            + powi<2>(p1z_in_d+p2z_in_d);
 
         // Total energy of incident macroparticles in the lab frame
         const double E_lab_d = (p1t_in + p2t_in) * c_d;
@@ -117,9 +131,8 @@ namespace {
         // due to possible inconsistencies in how the mass is defined in the code, it is
         // probably more robust to subtract the rest masses and to add the reaction energy to the
         // total kinetic energy.
-        const double E_rest_in_d = (static_cast<double>(m1_in) + static_cast<double>(m2_in))*c2_d;
-        const double E_rest_out_d = (static_cast<double>(m1_out) + static_cast<double>(m2_out))*c2_d;
-        const auto E_reaction_d = static_cast<double>(E_reaction);
+        const double E_rest_in_d = (m1_in_d + m2_in_d)*c2_d;
+        const double E_rest_out_d = (m1_out_d + m2_out_d)*c2_d;
         const double E_star_f_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d, 0.0);
         const double E_star_f_sq_d = E_star_f_d*E_star_f_d;
 
@@ -127,8 +140,6 @@ namespace {
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
-        const auto m1_out_d = static_cast<double>(m1_out);
-        const auto m2_out_d = static_cast<double>(m2_out);
         const double E_ratio_d = std::sqrt(E_star_f_sq_d) / ((m1_out_d + m2_out_d) * c2_d);
         double p_star_f_sq_d = 0.0;
         if (E_ratio_d > std::numeric_limits<double>::min())
@@ -145,9 +156,9 @@ namespace {
         double vcz_d = 0.0;
         if (pt_d > std::numeric_limits<double>::min())
         {
-            vcx_d = (static_cast<double>(p1x_in) + static_cast<double>(p2x_in)) * c_d / pt_d;
-            vcy_d = (static_cast<double>(p1y_in) + static_cast<double>(p2y_in)) * c_d / pt_d;
-            vcz_d = (static_cast<double>(p1z_in) + static_cast<double>(p2z_in)) * c_d / pt_d;
+            vcx_d = (p1x_in_d + p2x_in_d) * c_d / pt_d;
+            vcy_d = (p1y_in_d + p2y_in_d) * c_d / pt_d;
+            vcz_d = (p1z_in_d + p2z_in_d) * c_d / pt_d;
         }
         const double vc_sq_d = vcx_d*vcx_d + vcy_d*vcy_d + vcz_d*vcz_d;
         const double one_minus_beta_sq_d = amrex::max(1.0 - vc_sq_d*inv_c2_d, std::numeric_limits<double>::epsilon());
@@ -172,20 +183,20 @@ namespace {
             {
                 // Convert momentum of first incident particle to lab frame, using equation (2)
                 // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
-                const double vcDps_d = vcx_d*static_cast<double>(p1x_in)
-                                       + vcy_d*static_cast<double>(p1y_in)
-                                       + vcz_d*static_cast<double>(p1z_in);
+                const double vcDps_d = vcx_d*p1x_in_d
+                                       + vcy_d*p1y_in_d
+                                       + vcz_d*p1z_in_d;
                 const double factor0_d = (gc_d-1.0)/vc_sq_d;
                 const double factor_d = factor0_d*vcDps_d - p1t_in*gc_d/c_d;
-                p1x_star_in_d = static_cast<double>(p1x_in) + vcx_d*factor_d;
-                p1y_star_in_d = static_cast<double>(p1y_in) + vcy_d*factor_d;
-                p1z_star_in_d = static_cast<double>(p1z_in) + vcz_d*factor_d;
+                p1x_star_in_d = p1x_in_d + vcx_d*factor_d;
+                p1y_star_in_d = p1y_in_d + vcy_d*factor_d;
+                p1z_star_in_d = p1z_in_d + vcz_d*factor_d;
             }
             else // If center of mass velocity is zero, we are already in the lab frame
             {
-                p1x_star_in_d = static_cast<double>(p1x_in);
-                p1y_star_in_d = static_cast<double>(p1y_in);
-                p1z_star_in_d = static_cast<double>(p1z_in);
+                p1x_star_in_d = p1x_in_d;
+                p1y_star_in_d = p1y_in_d;
+                p1z_star_in_d = p1z_in_d;
             }
             const double p1_star_in_d = std::sqrt(p1x_star_in_d*p1x_star_in_d + p1y_star_in_d*p1y_star_in_d + p1z_star_in_d*p1z_star_in_d);
 
@@ -209,6 +220,10 @@ namespace {
             }
         }
 
+        const auto px_star_out_d = static_cast<double>(px_star_out);
+        const auto py_star_out_d = static_cast<double>(py_star_out);
+        const auto pz_star_out_d = static_cast<double>(pz_star_out);
+
         // Next step is to convert momenta to lab frame
         double p1x_out_d;
         double p1y_out_d;
@@ -218,31 +233,31 @@ namespace {
         if ( vc_sq_d > std::numeric_limits<double>::min() )
         {
             const double p1t_out_d = std::sqrt(m1_out_d*m1_out_d*c2_d + p_star_f_sq_clamped_d);
-            const double vcDps_d = vcx_d*static_cast<double>(px_star_out)
-                                   + vcy_d*static_cast<double>(py_star_out)
-                                   + vcz_d*static_cast<double>(pz_star_out);
+            const double vcDps_d = vcx_d*px_star_out_d
+                                   + vcy_d*py_star_out_d
+                                   + vcz_d*pz_star_out_d;
             const double factor0_d = (gc_d-1.0)/vc_sq_d;
             const double factor_d = factor0_d*vcDps_d + p1t_out_d*gc_d/c_d;
-            p1x_out_d = static_cast<double>(px_star_out) + vcx_d*factor_d;
-            p1y_out_d = static_cast<double>(py_star_out) + vcy_d*factor_d;
-            p1z_out_d = static_cast<double>(pz_star_out) + vcz_d*factor_d;
+            p1x_out_d = px_star_out_d + vcx_d*factor_d;
+            p1y_out_d = py_star_out_d + vcy_d*factor_d;
+            p1z_out_d = pz_star_out_d + vcz_d*factor_d;
         }
         else // If center of mass velocity is zero, we are already in the lab frame
         {
-            p1x_out_d = static_cast<double>(px_star_out);
-            p1y_out_d = static_cast<double>(py_star_out);
-            p1z_out_d = static_cast<double>(pz_star_out);
+            p1x_out_d = px_star_out_d;
+            p1y_out_d = py_star_out_d;
+            p1z_out_d = pz_star_out_d;
         }
 
         // Compute momentum of the second product in lab frame, using total momentum conservation
-        const double p2x_out_d = static_cast<double>(p1x_in) + static_cast<double>(p2x_in) - p1x_out_d;
-        const double p2y_out_d = static_cast<double>(p1y_in) + static_cast<double>(p2y_in) - p1y_out_d;
-        const double p2z_out_d = static_cast<double>(p1z_in) + static_cast<double>(p2z_in) - p1z_out_d;
+        const double p2x_out_d = p1x_in_d + p2x_in_d - p1x_out_d;
+        const double p2y_out_d = p1y_in_d + p2y_in_d - p1y_out_d;
+        const double p2z_out_d = p1z_in_d + p2z_in_d - p1z_out_d;
 
         // Compute the momentum of the product macroparticles
         // Note: for massless particles, the momentum is normalized to the electron mass
-        const double m1_norm_d = (m1_out == 0) ? static_cast<double>(me) : m1_out_d;
-        const double m2_norm_d = (m2_out == 0) ? static_cast<double>(me) : m2_out_d;
+        const double m1_norm_d = (m1_out == 0) ? me_d : m1_out_d;
+        const double m2_norm_d = (m2_out == 0) ? me_d : m2_out_d;
         u1x_out = static_cast<amrex::ParticleReal>(p1x_out_d/m1_norm_d);
         u1y_out = static_cast<amrex::ParticleReal>(p1y_out_d/m1_norm_d);
         u1z_out = static_cast<amrex::ParticleReal>(p1z_out_d/m1_norm_d);
