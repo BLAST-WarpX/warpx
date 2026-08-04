@@ -649,6 +649,24 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
             m_D[n]->setVal(0.0_rt);
         }
     }
+    // Honor include_joule_heating (default off), matching the explicit QDSMC
+    // path: with it off, the dissipative work D.J_p (Ohmic + hyper-resistive)
+    // is NOT deposited into pe -- it leaves the system as the vacuum/hyper
+    // dissipation it is (Faraday still drains it from W_B, so the B-field
+    // damping physics is unchanged). Without this, eta_H's grid-scale
+    // dissipation at the sharp FRC edge current sheets heats the few
+    // electrons there to keV within ~100 steps. The reversible E*.J_e
+    // transport/compression pairing is unaffected. Pair against D = 0 by
+    // pointing the kernel at zeroed fields.
+    const bool jheat = m_hybrid_pic_model->m_include_joule_heating;
+    if (!jheat && !m_D_zero[0]) {
+        for (int n = 0; n < 3; ++n) {
+            m_D_zero[n] = std::make_unique<amrex::MultiFab>(
+                Efld[n]->boxArray(), Efld[n]->DistributionMap(),
+                Efld[n]->nComp(), Efld[n]->nGrowVect());
+            m_D_zero[n]->setVal(0.0_rt);
+        }
+    }
 
     const amrex::Geometry& geom = m_WarpX->Geom(lev);
 
@@ -738,9 +756,12 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
         amrex::Array4<amrex::Real const> const& Ex_arr = Efld[0]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Ey_arr = Efld[1]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Ez_arr = Efld[2]->const_array(mfi);
-        amrex::Array4<amrex::Real const> const& Dx = m_D[0]->const_array(mfi);
-        amrex::Array4<amrex::Real const> const& Dy = m_D[1]->const_array(mfi);
-        amrex::Array4<amrex::Real const> const& Dz = m_D[2]->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Dx =
+            (jheat ? m_D[0] : m_D_zero[0])->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Dy =
+            (jheat ? m_D[1] : m_D_zero[1])->const_array(mfi);
+        amrex::Array4<amrex::Real const> const& Dz =
+            (jheat ? m_D[2] : m_D_zero[2])->const_array(mfi);
 
         const amrex::Box tb = mfi.tilebox(amrex::IntVect::TheNodeVector());
 
@@ -1156,13 +1177,32 @@ void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
     amrex::MultiFab::LinComb(*pe, 1._rt/m_theta, *m_pe_theta, 0,
                              -(1._rt - m_theta)/m_theta, *m_pe_old, 0,
                              0, pe->nComp(), pe->nGrowVect());
-    // guard against negative overshoot from the extrapolation
-    for (amrex::MFIter mfi(*pe); mfi.isValid(); ++mfi) {
-        const amrex::Box bx = mfi.growntilebox();
-        auto const& a = pe->array(mfi);
-        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-            a(i,j,k) = amrex::max(a(i,j,k), 0._rt);
-        });
+    // Guard against negative overshoot from the extrapolation, and pin
+    // below-floor cells to the floored-adiabat constant (the algebraic
+    // closure at n_floor -- continuous with the plasma edge and the value
+    // the explicit QDSMC's insulating halo holds). Without the pin, the
+    // energy-paired work term stores the vacuum-resistivity dissipation
+    // eta*J^2 in the halo pe step after step, and T_e = pe/(n_floor k_B)
+    // grows without bound. Applied POST-STEP only: pinning inside the
+    // Newton residual makes the residual discontinuous in the cells whose
+    // re-deposited rho straddles the floor, and Newton stalls.
+    {
+        const amrex::Real gam = m_hybrid_pic_model->m_gamma;
+        const amrex::Real rho_floor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+        const amrex::Real pe_vac = m_hybrid_pic_model->m_n_floor
+            * m_hybrid_pic_model->m_elec_temp
+            * std::pow(m_hybrid_pic_model->m_n_floor / m_hybrid_pic_model->m_n0_ref,
+                       gam - 1._rt);
+        const amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+        for (amrex::MFIter mfi(*pe); mfi.isValid(); ++mfi) {
+            const amrex::Box bx = mfi.growntilebox();
+            auto const& a = pe->array(mfi);
+            auto const& r = rho->const_array(mfi);
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                a(i,j,k) = (r(i,j,k,0) <= rho_floor)
+                    ? pe_vac : amrex::max(a(i,j,k), 0._rt);
+            });
+        }
     }
     amrex::MultiFab::Copy(*m_pe_old, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
 

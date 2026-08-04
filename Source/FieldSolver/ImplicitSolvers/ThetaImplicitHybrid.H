@@ -170,6 +170,10 @@ private:
      * scratch for the two Ohm solves that form it. */
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_D;
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_E_work;
+    /** Zeroed stand-in for m_D in the pe work pairing when
+     * include_joule_heating is off (the dissipative work then leaves the
+     * system instead of heating pe, matching the explicit QDSMC path). */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_D_zero;
 
     /**
      * J and rho (scaled + synced) captured right after PreRHSOp of the last nonlinear
