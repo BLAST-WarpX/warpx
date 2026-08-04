@@ -3657,7 +3657,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
             setattr(
                 pywarpx.macroscopic,
                 "macroscopic_" + self.name + "_method",
-                self.value,
+                self.method,
             )
 
 
