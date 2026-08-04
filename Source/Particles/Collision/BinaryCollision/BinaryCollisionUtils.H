@@ -190,7 +190,7 @@ namespace BinaryCollisionUtils{
         // Find the squared COM momentum from the factored Kallen form, obtaining
         // both numerator factors from s_minus_threshold without cancellation.
         double p_star_sq;
-        if (m1_dbl + m2_dbl == 0) {
+        if (m_sum_c2 == 0.0) {
             p_star_sq = powi<2>( 0.5 * E_star * inv_c );
         } else {
             p_star_sq = s_minus_threshold * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2) / (4.0 * E_star_sq * c2);
