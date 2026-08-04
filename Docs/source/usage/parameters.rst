@@ -5184,7 +5184,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
 
         The output columns are the charge flux for each available particle
         species, using the scraped-particle data already collected in the
-        :ref:`particle boundary buffer <running-cpp-parameters-boundary>` for
+        :ref:`particle boundary buffer <running-cpp-parameters-particle>` for
         the ``eb`` boundary.
 
         When providing ``<reduced_diags_name>.weighting_function(x,y,z)``,
