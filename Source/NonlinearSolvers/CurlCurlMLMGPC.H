@@ -13,6 +13,7 @@
 #include "Preconditioner.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
@@ -76,7 +77,7 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         /**
          * \brief Define the preconditioner
          */
-        void Define (const T&, Ops* const) override;
+        void Define (const T&, Ops*) override;
 
         /**
          * \brief Update the preconditioner

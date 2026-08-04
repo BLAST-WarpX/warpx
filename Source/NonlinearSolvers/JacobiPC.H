@@ -57,7 +57,7 @@ class JacobiPC : public Preconditioner<T,Ops>
         JacobiPC(JacobiPC&&) noexcept = delete;
         JacobiPC& operator=(JacobiPC&&) noexcept = delete;
 
-        void Define (const T&, Ops* const) override;
+        void Define (const T&, Ops*) override;
 
         void Update (const T& a_U) override;
 

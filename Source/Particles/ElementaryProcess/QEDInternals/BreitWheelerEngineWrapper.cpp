@@ -54,7 +54,7 @@ BreitWheelerEngine::build_pair_functor () const
 {
     AMREX_ALWAYS_ASSERT(m_lookup_tables_initialized);
 
-    return {m_pair_prod_table.get_view()};
+    return BreitWheelerGeneratePairs{m_pair_prod_table.get_view()};
 }
 
 bool BreitWheelerEngine::are_lookup_tables_initialized () const

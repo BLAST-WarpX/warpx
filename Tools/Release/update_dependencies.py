@@ -150,28 +150,31 @@ def update(args):
                 dependencies_data[f"commit_{repo_name}"] = new_commit_sha
 
         # update version
-        print(f"- old version: {dependencies_data[version_key]}")
-        print(f"- new version: {repo_version_tag}")
-        if dependencies_data[version_key] == repo_version_tag:
-            print("Skipping version update...")
+        if repo_name == "pybind11":
+            print("Skipping version update... (minimum version set manually)")
         else:
-            print("Updating version...")
-            dependencies_data[f"version_{repo_name}"] = repo_version_tag
+            print(f"- old version: {dependencies_data[version_key]}")
+            print(f"- new version: {repo_version_tag}")
+            if dependencies_data[version_key] == repo_version_tag:
+                print("Skipping version update...")
+            else:
+                print("Updating version...")
+                dependencies_data[f"version_{repo_name}"] = repo_version_tag
 
-            # update PICMI version in requirements.txt files manually
-            if repo_name == "picmi":
-                files = [
-                    os.path.join(repo_dir, "requirements.txt"),
-                    os.path.join(repo_dir, "Docs", "requirements.txt"),
-                ]
-                for filename in files:
-                    with open(filename) as f:
-                        lines = f.readlines()
-                    with open(filename, "w") as f:
-                        for line in lines:
-                            if line.startswith("picmistandard=="):
-                                line = f"picmistandard=={repo_version_tag}\n"
-                            f.write(line)
+                # update PICMI version in requirements.txt files manually
+                if repo_name == "picmi":
+                    files = [
+                        os.path.join(repo_dir, "requirements.txt"),
+                        os.path.join(repo_dir, "Docs", "requirements.txt"),
+                    ]
+                    for filename in files:
+                        with open(filename) as f:
+                            lines = f.readlines()
+                        with open(filename, "w") as f:
+                            for line in lines:
+                                if line.startswith("picmistandard=="):
+                                    line = f"picmistandard=={repo_version_tag}\n"
+                                f.write(line)
 
     # write to JSON file with dependencies data
     with open(dependencies_file, "w") as file:

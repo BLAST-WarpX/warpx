@@ -39,6 +39,10 @@ module_path = os.path.dirname(os.path.abspath(__file__))
 checksum_path = os.path.join(module_path, "../../Regression/Checksum")
 sys.path.insert(0, checksum_path)
 
+# Modify sys.path to use custom extension in _ext
+_ext_path = os.path.join(module_path, "_ext")
+sys.path.insert(0, _ext_path)
+
 
 def download_with_headers(url, filename):
     """Download a file with proper User-Agent header to avoid 403 errors."""
@@ -69,8 +73,10 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_design",
     "breathe",
+    "myst_parser",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
+    "parmparse",
 ]
 
 # Google Analytics
@@ -110,8 +116,7 @@ bibtex_default_style = "warpxbibstyle"
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = ".rst"
+source_suffix = [".rst", ".md"]
 
 # The master toctree document.
 master_doc = "index"

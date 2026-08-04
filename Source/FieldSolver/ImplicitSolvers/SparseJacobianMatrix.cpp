@@ -237,8 +237,10 @@ int SparseJacobianMatrix::Assemble (
 
                 auto dof_arr = dofs_mfarrvec[lev][dir]->const_array(mfi);
 
-                // Set row indices and identity diagonal (unconditional)
-                ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                // Set row indices and identity diagonal (unconditional).
+                // amrex::For: iterations share the nnz_actual overflow counter
+                // (no SIMD pragma, see issue #7097)
+                For(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     int ridx_l = dof_arr(i,j,k,0);
                     if (ridx_l < 0) { return; }
@@ -296,7 +298,9 @@ int SparseJacobianMatrix::Assemble (
                             dofs_mfarrvec[lev][tdir2]->const_array(mfi)) }};
 #endif
 
-                    ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                    // amrex::For: iterations share the nnz_actual overflow counter
+                    // (no SIMD pragma, see issue #7097)
+                    For(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }
@@ -688,7 +692,9 @@ int SparseJacobianMatrix::Assemble (
                         MM_width[space_dir] = (MM_ncomp[space_dir] - 1) / 2;
                     }
 
-                    ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                    // amrex::For: iterations share the nnz_actual overflow counter
+                    // (no SIMD pragma, see issue #7097)
+                    For(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }

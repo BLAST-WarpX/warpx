@@ -86,11 +86,7 @@ void InjectorDensity::prepare (int li, InjectorDensity** inj_rho)
 
 bool InjectorDensity::needPreparation () const
 {
-    if (type == Type::fromfile) {
-        return true;
-    } else {
-        return false;
-    }
+    return (type == Type::fromfile);
 }
 
 bool InjectorDensity::distributed () const
@@ -103,11 +99,12 @@ bool InjectorDensity::distributed () const
 }
 
 InjectorDensityFromFile::InjectorDensityFromFile (std::string const& a_file_name,
+                                                  std::string const& a_F_name,
                                                   amrex::Geometry const& a_geom,
                                                   bool a_distributed)
 {
     m_external_field_reader = new ExternalFieldReader
-        (a_file_name, "density", "", a_geom.ProbLoArray(), a_geom.CellSizeArray(),
+        (a_file_name, a_F_name, "", a_geom.ProbLoArray(), a_geom.CellSizeArray(),
          amrex::convert(a_geom.Domain(),amrex::IntVect(1)), a_distributed);
 }
 

@@ -137,7 +137,7 @@ cmake \
     -Duse_openmp=ON                           \
     -Dgpu_backend=OFF                         \
     -DBUILD_SHARED_LIBS=OFF                   \
-    -DCMAKE_CXX_STANDARD=17                   \
+    -DCMAKE_CXX_STANDARD=20                   \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake \
     --build ${build_dir}/blaspp-tuolumne-cpu-build \
@@ -159,7 +159,7 @@ cmake \
     --fresh                                     \
     -S ${SRC_DIR}/lapackpp                      \
     -B ${build_dir}/lapackpp-tuolumne-cpu-build \
-    -DCMAKE_CXX_STANDARD=17                     \
+    -DCMAKE_CXX_STANDARD=20                     \
     -Dgpu_backend=OFF                           \
     -Dbuild_tests=OFF                           \
     -DBUILD_SHARED_LIBS=OFF                     \

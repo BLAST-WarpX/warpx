@@ -1,6 +1,5 @@
 warpx.serialize_initial_conditions = 0
 warpx.do_dynamic_scheduling = 0
-particles.do_tiling = 0
 
 warpx.B_ext_grid_init_style = "read_from_file"
 warpx.read_fields_from_path = "../../../../openPMD-example-datasets/example-femm-thetaMode.h5"

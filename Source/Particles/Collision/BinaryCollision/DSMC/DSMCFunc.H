@@ -60,13 +60,14 @@ public:
      */
     DSMCFunc ( const std::string& collision_name,
                [[maybe_unused]] MultiParticleContainer const * mypc,
-               const bool isSameSpecies );
+               bool isSameSpecies );
 
     struct Executor {
         /**
          * \brief Executor of the DSMCFunc class. Performs DSMC collisions at the cell level.
          * Note that this function does not yet create the product particles, but
-         * instead fills an array p_mask that stores which pairs result in a collision event.
+         * instead fills an array p_mask that stores, for each pair, the index of
+         * the selected scattering process plus one (or 0 if no collision occurs for that pair).
          *
          * @param[in] I1s,I2s is the start index for I1,I2 (inclusive).
          * @param[in] I1e,I2e is the stop index for I1,I2 (exclusive).
@@ -77,9 +78,9 @@ public:
          * @param[in] dV is the volume of the corresponding cell.
          * @param[in] coll_idx is the collision index offset.
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
-         * @param[out] p_mask is a mask that will be set to true if a fusion event occurs for a given
-         * pair. It is only needed here to store information that will be used later on when actually
-         * creating the product particles.
+         * @param[out] p_mask for each pair: 0 if no collision occurs ;
+         * index+1 of the selected process for that pair if a collision occurs,
+         * where `index` is the index of the process in the `m_scattering_processes_data` array.
          * @param[out] p_pair_indices_1,p_pair_indices_2 arrays that store the indices of the
          * particles of a given pair. They are only needed here to store information that will be used
          * later on when actually creating the product particles.
@@ -132,10 +133,6 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-            amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-            amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
-#endif
             index_type i1 = I1s + coll_idx;
             index_type i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
@@ -146,28 +143,12 @@ public:
                 // reduced to zero from a previous collision
                 if (idcpu1[ I1[i1] ]==amrex::ParticleIdCpus::Invalid ||
                     idcpu2[ I2[i2] ]==amrex::ParticleIdCpus::Invalid ) {
-                    p_mask[pair_index] = false;
+                    p_mask[pair_index] = index_type(0);
                 } else {
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                    /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
-                    * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                    * are actually not local in space. In this case, the underlying assumption is that
-                    * particles within the same cylindrical cell represent a cylindrically-symmetry
-                    * momentum distribution function. Therefore, here, we temporarily rotate the
-                    * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                    * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                    * there is a corresponding assert statement at initialization.)
-                    */
-                    amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
-                    amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-                    u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
-#endif
 
                     const int max_process_count = 4; // Pre-defined value, for performance reasons
                     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-                        (m_process_count < max_process_count), "Too many scattering processes in DSMC routine (hardcoded to only allow 4). Update the max_process_count value in source code to allow more scattering processes."
+                        (m_process_count <= max_process_count), "Too many scattering processes in DSMC routine (hardcoded to only allow up to 4). Update the max_process_count value in source code to allow more scattering processes."
                     );
                     CollisionPairFilter<max_process_count>(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
@@ -176,13 +157,6 @@ public:
                         dt, dV, static_cast<int>(pair_index), p_mask,
                         p_pair_reaction_weight, multiplier_ratio,
                         m_process_count, m_scattering_processes_data, engine);
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                    /* Undo the earlier velocity rotation. */
-                    amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-                    u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
-#endif
 
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {

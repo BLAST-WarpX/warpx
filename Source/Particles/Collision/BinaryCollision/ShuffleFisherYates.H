@@ -74,7 +74,7 @@ struct IndependentPairHelper
         // Compute the number of independent pairs in each cell. This is equal to
         // the number of particles in whichever species has fewer
         index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = m_n_ind_pairs_in_each_cell.dataPtr();
-        int n_cells = m_n_cells;
+        const int n_cells = m_n_cells;
         index_type const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
         index_type const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
         amrex::ParallelFor( n_cells+1, [=] AMREX_GPU_DEVICE (int i_cell) noexcept
@@ -108,13 +108,13 @@ struct IndependentPairHelper
     {
     // shuffle each species.
     // we launch 2*n_cells threads to process both species simultaneously
-    int n_cells = m_n_cells;
+    const int n_cells = m_n_cells;
     index_type const* AMREX_RESTRICT cell_offsets_1 = m_cell_offsets_1;
     index_type const* AMREX_RESTRICT cell_offsets_2 = m_cell_offsets_2;
     amrex::ParallelForRNG( 2*m_n_cells,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
     {
-        int i_cell = i < n_cells ? i : i - n_cells;
+        const int i_cell = i < n_cells ? i : i - n_cells;
 
         // The particles from species1 that are in the cell `i_cell` are
         // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -137,8 +137,8 @@ struct IndependentPairHelper
     });
     }
 
-    int numIndependentPairs () const {return m_n_independent_pairs;}
-    const index_type* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
+    [[nodiscard]] int numIndependentPairs () const {return m_n_independent_pairs;}
+    [[nodiscard]] const index_type* collisionOffsetsPtr () const {return m_coll_offsets.dataPtr();}
 };
 
 #endif // WARPX_PARTICLES_COLLISION_SHUFFLE_FISHER_YATES_H_

@@ -84,7 +84,7 @@ namespace {
         using namespace amrex::literals;
 
         constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-        constexpr amrex::ParticleReal inv_csq = 1._prt / ( PhysConst::c * PhysConst::c );
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
         // Extract the momenta of the incident particles
         amrex::ParticleReal const photon_ux = soa1_in.m_rdata[PIdx::ux][idx1_in];
@@ -98,7 +98,7 @@ namespace {
         // - Prepare parameters of the Lorentz transformation
         amrex::ParticleReal const lepton_u2 = (lepton_ux*lepton_ux + lepton_uy*lepton_uy + lepton_uz*lepton_uz);
         amrex::ParticleReal const lepton_u = std::sqrt(lepton_u2);
-        amrex::ParticleReal const lepton_gamma = std::sqrt(1.0_prt + lepton_u2*inv_csq);
+        amrex::ParticleReal const lepton_gamma = std::sqrt(1.0_prt + lepton_u2*inv_c2);
         amrex::ParticleReal const lepton_beta = lepton_u / lepton_gamma * inv_c;
         amrex::ParticleReal const lepton_nx = lepton_ux / lepton_u;
         amrex::ParticleReal const lepton_ny = lepton_uy / lepton_u;
@@ -139,7 +139,7 @@ namespace {
         // By convention, in WarpX, the photon momentum u is normalized by the electron mass m_e, so k corresponds to p/(m_e*c)
         amrex::ParticleReal const c0 = 2._prt * (2._prt*k*k + 2._prt*k + 1._prt) / amrex::Math::powi<3>(2._prt*k + 1._prt);
         amrex::ParticleReal const b = (2._prt + c0) / (2._prt - c0);
-        amrex::ParticleReal const a = 2._prt*b - 1._prt;
+        amrex::ParticleReal const a = 2._prt*( b - 1._prt );
         // Use rejection method to draw x
         bool reject = true;
         amrex::ParticleReal x = 0;

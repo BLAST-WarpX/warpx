@@ -58,11 +58,16 @@ public:
      *  Picard: U = b + R(U).
      *  Newton: F(U) = U - b - R(U) = 0.
      */
-    virtual void Solve ( Vec&,
-                   const Vec&,
-                         amrex::Real,
-                         amrex::Real,
-                         int) const = 0;
+    virtual void Solve (Vec&,
+                  const Vec&,
+                        amrex::Real,
+                        amrex::Real,
+                        int) const = 0;
+
+    /**
+     * \brief Return the nonlinear solver exit status.
+     */
+    int GetExitStatus() const { return m_exit_status; }
 
     /**
      * \brief Print parameters used by the nonlinear solver.
@@ -92,6 +97,8 @@ protected:
     std::string m_diagnostic_file;
     int m_diagnostic_interval = 1;
     bool m_usePC = false;
+
+    mutable int m_exit_status = 0;
 
 };
 

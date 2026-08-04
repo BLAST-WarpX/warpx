@@ -44,7 +44,7 @@ class ExternLibPC : public Preconditioner<T,Ops>
         ExternLibPC(ExternLibPC&&) noexcept = delete;
         ExternLibPC& operator=(ExternLibPC&&) noexcept = delete;
 
-        void Define (const T&, Ops* const) override;
+        void Define (const T&, Ops*) override;
 
         void Update (const T& a_U) override;
 

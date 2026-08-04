@@ -15,6 +15,9 @@
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+
+#include <array>
 
 /**
  * \brief This class defines an operator to create product particles from DSMC
@@ -75,8 +78,9 @@ public:
      *                                      appended to each tile.
      * @param[in]     m0                    rest mass of the first reactant species (slot 0).
      * @param[in]     m1                    rest mass of the other reactant species (slot 1).
-     * @param[in]     mask                  per-pair collision type: 0 = no collision,
-     *                                      otherwise cast of ScatteringProcessType to int.
+     * @param[in]     mask                  for each pair: 0 if no collision occurs ;
+     *                                      index+1 of the selected process for that pair if a collision occurs,
+     *                                      where `index` is the index of the process in the `m_scattering_processes_exe` array.
      * @param[in,out] products_np           macroparticle count of each product tile; updated in this
      *                                      kernel to reflect the number of new macroparticles added in each species.
      * @param[in]     copy_species0         array of SmartCopy functors (size m_num_product_species);
@@ -117,7 +121,7 @@ public:
         //   Slot 2: first true product species
         //   Slot 3: second true product species
         //
-        // For non-product producing collisions (elastic, back, forward scattering), only slots 0
+        // For non-product producing collisions (e.g. elastic, excitation), only slots 0
         // and 1 receive new macroparticles: one weight-split copy per reactant per colliding pair.
         // These are counted by `no_product_total` and NOT reflected in `m_num_products_host`.
         //
@@ -130,18 +134,23 @@ public:
         // zeros, indicating that for all the "product" species, there were no new macroparticles added.
         if (n_total_pairs == 0) { return amrex::Vector<int>(m_num_product_species, 0); }
 
+        // The list of scattering processes, used to look up the type (and, further below, the
+        // energy penalty) of the process selected for each pair via its index.
+        const ScatteringProcess::Executor* AMREX_RESTRICT scattering_processes =
+            m_scattering_processes_exe.data();
+
         // The following is used to calculate the appropriate offsets for
         // non-product producing collisions (i.e., not ionization, not two-product reaction).
-        // Note that a standard cummulative sum is not appropriate since the
-        // mask is also used to specify the type of collision and can therefore
-        // have values >1
+        // Note that a standard cummulative sum is not appropriate since we count 1 for each
+        // colliding pair, regardless of the index of the selected scattering process.
         amrex::Gpu::DeviceVector<index_type> no_product_offsets(n_total_pairs);
         index_type* AMREX_RESTRICT no_product_offsets_data = no_product_offsets.data();
         auto const no_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return ((mask[i] > 0) &
-                        (mask[i] != int(ScatteringProcessType::IONIZATION)) &
-                        (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
+                if (mask[i] == 0) { return 0; }
+                const auto selected_process_index = mask[i] - 1;
+                auto const& scattering_process = scattering_processes[selected_process_index];
+                return !scattering_process.m_produces_products;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { no_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -158,15 +167,16 @@ public:
 
         // The following is used to calculate the appropriate offsets for
         // product producing processes (i.e., ionization and two-product reaction).
-        // Note that a standard cummulative sum is not appropriate since the
-        // mask is also used to specify the type of collision and can therefore
-        // have values >1
+        // Note that a standard cummulative sum is not appropriate since we count 1 for each
+        // colliding pair, regardless of the index of the selected scattering process.
         amrex::Gpu::DeviceVector<index_type> with_product_offsets(n_total_pairs);
         index_type* AMREX_RESTRICT with_product_offsets_data = with_product_offsets.data();
         auto const with_product_total = amrex::Scan::PrefixSum<index_type>(n_total_pairs,
             [=] AMREX_GPU_DEVICE (index_type i) -> index_type {
-                return ((mask[i] == int(ScatteringProcessType::IONIZATION)) |
-                        (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))) ? 1 : 0;
+                if (mask[i] == 0) { return 0; }
+                const auto selected_process_index = mask[i] - 1;
+                auto const& scattering_process = scattering_processes[selected_process_index];
+                return scattering_process.m_produces_products;
             },
             [=] AMREX_GPU_DEVICE (index_type i, index_type s) { with_product_offsets_data[i] = s; },
             amrex::Scan::Type::exclusive, amrex::Scan::retSum
@@ -175,7 +185,7 @@ public:
         for (int i = 0; i < m_num_product_species; i++)
         {
             // Add the number of product producing events to the species involved in those processes.
-            int num_products = m_num_products_host[i];
+            const int num_products = m_num_products_host[i];
             const index_type num_added = with_product_total * num_products;
             num_added_vec[i] += static_cast<int>(num_added);
         }
@@ -221,7 +231,6 @@ public:
 #endif
 
         const int num_product_species = m_num_product_species;
-        const auto reaction_energy = m_reaction_energy;
 
         // Grab the masses of the true product species (slots 2 and 3)
         amrex::ParticleReal mass_slot2 = 0;
@@ -235,7 +244,15 @@ public:
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
-            if ((mask[i] > 0) & (mask[i] != int(ScatteringProcessType::IONIZATION)) & (mask[i] != int(ScatteringProcessType::TWOPRODUCT_REACTION)))
+            // Skip pairs for which no collision occurred.
+            if (mask[i] == 0) { return; }
+
+            // The scattering process selected for this pair, and its type.
+            const auto selected_process_index = mask[i] - 1;
+            auto const& scattering_process = scattering_processes[selected_process_index];
+            const auto process_type = scattering_process.m_type;
+
+            if (!scattering_process.m_produces_products)
             {
                 const auto slot0_idx = products_np_data[0] + no_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species
@@ -251,91 +268,37 @@ public:
                 // Set the weight of the new particles to p_pair_reaction_weight[i]
                 soa_products_data[1].m_rdata[PIdx::w][slot1_idx] = p_pair_reaction_weight[i];
 
-                // Set the child particle properties appropriately
-                auto& ux0 = soa_products_data[0].m_rdata[PIdx::ux][slot0_idx];
-                auto& uy0 = soa_products_data[0].m_rdata[PIdx::uy][slot0_idx];
-                auto& uz0 = soa_products_data[0].m_rdata[PIdx::uz][slot0_idx];
-                auto& ux1 = soa_products_data[1].m_rdata[PIdx::ux][slot1_idx];
-                auto& uy1 = soa_products_data[1].m_rdata[PIdx::uy][slot1_idx];
-                auto& uz1 = soa_products_data[1].m_rdata[PIdx::uz][slot1_idx];
+                // Particle-conserving scattering (e.g. elastic, excitation). Set the momenta of
+                // the two scattered particles using conservation of energy and momentum. The
+                // angular distribution in the center-of-mass frame is set by the process's
+                // scattering angle model, and any inelastic energy loss (e.g. for excitation) is
+                // passed as the (released) energy penalty.
+                const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
+                const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
-                * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                * are actually not local in space. In this case, the underlying assumption is that
-                * particles within the same cylindrical cell represent a cylindrically-symmetry
-                * momentum distribution function. Therefore, here, we temporarily rotate the
-                * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                * there is a corresponding assert statement at initialization.)
-                */
-                amrex::ParticleReal const theta = (
-                    soa_products_data[1].m_rdata[PIdx::theta][slot1_idx]
-                    - soa_products_data[0].m_rdata[PIdx::theta][slot0_idx]
-                );
-                amrex::ParticleReal const ux0buf = ux0;
-                ux0 = ux0buf*std::cos(theta) - uy0*std::sin(theta);
-                uy0 = ux0buf*std::sin(theta) + uy0*std::cos(theta);
-#endif
-
-                // for simplicity (for now) we assume non-relativistic particles
-                // and simply calculate the center-of-momentum velocity from the
-                // rest masses
-                // TODO: this could be made relativistic by using TwoProductComputeProductMomenta
-                auto const uCOM_x = (m0 * ux0 + m1 * ux1) / (m0 + m1);
-                auto const uCOM_y = (m0 * uy0 + m1 * uy1) / (m0 + m1);
-                auto const uCOM_z = (m0 * uz0 + m1 * uz1) / (m0 + m1);
-
-                // transform to COM frame
-                ux0 -= uCOM_x;
-                uy0 -= uCOM_y;
-                uz0 -= uCOM_z;
-                ux1 -= uCOM_x;
-                uy1 -= uCOM_y;
-                uz1 -= uCOM_z;
-
-                if (mask[i] == int(ScatteringProcessType::ELASTIC)) {
-                    // randomly rotate the velocity vector for the first particle
-                    ParticleUtils::RandomizeVelocity(
-                        ux0, uy0, uz0, std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0), engine
-                    );
-                    // set the second particles velocity so that the total momentum
-                    // is zero
-                    ux1 = -ux0 * m0 / m1;
-                    uy1 = -uy0 * m0 / m1;
-                    uz1 = -uz0 * m0 / m1;
-                } else if (mask[i] == int(ScatteringProcessType::BACK)) {
-                    // reverse the velocity vectors of both particles
-                    ux0 *= -1.0_prt;
-                    uy0 *= -1.0_prt;
-                    uz0 *= -1.0_prt;
-                    ux1 *= -1.0_prt;
-                    uy1 *= -1.0_prt;
-                    uz1 *= -1.0_prt;
-                } else if (mask[i] == int(ScatteringProcessType::FORWARD)) {
-                    amrex::Abort("Forward scattering with DSMC not implemented yet.");
-                }
-                else {
-                    amrex::Abort("Unknown scattering process.");
-                }
-                // transform back to labframe
-                ux0 += uCOM_x;
-                uy0 += uCOM_y;
-                uz0 += uCOM_z;
-                ux1 += uCOM_x;
-                uy1 += uCOM_y;
-                uz1 += uCOM_z;
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                /* Undo the earlier velocity rotation. */
-                amrex::ParticleReal const ux0buf_new = ux0;
-                ux0 = ux0buf_new*std::cos(-theta) - uy0*std::sin(-theta);
-                uy0 = ux0buf_new*std::sin(-theta) + uy0*std::cos(-theta);
-#endif
+                TwoProductComputeProductMomenta(
+                    soa_0.m_rdata[PIdx::ux][src0_idx],
+                    soa_0.m_rdata[PIdx::uy][src0_idx],
+                    soa_0.m_rdata[PIdx::uz][src0_idx], m0,
+                    soa_1.m_rdata[PIdx::ux][src1_idx],
+                    soa_1.m_rdata[PIdx::uy][src1_idx],
+                    soa_1.m_rdata[PIdx::uz][src1_idx], m1,
+                    soa_products_data[0].m_rdata[PIdx::ux][slot0_idx],
+                    soa_products_data[0].m_rdata[PIdx::uy][slot0_idx],
+                    soa_products_data[0].m_rdata[PIdx::uz][slot0_idx], m0,
+                    soa_products_data[1].m_rdata[PIdx::ux][slot1_idx],
+                    soa_products_data[1].m_rdata[PIdx::uy][slot1_idx],
+                    soa_products_data[1].m_rdata[PIdx::uz][slot1_idx], m1,
+                    -scattering_process.m_energy_penalty*PhysConst::q_e,
+                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the
+                    // negative sign; the energy penalty is also converted from eV to Joules.
+                    scattering_process.m_scattering_angle_model,
+                    engine);
             }
 
             // Next perform all product-producing collisions
-            else if (mask[i] == int(ScatteringProcessType::TWOPRODUCT_REACTION))
+            else if ((process_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
+                     (process_type == ScatteringProcessType::CHARGE_EXCHANGE))
             {
                 // create a copy of the first product species at the location of the first reactant species
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
@@ -353,6 +316,31 @@ public:
                 // Set the weight of the new particle to p_pair_reaction_weight[i]
                 soa_products_data[3].m_rdata[PIdx::w][slot3_idx] = p_pair_reaction_weight[i];
 
+                // For charge exchange, swap positions at which the products are created
+                // to ensure local charge conservation. For instance in the reaction
+                // `A+ + B -> A + B+`, B+ will be created at the position of A+, instead of that of B.
+                if (process_type == ScatteringProcessType::CHARGE_EXCHANGE) {
+                    // The SoA components that define the positions depend on the geometry.
+#if defined(WARPX_DIM_1D_Z)
+                    constexpr std::array<int, 1> position_indices = {PIdx::z};
+#elif defined(WARPX_DIM_XZ)
+                    constexpr std::array<int, 2> position_indices = {PIdx::x, PIdx::z};
+#elif defined(WARPX_DIM_RZ)
+                    constexpr std::array<int, 3> position_indices = {PIdx::r, PIdx::z, PIdx::theta};
+#elif defined(WARPX_DIM_RCYLINDER)
+                    constexpr std::array<int, 2> position_indices = {PIdx::r, PIdx::theta};
+#elif defined(WARPX_DIM_RSPHERE)
+                    constexpr std::array<int, 3> position_indices = {PIdx::r, PIdx::theta, PIdx::phi};
+#elif defined(WARPX_DIM_3D)
+                    constexpr std::array<int, 3> position_indices = {PIdx::x, PIdx::y, PIdx::z};
+#endif
+                    // Loop over the components that define the positions and swap the positions of the products.
+                    for (int const idim : position_indices) {
+                        soa_products_data[2].m_rdata[idim][slot2_idx] = soa_1.m_rdata[idim][src1_idx];
+                        soa_products_data[3].m_rdata[idim][slot3_idx] = soa_0.m_rdata[idim][src0_idx];
+                    }
+                }
+
                 // Update the momenta of the products
                 TwoProductComputeProductMomenta(
                     soa_0.m_rdata[PIdx::ux][src0_idx],
@@ -367,15 +355,15 @@ public:
                     soa_products_data[3].m_rdata[PIdx::ux][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uy][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uz][slot3_idx], mass_slot3,
-                    -reaction_energy*PhysConst::q_e,
+                    -scattering_process.m_energy_penalty*PhysConst::q_e,
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
                     // We also convert from eV to Joules
-                    false,
-                    // no angular scattering: the products' momenta have the same direction
-                    // as that of the reactant particle, in the center-of-mass frame
+                    scattering_process.m_scattering_angle_model,
+                    // The angular distribution of the products in the center-of-mass frame is set by
+                    // the process's scattering angle model.
                     engine);
             }
-            else if (mask[i] == int(ScatteringProcessType::IONIZATION))
+            else if (process_type == ScatteringProcessType::IONIZATION)
             {
                 const auto slot0_idx = products_np_data[0] + no_product_total + with_product_offsets_data[i];
                 // Make a copy of the particle from the first reactant species (slot 0)
@@ -413,24 +401,14 @@ public:
                 auto& uy3 = soa_products_data[3].m_rdata[PIdx::uy][slot3_idx];
                 auto& uz3 = soa_products_data[3].m_rdata[PIdx::uz][slot3_idx];
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                /* In RZ and RCYLINDER geometry, macroparticles can collide with other macroparticles
-                * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                * are actually not local in space. In this case, the underlying assumption is that
-                * particles within the same cylindrical cell represent a cylindrically-symmetry
-                * momentum distribution function. Therefore, here, we temporarily rotate the
-                * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                * there is a corresponding assert statement at initialization.)
-                */
-                amrex::ParticleReal const theta = (
-                    soa_products_data[2].m_rdata[PIdx::theta][slot2_idx]
-                    - soa_products_data[0].m_rdata[PIdx::theta][slot0_idx]
-                );
-                amrex::ParticleReal const ux0buf = ux0;
-                ux0 = ux0buf*std::cos(theta) - uy0*std::sin(theta);
-                uy0 = ux0buf*std::sin(theta) + uy0*std::cos(theta);
-#endif
+                // Note: in RZ/RCYLINDER geometry, ux0/uy0 and ux2,3/uy2,3 have already been
+                // rotated into each particle's own local curvilinear frame (theta = 0) by
+                // WarpXParticleContainer::TransformMomentumToCurvilinear(), called once for the
+                // whole particle container in CollisionHandler::doCollisions() before any collision
+                // routine runs. They are combined directly below, with no further per-pair rotation,
+                // for consistency with CollisionFilterFunc.H (which selects this pair for ionization
+                // using that same convention) and with TwoProductComputeProductMomenta (used by every
+                // other DSMC scattering process).
 
                 // for simplicity (for now) we assume non-relativistic particles
                 // and simply calculate the center-of-momentum velocity from the
@@ -450,93 +428,121 @@ public:
                 uy3 -= uCOM_y;
                 uz3 -= uCOM_z;
 
-                // calculate kinetic energy of the collision (in eV)
-                const amrex::ParticleReal E1 = (
-                    0.5_prt * m0 * (ux0*ux0 + uy0*uy0 + uz0*uz0) / PhysConst::q_e
-                );
-                const amrex::ParticleReal E2 = (
-                    0.5_prt * m1 * (ux3*ux3 + uy3*uy3 + uz3*uz3) / PhysConst::q_e
-                );
-                const amrex::ParticleReal E_coll = E1 + E2;
+                // calculate kinetic energy of the collision
+                const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
+                const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
 
-                // subtract the energy cost for ionization
-                const amrex::ParticleReal E_out = (E_coll - reaction_energy) * PhysConst::q_e;
+                // subtract the energy cost for ionization (converted from eV to J)
+                amrex::ParticleReal E_out = E_coll - scattering_process.m_energy_penalty * PhysConst::q_e;
 
-                // Momentum and energy division after the ionization event
-                // is done as follows:
-                // Three numbers are generated that satisfy the triangle
-                // inequality. These numbers will be scaled to give the
-                // momentum for each particle (satisfying the triangle
-                // inequality ensures that the momentum vectors can be
-                // arranged such that the net linear momentum is zero).
-                // Product 2 is definitely an ion, so we first choose its
-                // proportion to be n_2 = min(E2 / E_coll, 0.5 * R), where
-                // R is a random number between 0 and 1.
-                // The other two numbers (n_0 & n_1) are then found
-                // by choosing a random point on the ellipse characterized
-                // by the semi-major and semi-minor axes
-                //    a = (1 - n_0) / 2.0
-                //    b = 0.5 * sqrt(1 - 2 * n_0)
-                // The numbers are found by randomly sampling an x value
-                // between -a and a, and finding the corresponding y value
-                // that falls on the ellipse: y^2 = b^2 - b^2/a^2 * x^2.
-                // Then n_0 = sqrt(y^2 + (x - n_2/2)^2) and
-                // n_1 = 1 - n_2 - n_0.
-                // Next, we need to find the number C, such that if
-                // p_i = C * n_i, we would have E_0 + E_1 + E_2 = E_out
-                // where E_i = p_i^2 / (2 M_i), i.e.,
-                // C^2 * \sum_i [n_i^2 / (2 M_i)] = E_out
-                // After C is determined the momentum vectors are arranged
-                // such that the net linear momentum is zero.
+                // clamp E_out to 0: CollisionFilterFunc.H selects this pair for ionization
+                // using  a differently-computed (relativistic, whole-pair) collision energy,
+                // so E_out can come out (slightly) negative here even though the pair cleared
+                // the ionization threshold there; without the floor, the sqrt() calls below
+                // would produce a NaN velocity in such cases.
+                // TODO: update the E_coll calculation above to match the calculation in
+                // CollisionFilterFunc.H
+                E_out = amrex::max(E_out, 0.0_prt);
 
-                const double n_2 = std::min<double>(E2 / E_coll, 0.5 * amrex::Random(engine));
+                // The kinematics of the ionization event (i.e. how the energy and momentum are
+                // distributed among the products) depend on the nature of the incident particle
+                // (first reactant species, slot 0, with mass m0).
+                if (m0 > 2.0_prt * PhysConst::m_e)
+                {
+                    // Ion impact ionization (the incident particle is heavier than an electron).
+                    // We use the collinear model: in the center-of-mass frame, the two products
+                    // (the ion and the electron) are assumed to have equal velocity, and their
+                    // velocity vector is aligned with that of the incident (non-target) particle.
 
-                // find ellipse semi-major and minor axis
-                const double a = 0.5 * (1.0 - n_2);
-                const double b = 0.5 * std::sqrt(1.0 - 2.0 * n_2);
+                    // Momentum and energy division after the ionization event is done as follows:
+                    // we assume that, in the center of mass frame, the two products (the ion and the electron)
+                    // have equal velocity and that their velocity vector is aligned with that of the target particle
 
-                // sample random x value and calculate y
-                const double x = (2.0 * amrex::Random(engine) - 1.0) * a;
-                const double y2 = b*b - b*b/(a*a) * x*x;
-                const double n_0 = std::sqrt(y2 + x*x - x*n_2 + 0.25*n_2*n_2);
-                const double n_1 = 1.0 - n_0 - n_2;
+                    // With these assumptions, conservation of momentum in the center of mass frame allows to express the momenta
+                    // of the products, as a function of the outcoming momentum of the non-target particle:
+                    // p2 = - p_non_target_out * mass_slot2 / m1
+                    // p3 = - p_non_target_out * mass_slot3 / m1
+                    // (with m1 = mass_slot2 + mass_slot3, by conservation of mass)
 
-                // calculate the value of C
-                const double C = std::sqrt(E_out / (
-                    n_0*n_0 / (2.0 * m0) + n_1*n_1 / (2.0 * mass_slot2) + n_2*n_2 / (2.0 * mass_slot3)
-                ));
+                    // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
+                    const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m0 + 1.0_prt / (mass_slot2 + mass_slot3) ) );
 
-                // Now that appropriate momenta are set for each outgoing species
-                // the directions for the velocity vectors must be chosen such
-                // that the net linear momentum in the current frame is 0.
-                // This is achieved by arranging the momentum vectors in
-                // a triangle and finding the required angles between the vectors.
-                const double cos_alpha = (n_0*n_0 + n_1*n_1 - n_2*n_2) / (2.0 * n_0 * n_1);
-                const double sin_alpha = std::sqrt(1.0 - cos_alpha*cos_alpha);
-                const double cos_gamma = (n_0*n_0 + n_2*n_2 - n_1*n_1) / (2.0 * n_0 * n_2);
-                const double sin_gamma = std::sqrt(1.0 - cos_gamma*cos_gamma);
+                    // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
+                    const amrex::ParticleReal reduce_factor = p_non_target_out / p_non_target_in;
+                    ux0 *= reduce_factor;
+                    uy0 *= reduce_factor;
+                    uz0 *= reduce_factor;
+                    // Obtain the other velocity vectors by conservation of momentum
+                    const amrex::ParticleReal mass_ratio = m0 / (mass_slot2 + mass_slot3);
+                    ux2 = -mass_ratio * ux0;
+                    uy2 = -mass_ratio * uy0;
+                    uz2 = -mass_ratio * uz0;
+                    ux3 = -mass_ratio * ux0;
+                    uy3 = -mass_ratio * uy0;
+                    uz3 = -mass_ratio * uz0;
+                }
+                else
+                {
+                    // Electron impact ionization (the incident particle is an electron).
+                    // We use the following model: in the center-of-mass frame, the two
+                    // electrons (the incident electron and the newly freed electron)
+                    // are scattered isotropically and are assumed to carry an equal share
+                    // of the energy. All the other unknowns (magnitude of the isotropically
+                    // scattered electron momentum, momentum of the ion) are determined by
+                    // conservation of energy and momentum.
 
-                // choose random theta and phi values (orientation of the triangle)
-                const double Theta = amrex::Random(engine) * 2.0 * MathConst::pi;
-                const double phi = amrex::Random(engine) * MathConst::pi;
+                    // The freed electron has the same mass as the incident electron (m0);
+                    // the ion is the heavier of the two products in slots 2 and 3.
+                    const amrex::ParticleReal m_ion = amrex::max(mass_slot2, mass_slot3);
 
-                const double cos_theta = std::cos(Theta);
-                const double sin_theta = std::sin(Theta);
-                const double cos_phi = std::cos(phi);
-                const double sin_phi = std::sin(phi);
+                    // Sample two isotropic unit vectors: one for the incident electron
+                    // (slot 0) and one for the newly freed electron.
+                    // These units vectors have the right direction, but not the right magnitude ;
+                    // they will be multiplied by the right magnitude p_e further down.
+                    amrex::ParticleReal scaled_ux0, scaled_uy0, scaled_uz0;
+                    amrex::ParticleReal scaled_ux_new, scaled_uy_new, scaled_uz_new;
+                    ParticleUtils::getRandomVector(scaled_ux0, scaled_uy0, scaled_uz0, engine);
+                    ParticleUtils::getRandomVector(scaled_ux_new, scaled_uy_new, scaled_uz_new, engine);
 
-                // calculate the velocity components for each particle
-                ux0 = static_cast<amrex::ParticleReal>(C * n_0 / m0 * cos_theta * cos_phi);
-                uy0 = static_cast<amrex::ParticleReal>(C * n_0 / m0 * cos_theta * sin_phi);
-                uz0 = static_cast<amrex::ParticleReal>(-C * n_0 / m0 * sin_theta);
+                    // Sum of the two electron directions; the ion momentum is
+                    // proportional to its opposite (conservation of momentum in COM).
+                    const amrex::ParticleReal scaled_ux_ion = -(scaled_ux0 + scaled_ux_new);
+                    const amrex::ParticleReal scaled_uy_ion = -(scaled_uy0 + scaled_uy_new);
+                    const amrex::ParticleReal scaled_uz_ion = -(scaled_uz0 + scaled_uz_new);
+                    const amrex::ParticleReal scaled_u2_ion = scaled_ux_ion*scaled_ux_ion + scaled_uy_ion*scaled_uy_ion + scaled_uz_ion*scaled_uz_ion;
 
-                ux2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (-cos_alpha * cos_theta * cos_phi - sin_alpha * sin_phi));
-                uy2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (-cos_alpha * cos_theta * sin_phi + sin_alpha * cos_phi));
-                uz2 = static_cast<amrex::ParticleReal>(C * n_1 / mass_slot2 * (cos_alpha * sin_theta));
+                    // Magnitude of the momentum of the two electrons, from conservation
+                    // of energy in the center-of-mass frame (both electrons are assumed
+                    // to carry an equal share of the energy):
+                    //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
+                    const amrex::ParticleReal p_e = std::sqrt(
+                        E_out / (1.0_prt/m0 + 0.5_prt*scaled_u2_ion/m_ion) );
 
-                ux3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (-cos_gamma * cos_theta * cos_phi + sin_gamma * sin_phi));
-                uy3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (-cos_gamma * cos_theta * sin_phi - sin_gamma * cos_phi));
-                uz3 = static_cast<amrex::ParticleReal>(C * n_2 / mass_slot3 * (cos_gamma * sin_theta));
+                    // Assign the normalized momenta (still in the COM frame; the surrounding code
+                    // transforms them back to the lab frame). The incident electron is in
+                    // slot 0; the two products of the ionized target (slots 2 and 3) are
+                    // one electron and one ion, the electron being the lighter of the two.
+                    ux0 = p_e/m0 * scaled_ux0;
+                    uy0 = p_e/m0 * scaled_uy0;
+                    uz0 = p_e/m0 * scaled_uz0;
+                    if (mass_slot2 < mass_slot3) {
+                        // slot 2 is the freed electron, slot 3 is the ion
+                        ux2 = p_e/m0 * scaled_ux_new;
+                        uy2 = p_e/m0 * scaled_uy_new;
+                        uz2 = p_e/m0 * scaled_uz_new;
+                        ux3 = p_e/m_ion * scaled_ux_ion;
+                        uy3 = p_e/m_ion * scaled_uy_ion;
+                        uz3 = p_e/m_ion * scaled_uz_ion;
+                    } else {
+                        // slot 3 is the freed electron, slot 2 is the ion
+                        ux3 = p_e/m0 * scaled_ux_new;
+                        uy3 = p_e/m0 * scaled_uy_new;
+                        uz3 = p_e/m0 * scaled_uz_new;
+                        ux2 = p_e/m_ion * scaled_ux_ion;
+                        uy2 = p_e/m_ion * scaled_uy_ion;
+                        uz2 = p_e/m_ion * scaled_uz_ion;
+                    }
+                }
 
                 // transform back to labframe
                 ux0 += uCOM_x;
@@ -548,13 +554,6 @@ public:
                 ux3 += uCOM_x;
                 uy3 += uCOM_y;
                 uz3 += uCOM_z;
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                /* Undo the earlier velocity rotation. */
-                amrex::ParticleReal const ux0buf_new = ux0;
-                ux0 = ux0buf_new*std::cos(-theta) - uy0*std::sin(-theta);
-                uy0 = ux0buf_new*std::sin(-theta) + uy0*std::cos(-theta);
-#endif
             }
         });
 
@@ -574,8 +573,10 @@ public:
 private:
     // How many different type of species the collision produces
     int m_num_product_species;
-    // If ionization collisions are included, what is the energy cost
-    amrex::ParticleReal m_reaction_energy = 0.0;
+    // The scattering processes, in the same order as the input list (and as the indices encoded
+    // in the per-pair mask). Used to look up, for each pair, the process type and energy penalty.
+    amrex::Vector<ScatteringProcess> m_scattering_processes;
+    amrex::Gpu::DeviceVector<ScatteringProcess::Executor> m_scattering_processes_exe;
     // Vector of size m_num_product_species: for each product slot, the number of new particles
     // created per *reaction* event (ionization, two-product reaction, charge exchange).
     // Weight-split particles added to slots 0 and 1 during non-reaction events are NOT counted
