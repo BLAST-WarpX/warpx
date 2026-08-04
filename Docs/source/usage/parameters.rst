@@ -3018,12 +3018,18 @@ Details about the collision models can be found in the :ref:`theory section <mul
     is used for the background density, the input parameter ``<collision_name>.max_background_density``
     must also be provided to calculate the maximum collision probability.
 
+    The arguments ``x``, ``y`` and ``z`` are the Cartesian coordinates of the macroparticle, in every
+    geometry. In ``RZ``, ``RCYLINDER`` and ``RSPHERE`` geometry this means that the radius must be
+    written as ``sqrt(x**2+y**2)`` (``RZ``, ``RCYLINDER``) or ``sqrt(x**2+y**2+z**2)`` (``RSPHERE``),
+    and in 2D (``XZ``) geometry ``y`` is always 0.
+
 .. pp:param:: <collision_name>.background_temperature
     :type: ``float``
 
     Only for ``background_mcc`` and ``background_stopping``. The temperature of the background in Kelvin.
     Can also provide ``<collision_name>.background_temperature(x,y,z,t)`` using the parser
-    initialization style for spatially and temporally varying temperature.
+    initialization style for spatially and temporally varying temperature. The arguments follow the
+    same convention as for :pp:param:`<collision_name>.background_density`.
 
 .. pp:param:: <collision_name>.background_mass
     :type: ``float``
