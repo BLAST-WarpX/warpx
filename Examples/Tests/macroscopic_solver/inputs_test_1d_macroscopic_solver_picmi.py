@@ -23,7 +23,7 @@ zmax = 1.0
 max_grid_size = 128
 
 # Problem specific parameters
-epsilon = 1.5 * picmi.constants.ep0
+epsilon_r = 1.5
 L = zmax - zmin
 kz = 1.0 * np.pi / L
 By_expression = "cos(kz*z)"
@@ -50,7 +50,9 @@ sim = picmi.Simulation(
 )
 
 # Define epsilon
-epsilon = picmi.MacroscopicProperty(name="epsilon", implicit_function="1.5*epsilon0")
+epsilon = picmi.MacroscopicProperty(
+    name="epsilon", implicit_function="epsilon_r*epsilon0", epsilon_r=epsilon_r
+)
 sigma = picmi.MacroscopicProperty(name="sigma", value=0.0)
 mu = picmi.MacroscopicProperty(name="mu", value=picmi.constants.mu0)
 
