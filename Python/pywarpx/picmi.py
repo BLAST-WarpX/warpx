@@ -1261,7 +1261,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
     warpx_potential_hi_z: float, default=0.
        Electrostatic potential on the upper z boundary
 
-    warpx_particle_eb: string, default="Absorbing", optional
+    warpx_boundary_particle_eb: string, default="Absorbing", optional
        The boundary condition applied to the particles when they reach the surface
        of the embedded boundary. Absorbing, Reflecting, or None
 
@@ -1286,7 +1286,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
         self.blocking_factor_x = kw.pop("warpx_blocking_factor_x", None)
         self.blocking_factor_y = kw.pop("warpx_blocking_factor_y", None)
 
-        self.particle_eb = kw.pop("warpx_particle_eb", None)
+        self.particle_boundary_eb = kw.pop("warpx_boundary_particle_eb", None)
         self.potential_xmin = kw.pop("warpx_potential_lo_x", None)
         self.potential_xmax = kw.pop("warpx_potential_hi_x", None)
         self.potential_ymin = None
@@ -1320,7 +1320,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
         pywarpx.amr.blocking_factor_y = self.blocking_factor_y
 
         # Boundary conditions
-        pywarpx.boundary.particle_eb = self.particle_eb
+        pywarpx.boundary.particle_eb = self.particle_boundary_eb
         pywarpx.boundary.field_lo = [
             BC_map[bc] for bc in self.lower_boundary_conditions
         ]
@@ -1403,7 +1403,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
     warpx_potential_hi_z: float, default=0.
        Electrostatic potential on the upper z boundary
 
-    warpx_particle_eb: string, default="Absorbing", optional
+    warpx_boundary_particle_eb: string, default="Absorbing", optional
        The boundary condition applied to the particles when they reach the surface
        of the embedded boundary. Absorbing, Reflecting, or None
 
@@ -1430,7 +1430,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         self.blocking_factor_y = kw.pop("warpx_blocking_factor_y", None)
         self.blocking_factor_z = kw.pop("warpx_blocking_factor_z", None)
 
-        self.particle_eb = kw.pop("warpx_particle_eb", None)
+        self.particle_boundary_eb = kw.pop("warpx_boundary_particle_eb", None)
         self.potential_xmin = kw.pop("warpx_potential_lo_x", None)
         self.potential_xmax = kw.pop("warpx_potential_hi_x", None)
         self.potential_ymin = kw.pop("warpx_potential_lo_y", None)
@@ -1466,7 +1466,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         pywarpx.amr.blocking_factor_z = self.blocking_factor_z
 
         # Boundary conditions
-        pywarpx.boundary.particle_eb = self.particle_eb
+        pywarpx.boundary.particle_eb = self.particle_boundary_eb
         pywarpx.boundary.field_lo = [
             BC_map[bc] for bc in self.lower_boundary_conditions
         ]
