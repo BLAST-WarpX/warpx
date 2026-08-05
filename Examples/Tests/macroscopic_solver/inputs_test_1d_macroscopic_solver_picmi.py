@@ -53,7 +53,7 @@ sim = picmi.Simulation(
 epsilon = picmi.MacroscopicProperty(
     name="epsilon", implicit_function="epsilon_r*epsilon0", epsilon_r=epsilon_r
 )
-sigma = picmi.MacroscopicProperty(name="sigma", value=0.0)
+sigma = picmi.MacroscopicProperty(name="sigma", value=0.0, method="backwardeuler")
 mu = picmi.MacroscopicProperty(name="mu", value=picmi.constants.mu0)
 
 # Define diagnostics

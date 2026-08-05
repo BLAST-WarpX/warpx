@@ -3655,7 +3655,7 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
         if self.method is not None:
             setattr(
-                pywarpx.macroscopic,
+                pywarpx.algo,
                 "macroscopic_" + self.name + "_method",
                 self.method,
             )
