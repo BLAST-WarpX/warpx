@@ -706,6 +706,18 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
     const amrex::Real gamma = m_hybrid_pic_model->m_gamma;
     const amrex::Real rho_floor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
     const amrex::Real q_e = PhysConst::q_e;
+    // Marker-CFL cap on u_e in the pe advance: the theta-centered fixed
+    // point contracts only where |u_e| k_max theta dt < 1. The floored-edge
+    // u_e = J/(e n_floor) (~1e7 m/s -- fictitious, there is no electron
+    // fluid there) violates this, and the local divergence grows a hot-cell
+    // tail (~x2 per 150 steps on the 3D FRC). 0.25 dx_min/(theta dt) keeps
+    // the contraction <= 0.25*pi everywhere; the physical interior u_e sits
+    // 1-2 orders below the cap.
+    amrex::Real dx_min = geom.CellSize(0);
+    for (int d = 1; d < AMREX_SPACEDIM; ++d) {
+        dx_min = std::min(dx_min, geom.CellSize(d));
+    }
+    const amrex::Real ue_cap = 0.25_rt * dx_min / theta_dt;
 
     const amrex::GpuArray<int, 3> Jx_stag = m_hybrid_pic_model->Jx_IndexType;
     const amrex::GpuArray<int, 3> Jy_stag = m_hybrid_pic_model->Jy_IndexType;
@@ -767,16 +779,23 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
 
         amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
 
+            // Marker-CFL clamp on u_e (see ue_cap above): keeps the
+            // theta-centered fixed point contractive in the floored-edge
+            // cells, whose fictitious u_e = J/(e n_floor) otherwise makes
+            // it locally divergent (hot-cell tail doubling each ~150 steps).
+            auto uclamp = [&] (amrex::Real u) {
+                return amrex::min(amrex::max(u, -ue_cap), ue_cap);
+            };
             // electron velocity at a node: ue = (J_ion - J_net)/(e n)
             auto ue_x = [&] (int ii, int jj, int kk) {
                 const amrex::Real n_ = amrex::max(rho_arr(ii,jj,kk,0), rho_floor);
-                return (Interp(Jx, Jx_stag, nodal, coarsen, ii, jj, kk, 0)
-                      - Interp(Jpx, Jx_stag, nodal, coarsen, ii, jj, kk, 0)) / n_;
+                return uclamp((Interp(Jx, Jx_stag, nodal, coarsen, ii, jj, kk, 0)
+                      - Interp(Jpx, Jx_stag, nodal, coarsen, ii, jj, kk, 0)) / n_);
             };
             auto ue_z = [&] (int ii, int jj, int kk) {
                 const amrex::Real n_ = amrex::max(rho_arr(ii,jj,kk,0), rho_floor);
-                return (Interp(Jz, Jz_stag, nodal, coarsen, ii, jj, kk, 0)
-                      - Interp(Jpz, Jz_stag, nodal, coarsen, ii, jj, kk, 0)) / n_;
+                return uclamp((Interp(Jz, Jz_stag, nodal, coarsen, ii, jj, kk, 0)
+                      - Interp(Jpz, Jz_stag, nodal, coarsen, ii, jj, kk, 0)) / n_);
             };
             // The fixed point iterates pe^{n+theta} directly:
             //   pe^{n+theta} = pe^n - theta*dt*RHS(pe^{n+theta}),
@@ -819,7 +838,7 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
                 auto ue_zedge = [&] (int ie) {
                     const amrex::Real rho_e = amrex::max(
                         0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                    return (Jz(ie,j,k) - Jpz(ie,j,k)) / rho_e;
+                    return uclamp((Jz(ie,j,k) - Jpz(ie,j,k)) / rho_e);
                 };
                 divF += (ue_zedge(i)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i+1,j,k))
                        - ue_zedge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k)))
@@ -859,12 +878,12 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
                 auto ue_xedge = [&] (int ie) {
                     const amrex::Real rho_e = amrex::max(
                         0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                    return (Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e;
+                    return uclamp((Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e);
                 };
                 auto ue_zedge = [&] (int je) {
                     const amrex::Real rho_e = amrex::max(
                         0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
-                    return (Jz(i,je,k) - Jpz(i,je,k)) / rho_e;
+                    return uclamp((Jz(i,je,k) - Jpz(i,je,k)) / rho_e);
                 };
                 divF += (ue_xedge(i)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i+1,j,k))
                        - ue_xedge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k)))
@@ -922,12 +941,12 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
             auto ue_redge = [&] (int ie) {
                 const amrex::Real rho_e = amrex::max(
                     0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                return (Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e;
+                return uclamp((Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e);
             };
             auto ue_zedge = [&] (int je) {
                 const amrex::Real rho_e = amrex::max(
                     0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
-                return (Jz(i,je,k) - Jpz(i,je,k)) / rho_e;
+                return uclamp((Jz(i,je,k) - Jpz(i,je,k)) / rho_e);
             };
             {
                 const amrex::Real Frp =
@@ -963,8 +982,8 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
 #elif defined(WARPX_DIM_3D)
             auto ue_y = [&] (int ii, int jj, int kk) {
                 const amrex::Real n_ = amrex::max(rho_arr(ii,jj,kk,0), rho_floor);
-                return (Interp(Jy, Jy_stag, nodal, coarsen, ii, jj, kk, 0)
-                      - Interp(Jpy, Jy_stag, nodal, coarsen, ii, jj, kk, 0)) / n_;
+                return uclamp((Interp(Jy, Jy_stag, nodal, coarsen, ii, jj, kk, 0)
+                      - Interp(Jpy, Jy_stag, nodal, coarsen, ii, jj, kk, 0)) / n_);
             };
             auto Fy = [&] (int ii, int jj, int kk) { return ue_y(ii,jj,kk) * pec(ii,jj,kk); };
             if (((i <= dlo.x || i >= dhi.x) && !is_per[0]) ||
@@ -980,17 +999,17 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian )
                 auto ue_xedge = [&] (int ie) {
                     const amrex::Real rho_e = amrex::max(
                         0.5_rt*(rho_arr(ie,j,k,0) + rho_arr(ie+1,j,k,0)), rho_floor);
-                    return (Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e;
+                    return uclamp((Jx(ie,j,k) - Jpx(ie,j,k)) / rho_e);
                 };
                 auto ue_yedge = [&] (int je) {
                     const amrex::Real rho_e = amrex::max(
                         0.5_rt*(rho_arr(i,je,k,0) + rho_arr(i,je+1,k,0)), rho_floor);
-                    return (Jy(i,je,k) - Jpy(i,je,k)) / rho_e;
+                    return uclamp((Jy(i,je,k) - Jpy(i,je,k)) / rho_e);
                 };
                 auto ue_zedge = [&] (int ke) {
                     const amrex::Real rho_e = amrex::max(
                         0.5_rt*(rho_arr(i,j,ke,0) + rho_arr(i,j,ke+1,0)), rho_floor);
-                    return (Jz(i,j,ke) - Jpz(i,j,ke)) / rho_e;
+                    return uclamp((Jz(i,j,ke) - Jpz(i,j,ke)) / rho_e);
                 };
                 divF += (ue_xedge(i)   * 0.5_rt*(pe_it_arr(i,j,k)   + pe_it_arr(i+1,j,k))
                        - ue_xedge(i-1) * 0.5_rt*(pe_it_arr(i-1,j,k) + pe_it_arr(i,j,k)))
