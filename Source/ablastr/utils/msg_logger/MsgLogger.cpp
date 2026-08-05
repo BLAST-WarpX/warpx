@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <numeric>
+#include <ranges>
 
 namespace abl_msg_logger = ablastr::utils::msg_logger;
 namespace abl_ser = ablastr::utils::serialization;
