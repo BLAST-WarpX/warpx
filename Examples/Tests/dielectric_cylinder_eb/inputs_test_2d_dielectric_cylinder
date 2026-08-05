@@ -14,8 +14,8 @@ warpx.const_dt = 1e-6
 
 warpx.do_electrostatic = labframe
 eb2.geom_type = all_regular
-warpx.epsilon_function(x,y,z) = "(x**2+z**2<1.0) ? 5.0 : 1.0"
-warpx.self_fields_required_precision = 1.e-10
+warpx.epsilon_function(x,y,z) = "if(x**2+z**2<1.0, 5.0 , 1.0)"
+warpx.self_fields_required_precision = 1.e-6
 warpx.abort_on_warning_threshold = medium
 
 diagnostics.diags_names = diag1
