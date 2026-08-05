@@ -371,10 +371,18 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     // --- Compute full Ohm's law E for Faraday update ---
     // The gamma-law electron pressure is advanced to pe^{n+theta} inside every
     // residual evaluation (in-loop), with its work terms discretely paired to
-    // the ion push and Faraday ledgers -- this IS the implicit scheme's
-    // implementation of the gamma-law closure (energy-conserving by
-    // construction, and the only pe model currently supported implicitly).
-    AdvanceElectronPressure( a_from_jacobian );
+    // the ion push and Faraday ledgers -- the implicit scheme's
+    // implementation of the gamma-law closure with a discrete electron
+    // energy ledger. With implicit_use_algebraic_closure on, the pressure
+    // is instead re-evaluated algebraically from the iterate's rho (the
+    // exact counterpart of the explicit path's default closure): no pe
+    // state, no work pairing, and none of the pairing's floored-edge
+    // artifacts (Yee Hall-work residual, Cartesian m=4 separatrix layer).
+    if (m_hybrid_pic_model->m_implicit_use_algebraic_closure) {
+        m_hybrid_pic_model->CalculateElectronPressure();
+    } else {
+        AdvanceElectronPressure( a_from_jacobian );
+    }
 
     m_hybrid_pic_model->HybridPICSolveE(
         Efield_fp, current_fp, Bfield_fp, rho_fp,

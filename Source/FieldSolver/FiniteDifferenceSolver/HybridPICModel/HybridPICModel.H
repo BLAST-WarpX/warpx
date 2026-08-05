@@ -530,6 +530,15 @@ public:
      * same floor as the rest of the hybrid solver. */
     amrex::Real m_qdsmc_n_floor = 1.0;
 
+    /** Implicit scheme only: use the algebraic gamma-law closure
+     * Pe = n0 kB Te0 (n/n0)^gamma, re-evaluated from the iterate's rho in
+     * every residual, instead of the in-loop pe advance -- the exact
+     * counterpart of the explicit path's default closure. Sidesteps the
+     * in-loop advance's work-pairing artifacts at floored edges (Yee Hall
+     * residual, Cartesian m=4 separatrix layer) at the cost of the discrete
+     * electron energy ledger. Default off (in-loop advance). */
+    bool m_implicit_use_algebraic_closure = false;
+
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;
 

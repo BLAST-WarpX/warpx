@@ -97,6 +97,10 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("solve_electron_energy_equation",
                     m_solve_electron_energy_equation);
     pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
+    // Implicit scheme: algebraic gamma-law closure instead of the in-loop
+    // pe advance (see the member doc in HybridPICModel.H).
+    pp_hybrid.query("implicit_use_algebraic_closure",
+                    m_implicit_use_algebraic_closure);
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_solve_electron_energy_equation,
