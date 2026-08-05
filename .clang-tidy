@@ -39,6 +39,7 @@ Checks: '
         -modernize-avoid-c-arrays,
         -modernize-return-braced-init-list,
         -modernize-use-trailing-return-type,
+        -modernize-use-constraints,
         -modernize-use-designated-initializers,
         -modernize-use-std-numbers,
         -modernize-use-ranges,
