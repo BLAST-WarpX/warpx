@@ -227,8 +227,8 @@ void ChebyshevImpl<T>::Solve (T& a_x, const T& a_b)
 
     if (!m_ops->HasOffDiag()) {
         if (m_verbose) {
-            RT bnorm = a_b.norm2();
-            RT res = m_ops->ResidualNorm(a_x, a_b);
+            const RT bnorm = a_b.norm2();
+            const RT res = m_ops->ResidualNorm(a_x, a_b);
             Print() << "  " << m_name << " (diag): residual = " << res
                     << ", " << res / std::max(bnorm, RT(1.e-30))
                     << " (rel.)\n";
@@ -275,7 +275,7 @@ void ChebyshevImpl<T>::Solve (T& a_x, const T& a_b)
         } else {
             // Three-term recurrence:
             // x_{k+1} = omega * (tau * z + x_k - x_{k-1}) + x_{k-1}
-            RT omega_new = RT(1) / (RT(1) - sigma * sigma * omega / RT(4));
+            const RT omega_new = RT(1) / (RT(1) - sigma * sigma * omega / RT(4));
 
             // Save x_k in m_w1 (reuse, we're done with the residual)
             m_w1.Copy(a_x);
@@ -290,7 +290,7 @@ void ChebyshevImpl<T>::Solve (T& a_x, const T& a_b)
         }
 
         // Check convergence
-        RT res = m_ops->ResidualNorm(a_x, a_b);
+        const RT res = m_ops->ResidualNorm(a_x, a_b);
         m_num_iters = k + 1;
         m_res_norm = res;
 

@@ -242,17 +242,17 @@ int SparseJacobianMatrix::Assemble (
                 // (no SIMD pragma, see issue #7097)
                 For(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    int ridx_l = dof_arr(i,j,k,0);
+                    const int ridx_l = dof_arr(i,j,k,0);
                     if (ridx_l < 0) { return; }
 
                     int icol = 0;
-                    int ridx_g = dof_arr(i,j,k,1);
+                    const int ridx_g = dof_arr(i,j,k,1);
 
                     r_indices_g_ptr[ridx_l] = ridx_g;
 
                     {
-                        int cidx_g_lhs = dof_arr(i,j,k,1);
-                        Real val = 1.0_rt;
+                        const int cidx_g_lhs = dof_arr(i,j,k,1);
+                        const Real val = 1.0_rt;
                         auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                             cidx_g_lhs, val,
                             &c_indices_g_ptr[ridx_l*nnz_max],
@@ -302,7 +302,7 @@ int SparseJacobianMatrix::Assemble (
                     // (no SIMD pragma, see issue #7097)
                     For(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
-                        int ridx_l = dof_arr(i,j,k,0);
+                        const int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }
 
                         int icol = num_nz_ptr[ridx_l];
@@ -310,8 +310,8 @@ int SparseJacobianMatrix::Assemble (
 #if defined(WARPX_DIM_1D_Z)
                         if (dir != 2) {
                             {
-                                int cidx_g_rhs = dof_arr(i,j,k,1);
-                                Real val = 2.0_rt * alpha
+                                const int cidx_g_rhs = dof_arr(i,j,k,1);
+                                const Real val = 2.0_rt * alpha
                                     * dxi[0]*dxi[0]
                                     * BC_mask_Edir_arr(i,j,k,0);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
@@ -322,8 +322,8 @@ int SparseJacobianMatrix::Assemble (
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                int cidx_g_rhs = dof_arr(i-1,j,k,1);
-                                Real val = -alpha
+                                const int cidx_g_rhs = dof_arr(i-1,j,k,1);
+                                const Real val = -alpha
                                     * dxi[0]*dxi[0]
                                     * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
@@ -334,8 +334,8 @@ int SparseJacobianMatrix::Assemble (
                                 if (!flag) { Gpu::Atomic::Max(nnz_actual_ptr, icol); }
                             }
                             {
-                                int cidx_g_rhs = dof_arr(i+1,j,k,1);
-                                Real val = -alpha
+                                const int cidx_g_rhs = dof_arr(i+1,j,k,1);
+                                const Real val = -alpha
                                     * dxi[0]*dxi[0]
                                     * BC_mask_Edir_arr(i,j,k,1);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
@@ -696,7 +696,7 @@ int SparseJacobianMatrix::Assemble (
                     // (no SIMD pragma, see issue #7097)
                     For(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
-                        int ridx_l = dof_arr(i,j,k,0);
+                        const int ridx_l = dof_arr(i,j,k,0);
                         if (ridx_l < 0) { return; }
 
                         const IntVect iv_base = IntVect(AMREX_D_DECL(i,j,k));
@@ -711,8 +711,8 @@ int SparseJacobianMatrix::Assemble (
                                     const int ii0 = comp0 - MM_width[0];
                                     const IntVect iv_shift = IntVect(AMREX_D_DECL(ii0, jj0, kk0));
                                     if (full_bx.contains(iv_base + iv_shift)) {
-                                        int cidx_g_rhs = dof_arr(iv_base + iv_shift, 1);
-                                        Real val = sigma_ii_arr(iv_base, mm_comp);
+                                        const int cidx_g_rhs = dof_arr(iv_base + iv_shift, 1);
+                                        const Real val = sigma_ii_arr(iv_base, mm_comp);
                                         auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                             cidx_g_rhs, val,
                                             &c_indices_g_ptr[ridx_l*nnz_max],
@@ -805,7 +805,7 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
                     int k = idx / (gbx_len.x * gbx_len.y);
                     int j = (idx - k * gbx_len.x * gbx_len.y) / gbx_len.x;
                     int i = idx - k * gbx_len.x * gbx_len.y - j * gbx_len.x;
-                    i += gbx_lo.x; j += gbx_lo.y; k += gbx_lo.z;
+                    AMREX_D_TERM(i += gbx_lo.x;, j += gbx_lo.y;, k += gbx_lo.z;)
                     if (vbx.contains(IntVect(AMREX_D_DECL(i, j, k)))) {
                         global_to_ext[gdof] = ldof_h[idx];
                     } else {
@@ -1010,7 +1010,7 @@ amrex::Real SparseJacobianMatrix::MatResidualNorm (const amrex::Real* a_x_ext,
                     Ax += a_ij_ptr[idx] * a_x_ext[j_ext];
                 }
             }
-            Real r = a_b[row] - Ax;
+            const Real r = a_b[row] - Ax;
             return {r * r};
         });
 
@@ -1061,8 +1061,8 @@ amrex::Real SparseJacobianMatrix::EstimateOmega () const
             for (int col = 0; col < ncols; col++) {
                 row_sum += amrex::Math::abs(aij_ptr[row * nnz + col]);
             }
-            Real abs_diag = amrex::Math::abs(diag_ptr[row]);
-            Real r = (row_sum - abs_diag) / abs_diag;
+            const Real abs_diag = amrex::Math::abs(diag_ptr[row]);
+            const Real r = (row_sum - abs_diag) / abs_diag;
             return {r};
         });
 

@@ -93,7 +93,7 @@ void JacobiPC<T,Ops>::printParameters() const
     using namespace amrex;
     auto pc_name = getEnumNameString(PreconditionerType::pc_jacobi);
     m_solver.printParameters(pc_name);
-    bool use_csr = (m_ops != nullptr && m_ops->GetThetaForPC() > amrex::Real(0.0));
+    const bool use_csr = (m_ops != nullptr && m_ops->GetThetaForPC() > amrex::Real(0.0));
     Print() << pc_name << " use CSR path:         " << (use_csr?"true":"false") << "\n";
 }
 
@@ -147,7 +147,7 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
     m_solver.Update(a_U);
 
     if (m_solver.isVerbose()) {
-        bool use_csr = (m_ops->GetThetaForPC() > Real(0.0));
+        const bool use_csr = (m_ops->GetThetaForPC() > Real(0.0));
         amrex::Print() << "Updating " << amrex::getEnumNameString(PreconditionerType::pc_jacobi)
                        << ": theta*dt = " << this->m_dt
                        << ", path = " << (use_csr ? "CSR" : "stencil")

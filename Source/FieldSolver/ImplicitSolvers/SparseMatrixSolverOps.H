@@ -31,6 +31,11 @@ public:
     SparseMatrixSolverOps () = default;
     ~SparseMatrixSolverOps () override = default;
 
+    SparseMatrixSolverOps (const SparseMatrixSolverOps&) = delete;
+    SparseMatrixSolverOps& operator= (const SparseMatrixSolverOps&) = delete;
+    SparseMatrixSolverOps (SparseMatrixSolverOps&&) noexcept = delete;
+    SparseMatrixSolverOps& operator= (SparseMatrixSolverOps&&) noexcept = delete;
+
     /** \brief Set the Ops pointer and cache geometry. */
     void Define (Ops* a_ops);
 

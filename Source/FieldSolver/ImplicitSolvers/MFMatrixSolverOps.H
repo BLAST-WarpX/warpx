@@ -133,7 +133,7 @@ void MFMatrixSolverOps<T>::InitialGuess (T& a_x, const T& a_b)
             const int diag_comp = (a_mf.nComp() - 1) / 2;
 
             for (MFIter mfi(x_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                Box bx = mfi.tilebox();
+                const Box bx = mfi.tilebox();
                 auto x_arr = x_mf.array(mfi);
                 auto b_arr = b_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
@@ -175,7 +175,7 @@ void MFMatrixSolverOps<T>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
                 const int diag_comp = (a_mf.nComp() - 1) / 2;
 
                 for (MFIter mfi(x_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    Box bx = mfi.tilebox();
+                    const Box bx = mfi.tilebox();
                     auto x_arr = x_mf.array(mfi);
                     auto b_arr = b_mf.const_array(mfi);
                     auto jx_arr = jx_mf.const_array(mfi);
@@ -184,7 +184,7 @@ void MFMatrixSolverOps<T>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
                     ParallelFor(bx,
                         [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
                     {
-                        RT r = b_arr(i,j,k) - jx_arr(i,j,k);
+                        const RT r = b_arr(i,j,k) - jx_arr(i,j,k);
                         x_arr(i,j,k) += om * r
                             / (RT(1.0) + pc_factor * a_arr(i,j,k,diag_comp));
                     });
@@ -192,7 +192,7 @@ void MFMatrixSolverOps<T>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
             } else {
                 // No mass matrices: diag(J) = I
                 for (MFIter mfi(x_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    Box bx = mfi.tilebox();
+                    const Box bx = mfi.tilebox();
                     auto x_arr = x_mf.array(mfi);
                     auto b_arr = b_mf.const_array(mfi);
                     auto jx_arr = jx_mf.const_array(mfi);

@@ -84,7 +84,7 @@ void ChebyshevPC<T,Ops>::printParameters () const
 {
     auto pc_name = amrex::getEnumNameString(PreconditionerType::pc_chebyshev);
     m_solver.printParameters(pc_name);
-    bool use_csr = (m_ops != nullptr && m_ops->GetThetaForPC() > amrex::Real(0.0));
+    const bool use_csr = (m_ops != nullptr && m_ops->GetThetaForPC() > amrex::Real(0.0));
     amrex::Print() << pc_name << " use CSR path:         " << (use_csr?"true":"false") << "\n";
 }
 

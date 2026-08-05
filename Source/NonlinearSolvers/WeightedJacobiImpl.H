@@ -170,8 +170,8 @@ void WeightedJacobiImpl<T>::Solve (T& a_x, const T& a_b)
 
         if (!m_matrix_ops->HasOffDiag()) {
             if (m_verbose) {
-                RT bnorm = a_b.norm2();
-                RT res = m_matrix_ops->ResidualNorm(a_x, a_b);
+                const RT bnorm = a_b.norm2();
+                const RT res = m_matrix_ops->ResidualNorm(a_x, a_b);
                 Print() << "  " << m_name << " (diag): residual = " << res
                         << ", " << res / std::max(bnorm, RT(1.e-30))
                         << " (rel.)\n";
@@ -180,8 +180,8 @@ void WeightedJacobiImpl<T>::Solve (T& a_x, const T& a_b)
         }
 
         // Compute initial residual
-        RT bnorm = a_b.norm2();
-        RT res0 = m_matrix_ops->ResidualNorm(a_x, a_b);
+        const RT bnorm = a_b.norm2();
+        const RT res0 = m_matrix_ops->ResidualNorm(a_x, a_b);
         RT res_prev = res0;
 
         if (m_verbose) {
@@ -197,7 +197,7 @@ void WeightedJacobiImpl<T>::Solve (T& a_x, const T& a_b)
 
             m_matrix_ops->JacobiSweep(a_x, a_b, omega);
 
-            RT res_norm = m_matrix_ops->ResidualNorm(a_x, a_b);
+            const RT res_norm = m_matrix_ops->ResidualNorm(a_x, a_b);
 
             m_num_iters = iter + 1;
             m_res_norm = res_norm;

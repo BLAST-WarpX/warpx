@@ -66,7 +66,7 @@ public:
                 linop->apply(y, x);
             };
             auto* bcoefs = ops->GetMassMatricesJacDiag();
-            int n_levels = ops->numAMRLevels();
+            const int n_levels = ops->numAMRLevels();
             auto mf_ops = std::make_unique<MFMatrixSolverOps<Vec>>();
             mf_ops->Define(std::move(matvec), bcoefs, n_levels);
             m_matrix_ops = std::move(mf_ops);

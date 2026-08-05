@@ -30,6 +30,11 @@ public:
     MultiFabMatrixSolverOps () = default;
     ~MultiFabMatrixSolverOps () override = default;
 
+    MultiFabMatrixSolverOps (const MultiFabMatrixSolverOps&) = delete;
+    MultiFabMatrixSolverOps& operator= (const MultiFabMatrixSolverOps&) = delete;
+    MultiFabMatrixSolverOps (MultiFabMatrixSolverOps&&) noexcept = delete;
+    MultiFabMatrixSolverOps& operator= (MultiFabMatrixSolverOps&&) noexcept = delete;
+
     /** \brief Set the Ops pointer and read mass matrix coefficients. */
     void Define (Ops* a_ops);
 
@@ -93,8 +98,8 @@ void MultiFabMatrixSolverOps<T,Ops>::Update (const T& a_U)
             if ((*m_bcoefs)[n][dim]->nComp() > 1) {
                 m_has_offdiag = true;
                 for (int d = 0; d < AMREX_SPACEDIM; d++) {
-                    int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
-                    int w_d = (nc_d - 1) / 2;
+                    const int nc_d = m_ops->GetMassMatricesPCnComp(dim, d);
+                    const int w_d = (nc_d - 1) / 2;
                     m_stencil_width = std::max(m_stencil_width, w_d);
                 }
             }
@@ -135,7 +140,7 @@ void MultiFabMatrixSolverOps<T,Ops>::InitialGuess (T& a_x, const T& a_b)
             const int diag_comp = (a_mf.nComp() - 1) / 2;
 
             for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                Box bx = mfi.tilebox();
+                const Box bx = mfi.tilebox();
                 auto x_arr = x_mf.array(mfi);
                 auto b_arr = b_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
@@ -172,7 +177,7 @@ void MultiFabMatrixSolverOps<T,Ops>::Matvec (T& a_y, const T& a_x)
                 auto& x_mf = *(x_mfarrvec[n][dim]);
                 for (MFIter mfi(y_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
                 {
-                    Box bx = mfi.tilebox();
+                    const Box bx = mfi.tilebox();
                     auto y_arr = y_mf.array(mfi);
                     auto x_arr = x_mf.const_array(mfi);
                     auto a_arr = a_mf.const_array(mfi);
@@ -195,7 +200,7 @@ void MultiFabMatrixSolverOps<T,Ops>::Matvec (T& a_y, const T& a_x)
 
             for (MFIter mfi(y_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
             {
-                Box bx = mfi.tilebox();
+                const Box bx = mfi.tilebox();
                 auto y_arr = y_mf.array(mfi);
                 auto xg_arr = xg_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
@@ -257,7 +262,7 @@ void MultiFabMatrixSolverOps<T,Ops>::JacobiSweep (T& a_x, const T& a_b, RT a_ome
 
             for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
             {
-                Box bx = mfi.tilebox();
+                const Box bx = mfi.tilebox();
                 auto w_arr = w_mf.array(mfi);
                 auto xg_arr = xg_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
@@ -285,7 +290,7 @@ void MultiFabMatrixSolverOps<T,Ops>::JacobiSweep (T& a_x, const T& a_b, RT a_ome
 
             for (MFIter mfi(x_mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
             {
-                Box bx = mfi.tilebox();
+                const Box bx = mfi.tilebox();
                 auto x_arr = x_mf.array(mfi);
                 auto b_arr = b_mf.const_array(mfi);
                 auto w_arr = w_mf.const_array(mfi);
@@ -294,7 +299,7 @@ void MultiFabMatrixSolverOps<T,Ops>::JacobiSweep (T& a_x, const T& a_b, RT a_ome
                 ParallelFor(bx,
                     [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
                 {
-                    RT r = b_arr(i,j,k) - w_arr(i,j,k);
+                    const RT r = b_arr(i,j,k) - w_arr(i,j,k);
                     x_arr(i,j,k) += om * r
                         / (RT(1.0) + a_arr(i,j,k,diag_comp));
                 });
@@ -334,7 +339,7 @@ auto MultiFabMatrixSolverOps<T,Ops>::EstimateOmega () const -> RT
             using ReduceTuple = typename decltype(reduce_data)::Type;
 
             for (MFIter mfi(a_mf); mfi.isValid(); ++mfi) {
-                Box bx = mfi.validbox();
+                const Box bx = mfi.validbox();
                 auto a_arr = a_mf.const_array(mfi);
                 const int nc = ncomp;
                 const int dc = diag_comp;
@@ -348,11 +353,11 @@ auto MultiFabMatrixSolverOps<T,Ops>::EstimateOmega () const -> RT
                                 offdiag_sum += amrex::Math::abs(a_arr(i,j,k,c));
                             }
                         }
-                        RT diag = RT(1.0) + a_arr(i,j,k,dc);
+                        const RT diag = RT(1.0) + a_arr(i,j,k,dc);
                         return {offdiag_sum / amrex::Math::abs(diag)};
                     });
             }
-            RT dim_max_r = amrex::get<0>(reduce_data.value(reduce_op));
+            const RT dim_max_r = amrex::get<0>(reduce_data.value(reduce_op));
             max_r = std::max(max_r, dim_max_r);
         }
     }
@@ -408,7 +413,7 @@ auto MultiFabMatrixSolverOps<T,Ops>::computeResidualNormInternal (
                 ? m_x_ghost[n][dim] : *(x_mfarrvec[n][dim]);
 
             for (MFIter mfi(b_mf); mfi.isValid(); ++mfi) {
-                Box bx = mfi.validbox();
+                const Box bx = mfi.validbox();
                 auto xg_arr = xg_mf.const_array(mfi);
                 auto b_arr = b_mf.const_array(mfi);
                 auto a_arr = a_mf.const_array(mfi);
@@ -418,8 +423,8 @@ auto MultiFabMatrixSolverOps<T,Ops>::computeResidualNormInternal (
                     reduce_op.eval(bx, reduce_data,
                         [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
                         {
-                            RT Ax = x_arr(i,j,k) * (RT(1.0) + a_arr(i,j,k,0));
-                            RT r = b_arr(i,j,k) - Ax;
+                            const RT Ax = x_arr(i,j,k) * (RT(1.0) + a_arr(i,j,k,0));
+                            const RT r = b_arr(i,j,k) - Ax;
                             return {r * r};
                         });
                 } else {
@@ -439,8 +444,8 @@ auto MultiFabMatrixSolverOps<T,Ops>::computeResidualNormInternal (
                                     }
                                 }
                             }
-                            RT Ax = xg_arr(i,j,k) + mx;
-                            RT r = b_arr(i,j,k) - Ax;
+                            const RT Ax = xg_arr(i,j,k) + mx;
+                            const RT r = b_arr(i,j,k) - Ax;
                             return {r * r};
                         });
                 }
