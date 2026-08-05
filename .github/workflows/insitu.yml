@@ -30,7 +30,7 @@ jobs:
     container:
       image: alpinedav/ascent:0.9.3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Configure
       run: |
         . /ascent_docker_setup_env.sh
@@ -50,7 +50,7 @@ jobs:
             max_step = 40              \
             diag1.intervals = 30:40:10 \
             diag1.format = ascent
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: ascent-test-artifacts
         path: |
@@ -76,7 +76,7 @@ jobs:
     container:
       image: kitware/paraview:ci-catalyst-amrex-warpx-20240828
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Configure
       run: |
         cmake -S . -B build   \
@@ -107,7 +107,7 @@ jobs:
             diagnostics.diags_names = diag1 \
             diag1.format = catalyst\
             diag1.intervals = 3
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: catalyst-test-artifacts
         path: |

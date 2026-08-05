@@ -4,6 +4,10 @@
 
 WarpX is a massively parallel electromagnetic Particle-In-Cell (PIC) code built on top of AMReX (adaptive mesh refinement framework). It supports multiple dimensionalities (1D, 2D, 3D, RZ cylindrical) and compute backends (CPU/OpenMP, CUDA, HIP, SYCL).
 
+## Domain Context
+
+Reference `Docs/source/glossary.rst` as context for WarpX terminology, acronyms, and physics concepts.
+
 ## Development Environment
 
 If you cannot find the `cmake` or `ctest` command, activate the conda environment named `warpx-cpu-mpich-dev` before running shell commands that compile or test WarpX.
@@ -118,6 +122,7 @@ Commits should limit any formatting changes of unchanged code.
 - Fields are stored as AMReX `MultiFab` objects, managed via `ablastr::fields::MultiFabRegister`
 - Particle species managed by `MultiParticleContainer` → `WarpXParticleContainer`
 - Compile-time macros: `WARPX_DIM_3D`, `WARPX_DIM_XZ`, `WARPX_DIM_1D_Z`, `WARPX_DIM_RZ`
+- `amrex::ParallelFor` promises the compiler that loop iterations are independent (it applies a CPU SIMD pragma). Kernels where different iterations can write the same memory location — particle-to-grid deposition, scatter-add, histogram binning, shared counters — must use `amrex::For` instead, and whole-loop sums/maxima the `amrex::Reduce` function. `amrex::Gpu::Atomic` operations are plain non-atomic updates on CPU and do not make a `ParallelFor` safe; `amrex::HostDevice::Atomic` is atomic across OpenMP threads on CPU but does not make a `ParallelFor` safe either. See `Docs/source/developers/portability.rst`.
 
 ## C++ Style
 

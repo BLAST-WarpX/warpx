@@ -5,12 +5,14 @@
 #
 # License: BSD-3-Clause-LBNL
 
-import re
 import sys
 
 import numpy as np
 import scipy.constants as scc
 import yt
+
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
 
 ## This script performs various checks for the proton boron nuclear fusion module. The simulation
 ## that we check is made of 5 different tests, each with different proton, boron and alpha species.
@@ -81,9 +83,8 @@ E_decay = 3.12600414 * MeV_to_Joule  # Energy released during Be* -> 2*alpha
 E_fusion_total = E_fusion + E_decay  # Energy released during p + B -> 3*alpha
 
 ## Checks whether this is the 2D or the 3D test
-with open("./warpx_used_inputs") as warpx_used_inputs:
-    is_2D = re.search(r"geometry.dims\s*=\s*2", warpx_used_inputs.read())
-warpx_used_inputs.close()
+input_dict = parse_input_file("./warpx_used_inputs")
+is_2D = input_has_value(input_dict, "geometry.dims", "2")
 
 ## Some numerical parameters for this test
 size_x = 8

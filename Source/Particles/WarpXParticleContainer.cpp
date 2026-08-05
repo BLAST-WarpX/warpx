@@ -533,11 +533,11 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
         do_cropping[idim][0] = m_crop_on_PEC_boundary &&
                                 (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
-                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator));
         do_cropping[idim][1] = m_crop_on_PEC_boundary &&
                                 (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
-                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator));
 
         domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - tilebox.smallEnd(idim));
         domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - tilebox.smallEnd(idim));
@@ -1118,11 +1118,11 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
         do_cropping[idim][0] = m_crop_on_PEC_boundary &&
                                 (tilebox.smallEnd(idim) <= domain_box.smallEnd(idim) &&
                                  (field_boundary_lo[idim] == FieldBoundaryType::PEC
-                               || field_boundary_lo[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator));
         do_cropping[idim][1] = m_crop_on_PEC_boundary &&
                                 (tilebox.bigEnd(idim) >= domain_box.bigEnd(idim) &&
                                  (field_boundary_hi[idim] == FieldBoundaryType::PEC
-                               || field_boundary_hi[idim] == FieldBoundaryType::PECInsulator));
+                               || field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator));
 
         domain_double[idim][0] = static_cast<double>(domain_box.smallEnd(idim) - tilebox.smallEnd(idim));
         domain_double[idim][1] = static_cast<double>(domain_box.bigEnd(idim) - tilebox.smallEnd(idim));
@@ -2000,7 +2000,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(pti);
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(pti);
 
-        amrex::ParallelFor(np,
+        // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+        amrex::For(np,
             [=] AMREX_GPU_DEVICE (long ip) {
                 // Get position in AMReX convention to calculate corresponding index.
                 const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
@@ -2058,7 +2059,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(pti);
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(pti);
 
-        amrex::ParallelFor(np,
+        // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+        amrex::For(np,
             [=] AMREX_GPU_DEVICE (long ip) {
                 // Get position in AMReX convention to calculate corresponding index.
                 const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
@@ -2853,8 +2855,8 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
         {
             auto GetPosition = GetParticlePosition<PIdx>(pti);
             auto SetPosition = SetParticlePosition<PIdx>(pti);
-            amrex::XDim3 gridmin;
-            amrex::XDim3 gridmax;
+            amrex::XDim3 gridmin{};
+            amrex::XDim3 gridmax{};
 #ifndef WARPX_DIM_1D_Z
             gridmin.x = Geom(lev).ProbLo(0);
             gridmax.x = Geom(lev).ProbHi(0);

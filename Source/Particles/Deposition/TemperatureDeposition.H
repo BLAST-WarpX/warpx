@@ -329,9 +329,9 @@ void doVarianceDepositionShapeNKernel(
         const amrex::Real wpy_var = wp*sx_jy[ix];
         const amrex::Real wpz_var = wp*sx_jz[ix];
 
-        amrex::IntVectND<3> ixv{lo.x+j_jx+ix, 0, 0};
-        amrex::IntVectND<3> iyv{lo.x+j_jy+ix, 0, 0};
-        amrex::IntVectND<3> izv{lo.x+j_jz+ix, 0, 0};
+        amrex::IntVectND<3> const ixv{lo.x+j_jx+ix, 0, 0};
+        amrex::IntVectND<3> const iyv{lo.x+j_jy+ix, 0, 0};
+        amrex::IntVectND<3> const izv{lo.x+j_jz+ix, 0, 0};
 
         varianceDepositionSubKernel(
             vx, vy, vz,
@@ -480,8 +480,9 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     const amrex::IntVect & vary_type = vary_fab.box().type();
     const amrex::IntVect & varz_type = varz_fab.box().type();
 
-    // Loop over particles and deposit into the deposition buffers
-    amrex::ParallelFor(
+    // Loop over particles and deposit into the deposition buffers.
+    // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long ip) {
             amrex::ParticleReal xp, yp, zp;
