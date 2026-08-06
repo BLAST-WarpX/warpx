@@ -2609,8 +2609,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
     return mean_v;
 }
 
-amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::XDim3 dx,
-                                                             bool local) {
+amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(bool local) {
 
     constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
     ReduceOps<ReduceOpMax> reduce_op;
@@ -2639,6 +2638,8 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::XDim3 dx,
             const auto GetPosition = GetParticlePosition<PIdx>(pti);
 #endif
 
+            const XDim3 dxi = WarpX::InvCellSize(lev);
+
             reduce_op.eval(np, reduce_data,
                 [=] AMREX_GPU_DEVICE (int ip)
                 {
@@ -2648,15 +2649,15 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::XDim3 dx,
 
 #if defined(WARPX_DIM_3D)
                 const amrex::ParticleReal dt_inv = gaminv *
-                                                   std::max({std::abs(ux[ip]) / dx.x,
-                                                             std::abs(uy[ip]) / dx.y,
-                                                             std::abs(uz[ip]) / dx.z});
+                                                   std::max({std::abs(ux[ip]) * dxi.x,
+                                                             std::abs(uy[ip]) * dxi.y,
+                                                             std::abs(uz[ip]) * dxi.z});
 #elif defined(WARPX_DIM_XZ)
                 const amrex::ParticleReal dt_inv = gaminv *
-                                                   std::max(std::abs(ux[ip]) / dx.x,
-                                                            std::abs(uz[ip]) / dx.z);
+                                                   std::max(std::abs(ux[ip]) * dxi.x,
+                                                            std::abs(uz[ip]) * dxi.z);
 #elif defined(WARPX_DIM_1D_Z)
-                const amrex::ParticleReal dt_inv = gaminv * std::abs(uz[ip]) / dx.z;
+                const amrex::ParticleReal dt_inv = gaminv * std::abs(uz[ip]) * dxi.z;
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                 amrex::ParticleReal xp, yp, zp;
                 GetPosition(ip, xp, yp, zp);
@@ -2665,11 +2666,11 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::XDim3 dx,
                 const amrex::ParticleReal sinth = (rp > 0._rt ? yp/rp : 0._rt);
                 const amrex::ParticleReal ur = ux[ip]*costh + uy[ip]*sinth;
 #if defined(WARPX_DIM_RCYLINDER)
-                const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) / dx.x;
+                const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
 #else
                 const amrex::ParticleReal dt_inv = gaminv *
-                                                   std::max(std::abs(ur) / dx.x,
-                                                            std::abs(uz[ip]) / dx.z);
+                                                   std::max(std::abs(ur) * dxi.x,
+                                                            std::abs(uz[ip]) * dxi.z);
 #endif
 #elif defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal xp, yp, zp;
@@ -2681,7 +2682,7 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(amrex::XDim3 dx,
                 const amrex::ParticleReal cosph = (rp > 0._rt ? rpxy/rp : 1._rt);
                 const amrex::ParticleReal sinph = (rp > 0._rt ? zp/rp : 0._rt);
                 const amrex::ParticleReal ur = ux[ip]*costh*cosph + uy[ip]*sinth*cosph + uz[ip]*sinph;
-                const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) / dx.x;
+                const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
 #endif
                 return dt_inv;
                 });

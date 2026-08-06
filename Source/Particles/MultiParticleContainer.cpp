@@ -415,10 +415,10 @@ MultiParticleContainer::GetParticleContainerFromName (const std::string& name) c
 }
 
 amrex::ParticleReal
-MultiParticleContainer::maxParticleDtInv(amrex::XDim3 dx) {
+MultiParticleContainer::maxParticleDtInv() {
     amrex::ParticleReal max_dt_inv = 0.0_prt;
     for (const auto &pc : allcontainers) {
-        max_dt_inv = std::max(max_dt_inv, pc->maxParticleDtInv(dx));
+        max_dt_inv = std::max(max_dt_inv, pc->maxParticleDtInv());
     }
     return max_dt_inv;
 }

@@ -38,7 +38,6 @@
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
 #include <AMReX_Vector.H>
-#include <AMReX_Dim3.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -93,7 +92,7 @@ public:
         return allcontainers[index]->meanParticleVelocity();
     }
 
-    amrex::ParticleReal maxParticleDtInv(amrex::XDim3 dx);
+    amrex::ParticleReal maxParticleDtInv();
 
     void TransformMomentumToCurvilinear (bool forward);
 

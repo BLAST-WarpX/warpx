@@ -41,7 +41,6 @@
 #include <AMReX_REAL.H>
 #include <AMReX_StructOfArrays.H>
 #include <AMReX_Vector.H>
-#include <AMReX_Dim3.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -480,8 +479,7 @@ public:
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
-    amrex::ParticleReal maxParticleDtInv(amrex::XDim3 dx,
-                                         bool local = false);
+    amrex::ParticleReal maxParticleDtInv(bool local = false);
 
     /**
      * \brief Map the momentum of the particles to and from the curvilinear frame.
