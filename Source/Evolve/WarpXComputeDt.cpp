@@ -120,7 +120,12 @@ WarpX::ComputeDt ()
 amrex::Real
 WarpX::ParticleGridSpeedMax ()
 {
-    const amrex::Real* dx = geom[max_level].CellSize();
+    const auto dx_array = WarpX::CellSize(max_level);
+    amrex::XDim3 const dx{
+        dx_array[0],
+        dx_array[1],
+        dx_array[2]
+    };
     const amrex::ParticleReal max_dt_inv = mypc->maxParticleDtInv(dx);
 
     return max_dt_inv;

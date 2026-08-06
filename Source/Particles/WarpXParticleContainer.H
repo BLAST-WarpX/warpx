@@ -41,6 +41,7 @@
 #include <AMReX_REAL.H>
 #include <AMReX_StructOfArrays.H>
 #include <AMReX_Vector.H>
+#include <AMReX_XDim3.H>
 
 #include <AMReX_BaseFwd.H>
 #include <AMReX_AmrCoreFwd.H>
@@ -479,7 +480,7 @@ public:
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
-    amrex::ParticleReal maxParticleDtInv(amrex::Real const * dx,
+    amrex::ParticleReal maxParticleDtInv(amrex::XDim3 dx,
                                          bool local = false);
 
     /**

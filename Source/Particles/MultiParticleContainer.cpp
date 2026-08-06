@@ -71,6 +71,7 @@
 #include <AMReX_StructOfArrays.H>
 #include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
+#include <AMReX_XDim3.H>
 
 #include <algorithm>
 #include <cmath>
@@ -415,7 +416,7 @@ MultiParticleContainer::GetParticleContainerFromName (const std::string& name) c
 }
 
 amrex::ParticleReal
-MultiParticleContainer::maxParticleDtInv(amrex::Real const * const dx) {
+MultiParticleContainer::maxParticleDtInv(amrex::XDim3 dx) {
     amrex::ParticleReal max_dt_inv = 0.0_prt;
     for (const auto &pc : allcontainers) {
         max_dt_inv = std::max(max_dt_inv, pc->maxParticleDtInv(dx));
