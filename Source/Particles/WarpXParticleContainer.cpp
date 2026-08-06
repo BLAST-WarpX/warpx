@@ -2662,8 +2662,8 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(bool local) {
                 amrex::ParticleReal xp, yp, zp;
                 GetPosition(ip, xp, yp, zp);
                 const amrex::ParticleReal rp = std::sqrt(xp*xp + yp*yp);
-                const amrex::ParticleReal costh = (rp > 0._rt ? xp/rp : 1._rt);
-                const amrex::ParticleReal sinth = (rp > 0._rt ? yp/rp : 0._rt);
+                const amrex::ParticleReal costh = (rp > 0._prt ? xp/rp : 1._prt);
+                const amrex::ParticleReal sinth = (rp > 0._prt ? yp/rp : 0._prt);
                 const amrex::ParticleReal ur = ux[ip]*costh + uy[ip]*sinth;
 #if defined(WARPX_DIM_RCYLINDER)
                 const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
