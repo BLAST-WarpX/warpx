@@ -49,6 +49,7 @@ Checks: '
     performance-*,
         -performance-enum-size,
     portability-*,
+        -portability-template-virtual-member-function,
     readability-*,
         -readability-avoid-nested-conditional-operator,
         -readability-convert-member-functions-to-static,
