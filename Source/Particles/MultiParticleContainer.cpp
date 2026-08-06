@@ -71,7 +71,6 @@
 #include <AMReX_StructOfArrays.H>
 #include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
-#include <AMReX_XDim3.H>
 
 #include <algorithm>
 #include <cmath>
