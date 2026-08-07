@@ -92,8 +92,6 @@ void HybridPICModel::ReadParameters ()
     // preserves the legacy algebraic adiabatic closure.
     pp_hybrid.query("solve_electron_energy_equation",
                     m_solve_electron_energy_equation);
-    m_qdsmc_n_floor = m_n_floor;
-    pp_hybrid.query("qdsmc_n_floor", m_qdsmc_n_floor);
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_solve_electron_energy_equation,
@@ -428,9 +426,10 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     // Joules after ReadParameters, so dividing by k_B gives Kelvin). The
     // iter-0 diagnostic dump -- which WarpX::InitData() flushes BEFORE the
     // first field-solve -- then sees a meaningful T_e rather than the
-    // zero-initialized allocation. With the energy equation on, this is the
-    // starting K_e value the QDSMC particles will read on the first step;
-    // with it off, CalculateElectronPressure overwrites it each step.
+    // zero-initialized allocation. This value does not survive into the
+    // solve: CalculateElectronPressure overwrites T_e from the closure, both
+    // each step on the algebraic path and once from HybridPICInitializeRhoJandB
+    // (on the floored density) to seed the energy-equation path.
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         amrex::MultiFab & Te_mf = *warpx.m_fields.get(
             FieldType::hybrid_electron_temperature_fp, lev);
@@ -563,16 +562,16 @@ void HybridPICModel::HybridPICSolveE (
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
 }
 
-void HybridPICModel::CalculateElectronPressure() const
+void HybridPICModel::CalculateElectronPressure(bool const floor_density) const
 {
     auto& warpx = WarpX::GetInstance();
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
     {
-        CalculateElectronPressure(lev);
+        CalculateElectronPressure(lev, floor_density);
     }
 }
 
-void HybridPICModel::CalculateElectronPressure(const int lev) const
+void HybridPICModel::CalculateElectronPressure(const int lev, bool const floor_density) const
 {
     ABLASTR_PROFILE("WarpX::CalculateElectronPressure()");
 
@@ -585,9 +584,15 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
     FillElectronPressureMF(
         *electron_pressure_fp,
         *electron_temperature_fp,
-        *rho_fp
+        *rho_fp,
+        floor_density
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
+    ablastr::utils::communication::FillBoundary(
+        *electron_pressure_fp,
+        WarpX::do_single_precision_comms,
+        warpx.Geom(lev).periodicity(),
+        true);
 
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
@@ -599,12 +604,17 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
 void HybridPICModel::FillElectronPressureMF (
     amrex::MultiFab& Pe_field,
     amrex::MultiFab& Te_field,
-    amrex::MultiFab const& rho_field
+    amrex::MultiFab const& rho_field,
+    bool const floor_density
 ) const
 {
     const auto n0_ref = m_n0_ref;
     const auto elec_temp = m_elec_temp;
     const auto gamma_minus_1 = m_gamma - 1.0_rt;
+    // Only bites when floor_density is set: max(rho, 0) leaves every physical
+    // rho >= 0 bit-for-bit alone, so the algebraic-closure path is unchanged.
+    const auto rho_floor =
+        floor_density ? PhysConst::q_e * m_n_floor : amrex::Real(0.0);
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -618,13 +628,27 @@ void HybridPICModel::FillElectronPressureMF (
         Array4<Real> const& Pe = Pe_field.array(mfi);
 
         // Extract tileboxes for which to loop
-        const Box& tilebox  = mfi.tilebox();
+        Box tilebox = mfi.tilebox();
+        if (floor_density) {
+            // Cover the ghosts too, because this is the QDSMC seed:
+            // QDSMCInitializeKe reads T_e over its own ghost-grown box and
+            // hybrid_electron_temperature_fp is never FillBoundary'd anywhere,
+            // so the seed has to leave T_e's ghosts valid itself. rho's
+            // out-of-domain ghosts are 0, which the floor lifts to the same
+            // n_floor adiabat value the rest of the halo gets -- exactly the
+            // uniform K_e wanted there, instead of a K_e = 0 absorbing ring.
+            // P_e's ghosts come along for free; the caller's
+            // ApplyElectronPressureBoundary and FillBoundary then overwrite
+            // whichever of those they own.
+            tilebox.grow(Pe_field.nGrowVect());
+        }
 
         ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
             // Polytropic closure: T_e = T0 (n_e/n0)^(gamma-1), in the units of
             // elec_temp (Joules), with P_e = n_e T_e following from it. The
-            // "Te" diagnostic wants Kelvin.
-            const Real ne = rho(i, j, k) / PhysConst::q_e;
+            // "Te" diagnostic wants Kelvin. Flooring n_e once here keeps P_e
+            // and T_e consistent with each other.
+            const Real ne = std::max(rho(i, j, k), rho_floor) / PhysConst::q_e;
             const Real Te_joule = elec_temp * std::pow(ne/n0_ref, gamma_minus_1);
             Pe(i, j, k) = ne * Te_joule;
             Te(i, j, k) = Te_joule / PhysConst::kb;
@@ -799,11 +823,7 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
     // momentarily receives no deposit.
 
     auto const gamma      = m_gamma;
-    // Conversion floor: must match the floor QDSMCInitializeKe applies, so
-    // the K -> T_e round-trip is exact for a marker that stayed home.
     auto const n_floor    = m_n_floor;
-    // Deposited-weight guard: cells no QDSMC marker reached keep their T_e.
-    auto const w_floor    = m_qdsmc_n_floor;
     auto const kb_over_qe = PhysConst::kb / PhysConst::q_e;
 
 #ifdef AMREX_USE_OMP
@@ -822,7 +842,12 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
 
         amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            if (weights_arr(i,j,k) <= w_floor) { return; }
+            // Guard the division: a cell no QDSMC marker reached has exactly
+            // zero deposited weight and keeps its previous T_e. Cells that did
+            // receive weight are all updated, however small the deposit -- the
+            // (K*N)/N ratio is well conditioned there because numerator and
+            // denominator carry the same small factor.
+            if (weights_arr(i,j,k) <= 0.0_rt) { return; }
             amrex::Real const w = weights_arr(i,j,k) * cell_volume;
             // Floored density, mirroring QDSMCInitializeKe: below-floor
             // cells are updated too (insulating halo), and the K <-> T_e
@@ -1309,43 +1334,6 @@ void HybridPICModel::QDSMCFillElectronPressureFromTe (int const lev) const
             amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
             amrex::Real const ne      = rho_val / PhysConst::q_e;
             Pe_arr(i,j,k) = ne * PhysConst::kb * Te_arr(i,j,k);
-        });
-    }
-}
-
-
-void HybridPICModel::SeedTeAdiabat (int const lev) const
-{
-    ABLASTR_PROFILE("HybridPICModel::SeedTeAdiabat()");
-
-    auto & warpx = WarpX::GetInstance();
-
-    amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
-    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
-
-    auto const n0_ref    = m_n0_ref;
-    auto const gamma     = m_gamma;
-    auto const rho_floor = PhysConst::q_e * m_n_floor;
-    // m_elec_temp is k_B T_e0 [J]; the T_e field is in K.
-    auto const Te0_K     = m_elec_temp / PhysConst::kb;
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-    {
-        amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
-        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
-
-        amrex::Box const tbox = amrex::convert(mfi.tilebox(), Te.ixType().toIntVect());
-        amrex::Box       box  = tbox;
-        box.grow(Te.nGrowVect());
-
-        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            amrex::Real const ne =
-                amrex::max(rho_arr(i,j,k), rho_floor) / PhysConst::q_e;
-            Te_arr(i,j,k) = Te0_K * std::pow(ne / n0_ref, gamma - 1.0_rt);
         });
     }
 }

@@ -2158,13 +2158,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         (temperatures in eV) and ``t`` (time). Only used when
         ``solve_electron_energy_equation`` is True.
 
-    qdsmc_n_floor: float, optional
-        Deposited-weight threshold (in m^-3) for the QDSMC electron
-        temperature update: cells whose deposited marker weight is at or
-        below this value are skipped and keep their previous temperature
-        (the density floor used in the entropy <-> temperature conversion
-        itself is ``n_floor``). Defaults to ``n_floor``.
-
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full
         timestep (split evenly between the two half-steps, so ``substeps/2``
@@ -2270,7 +2263,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         include_joule_heating=None,
         joule_redirect_Te_threshold=None,
         electron_ion_relaxation_rate=None,
-        qdsmc_n_floor=None,
         substeps=None,
         use_rkf45=None,
         substep_rtol=None,
@@ -2300,7 +2292,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.include_joule_heating = include_joule_heating
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
-        self.qdsmc_n_floor = qdsmc_n_floor
 
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
@@ -2374,8 +2365,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                     self.electron_ion_relaxation_rate, self.mangle_dict
                 ),
             )
-        if self.qdsmc_n_floor is not None:
-            pywarpx.hybridpicmodel.qdsmc_n_floor = self.qdsmc_n_floor
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol

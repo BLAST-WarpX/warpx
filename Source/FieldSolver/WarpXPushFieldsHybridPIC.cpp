@@ -378,30 +378,11 @@ void WarpX::HybridPICInitializeRhoJandB ()
     // step. From the first step onward, HybridPICEvolveFields refreshes Pe
     // right after each deposition (via the closure, or via the QDSMC entropy
     // transport when solve_electron_energy_equation is on).
-    //
-    // With the energy equation on, seed T_e itself on the floored adiabat
-    // (uniform K_e -- the transport's zero-gradient state) and emit
-    // Pe = n_e k_B T_e from it, with the same boundary treatment
-    // CalculateElectronPressure applies. Calling the algebraic closure here
-    // instead would leave K_e ~ 0 across the floored halo (its T_e mirror
-    // divides by the floored density while the pressure uses the raw one),
-    // re-creating the absorbing edge on the first step. Note that T_e is not
-    // checkpointed either, so on restart the seed re-derives T_e from the
-    // restored rho: evolved T_e structure is not preserved across a restart.
-    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
-        for (int lev = 0; lev <= finest_level; ++lev) {
-            m_hybrid_pic_model->SeedTeAdiabat(lev);
-            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev);
-            ApplyElectronPressureBoundary(lev, PatchType::fine);
-            ablastr::utils::communication::FillBoundary(
-                *m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
-                do_single_precision_comms,
-                Geom(lev).periodicity(),
-                true);
-        }
-    } else {
-        m_hybrid_pic_model->CalculateElectronPressure();
-    }
+    // With the energy equation on the closure is evaluated on floored density.
+    // T_e is not checkpointed either, so on restart the seed re-derives it from
+    // the restored rho: evolved T_e structure is not preserved across a restart.
+    m_hybrid_pic_model->CalculateElectronPressure(
+        m_hybrid_pic_model->m_solve_electron_energy_equation);
 
     if (restart_chkfile.empty()) {
         // Handle field splitting for Hybrid field push

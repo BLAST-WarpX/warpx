@@ -3760,17 +3760,6 @@ Maxwell solver: kinetic-fluid hybrid
     (see the :ref:`theory section <theory-hybrid-model-electron-energy-eq>`), instead of evaluating the polytropic
     closure with the constant reference state :math:`(n_0, T_{e0})`.
 
-.. pp:param:: hybrid_pic_model.qdsmc_n_floor
-    :type: ``float``
-    :default: :pp:param:`hybrid_pic_model.n_floor`
-    :optional:
-
-    Deposited-weight threshold, in :math:`m^{-3}`, for the QDSMC electron-energy-equation update: cells whose
-    deposited marker weight is at or below this value are skipped and keep their previous electron temperature
-    (guarding the division by the deposited weight in cells no QDSMC marker reached). The density floor used in
-    the :math:`K_e \leftrightarrow T_e` conversion itself is :pp:param:`hybrid_pic_model.n_floor`.
-    Defaults to :pp:param:`hybrid_pic_model.n_floor`.
-
 .. pp:param:: hybrid_pic_model.include_joule_heating
     :type: ``bool``
     :default: ``false``
