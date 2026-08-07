@@ -518,7 +518,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                 for (PIter pti(pc, lev); pti.isValid(); ++pti) {
                     auto phiarr = (*distance_to_eb[lev])[pti].array();  // signed distance function
                     auto index = std::make_pair(pti.index(), pti.LocalTileIndex());
-                    if (plevel.find(index) == plevel.end()) { continue; }
+                    if (!plevel.contains(index)) { continue; }
 
                     const auto getPosition = GetParticlePosition<PIdx>(pti);
                     auto &ptile_buffer = species_buffer.DefineAndReturnParticleTile(lev, pti.index(),
