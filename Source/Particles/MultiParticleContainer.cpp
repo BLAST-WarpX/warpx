@@ -1246,6 +1246,19 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
+    // Insulating EB wall: collect particles a standoff band BEFORE the
+    // surface (no charge is ever deposited against the wall) and tally the
+    // collected charge/energy per species. Absorbing (default) keeps the
+    // historical phi < 0 scrape.
+    bool const insulating =
+        (WarpX::eb_boundary_type == EmbeddedBoundaryType::Insulating);
+    amrex::Real const standoff_cells =
+        insulating ? WarpX::eb_standoff_cells : amrex::Real(0.0);
+
+    if (insulating) {
+        TallyParticlesToBeCollectedAtEB(distance_to_eb, standoff_cells);
+    }
+
     if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting) {
         auto& warpx = WarpX::GetInstance();
         for (auto& pc : allcontainers) {
@@ -1258,9 +1271,122 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
         }
     } else {
         for (auto& pc : allcontainers) {
-            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb(),
+                                standoff_cells);
         }
     }
+}
+
+void MultiParticleContainer::TallyParticlesToBeCollectedAtEB (
+    ablastr::fields::MultiLevelScalarField const& distance_to_eb,
+    amrex::Real const standoff_cells)
+{
+    using namespace amrex::literals;
+
+    if (m_eb_collected_charge.empty()) {
+        m_eb_collected_charge.resize(nSpecies(), 0.0_rt);
+        m_eb_collected_energy.resize(nSpecies(), 0.0_rt);
+    }
+
+    amrex::Vector<amrex::Real> increments(2*nSpecies(), 0.0_rt);
+
+    for (int isp = 0; isp < nSpecies(); ++isp)
+    {
+        auto & pc = *allcontainers[isp];
+        amrex::ParticleReal const q = pc.getCharge();
+        amrex::ParticleReal const m = pc.getMass();
+        amrex::Real const inv_c2 = 1.0_rt / (PhysConst::c * PhysConst::c);
+
+        amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum> reduce_op;
+        amrex::ReduceData<amrex::Real, amrex::Real> reduce_data(reduce_op);
+        using ReduceTuple = typename decltype(reduce_data)::Type;
+
+        for (int lev = 0; lev <= pc.finestLevel(); ++lev)
+        {
+            const auto plo = pc.Geom(lev).ProbLoArray();
+            const auto dxi = pc.Geom(lev).InvCellSizeArray();
+            amrex::Real dx_max = pc.Geom(lev).CellSize(0);
+            for (int d = 1; d < AMREX_SPACEDIM; ++d) {
+                dx_max = std::max(dx_max, pc.Geom(lev).CellSize(d));
+            }
+            amrex::Real const phi_threshold = standoff_cells * dx_max;
+
+            // No OpenMP here: the tiles share one ReduceData.
+            for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti)
+            {
+                const auto getPosition = GetParticlePosition<PIdx>(pti);
+                auto& tile = pti.GetParticleTile();
+                auto ptd = tile.getParticleTileData();
+                const long np = tile.numParticles();
+                auto phi_arr = (*distance_to_eb[lev])[pti].array();
+                auto & soa = pti.GetStructOfArrays();
+                amrex::ParticleReal const * const AMREX_RESTRICT w_ptr  = soa.GetRealData(PIdx::w).data();
+                amrex::ParticleReal const * const AMREX_RESTRICT ux_ptr = soa.GetRealData(PIdx::ux).data();
+                amrex::ParticleReal const * const AMREX_RESTRICT uy_ptr = soa.GetRealData(PIdx::uy).data();
+                amrex::ParticleReal const * const AMREX_RESTRICT uz_ptr = soa.GetRealData(PIdx::uz).data();
+
+                reduce_op.eval(np, reduce_data,
+                    [=] AMREX_GPU_DEVICE (const long ip) -> ReduceTuple
+                    {
+                        if (!amrex::ConstParticleIDWrapper{ptd.m_idcpu[ip]}.is_valid()) {
+                            return {0.0_rt, 0.0_rt};
+                        }
+
+                        amrex::ParticleReal xp, yp, zp;
+                        getPosition(ip, xp, yp, zp);
+
+                        int i, j, k;
+                        amrex::Real W[AMREX_SPACEDIM][2];
+                        ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                            xp, yp, zp, plo, dxi, i, j, k, W);
+                        amrex::Real const phi =
+                            ablastr::particles::interp_field_nodal(i, j, k, W, phi_arr);
+                        if (phi >= phi_threshold) { return {0.0_rt, 0.0_rt}; }
+
+                        auto const w = static_cast<amrex::Real>(w_ptr[ip]);
+                        amrex::Real const charge = static_cast<amrex::Real>(q) * w;
+                        amrex::Real energy = 0.0_rt;
+                        if (m > 0.0_prt) {
+                            auto const ux = static_cast<amrex::Real>(ux_ptr[ip]);
+                            auto const uy = static_cast<amrex::Real>(uy_ptr[ip]);
+                            auto const uz = static_cast<amrex::Real>(uz_ptr[ip]);
+                            amrex::Real const u2 = ux*ux + uy*uy + uz*uz;
+                            amrex::Real const gamma = std::sqrt(1.0_rt + u2*inv_c2);
+                            // m c^2 (gamma - 1) = m u^2 / (gamma + 1), stable
+                            // for non-relativistic particles
+                            energy = w * static_cast<amrex::Real>(m) * u2 / (gamma + 1.0_rt);
+                        }
+                        return {charge, energy};
+                    });
+            }
+        }
+
+        ReduceTuple const r = reduce_data.value(reduce_op);
+        increments[2*isp]   = amrex::get<0>(r);
+        increments[2*isp+1] = amrex::get<1>(r);
+    }
+
+    amrex::ParallelDescriptor::ReduceRealSum(
+        increments.data(), static_cast<int>(increments.size()));
+
+    for (int isp = 0; isp < nSpecies(); ++isp) {
+        m_eb_collected_charge[isp] += increments[2*isp];
+        m_eb_collected_energy[isp] += increments[2*isp+1];
+    }
+}
+
+amrex::Real MultiParticleContainer::GetEBCollectedCharge (
+    const std::string& species_name) const
+{
+    if (m_eb_collected_charge.empty()) { return amrex::Real(0.0); }
+    return m_eb_collected_charge[getSpeciesID(species_name)];
+}
+
+amrex::Real MultiParticleContainer::GetEBCollectedEnergy (
+    const std::string& species_name) const
+{
+    if (m_eb_collected_energy.empty()) { return amrex::Real(0.0); }
+    return m_eb_collected_energy[getSpeciesID(species_name)];
 }
 
 #ifdef WARPX_QED

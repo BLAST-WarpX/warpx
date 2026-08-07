@@ -299,6 +299,23 @@ void WarpX::MakeWarpX ()
             eb_particle_boundary == ParticleBoundaryType::Absorbing ||
             eb_particle_boundary == ParticleBoundaryType::Reflecting,
             "boundary.particle_eb must be Absorbing or Reflecting");
+
+        // Embedded-boundary wall type. Defaults to Absorbing (the historical
+        // behavior); Insulating collects particles a standoff band before the
+        // surface and holds a zero-normal-gradient T_e/P_e fill into the band
+        // (hybrid electron energy equation).
+        pp_boundary.query_enum_case_insensitive("eb_type", eb_boundary_type);
+        if (eb_boundary_type == EmbeddedBoundaryType::Insulating) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                eb_particle_boundary == ParticleBoundaryType::Absorbing,
+                "boundary.eb_type = insulating is a collecting wall and "
+                "requires boundary.particle_eb = absorbing (the default)");
+            utils::parser::queryWithParser(
+                pp_boundary, "eb_standoff_cells", eb_standoff_cells);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                eb_standoff_cells >= 0.0,
+                "boundary.eb_standoff_cells must be >= 0");
+        }
     }
 
     CheckGriddingForRZSpectral();

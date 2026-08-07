@@ -3455,6 +3455,19 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         Whether to cover cells with multiple cuts.
         (If False, this will raise an error if some cells have multiple cuts)
 
+    eb_type: string, default=None
+        The embedded-boundary wall type, "absorbing" (the default behavior:
+        particles are collected at the surface) or "insulating" (a collecting
+        wall held off the plasma by a density standoff band: particles are
+        collected eb_standoff_cells cells before the surface, the collected
+        charge/energy is tallied per species, and with the hybrid electron
+        energy equation on, T_e is filled with zero normal gradient into
+        the band and the covered region each step).
+
+    eb_standoff_cells: float, default=None
+        Width of the insulating wall's standoff band, in cells (WarpX
+        default 2). Only used with eb_type="insulating".
+
     Parameters used in the analytic expressions should be given as additional keyword arguments.
 
     """
@@ -3468,6 +3481,8 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         stl_reverse_normal=False,
         potential=None,
         cover_multiple_cuts=None,
+        eb_type=None,
+        eb_standoff_cells=None,
         **kw,
     ):
         assert stl_file is None or implicit_function is None, Exception(
@@ -3495,6 +3510,9 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
         self.potential = potential
 
         self.cover_multiple_cuts = cover_multiple_cuts
+
+        self.eb_type = eb_type
+        self.eb_standoff_cells = eb_standoff_cells
 
         # Handle keyword arguments used in expressions
         self.user_defined_kw = {}
@@ -3529,6 +3547,11 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
             pywarpx.eb2.stl_reverse_normal = self.stl_reverse_normal
 
         pywarpx.eb2.cover_multiple_cuts = self.cover_multiple_cuts
+
+        if self.eb_type is not None:
+            pywarpx.boundary.eb_type = self.eb_type
+        if self.eb_standoff_cells is not None:
+            pywarpx.boundary.eb_standoff_cells = self.eb_standoff_cells
 
         if self.potential is not None:
             expression = pywarpx.my_constants.mangle_expression(

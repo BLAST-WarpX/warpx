@@ -239,6 +239,61 @@ public:
     void QDSMCUpdateTe (int lev) const;
 
     /**
+     * \brief Insulating EB wall: after the QDSMC scatter and before
+     *        QDSMCUpdateTe, fold the entropy deposit (K*N) that landed on
+     *        below-floor nodes back onto the open nodes next to them.
+     *
+     *        Entropy deposited on below-floor nodes is dead weight:
+     *        QDSMCUpdateTe's floor guard never recovers it and the next
+     *        QDSMCInitializeKe re-zeroes K_e there, so entropy carried into
+     *        the floored halo by the plasma-edge markers is dropped -- a
+     *        one-way energy drain out of the open set at every density-floor
+     *        boundary (measured on the standoff-disc instrument: -7.3e-2
+     *        relative over 16 steps AT REST). The fold moves each
+     *        below-floor node's deposited K*N equally onto the open nodes of
+     *        its 3^D-1 neighborhood (the reach of the order-1 deposit) and
+     *        clears the node, conserving the deposited entropy over the open
+     *        set (same instrument: -1.1e-4). The deposited weight N is NOT
+     *        folded: it is a marker-density estimate that the recovery
+     *        discards on below-floor nodes anyway, and importing it without
+     *        matching entropy dilutes the edge temperature (measured to make
+     *        the drift worse than no fold at all).
+     *
+     *        Below-floor nodes with no open neighbor are cleared without a
+     *        destination (their content is dropped, as before the fold);
+     *        covered nodes that sit above the floor (only reachable through
+     *        a pathological initial load) are left untouched.
+     *
+     *        Reads hybrid_rho_fp_temp (rho^n, the mask) and distance_to_eb;
+     *        rewrites hybrid_entropy_fp in place.
+     */
+    void QDSMCFoldInsulatingDeposits (int lev) const;
+
+    /**
+     * \brief Insulating EB wall: after QDSMCUpdateTe, fill T_e with zero
+     *        normal gradient into the standoff band and the EB-covered
+     *        region, so the P_e emitted downstream drives no spurious
+     *        grad-P_e electric field at the plasma edge.
+     *
+     *        The fill mask keys off the transport's own boundary set -- a
+     *        node is filled only if it is below the density floor
+     *        (m_qdsmc_n_floor on rho_fp, the QDSMCUpdateTe guard) or
+     *        EB-covered (distance_to_eb <= 0), AND within
+     *        (eb_standoff_cells + 1) cells of the surface. Live plasma nodes
+     *        are never touched (a geometry-based mask would rewrite
+     *        above-floor plasma-edge nodes each step and act as an energy
+     *        source/sink). Filling proceeds by onion-peel sweeps: each
+     *        masked node takes the average of its already-valid neighbors,
+     *        so the first band ring copies the plasma-edge T_e (the
+     *        zero-normal-gradient condition) and deeper rings follow.
+     *
+     *        Reads rho_fp and distance_to_eb; writes
+     *        hybrid_electron_temperature_fp (masked nodes only, ghosts
+     *        refreshed).
+     */
+    void QDSMCApplyInsulatingEBFill (int lev) const;
+
+    /**
      * \brief Resistive electron-heating source (see Phys. Plasmas 31, 012902 (2024), Eq. 12).
      *        Adds, per cell and per charged ion species,
      *           T_e += dt * (gamma-1) * Z_s e^2 eta n_s |dV|^2 / k_B,
@@ -329,7 +384,9 @@ public:
      *   2. QDSMCInitializeUe  (V_e from J_plasma and J_i)
      *   3. QDSMCInitializeKe  (K_e from T_e^n and rho^n)
      *   4. QDSMC particle SetV / SetK / PushX / DepositK / DepositField
+     *      (4b, insulating EB wall: QDSMCFoldInsulatingDeposits)
      *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
+     *      (5b, insulating EB wall: QDSMCApplyInsulatingEBFill)
      *   6. QDSMCAddJouleHeating (if m_include_joule_heating is on):
      *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2 -> T_e
      *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)

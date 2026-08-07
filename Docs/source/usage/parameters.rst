@@ -1031,6 +1031,37 @@ additionally define the electric potential at the embedded boundary with an anal
 
     * ``Reflecting``: Particles that reach the embedded boundary are specularly reflected back into the simulation domain
 
+.. pp:param:: boundary.eb_type
+    :type: ``string``
+    :default: ``absorbing``
+    :optional:
+
+    The embedded-boundary wall type. Options are:
+
+    * ``absorbing``: Particles are collected where they reach the embedded boundary surface. This is the default behavior.
+
+    * ``insulating``: A collecting wall held off the plasma by a maintained density standoff band.
+      Particles are collected where the signed distance to the embedded boundary falls below
+      :pp:param:`boundary.eb_standoff_cells` cells, so no charge is ever deposited against the wall,
+      and the collected charge and kinetic energy are tallied per species (accessible from Python
+      through ``warpx.get_eb_collected_charge(species_name)`` and ``warpx.get_eb_collected_energy(species_name)``).
+      With the hybrid-PIC electron energy equation
+      (:pp:param:`hybrid_pic_model.solve_electron_energy_equation`), the electron temperature is
+      additionally filled with zero normal gradient into the standoff band and the covered region
+      each step (so :math:`\nabla P_e` drives no spurious electric field at the plasma edge), and
+      the electron entropy deposited on below-floor nodes by the transport markers is folded back
+      onto the neighboring live-plasma nodes instead of being dropped (which is otherwise a
+      one-way energy drain at every density-floor boundary).
+      Requires ``boundary.particle_eb = absorbing``.
+
+.. pp:param:: boundary.eb_standoff_cells
+    :type: ``float``
+    :default: ``2.``
+    :optional:
+
+    Width of the insulating wall's standoff band, in cells (measured with the largest cell size
+    of the level). Only used with ``boundary.eb_type = insulating``.
+
 .. _param-particle-thermalizer:
 
 Particle thermalizer

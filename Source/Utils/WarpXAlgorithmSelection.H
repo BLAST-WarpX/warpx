@@ -149,6 +149,17 @@ AMREX_ENUM(ParticleBoundaryType,
            None,          //!< For r=0 boundary with RZ simulations
            Default = Absorbing);
 
+/** Embedded-boundary wall type
+ */
+AMREX_ENUM(EmbeddedBoundaryType,
+           Absorbing,     //!< particles are collected at the EB surface (default)
+           Insulating,    /**< collecting wall held off the plasma by a density standoff
+                             band: particles are collected `boundary.eb_standoff_cells`
+                             cells before the surface and, with the hybrid electron
+                             energy equation on, T_e/P_e are filled with zero normal
+                             gradient into the band and the covered region */
+           Default = Absorbing);
+
 /** MPI reductions
  */
 AMREX_ENUM(ReductionType,

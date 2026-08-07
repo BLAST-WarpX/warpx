@@ -850,6 +850,252 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
 }
 
 
+void HybridPICModel::QDSMCFoldInsulatingDeposits (int const lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCFoldInsulatingDeposits()");
+
+    auto & warpx = WarpX::GetInstance();
+    amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
+
+    amrex::MultiFab       & K     = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,        lev);
+    amrex::MultiFab const & rho_n = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp,       lev);
+    amrex::MultiFab const & phi   = *warpx.m_fields.get(FieldType::distance_to_eb,           lev);
+
+    // Only the deposited entropy K*N is folded. The deposited weight N is a
+    // marker-density estimate that the recovery discards on below-floor
+    // nodes anyway (the true density is the ion-deposited rho); folding it
+    // would import weight without matching entropy and dilute the edge
+    // temperature (measured: the N+K*N fold made the at-rest open-set
+    // entropy drift WORSE than no fold, -1.1e-1 vs -7.3e-2 per 16 steps on
+    // the standoff-disc instrument, while the K*N-only fold reduces it to
+    // -1.1e-4).
+    //
+    // Node classes: 0 = open (live plasma), 1 = foldable (below the floor:
+    // deposits here are dead weight, see the header doc), 2 = masked with
+    // unknown own content (covered but above the floor; only reachable
+    // through a pathological initial load -- neither folded from nor counted
+    // as a destination). Built once with two ghost nodes so the gather below
+    // never reads raw-field ghosts beyond their filled range;
+    // domain-exterior ghosts stay at class 2.
+    amrex::iMultiFab imask(K.boxArray(), K.DistributionMap(), 1, 2);
+    imask.setVal(2);
+
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(K, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<int>               const & m_arr   = imask.array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho_n.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & phi_arr = phi.const_array(mfi);
+
+        amrex::Box const box = amrex::convert(mfi.tilebox(), K.ixType().toIntVect());
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            bool const below_floor = (rho_arr(i,j,k) <= rho_floor);
+            bool const covered     = (phi_arr(i,j,k) <= 0.0_rt);
+            m_arr(i,j,k) = below_floor ? 1 : (covered ? 2 : 0);
+        });
+    }
+    imask.FillBoundary(period);
+
+    // Pure gather formulation: every node computes its own folded value from
+    // the (consistent) deposited data, so no atomics and no post-pass
+    // SumBoundary of increments are needed; box-seam copies of a node
+    // compute identical results from identical ghost data.
+    amrex::MultiFab K_new(K.boxArray(), K.DistributionMap(), 1, 0);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(K, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<amrex::Real>       const & Kn_arr  = K_new.array(mfi);
+        amrex::Array4<amrex::Real const> const & K_arr   = K.const_array(mfi);
+        amrex::Array4<int const>         const & m_arr   = imask.const_array(mfi);
+
+        amrex::Box const box = amrex::convert(mfi.tilebox(), K.ixType().toIntVect());
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            // Loop bounds of the 3^D-1 neighborhood (collapsed dims excluded)
+#if defined(WARPX_DIM_3D)
+            constexpr int jlo = -1; constexpr int jhi = 1;
+            constexpr int klo = -1; constexpr int khi = 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            constexpr int jlo = -1; constexpr int jhi = 1;
+            constexpr int klo =  0; constexpr int khi = 0;
+#else
+            constexpr int jlo =  0; constexpr int jhi = 0;
+            constexpr int klo =  0; constexpr int khi = 0;
+#endif
+
+            if (m_arr(i,j,k) == 1) {
+                // The entropy deposited here would be dropped by the
+                // QDSMCUpdateTe floor guard and re-zeroed by the next
+                // QDSMCInitializeKe: move it to the open neighbors instead
+                // (the fold below) and clear this node.
+                Kn_arr(i,j,k) = 0.0_rt;
+                return;
+            }
+            if (m_arr(i,j,k) == 2) {
+                Kn_arr(i,j,k) = K_arr(i,j,k);
+                return;
+            }
+
+            // Open node: reclaim the entropy of every foldable neighbor,
+            // split equally over that neighbor's open nodes.
+            amrex::Real k_gain = 0.0_rt;
+            for         (int kk = k+klo; kk <= k+khi; ++kk) {
+                for     (int jj = j+jlo; jj <= j+jhi; ++jj) {
+                    for (int ii = i-1;   ii <= i+1;   ++ii) {
+                        if (ii == i && jj == j && kk == k) { continue; }
+                        if (m_arr(ii,jj,kk) != 1) { continue; }
+
+                        int n_open = 0;
+                        for         (int k2 = kk+klo; k2 <= kk+khi; ++k2) {
+                            for     (int j2 = jj+jlo; j2 <= jj+jhi; ++j2) {
+                                for (int i2 = ii-1;   i2 <= ii+1;   ++i2) {
+                                    if (i2 == ii && j2 == jj && k2 == kk) { continue; }
+                                    if (m_arr(i2,j2,k2) == 0) { ++n_open; }
+                                }
+                            }
+                        }
+                        // n_open >= 1: this node is one of them
+                        k_gain += K_arr(ii,jj,kk) / n_open;
+                    }
+                }
+            }
+            Kn_arr(i,j,k) = K_arr(i,j,k) + k_gain;
+        });
+    }
+
+    amrex::MultiFab::Copy(K, K_new, 0, 0, 1, 0);
+    K.FillBoundary(K.nGrowVect(), period);
+}
+
+
+void HybridPICModel::QDSMCApplyInsulatingEBFill (int const lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::QDSMCApplyInsulatingEBFill()");
+
+    auto & warpx = WarpX::GetInstance();
+    amrex::Geometry const & geom = warpx.Geom(lev);
+    amrex::Periodicity const & period = geom.periodicity();
+
+    amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
+    amrex::MultiFab const & phi = *warpx.m_fields.get(FieldType::distance_to_eb,                 lev);
+
+    amrex::Real dx_max = geom.CellSize(0);
+    for (int d = 1; d < AMREX_SPACEDIM; ++d) {
+        dx_max = amrex::max(dx_max, geom.CellSize(d));
+    }
+    // Fill reach: the standoff band plus one ring of ramp spillover. Below-
+    // floor nodes farther from the wall keep the QDSMCUpdateTe stale-T_e
+    // semantics unchanged.
+    amrex::Real const band_bound = (WarpX::eb_standoff_cells + 1.0_rt) * dx_max;
+    int const n_sweeps =
+        static_cast<int>(std::ceil(WarpX::eb_standoff_cells)) + 3;
+
+    auto const n_floor = m_qdsmc_n_floor;
+
+    // status = 1: valid fill source (live plasma, or filled in an earlier
+    // sweep); 0: to fill. Ghosts outside the domain stay 0 and never donate.
+    amrex::iMultiFab status(amrex::convert(Te.boxArray(), Te.ixType().toIntVect()),
+                            Te.DistributionMap(), 1, 1);
+    status.setVal(0);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Array4<int>               const & st_arr  = status.array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & phi_arr = phi.const_array(mfi);
+
+        amrex::Box const box = amrex::convert(mfi.tilebox(), Te.ixType().toIntVect());
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+        {
+            bool const boundary_node =
+                (rho_arr(i,j,k) / PhysConst::q_e <= n_floor) ||
+                (phi_arr(i,j,k) <= 0.0_rt);
+            bool const to_fill = boundary_node && (phi_arr(i,j,k) <= band_bound);
+            st_arr(i,j,k) = to_fill ? 0 : 1;
+        });
+    }
+    status.FillBoundary(period);
+
+    amrex::MultiFab  Te_new(Te.boxArray(), Te.DistributionMap(), 1, 0);
+    amrex::iMultiFab st_new(status.boxArray(), status.DistributionMap(), 1, 0);
+
+    for (int sweep = 0; sweep < n_sweeps; ++sweep)
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real>       const & Tn_arr = Te_new.array(mfi);
+            amrex::Array4<int>               const & sn_arr = st_new.array(mfi);
+            amrex::Array4<amrex::Real const> const & T_arr  = Te.const_array(mfi);
+            amrex::Array4<int const>         const & s_arr  = status.const_array(mfi);
+
+            amrex::Box const box = amrex::convert(mfi.tilebox(), Te.ixType().toIntVect());
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                if (s_arr(i,j,k) == 1) {
+                    Tn_arr(i,j,k) = T_arr(i,j,k);
+                    sn_arr(i,j,k) = 1;
+                    return;
+                }
+#if defined(WARPX_DIM_3D)
+                constexpr int jlo = -1; constexpr int jhi = 1;
+                constexpr int klo = -1; constexpr int khi = 1;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                constexpr int jlo = -1; constexpr int jhi = 1;
+                constexpr int klo =  0; constexpr int khi = 0;
+#else
+                constexpr int jlo =  0; constexpr int jhi = 0;
+                constexpr int klo =  0; constexpr int khi = 0;
+#endif
+                amrex::Real t_sum = 0.0_rt;
+                int n_src = 0;
+                for         (int kk = k+klo; kk <= k+khi; ++kk) {
+                    for     (int jj = j+jlo; jj <= j+jhi; ++jj) {
+                        for (int ii = i-1;   ii <= i+1;   ++ii) {
+                            if (ii == i && jj == j && kk == k) { continue; }
+                            if (s_arr(ii,jj,kk) == 1) {
+                                t_sum += T_arr(ii,jj,kk);
+                                ++n_src;
+                            }
+                        }
+                    }
+                }
+                if (n_src > 0) {
+                    Tn_arr(i,j,k) = t_sum / n_src;
+                    sn_arr(i,j,k) = 1;
+                } else {
+                    Tn_arr(i,j,k) = T_arr(i,j,k);
+                    sn_arr(i,j,k) = 0;
+                }
+            });
+        }
+
+        amrex::MultiFab::Copy(Te, Te_new, 0, 0, 1, 0);
+        amrex::iMultiFab::Copy(status, st_new, 0, 0, 1, 0);
+        Te.FillBoundary(Te.nGrowVect(), period);
+        status.FillBoundary(period);
+    }
+}
+
+
 void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                                            amrex::MultiFab * const redirect_E) const
 {
@@ -1375,9 +1621,24 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
         m_qdsmc_pc->DepositK(lev, Karr_out);
         m_qdsmc_pc->DepositField(lev, weights_out);
 
+        // Steps 4b/5b (insulating EB wall only): fold the deposit spill that
+        // landed on below-floor/covered nodes back onto their open neighbors
+        // (4b, before the recovery drops it), and refill T_e with zero
+        // normal gradient into the standoff band and the covered region
+        // (5b, before P_e is emitted for the Ohm's-law solve).
+        bool const insulating_eb = EB::enabled() &&
+            (WarpX::eb_boundary_type == EmbeddedBoundaryType::Insulating);
+        if (insulating_eb) {
+            QDSMCFoldInsulatingDeposits(lev);
+        }
+
         // Step 5: recover T_e^{n+1} from (deposited K*N) / (deposited N) and
         // the updated n_e (from rho_fp = rho^{n+1}).
         QDSMCUpdateTe(lev);
+
+        if (insulating_eb) {
+            QDSMCApplyInsulatingEBFill(lev);
+        }
 
         // Step 6: Joule-heating source on T_e (Phys. Plasmas 31, 012902 (2024), Eq. 12), per-cell from
         // rho_fp(_s), the plasma current, and the Ohm's-law eta parser. With the

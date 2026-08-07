@@ -281,5 +281,21 @@ void init_WarpX (py::module& m)
             },
             "Gets the number of substeps to take in the hybrid solver."
         )
+        .def("get_eb_collected_charge",
+            [](WarpX& wx, std::string const& species_name) {
+                return wx.GetPartContainer().GetEBCollectedCharge(species_name);
+            },
+            py::arg("species_name"),
+            "Gets the cumulative charge [C] the given species has deposited "
+            "on the embedded boundary (insulating EB wall type only)."
+        )
+        .def("get_eb_collected_energy",
+            [](WarpX& wx, std::string const& species_name) {
+                return wx.GetPartContainer().GetEBCollectedEnergy(species_name);
+            },
+            py::arg("species_name"),
+            "Gets the cumulative kinetic energy [J] the given species has "
+            "deposited on the embedded boundary (insulating EB wall type only)."
+        )
     ;
 }

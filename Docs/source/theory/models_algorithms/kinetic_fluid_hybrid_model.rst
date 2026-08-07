@@ -203,6 +203,19 @@ The sink on the electron fluid is paired with a matching thermal-velocity
 kick on the ion macro-particles of each species so that the exchange
 conserves energy exactly.
 
+With an embedded boundary present, the recommended wall model for the energy
+equation is the insulating wall (``boundary.eb_type = insulating``): the
+plasma is held off the conductor by a maintained density standoff band
+(particles are collected ``boundary.eb_standoff_cells`` cells before the
+surface, with the collected charge and energy tallied per species), the
+electron temperature is filled with zero normal gradient into the band and
+the covered region each step, and the electron entropy the transport markers
+deposit on below-floor nodes is folded back onto the neighboring live-plasma
+nodes. Together these make the wall band insulating for the transported
+electron energy: without them, entropy dropped at the density-floor boundary
+acts as a one-way energy drain, and the stale temperature in the band lets
+:math:`\nabla P_e` drive a spurious electric field at the plasma edge.
+
 Verification tests of the transport terms (adiabatic compression), the Joule
 source (force-free field decay) and the :math:`Q_{ei}` exchange are described
 in the :ref:`examples section <examples-ohm-solver-electron-energy-eq>`.

@@ -223,6 +223,29 @@ public:
      */
     static inline ParticleBoundaryType eb_particle_boundary = ParticleBoundaryType::Absorbing;
 
+    /** Embedded-boundary wall type (`boundary.eb_type`).
+     *
+     *  Absorbing (default): particles are collected where the signed distance
+     *  to the EB crosses zero -- the historical behavior.
+     *
+     *  Insulating: a collecting wall held off the plasma by a maintained
+     *  density standoff band. Particles are collected `eb_standoff_cells`
+     *  cells before the surface (so no charge is ever deposited against the
+     *  wall), the collected charge and kinetic energy are tallied per
+     *  species, and -- with the hybrid electron energy equation on -- T_e is
+     *  filled with zero normal gradient into the band and the covered region
+     *  each step, so grad P_e drives no spurious E field at the plasma edge.
+     */
+    static inline auto eb_boundary_type = EmbeddedBoundaryType::Absorbing;
+
+    /** Width of the insulating-wall standoff band, in cells
+     *  (`boundary.eb_standoff_cells`): particles are collected where the
+     *  signed distance to the EB falls below this many cells (times the
+     *  largest cell size of the level). Only used with
+     *  `boundary.eb_type = insulating`.
+     */
+    static inline amrex::Real eb_standoff_cells = amrex::Real(2.0);
+
     //! Integers that correspond to the time dependency of J (constant, linear)
     //! and rho (linear, quadratic) for the PSATD algorithm
     static inline auto time_dependency_J = TimeDependencyJ::Default;
