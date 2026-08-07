@@ -5339,6 +5339,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
 
         In practice, the above expression of the differential luminosity is evaluated over discrete bins in energy :math:`\mathcal{E}^*`,
         and by summing over macroparticles.
+        The text output contains step, time, the binned differential luminosity values, and a final total luminosity column accumulated over all particle pairs regardless of the binning range.
 
         * ``<reduced_diags_name>.species`` (``list of two strings``)
             The names of the two species for which the differential luminosity is computed.
