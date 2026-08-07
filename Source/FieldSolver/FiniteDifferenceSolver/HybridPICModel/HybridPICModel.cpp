@@ -604,7 +604,7 @@ void HybridPICModel::FillElectronPressureMF (
 {
     const auto n0_ref = m_n0_ref;
     const auto elec_temp = m_elec_temp;
-    const auto gamma = m_gamma;
+    const auto gamma_minus_1 = m_gamma - 1.0_rt;
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -621,13 +621,11 @@ void HybridPICModel::FillElectronPressureMF (
         const Box& tilebox  = mfi.tilebox();
 
         ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-            // The closure gives the electron temperature in Joules (the units
-            // of elec_temp); P_e = n_e T_e follows from it, but the "Te"
-            // diagnostic wants Kelvin.
+            // Polytropic closure: T_e = T0 (n_e/n0)^(gamma-1), in the units of
+            // elec_temp (Joules), with P_e = n_e T_e following from it. The
+            // "Te" diagnostic wants Kelvin.
             const Real ne = rho(i, j, k) / PhysConst::q_e;
-            const Real Te_joule = ElectronPressure::get_temperature(
-                n0_ref, elec_temp, gamma, ne
-            );
+            const Real Te_joule = elec_temp * std::pow(ne/n0_ref, gamma_minus_1);
             Pe(i, j, k) = ne * Te_joule;
             Te(i, j, k) = Te_joule / PhysConst::kb;
         });

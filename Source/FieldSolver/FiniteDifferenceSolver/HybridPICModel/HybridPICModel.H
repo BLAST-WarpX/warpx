@@ -507,33 +507,4 @@ public:
     std::unique_ptr<QdsmcParticleContainer> m_qdsmc_pc;
 };
 
-/**
- * \brief
- * This struct contains only static functions to compute the electron pressure
- * using the particle density at a given point and the user provided reference
- * density and temperatures.
- */
-struct ElectronPressure {
-
-    /** Electron temperature implied by the polytropic closure,
-     *  T_e = T0 (n_e/n0)^(gamma-1), returned in the units of T0. */
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static amrex::Real get_temperature (amrex::Real const n0,
-                                        amrex::Real const T0,
-                                        amrex::Real const gamma,
-                                        amrex::Real const ne) {
-        return T0 * std::pow(ne/n0, gamma - amrex::Real(1.0));
-    }
-
-    /** Electron pressure P_e = n_e T_e = n0 T0 (n_e/n0)^gamma, in the units
-     *  of n0 T0. */
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static amrex::Real get_pressure (amrex::Real const n0,
-                                     amrex::Real const T0,
-                                     amrex::Real const gamma,
-                                     amrex::Real const ne) {
-        return ne * get_temperature(n0, T0, gamma, ne);
-    }
-};
-
 #endif // WARPX_HYBRIDPICMODEL_H_
