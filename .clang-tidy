@@ -34,6 +34,7 @@ Checks: '
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
         -misc-include-cleaner,
+        -misc-redundant-expression,
         -misc-use-internal-linkage,
     modernize-*,
         -modernize-avoid-c-arrays,
@@ -49,6 +50,7 @@ Checks: '
     performance-*,
         -performance-enum-size,
     portability-*,
+        -portability-template-virtual-member-function,
     readability-*,
         -readability-avoid-nested-conditional-operator,
         -readability-convert-member-functions-to-static,
@@ -92,6 +94,7 @@ HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 
 # TODO Consider enabling the following checks:
 # -bugprone-unused-local-non-trivial-variable
+# -misc-redundant-expression
 # -misc-use-internal-linkage
 # -performance-enum-size
 # -readability-container-contains
