@@ -577,44 +577,17 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
     ABLASTR_PROFILE("WarpX::CalculateElectronPressure()");
 
     auto& warpx = WarpX::GetInstance();
+    ablastr::fields::ScalarField electron_temperature_fp = warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     ablastr::fields::ScalarField electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
     ablastr::fields::ScalarField rho_fp = warpx.m_fields.get(FieldType::rho_fp, lev);
 
-    // Calculate the electron pressure using rho^{n+1}.
+    // Calculate the electron pressure (and its implied temperature) using rho^{n+1}.
     FillElectronPressureMF(
         *electron_pressure_fp,
+        *electron_temperature_fp,
         *rho_fp
     );
     warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
-
-    // Mirror the closure's implied electron temperature,
-    // T_e = P_e / (n_e k_B), into hybrid_electron_temperature_fp so the "Te"
-    // diagnostic is meaningful. Diagnostic-only on this path: with
-    // solve_electron_energy_equation on, this function is not called and
-    // T_e is owned by the QDSMC entropy transport, which fills Te/Pe at
-    // this same point in the field loop.
-    {
-        amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
-        amrex::MultiFab const & Pe  = *electron_pressure_fp;
-        amrex::MultiFab const & rho = *rho_fp;
-        auto const rho_floor = PhysConst::q_e * m_n_floor;
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
-        {
-            amrex::Array4<amrex::Real>       const & Te_arr  = Te.array(mfi);
-            amrex::Array4<amrex::Real const> const & Pe_arr  = Pe.const_array(mfi);
-            amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
-            amrex::Box const & tbox = mfi.tilebox();
-            amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
-                amrex::Real const ne      = rho_val / PhysConst::q_e;
-                Te_arr(i,j,k) = Pe_arr(i,j,k) / (ne * PhysConst::kb);
-            });
-        }
-    }
 
     ablastr::utils::communication::FillBoundary(
         *electron_pressure_fp,
@@ -625,12 +598,13 @@ void HybridPICModel::CalculateElectronPressure(const int lev) const
 
 void HybridPICModel::FillElectronPressureMF (
     amrex::MultiFab& Pe_field,
+    amrex::MultiFab& Te_field,
     amrex::MultiFab const& rho_field
 ) const
 {
     const auto n0_ref = m_n0_ref;
     const auto elec_temp = m_elec_temp;
-    const auto gamma = m_gamma;
+    const auto gamma_minus_1 = m_gamma - 1.0_rt;
 
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
@@ -640,15 +614,20 @@ void HybridPICModel::FillElectronPressureMF (
     {
         // Extract field data for this grid/tile
         Array4<Real const> const& rho = rho_field.const_array(mfi);
+        Array4<Real> const& Te = Te_field.array(mfi);
         Array4<Real> const& Pe = Pe_field.array(mfi);
 
         // Extract tileboxes for which to loop
         const Box& tilebox  = mfi.tilebox();
 
         ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-            Pe(i, j, k) = ElectronPressure::get_pressure(
-                n0_ref, elec_temp, gamma, rho(i, j, k)
-            );
+            // Polytropic closure: T_e = T0 (n_e/n0)^(gamma-1), in the units of
+            // elec_temp (Joules), with P_e = n_e T_e following from it. The
+            // "Te" diagnostic wants Kelvin.
+            const Real ne = rho(i, j, k) / PhysConst::q_e;
+            const Real Te_joule = elec_temp * std::pow(ne/n0_ref, gamma_minus_1);
+            Pe(i, j, k) = ne * Te_joule;
+            Te(i, j, k) = Te_joule / PhysConst::kb;
         });
     }
 }

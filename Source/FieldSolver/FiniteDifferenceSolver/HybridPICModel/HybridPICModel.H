@@ -195,13 +195,20 @@ public:
     /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
-     * specified electron equation of state.
+     * specified electron equation of state. The closure's electron temperature,
+     * T_e = T0 (n_e/n0)^(gamma-1), is filled at the same time (P_e = n_e T_e
+     * is formed from it). That T_e is diagnostic-only on this path: with
+     * solve_electron_energy_equation on, this function is not called and
+     * T_e is owned by the QDSMC entropy transport, which fills Te/Pe at
+     * this same point in the field loop.
      *
      * \param[out] Pe_field scalar electron pressure MultiFab at a given level
+     * \param[out] Te_field scalar electron temperature MultiFab (in Kelvin) at a given level
      * \param[in] rho_field scalar ion charge density Multifab at a given level
      */
     void FillElectronPressureMF (
         amrex::MultiFab& Pe_field,
+        amrex::MultiFab& Te_field,
         amrex::MultiFab const& rho_field ) const;
 
     /**
@@ -498,23 +505,6 @@ public:
      *  because its lifetime is tied to the electron-energy equation that
      *  the hybrid model is responsible for. */
     std::unique_ptr<QdsmcParticleContainer> m_qdsmc_pc;
-};
-
-/**
- * \brief
- * This struct contains only static functions to compute the electron pressure
- * using the particle density at a given point and the user provided reference
- * density and temperatures.
- */
-struct ElectronPressure {
-
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static amrex::Real get_pressure (amrex::Real const n0,
-                                     amrex::Real const T0,
-                                     amrex::Real const gamma,
-                                     amrex::Real const rho) {
-        return n0 * T0 * std::pow((rho/PhysConst::q_e)/n0, gamma);
-    }
 };
 
 #endif // WARPX_HYBRIDPICMODEL_H_
