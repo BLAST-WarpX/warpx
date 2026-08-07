@@ -2659,12 +2659,9 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(bool local) {
 #elif defined(WARPX_DIM_1D_Z)
                 const amrex::ParticleReal dt_inv = gaminv * std::abs(uz[ip]) * dxi.z;
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                amrex::ParticleReal xp, yp, zp;
-                GetPosition(ip, xp, yp, zp);
-                const amrex::ParticleReal rp = std::sqrt(xp*xp + yp*yp);
-                const amrex::ParticleReal costh = (rp > 0._prt ? xp/rp : 1._prt);
-                const amrex::ParticleReal sinth = (rp > 0._prt ? yp/rp : 0._prt);
-                const amrex::ParticleReal ur = ux[ip]*costh + uy[ip]*sinth;
+                amrex::ParticleReal rp, tp, zp;
+                GetPosition.AsStored(ip, rp, tp, zp);
+                const amrex::ParticleReal ur = ux[ip]*std::cos(tp) + uy[ip]*std::sin(tp);
 #if defined(WARPX_DIM_RCYLINDER)
                 const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
 #else
@@ -2673,14 +2670,12 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(bool local) {
                                                               std::abs(uz[ip]) * dxi.z);
 #endif
 #elif defined(WARPX_DIM_RSPHERE)
-                amrex::ParticleReal xp, yp, zp;
-                GetPosition(ip, xp, yp, zp);
-                const amrex::ParticleReal rpxy = std::sqrt(xp*xp + yp*yp);
-                const amrex::ParticleReal rp = std::sqrt(xp*xp + yp*yp + zp*zp);
-                const amrex::ParticleReal costh = (rpxy > 0._prt ? xp/rpxy : 1._prt);
-                const amrex::ParticleReal sinth = (rpxy > 0._prt ? yp/rpxy : 0._prt);
-                const amrex::ParticleReal cosph = (rp > 0._prt ? rpxy/rp : 1._prt);
-                const amrex::ParticleReal sinph = (rp > 0._prt ? zp/rp : 0._prt);
+                amrex::ParticleReal rp, tp, pp;
+                GetPosition.AsStored(ip, rp, tp, pp);
+                const amrex::ParticleReal costh = std::cos(tp);
+                const amrex::ParticleReal sinth = std::sin(tp);
+                const amrex::ParticleReal cosph = std::cos(pp);
+                const amrex::ParticleReal sinph = std::sin(pp);
                 const amrex::ParticleReal ur = ux[ip]*costh*cosph + uy[ip]*sinth*cosph + uz[ip]*sinph;
                 const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
 #endif
