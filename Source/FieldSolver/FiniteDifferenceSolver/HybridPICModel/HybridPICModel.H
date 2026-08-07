@@ -195,13 +195,20 @@ public:
     /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
-     * specified electron equation of state.
+     * specified electron equation of state. The closure's electron temperature,
+     * T_e = T0 (n_e/n0)^(gamma-1), is filled at the same time (P_e = n_e T_e
+     * is formed from it). That T_e is diagnostic-only on this path: with
+     * solve_electron_energy_equation on, this function is not called and
+     * T_e is owned by the QDSMC entropy transport, which fills Te/Pe at
+     * this same point in the field loop.
      *
      * \param[out] Pe_field scalar electron pressure MultiFab at a given level
+     * \param[out] Te_field scalar electron temperature MultiFab (in Kelvin) at a given level
      * \param[in] rho_field scalar ion charge density Multifab at a given level
      */
     void FillElectronPressureMF (
         amrex::MultiFab& Pe_field,
+        amrex::MultiFab& Te_field,
         amrex::MultiFab const& rho_field ) const;
 
     /**
@@ -508,12 +515,24 @@ public:
  */
 struct ElectronPressure {
 
+    /** Electron temperature implied by the polytropic closure,
+     *  T_e = T0 (n_e/n0)^(gamma-1), returned in the units of T0. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real get_temperature (amrex::Real const n0,
+                                        amrex::Real const T0,
+                                        amrex::Real const gamma,
+                                        amrex::Real const ne) {
+        return T0 * std::pow(ne/n0, gamma - amrex::Real(1.0));
+    }
+
+    /** Electron pressure P_e = n_e T_e = n0 T0 (n_e/n0)^gamma, in the units
+     *  of n0 T0. */
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real get_pressure (amrex::Real const n0,
                                      amrex::Real const T0,
                                      amrex::Real const gamma,
-                                     amrex::Real const rho) {
-        return n0 * T0 * std::pow((rho/PhysConst::q_e)/n0, gamma);
+                                     amrex::Real const ne) {
+        return ne * get_temperature(n0, T0, gamma, ne);
     }
 };
 
