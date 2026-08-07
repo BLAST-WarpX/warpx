@@ -2654,8 +2654,8 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(bool local) {
                                                              std::abs(uz[ip]) * dxi.z});
 #elif defined(WARPX_DIM_XZ)
                 const amrex::ParticleReal dt_inv = gaminv *
-                                                   std::max(std::abs(ux[ip]) * dxi.x,
-                                                            std::abs(uz[ip]) * dxi.z);
+                                                   amrex::max(std::abs(ux[ip]) * dxi.x,
+                                                              std::abs(uz[ip]) * dxi.z);
 #elif defined(WARPX_DIM_1D_Z)
                 const amrex::ParticleReal dt_inv = gaminv * std::abs(uz[ip]) * dxi.z;
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
