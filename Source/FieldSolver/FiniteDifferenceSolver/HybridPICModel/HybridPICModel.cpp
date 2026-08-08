@@ -593,12 +593,6 @@ void HybridPICModel::CalculateElectronPressure(const int lev, bool const floor_d
         WarpX::do_single_precision_comms,
         warpx.Geom(lev).periodicity(),
         true);
-
-    ablastr::utils::communication::FillBoundary(
-        *electron_pressure_fp,
-        WarpX::do_single_precision_comms,
-        warpx.Geom(lev).periodicity(),
-        true);
 }
 
 void HybridPICModel::FillElectronPressureMF (
@@ -629,19 +623,11 @@ void HybridPICModel::FillElectronPressureMF (
 
         // Extract tileboxes for which to loop
         Box tilebox = mfi.tilebox();
-        if (floor_density) {
-            // Cover the ghosts too, because this is the QDSMC seed:
-            // QDSMCInitializeKe reads T_e over its own ghost-grown box and
-            // hybrid_electron_temperature_fp is never FillBoundary'd anywhere,
-            // so the seed has to leave T_e's ghosts valid itself. rho's
-            // out-of-domain ghosts are 0, which the floor lifts to the same
-            // n_floor adiabat value the rest of the halo gets -- exactly the
-            // uniform K_e wanted there, instead of a K_e = 0 absorbing ring.
-            // P_e's ghosts come along for free; the caller's
-            // ApplyElectronPressureBoundary and FillBoundary then overwrite
-            // whichever of those they own.
-            tilebox.grow(Pe_field.nGrowVect());
-        }
+        // Cover the ghosts too.
+        // QDSMCInitializeKe reads T_e over its own ghost-grown box 
+        // so the seed has to leave T_e's ghosts valid itself. 
+        // Out-of-domain ghosts are handled at the density floor.
+        tilebox.grow(Pe_field.nGrowVect());
 
         ParallelFor(tilebox, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
             // Polytropic closure: T_e = T0 (n_e/n0)^(gamma-1), in the units of
