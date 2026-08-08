@@ -186,11 +186,22 @@ public:
 
     /**
      * \brief
-     * Function to calculate the electron pressure using the simulation charge
-     * density. Used in the Ohm's law solver (kinetic-fluid hybrid model).
+     * Function to calculate the electron pressure, and the closure's electron
+     * temperature alongside it, from the simulation charge density. Used in the
+     * Ohm's law solver (kinetic-fluid hybrid model).
+     *
+     * \param[in] floor_density if true, evaluate the closure on the floored
+     *            density max(n_e, n_floor) instead of the raw n_e, so T_e
+     *            flattens to T_e0 (n_floor/n0)^(gamma-1) below the floor rather
+     *            than decaying towards zero with n_e. The QDSMC electron-energy
+     *            equation needs that flattened state from its seed: it is the
+     *            transport's zero-gradient state (K_e uniform, floored halo
+     *            included), whereas a halo whose T_e decays to ~0 acts as an
+     *            absorbing K_e = 0 boundary. Off by default, leaving the
+     *            algebraic closure path evaluated on the raw density.
      */
-    void CalculateElectronPressure () const;
-    void CalculateElectronPressure (int lev) const;
+    void CalculateElectronPressure (bool floor_density = false) const;
+    void CalculateElectronPressure (int lev, bool floor_density = false) const;
 
     /**
      * \brief Fill the electron pressure multifab given the kinetic particle
@@ -205,11 +216,14 @@ public:
      * \param[out] Pe_field scalar electron pressure MultiFab at a given level
      * \param[out] Te_field scalar electron temperature MultiFab (in Kelvin) at a given level
      * \param[in] rho_field scalar ion charge density Multifab at a given level
+     * \param[in] floor_density evaluate the closure at max(rho, q_e n_floor)
+     *            instead of rho
      */
     void FillElectronPressureMF (
         amrex::MultiFab& Pe_field,
         amrex::MultiFab& Te_field,
-        amrex::MultiFab const& rho_field ) const;
+        amrex::MultiFab const& rho_field,
+        bool floor_density = false ) const;
 
     /**
      * \brief Fill the nodal V_e = -(J_plasma - J_i) / (q_e n_e) MultiFabs by
@@ -225,8 +239,10 @@ public:
 
     /**
      * \brief Fill the nodal K_e = T_e * n_e^(1-gamma) * (k_B / q_e) MultiFab
-     *        from the current T_e and rho_fp_temp (= rho at n+1/2). Cells with
-     *        rho <= rho_floor are left at 0.
+     *        from the current T_e and rho_fp_temp (= rho at n+1/2), using the
+     *        floored density max(n_e, n_floor) so below-floor (halo) cells
+     *        carry a valid K_e instead of acting as an absorbing K_e = 0
+     *        boundary.
      *
      *        Reads hybrid_electron_temperature_fp (T_e in K) and
      *        hybrid_rho_fp_temp; writes hybrid_entropy_fp.
@@ -237,9 +253,10 @@ public:
      * \brief After the QDSMC scatter, recover T_e^{n+1} from
      *           T_e = (deposited K*N) / (deposited N) / n_e^(1-gamma)
      *                 / (k_B / q_e)
-     *        using rho at n+1 (rho_fp), the deposited entropy field
-     *        (hybrid_entropy_fp), and the deposited weight field
-     *        (hybrid_qdsmc_weights_fp).
+     *        using the floored density max(n_e, n_floor) from rho at n+1
+     *        (rho_fp), the deposited entropy field (hybrid_entropy_fp), and
+     *        the deposited weight field (hybrid_qdsmc_weights_fp). Cells that
+     *        received no deposited weight keep their previous T_e.
      *
      *        Writes hybrid_electron_temperature_fp.
      */
@@ -370,7 +387,8 @@ public:
 
     bool m_holmstrom_vacuum_region = false;
 
-    /** Electron temperature in eV */
+    /** Electron temperature: read from the input in eV, converted to
+     * k_B T_e in J at the end of ReadParameters. */
     amrex::Real m_elec_temp;
     /** Reference electron density */
     amrex::Real m_n0_ref = 1.0;
@@ -427,12 +445,6 @@ public:
     std::string m_nu_ei_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_nu_ei_parser;
     amrex::ParserExecutor<4> m_nu_ei;
-
-    /** Density floor used when dividing by the deposited QDSMC weight to
-     * recover K_e^{n+1} from (K*N) / N. Avoids divide-by-zero in cells
-     * that no QDSMC particle reached during the push. Defaults to the
-     * same floor as the rest of the hybrid solver. */
-    amrex::Real m_qdsmc_n_floor = 1.0;
 
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;
