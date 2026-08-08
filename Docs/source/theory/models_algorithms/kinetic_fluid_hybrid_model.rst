@@ -203,9 +203,10 @@ The sink on the electron fluid is paired with a matching thermal-velocity
 kick on the ion macro-particles of each species so that the exchange
 conserves energy exactly.
 
-Verification tests of the transport terms (adiabatic compression), the Joule
-source (force-free field decay) and the :math:`Q_{ei}` exchange are described
-in the :ref:`examples section <examples-ohm-solver-electron-energy-eq>`.
+Verification tests of the transport terms (adiabatic compression, and slab
+transport through a below-floor halo), the Joule source (force-free field
+decay) and the :math:`Q_{ei}` exchange are described in the
+:ref:`examples section <examples-ohm-solver-electron-energy-eq>`.
 
 Electron current
 ^^^^^^^^^^^^^^^^
