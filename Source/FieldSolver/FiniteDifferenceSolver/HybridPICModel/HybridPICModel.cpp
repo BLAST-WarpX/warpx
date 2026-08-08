@@ -624,8 +624,8 @@ void HybridPICModel::FillElectronPressureMF (
         // Extract tileboxes for which to loop
         Box tilebox = mfi.tilebox();
         // Cover the ghosts too.
-        // QDSMCInitializeKe reads T_e over its own ghost-grown box 
-        // so the seed has to leave T_e's ghosts valid itself. 
+        // QDSMCInitializeKe reads T_e over its own ghost-grown box
+        // so the seed has to leave T_e's ghosts valid itself.
         // Out-of-domain ghosts are handled at the density floor.
         tilebox.grow(Pe_field.nGrowVect());
 
