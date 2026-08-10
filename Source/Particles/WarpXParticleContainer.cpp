@@ -160,10 +160,9 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies,
 void
 WarpXParticleContainer::ReadParameters ()
 {
-    // note: no static "read once" guard here. do_tiling is a static of the
+    // do_tiling is a static of the
     // AMReX particle container base, so a process-lifetime guard would make
-    // every WarpX instance after the first ignore particles.do_tiling. The
-    // query itself is cheap.
+    // every WarpX instance after the first ignore particles.do_tiling.
     const ParmParse pp_particles("particles");
     pp_particles.query("do_tiling", do_tiling);
 }
