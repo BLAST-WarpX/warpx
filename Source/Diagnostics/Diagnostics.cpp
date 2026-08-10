@@ -82,6 +82,10 @@ Diagnostics::BaseReadParameters ()
         }
     }
 
+    amrex::Vector< std::string > additional_varnames_fields;
+    pp_diag_name.queryarr("additional_fields_to_plot", additional_varnames_fields);
+    m_varnames_fields.insert(m_varnames_fields.end(), additional_varnames_fields.begin(), additional_varnames_fields.end());
+
     // Sanity check if user requests to plot phi
     if (utils::algorithms::is_in(m_varnames_fields, "phi") && (
             WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrame &&

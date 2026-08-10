@@ -96,6 +96,7 @@ examples below were generated at that time.
    examples/ohm_solver_em_modes/README.rst
    examples/ohm_solver_ion_beam_instability/README.rst
    examples/ohm_solver_ion_Landau_damping/README.rst
+   examples/ohm_solver_electron_energy_eq/README.rst
 
 
 High-Performance Computing and Numerics

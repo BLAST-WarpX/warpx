@@ -897,6 +897,36 @@ public:
         const ablastr::fields::MultiLevelVectorField& mfvec,
         int lev);
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    /** Charge/current-conserving binomial smoothing in radial geometry.
+     *
+     * Filtering a density with the plain index-space binomial stencil does
+     * not conserve its volume integral on cells of unequal volume (and an
+     * extensive-quantity variant piles charge onto the small axis cells
+     * instead). This applies the binomial passes in flux form -- the
+     * discrete divergence of a two-point diffusive flux with face-averaged
+     * volume factors (conventions of the inverse-volume-scaling routines),
+     * which conserves the volume integral exactly, leaves constants
+     * untouched, has zero flux through the axis, and reduces to the
+     * standard bilinear filter where the volumes are uniform. */
+    /** \returns the guard-cell width over which dst holds filtered data. */
+    amrex::IntVect ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
+                                    int lev, int scomp, int dcomp, int ncomp);
+#endif
+
+    /** Filter a current density. In radial geometries this dispatches to
+     * the volume-weighted (charge/current conserving) filter; in Cartesian
+     * geometries the cell volumes are uniform and it reduces to
+     * ApplyFilterMF. */
+    void ApplyFilterJ (
+        const ablastr::fields::MultiLevelVectorField& current,
+        int lev,
+        int idim);
+
+    void ApplyFilterJ (
+        const ablastr::fields::MultiLevelVectorField& current,
+        int lev);
+
     // Device vectors of stencil coefficients used for finite-order centering of fields
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_x;
     amrex::Gpu::DeviceVector<amrex::Real> device_field_centering_stencil_coeffs_y;
