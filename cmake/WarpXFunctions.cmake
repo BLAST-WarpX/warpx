@@ -237,6 +237,46 @@ macro(warpx_set_suffix_dims suffix dim)
     endif()
 endmacro()
 
+# Set the PYTHONPATH (and PATH, for .dll files on Windows) on a test, so that
+# the build tree is importable without installing our Python packages first.
+#
+# The build tree is prepended, so that an already installed pywarpx cannot
+# shadow the freshly built one.
+#
+# test_name: name of an already registered ctest test
+#
+function(warpx_test_set_pythonpath test_name)
+    if(WIN32)
+        string(REPLACE ";" "\\;" WIN_PYTHONPATH "$ENV{PYTHONPATH}")
+        string(REPLACE ";" "\\;" WIN_PATH "$ENV{PATH}")  # DLLs
+        string(REGEX REPLACE "/" "\\\\" WIN_PYTHON_OUTPUT_DIRECTORY ${CMAKE_PYTHON_OUTPUT_DIRECTORY})
+        # shared library note:
+        #   For Windows Python 3.8+, this also needs to be injected via
+        #   os.add_dll_directory.
+        #   https://github.com/python/cpython/issues/80266
+        #   https://docs.python.org/3.8/library/os.html#os.add_dll_directory
+        set_property(TEST ${test_name}
+            APPEND PROPERTY ENVIRONMENT
+                "PYTHONPATH=${WIN_PYTHON_OUTPUT_DIRECTORY}\;${WIN_PYTHONPATH}"
+        )
+        #   collect all DLL directories into a single PATH entry: repeating the
+        #   key in the ENVIRONMENT property would keep only the last one
+        #   note: WarpX_amrex_dim maps RZ->2, RCYLINDER/RSPHERE->1 (see top-level CMakeLists.txt)
+        set(WIN_DLL_DIRS "$<TARGET_FILE_DIR:pyWarpX_${WarpX_DIMS_LAST}>")
+        foreach(D IN LISTS WarpX_amrex_dim)
+            string(APPEND WIN_DLL_DIRS "\;$<TARGET_FILE_DIR:AMReX::amrex_${D}d>")
+        endforeach()
+        set_property(TEST ${test_name}
+            APPEND PROPERTY ENVIRONMENT "PATH=${WIN_DLL_DIRS}\;${WIN_PATH}"
+        )
+    else()
+        set_property(TEST ${test_name}
+            APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_PYTHON_OUTPUT_DIRECTORY}:$ENV{PYTHONPATH}"
+        )
+    endif()
+endfunction()
+
+
 # Take an <imported_target> and expose it as INTERFACE target with
 # WarpX::thirdparty::<propagated_name> naming and SYSTEM includes.
 #

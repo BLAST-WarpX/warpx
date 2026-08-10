@@ -280,6 +280,65 @@ function(add_warpx_test
     endif()
 endfunction()
 
+# Add a pytest-based unit test suite for one dimensionality.
+#
+# Every pytest process is pinned to a single dimensionality: the compiled
+# warpx_pybind_* module can only be imported once per process (see
+# Python/pywarpx/_libwarpx.py). We therefore register one ctest test per built
+# dimensionality, each running the tests in the matching source subdirectory.
+#
+# Test names are pytest.WarpX.<suffix>, so that
+#   ctest -R pytest             runs all of them and
+#   ctest -R pytest.WarpX.3d    runs a single dimensionality.
+#
+# dims: 1, 2, 3, RZ, RCYLINDER, RSPHERE
+#
+function(add_warpx_pytest dims)
+    # pytest tests drive WarpX through its Python bindings
+    if(NOT WarpX_PYTHON)
+        return()
+    endif()
+
+    # cannot run tests with unsupported geometry
+    if(NOT dims IN_LIST WarpX_DIMS)
+        return()
+    endif()
+
+    # set dimension suffix
+    warpx_set_suffix_dims(SD ${dims})
+
+    # nothing to run if no tests were written for this dimensionality yet
+    set(THIS_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${SD})
+    if(NOT IS_DIRECTORY ${THIS_TEST_DIR})
+        return()
+    endif()
+
+    set(name pytest.WarpX.${SD})
+
+    # make a unique run directory
+    file(MAKE_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${name})
+    set(THIS_WORKING_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${name})
+
+    if(NOT Python_EXECUTABLE)
+        find_package(Python COMPONENTS Interpreter REQUIRED)
+    endif()
+
+    add_test(
+        NAME ${name}
+        COMMAND
+            ${Python_EXECUTABLE} -m pytest -s -vvvv
+            ${THIS_TEST_DIR}
+        WORKING_DIRECTORY ${THIS_WORKING_DIR}
+    )
+
+    # run all tests with 1 OpenMP thread by default
+    set_property(TEST ${name} APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    set_property(TEST ${name} APPEND PROPERTY LABELS "pytest")
+
+    warpx_test_set_pythonpath(${name})
+endfunction()
+
 # Add a CTest label to a WarpX test set.
 #
 # Labeling it here will add the label to the run test, its analysis and its cleanup.
