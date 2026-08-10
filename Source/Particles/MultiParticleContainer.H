@@ -545,6 +545,15 @@ private:
 
     void ReadParameters ();
 
+    /** Guards ReadParameters against running twice for this instance.
+     *
+     * This is deliberately a member and not a function-local static: with the
+     * Python bindings, several WarpX instances can be created and destroyed in
+     * one process, and a process-lifetime flag would leave species_names empty
+     * for every instance after the first.
+     */
+    bool m_params_initialized = false;
+
     void mapSpeciesProduct ();
 
     bool m_do_back_transformed_particles = false;

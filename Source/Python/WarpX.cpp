@@ -48,6 +48,7 @@
 #if defined(AMREX_DEBUG) || defined(DEBUG)
 #   include <cstdio>
 #endif
+#include <memory>
 #include <string>
 
 
@@ -103,7 +104,13 @@ void init_WarpX (py::module& m)
     m.def("finalize", &WarpX::Finalize,
         "Close out the WarpX related data");
 
-    py::class_<WarpX> warpx(m, "WarpX");
+    // WarpX is a singleton owned by the C++ side: its lifetime ends in
+    // WarpX::Finalize (i.e. WarpX::ResetInstance), never when the last Python
+    // reference goes away. Without py::nodelete, pybind11's default
+    // return_value_policy for the raw pointer returned by get_instance below is
+    // take_ownership, and destroying the Python object would leave
+    // WarpX::m_instance dangling and WarpX::Finalize double-freeing it.
+    py::class_<WarpX, std::unique_ptr<WarpX, py::nodelete>> warpx(m, "WarpX");
     warpx
         // WarpX is a Singleton Class with a private constructor
         //   https://github.com/BLAST-WarpX/warpx/pull/4104

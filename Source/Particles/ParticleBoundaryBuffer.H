@@ -82,6 +82,14 @@ private:
     std::vector<std::string> m_boundary_names;
 
     mutable std::vector<std::string> m_species_names;
+    /** Guards the lazy read of m_species_names for this instance.
+     *
+     * This is deliberately a member and not a function-local static: with the
+     * Python bindings, several WarpX instances can be created and destroyed in
+     * one process, and a process-lifetime flag would leave m_species_names
+     * empty for every instance after the first.
+     */
+    mutable bool m_species_names_initialized = false;
 };
 
 #endif /*WARPX_PARTICLEBOUNDARYBUFFER_H_*/
