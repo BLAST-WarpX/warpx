@@ -183,7 +183,61 @@ class WarpX(Bucket):
         self.step(nsteps)
 
     def finalize(self, finalize_mpi=1):
+        """Tear down WarpX and AMReX and clear all input state.
+
+        After this call, the process is ready to build and initialize another
+        simulation of the *same* dimensionality. The compiled
+        ``warpx_pybind_*`` module stays loaded: multiple AMReX/WarpX geometries
+        cannot be loaded into the same Python process (see
+        :meth:`pywarpx._libwarpx.LibWarpX.load_library`), so the dimensionality
+        is fixed for the lifetime of the process.
+
+        Clearing the input state is not optional. What is cleared is the input
+        deck, not results: once the C++ side is gone, a half-populated deck is
+        not something a script can act on, it is only a way for the settings of
+        one simulation to leak into the next one.
+
+        Note that this is deliberately not part of
+        :meth:`pywarpx._libwarpx.LibWarpX.finalize`, which is the function
+        registered with :mod:`atexit`: there is nothing to gain from resetting
+        Python state while the interpreter is shutting down.
+        """
+        from . import callbacks
+
+        # shut down the C++ side first; a no-op if it was never initialized
         libwarpx.finalize(finalize_mpi)
+
+        # the per-object buckets are held by reference elsewhere, so clear them
+        # in place before the buckets that list them by name
+        del collisions_list[:]
+        del lasers_list[:]
+        del particles_list[:]
+        diagnostics._diagnostics_dict.clear()
+        reduced_diagnostics._diagnostics_dict.clear()
+        self._bucket_dict.clear()
+
+        for bucket in [
+            algo,
+            amr,
+            amrex,
+            boundary,
+            collisions,
+            diagnostics,
+            eb2,
+            external_vector_potential,
+            geometry,
+            hybridpicmodel,
+            interpolation,
+            lasers,
+            my_constants,
+            particles,
+            psatd,
+            reduced_diagnostics,
+            self,
+        ]:
+            bucket.clear()
+
+        callbacks.clear_all()
 
     def getProbLo(self, direction):
         return libwarpx.libwarpx_so.warpx_getProbLo(direction)
