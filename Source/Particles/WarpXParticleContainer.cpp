@@ -160,14 +160,11 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies,
 void
 WarpXParticleContainer::ReadParameters ()
 {
-    static bool initialized = false;
-
-    if (!initialized)
-    {
-        const ParmParse pp_particles("particles");
-        pp_particles.query("do_tiling", do_tiling);
-        initialized = true;
-    }
+    // do_tiling is a static of the
+    // AMReX particle container base, so a process-lifetime guard would make
+    // every WarpX instance after the first ignore particles.do_tiling.
+    const ParmParse pp_particles("particles");
+    pp_particles.query("do_tiling", do_tiling);
 }
 
 void
