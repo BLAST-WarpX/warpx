@@ -1259,7 +1259,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
                 ablastr::fields::MultiLevelVectorField const& J_cp = m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch);
                 if (use_filter)
                 {
-                    ApplyFilterMF(J_cp, lev+1, idim);
+                    ApplyFilterJ(J_cp, lev+1, idim);
                 }
                 SumBoundaryJ(J_cp, lev+1, idim, period);
             }
@@ -1296,7 +1296,7 @@ WarpX::SyncCurrent (const std::string& current_fp_string)
 
             if (use_filter)
             {
-                ApplyFilterMF(J_fp, lev, idim);
+                ApplyFilterJ(J_fp, lev, idim);
             }
             SumBoundaryJ(J_fp, lev, idim, period);
         }
@@ -1465,6 +1465,203 @@ void WarpX::ApplyFilterMF (
     }
 }
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+amrex::IntVect WarpX::ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
+                                       const int lev,
+                                       const int scomp, const int dcomp, const int ncomp)
+{
+    using namespace amrex::literals;
+    constexpr int NODE = amrex::IndexType::NODE;
+
+    const std::array<amrex::Real,3>& dx = CellSize(lev);
+    const amrex::Real dr = dx[0];
+
+    // Same volume conventions as ApplyInverseVolumeScalingToChargeDensity
+    // and ...ToCurrentDensity (Verboncoeur JCP 174, 421-427 (2001) for the
+    // modified axis factor).
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/3.0_rt : 1.0_rt/4.0_rt);
+#elif defined(WARPX_DIM_RSPHERE)
+    const amrex::Real axis_volume_factor = (m_verboncoeur_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt);
+#endif
+
+    const auto& bf = bilinear_filter;
+    const int npass_r = static_cast<int>(bf.npass_each_dir[0]);
+#if defined(WARPX_DIM_RZ)
+    const int npass_z = static_cast<int>(bf.npass_each_dir[1]);
+#else
+    const int npass_z = 0;
+#endif
+
+    // Each pass consumes one defined guard layer from the outside while
+    // pushing mass one layer outward. This runs before any guard-cell
+    // sum, so source guard layers hold only local deposits, bounded by
+    // the source guard width -- layers beyond it are genuinely zero.
+    // Extending the working arrays by 2*npass keeps the defined region
+    // at src.ng + npass after all passes, which covers the final mass
+    // reach, so every layer a subsequent guard-cell sum folds holds
+    // filtered data rather than a stale deposit.
+    const amrex::IntVect ng = src_mf.nGrowVect();
+    const amrex::IntVect npass_vec(AMREX_D_DECL(npass_r, npass_z, 0));
+    const amrex::IntVect ng_tmp = ng + 2*npass_vec;
+    amrex::MultiFab tmp_a(src_mf.boxArray(), src_mf.DistributionMap(), ncomp, ng_tmp);
+    amrex::MultiFab tmp_b(src_mf.boxArray(), src_mf.DistributionMap(), ncomp, ng_tmp);
+    tmp_a.setVal(0.0_rt);
+    tmp_b.setVal(0.0_rt);
+    amrex::MultiFab::Copy(tmp_a, src_mf, scomp, 0, ncomp, ng);
+
+    // One binomial pass in flux form. Written as the divergence of a
+    // diffusive two-point flux with face weights w_f, it conserves the
+    // volume integral of u exactly, leaves constants untouched, reduces to
+    // the standard (1/4, 1/2, 1/4) stencil where the volume factors are
+    // uniform, and has zero flux through the axis face by construction.
+    // dir = 0 sweeps radially with the geometric volume factors; dir = 1
+    // sweeps axially where the volumes are uniform.
+    // ng_avail tracks how many guard layers of the working arrays still
+    // hold meaningful data; each pass lowers it by one in its sweep
+    // direction, ending at src.ng + npass.
+    amrex::IntVect ng_avail = ng_tmp;
+
+    // Physical (non-periodic) domain boundaries: no smoothing flux crosses
+    // them, so the filter never exchanges with guard cells that nothing
+    // folds back -- the volume integral over the valid domain is conserved
+    // exactly. Periodic directions keep the ordinary flux (the guard sum
+    // restores it).
+    const amrex::Box& domain = Geom(lev).Domain();
+    const amrex::Periodicity& period = Geom(lev).periodicity();
+
+    auto sweep = [&](amrex::MultiFab& out, const amrex::MultiFab& in, int dir)
+    {
+        amrex::IntVect ng_out = ng_avail;
+        ng_out[dir] = std::max(0, ng_out[dir] - 1);
+        const bool dir_periodic = period.isPeriodic(dir);
+
+        for (amrex::MFIter mfi(in); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& valid = mfi.validbox();
+            amrex::Box tb = convert(valid, in.ixType().toIntVect());
+
+            const amrex::XDim3 xyzmin = WarpX::LowerCorner(valid, lev, 0._rt);
+            const amrex::Real rminx = xyzmin.x + (tb.type(0) == NODE ? 0._rt : 0.5_rt*dr);
+            const int irmin = lbound(valid).x;
+
+            tb.grow(ng_out);
+
+            amrex::Array4<amrex::Real const> const& u = in.const_array(mfi);
+            amrex::Array4<amrex::Real> const& v = out.array(mfi);
+
+            auto point_weight = [dr, rminx, irmin, axis_volume_factor]
+                AMREX_GPU_DEVICE (int i) -> amrex::Real
+            {
+                const amrex::Real r = amrex::Math::abs(rminx + (i - irmin)*dr);
+                if (r == 0._rt) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    return MathConst::pi*dr*axis_volume_factor;
+#elif defined(WARPX_DIM_RSPHERE)
+                    return 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
+#endif
+                }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                return 2.0_rt*MathConst::pi*r;
+#elif defined(WARPX_DIM_RSPHERE)
+                return 4.0_rt*MathConst::pi*r*r;
+#endif
+            };
+
+            // Domain edge in this field's own index space: the point at
+            // bigEnd owns the outward face on the physical boundary.
+            const amrex::Box domain_t = amrex::convert(domain, in.ixType().toIntVect());
+            const int dom_lo = domain_t.smallEnd(dir);
+            const int dom_hi = domain_t.bigEnd(dir);
+
+            if (dir == 0) {
+                amrex::ParallelFor(tb, ncomp,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+                {
+                    const amrex::Real r_signed = rminx + (i - irmin)*dr;
+                    const amrex::Real w0 = point_weight(i);
+                    // Face weights: arithmetic mean of the point volume
+                    // factors, zeroed when the face sits at or below the
+                    // axis (nothing crosses r = 0) or at the outer domain
+                    // boundary (nothing leaks into wall guard cells).
+                    const amrex::Real r_lo_face = r_signed - 0.5_rt*dr;
+                    const amrex::Real r_hi_face = r_signed + 0.5_rt*dr;
+                    amrex::Real w_lo = (r_lo_face <= 0._rt)
+                        ? 0._rt : 0.5_rt*(point_weight(i-1) + w0);
+                    amrex::Real w_hi = (r_hi_face <= 0._rt)
+                        ? 0._rt : 0.5_rt*(w0 + point_weight(i+1));
+                    if (i >= dom_hi) { w_hi = 0._rt; }
+                    if (i > dom_hi)  { w_lo = 0._rt; }
+                    v(i,j,k,n) = u(i,j,k,n) + 0.25_rt/w0 *
+                        ( w_hi*(u(i+1,j,k,n) - u(i,j,k,n))
+                        - w_lo*(u(i,j,k,n) - u(i-1,j,k,n)) );
+                });
+            } else {
+                amrex::ParallelFor(tb, ncomp,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+                {
+                    amrex::Real w_lo = 1._rt;
+                    amrex::Real w_hi = 1._rt;
+                    if (!dir_periodic) {
+                        if (j >= dom_hi) { w_hi = 0._rt; }
+                        if (j <= dom_lo) { w_lo = 0._rt; }
+                        if (j > dom_hi)  { w_lo = 0._rt; }
+                        if (j < dom_lo)  { w_hi = 0._rt; }
+                    }
+                    v(i,j,k,n) = u(i,j,k,n) + 0.25_rt *
+                        ( w_hi*(u(i,j+1,k,n) - u(i,j,k,n))
+                        - w_lo*(u(i,j,k,n) - u(i,j-1,k,n)) );
+                });
+            }
+        }
+        ng_avail = ng_out;
+    };
+
+    amrex::MultiFab* in = &tmp_a;
+    amrex::MultiFab* out = &tmp_b;
+    for (int p = 0; p < npass_r; ++p) {
+        sweep(*out, *in, 0);
+        std::swap(in, out);
+    }
+    for (int p = 0; p < npass_z; ++p) {
+        sweep(*out, *in, 1);
+        std::swap(in, out);
+    }
+
+    const amrex::IntVect ng_copy = amrex::min(dst.nGrowVect(), ng_avail);
+    amrex::MultiFab::Copy(dst, *in, 0, dcomp, ncomp, ng_copy);
+    return ng_copy;
+}
+#endif
+
+void WarpX::ApplyFilterJ (
+    const ablastr::fields::MultiLevelVectorField& current,
+    const int lev,
+    const int idim)
+{
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    using ablastr::fields::Direction;
+    amrex::MultiFab& J = *current[lev][Direction{idim}];
+    const int ncomp = J.nComp();
+    amrex::MultiFab J_filtered(J.boxArray(), J.DistributionMap(), ncomp, J.nGrowVect());
+    const amrex::IntVect ng_filled =
+        ApplyVolumeWeightedFilter(J_filtered, J, lev, 0, 0, ncomp);
+    amrex::MultiFab::Copy(J, J_filtered, 0, 0, ncomp, ng_filled);
+#else
+    ApplyFilterMF(current, lev, idim);
+#endif
+}
+
+void WarpX::ApplyFilterJ (
+    const ablastr::fields::MultiLevelVectorField& current,
+    const int lev)
+{
+    for (int idim=0; idim<3; ++idim)
+    {
+        ApplyFilterJ(current, lev, idim);
+    }
+}
+
 void WarpX::SumBoundaryJ (
     const ablastr::fields::MultiLevelVectorField& current,
     const int lev,
@@ -1542,7 +1739,7 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
 
     if (use_filter)
     {
-        ApplyFilterMF(J_fp, lev);
+        ApplyFilterJ(J_fp, lev);
     }
     SumBoundaryJ(J_fp, lev, period);
 
@@ -1561,8 +1758,8 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
 
             if (use_filter && J_buffer[lev+1][idim])
             {
-                ApplyFilterMF(J_cp, lev+1, idim);
-                ApplyFilterMF(J_buffer, lev+1, idim);
+                ApplyFilterJ(J_cp, lev+1, idim);
+                ApplyFilterJ(J_buffer, lev+1, idim);
 
                 MultiFab::Add(
                     *J_buffer[lev+1][idim], *J_cp[lev+1][idim],
@@ -1576,7 +1773,7 @@ void WarpX::AddCurrentFromFineLevelandSumBoundary (
             }
             else if (use_filter) // but no buffer
             {
-                ApplyFilterMF(J_cp, lev+1, idim);
+                ApplyFilterJ(J_cp, lev+1, idim);
 
                 ablastr::utils::communication::ParallelAdd(
                     mf, *J_cp[lev+1][idim], 0, 0,
@@ -1644,7 +1841,18 @@ void WarpX::ApplyFilterandSumBoundaryRho (int /*lev*/, int glev, amrex::MultiFab
         ng_depos_rho += bilinear_filter.stencil_length_each_dir-1;
         ng_depos_rho.min(ng);
         MultiFab rf(rho.boxArray(), rho.DistributionMap(), ncomp, ng);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // In radial geometry, filter the extensive quantity (charge) rather
+        // than the density so total charge is conserved. The flux-form
+        // passes fill one guard layer less per pass than the stencil form;
+        // seed the unfilled layers with the raw deposit and clamp the
+        // guard sum to the well-defined region.
+        MultiFab::Copy(rf, rho, icomp, 0, ncomp, amrex::min(ng, rho.nGrowVect()));
+        const IntVect ng_filled = ApplyVolumeWeightedFilter(rf, rho, glev, icomp, 0, ncomp);
+        ng_depos_rho.min(ng_filled);
+#else
         bilinear_filter.ApplyStencil(rf, rho, glev, icomp, 0, ncomp);
+#endif
         WarpXSumGuardCells(rho, rf, period, ng_depos_rho, icomp, ncomp );
     } else {
         ng_depos_rho.min(ng);
