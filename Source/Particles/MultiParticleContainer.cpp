@@ -129,8 +129,7 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
 void
 MultiParticleContainer::ReadParameters ()
 {
-    static bool initialized = false;
-    if (!initialized)
+    if (!m_params_initialized)
     {
         const ParmParse pp_particles("particles");
 
@@ -398,7 +397,7 @@ MultiParticleContainer::ReadParameters ()
                 pp_qed_schwinger, "zmax", m_qed_schwinger_zmax);
         }
 #endif
-        initialized = true;
+        m_params_initialized = true;
     }
 }
 

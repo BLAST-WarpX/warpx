@@ -332,12 +332,11 @@ void ParticleBoundaryBuffer::redistribute () {
 
 const std::vector<std::string>& ParticleBoundaryBuffer::getSpeciesNames() const
 {
-    static bool initialized = false;
-    if (!initialized)
+    if (!m_species_names_initialized)
     {
         const amrex::ParmParse pp_particles("particles");
         pp_particles.queryarr("species_names", m_species_names);
-        initialized = true;
+        m_species_names_initialized = true;
     }
     return m_species_names;
 }
