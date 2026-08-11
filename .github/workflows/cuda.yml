@@ -147,15 +147,10 @@ jobs:
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
         which nvcc || echo "nvcc not in PATH!"
 
+        git clone https://github.com/AMReX-Codes/amrex.git ../amrex
         dependencies_file="./dependencies.json"
-        amrex_repo=$(jq -r ".repo_amrex // \"https://github.com/AMReX-Codes/amrex.git\"" "${dependencies_file}")
-        amrex_commit=$(jq -r ".commit_amrex" "${dependencies_file}")
-        git clone "${amrex_repo}" ../amrex
-        if git -C ../amrex rev-parse --verify --quiet "${amrex_commit}^{commit}" > /dev/null; then
-          git -C ../amrex checkout --detach "${amrex_commit}"
-        else
-          git -C ../amrex checkout --detach "origin/${amrex_commit}"
-        fi
+        amrex_commit=$(jq -r '.commit_amrex' "${dependencies_file}")
+        cd ../amrex && git checkout --detach ${amrex_commit} && cd -
         make COMP=gcc QED=FALSE USE_MPI=TRUE USE_GPU=TRUE USE_OMP=FALSE USE_FFT=TRUE USE_CCACHE=TRUE -j 4
 
         ccache -s
