@@ -40,7 +40,7 @@ Who can add the label?
 ----------------------
 
 Anyone in the `warpx-contributors team <https://github.com/orgs/BLAST-WarpX/teams/warpx-contributors>`__ on GitHub can add the ``bot: run GPU`` label.
-Membership is restricted to vetted contributors who are known, identifiable individuals personally accountable for their actions, and is granted by members of the WarpX :ref:`Technical Committee <governance>`.
+Membership is restricted to vetted contributors who are known, identifiable individuals personally accountable for their actions, and is granted by members of the WarpX :ref:`Technical Committee <technical-committee>`.
 
 .. warning::
 
