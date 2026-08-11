@@ -17,6 +17,7 @@
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials_fwd.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
@@ -952,6 +953,9 @@ public:
     // Field container
     ablastr::fields::MultiFabRegister m_fields;
     ablastr::fields::MultiFabRegister& GetMultiFabRegister() {return m_fields;}
+    [[nodiscard]] DielectricMaterials& GetDielectricMaterials () {return *m_dielectric_materials;}
+    [[nodiscard]] DielectricMaterials const& GetDielectricMaterials () const {return *m_dielectric_materials;}
+    [[nodiscard]] bool HasDielectricMaterials () const;
 
     //! Use this function to override the Level 0 grids made by AMReX.
     //! This function is called in amrex::AmrCore::InitFromScratch.
@@ -1311,6 +1315,7 @@ private:
 
     // Electrostatic solver
     std::unique_ptr<ElectrostaticSolver> m_electrostatic_solver;
+    std::unique_ptr<DielectricMaterials> m_dielectric_materials;
 
     // Hybrid PIC algorithm parameters
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;

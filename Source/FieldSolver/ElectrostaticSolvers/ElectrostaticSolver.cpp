@@ -45,10 +45,6 @@ void ElectrostaticSolver::ReadParameters () {
    utils::parser::queryWithParser(
         pp_warpx, "use_2d_slices_fft_solver", is_igf_2d_slices);
 
-
-    // Spatially-varying dielectric permittivity for the EB electrostatic solve
-    m_has_dielectric_function = pp_warpx.query(
-        "epsilon_function(x,y,z)", m_dielectric_function_str);
 }
 
 void
@@ -136,7 +132,7 @@ ElectrostaticSolver::computePhi (
     int const verbosity,
     bool const is_igf_2d,
     std::optional<ablastr::fields::MultiLevelVectorField> efield,
-    amrex::MultiFab const* dielectric_epsilon
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> dielectric_epsilon
 ) const
 {
     // create a vector to our fields, sorted by level

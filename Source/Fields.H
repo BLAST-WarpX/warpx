@@ -95,7 +95,8 @@ namespace warpx::fields
         Venl,
         global_debye_length,
         effective_potential_sigma,  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
-        dielectric_epsilon
+        dielectric_epsilon,
+        dielectric_signed_distance
     );
 
     /** these are vector fields */

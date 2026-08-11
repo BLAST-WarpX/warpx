@@ -7,6 +7,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "LabFrameExplicitES.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
@@ -20,54 +21,6 @@ using namespace amrex;
 void LabFrameExplicitES::InitData() {
     auto & warpx = WarpX::GetInstance();
     m_poisson_boundary_handler->DefinePhiBCs(warpx.Geom(0));
-    InitializeDielectricEpsilon();
-}
-
-void LabFrameExplicitES::InitializeDielectricEpsilon ()
-{
-
-    if (!m_has_dielectric_function) {return;}
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(EB::enabled(),
-        "warpx.dielectric_function(x,y,z) is only supported with embedded "
-        "boundaries enabled (set warpx.eb_implicit_function or eb2.geom_type).");
-
-    auto & warpx = WarpX::GetInstance();
-    auto & fields = warpx.GetMultiFabRegister();
-
-    const int lev = 0;
-    amrex::BoxArray ba = warpx.boxArray(lev);
-    amrex::DistributionMapping dmap = warpx.DistributionMap(lev);
-
-    auto* epsilon = fields.alloc_init(warpx::fields::FieldType::dielectric_epsilon, lev, ba, dmap, 1, amrex::IntVect(2), 1.0_rt);
-
-    auto dielectric_parser = utils::parser::makeParser(
-        m_dielectric_function_str, {"x", "y", "z"});
-    auto dielectric_exec = dielectric_parser.compile<3>();
-
-    const auto dx = warpx.Geom(lev).CellSizeArray();
-    const auto problo = warpx.Geom(lev).ProbLoArray();
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (amrex::MFIter mfi(*epsilon, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        const amrex::Box& bx = mfi.growntilebox();
-        amrex::Array4<amrex::Real> const& epsilon_arr = epsilon->array(mfi);
-        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-#if defined(WARPX_DIM_3D)
-            const amrex::Real x = problo[0] + (i + 0.5_rt) * dx[0];
-            const amrex::Real y = problo[1] + (j + 0.5_rt) * dx[1];
-            const amrex::Real z = problo[2] + (k + 0.5_rt) * dx[2];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            const amrex::Real x = problo[0] + (i + 0.5_rt) * dx[0];
-            const amrex::Real y = 0.0_rt;
-            const amrex::Real z = problo[1] + (j + 0.5_rt) * dx[1];
-            amrex::ignore_unused(k);
-#endif
-            epsilon_arr(i,j,k) = dielectric_exec(x, y, z);
-        });
-    }
-
 }
 
 void LabFrameExplicitES::ComputeSpaceChargeField (
@@ -124,10 +77,14 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
         computePhiTriDiagonal(rho_fp, phi_fp);
 #else
 
-        amrex::MultiFab const* dielectric_epsilon = nullptr;
-        if (m_has_dielectric_function) {
-            dielectric_epsilon = warpx.GetMultiFabRegister().get(
-                warpx::fields::FieldType::dielectric_epsilon, 0);
+        std::optional<ablastr::fields::ConstMultiLevelScalarField> dielectric_epsilon;
+        if (warpx.HasDielectricMaterials()) {
+            warpx.GetDielectricMaterials().UpdateEpsilon(warpx, max_level, warpx.gett_new(0));
+            ablastr::fields::ConstMultiLevelScalarField epsilon;
+            for (int lev = 0; lev <= max_level; ++lev) {
+                epsilon.push_back(fields.get(FieldType::dielectric_epsilon, lev));
+            }
+            dielectric_epsilon = std::move(epsilon);
         }
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
         computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
