@@ -642,8 +642,9 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
     enum exteb_flags : int { no_exteb, has_exteb };
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
-    // Loop over particles and deposit mass matrices
-    amrex::ParallelFor(
+    // Loop over particles and deposit mass matrices.
+    // amrex::For: iterations scatter-add into shared J/Sigma nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
         amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
         {exteb_runtime_flag},
         np_to_deposit,
@@ -1882,8 +1883,9 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
     enum exteb_flags : int { no_exteb, has_exteb };
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
-    // Loop over particles and deposit mass matrices
-    amrex::ParallelFor(
+    // Loop over particles and deposit mass matrices.
+    // amrex::For: iterations scatter-add into shared J/Sigma nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
         amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
         {exteb_runtime_flag},
         np_to_deposit,

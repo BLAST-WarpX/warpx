@@ -1114,6 +1114,12 @@ void ImplicitSolver::FinishMassMatrices ()
             });
 
 #elif AMREX_SPACEDIM == 2
+            // In-place fold of the mass matrices: for every (ncomp_x, ncomp_y)
+            // combination, the components written at iv_dst are disjoint from
+            // the components read at any i-offset source, so iterations of the
+            // vectorized i loop are independent, as required by ParallelFor
+            // (see issue #7097). Reads across j rely on the serial ascending j
+            // loop on CPU and must not be reordered.
             amrex::ParallelFor( Sbx, Sby, Sbz,
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)

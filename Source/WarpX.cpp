@@ -744,6 +744,26 @@ WarpX::ReadParameters ()
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
         }
 
+        // Sub-cycling is only implemented for the finite-difference electromagnetic
+        // solvers, in the mesh-refinement PIC loop WarpX::OneStep_sub1.
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_do_subcycling ||
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC ||
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT,
+            "warpx.do_subcycling = 1 is only supported with the electromagnetic solvers "
+            "algo.maxwell_solver = yee, ckc or ect. It is not supported with the "
+            "electrostatic/magnetostatic solvers (warpx.do_electrostatic), with the "
+            "hybrid-PIC solver (algo.maxwell_solver = hybrid), nor with the spectral "
+            "solver (algo.maxwell_solver = psatd).");
+
+        // Sub-cycling is reached only from the explicit branch of WarpX::OneStep.
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_do_subcycling || evolve_scheme == EvolveScheme::Explicit,
+            "warpx.do_subcycling = 1 is only supported with algo.evolve_scheme = explicit. "
+            "The implicit and semi-implicit evolve schemes advance all mesh-refinement "
+            "levels with the same time step and do not sub-cycle.");
+
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(electrostatic_solver_id == ElectrostaticSolverAlgo::None,
                   "Electrostatic solver not supported with 1D cylindrical and spherical");
@@ -875,14 +895,6 @@ WarpX::ReadParameters ()
                 // (see https://github.com/BLAST-WarpX/warpx/issues/1943)
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!use_filter || filter_npass_each_dir[0] == 0,
                     "In cylindrical and spherical geometry with FDTD, filtering can not be done in the radial direction. This can be controlled by setting warpx.filter_npass_each_dir");
-            } else {
-                if (use_filter && filter_npass_each_dir[0] > 0) {
-                    ablastr::warn_manager::WMRecordWarning(
-                        "HybridPIC ElectromagneticSolver",
-                        "Radial Filtering in cylindrical and spherical geometry is not currently using radial geometric weighting to conserve charge. Use at your own risk.",
-                        ablastr::warn_manager::WarnPriority::low
-                    );
-                }
             }
         }
 #endif
@@ -2258,6 +2270,14 @@ WarpX::BackwardCompatibility ()
             "lasers.nlasers is ignored. Just use lasers.names please.",
             ablastr::warn_manager::WarnPriority::low);
     }
+
+    const ParmParse pp_hybrid("hybrid_pic_model");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_hybrid.query("qdsmc_n_floor", backward_Real),
+        "hybrid_pic_model.qdsmc_n_floor is no longer used: the QDSMC electron-energy "
+        "update floors the density with hybrid_pic_model.n_floor and skips only the "
+        "cells that received no marker weight at all. Please remove it."
+    );
 }
 
 // This is a virtual function.
