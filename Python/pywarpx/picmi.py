@@ -4323,6 +4323,18 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     self.plot_crsepatch = 1
                 elif dataname == "none":
                     fields_to_plot = set(("none",))
+                else:
+                    # Pass unrecognized names through to C++ for validation.
+                    # Since #7025, the diagnostics resolve any name registered in
+                    # the MultiFabRegister by its registered name. That covers
+                    # fields registered from Python, and internal fields that have
+                    # no short alias in the branches above (e.g. "hybrid_current_fp"
+                    # or "vector_potential_fp"; contrast "Pe"/"Te", which are
+                    # handled explicitly and so never reach here). Dropping unknown
+                    # names would make that capability unreachable through PICMI.
+                    # C++ raises a descriptive error if the name is not registered
+                    # either, so a typo is still reported.
+                    fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
             # --- is the same on all processors.
