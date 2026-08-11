@@ -547,7 +547,8 @@ public:
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
-                amrex::ParallelFor( np1,
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( np1,
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
                         if (correct_energy_momentum) {
@@ -720,7 +721,8 @@ public:
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
-                amrex::ParallelFor( np1,
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
@@ -737,7 +739,8 @@ public:
                     }
                 );
 
-                amrex::ParallelFor( np1,
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
@@ -764,9 +767,10 @@ public:
                 const int energy_correction_sort_by_weight_flag = m_energy_correction_sort_by_weight ? sort : no_sort;
                 auto heapSortDecreasing = ParticleUtils::HeapSortDecreasing();
 
-                amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
-                                   {energy_correction_sort_by_weight_flag},
-                                   n_cells,
+                // amrex::For: iterations share the failed-corrections counter (no SIMD pragma, see issue #7097)
+                amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
+                           {energy_correction_sort_by_weight_flag},
+                           n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell, auto energy_correction_sort_by_weight_control) noexcept
                     {
 
@@ -1079,7 +1083,8 @@ public:
 
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
-                amrex::ParallelFor( std::max(np1, np2),
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
                         if (correct_energy_momentum) {
@@ -1328,7 +1333,8 @@ public:
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
-                amrex::ParallelFor( std::max(np1, np2),
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
 
@@ -1399,9 +1405,10 @@ public:
                 const int energy_correction_sort_by_weight_flag = m_energy_correction_sort_by_weight ? sort : no_sort;
                 auto heapSortDecreasing = ParticleUtils::HeapSortDecreasing();
 
-                amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
-                                   {energy_correction_sort_by_weight_flag},
-                                   n_cells,
+                // amrex::For: iterations share the failed-corrections counter (no SIMD pragma, see issue #7097)
+                amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
+                           {energy_correction_sort_by_weight_flag},
+                           n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell, auto energy_correction_sort_by_weight_control) noexcept
                     {
                         // The particles from species1 that are in the cell `i_cell` are

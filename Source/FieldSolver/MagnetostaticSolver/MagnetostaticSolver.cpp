@@ -140,7 +140,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
 
     More specifically, this solves the equation
     \f[
-        \vec{\nabla}^2 r \vec{A} = - r \mu_0 \vec{J}
+        \nabla^2 r \boldsymbol{A} = - r \mu_0 \boldsymbol{J}
  \f]
 
    \param[in] curr The current density
