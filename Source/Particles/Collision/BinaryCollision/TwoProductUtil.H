@@ -141,9 +141,11 @@ namespace {
         // E_ratio <= 1 means the COM energy does not reach the combined rest mass of
         // the products, i.e. this pair is below the reaction threshold.
         if (E_ratio_d <= 1.0 && E_star_f_d > 0.0) {
-            ablastr::warn_manager::WMRecordWarning("BinaryCollision::TwoProductComputeProductMomenta",
-                "COM energy is below the product rest mass (pair selected below the reaction threshold)",
-                ablastr::warn_manager::WarnPriority::high);
+            AMREX_IF_ON_HOST((
+                ablastr::warn_manager::WMRecordWarning("BinaryCollision::TwoProductComputeProductMomenta",
+                    "COM energy is below the product rest mass (pair selected below the reaction threshold)",
+                    ablastr::warn_manager::WarnPriority::high);
+            ))
         }
         if (E_ratio_d > 1.0)
         {
