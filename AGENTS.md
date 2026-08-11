@@ -146,4 +146,4 @@ When a change removes or renames a user-facing input parameter, add a guard to t
 
 - Main branch: `development` (not `main`)
 - Fork-and-branch workflow; PRs target `development`
-- Pull requests with features and bug fixes need to add a test for coverage.
+- Pull requests with new features need to add a test for coverage.
