@@ -1880,16 +1880,20 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                     (-kb * Te_K * std::expm1(-2._prt * nu_dt) + E_s) / m_i;
                 if (drag <= 0._prt && sig2 <= 0._prt) { return; }
 
-                amrex::ParticleReal uix = coef_arr(ii,jj,kk,1);
-                amrex::ParticleReal uiy = coef_arr(ii,jj,kk,2);
-                amrex::ParticleReal const uiz = coef_arr(ii,jj,kk,3);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                // Rotate the cylindrical (r,theta) bulk-velocity components to
+                // the particle's Cartesian frame at its azimuthal position.
                 amrex::ParticleReal const costheta = std::cos(thetap[ip]);
                 amrex::ParticleReal const sintheta = std::sin(thetap[ip]);
-                amrex::ParticleReal const uir = uix;
-                uix = uir*costheta - uiy*sintheta;
-                uiy = uir*sintheta + uiy*costheta;
+                amrex::ParticleReal const uix =
+                    coef_arr(ii,jj,kk,1)*costheta - coef_arr(ii,jj,kk,2)*sintheta;
+                amrex::ParticleReal const uiy =
+                    coef_arr(ii,jj,kk,1)*sintheta + coef_arr(ii,jj,kk,2)*costheta;
+#else
+                amrex::ParticleReal const uix = coef_arr(ii,jj,kk,1);
+                amrex::ParticleReal const uiy = coef_arr(ii,jj,kk,2);
 #endif
+                amrex::ParticleReal const uiz = coef_arr(ii,jj,kk,3);
                 amrex::ParticleReal const sig = std::sqrt(amrex::max(0._prt, sig2));
                 uxp[ip] += -drag*(uxp[ip]-uix) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
                 uyp[ip] += -drag*(uyp[ip]-uiy) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
