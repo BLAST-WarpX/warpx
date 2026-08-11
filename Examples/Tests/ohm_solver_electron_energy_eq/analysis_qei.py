@@ -124,7 +124,9 @@ def main(argv=None):
 
     # (1) fit ln((Te-Ti)/(Te0-Ti0)) = -rate t.
     d = (Te - Ti) / (Te0 - Ti0)
-    good = d > 1e-3
+    # Fit only while the difference is well above the particle-noise floor;
+    # long (multi-tau) runs otherwise flatten the tail and bias the rate low.
+    good = d > max(1e-3, 0.05 * d[0])
     rate_fit = -np.polyfit(t[good], np.log(d[good]), 1)[0]
     rel_err = abs(rate_fit - rate_pred) / rate_pred
 
