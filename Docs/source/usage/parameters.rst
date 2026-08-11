@@ -1763,6 +1763,13 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, ``u_mean`` is read as a function of position from an openPMD
+          file and interpolated to the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1779,6 +1786,13 @@ Particle initialization
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
+        * If ``read_from_file``, ``u_std`` is read as a function of position from an openPMD
+          file and interpolated to the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_u_std_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
@@ -1814,6 +1828,13 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, ``u_mean`` is read as a function of position from an openPMD
+          file and interpolated to the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.
@@ -4060,8 +4081,19 @@ Additional parameters
     evolves with its own time step, set to its own CFL limit. In practice, it
     means that when level 0 performs one iteration, level 1 performs two
     iterations. Currently, this option is only supported when
-    :pp:param:`amr.max_level = 1`. More information can be found at
-    https://ieeexplore.ieee.org/document/8659392.
+    :pp:param:`amr.max_level = 1` and when the refinement ratio
+    :pp:param:`amr.ref_ratio` is 2 in all directions. More information can be
+    found at https://ieeexplore.ieee.org/document/8659392.
+
+    Sub-cycling is only implemented for the finite-difference electromagnetic
+    solvers (``algo.maxwell_solver = yee``, ``ckc`` or ``ect``). It is not
+    supported with the electrostatic and magnetostatic solvers (see
+    :pp:param:`warpx.do_electrostatic`), with the hybrid-PIC solver
+    (``algo.maxwell_solver = hybrid``), nor with the spectral solver
+    (``algo.maxwell_solver = psatd``); WarpX aborts if sub-cycling is requested
+    with any of these solvers. It also requires the explicit evolve scheme
+    (:pp:param:`algo.evolve_scheme` = ``explicit``, the default), since the
+    implicit and semi-implicit schemes do not sub-cycle.
 
 .. pp:param:: warpx.override_sync_intervals
     :type: ``string``

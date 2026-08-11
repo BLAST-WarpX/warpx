@@ -1,3 +1,4 @@
+(governance)=
 # WarpX Governance
 
 WarpX is led in an open governance model, described in this file.
@@ -40,6 +41,7 @@ As a SC member, regularly attending and contributing to the weekly developer mee
 SC members can resign or be removed by majority vote, e.g., due to inactivity, bad acting or other reasons.
 
 
+(technical-committee)=
 ## Technical Committee
 
 ### Current Roster
