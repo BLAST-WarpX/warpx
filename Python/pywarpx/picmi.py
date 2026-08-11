@@ -3638,15 +3638,15 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
         # The keywords are mangled if there is a conflicting variable already
         # defined in my_constants with the same name but different value.
         self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
-
+        macroscopic = pywarpx.warpx.get_bucket("macroscopic")
         if self.implicit_function is not None:
             expression = pywarpx.my_constants.mangle_expression(
                 self.implicit_function, self.mangle_dict
             )
-            setattr(pywarpx.macroscopic, self.name + "_function(x,y,z)", expression)
+            setattr(macroscopic, self.name + "_function(x,y,z)", expression)
 
         if self.value is not None:
-            setattr(pywarpx.macroscopic, self.name, self.value)
+            setattr(macroscopic, self.name, self.value)
 
         if self.stl_file is not None:
             raise NotImplementedError(

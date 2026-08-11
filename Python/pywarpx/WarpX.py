@@ -22,7 +22,6 @@ from .Geometry import geometry
 from .HybridPICModel import external_vector_potential, hybridpicmodel
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
-from .MacroscopicProperties import macroscopic
 from .Particles import particles, particles_list
 from .PSATD import psatd
 
@@ -53,7 +52,6 @@ class WarpX(Bucket):
         argv += external_vector_potential.attrlist()
         argv += boundary.attrlist()
         argv += algo.attrlist()
-        argv += macroscopic.attrlist()
         argv += interpolation.attrlist()
         argv += psatd.attrlist()
         argv += eb2.attrlist()
