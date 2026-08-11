@@ -10,3 +10,13 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/field_diags"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_rz_ohm_solver_resistive_drag_species_fields_picmi  # name
+    RZ  # dims
+    2  # nprocs
+    inputs_test_rz_ohm_solver_resistive_drag_species_fields_picmi.py  # inputs
+    analysis_rz_species_fields.py  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
