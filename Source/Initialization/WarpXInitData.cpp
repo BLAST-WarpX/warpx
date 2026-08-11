@@ -1293,14 +1293,14 @@ WarpX::InitLevelData (int lev, Real /*time*/)
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::fine, m_eb_update_B);
+            lev, PatchType::fine, m_eb_update_B_fp);
 
         ComputeExternalFieldOnGridUsingParser(
             FieldType::Bfield_cp,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::coarse, m_eb_update_B);
+            lev, PatchType::coarse, m_eb_update_B_cp);
     }
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
@@ -1331,14 +1331,14 @@ WarpX::InitLevelData (int lev, Real /*time*/)
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
                 m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::fine, m_eb_update_E);
+                lev, PatchType::fine, m_eb_update_E_fp);
 
             ComputeExternalFieldOnGridUsingParser(
                 FieldType::Efield_cp,
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
                 m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::coarse, m_eb_update_E);
+                lev, PatchType::coarse, m_eb_update_E_cp);
 #ifdef AMREX_USE_EB
             if (eb_enabled) {
                 if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
@@ -1592,15 +1592,16 @@ void WarpX::CheckGuardCells()
 void WarpX::InitializeEBGridData (int lev)
 {
 #ifdef AMREX_USE_EB
-    if (lev == maxLevel()) {
+    auto const eb_fact = fieldEBFactory(lev);
 
-        auto const eb_fact = fieldEBFactory(lev);
+    if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
+    {
+        using warpx::fields::FieldType;
 
-        if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
-        {
-            using warpx::fields::FieldType;
+        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+            // The ECT solver only supports a single level for now
+            if (lev == maxLevel()) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
                 warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
@@ -1620,28 +1621,55 @@ void WarpX::InitializeEBGridData (int lev)
                 ComputeFaceExtensions();
 
                 // Mark on which grid points E should be updated
-                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E[lev], edge_lengths_lev );
+                warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E_fp[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
-                warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B[lev], face_areas_lev, edge_lengths_lev);
-
-            } else {
-                // Mark on which grid points E should be updated (stair-case approximation)
-                warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                    m_eb_update_E[lev],
-                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                    eb_fact, Geom(lev).periodicity() );
-                // Mark on which grid points B should be updated (stair-case approximation)
-                warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                    m_eb_update_B[lev],
-                    m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                    eb_fact, Geom(lev).periodicity() );
+                warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B_fp[lev], face_areas_lev, edge_lengths_lev);
             }
 
+        } else {
+
+            // Mark on which grid points E and B should be updated (stair-case approximation),
+            // on the fine patch of this level.
+            warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                m_eb_update_E_fp[lev],
+                m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                eb_fact, Geom(lev).periodicity() );
+            warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                m_eb_update_B_fp[lev],
+                m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                eb_fact, Geom(lev).periodicity() );
+
+            // The coarse-patch fields (Efield_cp/Bfield_cp) live on a coarsened grid, so they
+            // need their own EB flags, computed from an EB factory at the coarse-patch resolution.
+            if (lev > 0) {
+                const amrex::IntVect rr = refRatio(lev-1);
+                const amrex::Geometry cgeom = amrex::coarsen(Geom(lev), rr);
+                // Use the exact (cell-centered) BoxArray and DistributionMapping of the
+                // coarse-patch fields, so that the EB flags share their grid layout.
+                const amrex::MultiFab& Efield_cp0 = *m_fields.get(FieldType::Efield_cp, ablastr::fields::Direction{0}, lev);
+                const amrex::BoxArray cba = amrex::convert(Efield_cp0.boxArray(), amrex::IntVect::TheCellVector());
+                const amrex::DistributionMapping& cdm = Efield_cp0.DistributionMap();
+                int const max_guard = guard_cells.ng_FieldSolver.max();
+                auto const cp_eb_fact = amrex::makeEBFabFactory(
+                    cgeom, cba, cdm,
+                    {max_guard, max_guard, max_guard}, amrex::EBSupport::full);
+
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                    m_eb_update_E_cp[lev],
+                    m_fields.get_alldirs(FieldType::Efield_cp, lev),
+                    *cp_eb_fact, cgeom.periodicity() );
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                    m_eb_update_B_cp[lev],
+                    m_fields.get_alldirs(FieldType::Bfield_cp, lev),
+                    *cp_eb_fact, cgeom.periodicity() );
+            }
         }
 
+    }
+
+    if (lev == maxLevel()) {
         ComputeDistanceToEB();
         warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
-
     }
 #else
     amrex::ignore_unused(lev);
@@ -1683,7 +1711,7 @@ WarpX::LoadExternalFields (int const lev)
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
             m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::fine, m_eb_update_B);
+            lev, PatchType::fine, m_eb_update_B_fp);
     }
     else if (m_p_ext_field_params->B_ext_grid_type == ExternalFieldType::read_from_file) {
 #if defined(WARPX_DIM_RZ)
@@ -1702,7 +1730,7 @@ WarpX::LoadExternalFields (int const lev)
             m_p_ext_field_params->Exfield_parser->compile<4>(),
             m_p_ext_field_params->Eyfield_parser->compile<4>(),
             m_p_ext_field_params->Ezfield_parser->compile<4>(),
-            lev, PatchType::fine, m_eb_update_E );
+            lev, PatchType::fine, m_eb_update_E_fp );
     }
     else if (m_p_ext_field_params->E_ext_grid_type == ExternalFieldType::read_from_file) {
 #if defined(WARPX_DIM_RZ)

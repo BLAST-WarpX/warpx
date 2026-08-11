@@ -162,8 +162,8 @@ public:
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag() { return m_eb_update_B; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag_fp() { return m_eb_update_E_fp; }
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag_fp() { return m_eb_update_B_fp; }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
 
     /**
@@ -1250,9 +1250,13 @@ private:
 
     /** EB: Flag to indicate whether a gridpoint is inside the embedded boundary and therefore
      * whether the E or B should not be updated. (One array per level and per direction, due to staggering)
+     * The `_cp` variants live on the coarse patch (coarsened grid) of each mesh-refinement level,
+     * and are used when updating the coarse-patch fields (`Efield_cp`/`Bfield_cp`).
      */
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E;
-    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E_fp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B_fp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_E_cp;
+    amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > > m_eb_update_B_cp;
 
     /** EB: Mask that indicates whether a particle should use its regular shape factor (mask set to 0)
      *  or a reduced, order-1 shape factor instead (mask set to 1) in a given cell, when depositing charge/current.

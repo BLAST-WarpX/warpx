@@ -414,7 +414,7 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
                 m_J_external[1],
                 m_J_external[2],
                 lev, PatchType::fine,
-                warpx.GetEBUpdateEFlag());
+                warpx.GetEBUpdateEFlag_fp());
         }
     }
 
@@ -459,7 +459,7 @@ void HybridPICModel::GetCurrentExternal ()
             m_J_external[1],
             m_J_external[2],
             lev, PatchType::fine,
-            warpx.GetEBUpdateEFlag());
+            warpx.GetEBUpdateEFlag_fp());
     }
 }
 
@@ -1346,7 +1346,7 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
     if (!m_qdsmc_J_plasma_valid) {
         CalculatePlasmaCurrent(
             warpx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, warpx.finestLevel()),
-            warpx.GetEBUpdateEFlag());
+            warpx.GetEBUpdateEFlag_fp());
         m_qdsmc_J_plasma_valid = true;
     }
 

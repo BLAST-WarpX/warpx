@@ -112,7 +112,7 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp, rho_fp_temp,
-        m_eb_update_E,
+        m_eb_update_E_fp,
         getistep(0),
         0.5_rt*dt[0],
         SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
@@ -144,7 +144,7 @@ void WarpX::HybridPICEvolveFields ()
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         rho_fp_temp,
-        m_eb_update_E,
+        m_eb_update_E_fp,
         getistep(0),
         0.5_rt*dt[0],
         SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
@@ -178,13 +178,13 @@ void WarpX::HybridPICEvolveFields ()
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
     m_hybrid_pic_model->CalculatePlasmaCurrent(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-        m_eb_update_E);
+        m_eb_update_E_fp);
     m_hybrid_pic_model->HybridPICSolveE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_eb_update_E, false);
+        m_eb_update_E_fp, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
     // Handle field splitting for Hybrid field push

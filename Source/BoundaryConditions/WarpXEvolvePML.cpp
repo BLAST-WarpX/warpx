@@ -262,6 +262,11 @@ WarpX::DampJPML (int lev, PatchType patch_type)
         const auto& pml_j = (patch_type == PatchType::fine) ? m_fields.get_alldirs(FieldType::pml_j_fp, lev) : m_fields.get_alldirs(FieldType::pml_j_cp, lev);
         const auto& sigba = (patch_type == PatchType::fine) ? pml[lev]->GetMultiSigmaBox_fp()
                                                             : pml[lev]->GetMultiSigmaBox_cp();
+        // Flags indicating where the field should be updated, on the patch that is being
+        // damped. The PML current has the same staggering as the PML E field, so the same
+        // flags are used here.
+        const auto& eb_update_E = (patch_type == PatchType::fine) ? pml[lev]->GetEBUpdateEFlag_fp()
+                                                                  : pml[lev]->GetEBUpdateEFlag_cp();
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
@@ -287,9 +292,7 @@ WarpX::DampJPML (int lev, PatchType patch_type)
 
             // Skip the field update if this gridpoint is inside the embedded boundary
             amrex::Array4<int> update_Ex_arr, update_Ey_arr, update_Ez_arr;
-            if (EB::enabled()) {
-                const auto &eb_update_E = pml[lev]->GetEBUpdateEFlag();
-
+            if (EB::enabled() && eb_update_E[0] != nullptr) {
                 update_Ex_arr = eb_update_E[0]->array(mfi);
                 update_Ey_arr = eb_update_E[1]->array(mfi);
                 update_Ez_arr = eb_update_E[2]->array(mfi);
