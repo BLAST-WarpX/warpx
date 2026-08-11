@@ -137,7 +137,7 @@ ElectrostaticSolver::computePhi (
     int const verbosity,
     bool const is_igf_2d,
     std::optional<ablastr::fields::MultiLevelVectorField> const& efield, // only used for EB
-    std::optional<ablastr::fields::ConstMultiLevelScalarField> const& epsilon
+    std::optional<ablastr::fields::ConstMultiLevelScalarField> const& dielectric_epsilon
 ) const
 {
     // create a vector to our fields, sorted by level
@@ -226,7 +226,7 @@ ElectrostaticSolver::computePhi (
         *m_poisson_boundary_handler,
         warpx.gett_new(0),
         eb_farray_box_factory,
-        epsilon
+        dielectric_epsilon
     );
 
 }

@@ -13,12 +13,13 @@ boundary.potential_hi_x = -3.0
 warpx.const_dt = 1e-6
 
 warpx.do_electrostatic = labframe
-eb2.geom_type = all_regular
-warpx.epsilon_function(x,y,z) = "if(x**2+z**2<1.0, 5.0 , 1.0)"
+dielectrics.names = cylinder
+cylinder.implicit_function = "1.0 - (x**2 + z**2)"
+cylinder.permittivity = 5.0
 warpx.self_fields_required_precision = 1.e-6
 warpx.abort_on_warning_threshold = medium
 
 diagnostics.diags_names = diag1
 diag1.intervals = 1
 diag1.diag_type = Full
-diag1.fields_to_plot = phi Ex Ey Ez
+diag1.fields_to_plot = phi Ex Ey Ez dielectric_epsilon dielectric_signed_distance dielectric_mask

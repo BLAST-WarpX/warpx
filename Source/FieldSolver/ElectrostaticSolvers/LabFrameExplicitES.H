@@ -37,8 +37,6 @@ public:
         const ablastr::fields::MultiLevelScalarField& phi
     );
 
-    void InitializeDielectricEpsilon ();
-
 };
 
 #endif  // WARPX_LABFRAMEEXPLICITES_H_
