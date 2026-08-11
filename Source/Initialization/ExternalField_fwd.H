@@ -9,5 +9,6 @@
 #define WARPX_EXTERNAL_FIELD_FWD_H_
 
 struct ExternalFieldParams;
+class ExternalFieldReader;
 
 #endif //WARPX_EXTERNAL_FIELD_FWD_H_
