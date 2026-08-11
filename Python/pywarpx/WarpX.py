@@ -192,11 +192,6 @@ class WarpX(Bucket):
         :meth:`pywarpx._libwarpx.LibWarpX.load_library`), so the dimensionality
         is fixed for the lifetime of the process.
 
-        Clearing the input state is not optional. What is cleared is the input
-        deck, not results: once the C++ side is gone, a half-populated deck is
-        not something a script can act on, it is only a way for the settings of
-        one simulation to leak into the next one.
-
         Note that this is deliberately not part of
         :meth:`pywarpx._libwarpx.LibWarpX.finalize`, which is the function
         registered with :mod:`atexit`: there is nothing to gain from resetting
