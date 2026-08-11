@@ -365,7 +365,7 @@ namespace detail
                                           {openPMD::UnitDimension::L, -2},
                                           {openPMD::UnitDimension::I,  1},
                                   });
-        } else if (field_name.substr(0,3) == "rho"){ // charge density
+        } else if (field_name.starts_with("rho")){ // charge density
             mesh.setUnitDimension({
                                           {openPMD::UnitDimension::L, -3},
                                           {openPMD::UnitDimension::I,  1},

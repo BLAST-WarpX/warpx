@@ -1,37 +1,31 @@
-.. _governance:
-
-WarpX Governance
-================
+(governance)=
+# WarpX Governance
 
 WarpX is led in an open governance model, described in this file.
 
 
-Steering Committee
-------------------
+## Steering Committee
 
-Current Roster
-^^^^^^^^^^^^^^
+### Current Roster
 
-- Jean-Luc Vay (chair)
-- Remi Lehe
-- Axel Huebl
+- Jean-Luc Vay ([@jlvay](https://github.com/jlvay)) (chair)
+- Remi Lehe ([@RemiLehe](https://github.com/RemiLehe))
+- Axel Huebl ([@ax3l](https://github.com/ax3l))
 
-See: `GitHub team <https://github.com/orgs/BLAST-WarpX/teams/warpx-steering-committee>`__
+See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-steering-committee)
 
-Role
-^^^^
+### Role
 
 Members of the steering committee (SC) can change organizational settings, do administrative operations such as rename/move/archive repositories, change branch protection rules, etc.
 SC members can call votes for decisions (technical or governance).
 
 The SC can veto decisions of the technical committee (TC) by voting in the SC.
 The TC can overwrite a veto with a 2/3rd majority vote in the TC.
-Decisions are documented in the `weekly developer meeting notes <https://docs.google.com/document/d/1eYD8EYCYDI0H7FhiiEuRUDJZ5pPDr6MUL-IibE-Pk50/edit>`__ and/or on the GitHub repository.
+Decisions are documented in the [weekly developer meeting notes](https://docs.google.com/document/d/1eYD8EYCYDI0H7FhiiEuRUDJZ5pPDr6MUL-IibE-Pk50/edit) and/or on the GitHub repository.
 
 The SC can change the governance structure, but only in a unanimous vote.
 
-Decision Process
-^^^^^^^^^^^^^^^^
+### Decision Process
 
 Decision of the SC usually happen in the weekly developer meetings, via e-mail or public chat.
 
@@ -39,8 +33,7 @@ Decisions are made in a non-confidential manner, by majority on the cast votes o
 Votes can be cast in asynchronous manner, e.g., over the time of 1-2 weeks.
 In tie situations, the chair of the SC acts as the tie breaker.
 
-Appointment Process
-^^^^^^^^^^^^^^^^^^^
+### Appointment Process
 
 Appointed by current SC members in an unanimous vote.
 As a SC member, regularly attending and contributing to the weekly developer meetings is expected.
@@ -48,30 +41,28 @@ As a SC member, regularly attending and contributing to the weekly developer mee
 SC members can resign or be removed by majority vote, e.g., due to inactivity, bad acting or other reasons.
 
 
-Technical Committee
--------------------
+(technical-committee)=
+## Technical Committee
 
-Current Roster
-^^^^^^^^^^^^^^
+### Current Roster
 
-- Justin Ray Angus
-- Luca Fedeli
-- Arianna Formenti
-- Roelof Groenewald
-- David Grote
-- Axel Huebl
-- Revathi Jambunathan
-- Remi Lehe
-- Andrew Myers
-- Maxence Thévenet
-- Jean-Luc Vay
-- Weiqun Zhang
-- Edoardo Zoni
+- Justin Ray Angus ([@JustinRayAngus](https://github.com/JustinRayAngus))
+- Luca Fedeli ([@lucafedeli88](https://github.com/lucafedeli88))
+- Arianna Formenti ([@aeriforme](https://github.com/aeriforme))
+- Roelof Groenewald ([@roelof-groenewald](https://github.com/roelof-groenewald))
+- David Grote ([@dpgrote](https://github.com/dpgrote))
+- Axel Huebl ([@ax3l](https://github.com/ax3l))
+- Revathi Jambunathan ([@RevathiJambunathan](https://github.com/RevathiJambunathan))
+- Remi Lehe ([@RemiLehe](https://github.com/RemiLehe))
+- Andrew Myers ([@atmyers](https://github.com/atmyers))
+- Maxence Thévenet ([@MaxThevenet](https://github.com/MaxThevenet))
+- Jean-Luc Vay ([@jlvay](https://github.com/jlvay))
+- Weiqun Zhang ([@WeiqunZhang](https://github.com/WeiqunZhang))
+- Edoardo Zoni ([@EZoni](https://github.com/EZoni))
 
-See: `GitHub team <https://github.com/orgs/BLAST-WarpX/teams/warpx-technical-committee>`__
+See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-technical-committee)
 
-Role
-^^^^
+### Role
 
 The technical committee (TC) is the core governance body, where under normal operations most ideas are discussed and decisions are made.
 Individual TC members can approve and merge code changes.
@@ -81,20 +72,18 @@ TC members merge/close PRs and issues, and moderate (including block/mute) bad a
 The TC can propose governance changes to the SC.
 
 
-Decision Process
-^^^^^^^^^^^^^^^^
+### Decision Process
 
 Discussion in the TC usually happens in the weekly developer meetings.
 
 If someone calls for a vote to make a decision: majority based on the cast votes; we need 50% of the committee participating to vote. In the absence of a quorum, the SC will decide according to its voting rules.
 
 Votes are cast in a non-confidential manner.
-Decisions are documented in the `weekly developer meeting notes <https://docs.google.com/document/d/1eYD8EYCYDI0H7FhiiEuRUDJZ5pPDr6MUL-IibE-Pk50/edit>`__ and/or on the GitHub repository.
+Decisions are documented in the [weekly developer meeting notes](https://docs.google.com/document/d/1eYD8EYCYDI0H7FhiiEuRUDJZ5pPDr6MUL-IibE-Pk50/edit) and/or on the GitHub repository.
 
 TC members can individually appoint new contributors, unless a vote is called on an individual.
 
-Appointment Process
-^^^^^^^^^^^^^^^^^^^
+### Appointment Process
 
 TC members are the maintainers of WarpX.
 As a TC member, regularly attending and contributing to the weekly developer meetings is expected.
@@ -105,16 +94,13 @@ Steering committee members can also be TC members.
 TC members can resign or be removed by majority vote by either TC or SC, e.g., due to inactivity, bad acting or other reasons.
 
 
-Contributors
-------------
+## Contributors
 
-Current Roster
-^^^^^^^^^^^^^^
+### Current Roster
 
-See: `GitHub team <https://github.com/orgs/BLAST-WarpX/teams/warpx-contributors>`__
+See: [GitHub team](https://github.com/orgs/BLAST-WarpX/teams/warpx-contributors)
 
-Role
-^^^^
+### Role
 
 Contributors are valuable, vetted developers of WarpX.
 Contributions can be in many forms and not all need to be code contributions.
@@ -123,21 +109,18 @@ Contributors can participate in developer meetings and weigh in on discussions.
 Contributors can "triage" (add labels) to pull requests, issues, and GitHub discussion pages.
 Contributors can comment and review PRs (but not merge).
 
-Decision Process
-^^^^^^^^^^^^^^^^
+### Decision Process
 
 Contributors can individually decide on classification (triage) of pull requests, issues, and GitHub discussion pages.
 
-Appointment Process
-^^^^^^^^^^^^^^^^^^^
+### Appointment Process
 
 Appointed after contributing to WarpX (see above) by any member of the TC.
 
 The role can be lost by resigning or by decision of an individual TC or SC member, e.g., due to inactivity, bad acting or other.
 
 
-Former Members
---------------
+## Former Members
 
 "Former members" are the giants on whose shoulders we stand.
 But, for the purpose of WarpX governance, they are *not* tracked as a governance role in WarpX.

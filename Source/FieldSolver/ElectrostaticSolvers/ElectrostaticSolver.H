@@ -69,11 +69,11 @@ public:
 
     /**
      * Compute the potential `phi` by solving the Poisson equation with `rho` as
-     * a source, assuming that the source moves at a constant speed \f$\vec{\beta}\f$.
+     * a source, assuming that the source moves at a constant speed \f$\boldsymbol{\beta}\f$.
      * This uses the amrex solver.
      * More specifically, this solves the equation
      *  \f[
-     *      \vec{\nabla}^2 r \phi - (\vec{\beta}\cdot\vec{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
+     *      \nabla^2 r \phi - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
      *  \f]
      * \param[in] rho The charge density for a given species (relativistic solver)
      *                               or total charge density (labframe solver)
@@ -102,11 +102,11 @@ public:
      * \brief Compute the electric field that corresponds to `phi`, and
      *        add it to the set of MultiFab `E`.
      * The electric field is calculated by assuming that the source that
-     * produces the `phi` potential is moving with a constant speed \f$\vec{\beta}\f$:
+     * produces the `phi` potential is moving with a constant speed \f$\boldsymbol{\beta}\f$:
      * \f[
-     *     \vec{E} = -\vec{\nabla}\phi + \vec{\beta}(\vec{\beta} \cdot \vec{\nabla}\phi)
+     *     \boldsymbol{E} = -\boldsymbol{\nabla}\phi + \boldsymbol{\beta}(\boldsymbol{\beta} \cdot \boldsymbol{\nabla}\phi)
      * \f]
-     * (where the second term represent the term \f$\partial_t \vec{A}\f$, in
+     * (where the second term represent the term \f$\partial_t \boldsymbol{A}\f$, in
      *     the case of a moving source)
      *
      * \param[inout] E Electric field on the grid
@@ -123,13 +123,13 @@ public:
      * \brief Compute the magnetic field that corresponds to `phi`, and
      *        add it to the set of MultiFab `B`.
      *The magnetic field is calculated by assuming that the source that
-     *produces the `phi` potential is moving with a constant speed \f$\vec{\beta}\f$:
+     *produces the `phi` potential is moving with a constant speed \f$\boldsymbol{\beta}\f$:
      *\f[
-     *    \vec{B} = -\frac{1}{c}\vec{\beta}\times\vec{\nabla}\phi
+     *    \boldsymbol{B} = -\frac{1}{c}\boldsymbol{\beta}\times\boldsymbol{\nabla}\phi
      *\f]
-     *(this represents the term \f$\vec{\nabla} \times \vec{A}\f$, in the case of a moving source)
+     *(this represents the term \f$\boldsymbol{\nabla} \times \boldsymbol{A}\f$, in the case of a moving source)
      *
-     *\param[inout] B Electric field on the grid
+     *\param[inout] B Magnetic field on the grid
      *\param[in] phi The potential from which to compute the electric field
      *\param[in] beta Represents the velocity of the source of `phi`
      */
@@ -156,6 +156,8 @@ public:
      *  2 : convergence progress at every MLMG iteration
      */
     int self_fields_verbosity = 2;
+    /** MLGM number of smoothing sweeps */
+    int self_fields_num_final_sweeps = 8;
 
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)
