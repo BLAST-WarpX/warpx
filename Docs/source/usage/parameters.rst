@@ -4081,8 +4081,19 @@ Additional parameters
     evolves with its own time step, set to its own CFL limit. In practice, it
     means that when level 0 performs one iteration, level 1 performs two
     iterations. Currently, this option is only supported when
-    :pp:param:`amr.max_level = 1`. More information can be found at
-    https://ieeexplore.ieee.org/document/8659392.
+    :pp:param:`amr.max_level = 1` and when the refinement ratio
+    :pp:param:`amr.ref_ratio` is 2 in all directions. More information can be
+    found at https://ieeexplore.ieee.org/document/8659392.
+
+    Sub-cycling is only implemented for the finite-difference electromagnetic
+    solvers (``algo.maxwell_solver = yee``, ``ckc`` or ``ect``). It is not
+    supported with the electrostatic and magnetostatic solvers (see
+    :pp:param:`warpx.do_electrostatic`), with the hybrid-PIC solver
+    (``algo.maxwell_solver = hybrid``), nor with the spectral solver
+    (``algo.maxwell_solver = psatd``); WarpX aborts if sub-cycling is requested
+    with any of these solvers. It also requires the explicit evolve scheme
+    (:pp:param:`algo.evolve_scheme` = ``explicit``, the default), since the
+    implicit and semi-implicit schemes do not sub-cycle.
 
 .. pp:param:: warpx.override_sync_intervals
     :type: ``string``
