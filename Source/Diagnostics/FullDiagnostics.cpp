@@ -457,6 +457,20 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
                 }
+            } else if ( warpx.m_fields.has(m_varnames_fields[comp].substr(0, m_varnames_fields[comp].size() - 1), lev) &&
+                        m_varnames_fields[comp].back() == field_names[idir].front()) {
+                // This assumes a name like fieldname + field_names[idir]
+                const std::string fieldname = m_varnames_fields[comp].substr(0, m_varnames_fields[comp].size() - 1);
+                const amrex::MultiFab * mf = warpx.m_fields.get(fieldname, Direction{idir}, lev);
+                const int mf_ncomp = mf->nComp();
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
+                if (mf_ncomp == ncomp) {
+                    AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
+                } else if (mf_ncomp == 1) {
+                    m_varnames.push_back(m_varnames_fields[comp]);
+                } else {
+                    WARPX_ABORT_WITH_MESSAGE("Error: " + m_varnames_fields[comp] + " has an unexpected number of components and can not be written out");
+                }
             }
         }
         // Check if comp was found above
@@ -491,8 +505,9 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 AddRZModesToOutputNames(std::string("F"), ncomp);
             }
         } else if ( m_varnames_fields[comp] == "Te" ){
-            // Electron temperature [K] implied by the hybrid-PIC
-            // electron-pressure closure.
+            // Electron temperature [K]: closure-implied by default, the
+            // QDSMC electron-energy-equation state variable when that
+            // equation is solved.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
                 "The 'Te' diagnostic output requires the hybrid-PIC solver "
@@ -587,8 +602,18 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
             if (update_varnames) {
                 m_varnames.push_back(std::string("dielectric_mask"));
             }
-        }
-        else {
+        } else if ( warpx.m_fields.has(m_varnames_fields[comp], lev) ) {
+            amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
+            const int mf_ncomp = mf->nComp();
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
+            if (mf_ncomp == ncomp) {
+                AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
+            } else if (mf_ncomp == 1) {
+                m_varnames.push_back(m_varnames_fields[comp]);
+            } else {
+                WARPX_ABORT_WITH_MESSAGE("Error: " + m_varnames_fields[comp] + " has an unexpected number of components and can not be written out");
+            }
+        } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error: " + m_varnames_fields[comp] + " is not a known field output type in RZ geometry");
         }
@@ -936,6 +961,12 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
+            } else if ( warpx.m_fields.has(m_varnames[comp].substr(0, m_varnames[comp].size() - 1), lev) &&
+                        m_varnames[comp].back() == field_names[idir].front()) {
+                // This assumes a name like fieldname + field_names[idir]
+                const std::string fieldname = m_varnames[comp].substr(0, m_varnames[comp].size() - 1);
+                const amrex::MultiFab * mf = warpx.m_fields.get(fieldname, Direction{idir}, lev);
+                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio);
             }
         }
         // Check if comp was found above
@@ -955,8 +986,9 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "F" ){
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::F_fp, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "Te" ){
-            // Electron temperature [K] implied by the hybrid-PIC
-            // electron-pressure closure.
+            // Electron temperature [K]: closure-implied by default, the
+            // QDSMC electron-energy-equation state variable when that
+            // equation is solved.
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
                 "The 'Te' diagnostic output requires the hybrid-PIC solver "
@@ -1006,6 +1038,8 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                 warpx.HasDielectricMaterials(),
                 "The dielectric_mask diagnostic requires dielectrics.names.");
             m_all_field_functors[lev][comp] = std::make_unique<DielectricMaskFunctor>(lev, m_crse_ratio);
+        } else if ( warpx.m_fields.has(m_varnames[comp], lev) ) {
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], lev), lev, m_crse_ratio);
         } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error on component " + m_varnames[comp] + ": "

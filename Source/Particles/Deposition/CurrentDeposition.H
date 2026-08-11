@@ -330,8 +330,9 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::IntVect const jy_type = jy_fab.box().type();
     amrex::IntVect const jz_type = jz_fab.box().type();
 
-    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
-    amrex::ParallelFor(
+    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab.
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long ip) {
             amrex::ParticleReal xp, yp, zp;
@@ -415,8 +416,9 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
     amrex::IntVect const jy_type = jy_fab.box().type();
     amrex::IntVect const jz_type = jz_fab.box().type();
 
-    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
-    amrex::ParallelFor(
+    // Loop over particles and deposit into jx_fab, jy_fab and jz_fab.
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
             amrex::ParticleReal xp, yp, zp;
@@ -721,7 +723,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     enum eb_flags : int { has_reduced_shape, no_reduced_shape };
     const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
 
-    amrex::ParallelFor( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
         {reduce_shape_runtime_flag},
         np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
             // --- Get particle quantities
@@ -1158,8 +1161,9 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
 
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-    amrex::ParallelFor(
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr.
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
@@ -2214,8 +2218,9 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-    amrex::ParallelFor(
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr.
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
@@ -2311,8 +2316,9 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-    amrex::ParallelFor(
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr.
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
 
@@ -2443,8 +2449,9 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
     amrex::Array4<amrex::Real> const& Dz_arr = Dz_fab.array();
 
-    // Loop over particles and deposit (Dx,Dy,Dz) into Dx_fab, Dy_fab and Dz_fab
-    amrex::ParallelFor(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
+    // Loop over particles and deposit (Dx,Dy,Dz) into Dx_fab, Dy_fab and Dz_fab.
+    // amrex::For: iterations scatter-add into shared nodes (no SIMD pragma, see issue #7097)
+    amrex::For(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
     {
         // Inverse of Lorentz factor gamma
         const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * PhysConst::inv_c2

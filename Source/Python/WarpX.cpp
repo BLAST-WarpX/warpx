@@ -43,20 +43,16 @@
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>
-#include <AMReX_SIMD.H>
 #include <AMReX_OpenMP.H>
 
 #if defined(AMREX_DEBUG) || defined(DEBUG)
 #   include <cstdio>
 #endif
+#include <memory>
 #include <string>
 
 
 //using namespace warpx;
-
-namespace warpx {
-    struct Config {};
-}
 
 namespace detail
 {
@@ -108,7 +104,13 @@ void init_WarpX (py::module& m)
     m.def("finalize", &WarpX::Finalize,
         "Close out the WarpX related data");
 
-    py::class_<WarpX> warpx(m, "WarpX");
+    // WarpX is a singleton owned by the C++ side: its lifetime ends in
+    // WarpX::Finalize (i.e. WarpX::ResetInstance), never when the last Python
+    // reference goes away. Without py::nodelete, pybind11's default
+    // return_value_policy for the raw pointer returned by get_instance below is
+    // take_ownership, and destroying the Python object would leave
+    // WarpX::m_instance dangling and WarpX::Finalize double-freeing it.
+    py::class_<WarpX, std::unique_ptr<WarpX, py::nodelete>> warpx(m, "WarpX");
     warpx
         // WarpX is a Singleton Class with a private constructor
         //   https://github.com/BLAST-WarpX/warpx/pull/4104
@@ -287,83 +289,4 @@ void init_WarpX (py::module& m)
             "Gets the number of substeps to take in the hybrid solver."
         )
     ;
-
-    py::class_<warpx::Config>(m, "Config")
-//        .def_property_readonly_static(
-//            "warpx_version",
-//            [](py::object) { return Version(); },
-//            "WarpX version")
-        .def_property_readonly_static(
-            "have_mpi",
-            [](py::object){
-#ifdef AMREX_USE_MPI
-                return true;
-#else
-                return false;
-#endif
-            })
-        .def_property_readonly_static(
-            "have_gpu",
-            [](py::object){
-#ifdef AMREX_USE_GPU
-                return true;
-#else
-                return false;
-#endif
-            })
-        .def_property_readonly_static(
-            "have_omp",
-            [](py::object){
-#ifdef AMREX_USE_OMP
-                return true;
-#else
-                return false;
-#endif
-        })
-        .def_property_readonly_static(
-            "have_simd",
-            [](py::object const &){
-#ifdef AMREX_USE_SIMD
-                return true;
-#else
-                return false;
-#endif
-        })
-        .def_property_readonly_static(
-            "simd_size",
-            [](py::object const &){
-                return amrex::simd::native_simd_size_particlereal;
-        })
-        .def_property_readonly_static(
-            "gpu_backend",
-            [](py::object){
-#ifdef AMREX_USE_CUDA
-                return "CUDA";
-#elif defined(AMREX_USE_HIP)
-                return "HIP";
-#elif defined(AMREX_USE_DPCPP)
-                return "SYCL";
-#else
-                return py::none();
-#endif
-        })
-        .def_property_readonly_static(
-            "precision",
-            [](py::object){
-#ifdef AMREX_USE_FLOAT
-                return "SINGLE";
-#else
-                return "DOUBLE";
-#endif
-        })
-        .def_property_readonly_static(
-            "precision_particles",
-            [](py::object){
-#ifdef AMREX_SINGLE_PRECISION_PARTICLES
-                return "SINGLE";
-#else
-                return "DOUBLE";
-#endif
-        })
-        ;
 }

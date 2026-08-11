@@ -172,9 +172,12 @@ class LibWarpX:
         """
         # TODO: simplify, part of pyAMReX already
         if self.initialized:
+            self.initialized = False
             del self.warpx
-            # The call to warpx_finalize causes a crash - don't know why
-            # self.libwarpx_so.warpx_finalize()
+            # Destroy the C++ WarpX singleton (and everything it owns) before
+            # tearing down AMReX, so that its MultiFabs are freed while the
+            # Arena that allocated them still exists.
+            self.libwarpx_so.finalize()
             self.libwarpx_so.amrex_finalize()
 
             from pywarpx import callbacks

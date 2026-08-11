@@ -1,1 +1,0 @@
-../../GOVERNANCE.rst
