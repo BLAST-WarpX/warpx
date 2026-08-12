@@ -784,19 +784,13 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
     ABLASTR_PROFILE("HybridPICModel::QDSMCUpdateTe()");
 
     auto & warpx = WarpX::GetInstance();
-    amrex::Geometry const & geom = warpx.Geom(lev);
-
-    // After the QDSMC scatter, weights_fp ~= n_e (density) and entropy_fp ~=
-    // K_e * N_e (entropy weighted by count, summed). Recover T_e_new:
+    // After the QDSMC scatter, weights_fp holds the deposited extensive
+    // electron count and entropy_fp holds K_e times that count. Recover T_e:
     //
-    //   K_e_new = entropy_fp / (weights_fp * V_cell)
+    //   K_e_new = entropy_fp / weights_fp
     //   T_e_new = K_e_new / (n_e_new^(1-gamma) * k_B / q_e)
     //
     // n_e_new comes from rho_fp (post-deposit, post-particle-push).
-
-    auto const dx_arr = geom.CellSizeArray();
-    amrex::Real cell_volume = 1.0_rt;
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) { cell_volume *= dx_arr[d]; }
 
     amrex::MultiFab       & Te      = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & Ke      = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,              lev);
@@ -834,7 +828,7 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
             // (K*N)/N ratio is well conditioned there because numerator and
             // denominator carry the same small factor.
             if (weights_arr(i,j,k) <= 0.0_rt) { return; }
-            amrex::Real const w = weights_arr(i,j,k) * cell_volume;
+            amrex::Real const w = weights_arr(i,j,k);
             // Floored density, mirroring QDSMCInitializeKe: below-floor
             // cells are updated too (insulating halo), and the K <-> T_e
             // conversion uses the same n_e^(gamma-1) factor on both sides of
