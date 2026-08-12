@@ -77,13 +77,9 @@ void WarpX::HybridPICEvolveFields ()
     m_hybrid_pic_model->GetCurrentExternal();
 
     // Compute the per-species resistive overlay once per step, from the
-    // start-of-step fields, into the registered hybrid_eta_overlay_fp
-    // fields; the E-solves below (subcycled Faraday and, with the drag
-    // active, the push-field solve) only read it. Ve does change during the
-    // B-substeps (through J = curl B / mu0), but the overlay is deliberately
-    // evaluated once and held fixed across the step -- a lagged
-    // approximation, consistent with the per-step evaluation of its other
-    // inputs (Vs, rho_s, T_e).
+    // start-of-step fields; the E-solves below only read it. Ve varies
+    // through the B-substeps, but the overlay is deliberately held fixed
+    // across the step (lagged, like its other inputs Vs, rho_s, T_e).
     if (m_hybrid_pic_model->m_has_per_species_eta) {
         for (int lev = 0; lev <= finest_level; ++lev) {
             auto eta_overlay = m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
@@ -210,6 +206,25 @@ void WarpX::HybridPICEvolveFields ()
         m_hybrid_pic_model->CalculateIonFluidVelocity();
     }
 
+    // The drag operator also gathers J_plasma (the |J| parser argument) at
+    // the particle shape order, which can read beyond the single ghost
+    // layer CalculateCurrentAmpere computes: refresh the ghosts, and in
+    // radial geometries the below-axis guards.
+    if (m_hybrid_pic_model->m_has_resistive_drag) {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            ablastr::fields::VectorField J_plasma =
+                m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *J_plasma[idim], J_plasma[idim]->nGrowVect(),
+                    WarpX::do_single_precision_comms, Geom(lev).periodicity());
+            }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            ApplyFieldBoundaryOnAxis(J_plasma[0], J_plasma[1], J_plasma[2], lev);
+#endif
+        }
+    }
+
     // Handle field splitting for Hybrid field push
     if (add_external_fields) {
         // If using split fields, add the external field at the new time
@@ -292,12 +307,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Radial geometries: apply the inverse-volume scaling to the
             // per-species deposits so they carry physical charge/current
-            // densities, with the same scale-then-guard-sum processing as
-            // the totals below. The per-species fields are compared with
-            // the physical rho_floor (species fractions, Vs = Js/rhos) and
-            // exposed to SI-unit parsers, so raw radial weights would
-            // engage the floors at healthy densities near the axis and
-            // break the drag/Ohm push-field cancellation there.
+            // densities, like the totals below. The per-species fields are
+            // compared with the physical rho_floor (species fractions,
+            // Vs = Js/rhos) and exposed to SI-unit parsers.
             for (int lev = 0; lev <= finest_level; ++lev) {
                 ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
                 ApplyInverseVolumeScalingToCurrentDensity(
@@ -306,7 +318,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
 #endif
             // The per-species fields themselves are consumed directly
             // (Vs = Js/rhos, species fractions, per-species resistivity,
-            // resistive drag) and need their own guard-cell sum here.
+            // resistive drag) and need their own guard-cell sum here;
+            // dst_ng = nGrowVect() also leaves the ghosts neighbor-
+            // consistent for the drag's particle gathers.
             for (int lev = 0; lev <= finest_level; ++lev) {
                 ablastr::utils::communication::SumBoundary(
                     *rho_spec[lev], 0, rho_spec[lev]->nComp(),
@@ -319,24 +333,17 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
             }
-            // The resistive-drag operator gathers rho_fp_<spec> and
-            // current_fp_<spec> at particle positions, so their ghost cells
-            // must hold the neighbor's values (SumBoundary above folds ghost
-            // contributions into the valid cells but leaves the ghosts
-            // stale). The grid-side consumers only read valid cells, so this
-            // exchange is needed (and paid) only when the drag is active.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            // Below-axis guard cells still hold raw deposit remnants after
+            // the fold; fill them by parity reflection (as for E and B) for
+            // the drag operator's particle gathers near r = 0.
             if (m_hybrid_pic_model->m_has_resistive_drag) {
                 for (int lev = 0; lev <= finest_level; ++lev) {
-                    ablastr::utils::communication::FillBoundary(
-                        *rho_spec[lev], rho_spec[lev]->nGrowVect(),
-                        WarpX::do_single_precision_comms, Geom(lev).periodicity());
-                    for (int idim = 0; idim < 3; ++idim) {
-                        ablastr::utils::communication::FillBoundary(
-                            *J_spec[lev][idim], J_spec[lev][idim]->nGrowVect(),
-                            WarpX::do_single_precision_comms, Geom(lev).periodicity());
-                    }
+                    ApplyFieldBoundaryOnAxis(
+                        J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
                 }
             }
+#endif
             // Species-summed physical charge density (same form as the
             // rho_fp_s numerators), shared by the electron-energy-equation
             // and per-species-resistivity consumers. Accumulated AFTER the
@@ -484,6 +491,34 @@ void WarpX::HybridPICInitializeRhoJandB ()
         for (int idim = 0; idim < 3; ++idim) {
             MultiFab::Copy(*current_fp_temp[lev][idim], *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                         0, 0, 1, current_fp_temp[lev][idim]->nGrowVect());
+        }
+    }
+
+    // Seed Ve_fp / Vs_fp (and the J_plasma they derive from) for the first
+    // step: collisions run before the first HybridPICEvolveFields, so the
+    // resistive drag would otherwise gather the alloc-init zeros. This
+    // matters especially on restart, where the checkpointed E already
+    // contains the eta*J term while Ve/Vs are not checkpointed.
+    if (m_hybrid_pic_model->m_need_fluid_velocities) {
+        m_hybrid_pic_model->GetCurrentExternal();
+        m_hybrid_pic_model->CalculatePlasmaCurrent(
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+            m_eb_update_E);
+        m_hybrid_pic_model->CalculateElectronFluidVelocity();
+        m_hybrid_pic_model->CalculateIonFluidVelocity();
+    }
+    if (m_hybrid_pic_model->m_has_resistive_drag) {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            ablastr::fields::VectorField J_plasma =
+                m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *J_plasma[idim], J_plasma[idim]->nGrowVect(),
+                    WarpX::do_single_precision_comms, Geom(lev).periodicity());
+            }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            ApplyFieldBoundaryOnAxis(J_plasma[0], J_plasma[1], J_plasma[2], lev);
+#endif
         }
     }
 }

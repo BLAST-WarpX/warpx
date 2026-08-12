@@ -45,23 +45,6 @@ comm = mpi.COMM_WORLD
 simulation = None
 
 
-class HybridResistiveDragCollision(object):
-    """Minimal PICMI-style wrapper for the hybrid_resistive_drag collision
-    (not yet in picmistandard): one species, no further parameters -- the
-    drag rate comes from the Ohm's-law resistivity."""
-
-    def __init__(self, name, species):
-        self.name = name
-        self.species = species
-
-    def collision_initialize_inputs(self):
-        import pywarpx
-
-        coll = pywarpx.Collisions.newcollision(self.name)
-        coll.type = "hybrid_resistive_drag"
-        coll.species = [s.name for s in self.species]
-
-
 class ResistiveDragMomentum(object):
     # ---- Plasma parameters --------------------------------------------------
     ti_eV = 500.0  # ion temperature (eV)
@@ -250,7 +233,7 @@ class ResistiveDragMomentum(object):
 
         # The feature under test: ion side of the electron-ion friction.
         simulation.collisions = [
-            HybridResistiveDragCollision(name="ion_drag", species=[self.ions])
+            picmi.HybridResistiveDragCollisions(name="ion_drag", species=self.ions)
         ]
 
         # Remove any diags from a previous run in the same directory, so

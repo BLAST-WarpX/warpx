@@ -20,11 +20,13 @@
  *     nu_{s,e} = Z_s e^2 eta_s_eff n_e / m_s,
  *     eta_s_eff = eta_global(rho,|J|,t) + eta_s_per (per-species overlay, if any).
  *
- * The cell bulk velocity relaxes toward the electron fluid V_e,
+ * The species bulk velocity relaxes toward the electron fluid V_e,
  *     V_s -> V_e + (V_s - V_e) exp(-nu_{s,e} dt),
- * applied as a uniform per-cell shift to every particle:
+ * applied as a velocity-independent shift, with V_s and V_e gathered at each
+ * particle's position:
  *     v_p -= (V_s - V_e)(1 - exp(-nu_{s,e} dt)).
- * Only the bulk drift is decelerated; the thermal spread (T_i) is preserved.
+ * Only the bulk drift is decelerated; the thermal spread (T_i) is preserved
+ * to leading order in the gradients of V_s - V_e.
  * Drag only, no diffusion -- NOT a Q_ei temperature-relaxation channel.
  *
  * No electron heat is deposited here: the eta J^2 source on T_e is the separate
@@ -45,7 +47,8 @@ public:
     HybridResistiveDrag ( HybridResistiveDrag&& )                  = delete;
     HybridResistiveDrag& operator= ( HybridResistiveDrag&& )       = delete;
 
-    void doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc) override;
+    void doCollisions (amrex::Real cur_time, amrex::Real dt,
+                       MultiParticleContainer* mypc) override;
 };
 
 #endif // WARPX_PARTICLES_COLLISION_HYBRIDRESISTIVEDRAG_H_

@@ -7,20 +7,6 @@ from mpi4py import MPI
 
 from pywarpx import picmi
 
-
-class HybridResistiveDragCollision:
-    def __init__(self, name, species):
-        self.name = name
-        self.species = species
-
-    def collision_initialize_inputs(self):
-        import pywarpx
-
-        collision = pywarpx.Collisions.newcollision(self.name)
-        collision.type = "hybrid_resistive_drag"
-        collision.species = [species.name for species in self.species]
-
-
 comm = MPI.COMM_WORLD
 n0 = 2.0e20
 
@@ -59,13 +45,19 @@ simulation = picmi.Simulation(
     warpx_serialize_initial_conditions=True,
 )
 
+# A uniform axial drift makes the deposited per-species current J_s finite,
+# so its RZ inverse-volume scaling (including the on-axis cells) is covered
+# alongside rho_s. The drift is non-relativistic and moves particles by
+# v*dt = 1e-5 m << dz in the single step taken.
+v_drift = 1.0e5  # m/s
+
 ions = picmi.Species(
     name="ions",
     charge="q_e",
     mass=picmi.constants.m_p,
     initial_distribution=picmi.UniformDistribution(
         density=n0,
-        directed_velocity=[0.0, 0.0, 0.0],
+        directed_velocity=[0.0, 0.0, v_drift],
     ),
 )
 simulation.add_species(
@@ -75,7 +67,9 @@ simulation.add_species(
         n_macroparticle_per_cell=[2, 4, 2],
     ),
 )
-simulation.collisions = [HybridResistiveDragCollision(name="ion_drag", species=[ions])]
+simulation.collisions = [
+    picmi.HybridResistiveDragCollisions(name="ion_drag", species=ions)
+]
 
 if comm.rank == 0 and Path("diags").exists():
     shutil.rmtree("diags")
@@ -85,7 +79,7 @@ field_diag = picmi.FieldDiagnostic(
     name="field_diag",
     grid=grid,
     period=1,
-    data_list=["rho_ions"],
+    data_list=["rho_ions", "J"],
     write_dir="diags",
     warpx_file_prefix="field_diags",
     warpx_format="openpmd",
@@ -94,6 +88,13 @@ field_diag = picmi.FieldDiagnostic(
 simulation.add_diagnostic(field_diag)
 
 simulation.initialize_inputs()
-field_diag.diagnostic.additional_fields_to_plot = ["hybrid_rho_species_sum_fp"]
+# The per-species current is registered as a vector field, which the
+# diagnostics resolve per component through the register-mangled name
+# (only the axial component is needed: the drift is purely axial). The
+# name is quoted so the embedded '=' survives the AMReX inputs parser.
+field_diag.diagnostic.additional_fields_to_plot = [
+    "hybrid_rho_species_sum_fp",
+    '"current_fp_ions[dir=z]"',
+]
 simulation.initialize_warpx()
 simulation.step()

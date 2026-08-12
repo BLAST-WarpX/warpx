@@ -547,16 +547,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
-    // When the resistive-drag collision applies the ion-side friction, the
-    // resistive terms belong in every E-solve, including the one that builds
-    // the particle-push field: the drag (-R_s on each species) and the
-    // resistive E (+(rho_s/rho) Sum_t R_t via the Lorentz force) are the two
-    // halves of the electron-ion friction, and only their sum conserves
-    // momentum. Without the drag, excluding them from the push field is
-    // exactly equivalent for a global eta (the two halves cancel per species,
-    // pointwise) and is kept as the long-standing default. The hyper-resistive
-    // term is numerical dissipation with no drag back-reaction, so it stays in
-    // the Faraday solves only.
+    // With the resistive-drag collision active, the resistive terms belong
+    // in every E-solve, including the one that builds the particle-push
+    // field: the drag (-R_s on each species) and the resistive E
+    // (+(rho_s/rho) Sum_t R_t via the Lorentz force) are the two halves of
+    // the electron-ion friction, and only their sum conserves momentum.
+    // Without the drag they are excluded from the push field, which is
+    // exactly equivalent for a global eta (the two halves cancel per
+    // species, pointwise). The hyper-resistive term is numerical dissipation
+    // with no drag back-reaction and stays in the Faraday solves only.
     const bool include_resistivity =
         solve_for_Faraday || hybrid_model->m_has_resistive_drag;
 
@@ -605,13 +604,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
-    // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
-    // Computed once per step (HybridPICEvolveFields -> ComputeResistiveOverlay)
-    // into the registered hybrid_eta_overlay_fp fields and only READ here, so
-    // the subcycled E-solves share it instead of recomputing it. When no
-    // per-species resistivity parser is registered the fields are not
-    // allocated and the per-cell add is skipped (E += 0 is a no-op) --
-    // bit-identical to the single-eta path.
+    // Per-species resistive overlay added to Ohm's-law E alongside
+    // +eta_global J. Computed once per step (HybridPICEvolveFields ->
+    // ComputeResistiveOverlay) into the registered hybrid_eta_overlay_fp
+    // fields and only read here, shared by the subcycled E-solves. The
+    // fields are not allocated when no per-species parser is registered.
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
     ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
     if (has_eta_overlay) {
@@ -720,9 +717,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
-        // Overlay arrays stay default-constructed (never indexed) when no
-        // per-species resistivity is registered -- the kernels gate the read
-        // on has_eta_overlay.
+        // Default-constructed (never indexed) unless has_eta_overlay.
         Array4<Real const> eta_overlay_r, eta_overlay_t, eta_overlay_z;
         if (has_eta_overlay) {
             eta_overlay_r = eta_overlay_mf[0]->const_array(mfi);
@@ -790,8 +785,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
 
-                // Resistive terms: always for the Faraday solves; also in the
-                // push field when the resistive-drag collision is active.
+                // Resistive terms; see include_resistivity above.
                 if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
@@ -803,8 +797,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
-                    // Per-species resistive overlay (Phys. Plasmas 31, 012902 (2024)); zero
-                    // when no per-species eta is registered.
+                    // Per-species resistive overlay (Phys. Plasmas 31, 012902 (2024)).
                     if (has_eta_overlay) { Er(i, j, 0) += eta_overlay_r(i, j, 0); }
 
                     if (include_hyper_resistivity_term && solve_for_Faraday) {
@@ -865,8 +858,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Etheta(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
 
-                // Resistive terms: always for the Faraday solves; also in the
-                // push field when the resistive-drag collision is active.
+                // Resistive terms; see include_resistivity above.
                 if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if(resistivity_has_J_dependence) {
@@ -935,8 +927,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
 
-                // Resistive terms: always for the Faraday solves; also in the
-                // push field when the resistive-drag collision is active.
+                // Resistive terms; see include_resistivity above.
                 if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
@@ -1034,16 +1025,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
-    // When the resistive-drag collision applies the ion-side friction, the
-    // resistive terms belong in every E-solve, including the one that builds
-    // the particle-push field: the drag (-R_s on each species) and the
-    // resistive E (+(rho_s/rho) Sum_t R_t via the Lorentz force) are the two
-    // halves of the electron-ion friction, and only their sum conserves
-    // momentum. Without the drag, excluding them from the push field is
-    // exactly equivalent for a global eta (the two halves cancel per species,
-    // pointwise) and is kept as the long-standing default. The hyper-resistive
-    // term is numerical dissipation with no drag back-reaction, so it stays in
-    // the Faraday solves only.
+    // Resistive terms in the push field when the drag is active; see the
+    // design notes in HybridPICSolveECylindrical.
     const bool include_resistivity =
         solve_for_Faraday || hybrid_model->m_has_resistive_drag;
 
@@ -1092,12 +1075,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
-    // Per-species resistive overlay added to Ohm's-law E alongside +eta_global J.
-    // Computed once per step into the registered hybrid_eta_overlay_fp fields
-    // and only READ here; see HybridPICSolveECylindrical (RZ branch) for the
-    // design notes. When no per-species parser is registered the fields are
-    // not allocated and the per-cell add is skipped (bit-identical
-    // single-eta path).
+    // Per-species resistive overlay added to Ohm's-law E alongside
+    // +eta_global J; computed once per step, only read here (see
+    // HybridPICSolveECylindrical). Not allocated when no per-species
+    // parser is registered.
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
     ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
     if (has_eta_overlay) {
@@ -1206,9 +1187,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Bx = Bfield[0]->array(mfi);
         Array4<Real> const& By = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
-        // Overlay arrays stay default-constructed (never indexed) when no
-        // per-species resistivity is registered -- the kernels gate the read
-        // on has_eta_overlay.
+        // Default-constructed (never indexed) unless has_eta_overlay.
         Array4<Real const> eta_overlay_x, eta_overlay_y, eta_overlay_z;
         if (has_eta_overlay) {
             eta_overlay_x = eta_overlay_mf[0]->const_array(mfi);
@@ -1272,8 +1251,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
             }
 
-            // Resistive terms: always for the Faraday solves; also in the
-            // push field when the resistive-drag collision is active.
+            // Resistive terms; see include_resistivity above.
             if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
@@ -1338,8 +1316,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
             }
 
-            // Resistive terms: always for the Faraday solves; also in the
-            // push field when the resistive-drag collision is active.
+            // Resistive terms; see include_resistivity above.
             if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
@@ -1404,8 +1381,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
             }
 
-            // Resistive terms: always for the Faraday solves; also in the
-            // push field when the resistive-drag collision is active.
+            // Resistive terms; see include_resistivity above.
             if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {

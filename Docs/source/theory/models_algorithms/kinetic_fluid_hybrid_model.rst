@@ -276,6 +276,10 @@ Ohm's law:
 
         \boldsymbol{E} = -\frac{1}{en_e}\left( \boldsymbol{J}_e\times\boldsymbol{B} + \boldsymbol{\nabla} P_e \right)+\eta\boldsymbol{J}-\eta_h \nabla^2\boldsymbol{J}.
 
+Lastly, if an electron temperature is given from which the electron pressure can
+be calculated, the model is fully constrained and can be evolved given initial
+conditions.
+
 Multi-species resistivity
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -300,10 +304,6 @@ drift together the overlay reduces to
 :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s` enters the per-species Joule
 heating of the :ref:`electron energy equation
 <theory-hybrid-model-electron-energy-eq>`.
-
-Lastly, if an electron temperature is given from which the electron pressure can
-be calculated, the model is fully constrained and can be evolved given initial
-conditions.
 
 .. bibliography::
     :keyprefix: kfhm-

@@ -214,10 +214,11 @@ public:
 
     /**
      * \brief Compute the per-species ion bulk velocity Vs = Js/rhos on the
-     * grid for every charged species. Output is stored in Vs_fp_{species}
-     * (face-staggered like J). Used by the resistive-drag operator to
-     * apply a per-cell uniform shift (V_s - V_e)(1 - exp(-nu dt)) to every
-     * particle, leaving the thermal moment intact.
+     * grid for every charged, depositing species. Output is stored in
+     * Vs_fp_{species} (face-staggered like J). Used by the resistive-drag
+     * operator to apply a velocity-independent shift
+     * (V_s - V_e)(1 - exp(-nu dt)), gathered at each particle's position,
+     * leaving the thermal moment intact.
      */
     void CalculateIonFluidVelocity () const;
     void CalculateIonFluidVelocity (int lev) const;
@@ -385,7 +386,7 @@ public:
 
     /**
      * \brief Compute the per-species resistive overlay vector field added to
-     *        Ohm's-law E alongside the existing +eta_global * J term:
+     *        Ohm's-law E alongside the global +eta_global * J term:
      *
      *           overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
      *                                       * (V_s_d - V_e_d) ]
@@ -401,20 +402,14 @@ public:
      *        i.e. effectively eta_s_eff = eta_global + eta_s_per per species.
      *
      *        Output multifabs are at the Jx/Jy/Jz staggering (== E
-     *        component staggering). When m_has_per_species_eta is false
-     *        the overlay is set to zero and the function returns early
-     *        (single-eta behaviour is exactly recovered when callers add
-     *        a field of zeros to E).
+     *        component staggering); when m_has_per_species_eta is false
+     *        the overlay is set to zero and the function returns early.
      *
      *        Computed once per step (from HybridPICEvolveFields, into the
      *        registered hybrid_eta_overlay_fp fields) from the start-of-step
-     *        fields and held frozen across the E-solves, which only read it.
-     *        Ve (and the |J|, |B| parser arguments) do vary during the
-     *        B-substeps; the once-per-step evaluation is a deliberate lagged
-     *        approximation, consistent with the per-step evaluation of the
-     *        other inputs (Vs_fp, rho_fp_{spec}, T_e). Caller passes
-     *        pre-allocated Yee-staggered MultiFabs (one per direction) sized
-     *        to match Jx/Jy/Jz at this level.
+     *        fields and held frozen across the (subcycled) E-solves, which
+     *        only read it -- a deliberate lagged approximation, matching the
+     *        per-step evaluation of Vs_fp, rho_fp_{spec} and T_e.
      */
     void ComputeResistiveOverlay (
         int lev,
@@ -545,13 +540,9 @@ public:
      */
     std::map<std::string, std::unique_ptr<amrex::Parser>> m_per_species_resistivity_parser;
     std::map<std::string, amrex::ParserExecutor<7>>       m_eta_per_species;
-    /** Fast-path flag: true if at least one charged species has a
-     *  registered per-species resistivity parser. When false the
-     *  per-species code paths short-circuit to the global parser only,
-     *  preserving the existing single-eta behaviour with zero overhead.
-     *  Set from the input deck in ReadParameters (so AllocateLevelMFs can
-     *  gate the overlay fields) and confirmed in InitData when the parsers
-     *  are compiled. */
+    /** True if at least one species has a registered per-species
+     *  resistivity parser. Set in ReadParameters (so AllocateLevelMFs can
+     *  gate the overlay fields); the parsers are compiled in InitData. */
     bool m_has_per_species_eta = false;
 
     /** True when a hybrid_resistive_drag collision is present in the input
@@ -591,9 +582,7 @@ public:
      *  or the electron-energy equation is solved (its Joule and Q_ei
      *  sources read the per-species charge densities). Gates their
      *  allocation and the per-species deposition path in
-     *  HybridPICDepositRhoAndJ; when false, the deposition falls back to
-     *  the single-pass MultiParticleContainer path with zero extra cost.
-     *  Set in ReadParameters. */
+     *  HybridPICDepositRhoAndJ. Set in ReadParameters. */
     bool m_need_per_species_fields = false;
 
     /** Plasma hyper-resisitivity */

@@ -2890,13 +2890,20 @@ Details about the collision models can be found in the :ref:`theory section <mul
       :math:`\nu_{s,e} = Z_s e^2 \eta_{s,\mathrm{eff}} n_e / m_s` implied by the Ohm's-law
       resistivity (global plus the optional per-species overlay,
       :pp:param:`hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)`),
-      via a per-cell uniform shift that preserves the ion temperature. When this collision
+      via a velocity-independent bulk-velocity shift
+      :math:`(\boldsymbol{V}_s - \boldsymbol{V}_e)\left(1 - e^{-\nu_{s,e}\Delta t}\right)`
+      gathered at each particle's position, which decelerates the bulk drift while
+      preserving the thermal spread to leading order in field gradients. When this collision
       is registered the resistive terms of Ohm's law are also included in the E-field that
       pushes the particles (not only in the Faraday solves), because the drag and the
       resistive push-field force are the two halves of the friction and only their sum
       conserves momentum; for a global resistivity the two cancel exactly, recovering the
       plain-``eta`` behavior. For that reason the collision must be registered on every
-      charged species. It takes exactly one species and no further parameters.
+      charged species (non-depositing tracer species are exempt; species with negative
+      charge are not supported and are rejected at initialization).
+      It takes exactly one species and no type-specific parameters,
+      though the generic :pp:param:`<collision_name>.ndt_supercycle` and
+      :pp:param:`<collision_name>.ndt_subcycle` options still apply.
     - ``bremsstrahlung`` for slowing of electrons due to Bremsstrahlung collisions with ions.
       This uses the cross sections as given by `Seltzer and Berger <https://doi.org/10.1016/0092-640X(86)90014-8>`__.
     - ``inverse_bremsstrahlung`` for inverse bremstrahlung absorption of photons from the collisions of electrons and ions.
@@ -2927,7 +2934,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     If using ``background_mcc`` or ``background_stopping`` type this should be the name of the
     species for which collisions with a background will be included.
     If using ``pulsed_decay`` type this should be the name of the parent species.
-    In these three cases, only one species name should be given.
+    If using ``hybrid_resistive_drag``, this should be the one ion species the drag is applied to.
+    In these four cases, only one species name should be given.
     If using ``linear_breit_wheeler`` these should be two photon species.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
 

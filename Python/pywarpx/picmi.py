@@ -2307,11 +2307,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
 
-        self.solve_electron_energy_equation = solve_electron_energy_equation
-        self.include_joule_heating = include_joule_heating
-        self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
-        self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
-
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
         self.substep_rtol = substep_rtol
@@ -3380,6 +3375,43 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
                 if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
+
+
+class HybridResistiveDragCollisions(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle setup of the hybrid-PIC resistive drag collision in
+    WarpX. If collision initialization is added to picmistandard this can be
+    changed to inherit that functionality.
+
+    This is the ion-side half of the electron-ion friction operator of the
+    hybrid-PIC (Ohm's law) solver: it relaxes the bulk velocity of the given
+    ion species toward the electron fluid velocity at the rate implied by the
+    resistivity of Ohm's law, pairing with the ``plasma_resistivity`` /
+    ``plasma_resistivity_species`` parameters of :class:`HybridPICSolver`.
+    With the drag registered, the resistive terms of Ohm's law are also
+    included in the particle-push E-field, so when used the drag must be
+    registered on every charged species (WarpX asserts this at
+    initialization).
+
+    Parameters
+    ----------
+    name: string
+        Name of instance (used in the inputs file)
+
+    species: species instance
+        The (positive, current-depositing) ion species the drag acts on
+    """
+
+    def __init__(self, name, species, **kw):
+        self.name = name
+        self.species = species
+
+        self.handle_init(kw)
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "hybrid_resistive_drag"
+        collision.species = [self.species.name]
 
 
 class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):

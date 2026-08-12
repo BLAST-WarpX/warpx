@@ -101,4 +101,26 @@ assert rel_err < args.tol_decay, (
     f"{args.tol_decay}): the drag is disturbing the resistive field decay."
 )
 
+# --- tertiary: ion-temperature preservation ---------------------------------
+# The drag applies a velocity-independent bulk shift to each particle, so it
+# must not heat or cool the ions: the domain-mean deposited ion temperature
+# (T_ions, in eV) has to stay at its initial value (500 eV in the deck).
+Ti_mean = []
+for it in ts.iterations:
+    Ti, _ = ts.get_field(field="T_ions", iteration=it)
+    Ti_mean.append(np.mean(Ti))
+Ti_mean = np.asarray(Ti_mean)
+
+Ti_change = abs(Ti_mean[-1] - Ti_mean[0]) / Ti_mean[0]
+
+print(f"  <T_ions> (first dump)  = {Ti_mean[0]:.4f} eV")
+print(f"  <T_ions> (last dump)   = {Ti_mean[-1]:.4f} eV")
+print(f"  relative change        = {Ti_change:.4f} (tolerance 0.05)")
+
+assert Ti_change < 0.05, (
+    f"Domain-mean ion temperature changed by {Ti_change:.3f} relative "
+    "(tolerance 0.05): the resistive drag is not preserving the ion "
+    "thermal spread."
+)
+
 print("PASS")
