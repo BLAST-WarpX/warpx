@@ -318,17 +318,16 @@ QdsmcParticleContainer::SetK (int lev,
 
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
         {
-            // Carry the extensive electron count N = n_e * V_phys and the
+            // Carry the extensive electron count N = n_e * cell_volume and the
             // matching entropy content K*N. This conserves entropy when a
             // marker moves across RZ cells with different physical volumes.
-            amrex::Real const V_phys = qdsmc_physical_volume(x_node[ip], dx);
             amrex::Real const n_p = ablastr::particles::doGatherScalarFieldNodal(
                 x_node[ip], y_node[ip], z_node[ip], rho_arr, dxi, plo)
                 / PhysConst::q_e;
             amrex::Real const k_p = ablastr::particles::doGatherScalarFieldNodal(
                 x_node[ip], y_node[ip], z_node[ip], K_arr, dxi, plo);
 
-            np_real[ip] = n_p * V_phys;
+            np_real[ip] = n_p * qdsmc_physical_volume(x_node[ip], dx);
             entropy[ip] = k_p * np_real[ip];
         });
     }
