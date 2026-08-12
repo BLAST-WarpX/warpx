@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Analysis for test_2d_eb_diffuse_reflection.
+"""Analysis for test_2d_particle_boundary_interaction_thermal.
 
 A fully accommodating (diffuse) embedded-boundary wall at 600 K re-emits each impacting particle
 from a half-Maxwellian at the wall temperature. Starting from a 300 K gas, repeated wall strikes
-heat the gas toward the wall temperature. The wall still reflects (does not absorb), so particle
+heat the gas toward the wall temperature. The wall still re-emits (does not absorb), so particle
 number is conserved while the mean kinetic temperature rises from 300 K toward 600 K.
 
 Reads the ParticleNumber and ParticleEnergy reduced diagnostics; asserts number conservation and
@@ -28,12 +28,12 @@ N_spread = (N.max() - N.min()) / N[0]
 print(f"particle number: {N[0]:.6e} -> {N[-1]:.6e}   (max spread {N_spread:.3e})")
 print(f"kinetic temperature: {T0:.1f} K -> {T1:.1f} K   (gas 300 K, wall 600 K)")
 
-# reflection, not absorption
+# re-emission, not absorption
 assert N_spread < 5e-3, (
-    "particle number not conserved -> EB is absorbing/leaking, not reflecting"
+    "particle number not conserved -> EB is absorbing/leaking, not re-emitting"
 )
 # gas heats toward the wall ...
-assert T1 > T0 + 50.0, "gas did not heat -> diffuse accommodation not applied"
+assert T1 > T0 + 50.0, "gas did not heat -> thermal accommodation not applied"
 assert T1 > 380.0, "insufficient heating toward the 600 K wall"
 # ... but never exceeds the wall temperature
 assert T1 < 610.0, (
@@ -41,5 +41,5 @@ assert T1 < 610.0, (
 )
 
 print(
-    "PASS: diffuse EB reflection conserves particle number and thermalizes the gas toward the wall."
+    "PASS: thermal EB re-emission conserves particle number and thermalizes the gas toward the wall."
 )
