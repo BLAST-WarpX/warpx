@@ -277,7 +277,7 @@ WarpX::Evolve (int numsteps)
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
 
-        // Apply particle thermalizer (no-op until implemented)
+        // Apply particle thermalizer
         if (m_particle_thermalizer.defined()) {
             m_particle_thermalizer.applyThermalizer(*mypc);
         }
@@ -735,10 +735,12 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     mypc->ApplyBoundaryConditions();
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
 
-    // Without mesh refinement, use a local redistribute when particles can only
-    // have moved by a small number of cells; otherwise fall back to a global one.
-    if (finest_level == 0) {
-        // Estimate, per direction, the maximum distance a particle may have
+    if (m_do_subcycling) {
+        // With subcycling, fine-level particles can take multiple pushes before
+        // this synchronization point.
+        mypc->Redistribute();
+    } else {
+        // Redistribute: Estimate the maximum distance a particle may have
         // travelled during this step, expressed in number of cells.
         // (Geom().CellSizeArray() is indexed by active dimension 0..SPACEDIM-1.)
         const amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> dx = Geom(0).CellSizeArray();
@@ -753,15 +755,16 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         // Moving window: particles can additionally move by the number of cells
         // that the window was shifted, along the moving-window direction.
         if (moving_window_dir >= 0) {
-            max_distance_relative_to_grid[moving_window_dir] += static_cast<amrex::Real>(num_moved);
+            max_distance_relative_to_grid[moving_window_dir] +=
+                static_cast<amrex::Real>(num_moved);
         }
-
 
         // Galilean algorithm: account for the extra grid shift due to the moving
         // Galilean frame. m_v_galilean is indexed by x/y/z, so map its components
         // onto the active simulation dimensions.
 #if defined(WARPX_DIM_3D)
-        const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[1], m_v_galilean[2]};
+        const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[1],
+                                            m_v_galilean[2]};
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
         const amrex::RealVect v_galilean = {m_v_galilean[0], m_v_galilean[2]};
 #elif defined(WARPX_DIM_1D_Z)
@@ -770,7 +773,8 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         const amrex::RealVect v_galilean = amrex::RealVect::TheZeroVector();
 #endif
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            max_distance_relative_to_grid[d] += std::abs(v_galilean[d]) * dt[0] / dx[d];
+            max_distance_relative_to_grid[d] +=
+                std::abs(v_galilean[d]) * dt[0] / dx[d];
         }
 
         // Convert to an integer number of cells (rounding up), per direction.
@@ -786,16 +790,15 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         const amrex::IntVect domain_length = Geom(0).Domain().length();
         bool use_local_redistribute = true;
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            if (max_cells_travelled[d] >= domain_length[d]) { use_local_redistribute = false; }
+            if (max_cells_travelled[d] >= domain_length[d]) {
+                use_local_redistribute = false;
+            }
         }
         if (use_local_redistribute) {
             mypc->RedistributeLocal(max_cells_travelled);
         } else {
             mypc->Redistribute();
         }
-    }
-    else {
-        mypc->Redistribute();
     }
 
     // interact the particles with EB walls (if present)
