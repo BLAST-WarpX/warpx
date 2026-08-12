@@ -22,8 +22,8 @@ jobs:
               - '!.zenodo.json'
               - '!Docs/**'
               - '!Tools/machines/**'
-              - '!**.rst'
-              - '!**.md'
+              - '!**/*.rst'
+              - '!**/*.md'
           predicate-quantifier: 'every'
       - id: set-output
         run: |
