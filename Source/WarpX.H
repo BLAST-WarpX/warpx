@@ -114,11 +114,6 @@ public:
 
     [[nodiscard]] int Verbose () const { return verbose; }
 
-    [[nodiscard]] bool GetVerboncoeurAxisCorrection () const
-    {
-        return m_verboncoeur_axis_correction;
-    }
-
     [[nodiscard]] const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& GetFieldBoundaryLo () const
     {
         return field_boundary_lo;

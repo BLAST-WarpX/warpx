@@ -57,27 +57,18 @@ namespace
     amrex::Real
     qdsmc_physical_volume (
         amrex::Real r,
-        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
-        amrex::Real const axis_volume_factor)
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx)
     {
         amrex::Real vol = 1.0_rt;
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
             vol *= dx[d];
         }
 #if defined(WARPX_DIM_RZ)
-        r = amrex::Math::abs(r);
-        // The default marker is at the center of the first radial cell.
-        // Use the axis control volume for that cell, not the midpoint
-        // approximation 2*pi*r at r = dr/2.
-        if (r <= 0.5_rt * dx[0]) {
-            // Match the axis control-volume convention used by
-            // ApplyInverseVolumeScalingToChargeDensity.
-            vol *= MathConst::pi * dx[0] * axis_volume_factor;
-        } else {
-            vol *= 2.0_rt * MathConst::pi * r;
-        }
+        // The midpoint expression is the exact annular volume for every
+        // cell-centered marker, including the first radial cell at r = dr/2.
+        vol *= 2.0_rt * MathConst::pi * amrex::Math::abs(r);
 #else
-        amrex::ignore_unused(r, axis_volume_factor);
+        amrex::ignore_unused(r);
 #endif
         return vol;
     }
@@ -305,12 +296,6 @@ QdsmcParticleContainer::SetK (int lev,
     auto const plo = warpx.Geom(lev).ProbLoArray();
     auto const dxi = warpx.Geom(lev).InvCellSizeArray();
     auto const dx = warpx.Geom(lev).CellSizeArray();
-#if defined(WARPX_DIM_RZ)
-    amrex::Real const axis_volume_factor = warpx.GetVerboncoeurAxisCorrection()
-        ? 1.0_rt/3.0_rt : 1.0_rt/4.0_rt;
-#else
-    amrex::Real const axis_volume_factor = 1.0_rt;
-#endif
 
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
@@ -336,8 +321,7 @@ QdsmcParticleContainer::SetK (int lev,
             // Carry the extensive electron count N = n_e * V_phys and the
             // matching entropy content K*N. This conserves entropy when a
             // marker moves across RZ cells with different physical volumes.
-            amrex::Real const V_phys = qdsmc_physical_volume(
-                x_node[ip], dx, axis_volume_factor);
+            amrex::Real const V_phys = qdsmc_physical_volume(x_node[ip], dx);
             amrex::Real const n_p = ablastr::particles::doGatherScalarFieldNodal(
                 x_node[ip], y_node[ip], z_node[ip], rho_arr, dxi, plo)
                 / PhysConst::q_e;
