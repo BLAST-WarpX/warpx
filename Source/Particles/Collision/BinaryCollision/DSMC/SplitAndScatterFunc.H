@@ -428,12 +428,18 @@ public:
                 uy3 -= uCOM_y;
                 uz3 -= uCOM_z;
 
-                // calculate kinetic energy of the collision
-                const amrex::ParticleReal p_non_target_in = m0 * std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
-                const amrex::ParticleReal E_coll = 0.5_prt * p_non_target_in * p_non_target_in * (1.0_prt/m0 + 1.0_prt/m1);
+                // Calculate the kinetic energy of the collision. Squared SI momenta
+                // underflow in single precision, so keep these intermediates in double.
+                const auto m0_d = static_cast<double>(m0);
+                const auto m1_d = static_cast<double>(m1);
+                const auto ux0_d = static_cast<double>(ux0);
+                const auto uy0_d = static_cast<double>(uy0);
+                const auto uz0_d = static_cast<double>(uz0);
+                const double p_non_target_in_d = m0_d * std::sqrt(ux0_d*ux0_d + uy0_d*uy0_d + uz0_d*uz0_d);
+                const double E_coll_d = 0.5 * p_non_target_in_d * p_non_target_in_d * (1.0/m0_d + 1.0/m1_d);
 
                 // subtract the energy cost for ionization (converted from eV to J)
-                amrex::ParticleReal E_out = E_coll - scattering_process.m_energy_penalty * PhysConst::q_e;
+                double E_out_d = E_coll_d - static_cast<double>(scattering_process.m_energy_penalty) * PhysConst::q_e_v<double>;
 
                 // clamp E_out to 0: CollisionFilterFunc.H selects this pair for ionization
                 // using  a differently-computed (relativistic, whole-pair) collision energy,
@@ -442,7 +448,7 @@ public:
                 // would produce a NaN velocity in such cases.
                 // TODO: update the E_coll calculation above to match the calculation in
                 // CollisionFilterFunc.H
-                E_out = amrex::max(E_out, 0.0_prt);
+                E_out_d = amrex::max(E_out_d, 0.0);
 
                 // The kinematics of the ionization event (i.e. how the energy and momentum are
                 // distributed among the products) depend on the nature of the incident particle
@@ -465,10 +471,13 @@ public:
                     // (with m1 = mass_slot2 + mass_slot3, by conservation of mass)
 
                     // Amplitude of the momentum of the non-target particle, obtained from conservation of energy
-                    const amrex::ParticleReal p_non_target_out = std::sqrt( 2.0_prt * E_out / (1.0_prt / m0 + 1.0_prt / (mass_slot2 + mass_slot3) ) );
+                    const auto mass_slot2_d = static_cast<double>(mass_slot2);
+                    const auto mass_slot3_d = static_cast<double>(mass_slot3);
+                    const double products_mass_d = mass_slot2_d + mass_slot3_d;
+                    const double p_non_target_out_d = std::sqrt( 2.0 * E_out_d / (1.0 / m0_d + 1.0 / products_mass_d ) );
 
                     // Reduce the velocity of the non-target particle, to reflect the loss of energy due to ionization
-                    const amrex::ParticleReal reduce_factor = p_non_target_out / p_non_target_in;
+                    const auto reduce_factor = static_cast<amrex::ParticleReal>(p_non_target_out_d / p_non_target_in_d);
                     ux0 *= reduce_factor;
                     uy0 *= reduce_factor;
                     uz0 *= reduce_factor;
@@ -510,37 +519,41 @@ public:
                     const amrex::ParticleReal scaled_uy_ion = -(scaled_uy0 + scaled_uy_new);
                     const amrex::ParticleReal scaled_uz_ion = -(scaled_uz0 + scaled_uz_new);
                     const amrex::ParticleReal scaled_u2_ion = scaled_ux_ion*scaled_ux_ion + scaled_uy_ion*scaled_uy_ion + scaled_uz_ion*scaled_uz_ion;
+                    const auto scaled_u2_ion_d = static_cast<double>(scaled_u2_ion);
+                    const auto m_ion_d = static_cast<double>(m_ion);
 
                     // Magnitude of the momentum of the two electrons, from conservation
                     // of energy in the center-of-mass frame (both electrons are assumed
                     // to carry an equal share of the energy):
                     //     2 * p_e^2 / (2 m_e) + p_ion^2 / (2 m_ion) = E_out
-                    const amrex::ParticleReal p_e = std::sqrt(
-                        E_out / (1.0_prt/m0 + 0.5_prt*scaled_u2_ion/m_ion) );
+                    const double p_e_d = std::sqrt(
+                        E_out_d / (1.0/m0_d + 0.5*scaled_u2_ion_d/m_ion_d) );
+                    const auto u_e = static_cast<amrex::ParticleReal>(p_e_d/m0_d);
+                    const auto u_ion = static_cast<amrex::ParticleReal>(p_e_d/m_ion_d);
 
                     // Assign the normalized momenta (still in the COM frame; the surrounding code
                     // transforms them back to the lab frame). The incident electron is in
                     // slot 0; the two products of the ionized target (slots 2 and 3) are
                     // one electron and one ion, the electron being the lighter of the two.
-                    ux0 = p_e/m0 * scaled_ux0;
-                    uy0 = p_e/m0 * scaled_uy0;
-                    uz0 = p_e/m0 * scaled_uz0;
+                    ux0 = u_e * scaled_ux0;
+                    uy0 = u_e * scaled_uy0;
+                    uz0 = u_e * scaled_uz0;
                     if (mass_slot2 < mass_slot3) {
                         // slot 2 is the freed electron, slot 3 is the ion
-                        ux2 = p_e/m0 * scaled_ux_new;
-                        uy2 = p_e/m0 * scaled_uy_new;
-                        uz2 = p_e/m0 * scaled_uz_new;
-                        ux3 = p_e/m_ion * scaled_ux_ion;
-                        uy3 = p_e/m_ion * scaled_uy_ion;
-                        uz3 = p_e/m_ion * scaled_uz_ion;
+                        ux2 = u_e * scaled_ux_new;
+                        uy2 = u_e * scaled_uy_new;
+                        uz2 = u_e * scaled_uz_new;
+                        ux3 = u_ion * scaled_ux_ion;
+                        uy3 = u_ion * scaled_uy_ion;
+                        uz3 = u_ion * scaled_uz_ion;
                     } else {
                         // slot 3 is the freed electron, slot 2 is the ion
-                        ux3 = p_e/m0 * scaled_ux_new;
-                        uy3 = p_e/m0 * scaled_uy_new;
-                        uz3 = p_e/m0 * scaled_uz_new;
-                        ux2 = p_e/m_ion * scaled_ux_ion;
-                        uy2 = p_e/m_ion * scaled_uy_ion;
-                        uz2 = p_e/m_ion * scaled_uz_ion;
+                        ux3 = u_e * scaled_ux_new;
+                        uy3 = u_e * scaled_uy_new;
+                        uz3 = u_e * scaled_uz_new;
+                        ux2 = u_ion * scaled_ux_ion;
+                        uy2 = u_ion * scaled_uy_ion;
+                        uz2 = u_ion * scaled_uz_ion;
                     }
                 }
 
