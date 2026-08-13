@@ -3296,9 +3296,11 @@ Time step
     The ratio between the actual timestep that is used in the simulation
     and the Courant-Friedrichs-Lewy (CFL) limit. (e.g. for ``warpx.cfl=1``,
     the timestep will be exactly equal to the CFL limit.)
-    For some speed v and grid spacing dx, this limits the timestep to ``warpx.cfl * dx / v``.
-    When used with the electromagnetic solver, ``v`` is the speed of light.
-    For the electrostatic solver, ``v`` is the maximum speed among all particles in the domain.
+    For some speed ``v`` and grid spacing ``dx``, this limits the timestep to ``warpx.cfl * dx / v``.
+    When used with electromagnetic solvers that treat light waves explicitly, ``v`` is the speed of light.
+    For the electrostatic solver and electromagnetic solvers that treat light waves implicitly, ``dx / v``
+    is the minimum direction-dependent value ``dx_i / v_i`` among all particles in the domain, where ``v_i`` is the
+    maximum speed in grid direction ``i`` and ``dx_i`` is the associated grid spacing.
 
 .. pp:param:: warpx.const_dt
     :type: ``float``
