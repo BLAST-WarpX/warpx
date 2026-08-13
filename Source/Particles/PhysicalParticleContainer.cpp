@@ -2123,94 +2123,54 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             WarpXSumGuardCells(*w2_mf, periodicity, w2_mf->nGrowVect(), 0, 1);
         }
 
-        // Get MF pointers for all deposition multifabs
-        amrex::iMultiFab* nx_mf    = local_temperature_arrays->get_n(Direction{0}, lev);
-        amrex::iMultiFab* ny_mf    = local_temperature_arrays->get_n(Direction{1}, lev);
-        amrex::iMultiFab* nz_mf    = local_temperature_arrays->get_n(Direction{2}, lev);
-        amrex::MultiFab*  wx_mf    = local_temperature_arrays->get("w", Direction{0}, lev);
-        amrex::MultiFab*  wy_mf    = local_temperature_arrays->get("w", Direction{1}, lev);
-        amrex::MultiFab*  wz_mf    = local_temperature_arrays->get("w", Direction{2}, lev);
-        amrex::MultiFab*  w2x_mf   = local_temperature_arrays->get("w2", Direction{0}, lev);
-        amrex::MultiFab*  w2y_mf   = local_temperature_arrays->get("w2", Direction{1}, lev);
-        amrex::MultiFab*  w2z_mf   = local_temperature_arrays->get("w2", Direction{2}, lev);
-        amrex::MultiFab*  vbarx_mf = local_temperature_arrays->get("vbar", Direction{0}, lev);
-        amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
-        amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
+        // Normalize each component on its own staggered BoxArray. Iterating the
+        // x-staggered field while indexing the y- and z-staggered arrays can leave
+        // valid points unnormalized at grid boundaries.
+        const bool single_pass = (depos_type == TemperatureDepositionType::SINGLE_PASS);
+        for (int idir = 0; idir < 3; ++idir)
+        {
+            const Direction dir{idir};
+            amrex::MultiFab& variance = *T_vf[lev][dir];
+            amrex::iMultiFab const& nsamples =
+                *local_temperature_arrays->get_n(dir, lev);
+            amrex::MultiFab const& weights =
+                *local_temperature_arrays->get("w", dir, lev);
+            amrex::MultiFab const& centered_second_moment =
+                *local_temperature_arrays->get("w2", dir, lev);
+            amrex::MultiFab& mean_velocity =
+                *local_temperature_arrays->get("vbar", dir, lev);
 
-        // Normalize variance after accumulating sums cell by cell
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for ( amrex::MFIter mfi(*T_vf[lev][0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+            for (amrex::MFIter mfi(variance, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                const amrex::Box& box = mfi.growntilebox();
+                const amrex::Array4<amrex::Real>& var_arr = variance.array(mfi);
+                const amrex::Array4<const int>& n_arr = nsamples.const_array(mfi);
+                const amrex::Array4<const amrex::Real>& w_arr = weights.const_array(mfi);
+                const amrex::Array4<const amrex::Real>& w2_arr =
+                    centered_second_moment.const_array(mfi);
+                const amrex::Array4<amrex::Real>& vbar_arr = mean_velocity.array(mfi);
 
-            amrex::Array4<amrex::Real> const& varx_arr = T_vf[lev][0]->array(mfi);
-            amrex::Array4<amrex::Real> const& vary_arr = T_vf[lev][1]->array(mfi);
-            amrex::Array4<amrex::Real> const& varz_arr = T_vf[lev][2]->array(mfi);
-            const amrex::Array4<const int> & nx_arr = nx_mf->const_array(mfi);
-            const amrex::Array4<const int> & ny_arr = ny_mf->const_array(mfi);
-            const amrex::Array4<const int> & nz_arr = nz_mf->const_array(mfi);
-            const amrex::Array4<const amrex::Real> & wx_arr = wx_mf->const_array(mfi);
-            const amrex::Array4<const amrex::Real> & wy_arr = wy_mf->const_array(mfi);
-            const amrex::Array4<const amrex::Real> & wz_arr = wz_mf->const_array(mfi);
-            const amrex::Array4<const amrex::Real> & w2x_arr = w2x_mf->const_array(mfi);
-            const amrex::Array4<const amrex::Real> & w2y_arr = w2y_mf->const_array(mfi);
-            const amrex::Array4<const amrex::Real> & w2z_arr = w2z_mf->const_array(mfi);
-            amrex::Array4<amrex::Real> const& vxbar_arr = vbarx_mf->array(mfi);
-            amrex::Array4<amrex::Real> const& vybar_arr = vbary_mf->array(mfi);
-            amrex::Array4<amrex::Real> const& vzbar_arr = vbarz_mf->array(mfi);
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                {
+                    if (n_arr(i, j, k) > 1)
+                    {
+                        const amrex::Real sumw = w_arr(i, j, k);
+                        const amrex::Real sumwv = vbar_arr(i, j, k);
+                        const auto n = static_cast<amrex::Real>(n_arr(i, j, k));
+                        const amrex::Real norm = n / ((n - 1._rt) * sumw);
 
-            const amrex::Box& tbx  = mfi.growntilebox( T_vf[lev][0]->ixType().toIntVect() );
-            const amrex::Box& tby  = mfi.growntilebox( T_vf[lev][1]->ixType().toIntVect() );
-            const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
-
-
-            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
-
-            // Update Mean and Variance values after running through weight deposition loop
-            amrex::ParallelFor(tbx, tby, tbz,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (nx_arr(i,j,k) > 1) {
-                        const amrex::Real sumw = wx_arr(i,j,k);
-                        const amrex::Real sumwv = vxbar_arr(i,j,k);
-                        const auto n = static_cast<amrex::Real>(nx_arr(i,j,k));
-                        const amrex::Real norm = n/((n-1._rt)*sumw);
-
-                        vxbar_arr(i,j,k) = sumwv/sumw;
-                        varx_arr(i,j,k) = norm*w2x_arr(i,j,k);
-                        if (single_pass){
-                            varx_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
-                        }
-                    }
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (ny_arr(i,j,k) > 1) {
-                        const amrex::Real sumw = wy_arr(i,j,k);
-                        const amrex::Real sumwv = vybar_arr(i,j,k);
-                        const auto n = static_cast<amrex::Real>(ny_arr(i,j,k));
-                        const amrex::Real norm = n/((n-1._rt)*sumw);
-
-                        vybar_arr(i,j,k) = sumwv/sumw;
-                        vary_arr(i,j,k) = norm*w2y_arr(i,j,k);
-                        if (single_pass){
-                            vary_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
-                        }
-                    }
-                },
-                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (nz_arr(i,j,k) > 1) {
-                        const amrex::Real sumw = wz_arr(i,j,k);
-                        const amrex::Real sumwv = vzbar_arr(i,j,k);
-                        const auto n = static_cast<amrex::Real>(nz_arr(i,j,k));
-                        const amrex::Real norm = n/((n-1._rt)*sumw);
-
-                        vzbar_arr(i,j,k) = sumwv/sumw;
-                        varz_arr(i,j,k) = norm*w2z_arr(i,j,k);
-                        if (single_pass) {
-                            varz_arr(i,j,k) -= norm*sumwv*sumwv/sumw;
+                        vbar_arr(i, j, k) = sumwv / sumw;
+                        var_arr(i, j, k) = norm * w2_arr(i, j, k);
+                        if (single_pass)
+                        {
+                            var_arr(i, j, k) -= norm * sumwv * sumwv / sumw;
                         }
                     }
                 });
-
+            }
         }
 
         amrex::Gpu::streamSynchronize();
