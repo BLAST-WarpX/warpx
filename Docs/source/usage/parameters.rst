@@ -1031,6 +1031,15 @@ additionally define the electric potential at the embedded boundary with an anal
 
     * ``Reflecting``: Particles that reach the embedded boundary are specularly reflected back into the simulation domain
 
+    * ``Thermal``: Particles that reach the embedded boundary are re-emitted back into the simulation domain
+      with a thermalized velocity, as from a fully accommodating diffuse wall. The two velocity components
+      tangential to the local surface are sampled from a ``gaussian`` distribution, and the component along
+      the (inward) surface normal is sampled from a ``gaussian flux`` distribution.
+      The standard deviation for these distributions should be provided for each species using
+      ``boundary.<species_name>.u_th`` (in units of :math:`c`, i.e. :math:`\sqrt{k_B T_\mathrm{wall}/m}/c`),
+      the same input used by the domain ``thermal`` particle boundary condition. The same standard
+      deviation is used to sample all components.
+
 .. _param-particle-thermalizer:
 
 Particle thermalizer
