@@ -43,7 +43,7 @@ if emass_10:
     l2_tolerance = 0.096
     e_mass = 10
 else:
-    l2_tolerance = 0.05
+    l2_tolerance = 0.06
     e_mass = m_e  # Electron mass in kg
 ndims = np.count_nonzero(ds.domain_dimensions > 1)
 

@@ -429,7 +429,6 @@ public:
     /**
      * Determine the simulation timestep from the time step limiters
      */
-    amrex::Real ParticleGridSpeedMax ();
     amrex::Real GlobalPlasmaFrequencyMax ();
     amrex::Real GlobalCyclotronFrequencyMax ();
     void ApplyDtLimiters ();

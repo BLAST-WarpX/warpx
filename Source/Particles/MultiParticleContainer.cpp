@@ -414,12 +414,12 @@ MultiParticleContainer::GetParticleContainerFromName (const std::string& name) c
 }
 
 amrex::ParticleReal
-MultiParticleContainer::maxParticleVelocity() {
-    amrex::ParticleReal max_v = 0.0_prt;
+MultiParticleContainer::maxParticleDtInv() {
+    amrex::ParticleReal max_dt_inv = 0.0_prt;
     for (const auto &pc : allcontainers) {
-        max_v = std::max(max_v, pc->maxParticleVelocity());
+        max_dt_inv = amrex::max(max_dt_inv, pc->maxParticleDtInv());
     }
-    return max_v;
+    return max_dt_inv;
 }
 
 void
