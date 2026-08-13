@@ -185,12 +185,7 @@ namespace BinaryCollisionUtils{
 
         // Find the squared COM momentum from the factored Kallen form, obtaining
         // both numerator factors from s_minus_threshold without cancellation.
-        double p_star_sq;
-        if (m_sum_c2 == 0.0) {
-            p_star_sq = powi<2>( 0.5 * E_star * inv_c );
-        } else {
-            p_star_sq = s_minus_threshold * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2) / (4.0 * E_star_sq * c2);
-        }
+        double p_star_sq = (E_star == 0) ? 0.0 : s_minus_threshold * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2) / (4.0 * E_star_sq * c2);
 
         // Energy of each particle in the center of mass frame
         const double E1_star = std::sqrt(m1_sq*c2 + p_star_sq) * c;
