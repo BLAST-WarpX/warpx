@@ -130,7 +130,6 @@ namespace {
         const double E_rest_in_d = (m1_in_d + m2_in_d)*c2_d;
         const double E_rest_out_d = (m1_out_d + m2_out_d)*c2_d;
         const double E_star_f_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d, 0.0);
-        const double E_star_f_sq_d = E_star_f_d*E_star_f_d;
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle

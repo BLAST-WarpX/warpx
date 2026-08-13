@@ -129,7 +129,6 @@ namespace BinaryCollisionUtils{
 
         constexpr auto c = PhysConst::c_v<double>;
         constexpr auto c2 = PhysConst::c2_v<double>;
-        constexpr auto inv_c = PhysConst::inv_c_v<double>;
 
         // Cast input parameters to double before computing collision properties
         // This is needed to avoid errors when using single-precision particles
