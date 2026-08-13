@@ -181,11 +181,7 @@ namespace BinaryCollisionUtils{
 
         // Compute E_star - (m1 + m2)c^2 in factored form to avoid cancellation.
         // For two massless particles E_kin_COM is E_star directly.
-        if (m_sum_c2 == 0.0) {
-            E_kin_COM = static_cast<amrex::ParticleReal>(E_star);
-        } else {
-            E_kin_COM = static_cast<amrex::ParticleReal>(s_minus_threshold / (E_star + m_sum_c2));
-        }
+        E_kin_COM = (E_star == 0.0) ? 0.0_prt :  static_cast<amrex::ParticleReal>(s_minus_threshold / (E_star + m_sum_c2));
 
         // Find the squared COM momentum from the factored Kallen form, obtaining
         // both numerator factors from s_minus_threshold without cancellation.
@@ -201,7 +197,7 @@ namespace BinaryCollisionUtils{
         const double E2_star = std::sqrt(m2_sq*c2 + p_star_sq) * c;
 
         // relative velocity in the center of mass frame, cast back to chosen precision
-        v_rel_COM = static_cast<amrex::ParticleReal>(c * std::sqrt(p_star_sq) * c * (1.0/E1_star + 1.0/E2_star));
+        v_rel_COM = static_cast<amrex::ParticleReal>(std::sqrt(p_star_sq) * c2 * (1.0/E1_star + 1.0/E2_star));
 
         // Cross sections and relative velocity are computed in the center of mass frame.
         // On the other hand, the particle densities (weight over volume) in the lab frame are used.

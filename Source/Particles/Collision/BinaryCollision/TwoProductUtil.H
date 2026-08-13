@@ -136,7 +136,7 @@ namespace {
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
         // The expression below is specifically written in a form that avoids returning
         // small negative numbers due to machine precision errors, for low-energy particles
-        const double E_ratio_d = std::sqrt(E_star_f_sq_d)/((m1_out_d + m2_out_d)*c2_d);
+        const double E_ratio_d = E_star_f_d/E_rest_out_d;
         double p_star_f_sq_d = 0.0;
         // E_ratio <= 1 means the COM energy does not reach the combined rest mass of
         // the products, i.e. this pair is below the reaction threshold.
