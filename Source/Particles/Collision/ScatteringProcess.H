@@ -18,6 +18,7 @@
 #include <AMReX_RandomEngine.H>
 #include <AMReX_Vector.H>
 
+#include <cmath>
 #include <string>
 
 enum class ScatteringProcessType {
@@ -36,7 +37,8 @@ public:
                 const std::string& scattering_process,
                 const std::string& cross_section_file,
                 amrex::ParticleReal energy,
-                ScatteringAngleModel scattering_angle_model
+                ScatteringAngleModel scattering_angle_model,
+                const std::string& cross_section_file_mt = ""
                 );
 
     template <typename InputVector>
@@ -45,7 +47,8 @@ public:
                 const InputVector&& energies,
                 const InputVector&& sigmas,
                 amrex::ParticleReal energy,
-                ScatteringAngleModel scattering_angle_model
+                ScatteringAngleModel scattering_angle_model,
+                const InputVector&& sigmas_mt = InputVector()
                 );
 
     ~ScatteringProcess() = default;
@@ -55,19 +58,27 @@ public:
     ScatteringProcess (ScatteringProcess &&)                = default;
     ScatteringProcess& operator= (ScatteringProcess &&)     = default;
 
-    /** Read the given cross-section data file to memory.
+    /** Read the given cross-section data file(s) to memory.
      *
-     * @param cross_section_file the path to the file containing the cross-
+     * @param cross_section_file the path to the file containing the integral cross-
      *        section data
      * @param energies vector storing energy values in eV
-     * @param sigmas vector storing cross-section values
+     * @param sigmas vector storing (integral) cross-section values
+     * @param cross_section_file_mt optional path to the file containing the momentum-
+     *        transfer cross-section data (used by the screened Rutherford angle model).
+     *        When non-empty, it must be tabulated on the same energy grid as
+     *        \p cross_section_file.
+     * @param sigmas_mt optional vector storing momentum-transfer cross-section values;
+     *        only filled when \p cross_section_file_mt is non-empty (may be nullptr)
      *
      */
     static
     void readCrossSectionFile (
                                const std::string& cross_section_file,
                                amrex::Vector<amrex::ParticleReal>& energies,
-                               amrex::Gpu::HostVector<amrex::ParticleReal>& sigmas
+                               amrex::Gpu::HostVector<amrex::ParticleReal>& sigmas,
+                               const std::string& cross_section_file_mt = "",
+                               amrex::Gpu::HostVector<amrex::ParticleReal>* sigmas_mt = nullptr
                                );
 
     static
@@ -107,10 +118,47 @@ public:
             }
         }
 
+        /** Get the screening parameter eta of the screened Rutherford model at the given
+         * collision energy. This is only meaningful when the scattering angle model is
+         * `Screened_Rutherford` (otherwise `m_log_eta_data` is nullptr). The tabulated
+         * `ln(eta)` is linearly interpolated on the same (possibly non-uniform) energy grid
+         * as the cross-section, using the same bisection search as `getCrossSection`. Outside
+         * the energy range, the first (last) tabulated value is used.
+         *
+         * @param E_coll collision energy in eV
+         *
+         */
+        [[nodiscard]]
+        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+        amrex::ParticleReal getEta (amrex::ParticleReal E_coll) const
+        {
+            if (E_coll < m_energy_lo) {
+                return std::exp(m_log_eta_lo);
+            } else if (E_coll > m_energy_hi) {
+                return std::exp(m_log_eta_hi);
+            } else {
+                // Same bracketing as getCrossSection (does not assume an evenly spaced grid).
+                const int idx_1 = amrex::bisect(m_energies_data, 0, m_grid_size - 1, E_coll);
+                const int idx_2 = idx_1 + 1;
+
+                // linearly interpolate ln(eta) to the given energy value
+                const amrex::ParticleReal temp =
+                    (E_coll - m_energies_data[idx_1])
+                    / (m_energies_data[idx_2] - m_energies_data[idx_1]);
+                const amrex::ParticleReal log_eta =
+                    m_log_eta_data[idx_1] + (m_log_eta_data[idx_2] - m_log_eta_data[idx_1]) * temp;
+                return std::exp(log_eta);
+            }
+        }
+
         amrex::ParticleReal* m_energies_data = nullptr;
         amrex::ParticleReal* m_sigmas_data = nullptr;
+        /** Tabulated ln(eta) on the energy grid, for the screened Rutherford angle model
+         *  (nullptr for all other angle models). **/
+        amrex::ParticleReal* m_log_eta_data = nullptr;
         int m_grid_size = 0;
         amrex::ParticleReal m_energy_lo, m_energy_hi, m_sigma_lo, m_sigma_hi, m_dE;
+        amrex::ParticleReal m_log_eta_lo = 0, m_log_eta_hi = 0;
         amrex::ParticleReal m_energy_penalty;
         ScatteringProcessType m_type;
         ScatteringAngleModel m_scattering_angle_model;
@@ -148,11 +196,24 @@ private:
     void init (const std::string& scattering_process, amrex::ParticleReal energy,
                ScatteringAngleModel scattering_angle_model);
 
+    /** Build the lookup table of ln(eta) vs. energy for the screened Rutherford angle
+     *  model, by inverting sigma_mt/sigma = 2*eta*[(eta+1)*ln(1+1/eta) - 1] at each energy
+     *  node. Requires `m_energies`, `m_sigmas_h` and `m_sigmas_mt_h` to already be filled;
+     *  fills `m_log_eta_h`. **/
+    void buildScreenedRutherfordTable ();
+
     amrex::Vector<amrex::ParticleReal> m_energies;
+
+    // Momentum-transfer cross-section and tabulated ln(eta) for the screened Rutherford
+    // angle model. The momentum-transfer cross-section is only used at initialization
+    // (to build the ln(eta) table) and is therefore kept host-only.
+    amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_mt_h;
+    amrex::Gpu::HostVector<amrex::ParticleReal> m_log_eta_h;
 
 #ifdef AMREX_USE_GPU
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_energies_d;
     amrex::Gpu::DeviceVector<amrex::ParticleReal> m_sigmas_d;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_log_eta_d;
     Executor m_exe_d;
 #endif
     amrex::Gpu::HostVector<amrex::ParticleReal> m_sigmas_h;

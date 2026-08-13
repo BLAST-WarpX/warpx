@@ -396,6 +396,14 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                   // is computed as the second product but discarded.
                                   amrex::ParticleReal u1x_out, u1y_out, u1z_out;
                                   amrex::ParticleReal u2x_out, u2y_out, u2z_out;
+                                  // For the screened Rutherford angle model, evaluate the
+                                  // screening parameter at the collision energy (in eV);
+                                  // it is unused (and left at zero) for all other models.
+                                  const amrex::ParticleReal eta =
+                                      (scattering_process.m_scattering_angle_model
+                                       == ScatteringAngleModel::Screened_Rutherford)
+                                      ? scattering_process.getEta(static_cast<amrex::ParticleReal>(E_coll))
+                                      : amrex::ParticleReal(0);
                                   TwoProductComputeProductMomenta(
                                       ux[ip], uy[ip], uz[ip], m,
                                       ua_x, ua_y, ua_z, M,
@@ -405,7 +413,7 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                       // TwoProductComputeProductMomenta expects the *released* energy here, hence
                                       // the negative sign; the energy penalty is also converted from eV to Joules.
                                       scattering_process.m_scattering_angle_model,
-                                      engine);
+                                      engine, eta);
 
                                   // update projectile velocity with new components in labframe
                                   // (the background-gas recoil u2*_out is discarded)

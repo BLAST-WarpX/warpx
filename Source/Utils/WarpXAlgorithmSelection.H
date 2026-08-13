@@ -189,6 +189,7 @@ AMREX_ENUM(ScatteringAngleModel,
            Forward,    /**< Scattering angle is zero, i.e., products have the same direction as the incident particle in the center of mass frame */
            Backward,   /**< Scattering angle is pi, i.e., products have the opposite direction of the incident particle in the center of mass frame */
            Isotropic,  /**< Scattering angle is random, i.e., products are scattered isotropically in the center of mass frame */
+           Screened_Rutherford,  /**< Scattering angle is sampled from the screened Rutherford model, using the ratio of the momentum-transfer and integral cross sections (input string: `screened_rutherford`) */
            Default = Isotropic  /**< Isotropic */
 );
 

@@ -150,8 +150,28 @@ namespace BinaryCollisionUtils{
             pp_collision_name.query_enum_case_insensitive(
                 scattering_process + "_scattering_angle_model", scattering_angle_model);
 
+            // The screened Rutherford angle model additionally requires the momentum-transfer
+            // cross-section, provided via `<process>_cross_section_mt` (same file format and
+            // energy grid as `<process>_cross_section`). It is only meaningful for that model.
+            const std::string kw_cross_section_mt = scattering_process + "_cross_section_mt";
+            std::string cross_section_file_mt;
+            pp_collision_name.query(kw_cross_section_mt, cross_section_file_mt);
+            std::string cross_section_mt_message("'");
+            cross_section_mt_message.append(kw_cross_section_mt);
+            cross_section_mt_message.append(
+                "' must be provided if and only if '");
+            cross_section_mt_message.append(scattering_process);
+            cross_section_mt_message.append(
+                "_scattering_angle_model' is 'screened_rutherford'.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                (cross_section_file_mt.empty()) ==
+                    (scattering_angle_model != ScatteringAngleModel::Screened_Rutherford),
+                cross_section_mt_message
+            );
+
             scattering_processes.push_back(ScatteringProcess(
-                scattering_process, cross_section_file, energy, scattering_angle_model));
+                scattering_process, cross_section_file, energy, scattering_angle_model,
+                cross_section_file_mt));
         }
 
         return scattering_processes;

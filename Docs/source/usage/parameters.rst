@@ -3126,6 +3126,19 @@ Details about the collision models can be found in the :ref:`theory section <mul
     represent the kinetic energy of the center-of-mass frame. The energy values in this column
     must be in strictly increasing order.
 
+.. pp:param:: <collision_name>.<scattering_process>_cross_section_mt
+    :type: ``string``
+    :optional:
+
+    Only for ``dsmc`` and ``background_mcc``, and required if and only if
+    :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` is
+    ``screened_rutherford``. Path to the file containing the *momentum-transfer* cross-section
+    :math:`\sigma_{mt}` of the process. It uses the same 2-column file format (energy in eV in
+    the center-of-mass frame, cross-section in :math:`m^2`) and must be tabulated on the **same
+    energy grid** as :pp:param:`<collision_name>.<scattering_process>_cross_section` (the
+    integral cross-section :math:`\sigma`). See the ``screened_rutherford`` model in
+    :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` for how it is used.
+
 .. pp:param:: <collision_name>.<scattering_process>_energy
     :type: ``float``
 
@@ -3141,7 +3154,8 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc`` and ``background_mcc``, and only for ``elasticX``, ``excitationX``,
     ``charge_exchange`` and ``twoproduct_reaction``.
     The model used to determine the scattering angle of the products
-    in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
+    in the center-of-mass frame. The possible values are ``isotropic``, ``forward``, ``backward``
+    and ``screened_rutherford``.
     The default is ``isotropic`` for ``elasticX`` and ``excitationX``, and ``forward`` for
     ``charge_exchange`` and ``twoproduct_reaction``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
@@ -3149,6 +3163,33 @@ Details about the collision models can be found in the :ref:`theory section <mul
     as the incident particle (in the center of mass frame).
     With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in
     the opposite direction of the incident particle (in the center of mass frame).
+
+    With ``screened_rutherford``, the scattering angle :math:`\theta` is drawn from the screened
+    Rutherford (Wentzel) distribution
+
+    .. math::
+
+        f(\cos\theta) = \frac{2\eta(\eta+1)}{(2\eta + 1 - \cos\theta)^2}, \qquad \cos\theta \in [-1, 1],
+
+    which is forward-peaked and controlled by a single screening parameter :math:`\eta > 0`. The
+    value of :math:`\eta` (as a function of energy) is not provided directly by the user: instead,
+    the user provides both the integral cross-section :math:`\sigma` (via
+    :pp:param:`<collision_name>.<scattering_process>_cross_section`) and the momentum-transfer
+    cross-section :math:`\sigma_{mt}` (via
+    :pp:param:`<collision_name>.<scattering_process>_cross_section_mt`), which fix the mean
+    scattering cosine through
+
+    .. math::
+
+        \frac{\sigma_{mt}}{\sigma} = 2\eta\left[(\eta+1)\ln\left(1+\tfrac{1}{\eta}\right) - 1\right]
+        = 1 - \langle\cos\theta\rangle .
+
+    WarpX inverts this relation internally (at each tabulated energy) to obtain
+    :math:`\eta(\varepsilon)`, and then samples :math:`\theta` from the distribution above at each
+    collision. This model is therefore only meaningful for (and typically used with) ``elasticX``
+    processes. Note that the model can only represent :math:`\sigma_{mt}/\sigma \in (0, 1)`, i.e.
+    a forward-biased mean cosine :math:`\langle\cos\theta\rangle \in (0, 1)`; ratios outside this
+    range are clamped to the nearest representable value.
 
 .. pp:param:: <collision_name>.ionization_species
     :type: ``float``

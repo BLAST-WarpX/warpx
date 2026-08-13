@@ -276,6 +276,27 @@ public:
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
 
+                // For the screened Rutherford angle model, evaluate the screening parameter
+                // at the collision energy. The collision energy is recomputed here from the
+                // reactant momenta using the same convention as the cross-section lookup (see
+                // CollisionFilterFunc.H); it is unused (and left at zero) for other models.
+                amrex::ParticleReal eta = 0._prt;
+                if (scattering_process.m_scattering_angle_model
+                    == ScatteringAngleModel::Screened_Rutherford) {
+                    constexpr amrex::ParticleReal me = PhysConst::m_e;
+                    const amrex::ParticleReal p1x = (m0 == 0) ? me*soa_0.m_rdata[PIdx::ux][src0_idx] : m0*soa_0.m_rdata[PIdx::ux][src0_idx];
+                    const amrex::ParticleReal p1y = (m0 == 0) ? me*soa_0.m_rdata[PIdx::uy][src0_idx] : m0*soa_0.m_rdata[PIdx::uy][src0_idx];
+                    const amrex::ParticleReal p1z = (m0 == 0) ? me*soa_0.m_rdata[PIdx::uz][src0_idx] : m0*soa_0.m_rdata[PIdx::uz][src0_idx];
+                    const amrex::ParticleReal p2x = (m1 == 0) ? me*soa_1.m_rdata[PIdx::ux][src1_idx] : m1*soa_1.m_rdata[PIdx::ux][src1_idx];
+                    const amrex::ParticleReal p2y = (m1 == 0) ? me*soa_1.m_rdata[PIdx::uy][src1_idx] : m1*soa_1.m_rdata[PIdx::uy][src1_idx];
+                    const amrex::ParticleReal p2z = (m1 == 0) ? me*soa_1.m_rdata[PIdx::uz][src1_idx] : m1*soa_1.m_rdata[PIdx::uz][src1_idx];
+                    amrex::ParticleReal E_coll_J, v_rel_COM, lab_to_COM;
+                    BinaryCollisionUtils::get_collision_parameters(
+                        p1x, p1y, p1z, p2x, p2y, p2z, m0, m1,
+                        E_coll_J, v_rel_COM, lab_to_COM);
+                    eta = scattering_process.getEta(E_coll_J / PhysConst::q_e);
+                }
+
                 TwoProductComputeProductMomenta(
                     soa_0.m_rdata[PIdx::ux][src0_idx],
                     soa_0.m_rdata[PIdx::uy][src0_idx],
@@ -293,7 +314,7 @@ public:
                     // TwoProductComputeProductMomenta expects the *released* energy here, hence the
                     // negative sign; the energy penalty is also converted from eV to Joules.
                     scattering_process.m_scattering_angle_model,
-                    engine);
+                    engine, eta);
             }
 
             // Next perform all product-producing collisions

@@ -45,6 +45,9 @@ namespace {
      * @param[in] E_reaction energy liberated during the reaction
      * @param[in] scattering_angle_model the scattering angle distribution to use
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
+     * @param[in] eta screening parameter of the screened Rutherford model, evaluated at the
+     *            collision energy. Only used when `scattering_angle_model` is
+     *            `Screened_Rutherford`; ignored (and may be left at its default) otherwise.
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void TwoProductComputeProductMomenta (
@@ -66,7 +69,8 @@ namespace {
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
                             ScatteringAngleModel scattering_angle_model,
-                            const amrex::RandomEngine& engine )
+                            const amrex::RandomEngine& engine,
+                            const amrex::ParticleReal eta = amrex::ParticleReal(0) )
     {
         using namespace amrex::literals;
         using namespace amrex::Math;
@@ -139,9 +143,12 @@ namespace {
                                              engine);
         }
         else if (scattering_angle_model == ScatteringAngleModel::Forward ||
-                 scattering_angle_model == ScatteringAngleModel::Backward) {
-            // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
-            // Backward scattering: the products have the opposite direction of the incident particle in the center of mass frame
+                 scattering_angle_model == ScatteringAngleModel::Backward ||
+                 scattering_angle_model == ScatteringAngleModel::Screened_Rutherford) {
+            // These models all emit the first product along a direction obtained by rotating
+            // the incident particle's direction (in the center of mass frame) by a fixed
+            // (forward/backward) or sampled (screened Rutherford) polar angle. First compute
+            // the incident particle's direction in the center of mass frame.
             amrex::ParticleReal p1x_star_in, p1y_star_in, p1z_star_in;
             if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
             {
@@ -161,16 +168,49 @@ namespace {
                 p1z_star_in = p1z_in;
             }
             const amrex::ParticleReal p1_star_in = std::sqrt(p1x_star_in*p1x_star_in + p1y_star_in*p1y_star_in + p1z_star_in*p1z_star_in);
+            const amrex::ParticleReal p_star_f = std::sqrt(p_star_f_sq);
 
-            // Momentum of the first product in the center of mass frame:
-            // same (forward) or opposite (backward) direction as the incident, scaled to have
-            // the magnitude sqrt(p_star_f_sq)
-            const amrex::ParticleReal sign = (scattering_angle_model == ScatteringAngleModel::Backward)
-                                             ? -1._prt : 1._prt;
-            const amrex::ParticleReal scaling = sign*std::sqrt(p_star_f_sq)/p1_star_in;
-            px_star_out = p1x_star_in * scaling;
-            py_star_out = p1y_star_in * scaling;
-            pz_star_out = p1z_star_in * scaling;
+            if (scattering_angle_model == ScatteringAngleModel::Screened_Rutherford) {
+                // Unit vector along the incident direction in the center of mass frame
+                const amrex::ParticleReal ux = p1x_star_in / p1_star_in;
+                const amrex::ParticleReal uy = p1y_star_in / p1_star_in;
+                const amrex::ParticleReal uz = p1z_star_in / p1_star_in;
+
+                // Sample the polar scattering angle from the screened Rutherford (Wentzel)
+                // distribution f(cos(theta)) = 2*eta*(eta+1)/(2*eta+1-cos(theta))^2, using
+                // the inverse-CDF relation cos(theta) = 1 - 2*eta*X/(1 - X + eta), X ~ U(0,1).
+                const amrex::ParticleReal X = amrex::Random(engine);
+                const amrex::ParticleReal cos_theta = 1._prt - 2._prt*eta*X/(1._prt - X + eta);
+                const amrex::ParticleReal one_minus = 1._prt - cos_theta*cos_theta;
+                const amrex::ParticleReal sin_theta = std::sqrt((one_minus > 0._prt) ? one_minus : 0._prt);
+
+                // Build a unit vector perpendicular to the incident direction with a uniformly
+                // random azimuth, by projecting a random isotropic unit vector onto the plane
+                // perpendicular to the incident direction and normalizing.
+                amrex::ParticleReal rx, ry, rz;
+                ParticleUtils::RandomizeVelocity(rx, ry, rz, 1._prt, engine);
+                const amrex::ParticleReal fac = rx*ux + ry*uy + rz*uz;
+                const amrex::ParticleReal inv_perp_norm = 1._prt/std::sqrt(1._prt - fac*fac);
+                const amrex::ParticleReal perp_x = (rx - fac*ux)*inv_perp_norm;
+                const amrex::ParticleReal perp_y = (ry - fac*uy)*inv_perp_norm;
+                const amrex::ParticleReal perp_z = (rz - fac*uz)*inv_perp_norm;
+
+                px_star_out = p_star_f * (cos_theta*ux + sin_theta*perp_x);
+                py_star_out = p_star_f * (cos_theta*uy + sin_theta*perp_y);
+                pz_star_out = p_star_f * (cos_theta*uz + sin_theta*perp_z);
+            }
+            else {
+                // Forward scattering: the products have the same direction as the incident
+                // particle in the center of mass frame.
+                // Backward scattering: the products have the opposite direction.
+                // The direction is scaled to have the magnitude sqrt(p_star_f_sq).
+                const amrex::ParticleReal sign = (scattering_angle_model == ScatteringAngleModel::Backward)
+                                                 ? -1._prt : 1._prt;
+                const amrex::ParticleReal scaling = sign*p_star_f/p1_star_in;
+                px_star_out = p1x_star_in * scaling;
+                py_star_out = p1y_star_in * scaling;
+                pz_star_out = p1z_star_in * scaling;
+            }
         }
 
         // Next step is to convert momenta to lab frame
