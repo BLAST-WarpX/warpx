@@ -365,7 +365,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     m_boundary_conditions.Set_reflect_all_velocities(flag);
 
     // currently supports only isotropic thermal distribution
-    // same distribution is applied to all boundaries
+    // same distribution is applied to all boundaries (the domain faces and,
+    // when boundary.particle_eb = thermal, the embedded boundary)
     const amrex::ParmParse pp_species_boundary("boundary." + species_name);
     if (WarpX::isAnyParticleBoundaryThermal()) {
         amrex::Real boundary_uth = 0;

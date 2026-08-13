@@ -1245,14 +1245,17 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
 {
-    if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting) {
+    if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting ||
+        WarpX::eb_particle_boundary == ParticleBoundaryType::Thermal) {
         auto& warpx = WarpX::GetInstance();
         for (auto& pc : allcontainers) {
             amrex::ParticleReal const mass = pc->getMass();
+            amrex::ParticleReal const uth = pc->getBoundaryThermalVelocity();
             for (int lev = 0; lev <= pc->finestLevel(); ++lev) {
                 amrex::Real const dt_lev = warpx.getdt(lev);
                 scrapeParticlesAtEB(*pc, distance_to_eb, lev,
-                    ParticleBoundaryProcess::Reflect{dt_lev, mass});
+                    ParticleBoundaryProcess::ParticleBoundaryInteraction{
+                        dt_lev, mass, WarpX::eb_particle_boundary, uth});
             }
         }
     } else {

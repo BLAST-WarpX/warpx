@@ -297,8 +297,9 @@ void WarpX::MakeWarpX ()
         pp_boundary.query_enum_case_insensitive("particle_eb", eb_particle_boundary);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             eb_particle_boundary == ParticleBoundaryType::Absorbing ||
-            eb_particle_boundary == ParticleBoundaryType::Reflecting,
-            "boundary.particle_eb must be Absorbing or Reflecting");
+            eb_particle_boundary == ParticleBoundaryType::Reflecting ||
+            eb_particle_boundary == ParticleBoundaryType::Thermal,
+            "boundary.particle_eb must be Absorbing, Reflecting, or Thermal");
     }
 
     CheckGriddingForRZSpectral();
@@ -3592,7 +3593,7 @@ WarpX::isAnyParticleBoundaryThermal ()
         if (WarpX::particle_boundary_lo[idim] == ParticleBoundaryType::Thermal) {return true;}
         if (WarpX::particle_boundary_hi[idim] == ParticleBoundaryType::Thermal) {return true;}
     }
-    return false;
+    return WarpX::eb_particle_boundary == ParticleBoundaryType::Thermal;
 }
 
 void
