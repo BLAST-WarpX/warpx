@@ -256,25 +256,31 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation", do_rotation);
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_crabwaist", do_crabwaist);
+#if !defined(WARPX_DIM_3D)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_crabwaist,
+        "The crab waist transformation is only supported in 3D.");
+#endif
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_crabwaist || do_rotation,
+        "Crab waist requires do_gaussian_beam_rotation = 1.");
 
     if(do_rotation){
         utils::parser::queryWithParser(pp_species, source_name, "gaussian_beam_rotation_angle", rotation_angle);
         utils::parser::getArrWithParser(pp_species, source_name, "gaussian_beam_rotation_axis", rotation_axis, 0, 3);
-
-        // crabwaist only if beams collide with a nonzero crossing angle in the x-z plane
+#if defined(WARPX_DIM_3D)
+        // Crab waist only if beams collide with a nonzero crossing angle in the x-z plane
         if(do_crabwaist){
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rotation_angle!=0,
                 "Error: Invalid value for rotation_angle. It must not be 0!");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE((rotation_axis[0]==0 && rotation_axis[1]==1 && rotation_axis[2]==0),
                 "Error: Invalid value for rotation_axis. It must be [0,1,0]! Currently crab waist is supported in y dimension only.");
-            utils::parser::queryWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
+            utils::parser::getWithParser(pp_species, source_name, "crabwaist_strength", crabwaist_strength);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (crabwaist_strength>=0 && crabwaist_strength<=1),
                 "Error: Invalid value for crabwaist_strength. It must be between [0,1]!");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( !do_symmetrize,
+                "Error: The crab waist transformation cannot be used together with do_symmetrize.");
         }
-    }else if (do_crabwaist){
-        ablastr::warn_manager::WMRecordWarning("Species", "Crab waist works only when do_rotation flag is enabled."
-            " do_crabwaist and crabwaist_strength flags will be ignored.\n");
+#endif
     }
 
     if(focusing_is_specified){

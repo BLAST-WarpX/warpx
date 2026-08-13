@@ -383,9 +383,6 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
     const amrex::Real focal_distance = plasma_injector.focal_distance;
     const amrex::Real rotation_angle = plasma_injector.rotation_angle;
     const amrex::Vector<amrex::Real> rotation_axis = plasma_injector.rotation_axis;
-#if defined(WARPX_DIM_3D)
-    const amrex::Real crabwaist_strength = plasma_injector.crabwaist_strength;
-#endif
 
     // Declare temporary vectors on the CPU
     amrex::Gpu::HostVector<ParticleReal> particle_x;
@@ -434,11 +431,25 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                 std::abs( y - y_m ) <= y_cut * y_rms     &&
                 std::abs( z - z_m ) <= z_cut * z_rms   ) {
                 XDim3 u = plasma_injector.getMomentum(x, y, z);
-
+                XDim3 u_bulk{0._rt, 0._rt, 0._rt};
+                amrex::Real u_bulk_norm = 0._rt;
+                if (plasma_injector.do_crabwaist || plasma_injector.do_focusing){
+                    u_bulk = plasma_injector.getInjectorMomentumHost()->getBulkMomentum(x,y,z);
+                    u_bulk_norm = std::sqrt( u_bulk.x*u_bulk.x+u_bulk.y*u_bulk.y+u_bulk.z*u_bulk.z );
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(u_bulk_norm > 0._rt,
+                        "Focusing and crab waist require nonzero mean momentum.");
+                }
+#if defined(WARPX_DIM_3D)
+                // Apply crab waist transformation before rotation
+                // It assumes that the beams travel along z
+                if (plasma_injector.do_crabwaist){
+                    const amrex::Real crabwaist_strength = plasma_injector.crabwaist_strength;
+                    const Real alpha = -crabwaist_strength/std::tan(2._rt * rotation_angle);
+                    u.x += 0.5_rt * alpha * u.y*u.y / u_bulk_norm;
+                    y  -= alpha * (x - x_m) * u.y / u_bulk_norm;
+                }
+#endif
             if (plasma_injector.do_focusing){
-                const XDim3 u_bulk = plasma_injector.getInjectorMomentumHost()->getBulkMomentum(x,y,z);
-                const amrex::Real u_bulk_norm = std::sqrt( u_bulk.x*u_bulk.x+u_bulk.y*u_bulk.y+u_bulk.z*u_bulk.z );
-
                 // Compute the position of the focal plane
                 // (it is located at a distance `focal_distance` from the beam centroid, in the direction of the bulk velocity)
                 const amrex::Real n_x = u_bulk.x/u_bulk_norm;
@@ -472,17 +483,8 @@ PhysicalParticleContainer::AddGaussianBeam (PlasmaInjector const& plasma_injecto
                 x = x - (v_x - v_dot_n*n_x) * t;
 #endif
             }
-#if defined(WARPX_DIM_3D)
-        // crabwaist before rotation
-            // Lorentz boost currently only possible along z direction: x and z coords swapped if boost on, not if I only rotate
-            if (plasma_injector.do_crabwaist){
-              const Real acw = -crabwaist_strength/std::tan(2*rotation_angle);
-              u.x += 0.5 * acw * u.y*u.y;
-              y  -= acw * x*u.y;
-            }
-
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
             if (plasma_injector.do_rotation){
-
                     // normalize the rotation axis
                     const Real k_norm = std::sqrt(rotation_axis[0]*rotation_axis[0] + rotation_axis[1]*rotation_axis[1] + rotation_axis[2]*rotation_axis[2]);
                     const Real kx = rotation_axis[0]/k_norm;
