@@ -419,8 +419,8 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
             }
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 mypc.GetParticleContainerFromName(spec_name).getCharge() != 0._prt,
-                "hybrid_pic_model.plasma_resistivity_" + spec_name + " is set, "
-                "but species '" + spec_name + "' carries no charge: the "
+                "hybrid_pic_model.plasma_resistivity_" + spec_name +
+                " is set, but this species carries no charge: the "
                 "per-species resistivity overlay only applies to charged "
                 "species.");
             auto parser = std::make_unique<amrex::Parser>(
