@@ -134,6 +134,18 @@ web::MarkUpdateCellsStairCase (
 
     for (int idim = 0; idim < 3; ++idim) {
 
+        // Pre-fill the flags with 1 (i.e. "update this point"), including the
+        // ghost cells outside of the domain: guard cells beyond a non-periodic
+        // domain boundary are not covered by the valid-region marking below,
+        // nor by the final `FillBoundary`, but they are read by consumers that
+        // loop over grown tileboxes (e.g. `CalculateCurrentAmpere` or
+        // `ComputeExternalFieldOnGridUsingParser`). Pre-filling here (rather
+        // than only at allocation) also keeps the flags well-defined when they
+        // are re-allocated during load balancing.
+        // (The guard cells in the domain will be updated by `FillBoundary` at
+        // the end of this function.)
+        eb_update[idim]->setVal(1, eb_update[idim]->nGrow());
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
