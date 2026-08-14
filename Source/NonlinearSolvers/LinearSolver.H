@@ -4,22 +4,24 @@
 /**
  * \brief Top-level class for the linear solver
  *
- *    This class is templated on a vector class Vec, and an operator class Ops.
+ *    This class is templated on a vector class Vec, and a linear operator
+ *    class LinOp.
  *
- *    The Ops class must have the following function:
- *    ComputeRHS( R_vec, U_vec, time, nl_iter, from_jacobian ),
- *    where U_vec and R_vec are of type Vec.
+ *    The LinOp class represents the linear operator A of the linear system
+ *    A x = b solved by solve(). It must implement the interface defined in
+ *    LinearFunction.H; in particular, an apply( Ax_vec, x_vec ) function
+ *    that computes the action A(x) of the operator on a vector x
  *
  *    The Vec class must have basic math operators, such as Copy, +=, -=,
  *    increment(), linComb(), scale(), etc.. See WarpXSolverVec.H for an example.
  */
 
-template <typename Vec, typename Ops>
+template <typename Vec, typename LinOp>
 class LinearSolver
 {
 public:
 
-    using RT = typename Ops::RT; // double or float
+    using RT = typename LinOp::RT; // double or float
 
     LinearSolver () = default;
 
@@ -31,13 +33,16 @@ public:
     LinearSolver(LinearSolver&&) noexcept = delete;
     LinearSolver& operator=(LinearSolver&&) noexcept = delete;
 
-    //! Defines with a reference to Ops. It's the user's responsibility to
-    //! keep the Ops object alive for linear solver to be functional. This function
+    //! Defines with a reference to LinOp. It's the user's responsibility to
+    //! keep the LinOp object alive for linear solver to be functional. This function
     //! must be called before solve() can be called.
-    virtual void define (Ops& linop) = 0;
+    virtual void define (LinOp& linop) = 0;
 
     /**
-     * \brief Solve the linear system
+     * \brief Solve the linear system A x = b for x, where A is the linear
+     *        operator whose action A(x) on a vector x is computed by
+     *        LinOp::apply(), and where the right-hand side b is a given
+     *        vector that does not depend on x.
      *
      * \param a_sol     unknowns, i.e., x in A x = b.
      * \param a_rhs     RHS, i.e., b in A x = b.
