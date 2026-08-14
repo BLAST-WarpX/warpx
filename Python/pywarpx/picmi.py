@@ -3528,6 +3528,139 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
             pywarpx.warpx.__setattr__("eb_potential(x,y,z,t)", expression)
 
 
+class MacroscopicProperty(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle set up of material property specific to WarpX.
+    If macroscopic properties initialization is added to picmistandard this can be
+    changed to inherit that functionality. The geometry can be specified either as
+    an implicit function.  STL file (ASCII or binary) will be added in future. In
+    the latter case the geometry specified in the STL file can be scaled,
+    translated and inverted.
+
+    This can be used for both Electromagnetic and electrostatic solvers.
+
+    Parameters
+    ----------
+    name: string
+        the macroscopic property name to set. One of "sigma", "epsilon", or "mu"
+
+    implicit_function: string
+        Analytic expression f(x,y,z) describing the sigma, epsilon, or mu
+
+    value: float
+        Value of sigma, epsilon, or mu if it is a constant
+
+    method: string
+        The algorithm for updating electric field when algo.em_solver_medium is macroscopic.
+        Available options for name = sigma are: backwardeuler and laxwendroff
+
+    Parameters used in the analytic expressions should be given as additional keyword arguments.
+
+    Unimplemented Parameters
+    ------------------------
+    stl_file: string
+        STL file path (string),  file contains the embedded boundary geometry
+
+    stl_scale: float
+        Factor by which the STL geometry is scaled
+
+    stl_center: vector of floats
+        Vector by which the STL geometry is translated (in meters)
+
+    stl_reverse_normal: bool
+        If True inverts the orientation of the STL geometry
+
+    """
+
+    def __init__(
+        self,
+        name="epsilon",
+        implicit_function=None,
+        value=None,
+        method=None,
+        stl_file=None,
+        stl_scale=None,
+        stl_center=None,
+        stl_reverse_normal=False,
+        **kw,
+    ):
+        assert (
+            sum(
+                [stl_file is not None, implicit_function is not None, value is not None]
+            )
+            == 1
+        ), Exception(
+            "Exactly one one of implicit_function, stl_file, and value must be specified"
+        )
+        self.name = name
+        self.implicit_function = implicit_function
+        self.stl_file = stl_file
+        self.value = value
+        if stl_file is None:
+            assert stl_scale is None, Exception(
+                "Material property can only be scaled only when using an stl file"
+            )
+            assert stl_center is None, Exception(
+                "Material property  can only be translated only when using an stl file"
+            )
+            assert stl_reverse_normal is False, Exception(
+                "Material property  can only be reversed only when using an stl file"
+            )
+
+        self.stl_scale = stl_scale
+        self.stl_center = stl_center
+        self.stl_reverse_normal = stl_reverse_normal
+
+        # Validate method for conductivity (sigma)
+        if method is not None:
+            if self.name != "sigma":
+                raise ValueError("Input 'method' can only be used with 'sigma'")
+            if method not in ["backwardeuler", "laxwendroff"]:
+                raise ValueError(
+                    "Input 'method' must be one of 'backwardeuler' or 'laxwendroff'"
+                )
+
+        self.method = method
+
+        # Handle keyword arguments used in expressions
+        self.user_defined_kw = {}
+        for k in list(kw.keys()):
+            if implicit_function is not None and re.search(
+                r"\b%s\b" % k, implicit_function
+            ):
+                self.user_defined_kw[k] = kw[k]
+                del kw[k]
+
+        self.handle_init(kw)
+
+    def material_property_initialize_inputs(self, solver):
+        # Add the user defined keywords to my_constants
+        # The keywords are mangled if there is a conflicting variable already
+        # defined in my_constants with the same name but different value.
+        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        macroscopic = pywarpx.warpx.get_bucket("macroscopic")
+        if self.implicit_function is not None:
+            expression = pywarpx.my_constants.mangle_expression(
+                self.implicit_function, self.mangle_dict
+            )
+            setattr(macroscopic, self.name + "_function(x,y,z)", expression)
+
+        if self.value is not None:
+            setattr(macroscopic, self.name, self.value)
+
+        if self.stl_file is not None:
+            raise NotImplementedError(
+                "material property definition with stl file is not implemented yet"
+            )
+
+        if self.method is not None:
+            setattr(
+                pywarpx.algo,
+                "macroscopic_" + self.name + "_method",
+                self.method,
+            )
+
+
 class PlasmaLens(picmistandard.base._ClassWithInit):
     """
     Custom class to setup a plasma lens lattice.
@@ -3866,6 +3999,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.inputs_initialized = False
         self.warpx_initialized = False
+        self.macroscopic_properties = []
 
     def initialize_inputs(self):
         if self.inputs_initialized:
@@ -4035,6 +4169,11 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self.do_device_synchronize is not None:
             pywarpx.warpx.do_device_synchronize = self.do_device_synchronize
 
+        if len(self.macroscopic_properties) > 0:
+            pywarpx.algo.em_solver_medium = "macroscopic"
+            for prop in self.macroscopic_properties:
+                prop.material_property_initialize_inputs(self.solver)
+
     def initialize_warpx(self, mpi_comm=None):
         if self.warpx_initialized:
             return
@@ -4062,6 +4201,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self.warpx_initialized:
             self.warpx_initialized = False
             pywarpx.warpx.finalize()
+
+    def add_macroscopic_property(self, macroscopic_property):
+        if isinstance(macroscopic_property, MacroscopicProperty):
+            self.macroscopic_properties.append(macroscopic_property)
+        else:
+            raise TypeError(
+                "Expected a MacroscopicProperty instance, got f {type(macroscopic_property)}"
+            )
 
     @property
     def fields(self):
