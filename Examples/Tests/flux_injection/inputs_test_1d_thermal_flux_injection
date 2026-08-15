@@ -1,0 +1,129 @@
+# This sets up a uniform plasma with a drift velocity and uses flux injection
+# at the two boundaries to maintain constant density in the domain.
+
+my_constants.e_mass = 100.*m_e
+my_constants.i_mass = m_p
+my_constants.N = 1.e25
+my_constants.T = 1.  # 1 eV
+my_constants.mean_velocity = 10.e3
+my_constants.ppc = 1000
+my_constants.L = 2.e-7
+my_constants.nz = 200
+my_constants.dt = 1.e-14
+
+# Maximum number of time steps
+max_step = 100
+
+# number of grid points
+amr.n_cell = nz
+amr.max_level = 0
+amr.max_grid_size = 32
+
+# Geometry
+geometry.dims = 1
+geometry.prob_lo = 0.
+geometry.prob_hi = L
+
+warpx.do_electrostatic = labframe
+
+# Boundary condition
+boundary.field_lo = neumann
+boundary.field_hi = neumann
+boundary.particle_lo = absorbing
+boundary.particle_hi = absorbing
+
+# Verbosity
+warpx.verbose = 1
+
+# Algorithms
+algo.field_gathering = energy-conserving
+
+# Order of particle shape factors
+algo.particle_shape = 2
+
+warpx.const_dt = dt
+
+# Particles
+particles.species_names = electrons ions
+
+electrons.charge = -q_e
+electrons.mass = e_mass
+electrons.ux_m = 0.
+electrons.uy_m = 0.
+electrons.uz_m = mean_velocity/clight
+electrons.ux_th = sqrt(T*q_e/e_mass)/clight
+electrons.uy_th = sqrt(T*q_e/e_mass)/clight
+electrons.uz_th = sqrt(T*q_e/e_mass)/clight
+electrons.profile = constant
+electrons.density = N
+electrons.injection_sources = fill flux_left flux_right
+electrons.fill.injection_style = NUniformPerCell
+electrons.fill.num_particles_per_cell_each_dim = ppc
+electrons.fill.momentum_distribution_type = gaussian
+electrons.flux_left.injection_style = NFluxPerCell
+electrons.flux_left.surface_flux_pos = 0.
+electrons.flux_left.flux_normal_axis = z
+electrons.flux_left.flux_direction = +1
+electrons.flux_left.flux_profile = fixed_num_particles_per_cell
+electrons.flux_left.num_particles_per_cell = ppc
+electrons.flux_left.momentum_distribution_type = gaussianflux
+electrons.flux_right.injection_style = NFluxPerCell
+electrons.flux_right.surface_flux_pos = L
+electrons.flux_right.flux_normal_axis = z
+electrons.flux_right.flux_direction = -1
+electrons.flux_right.flux_profile = fixed_num_particles_per_cell
+electrons.flux_right.num_particles_per_cell = ppc
+electrons.flux_right.momentum_distribution_type = gaussianflux
+electrons.flux_right.uz_m = -mean_velocity/clight
+
+ions.mass = i_mass
+ions.charge = q_e
+ions.ux_m = 0.
+ions.uy_m = 0.
+ions.uz_m = mean_velocity/clight
+ions.ux_th = sqrt(T*q_e/i_mass)/clight
+ions.uy_th = sqrt(T*q_e/i_mass)/clight
+ions.uz_th = sqrt(T*q_e/i_mass)/clight
+ions.profile = constant
+ions.density = N
+ions.injection_sources = fill flux_left flux_right
+ions.fill.injection_style = NUniformPerCell
+ions.fill.num_particles_per_cell_each_dim = ppc
+ions.fill.momentum_distribution_type = gaussian
+ions.flux_left.injection_style = NFluxPerCell
+ions.flux_left.surface_flux_pos = 0.
+ions.flux_left.flux_normal_axis = z
+ions.flux_left.flux_direction = +1
+ions.flux_left.flux_profile = fixed_num_particles_per_cell
+ions.flux_left.num_particles_per_cell = ppc
+ions.flux_left.momentum_distribution_type = gaussianflux
+ions.flux_right.injection_style = NFluxPerCell
+ions.flux_right.surface_flux_pos = L
+ions.flux_right.flux_normal_axis = z
+ions.flux_right.flux_direction = -1
+ions.flux_right.flux_profile = fixed_num_particles_per_cell
+ions.flux_right.num_particles_per_cell = ppc
+ions.flux_right.momentum_distribution_type = gaussianflux
+ions.flux_right.uz_m = -mean_velocity/clight
+
+# Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 100
+diag1.diag_type = Full
+diag1.format = openpmd
+diag1.write_species = 1
+diag1.particle_fields_to_plot = nn vx vy vz vxvx vyvy vzvz
+diag1.particle_fields.nn(x,y,z,ux,uy,uz) = 1.
+diag1.particle_fields.nn.do_average = 0
+diag1.particle_fields.vx(x,y,z,ux,uy,uz) = ux
+diag1.particle_fields.vx.do_average = 0
+diag1.particle_fields.vy(x,y,z,ux,uy,uz) = uy
+diag1.particle_fields.vy.do_average = 0
+diag1.particle_fields.vz(x,y,z,ux,uy,uz) = uz
+diag1.particle_fields.vz.do_average = 0
+diag1.particle_fields.vxvx(x,y,z,ux,uy,uz) = ux*ux
+diag1.particle_fields.vxvx.do_average = 0
+diag1.particle_fields.vyvy(x,y,z,ux,uy,uz) = uy*uy
+diag1.particle_fields.vyvy.do_average = 0
+diag1.particle_fields.vzvz(x,y,z,ux,uy,uz) = uz*uz
+diag1.particle_fields.vzvz.do_average = 0

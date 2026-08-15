@@ -46,7 +46,8 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
                         const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& dx,
                         const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& prob_lo,
                         const PlasmaInjector& plasma_injector,
-                        amrex::RealBox& overlap_realbox, amrex::Box& overlap_box, amrex::IntVect& shifted)
+                        amrex::RealBox& overlap_realbox, amrex::Box& overlap_box, amrex::IntVect& shifted,
+                        amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> & emitting_cell_location)
 {
     using namespace amrex::literals;
 
@@ -64,21 +65,18 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         if ( (dir==0) && (plasma_injector.flux_normal_axis==0) ) {
 #endif
-            if (plasma_injector.flux_direction > 0) {
-                if (plasma_injector.surface_flux_pos <  tile_realbox.lo(dir) ||
-                    plasma_injector.surface_flux_pos >= tile_realbox.hi(dir)) {
-                    no_overlap = true;
-                    break;
-                }
-            } else {
-                if (plasma_injector.surface_flux_pos <= tile_realbox.lo(dir) ||
-                    plasma_injector.surface_flux_pos >  tile_realbox.hi(dir)) {
-                    no_overlap = true;
-                    break;
-                }
+            amrex::Real surface_flux_cell = plasma_injector.surface_flux_pos;
+            if (plasma_injector.flux_direction < 0) {
+                surface_flux_cell -= dx[dir];
             }
-            overlap_realbox.setLo( dir, plasma_injector.surface_flux_pos );
-            overlap_realbox.setHi( dir, plasma_injector.surface_flux_pos );
+            if (surface_flux_cell <  tile_realbox.lo(dir) ||
+                surface_flux_cell >= tile_realbox.hi(dir)) {
+                no_overlap = true;
+                break;
+            }
+            emitting_cell_location[dir] = plasma_injector.surface_flux_pos;
+            overlap_realbox.setLo( dir, surface_flux_cell );
+            overlap_realbox.setHi( dir, surface_flux_cell );
             overlap_box.setSmall( dir, 0 );
             overlap_box.setBig( dir, 0 );
             shifted[dir] =
@@ -96,6 +94,7 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
             } else {
                 no_overlap = true; break;
             }
+            emitting_cell_location[dir] = overlap_realbox.lo(dir);
             // Count the number of cells in this direction in overlap_realbox
             overlap_box.setSmall( dir, 0 );
             overlap_box.setBig( dir,
@@ -109,6 +108,7 @@ bool find_overlap_flux (const amrex::RealBox& tile_realbox, const amrex::RealBox
 
     return no_overlap;
 }
+
 
 PlasmaParserWrapper::PlasmaParserWrapper (const std::size_t a_num_user_int_attribs,
                                           const std::size_t a_num_user_real_attribs,

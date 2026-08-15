@@ -1,0 +1,45 @@
+{
+  "lev=0": {
+    "Bx": 0.0,
+    "By": 0.0,
+    "Bz": 0.0,
+    "Ex": 0.0,
+    "Ey": 0.0,
+    "Ez": 715032615.4488308,
+    "jx": 72161051734.49242,
+    "jy": 65615033309.54175,
+    "jz": 300092832031.4731,
+    "nn_electrons": 2.000599e+18,
+    "nn_ions": 2.000466e+18,
+    "vx_electrons": 2293501881450.4956,
+    "vx_ions": 502924104311.663,
+    "vxvx_electrons": 39109782594.46333,
+    "vxvx_ions": 2131970951.163522,
+    "vy_electrons": 2279307654437.5996,
+    "vy_ions": 518875415059.6428,
+    "vyvy_electrons": 39159920648.07713,
+    "vyvy_ions": 2130682048.9164214,
+    "vz_electrons": 60831305400920.04,
+    "vz_ions": 67141660990976.08,
+    "vzvz_electrons": 41053265018.51221,
+    "vzvz_ions": 4385416027.5459175
+  },
+  "electrons": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.2001403569175398,
+    "particle_momentum_x": 6.094968375386245e-18,
+    "particle_momentum_y": 6.0992116353639365e-18,
+    "particle_momentum_z": 6.2442310356044224e-18,
+    "particle_weight": 2.000599e+18
+  },
+  "ions": {
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.20007218138030863,
+    "particle_momentum_x": 2.613136135281151e-17,
+    "particle_momentum_y": 2.6115099096777785e-17,
+    "particle_momentum_z": 3.883692797460859e-17,
+    "particle_weight": 2.000466e+18
+  }
+}
