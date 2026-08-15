@@ -37,3 +37,19 @@ namespace EB
     }
 
 } // namespace EB
+
+namespace ParticleSink
+{
+    bool enabled ()
+    {
+#ifndef AMREX_USE_EB
+        return false;
+#else
+        amrex::ParmParse const pp_sinks("particle_sinks");
+        std::vector<std::string> sink_names;
+        pp_sinks.queryarr("names", sink_names);
+
+        return !sink_names.empty();
+#endif
+    }
+} // namespace ParticleSink

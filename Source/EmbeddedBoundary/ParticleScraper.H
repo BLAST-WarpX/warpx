@@ -173,7 +173,70 @@ void
 scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& distance_to_eb,
                  int lev_min, int lev_max, F&& f)
 {
+    amrex::Vector<ablastr::fields::MultiLevelScalarField const*> const eb_vec = { &distance_to_eb };
+    scrapeParticlesAtEB(pc, eb_vec, lev_min, lev_max, std::forward<F>(f));
+}
+/**
+ * \brief Interact particles with the embedded boundary walls.
+ *
+ *  This function detects which particles have entered into the region
+ *  covered by the embedded boundaries and applies an operation on those
+ *  that have. Boundary collision detection is performed using a signed
+ *  distance function, which is generated automatically when WarpX is
+ *  compiled with EB support.
+ *
+ *  The operation to be performed is specified by the callable function
+ *  passed in to this function as an argument. This function can access the
+ *  position at which the particle hit the boundary. Particles can be `absorbed`
+ *  by setting their ids to negative
+ *  to flag them for removal. Likewise, they can be reflected back into the domain
+ *  by modifying their data appropriately and leaving their ids alone.
+ *
+ *  This version operates only at the specified levels.
+ *
+ * \tparam pc a type of amrex ParticleContainer
+ * \tparam F a callable type, e.g. a lambda function or functor
+ *
+ * \param pc the particle container to test for boundary interactions.
+ * \param distance_to_eb a vector of a set of MultiFabs that store the signed distance function
+ * \param lev_min the minimum mesh refinement level to work on.
+ * \param lev_max the maximum mesh refinement level to work on.
+ * \param f the callable that defines what to do when a particle hits the boundary.
+ *
+ *        The form of the callable should model:
+ *        template <typename PData>
+ *        AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+ *        void operator() (PData& ptd, int i,
+ *                         const SetParticlePosition<PIdx>& setPosition,
+ *                         amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+ *                         amrex::Array4<const amrex::Real> const& distance_to_eb,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
+ *                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
+ *                         amrex::RandomEngine const& engine);
+ *
+ *        where ptd is the particle tile, i the index of the particle operated on,
+ *        setPosition writes a Cartesian position back to the particle (handling the
+ *        reduced-dimension conversion), xp/yp/zp the Cartesian particle position,
+ *        distance_to_eb the signed distance array, plo/dxi the geometry data, and
+ *        engine for random number generation.
+ */
+template <class PC, class F, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
+void
+scrapeParticlesAtEB (PC& pc,
+                     amrex::Vector<ablastr::fields::MultiLevelScalarField const*> const& distance_to_eb,
+                     int lev_min, int lev_max, F&& f)
+{
     BL_PROFILE("scrapeParticlesAtEB");
+
+    const amrex::Long num_ebs = distance_to_eb.size();
+    if (num_ebs == 0) { return; }
+
+    // Safety check for fixed GpuArray size
+    constexpr int MAX_SINKS = 8;
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        num_ebs <= MAX_SINKS,
+        "Exceeded maximum supported particle sinks (8) in scrapeParticlesAtEB."
+    );
 
     for (int lev = lev_min; lev <= lev_max; ++lev)
     {
@@ -189,7 +252,11 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
             auto& tile = pti.GetParticleTile();
             auto ptd = tile.getParticleTileData();
             const auto np = tile.numParticles();
-            auto distance_to_eb_arr = (*distance_to_eb[lev])[pti].array();  // signed distance function
+            // 1. Pack Array4 views into fixed-size GpuArray (Stack allocated, captured by value)
+            amrex::GpuArray<amrex::Array4<const amrex::Real>, MAX_SINKS> eb_arrs;
+            for (int n = 0; n < num_ebs; ++n) {
+                eb_arrs[n] = (*(*distance_to_eb[n])[lev])[pti].array();
+            }
             amrex::ParallelForRNG( np,
             [=] AMREX_GPU_DEVICE (const int ip, amrex::RandomEngine const& engine) noexcept
             {
@@ -203,11 +270,18 @@ scrapeParticlesAtEB (PC& pc, ablastr::fields::MultiLevelScalarField const& dista
                 amrex::Real W[AMREX_SPACEDIM][2];
                 ablastr::particles::compute_weights<amrex::IndexType::NODE>(
                     xp, yp, zp, plo, dxi, i, j, k, W);
-                amrex::Real const distance_to_eb_value = ablastr::particles::interp_field_nodal(i, j, k, W, distance_to_eb_arr);
-
-                if (distance_to_eb_value < 0.0)
+                // 2. Test particle against each distance field in order
+                for (int n = 0; n < num_ebs; ++n)
                 {
-                    f(ptd, ip, setPosition, xp, yp, zp, distance_to_eb_arr, plo, dxi, engine);
+                    auto const& distance_to_eb_arr = eb_arrs[n];
+                    amrex::Real const distance_to_eb_value =
+                        ablastr::particles::interp_field_nodal(i, j, k, W, distance_to_eb_arr);
+
+                    if (distance_to_eb_value < 0.0)
+                    {
+                        f(ptd, ip, setPosition, xp, yp, zp, distance_to_eb_arr, plo, dxi, engine);
+                        break; // Stop evaluating remaining EBs for this particle
+                    }
                 }
             });
         }

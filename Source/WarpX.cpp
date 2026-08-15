@@ -346,6 +346,8 @@ WarpX::WarpX ()
 
     BackwardCompatibility();
 
+    if (ParticleSink::enabled()) { InitParticleSinks(); }
+
     if (EB::enabled()) { InitEB(); }
 
     ablastr::utils::SignalHandling::InitSignalHandling();
@@ -2387,7 +2389,7 @@ WarpX::AllocLevelData (int lev, const BoxArray& ba, const DistributionMapping& d
 
 #ifdef AMREX_USE_EB
     bool const eb_enabled = EB::enabled();
-    if (eb_enabled) {
+    if (eb_enabled ||  ParticleSink::enabled()) {
         int const max_guard = guard_cells.ng_FieldSolver.max();
         auto const* eb_index_space = GetEBIndexSpace(lev);
         m_field_factory[lev] = amrex::makeEBFabFactory(eb_index_space, Geom(lev), ba, dm,
@@ -2642,6 +2644,12 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::Efield_avg_fp, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
     }
 
+    if (ParticleSink::enabled()) {
+        constexpr int nc_ls = 1;
+        amrex::IntVect const ng_ls(2);
+        AllocateParticleSinkFields( lev, amrex::convert(ba, IntVect::TheNodeVector()), dm, nc_ls, ng_ls, 0.0_rt);
+
+    }
     if (EB::enabled()) {
         constexpr int nc_ls = 1;
         amrex::IntVect const ng_ls(2);

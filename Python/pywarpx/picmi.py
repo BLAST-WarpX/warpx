@@ -3698,6 +3698,105 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
             )
 
 
+class ParticleSink(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle set up of particle sinks specific to WarpX.
+    If particle sink initialization is added to picmistandard this can be
+    changed to inherit that functionality. The geometry can be specified either as
+    an implicit function or as an STL file (ASCII or binary). In the latter case the
+    geometry specified in the STL file can be scaled, translated and inverted.
+
+    Parameters
+    ----------
+    name: string
+        The partice sink name to set.
+
+    implicit_function: string
+        Analytic expression describing the embedded boundary
+
+    stl_file: string
+        STL file path (string), file contains the embedded boundary geometry
+
+    stl_scale: float
+        Factor by which the STL geometry is scaled
+
+    stl_center: vector of floats
+        Vector by which the STL geometry is translated (in meters)
+
+    stl_reverse_normal: bool
+        If True inverts the orientation of the STL geometry
+
+    Parameters used in the analytic expressions should be given as additional keyword arguments.
+
+    """
+
+    def __init__(
+        self,
+        name,
+        implicit_function=None,
+        stl_file=None,
+        stl_scale=None,
+        stl_center=None,
+        stl_reverse_normal=False,
+        **kw,
+    ):
+        self.name = name
+        assert stl_file is None or implicit_function is None, Exception(
+            "Only one between implicit_function and stl_file can be specified"
+        )
+
+        self.implicit_function = implicit_function
+        self.stl_file = stl_file
+
+        if stl_file is None:
+            assert stl_scale is None, Exception(
+                "EB can only be scaled only when using an stl file"
+            )
+            assert stl_center is None, Exception(
+                "EB can only be translated only when using an stl file"
+            )
+            assert stl_reverse_normal is False, Exception(
+                "EB can only be reversed only when using an stl file"
+            )
+
+        self.stl_scale = stl_scale
+        self.stl_center = stl_center
+        self.stl_reverse_normal = stl_reverse_normal
+
+        # Handle keyword arguments used in expressions
+        self.user_defined_kw = {}
+        for k in list(kw.keys()):
+            if implicit_function is not None and re.search(
+                r"\b%s\b" % k, implicit_function
+            ):
+                self.user_defined_kw[k] = kw[k]
+                del kw[k]
+
+        self.handle_init(kw)
+
+    def particle_sink_initialize_inputs(self):
+        # Add the user defined keywords to my_constants
+        # The keywords are mangled if there is a conflicting variable already
+        # defined in my_constants with the same name but different value.
+        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+
+        # Register inputs with pywarpx for this sink
+        self.particle_sink = pywarpx.Particles.new_particle_sink(self.name)
+        if self.implicit_function is not None:
+            expression = pywarpx.my_constants.mangle_expression(
+                self.implicit_function, self.mangle_dict
+            )
+            self.particle_sink.geom_type = "implicit_function"
+            self.particle_sink.implicit_function = expression
+
+        elif self.stl_file is not None:
+            self.particle_sink.geom_type = "stl"
+            self.particle_sink.stl_file = self.stl_file
+            self.particle_sink.stl_scale = self.stl_scale
+            self.particle_sink.stl_center = self.stl_center
+            self.particle_sink.stl_reverse_normal = self.stl_reverse_normal
+
+
 class PlasmaLens(picmistandard.base._ClassWithInit):
     """
     Custom class to setup a plasma lens lattice.
@@ -4274,6 +4373,14 @@ class Simulation(picmistandard.PICMI_Simulation):
         easy fetching of the WarpXParticleContainer instances.
         """
         return self.extension.warpx.multi_particle_container()
+
+    def add_particle_sink(self, particle_sink):
+        if isinstance(particle_sink, ParticleSink):
+            particle_sink.particle_sink_initialize_inputs()
+        else:
+            raise TypeError(
+                "Expected a ParticleSink instance, got f{type(particle_sink)}"
+            )
 
 
 # ----------------------------

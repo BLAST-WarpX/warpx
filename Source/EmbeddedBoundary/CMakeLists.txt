@@ -7,5 +7,6 @@ foreach(D IN LISTS WarpX_DIMS)
         WarpXInitEB.cpp
         WarpXFaceExtensions.cpp
         WarpXFaceInfoBox.H
+        WarpXParticleSink.cpp
     )
 endforeach()

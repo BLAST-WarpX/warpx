@@ -19,6 +19,7 @@
 #   include <AMReX_EB2.H>
 #   include <AMReX_EB2_GeometryShop.H>
 #   include <AMReX_EB2_IF_Base.H>
+#   include <AMReX_EB2_IndexSpace_STL.H>
 #   include <AMReX_EB_utils.H>
 #   include <AMReX_GpuQualifiers.H>
 #   include <AMReX_ParmParse.H>
@@ -29,7 +30,7 @@
 #  include <string>
 
 using namespace ablastr::fields;
-
+using namespace amrex;
 #endif
 
 #ifdef AMREX_USE_EB
@@ -71,12 +72,11 @@ namespace {
 #endif
 
 void
-WarpX::InitEB ()
+WarpX::InitEB ([[maybe_unused]] const std::string& name)
 {
-    if (!EB::enabled()) {
+    if (!EB::enabled() && name == "eb2") {
         throw std::runtime_error("InitEB only works when EBs are enabled at runtime");
     }
-
 #if !defined(WARPX_DIM_3D) && !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_RZ)
     WARPX_ABORT_WITH_MESSAGE("EBs only implemented in 2D and 3D");
 #endif
@@ -86,8 +86,16 @@ WarpX::InitEB ()
 
     const amrex::ParmParse pp_warpx("warpx");
     pp_warpx.query("build_eb_data_per_level", m_build_eb_data_per_level);
+
+    amrex::ParmParse pp_name(name);
     std::string impf;
-    pp_warpx.query("eb_implicit_function", impf);
+    if (name == "eb2") {
+        pp_warpx.query("eb_implicit_function", impf);
+    } else { pp_name.query("implicit_function", impf); }
+
+    std::string geom_type;
+    pp_name.query("geom_type", geom_type);
+
     if (! impf.empty()) {
         auto eb_if_parser = utils::parser::makeParser(impf, {"x", "y", "z"});
         ParserIF const pif(eb_if_parser.compile<3>());
@@ -102,32 +110,88 @@ WarpX::InitEB ()
             // Build the EB data independently at each mesh-refinement level's own resolution.
             for (int ilev = 0; ilev <= maxLevel(); ++ilev) {
                 amrex::EB2::Build(gshop, Geom(ilev), 0, 20);
-                m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+                if (name == "eb2") {
+                    m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+                }
             }
         } else {
             // Build the EB data once at the finest level and coarsen it for coarser levels.
             amrex::EB2::Build(gshop, Geom(maxLevel()), maxLevel(), maxLevel()+20);
+            if (name == "eb2") {
+                m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+            }
         }
+    } else if (geom_type == "stl") {
+        std::string stl_file;
+        pp_name.get("stl_file", stl_file);
+        amrex::Real stl_scale = 1._rt;
+        pp_name.queryAdd("stl_scale", stl_scale);
+        std::vector<amrex::Real> stl_center{0.0_rt, 0.0_rt, 0.0_rt};
+        pp_name.queryAdd("stl_center", stl_center);
+        bool stl_reverse_normal = false;
+        pp_name.queryAdd("stl_reverse_normal", stl_reverse_normal);
+        bool stl_use_bvh = true;
+        pp_name.queryAdd("stl_use_bvh", stl_use_bvh);
+        amrex::EB2::IndexSpace::push(std::make_unique<amrex::EB2::IndexSpaceSTL>
+                                    (stl_file, stl_scale,
+                                    amrex::Array<amrex::Real,3>{stl_center[0], stl_center[1], stl_center[2]},
+                                    int(stl_reverse_normal), Geom(maxLevel()), maxLevel(),
+                                    maxLevel()+20, 4, true,
+                                    amrex::EB2::ExtendDomainFace(), amrex::EB2::NumCoarsenOpt(),
+                                    stl_use_bvh, false));
     } else {
-        amrex::ParmParse pp_eb2("eb2");
-        if (!pp_eb2.contains("geom_type")) {
-            std::string const geom_type = "all_regular";
-            pp_eb2.add("geom_type", geom_type); // use all_regular by default
+        if (geom_type.empty()) {
+            pp_name.add("geom_type", std::string("all_regular"));
         }
         // See the comment above on amrex::EB2::Build for the hard-wired number 20.
         if (m_build_eb_data_per_level) {
             // Build the EB data independently at each mesh-refinement level's own resolution.
             for (int ilev = 0; ilev <= maxLevel(); ++ilev) {
                 amrex::EB2::Build(Geom(ilev), 0, 20);
-                m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+                if (name == "eb2") {
+                    m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+                }
             }
         } else {
             // Build the EB data once at the finest level and coarsen it for coarser levels.
             amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20);
+            if (name == "eb2") {
+                m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+            }
         }
     }
 #endif
 }
+
+void
+WarpX::InitEB ()
+{
+    InitEB("eb2");
+}
+
+void
+WarpX::ComputeDistanceToEB ([[maybe_unused]] const std::string& field_name)
+{
+    if (!EB::enabled() and !ParticleSink::enabled()) {
+        throw std::runtime_error("ComputeDistanceToEB only works when EBs or particle sinks are enabled at runtime");
+    }
+#ifdef AMREX_USE_EB
+    BL_PROFILE("ComputeDistanceToEB");
+    const amrex::EB2::IndexSpace* eb_is = &amrex::EB2::IndexSpace::top();
+    for (int lev = 0; lev <= maxLevel(); ++lev) {
+        const amrex::EB2::Level& eb_level = eb_is->getLevel(Geom(lev));
+        auto* distance_mf = m_fields.get(field_name, lev);
+        auto const& eb_fact = fieldEBFactory(lev);
+        amrex::FillSignedDistance(*distance_mf, eb_level, eb_fact, 1);
+    }
+#endif
+}
+
+// void
+// WarpX::ComputeDistanceToEB ()
+// {
+//     ComputeDistanceToEB("distance_to_eb");
+// }
 
 void
 WarpX::ComputeDistanceToEB ()

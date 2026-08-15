@@ -46,6 +46,7 @@
 #include "Filter/BilinearFilter.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/ParticleThermalizer/ParticleThermalizer.H"
+#include "Particles/ParticleSinkContainer.H"
 #include "Utils/export.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
@@ -953,13 +954,47 @@ public:
         return static_cast<amrex::EBFArrayBoxFactory const&>(*m_field_factory[lev]);
     }
 #endif
-
+    /**
+     * \brief initialize the embedded boundaries using "eb2" runtime parameters
+     */
     void InitEB ();
 
     /**
-    * \brief Compute the level set function used for particle-boundary interaction.
-    */
+     * \brief initialize the embedded boundaries using runtime parameters specified by name
+     *
+     * \param[in] name String identifier of runtime parameter to parse
+     */
+    void InitEB (const std::string& name);
+
+    // particle sink stuff
+    std::unique_ptr<ParticleSinkContainer> m_particle_sinks;
+    void InitParticleSinks ();
+
+    void AllocateParticleSinkFields (int lev,
+                                     const amrex::BoxArray& ba_node,
+                                     const amrex::DistributionMapping& dm,
+                                     int nc_ls,
+                                     const amrex::IntVect& ng_ls,
+                                     amrex::Real val);
+
+    /**
+     * \brief Compute the level set functions for all particle sinks
+     */
+    void ComputeDistanceToParticleSinks ();
+
+    /**
+     * \brief Compute the level set function used for particle-boundary interaction for distance_to_eb.
+     */
     void ComputeDistanceToEB ();
+
+    /**
+     * \brief Compute the level set function used for particle-boundary interaction by field_name .
+     *
+     * \param[in] field_name String identifier of the target distance field to write to
+     */
+    void ComputeDistanceToEB (
+        const std::string& field_name
+    );
     /**
     * \brief Main function computing the cell extension. Where possible it computes one-way
     *       extensions and, when this is not possible, it does eight-ways extensions.

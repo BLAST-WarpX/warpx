@@ -805,6 +805,34 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->Redistribute();
     }
 
+
+    // interact the particles with particle sinks (if present)
+    if (ParticleSink::enabled()) {
+        // 1. Store the field objects in a local vector so they stay alive in memory
+        std::vector<ablastr::fields::MultiLevelScalarField> sink_fields;
+        for (const auto& sink_name : m_particle_sinks->get_names()) {
+            sink_fields.push_back(
+                m_fields.get_mr_levels("distance_to_" + sink_name, finest_level));
+        }
+
+        // 2. Gather pointers to pass to ScrapeParticlesAtEB
+        amrex::Vector<ablastr::fields::MultiLevelScalarField const*> sink_ptrs;
+        for (const auto& field : sink_fields) {
+            sink_ptrs.push_back(&field);
+        }
+
+        // 3. Scrape particles at sink boundaries
+        if (!sink_ptrs.empty()) {
+            mypc->ScrapeParticlesAtEB(sink_ptrs);
+            m_particle_boundary_buffer->gatherParticlesFromDistanceFields(*mypc, sink_ptrs, cur_time);
+            if (eb_particle_boundary == ParticleBoundaryType::Absorbing) {
+                mypc->deleteInvalidParticles();
+            } else {
+                mypc->Redistribute();
+            }
+        }
+    }
+
     // interact the particles with EB walls (if present)
     if (EB::enabled()) {
         using warpx::fields::FieldType;
