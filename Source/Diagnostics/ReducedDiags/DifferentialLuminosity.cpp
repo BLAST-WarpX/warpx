@@ -8,7 +8,7 @@
 #include "DifferentialLuminosity.H"
 
 #include "Diagnostics/ReducedDiags/ReducedDiags.H"
-#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
+#include "Particles/Collision/BinaryCollision/ParticleShufflers.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/SpeciesPhysicalProperties.H"
