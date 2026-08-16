@@ -1405,7 +1405,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
 
     warpx_boundary_particle_eb: string, default="Absorbing", optional
        The boundary condition applied to the particles when they reach the surface
-       of the embedded boundary. Absorbing, Reflecting, or None
+       of the embedded boundary. Absorbing, Reflecting, Thermal, or None
 
     warpx_start_moving_window_step: int, default=0
        The timestep at which the moving window starts
@@ -3726,6 +3726,10 @@ class ParticleSink(picmistandard.base._ClassWithInit):
     stl_reverse_normal: bool
         If True inverts the orientation of the STL geometry
 
+    type: string, default="Absorbing", optional
+       The boundary condition applied to the particles when they reach the surface
+       of the embedded boundary. Absorbing, Reflecting, Thermal, or None
+
     Parameters used in the analytic expressions should be given as additional keyword arguments.
 
     """
@@ -3738,6 +3742,7 @@ class ParticleSink(picmistandard.base._ClassWithInit):
         stl_scale=None,
         stl_center=None,
         stl_reverse_normal=False,
+        type="Absorbing",
         **kw,
     ):
         self.name = name
@@ -3774,6 +3779,13 @@ class ParticleSink(picmistandard.base._ClassWithInit):
 
         self.handle_init(kw)
 
+        availible_types = ["Absorbing", "Reflecting", "Thermal", "None"]
+        assert type in availible_types, Exception(
+            "boundaries must be Absorbing, Reflecting, Thermal, or None"
+        )
+
+        self.type = type
+
     def particle_sink_initialize_inputs(self):
         # Add the user defined keywords to my_constants
         # The keywords are mangled if there is a conflicting variable already
@@ -3795,6 +3807,7 @@ class ParticleSink(picmistandard.base._ClassWithInit):
             self.particle_sink.stl_scale = self.stl_scale
             self.particle_sink.stl_center = self.stl_center
             self.particle_sink.stl_reverse_normal = self.stl_reverse_normal
+        self.particle_sink.type = self.type
 
 
 class PlasmaLens(picmistandard.base._ClassWithInit):

@@ -178,7 +178,7 @@ grid = picmi.Cartesian2DGrid(
     upper_boundary_conditions_particles=["absorbing", "absorbing"],
     warpx_potential_lo_z=0.0,
     warpx_potential_hi_z=anodeVoltage,
-    # warpx_boundary_particle_eb = "Absorbing"
+    warpx_boundary_particle_eb="Absorbing",
 )
 
 
@@ -207,7 +207,7 @@ x1 = gap * 2.0 / 4.0
 z1 = gap / 2.0
 implicit_expr = "r^2-(x-x1)^2-(z-z1)^2"
 sink0 = picmi.ParticleSink(
-    name="sink0", implicit_function=implicit_expr, x1=x1, z1=z1, r=r
+    name="sink0", implicit_function=implicit_expr, type="Absorbing", x1=x1, z1=z1, r=r
 )
 
 
@@ -223,7 +223,7 @@ z2 = gap / 2.0
 
 implicit_expr = "r^2-(x-x2)^2-(z-z2)^2"
 sink1 = picmi.ParticleSink(
-    name="sink1", implicit_function=implicit_expr, x2=x2, z2=z2, r=r
+    name="sink1", implicit_function=implicit_expr, type="Reflecting", x2=x2, z2=z2, r=r
 )
 ##########################
 # diagnostics
