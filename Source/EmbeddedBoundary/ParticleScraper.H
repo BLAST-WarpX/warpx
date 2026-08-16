@@ -8,8 +8,9 @@
 #define WARPX_PARTICLESCRAPER_H_
 
 #include "EmbeddedBoundary/DistanceToEB.H"
+#include "EmbeddedBoundary/ParticleBoundaryProcess.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
-
+#include "Particles/ParticleSinkContainer.H"
 #include <ablastr/particles/NodalFieldGather.H>
 
 #include <AMReX.H>
@@ -287,5 +288,97 @@ scrapeParticlesAtEB (PC& pc,
         }
     }
 }
+
+template <class PC, std::enable_if_t<amrex::IsParticleContainer<PC>::value, int> foo = 0>
+void
+scrapeParticlesAtEB (PC& pc,
+                     ParticleSinkContainer const& particle_sinks,
+                     int lev_min, int lev_max)
+{
+    BL_PROFILE("scrapeParticlesAtEB");
+
+    // 1. Collect non-disabled sinks
+    const auto active_sinks = particle_sinks.get_active_sinks();
+
+    const amrex::Long num_ebs = active_sinks.size();
+    if (num_ebs == 0) { return; }
+
+    constexpr int MAX_SINKS = 8;
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        num_ebs <= MAX_SINKS,
+        "Exceeded maximum supported particle sinks (8) in scrapeParticlesAtEB."
+    );
+
+    // 2. Extract sink types ONCE (Global for all levels/tiles)
+    amrex::GpuArray<ParticleBoundaryType, MAX_SINKS> sink_types;
+    for (int n = 0; n < num_ebs; ++n) {
+        sink_types[n] = active_sinks[n]->type;
+    }
+
+    auto& warpx = WarpX::GetInstance();
+    amrex::ParticleReal const mass = pc.getMass();
+    amrex::ParticleReal const uth = pc.getBoundaryThermalVelocity();
+
+    for (int lev = lev_min; lev <= lev_max; ++lev)
+    {
+        const auto plo = pc.Geom(lev).ProbLoArray();
+        const auto dxi = pc.Geom(lev).InvCellSizeArray();
+        amrex::Real const dt_lev = warpx.getdt(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti)
+        {
+            const auto getPosition = GetParticlePosition<PIdx>(pti);
+            const auto setPosition = SetParticlePosition<PIdx>(pti);
+            auto& tile = pti.GetParticleTile();
+            auto ptd = tile.getParticleTileData();
+            const auto np = tile.numParticles();
+
+            // 3. Extract tile-specific Array4 views (1-line host setup)
+            amrex::GpuArray<amrex::Array4<const amrex::Real>, MAX_SINKS> eb_arrs;
+            for (int n = 0; n < num_ebs; ++n) {
+                eb_arrs[n] = (*active_sinks[n]->distance_field[lev])[pti].array();
+            }
+
+            amrex::ParallelForRNG( np,
+            [=] AMREX_GPU_DEVICE (const int ip, amrex::RandomEngine const& engine) noexcept
+            {
+                if (!amrex::ParticleIDWrapper{ptd.m_idcpu[ip]}.is_valid()) { return; }
+
+                amrex::ParticleReal xp, yp, zp;
+                getPosition(ip, xp, yp, zp);
+
+                int i, j, k;
+                amrex::Real W[AMREX_SPACEDIM][2];
+                ablastr::particles::compute_weights<amrex::IndexType::NODE>(
+                    xp, yp, zp, plo, dxi, i, j, k, W);
+
+                // 4. Test particle distance & construct functor on-the-fly
+                for (int n = 0; n < num_ebs; ++n)
+                {
+                    auto const& distance_to_eb_arr = eb_arrs[n];
+                    amrex::Real const distance_to_eb_value =
+                        ablastr::particles::interp_field_nodal(i, j, k, W, distance_to_eb_arr);
+
+                    if (distance_to_eb_value < 0.0)
+                    {
+                        if (sink_types[n] == ParticleBoundaryType::Absorbing) {
+                            ParticleBoundaryProcess::Absorb{}(
+                                ptd, ip, setPosition, xp, yp, zp, distance_to_eb_arr, plo, dxi, engine);
+                        } else {
+                            ParticleBoundaryProcess::ParticleBoundaryInteraction{
+                                dt_lev, mass, sink_types[n], uth
+                            }(ptd, ip, setPosition, xp, yp, zp, distance_to_eb_arr, plo, dxi, engine);
+                        }
+                        break;
+                    }
+                }
+            });
+        }
+    }
+}
+
 
 #endif //WARPX_PARTICLESCRAPER_H_

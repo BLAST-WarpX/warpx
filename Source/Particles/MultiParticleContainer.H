@@ -15,6 +15,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include "Particles/Collision/CollisionHandler.H"
+#include "Particles/ParticleSinkContainer.H"
 #ifdef WARPX_QED
 #   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper_fwd.H"
@@ -350,6 +351,7 @@ public:
 
     void ScrapeParticlesAtEB (ablastr::fields::MultiLevelScalarField const& distance_to_eb);
     void ScrapeParticlesAtEB (amrex::Vector<ablastr::fields::MultiLevelScalarField const*> const& distance_to_eb_list);
+    void ScrapeParticlesAtEB (ParticleSinkContainer const& particle_sinks);
 
     std::string m_B_ext_particle_s = "none";
     std::string m_E_ext_particle_s = "none";

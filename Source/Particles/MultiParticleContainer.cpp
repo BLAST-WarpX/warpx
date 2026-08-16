@@ -30,6 +30,7 @@
 #include "Particles/ParticleCreation/SmartUtils.H"
 #include "Particles/PhotonParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
+#include "Particles/ParticleSinkContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SpeciesPhysicalProperties.H"
@@ -1253,7 +1254,7 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
     ScrapeParticlesAtEB(distance_to_eb_list);
 }
 
-
+// TODO: this is no longer called? Can use original implementation.
 void MultiParticleContainer::ScrapeParticlesAtEB (
     amrex::Vector<ablastr::fields::MultiLevelScalarField const*> const& distance_to_eb_list)
 {
@@ -1277,6 +1278,14 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
             scrapeParticlesAtEB(*pc, distance_to_eb_list, 0, pc->finestLevel(),
                 ParticleBoundaryProcess::Absorb());
         }
+    }
+}
+
+void MultiParticleContainer::ScrapeParticlesAtEB (
+    ParticleSinkContainer const& particle_sinks)
+{
+    for (auto& pc : allcontainers) {
+        scrapeParticlesAtEB(*pc, particle_sinks, 0, pc->finestLevel());
     }
 }
 
