@@ -110,7 +110,7 @@ max_beam_energy = max(anodeVoltage, sphereVoltage) + beam_energy  # [eV]
 ##########################
 
 # --- Number of time steps
-max_steps = 1000
+max_steps = 500
 nDumps = 100
 diagnostic_intervals = "::%i" % (max_steps / nDumps)
 step_interval = 100
@@ -178,7 +178,7 @@ grid = picmi.Cartesian2DGrid(
     upper_boundary_conditions_particles=["absorbing", "absorbing"],
     warpx_potential_lo_z=0.0,
     warpx_potential_hi_z=anodeVoltage,
-    warpx_boundary_particle_eb="Absorbing",
+    warpx_boundary_particle_eb="Reflecting",
 )
 
 
@@ -312,12 +312,20 @@ def access_particle_buffer():
     buffer = particle_containers.ParticleBoundaryBufferWrapper()
     lev = 0
     xTiles = buffer.get_particle_scraped_this_step("electrons", "eb", "x", lev)
+    # zTiles = buffer.get_particle_scraped_this_step("electrons", "eb", "z", lev)
+    # nxTiles = buffer.get_particle_scraped_this_step("electrons", "eb", "nx", lev)
+    # nzTiles = buffer.get_particle_scraped_this_step("electrons", "eb", "nz", lev)
     for i, sink in enumerate(sinks):
         Ns[i] = sum(
             xp.count_nonzero(in_range(xTile, sink[0], sink[1])).item()
             for xTile in xTiles
         )
     print(Ns)
+    # for xTile,zTile,nxTile,nzTile, in zip(xTiles,zTiles,nxTiles,nzTiles):
+    #     I = in_range(xTile, xSink0[0], xSink0[1])
+    #     # print(nzTile[I])
+    #     angle = xp.rad2deg(xp.arctan2(nzTile[I],nxTile[I]))
+    #     print(angle)
 
 
 callbacks.installafterstep(access_particle_buffer)
