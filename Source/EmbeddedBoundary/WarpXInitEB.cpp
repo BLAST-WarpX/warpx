@@ -177,14 +177,27 @@ WarpX::ComputeDistanceToEB ([[maybe_unused]] const std::string& field_name)
     if (!EB::enabled() and !ParticleSink::enabled()) {
         throw std::runtime_error("ComputeDistanceToEB only works when EBs or particle sinks are enabled at runtime");
     }
+
 #ifdef AMREX_USE_EB
     BL_PROFILE("ComputeDistanceToEB");
     const amrex::EB2::IndexSpace* eb_is = &amrex::EB2::IndexSpace::top();
+
     for (int lev = 0; lev <= maxLevel(); ++lev) {
         const amrex::EB2::Level& eb_level = eb_is->getLevel(Geom(lev));
         auto* distance_mf = m_fields.get(field_name, lev);
-        auto const& eb_fact = fieldEBFactory(lev);
-        amrex::FillSignedDistance(*distance_mf, eb_level, eb_fact, 1);
+
+        // 6 Arguments: level, geom, boxarray, dmap, ngrow vector, support
+        amrex::EBFArrayBoxFactory sink_eb_fact(
+            eb_level,
+            Geom(lev),
+            distance_mf->boxArray(),
+            distance_mf->DistributionMap(),
+            amrex::Vector<int>{2, 2, 2},
+            amrex::EBSupport::full
+        );
+
+        amrex::FillSignedDistance(*distance_mf, eb_level, sink_eb_fact, 1);
+        distance_mf->FillBoundary(Geom(lev).periodicity());
     }
 #endif
 }
