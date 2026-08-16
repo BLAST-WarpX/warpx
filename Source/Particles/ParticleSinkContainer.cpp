@@ -39,6 +39,50 @@ void ParticleSinkContainer::add_sink (std::string name,
 
 #endif
 
+amrex::Vector<const ParticleSinkContainer::Sink*> ParticleSinkContainer::get_active_sinks () const
+{
+    amrex::Vector<const Sink*> active_sinks;
+    for (const auto& sink : m_sinks) {
+        if (sink.type != ParticleBoundaryType::None) {
+            active_sinks.push_back(&sink);
+        }
+    }
+    return active_sinks;
+}
+
+amrex::Vector<ablastr::fields::MultiLevelScalarField const*>
+ParticleSinkContainer::get_active_distance_fields () const
+{
+    amrex::Vector<ablastr::fields::MultiLevelScalarField const*> sink_ptrs;
+    for (const auto& sink : m_sinks) {
+        if (sink.type != ParticleBoundaryType::None) {
+            sink_ptrs.push_back(&sink.distance_field);
+        }
+    }
+    return sink_ptrs;
+}
+
+bool ParticleSinkContainer::has_absorbing_sinks () const
+{
+    for (const auto& sink : m_sinks) {
+        if (sink.type == ParticleBoundaryType::Absorbing) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ParticleSinkContainer::has_reflecting_or_thermal_sinks () const
+{
+    for (const auto& sink : m_sinks) {
+        if (sink.type == ParticleBoundaryType::Reflecting ||
+            sink.type == ParticleBoundaryType::Thermal) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::vector<std::string> ParticleSinkContainer::get_names () const
 {
     std::vector<std::string> names;

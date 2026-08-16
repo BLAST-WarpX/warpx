@@ -34,8 +34,16 @@ public:
                    const amrex::EB2::IndexSpace* is = nullptr);
     void set_distance_field (const std::string& name,
                          ablastr::fields::MultiLevelScalarField field);
+    [[nodiscard]] bool has_absorbing_sinks () const;
+
+    [[nodiscard]] bool has_reflecting_or_thermal_sinks () const;
 
     // getters
+    [[nodiscard]] amrex::Vector<const Sink*> get_active_sinks () const;
+
+    [[nodiscard]] amrex::Vector<ablastr::fields::MultiLevelScalarField const*>
+    get_active_distance_fields () const;
+
     [[nodiscard]] std::vector<ParticleBoundaryType> get_types () const;
     [[nodiscard]] std::vector<std::string> get_names () const;
 
