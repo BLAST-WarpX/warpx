@@ -818,7 +818,9 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
         if (m_particle_sinks->has_absorbing_sinks()) {
             mypc->deleteInvalidParticles();
-        } else {
+        }
+        if (m_particle_sinks->has_reflecting_or_thermal_sinks())
+        {
             mypc->Redistribute();
         }
     }
