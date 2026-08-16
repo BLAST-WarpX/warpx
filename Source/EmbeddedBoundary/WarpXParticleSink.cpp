@@ -51,13 +51,10 @@ void WarpX::ComputeDistanceToParticleSinks ()
     for (auto& sink : m_particle_sinks->get_sinks()) {
         if (sink.index_space != nullptr) {
             std::string const field_name = "distance_to_" + sink.name;
-
-            // 1. Push index space and compute EB distance field (registers into m_fields)
             amrex::EB2::IndexSpace::push(const_cast<amrex::EB2::IndexSpace*>(sink.index_space));
             ComputeDistanceToEB(field_name);
             amrex::EB2::IndexSpace::pop();
-            ablastr::fields::MultiLevelScalarField dist_field_ptrs =
-                m_fields.get_mr_levels(field_name, finestLevel());
+            const ablastr::fields::MultiLevelScalarField dist_field_ptrs = m_fields.get_mr_levels(field_name, finestLevel());
             m_particle_sinks->set_distance_field(sink.name, dist_field_ptrs);
         }
     }
