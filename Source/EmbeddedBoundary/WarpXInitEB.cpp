@@ -71,6 +71,7 @@ namespace {
 }
 #endif
 
+// TODO: new per_level implementation might be added to particleSinks?
 void
 WarpX::InitEB ([[maybe_unused]] const std::string& name)
 {
@@ -169,6 +170,7 @@ WarpX::InitEB ()
     InitEB("eb2");
 }
 
+// TODO: new per_level implementation might be added to particleSinks?
 void
 WarpX::ComputeDistanceToEB ([[maybe_unused]] const std::string& field_name)
 {
@@ -186,12 +188,6 @@ WarpX::ComputeDistanceToEB ([[maybe_unused]] const std::string& field_name)
     }
 #endif
 }
-
-// void
-// WarpX::ComputeDistanceToEB ()
-// {
-//     ComputeDistanceToEB("distance_to_eb");
-// }
 
 void
 WarpX::ComputeDistanceToEB ()
