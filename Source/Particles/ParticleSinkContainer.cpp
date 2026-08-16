@@ -64,23 +64,19 @@ ParticleSinkContainer::get_active_distance_fields () const
 
 bool ParticleSinkContainer::has_absorbing_sinks () const
 {
-    for (const auto& sink : m_sinks) {
-        if (sink.type == ParticleBoundaryType::Absorbing) {
-            return true;
-        }
-    }
-    return false;
+    return std::ranges::any_of(m_sinks,
+                               [](const Sink& sink) {
+                                   return sink.type == ParticleBoundaryType::Absorbing;
+                               });
 }
 
 bool ParticleSinkContainer::has_reflecting_or_thermal_sinks () const
 {
-    for (const auto& sink : m_sinks) {
-        if (sink.type == ParticleBoundaryType::Reflecting ||
-            sink.type == ParticleBoundaryType::Thermal) {
-            return true;
-        }
-    }
-    return false;
+    return std::ranges::any_of(m_sinks,
+                               [](const Sink& sink) {
+                                   return sink.type == ParticleBoundaryType::Reflecting ||
+                                          sink.type == ParticleBoundaryType::Thermal;
+                               });
 }
 
 std::vector<std::string> ParticleSinkContainer::get_names () const
