@@ -241,7 +241,6 @@ namespace ParticleUtils {
                             [[maybe_unused]]amrex::Real x,
                             [[maybe_unused]]amrex::Real y,
                             [[maybe_unused]]amrex::Real z) {
-        using namespace amrex::literals;
         const auto *const xlo = tilebox.lo();
         const auto *const xhi = tilebox.hi();
 #if defined(WARPX_DIM_3D)
