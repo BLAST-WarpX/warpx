@@ -141,15 +141,6 @@ private:
     HybridPICModel* m_hybrid_pic_model = nullptr;
 
     /**
-     * \brief When true, use Darwin split: JFNK solves only for E_T (transverse
-     * part of E_Ohm). E_L = ∇φ (curl-free part) is computed via a Poisson solve
-     * (∇²φ = ∇·E_Ohm) once per Newton step and frozen across GMRES matvecs.
-     * This decouples the longitudinal (Debye-scale) physics from the transverse
-     * Alfvén/Hall physics and improves JFNK conditioning.
-     */
-    bool m_use_darwin_split = false;
-
-    /**
      * \brief Persistent nodal MultiFab storing the spatially varying alpha
      * coefficient (theta*dt*sqrt((|B|/rho)^2+eta^2)/mu0) for the curl-curl preconditioner.
      * Derived from the hybrid Jacobian eigenvalue radius on the transverse (Er,Etheta) block.
@@ -244,15 +235,6 @@ private:
      * Uses: F^{n+1} = (1/theta)*F^{n+theta} + (1 - 1/theta)*F^n
      * This is applied to both E and B fields.
      */
-
-    /** Add E_L (hybrid_E_fp_long) to Efield_fp: E_fp += E_L */
-    void AddLongitudinalE ();
-
-    /** Subtract E_L from Efield_fp: E_fp -= E_L */
-    void SubtractLongitudinalE ();
-
-    /** Subtract E_L from a solver vector: a_vec -= E_L */
-    void SubtractLongitudinalE (WarpXSolverVec& a_vec);
 
     /**
      * \brief Add external B field to Bfield_fp: B_fp += B_external

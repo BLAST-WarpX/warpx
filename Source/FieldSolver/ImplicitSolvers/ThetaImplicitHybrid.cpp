@@ -72,7 +72,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_theta >= 0.5 && m_theta <= 1.0,
         "theta parameter must be between 0.5 and 1.0");
-    pp.query("use_darwin_split", m_use_darwin_split);
     pp.query("use_rho_response_divj", m_use_rho_response_divj);
 
     // Allocate persistent nodal alpha MultiFab for curl-curl preconditioner
@@ -129,14 +128,8 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
     // Save particle state at t^n
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Save E^n (or E_T^n if Darwin split)
+    // Save E^n
     m_Eold.Copy(FieldType::Efield_fp);
-
-    // Darwin split: decompose E^n = E_T^n + E_L^n; JFNK iterates on E_T only
-    if (m_use_darwin_split) {
-        m_hybrid_pic_model->ComputeLongitudinalE(0, GetLinOpBCLo(), GetLinOpBCHi());
-        SubtractLongitudinalE(m_Eold);
-    }
 
     // Save B^n
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -148,7 +141,7 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         }
     }
 
-    // Initial guess: E^{n+θ} = E^n  (or E_T^{n+θ} = E_T^n if Darwin split)
+    // Initial guess: E^{n+θ} = E^n
     m_E.Copy(m_Eold);
     
     // Solve nonlinear system for E^{n+θ} (and eventually Pe^{n+θ})
@@ -392,33 +385,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     m_WarpX->ApplyFillBoundaryE();
 
-    // Darwin split: always compute E_L from the current E_Ohm so that the JFNK
-    // Jacobian (J·v = (F(x+εv) - F(x))/ε) includes ∂E_L/∂E_T and is exactly
-    // consistent with the residual R = E_T_Ohm - E_T^n.  Freezing E_L only in
-    // GMRES matvecs (a_from_jacobian=true) misses ∂E_L/∂E_T and causes Newton
-    // to enter a 2-cycle at late simulation times when E_L is large.
-    //
-    // To keep the MLMG warm-start seed (hybrid_darwin_phi_fp) from being
-    // corrupted by the small ε-perturbations inside each matvec, we save and
-    // restore phi around every a_from_jacobian call.  The outer (!a_from_jacobian)
-    // call advances phi normally and provides the warm-start seed.
-    if (m_use_darwin_split) {
-        if (a_from_jacobian) {
-            // Save the outer phi so each matvec starts from the same warm seed.
-            amrex::MultiFab& phi_mf =
-                *m_WarpX->m_fields.get(FieldType::hybrid_darwin_phi_fp, 0);
-            amrex::MultiFab phi_save(phi_mf.boxArray(), phi_mf.DistributionMap(),
-                                     1, phi_mf.nGrowVect());
-            amrex::MultiFab::Copy(phi_save, phi_mf, 0, 0, 1, phi_mf.nGrowVect());
-            m_hybrid_pic_model->ComputeLongitudinalE(0, GetLinOpBCLo(), GetLinOpBCHi());
-            amrex::MultiFab::Copy(phi_mf, phi_save, 0, 0, 1, phi_mf.nGrowVect());
-        } else {
-            m_hybrid_pic_model->ComputeLongitudinalE(0, GetLinOpBCLo(), GetLinOpBCHi());
-        }
-        SubtractLongitudinalE();  // Efield_fp = E_T = E_Ohm - E_L
-    }
-
-    // RHS = E_T_ohm - E_T_old  (or E_ohm - E_old when Darwin split is off)
+    // RHS = E_ohm - E_old
     a_RHS.Copy(FieldType::Efield_fp);
     a_RHS.linComb(1.0, a_RHS, -1.0, m_Eold);
 }
@@ -1176,11 +1143,9 @@ void ThetaImplicitHybrid::FinishFieldUpdate( amrex::Real end_time )
     const amrex::Real c0 = 1.0_rt / m_theta;
     const amrex::Real c1 = 1.0_rt - c0;
 
-    // E^{n+1}  (or E_T^{n+1} if Darwin split)
+    // E^{n+1}
     m_E.linComb( c0, m_E, c1, m_Eold );
     m_WarpX->SetElectricFieldAndApplyBCs( m_E, end_time );
-    // Restore full E^{n+1} = E_T^{n+1} + E_L^{n+θ}  (E_L from final Newton iter)
-    if (m_use_darwin_split) { AddLongitudinalE(); }
 
     // B^{n+1}
     ablastr::fields::MultiLevelVectorField const& B_old = 
@@ -1291,48 +1256,6 @@ void ThetaImplicitHybrid::SubtractExternalEfield ()
                 *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_external, Direction{idim}, lev),
                 0, 0, 1,
                 m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
-        }
-    }
-}
-
-void ThetaImplicitHybrid::AddLongitudinalE ()
-{
-    using ablastr::fields::Direction;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        for (int idim = 0; idim < 3; ++idim) {
-            amrex::MultiFab::Add(
-                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
-                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_long, Direction{idim}, lev),
-                0, 0, 1,
-                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
-        }
-    }
-}
-
-void ThetaImplicitHybrid::SubtractLongitudinalE ()
-{
-    using ablastr::fields::Direction;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        for (int idim = 0; idim < 3; ++idim) {
-            amrex::MultiFab::Subtract(
-                *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev),
-                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_long, Direction{idim}, lev),
-                0, 0, 1,
-                m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{idim}, lev)->nGrowVect());
-        }
-    }
-}
-
-void ThetaImplicitHybrid::SubtractLongitudinalE (WarpXSolverVec& a_vec)
-{
-    using ablastr::fields::Direction;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        for (int idim = 0; idim < 3; ++idim) {
-            amrex::MultiFab::Subtract(
-                *a_vec.getArrayVec()[lev][idim],
-                *m_WarpX->m_fields.get(FieldType::hybrid_E_fp_long, Direction{idim}, lev),
-                0, 0, 1,
-                a_vec.getArrayVec()[lev][idim]->nGrowVect());
         }
     }
 }
