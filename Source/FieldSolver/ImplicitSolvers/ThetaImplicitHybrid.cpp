@@ -72,7 +72,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_theta >= 0.5 && m_theta <= 1.0,
         "theta parameter must be between 0.5 and 1.0");
-    pp.query("use_rho_response_divj", m_use_rho_response_divj);
 
     parseNonlinearSolverParams( pp );
     m_nlsolver->Define(m_E, this);
@@ -332,7 +331,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         }
     }
 
-    if (m_use_mass_matrices_jacobian && m_use_rho_response_divj) {
+    if (m_use_mass_matrices_jacobian) {
         if (!a_from_jacobian) {
             // Nonlinear evaluation: J and rho are now scaled and synced; capture the
             // linearization base for the rho response (see m_J_base in the header).

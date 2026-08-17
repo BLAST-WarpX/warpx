@@ -163,9 +163,6 @@ private:
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_J_base;
     mutable std::unique_ptr<amrex::MultiFab> m_rho_base;
 
-    /** Enable the continuity-based rho response in the MM linear stage (see m_J_base) */
-    bool m_use_rho_response_divj = true;
-
     /**
      * Evolve the electron pressure with its own gamma-law advection/compression
      * equation, (gamma-1)^{-1} [d_t pe + div(ue pe)] + pe div(ue) = 0 (Stanier et al.
