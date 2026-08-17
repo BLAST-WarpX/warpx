@@ -1452,7 +1452,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         {
             amrex::ignore_unused(j,k);
             const amrex::IntVect iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
-            amrex::ignore_unused(j,k);
             const auto index = overlap_box.index(iv);
 
             amrex::Real scale_fac;
