@@ -121,16 +121,6 @@ public:
      * Public because the CUDA compiler requires the enclosing function of an
      * extended device lambda to have public access. */
     void ApplyRhoResponseFromDivJ ();
-    [[nodiscard]] const amrex::Vector<amrex::MultiFab*>* GetAlphaCoeff () const override;
-
-    /**
-     * \brief Override: skip the c²μ₀θΔt EM scaling from the base class (derived
-     * from Ampere's law, physically wrong for the hybrid solver where E comes from
-     * Ohm's law).  For the curl-curl MLMG preconditioner, still adds +1 to the
-     * diagonal of MassMatrices_PC so that beta >= 1 everywhere, preventing the
-     * curl-curl operator from being singular in vacuum cells.
-     */
-    void SetMassMatricesForPC ( amrex::Real a_theta_dt ) override;
 
 private:
 
@@ -140,12 +130,6 @@ private:
      */
     HybridPICModel* m_hybrid_pic_model = nullptr;
 
-    /**
-     * \brief Persistent nodal MultiFab storing the spatially varying alpha
-     * coefficient (theta*dt*sqrt((|B|/rho)^2+eta^2)/mu0) for the curl-curl preconditioner.
-     * Derived from the hybrid Jacobian eigenvalue radius on the transverse (Er,Etheta) block.
-     * Reduces to theta*dt*|B|/(mu0*rho) for eta=0. Refilled each Newton iteration.
-     */
     /**
      * Ion current captured at the last nonlinear residual evaluation (same moment as
      * SaveE). During mass-matrix linear-stage evaluations the push field is computed
@@ -201,8 +185,6 @@ private:
 
 
 
-    mutable amrex::Vector<amrex::MultiFab>  m_alpha_mf;
-    mutable amrex::Vector<amrex::MultiFab*> m_alpha_mfarrvec;
 
     /**
      * \brief Flag indicating whether external fields from vector potentials
