@@ -4059,9 +4059,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.step(nsteps)
 
     def finalize(self):
-        if self.warpx_initialized:
-            self.warpx_initialized = False
-            pywarpx.warpx.finalize()
+        # unconditional: tearing down WarpX is a no-op if it was never
+        # initialized, but the input state still needs to be cleared
+        self.warpx_initialized = False
+        pywarpx.warpx.finalize()
 
     @property
     def fields(self):
