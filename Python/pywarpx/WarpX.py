@@ -201,9 +201,9 @@ class WarpX(Bucket):
         # This always unregisters the Python callbacks.
         libwarpx.finalize(finalize_mpi)
 
-        # these module-level lists are imported by name elsewhere (picmi), so
-        # they must be cleared in place; the dicts of the buckets below are
-        # rebound to fresh defaults by Bucket.clear() itself
+        # this module imports these lists by name (see above), so they must be
+        # cleared in place; the dicts of the buckets below are rebound to fresh
+        # defaults by Bucket.clear() itself
         del collisions_list[:]
         del lasers_list[:]
         del particles_list[:]
