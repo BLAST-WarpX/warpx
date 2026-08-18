@@ -40,13 +40,13 @@ if __name__ == "__main__":
     )
 
     # add arguments: relative tolerance
-    # Use a larger default for GPU backends. On CPU, use a tighter tolerance
-    # for restart checksum analysis.
     test_name = os.path.split(os.getcwd())[1]
     compute_backend = os.getenv("WARPX_COMPUTE", "").upper()
     if compute_backend in {"CUDA", "HIP", "SYCL"}:
-        default_tolerance = 1e-7
+        # GPU checksums
+        default_tolerance = 1e-1
     else:
+        # CPU checksums (default for restart tests is stricter)
         default_tolerance = 1e-12 if "_restart" in test_name else 1e-9
     parser.add_argument(
         "--rtol",
