@@ -113,21 +113,6 @@ WarpX::ComputeDt ()
     }
 }
 
-/**
- * Used to determine the simulation timestep from the maximum speed of all particles
- * Timestep will be set so that a particle can cross at most cfl*dx cells per timestep.
- */
-amrex::Real
-WarpX::ParticleGridSpeedMax ()
-{
-    const amrex::Real* dx = geom[max_level].CellSize();
-    const amrex::Real dx_min = minDim(dx);
-
-    const amrex::ParticleReal max_v = mypc->maxParticleVelocity();
-
-    return max_v/dx_min;
-}
-
 amrex::Real
 WarpX::GlobalPlasmaFrequencyMax ()
 {
@@ -239,12 +224,12 @@ WarpX::ApplyDtLimiters ()
     using namespace amrex::literals;
 
     // Calculate limiting values from the simulation conditions
-    const amrex::Real vmax_o_dx = ParticleGridSpeedMax();
+    const amrex::Real max_dt_inv = mypc->maxParticleDtInv();  // max value of abs(vp_i/dx[i])
     const amrex::Real omegap_max = m_max_omegap_dt.has_value() ? GlobalPlasmaFrequencyMax() : 0._rt;
     const amrex::Real omegac_max = m_max_omegac_dt.has_value() ? GlobalCyclotronFrequencyMax() : 0._rt;
 
     // Ensure that a valid time step value exists, either from the simulation conditions or from max_dt
-    if (vmax_o_dx == 0._rt &&
+    if (max_dt_inv == 0._rt &&
         (!m_max_omegap_dt.has_value() || omegap_max == 0._rt) &&
         (!m_max_omegac_dt.has_value() || omegac_max == 0._rt)) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_max_dt.has_value(),
@@ -253,8 +238,8 @@ WarpX::ApplyDtLimiters ()
 
     amrex::Real dt_new = std::numeric_limits<amrex::Real>::max();
 
-    if (vmax_o_dx > 0._rt) {
-        dt_new = std::min(dt_new, cfl/vmax_o_dx);
+    if (max_dt_inv > 0._rt) {
+        dt_new = std::min(dt_new, cfl/max_dt_inv);
     }
     if (m_max_omegap_dt.has_value() && omegap_max > 0._rt) {
         dt_new = std::min(dt_new, m_max_omegap_dt.value()/omegap_max);
@@ -326,7 +311,7 @@ WarpX::ApplyDtLimiters ()
         diagnostic_file << " ";
         diagnostic_file << dt_new;
         diagnostic_file << " ";
-        diagnostic_file << vmax_o_dx*dt_new;
+        diagnostic_file << max_dt_inv*dt_new;
 
         if (m_max_omegap_dt.has_value()) {
             diagnostic_file << " ";

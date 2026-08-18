@@ -122,6 +122,7 @@ Commits should limit any formatting changes of unchanged code.
 - Fields are stored as AMReX `MultiFab` objects, managed via `ablastr::fields::MultiFabRegister`
 - Particle species managed by `MultiParticleContainer` → `WarpXParticleContainer`
 - Compile-time macros: `WARPX_DIM_3D`, `WARPX_DIM_XZ`, `WARPX_DIM_1D_Z`, `WARPX_DIM_RZ`
+- `amrex::ParallelFor` promises the compiler that loop iterations are independent (it applies a CPU SIMD pragma). Kernels where different iterations can write the same memory location — particle-to-grid deposition, scatter-add, histogram binning, shared counters — must use `amrex::For` instead, and whole-loop sums/maxima the `amrex::Reduce` function. `amrex::Gpu::Atomic` operations are plain non-atomic updates on CPU and do not make a `ParallelFor` safe; `amrex::HostDevice::Atomic` is atomic across OpenMP threads on CPU but does not make a `ParallelFor` safe either. See `Docs/source/developers/portability.rst`.
 
 ## C++ Style
 
@@ -145,4 +146,4 @@ When a change removes or renames a user-facing input parameter, add a guard to t
 
 - Main branch: `development` (not `main`)
 - Fork-and-branch workflow; PRs target `development`
-- Pull requests with features and bug fixes need to add a test for coverage.
+- Pull requests with new features need to add a test for coverage.

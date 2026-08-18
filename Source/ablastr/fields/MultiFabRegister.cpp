@@ -10,6 +10,7 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_MakeType.H>
+#include <AMReX_VisMF.H>
 
 #include <array>
 #include <memory>
@@ -32,7 +33,8 @@ namespace ablastr::fields
         amrex::IntVect const & ngrow,
         std::optional<amrex::Real const> initial_value,
         bool remake,
-        bool redistribute_on_remake
+        bool redistribute_on_remake,
+        bool checkpoint_restart
     )
     {
         // checks
@@ -53,6 +55,7 @@ namespace ablastr::fields
                 level,
                 remake,
                 redistribute_on_remake,
+                checkpoint_restart,
                 ""   // we own the memory
             }
         );
@@ -82,7 +85,8 @@ namespace ablastr::fields
         amrex::IntVect const & ngrow,
         std::optional<amrex::Real const> initial_value,
         bool remake,
-        bool redistribute_on_remake
+        bool redistribute_on_remake,
+        bool checkpoint_restart
     )
     {
         // checks
@@ -107,6 +111,7 @@ namespace ablastr::fields
                 level,
                 remake,
                 redistribute_on_remake,
+                checkpoint_restart,
                 ""   // we own the memory
             }
         );
@@ -165,6 +170,7 @@ namespace ablastr::fields
                 level,
                 alias.m_remake,
                 alias.m_redistribute_on_remake,
+                alias.m_checkpoint_restart,
                 internal_alias_name
             }
 
@@ -225,6 +231,7 @@ namespace ablastr::fields
                 level,
                 alias.m_remake,
                 alias.m_redistribute_on_remake,
+                alias.m_checkpoint_restart,
                 internal_alias_name
             }
         );
@@ -295,6 +302,46 @@ namespace ablastr::fields
 
                 // replace old MultiFab with new one, deallocate old one
                 mf_owner.m_mf = std::move(new_mf);
+            }
+        }
+    }
+
+    void
+    MultiFabRegister::write_checkpoints (
+        int level,
+        const std::string & dir
+    )
+    {
+        for (auto & element : m_mf_register )
+        {
+            MultiFabOwner const & mf_owner = element.second;
+
+            if (mf_owner.m_checkpoint_restart && mf_owner.m_level == level && !mf_owner.is_alias()) {
+                // write MultiFabs to checkpoint directory
+                // only owning MultiFabs are written out
+                const amrex::MultiFab & mf = mf_owner.m_mf;
+                const std::string & name = element.first;
+                amrex::VisMF::Write(mf, dir + name);
+            }
+        }
+    }
+
+    void
+    MultiFabRegister::read_restarts (
+        int level,
+        const std::string & dir
+    )
+    {
+        for (auto & element : m_mf_register )
+        {
+            MultiFabOwner & mf_owner = element.second;
+
+            if (mf_owner.m_checkpoint_restart && mf_owner.m_level == level && !mf_owner.is_alias()) {
+                // read MultiFabs from checkpoint directory
+                // only owning MultiFabs are read in
+                amrex::MultiFab & mf = mf_owner.m_mf;
+                const std::string & name = element.first;
+                amrex::VisMF::Read(mf, dir + name);
             }
         }
     }
