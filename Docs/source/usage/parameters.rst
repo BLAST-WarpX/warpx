@@ -1031,6 +1031,15 @@ additionally define the electric potential at the embedded boundary with an anal
 
     * ``Reflecting``: Particles that reach the embedded boundary are specularly reflected back into the simulation domain
 
+    * ``Thermal``: Particles that reach the embedded boundary are re-emitted back into the simulation domain
+      with a thermalized velocity, as from a fully accommodating diffuse wall. The two velocity components
+      tangential to the local surface are sampled from a ``gaussian`` distribution, and the component along
+      the (inward) surface normal is sampled from a ``gaussian flux`` distribution.
+      The standard deviation for these distributions should be provided for each species using
+      ``boundary.<species_name>.u_th`` (in units of :math:`c`, i.e. :math:`\sqrt{k_B T_\mathrm{wall}/m}/c`),
+      the same input used by the domain ``thermal`` particle boundary condition. The same standard
+      deviation is used to sample all components.
+
 .. _param-particle-thermalizer:
 
 Particle thermalizer
@@ -1763,6 +1772,13 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, ``u_mean`` is read as a function of position from an openPMD
+          file and interpolated to the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1779,6 +1795,13 @@ Particle initialization
           ``<species_name>.ux_std_function(x,y,z)``,
           ``<species_name>.uy_std_function(x,y,z)``,
           ``<species_name>.uz_std_function(x,y,z)``.
+        * If ``read_from_file``, ``u_std`` is read as a function of position from an openPMD
+          file and interpolated to the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_u_std_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
@@ -1814,6 +1837,13 @@ Particle initialization
           ``<species_name>.ux_mean_function(x,y,z)``,
           ``<species_name>.uy_mean_function(x,y,z)``,
           ``<species_name>.uz_mean_function(x,y,z)``.
+        * If ``read_from_file``, ``u_mean`` is read as a function of position from an openPMD
+          file and interpolated to the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.
@@ -3248,6 +3278,22 @@ Details about the collision models can be found in the :ref:`theory section <mul
     This is only implemented for the explicit evolve scheme and is not available for the implicit evolve schemes, because the implicit
     formulation is intrinsically energy-conserving when combined with MCC collisions, as shown in `Angus et al., J. Comput. Phys. 456, 2022 <https://doi.org/10.1016/j.jcp.2022.111030>`__.
 
+.. pp:param:: collisions.shuffling_method
+    :type: ``bool``
+    :default: 0
+    :optional:
+
+    Specify the shuffling method used for pairwise collisions (which includes ``pairwisecoulomb``, ``nuclearfusion``, ``bremsstrahlung``, ``linear_breit_wheeler``, ``dsmc``, and ``linear_compton``).
+    This can also be set for individual collisions using there collision name as the prefix, .. pp:param:: <collision_name>.shuffling_method.
+    The particles are shuffled within each cell to obtain good statistical properties, so that each particle can collide with each other particle in the cell with equal probability.
+    Several shuffling methods are implemented with have different properties.
+
+    - ``FisherYates`` The default, is the best method numerically with the best randomness characteristics, and should be free of correlation effects. Every particle within a cell is swapped with another random particle within the cell. Note that the shuffle can be slow and take a significant amount of simulation time with large numbers of particles per cell.
+
+    - ``Modulus`` The particles are shuffled algorithmically, using a linear congruential generator where the particle ``i`` is replace by the particle ``(i*step + offset) % n``, where ``n`` is the number of particles, ``step`` is chosen randomly and is coprime with ``n``, and ``offset`` is chosen randomly. To increase randomness, multiple shuffles are done, with the particles in each cell divided randomly into up to five subgroups. The number of shuffles can be specified by the input paralel ``<collision_name>.modulus_rounds``, which defaults to 5. This method would be reasonable when there is some turnover of paticles in the cells. The advantage is that this shuffle is substantially faster (by orders of magnitude on GPU) than the Fisher-Yates and standard methods. In all of the tests performed, including ``pairwisecoulomb`` and ``nuclearfusion``, the collision rates were properly produced with this method. However, use carefully and check the results closely.
+
+    - ``None`` No shuffling is done. This option is here primarily for testing purposes and should not be used in production simulatins. However, this would be reasonable in cases where there is a large flux of particles across the cells, particularly in 2D and 3D, so that the turnover of particles in the cells is significant in the time that it would be expected that a particle would interact with all of the other particles in the cell. Use carefully and check the results closely.
+
 .. _running-cpp-parameters-numerics:
 
 Numerics and algorithms
@@ -3266,9 +3312,11 @@ Time step
     The ratio between the actual timestep that is used in the simulation
     and the Courant-Friedrichs-Lewy (CFL) limit. (e.g. for ``warpx.cfl=1``,
     the timestep will be exactly equal to the CFL limit.)
-    For some speed v and grid spacing dx, this limits the timestep to ``warpx.cfl * dx / v``.
-    When used with the electromagnetic solver, ``v`` is the speed of light.
-    For the electrostatic solver, ``v`` is the maximum speed among all particles in the domain.
+    For some speed ``v`` and grid spacing ``dx``, this limits the timestep to ``warpx.cfl * dx / v``.
+    When used with electromagnetic solvers that treat light waves explicitly, ``v`` is the speed of light.
+    For the electrostatic solver and electromagnetic solvers that treat light waves implicitly, ``dx / v``
+    is the minimum direction-dependent value ``dx_i / v_i`` among all particles in the domain, where ``v_i`` is the
+    maximum speed in grid direction ``i`` and ``dx_i`` is the associated grid spacing.
 
 .. pp:param:: warpx.const_dt
     :type: ``float``
@@ -4060,8 +4108,19 @@ Additional parameters
     evolves with its own time step, set to its own CFL limit. In practice, it
     means that when level 0 performs one iteration, level 1 performs two
     iterations. Currently, this option is only supported when
-    :pp:param:`amr.max_level = 1`. More information can be found at
-    https://ieeexplore.ieee.org/document/8659392.
+    :pp:param:`amr.max_level = 1` and when the refinement ratio
+    :pp:param:`amr.ref_ratio` is 2 in all directions. More information can be
+    found at https://ieeexplore.ieee.org/document/8659392.
+
+    Sub-cycling is only implemented for the finite-difference electromagnetic
+    solvers (``algo.maxwell_solver = yee``, ``ckc`` or ``ect``). It is not
+    supported with the electrostatic and magnetostatic solvers (see
+    :pp:param:`warpx.do_electrostatic`), with the hybrid-PIC solver
+    (``algo.maxwell_solver = hybrid``), nor with the spectral solver
+    (``algo.maxwell_solver = psatd``); WarpX aborts if sub-cycling is requested
+    with any of these solvers. It also requires the explicit evolve scheme
+    (:pp:param:`algo.evolve_scheme` = ``explicit``, the default), since the
+    implicit and semi-implicit schemes do not sub-cycle.
 
 .. pp:param:: warpx.override_sync_intervals
     :type: ``string``

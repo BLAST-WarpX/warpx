@@ -6,7 +6,7 @@
  */
 #include "InverseBremsstrahlung.H"
 
-#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
+#include "Particles/Collision/BinaryCollision/ParticleShufflers.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Utils/Parser/ParserUtils.H"
@@ -32,9 +32,21 @@ InverseBremsstrahlung::InverseBremsstrahlung (std::string const& collision_name,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species_1.AmIA<PhysicalSpecies::photon>(),
                                      "InverseBremsstrahlung: The first species must be photons");
 
+    const amrex::ParmParse pp_collisions("collisions");
     const amrex::ParmParse pp_collision_name(collision_name);
 
+    pp_collisions.query("energy_fraction", m_energy_fraction);
     pp_collision_name.query("energy_fraction", m_energy_fraction);
+
+    m_shuffling_method = ParticleShufflingMethod::Default;
+    pp_collisions.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+    pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+
+    if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+        m_modulus_rounds = 5;
+        pp_collisions.query("modulus_rounds", m_modulus_rounds);
+        pp_collision_name.query("modulus_rounds", m_modulus_rounds);
+    }
 
 }
 
@@ -274,20 +286,11 @@ void InverseBremsstrahlung::doInverseBremsstrahlungWithinTile (
         });
 
     // Shuffle the electrons so that the pairs used below are randomized
-    amrex::ParallelForRNG(n_cells,
-        [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-        {
-            // The particles from species1 that are in the cell `i_cell` are
-            // given by the `indices_electrons[cell_start_electrons:cell_stop_electrons]`
-            index_type const cell_start_electrons = cell_offsets_electrons[i_cell];
-            index_type const cell_stop_electrons  = cell_offsets_electrons[i_cell+1];
-
-            // Do not shuffle if there is only one particle in the cell
-            if (cell_stop_electrons - cell_start_electrons <= 1) { return; }
-
-            ShuffleFisherYates(indices_electrons, cell_start_electrons, cell_stop_electrons, engine);
-        }
-    );
+    if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+        ModulusShuffle(n_cells, np_electrons, m_modulus_rounds, cell_offsets_electrons, indices_electrons);
+    } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
+        FisherYatesShuffle(n_cells, cell_offsets_electrons, indices_electrons);
+    }
 
     amrex::Gpu::Buffer<amrex::Long> failed_corrections({0});
     amrex::Long* failed_corrections_ptr = failed_corrections.data();

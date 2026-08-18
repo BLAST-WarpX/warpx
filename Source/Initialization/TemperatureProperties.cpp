@@ -7,8 +7,14 @@
  */
 #include "TemperatureProperties.H"
 
+#include "ExternalField.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
+#include "WarpX.H"
+
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_IntVect.H>
 
 #include <sstream>
 
@@ -17,8 +23,11 @@
  *  temperature parameters: thermal spread `ux_std`, `uy_std`, `uz_std`
  *  for `maxwellian` distribution, and `theta` for `maxwell_juttner`.
  */
-TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name)
+TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
+                                              amrex::Geometry const& geom)
 {
+    amrex::ignore_unused(geom);
+
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
@@ -78,6 +87,39 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_ptr_uz_std_parser =
                 std::make_unique<amrex::Parser>(utils::parser::makeParser(sz, {"x", "y", "z"}));
             m_type = TempParserFunctionVector;
+        }
+        else if (u_std_dist_s == "read_from_file") {
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            if (WarpX::gamma_boost > 1.0) {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "maxwellian_u_std_distribution_type = read_from_file is not "
+                    "supported in boosted-frame simulations yet.");
+            }
+            utils::parser::get(pp, source_name, "read_u_std_from_path", m_read_u_std_path);
+            amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo =
+                geom.ProbLoArray();
+            amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dx =
+                geom.CellSizeArray();
+            amrex::Box const dombox = amrex::convert(geom.Domain(), amrex::IntVect(1));
+            m_u_std_x_reader = std::make_unique<ExternalFieldReader>(
+                m_read_u_std_path, "u_std", "x", problo, dx, dombox, false);
+            m_u_std_y_reader = std::make_unique<ExternalFieldReader>(
+                m_read_u_std_path, "u_std", "y", problo, dx, dombox, false);
+            m_u_std_z_reader = std::make_unique<ExternalFieldReader>(
+                m_read_u_std_path, "u_std", "z", problo, dx, dombox, false);
+            amrex::BoxArray const grids;
+            amrex::DistributionMapping const dmap;
+            m_u_std_x_reader->prepare(grids, dmap, amrex::IntVect(0));
+            m_u_std_y_reader->prepare(grids, dmap, amrex::IntVect(0));
+            m_u_std_z_reader->prepare(grids, dmap, amrex::IntVect(0));
+            m_type = TempFromFileVector;
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "maxwellian_u_std_distribution_type = read_from_file requires "
+                "WarpX built with openPMD support and is not supported in "
+                "RZ/RCYLINDER/RSPHERE geometries.");
+#endif
         }
         else {
             std::stringstream ss;
