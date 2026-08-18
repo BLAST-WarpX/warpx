@@ -202,7 +202,9 @@ jobs:
       export OMPI_MCA_rmaps_base_oversubscribe=1
       export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
       # determine if the build was triggered by a push to the development branch
-      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
+      # FIXME: Remove the ci_gpu_cdash exception after CDash debugging is complete.
+      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ||
+            "${SYSTEM_PULLREQUEST_SOURCEBRANCH:-}" == "refs/heads/ci_gpu_cdash" ]]; then
         # run tests (exclude pytest.AMReX when running Python tests)
         # and submit results to CDash as Experimental
         ctest --test-dir build --output-on-failure -E AMReX \
