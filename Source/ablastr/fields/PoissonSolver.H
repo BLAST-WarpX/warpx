@@ -217,7 +217,8 @@ computePhi (
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
     [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
+    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt, // only used for EB
+    [[maybe_unused]] std::optional<ablastr::fields::ConstMultiLevelScalarField> dielectric_epsilon = std::nullopt
 )
 {
     using namespace amrex::literals;
@@ -225,6 +226,16 @@ computePhi (
     ABLASTR_PROFILE("computePhi");
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
+    bool const has_dielectric = dielectric_epsilon.has_value();
+
+    if (has_dielectric) {
+        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
+            static_cast<int>(dielectric_epsilon->size()) > finest_level,
+            "Dielectric epsilon must be provided on every Poisson solve level.");
+        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
+            !is_solver_igf_on_lev0,
+            "Dielectric permittivity is not supported with the FFT Poisson solver.");
+    }
 
     if (!rel_ref_ratio.has_value()) {
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(finest_level == 0u,
@@ -264,6 +275,14 @@ computePhi (
             [](const auto b){return (b<1.0_rt);}),
         "Components of beta_solver must be < 1.");
 
+    if (has_dielectric) {
+        ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::all_of(beta_solver.begin(), beta_solver.end(),
+                [](const auto b){return (b == 0.0_rt);}),
+            "Dielectric permittivity is currently supported only for lab-frame "
+            "Poisson solves with beta = 0.");
+    }
+
     amrex::LPInfo info;
 
     for (int lev=0; lev<=finest_level; lev++) {
@@ -296,7 +315,7 @@ computePhi (
         constexpr bool is_rz = false;
 #endif
 
-        if (!eb_enabled && !is_rz) {
+        if (!eb_enabled && !is_rz && !has_dielectric) {
             // Determine whether to use semi-coarsening
             int max_semicoarsening_level = 0;
             int semicoarsening_direction = -1;
@@ -316,7 +335,7 @@ computePhi (
         }
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
-        if (eb_enabled || is_rz) {
+        if (eb_enabled || is_rz || has_dielectric) {
             // In the presence of EB or RZ: the solver assumes that the beam is
             // propagating along  one of the axes of the grid, i.e. that only *one*
             // of the components of `beta` is non-negligible.
@@ -358,6 +377,12 @@ computePhi (
                 1._rt-beta_solver[1]*beta_solver[1],
                 1._rt-beta_solver[2]*beta_solver[2])});
 #endif
+            if (has_dielectric) {
+                ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
+                    dielectric_epsilon.value()[lev] != nullptr,
+                    "Dielectric epsilon MultiFab is null on a Poisson solve level.");
+                linop_nodelap->setSigma(0, *dielectric_epsilon.value()[lev]);
+            }
 #if defined(AMREX_USE_EB)
             if (eb_enabled) {
                 if constexpr (!std::is_same_v<T_BoundaryHandler, std::nullopt_t>) {

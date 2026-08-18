@@ -21,6 +21,7 @@
 #   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
 #include "Fields.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
@@ -856,6 +857,10 @@ WarpX::InitData ()
             m_fields.get(FieldType::Efield_fp, Direction{1}, lev_zero)->ixType().toIntVect(),
             m_fields.get(FieldType::Efield_fp, Direction{2}, lev_zero)->ixType().toIntVect()
         );
+    }
+
+    if (HasDielectricMaterials()) {
+        m_dielectric_materials->InitData(*this);
     }
 
     m_electrostatic_solver->InitData();

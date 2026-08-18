@@ -1,0 +1,25 @@
+max_step = 1
+amr.n_cell = 128 128
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+geometry.dims = 2
+geometry.prob_lo = -3.0 -3.0
+geometry.prob_hi =  3.0  3.0
+boundary.field_lo = pec neumann
+boundary.field_hi = pec neumann
+boundary.potential_lo_x = 3.0
+boundary.potential_hi_x = -3.0
+warpx.const_dt = 1e-6
+
+warpx.do_electrostatic = labframe
+dielectrics.names = cylinder
+cylinder.implicit_function = "1.0 - (x**2 + z**2)"
+cylinder.permittivity = 5.0
+warpx.self_fields_required_precision = 1.e-6
+warpx.abort_on_warning_threshold = medium
+
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = phi Ex Ey Ez dielectric_epsilon dielectric_signed_distance dielectric_mask
