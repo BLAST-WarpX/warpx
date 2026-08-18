@@ -198,7 +198,7 @@ class WarpX(Bucket):
         Python state while the interpreter is shutting down.
         """
         # shut down the C++ side first; a no-op if it was never initialized.
-        # This also unregisters the Python callbacks.
+        # This always unregisters the Python callbacks.
         libwarpx.finalize(finalize_mpi)
 
         # these module-level lists are imported by name elsewhere (picmi), so
