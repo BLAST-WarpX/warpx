@@ -178,9 +178,11 @@ jobs:
       # configure
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
       export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
-      cmake -S . -B build    \
-        ${AMReX_CMAKE_FLAGS} \
-        ${WARPX_CMAKE_FLAGS} \
+      cmake -S . -B build          \
+        -DBUILDNAME=CI-Development \
+        -DSITE=Azure-CPU           \
+        ${AMReX_CMAKE_FLAGS}       \
+        ${WARPX_CMAKE_FLAGS}       \
         ${WARPX_TEST_FLAGS}
       # build
       cmake --build build -j 2

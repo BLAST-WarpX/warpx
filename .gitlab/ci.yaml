@@ -28,6 +28,8 @@ Nvidia-H100-single-precision:
     - |
       cmake -S . -B build                                  \
           -DCMAKE_VERBOSE_MAKEFILE=ON                      \
+          -DBUILDNAME="${CI_JOB_NAME}"                     \
+          -DSITE=GitLab-GPU                                \
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_EB=ON                                    \
           -DWarpX_PYTHON=OFF                               \
@@ -67,6 +69,8 @@ AMD-MI300:
           -DCMAKE_C_COMPILER=$(which clang)            \
           -DCMAKE_CXX_COMPILER=$(which clang++)        \
           -DCMAKE_VERBOSE_MAKEFILE=ON                  \
+          -DBUILDNAME="${CI_JOB_NAME}"                 \
+          -DSITE=GitLab-GPU                            \
           -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
           -DWarpX_EB=ON                                \
@@ -102,6 +106,8 @@ Intel-PVC:
     - |
       cmake -S . -B build                       \
           -DBUILD_SHARED_LIBS=ON                \
+          -DBUILDNAME="${CI_JOB_NAME}"          \
+          -DSITE=GitLab-GPU                     \
           -DCMAKE_VERBOSE_MAKEFILE=ON           \
           -DCMAKE_C_COMPILER=$(which icx)       \
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
