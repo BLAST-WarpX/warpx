@@ -38,6 +38,10 @@ public:
     //! must be called before solve() can be called.
     virtual void define (LinOp& linop) = 0;
 
+    //! Called by Newton before each solve() with the current iterate.
+    virtual void update ([[maybe_unused]] const Vec& a_U) {}
+
+
     /**
      * \brief Solve the linear system A x = b for x, where A is the linear
      *        operator whose action A(x) on a vector x is computed by
