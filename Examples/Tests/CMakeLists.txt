@@ -2,7 +2,6 @@
 #
 
 add_subdirectory(accelerator_lattice)
-add_subdirectory(amrex_throw_exception)
 add_subdirectory(boosted_diags)
 add_subdirectory(boundaries)
 add_subdirectory(btd_rz)
