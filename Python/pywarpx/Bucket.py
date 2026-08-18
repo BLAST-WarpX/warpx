@@ -44,7 +44,7 @@ class Bucket(object):
         in the same Python process starts from a clean input deck.
         """
         self.argvattrs.clear()
-        
+
         # drop instance attributes (prefix: "_", see `add_new_attr`) that were
         # added after construction
         for name in list(vars(self)):
