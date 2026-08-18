@@ -120,6 +120,9 @@ class CallbackFunctions(object):
     def clearlist(self):
         """Unregister/clear out all registered C callbacks"""
         self.funcs = []
+        # timings of a finalized simulation must not be added to the next one
+        self.time = 0.0
+        self.timers = {}
         # only reach into the compiled module if it is already loaded:
         # accessing libwarpx_so would otherwise load it, which needs the
         # geometry and thus fails if no simulation was initialized
