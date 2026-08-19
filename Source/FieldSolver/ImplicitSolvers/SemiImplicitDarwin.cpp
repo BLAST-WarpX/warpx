@@ -324,8 +324,10 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 
 void SemiImplicitDarwin::CalculateSourceVector ()
 {
-    // This function calculates the "b" vector for the linear magnetoinductive equation,
-    // i.e., the source vector.
+    // Compute the right-hand side of the magnetoinductive equation
+    // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+    // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
+    // ApplyScaledMassMatrices).
     BL_PROFILE("SemiImplicitDarwin::CalculateSourceVector()");
 
     const int lev = 0;
