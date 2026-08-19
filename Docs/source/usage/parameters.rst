@@ -450,6 +450,32 @@ Overall simulation parameters
             The extended simulation box size in real space is :math:`2n_x-1, 2n_y-1, 2n_z-1` with the 3D solver, :math:`2n_x-1, 2n_y -1, n_z` with the 2D solver.
             The extended simulation box size in spectral space is :math:`n_x, 2n_y-1, 2n_z-1` with the 3D solver, :math:`n_x, 2n_y-1, n_z` with the 2D solver.
 
+          * ``ablastr.igf_cache_max_entries`` (``int``) optional (default: 8): Number of Green's functions the solver keeps for reuse, evicting the least recently used one beyond that.
+            Building the Green's function is the dominant cost of this solver, so it is reused whenever the grid it was built for comes back.
+            ``0`` keeps only the one in use, which is still reused for as long as the cell size does not change.
+            Each entry costs :math:`32 n_x n_y n_z` bytes in single and :math:`64 n_x n_y n_z` in double precision, which is a sizable fraction of a GPU at large grid sizes.
+
+          * ``ablastr.igf_cache_max_bytes`` (``int``) optional (default: a quarter of the free GPU memory, unlimited on CPU): Memory budget for those Green's functions.
+            Entries are evicted, least recently used first, to stay within it. ``0`` means no limit.
+
+          * ``ablastr.igf_cache_tolerance`` (``float``) optional (default: :math:`64\epsilon` of the precision in use): How closely two cell sizes must agree to count as the same grid.
+            The default only absorbs round-off, so it never trades accuracy for reuse.
+            Raising it lets a Green's function be reused across grids that differ by that much, at the price of an error of the same order, so raise it deliberately.
+            This is worth considering for the relativistic electrostatic solver: it derives the longitudinal stretch from a velocity, and reconstructing it costs about :math:`\epsilon\gamma^2`, which reaches :math:`10^{-5}` at :math:`\gamma` of a few hundred thousand.
+            The velocity is also re-measured from the particles each step and carries sampling noise of its own, so those runs see no reuse at the default.
+
+            There are two ways to make a Green's function come back, and they are not interchangeable.
+            A caller that chooses its own grid can instead snap that grid to a repeating set: the Green's function then stays exact for the grid it is used on, reuse is bit-identical, and the price is paid in resolution rather than in accuracy.
+            ImpactX does this with its ``geometry.prob_relative_max`` and needs no tolerance at all.
+            This tolerance is for the other case, where the quantity that varies is measured rather than chosen and nothing can be snapped.
+            Prefer snapping the grid wherever that is possible.
+
+          * ``ablastr.igf_cache_verbose`` (``int``) optional (default: 0): Set to ``1`` to report at the end of the run how many Green's functions were reused, built and evicted.
+            A cache too small for a repeating cycle keeps evicting the entry it is about to need again, which costs time without ever showing up as a wrong answer.
+
+          * ``ablastr.igf_rebuild_always`` (``int``) optional (default: 0): Set to ``1`` to rebuild the Green's function on every solve, as before this reuse existed.
+            Intended as a reference when checking that reuse leaves results unchanged.
+
 .. pp:param:: warpx.self_fields_required_precision
     :type: ``float``
     :default: 1.e-11
