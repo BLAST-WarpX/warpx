@@ -117,12 +117,7 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     }
 
     // Evaluation of the (single) 4th-order field equation:
-    // bilaplacian(Z), discretized directly in a single pass. Composing two
-    // separate ComputeVectorLaplacian calls (with an intermediate boundary
-    // fill in between) introduces a parasitic, sign-alternating mode in Z's
-    // nodal component, since each application's guard cells are filled
-    // independently rather than being derived from a single consistent
-    // wide-stencil read of Z.
+    // bilaplacian(Z), discretized directly in a single pass.
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeVectorBiLaplacian(
         rhs_vec[lev], Zscratch, warpx_ptr->GetEBUpdateBFlag()[lev], lev
     );
