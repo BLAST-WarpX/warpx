@@ -183,7 +183,51 @@ class WarpX(Bucket):
         self.step(nsteps)
 
     def finalize(self, finalize_mpi=1):
+        """Tear down WarpX and AMReX and clear all input state.
+
+        After this call, the process is ready to build and initialize a new
+        WarpX simulation variable of the *same* dimensionality. The compiled
+        ``warpx_pybind_*`` module stays loaded: multiple AMReX/WarpX geometries
+        cannot be loaded into the same Python process (see
+        :meth:`pywarpx._libwarpx.LibWarpX.load_library`), so the dimensionality
+        is fixed for the lifetime of the process.
+
+        Note that this is deliberately not part of
+        :meth:`pywarpx._libwarpx.LibWarpX.finalize`, which is the function
+        registered with :mod:`atexit`: there is nothing to gain from resetting
+        Python state while the interpreter is shutting down.
+        """
+        # shut down the C++ side first; a no-op if it was never initialized.
+        # This always unregisters the Python callbacks.
         libwarpx.finalize(finalize_mpi)
+
+        # this module imports these lists by name (see above), so they must be
+        # cleared in place; the dicts of the buckets below are rebound to fresh
+        # defaults by Bucket.clear() itself
+        del collisions_list[:]
+        del lasers_list[:]
+        del particles_list[:]
+
+        for bucket in [
+            algo,
+            amr,
+            amrex,
+            boundary,
+            collisions,
+            diagnostics,
+            eb2,
+            external_vector_potential,
+            geometry,
+            hybridpicmodel,
+            interpolation,
+            lasers,
+            my_constants,
+            particles,
+            psatd,
+            reduced_diagnostics,
+            self,
+        ]:
+            bucket.clear()
 
     def getProbLo(self, direction):
         return libwarpx.libwarpx_so.warpx_getProbLo(direction)
