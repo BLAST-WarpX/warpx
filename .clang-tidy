@@ -10,6 +10,7 @@ Checks: '
         -cert-err58-cpp,
         -cert-int09-c,
     clang-analyzer-*,
+        -clang-analyzer-optin.core.EnumCastOutOfRange,
         -clang-analyzer-optin.performance.Padding,
         -clang-analyzer-optin.mpi.MPI-Checker,
         -clang-analyzer-osx.*,

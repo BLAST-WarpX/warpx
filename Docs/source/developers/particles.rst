@@ -85,7 +85,7 @@ Main functions
 
 .. doxygenfunction:: PhysicalParticleContainer::PushPX
 
-.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time)
+.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time, PushType push_type)
 
 .. note::
    The current deposition is used both by ``PhysicalParticleContainer`` and ``LaserParticleContainer``, so it is in the parent class ``WarpXParticleContainer``.

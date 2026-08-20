@@ -2099,6 +2099,31 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
+class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the semi-implicit Darwin evolve scheme.
+
+    linear_solver:
+        GMRESLinearSolver instance.
+    """
+
+    def __init__(
+        self,
+        linear_solver,
+    ):
+        if not isinstance(linear_solver, GMRESLinearSolver):
+            raise TypeError(
+                "SemiImplicitDarwinEvolveScheme only supports GMRESLinearSolver "
+                "as its linear_solver (there is no nonlinear solver for the "
+                "linear solver to attach to, which PETScKSPLinearSolver requires)"
+            )
+        self.linear_solver = linear_solver
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        self.linear_solver.linear_solver_initialize_inputs()
+
+
 class HybridPICSolver(picmistandard.base._ClassWithInit):
     """
     Hybrid-PIC solver based on Ohm's law.

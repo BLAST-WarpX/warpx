@@ -34,6 +34,7 @@ AMREX_ENUM(EvolveScheme,
            Theta_Implicit_EM,
            Semi_Implicit_EM,
            Strang_Implicit_Spectral_EM,
+           Semi_Implicit_Darwin,
            Default = Explicit);
 
 /**
