@@ -2856,13 +2856,12 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                     f"B{sdir}_external_grid_function(x,y,z)", expression
                 )
             pywarpx.warpx.do_initial_div_cleaning = self.do_initial_div_cleaning
-            if self.do_initial_div_cleaning:
-                pywarpx.warpx.add_new_group_attr(
-                    "projection_div_cleaner", "atol", self.div_cleaner_atol
-                )
-                pywarpx.warpx.add_new_group_attr(
-                    "projection_div_cleaner", "rtol", self.div_cleaner_rtol
-                )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "atol", self.div_cleaner_atol
+            )
+            pywarpx.warpx.add_new_group_attr(
+                "projection_div_cleaner", "rtol", self.div_cleaner_rtol
+            )
 
 
 class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
