@@ -206,18 +206,14 @@ jobs:
       # allow oversubscription for Open MPI 4 and 5
       export OMPI_MCA_rmaps_base_oversubscribe=1
       export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
-      # determine if the build was triggered by a push to the development branch
-      # FIXME: Remove the ci_gpu_cdash exception after CDash debugging is complete.
-      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ||
-            "${SYSTEM_PULLREQUEST_SOURCEBRANCH:-}" == "refs/heads/ci_gpu_cdash" ]]; then
-        # run tests (exclude pytest.AMReX when running Python tests)
-        # and submit results to CDash as Experimental
-        ctest --test-dir build --output-on-failure -E AMReX \
-          -D ExperimentalTest -D ExperimentalSubmit
-      else
-        # run tests (exclude pytest.AMReX when running Python tests)
-        ctest --test-dir build --output-on-failure -E AMReX
-      fi
+      # TODO: Submit to CDash only from development after CDash debugging is complete:
+      # if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
+      #   ctest ... -D ExperimentalTest -D ExperimentalSubmit
+      # fi
+      # run tests (exclude pytest.AMReX when running Python tests)
+      # and submit results to CDash as Experimental
+      ctest --test-dir build --output-on-failure -E AMReX \
+        -D ExperimentalTest -D ExperimentalSubmit
     displayName: 'Test'
 
   - bash: |
