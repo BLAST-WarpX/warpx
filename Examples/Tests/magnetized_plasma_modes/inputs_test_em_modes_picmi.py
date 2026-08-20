@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 #
-# --- Test script for the Darwin model in WarpX.
-# --- The script is set up to produce either parallel or perpendicular
-# --- (Bernstein) EM modes and can be run in 1d, 2d or 3d
-# --- Cartesian geometries. See Section 4.2 and 4.3 of Munoz et al. (2018).
+# --- Test script for magnetized plasma EM modes, run with either the Darwin
+# --- semi-implicit solver or the Ohm (kinetic-fluid hybrid) solver. The
+# --- script is set up to produce either parallel or perpendicular
+# --- (Bernstein) EM modes and can be run in 1d, 2d or 3d Cartesian
+# --- geometries. See Section 4.2 and 4.3 of Munoz et al. (2018).
 # --- As a CI test only a small number of steps are taken using the 1d version.
 
 import argparse
@@ -45,45 +46,72 @@ class DummyES_Solver(picmi.ElectrostaticSolver):
 class EMModes(object):
     """The following runs a simulation of an uniform plasma at a set
     temperature (Te = Ti) with an external magnetic field applied in either the
-    z-direction (parallel to domain) or x-direction (perpendicular to domain).
-    The analysis script (in this same directory) analyzes the output field data
-    for EM modes. This input is based on the EM modes tests as described by
-    Munoz et al. (2018) and tests done by Scott Nicks at TAE Technologies.
+    z-direction (parallel to domain) or x-direction (perpendicular to domain),
+    using either the Darwin semi-implicit solver or the Ohm (kinetic-fluid
+    hybrid) solver. The analysis script (in this same directory) analyzes the
+    output field data for EM modes. This input is based on the EM modes tests
+    as described by Munoz et al. (2018) and tests done by Scott Nicks at TAE
+    Technologies.
     """
 
-    # Applied field parameters
-    B0 = 0.15  # Initial magnetic field strength (T)
+    # Darwin solver parameters
+    DARWIN_PARAMS = dict(
+        B0=0.15,  # Initial magnetic field strength (T)
+        vA_over_c=0.015,  # ratio of Alfven speed to c, sets density
+        beta=[0.025, 0.1],  # Plasma beta, sets temperature
+        m_ion=10.0,  # Ion mass (electron masses)
+        Nz=[256, 128],  # number of cells in z direction
+        Nx=8,  # number of cells in x (and y) direction for >1 dimensions
+        LT=150.0,  # Simulation temporal length (ion cyclotron periods)
+        NPPC=256,  # Seed number of particles per cell
+        DZ=[300, 60],  # Cell size (Debye lengths)
+        DT=10.0,  # Time step (electron plasma periods)
+        C_SI=4.0,
+    )
 
-    # Plasma parameters
-    vA_over_c = 0.015  # ratio of Alfven speed to c, sets density
-    beta = [0.025, 0.1]  # Plasma beta, sets temperature
+    # Ohm solver parameters
+    OHM_PARAMS = dict(
+        B0=0.25,  # Initial magnetic field strength (T)
+        beta=[0.01, 0.1],  # Plasma beta, used to calculate temperature
+        m_ion=[100.0, 400.0],  # Ion mass (electron masses)
+        vA_over_c=[1e-4, 1e-3],  # ratio of Alfven speed and the speed of light
+        Nz=[1024, 1920],  # number of cells in z direction
+        Nx=8,  # number of cells in x (and y) direction for >1 dimensions
+        LT=300.0,  # Simulation temporal length (ion cyclotron periods)
+        NPPC=[1024, 256, 64],  # Seed number of particles per cell
+        DZ=1.0 / 10.0,  # Cell size (ion skin depths)
+        DT=[5e-3, 4e-3],  # Time step (ion cyclotron periods)
+        # Plasma resistivity - used to dampen the mode excitation
+        eta=[[1e-7, 1e-7], [1e-7, 1e-5], [1e-7, 1e-4]],
+        substeps=40,  # Number of substeps used to update B
+    )
 
-    # Plasma species parameters
-    m_ion = 10.0  # Ion mass (electron masses)
-
-    # Spatial domain
-    Nz = [256, 128]  # [1024, 1920]  # number of cells in z direction
-    Nx = 8  # number of cells in x (and y) direction for >1 dimensions
-
-    # Temporal domain (if not run as a CI test)
-    LT = 150.0  # Simulation temporal length (ion cyclotron periods)
-
-    # Numerical parameters
-    NPPC = 256  # Seed number of particles per cell
-    DZ = [300, 60]  # Cell size (Debye lengths)
-    DT = 10.0  # Time step (electron plasma periods)
-    C_SI = 4.0
-
-    def __init__(self, test, dim, B_dir, include_es_solver, verbose):
+    def __init__(
+        self,
+        solver,
+        test,
+        dim,
+        B_dir,
+        verbose,
+        include_es_solver=False,
+        use_rkf45=False,
+    ):
         """Get input parameters for the specific case desired."""
+        self.solver = solver
         self.test = test
         self.dim = int(dim)
         self.B_dir = B_dir
-        self.include_es_solver = include_es_solver
         self.verbose = verbose or self.test
+        self.include_es_solver = include_es_solver
+        self.use_rkf45 = use_rkf45
 
         # sanity check
         assert dim > 0 and dim < 4, f"{dim}-dimensions not a valid input"
+
+        # load the class attributes appropriate for the solver used
+        params = self.DARWIN_PARAMS if self.solver == "darwin" else self.OHM_PARAMS
+        for key, val in params.items():
+            setattr(self, key, val)
 
         # get simulation parameters from the defaults given the direction of
         # the initial B-field and the dimensionality
@@ -92,23 +120,37 @@ class EMModes(object):
         # calculate various plasma parameters based on the simulation input
         self.get_plasma_quantities()
 
-        self.dz = self.DZ * self.lambda_e
+        if self.solver == "darwin":
+            self.dz = self.DZ * self.lambda_e
+        else:
+            self.dz = self.DZ * self.l_i
         self.Lz = self.Nz * self.dz
         self.Lx = self.Nx * self.dz
 
-        self.dt = self.DT / self.w_pe
+        if self.solver == "darwin":
+            self.dt = self.DT / self.w_pe
+        else:
+            self.dt = self.DT * self.t_ci
 
         if not self.test:
-            self.total_steps = int(self.LT * self.t_ci / self.dt)
+            if self.solver == "darwin":
+                self.total_steps = int(self.LT * self.t_ci / self.dt)
+            else:
+                self.total_steps = int(self.LT / self.DT)
         else:
             # if this is a test case run for only a small number of steps
-            self.total_steps = 50
-        self.diag_steps = 3
+            self.total_steps = 50 if self.solver == "darwin" else 250
 
-        # calculate SIPIC modified plasma quantities
-        sipic_factor = np.sqrt(1.0 + self.C_SI * (self.w_pe * self.dt) ** 2 / 4.0)
-        self.lambda_e_SI = self.lambda_e * sipic_factor
-        self.w_pe_SI = self.w_pe / sipic_factor
+        if self.solver == "darwin":
+            self.diag_steps = 3
+        else:
+            # output diagnostics 20 times per cyclotron period
+            self.diag_steps = int(1.0 / 20 / self.DT)
+
+        if self.solver == "darwin":
+            # calculate SIPIC modified plasma quantities
+            sipic_factor = np.sqrt(1.0 + self.C_SI * (self.w_pe * self.dt) ** 2 / 4.0)
+            self.w_pe_SI = self.w_pe / sipic_factor
 
         # dump all the current attributes to a dill pickle file
         if comm.rank == 0:
@@ -162,7 +204,15 @@ class EMModes(object):
 
         self.beta = self.beta[idx]
         self.Nz = self.Nz[idx]
-        self.DZ = self.DZ[idx]
+
+        if self.solver == "darwin":
+            self.DZ = self.DZ[idx]
+        else:
+            self.m_ion = self.m_ion[idx]
+            self.vA_over_c = self.vA_over_c[idx]
+            self.DT = self.DT[idx]
+            self.NPPC = self.NPPC[self.dim - 1]
+            self.eta = self.eta[self.dim - 1][idx]
 
     def get_plasma_quantities(self):
         """Calculate various plasma parameters based on the simulation input."""
@@ -173,10 +223,6 @@ class EMModes(object):
         self.w_ci = constants.q_e * abs(self.B0) / self.M
         self.t_ci = 2.0 * np.pi / self.w_ci
 
-        # Cyclotron angular frequency (rad/s) and period (s)
-        self.w_ce = constants.q_e * abs(self.B0) / constants.m_e
-        self.t_ce = 2.0 * np.pi / self.w_ce
-
         # Alfven speed (m/s): vA = B / sqrt(mu0 * n * (M + m)) = c * omega_ci / w_pi
         self.vA = self.vA_over_c * constants.c
         self.n_plasma = (self.B0 / self.vA) ** 2 / (
@@ -185,13 +231,9 @@ class EMModes(object):
 
         # Ion plasma frequency (Hz)
         self.w_pi = np.sqrt(constants.q_e**2 * self.n_plasma / (self.M * constants.ep0))
-        self.w_pe = np.sqrt(
-            constants.q_e**2 * self.n_plasma / (constants.m_e * constants.ep0)
-        )
 
         # Skin depth (m)
         self.l_i = constants.c / self.w_pi
-        self.l_e = constants.c / self.w_pe
 
         # Ion thermal velocity (m/s) from beta = 2 * (v_ti / vA)**2
         self.v_ti = np.sqrt(self.beta / 2.0) * self.vA
@@ -199,17 +241,31 @@ class EMModes(object):
         # Temperature (eV) from thermal speed: v_ti = sqrt(kT / M)
         self.T_plasma = self.v_ti**2 * self.M / constants.q_e  # eV
 
-        # Electron thermal velocity (m/s) from v_th = sqrt(kB*T/m)
-        self.v_te = np.sqrt(self.T_plasma * constants.q_e / constants.m_e)
-
         # Larmor radius (m)
         self.rho_i = self.v_ti / self.w_ci
-        self.rho_e = self.v_te / self.w_ce
 
-        # Debye length
-        self.lambda_e = np.sqrt(
-            constants.ep0 * self.T_plasma / (self.n_plasma * constants.q_e)
-        )
+        if self.solver == "darwin":
+            # Cyclotron angular frequency (rad/s) and period (s)
+            self.w_ce = constants.q_e * abs(self.B0) / constants.m_e
+            self.t_ce = 2.0 * np.pi / self.w_ce
+
+            self.w_pe = np.sqrt(
+                constants.q_e**2 * self.n_plasma / (constants.m_e * constants.ep0)
+            )
+
+            # Skin depth (m)
+            self.l_e = constants.c / self.w_pe
+
+            # Electron thermal velocity (m/s) from v_th = sqrt(kB*T/m)
+            self.v_te = np.sqrt(self.T_plasma * constants.q_e / constants.m_e)
+
+            # Larmor radius (m)
+            self.rho_e = self.v_te / self.w_ce
+
+            # Debye length
+            self.lambda_e = np.sqrt(
+                constants.ep0 * self.T_plasma / (self.n_plasma * constants.q_e)
+            )
 
     def setup_run(self):
         """Setup simulation components."""
@@ -238,13 +294,47 @@ class EMModes(object):
         simulation.particle_shape = 1
         simulation.verbose = self.verbose
         simulation.current_deposition_algo = "direct"
-        simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
-            linear_solver=picmi.GMRESLinearSolver(
-                relative_tolerance=5e-5,
-                max_iterations=2048,
-                verbose_int=(2 if self.test else 0),
-            ),
+
+        #######################################################################
+        # Field solver and external field                                     #
+        #######################################################################
+
+        if self.solver == "darwin":
+            simulation.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
+                linear_solver=picmi.GMRESLinearSolver(
+                    relative_tolerance=5e-5,
+                    max_iterations=2048,
+                    verbose_int=(2 if self.test else 0),
+                ),
+            )
+            if self.include_es_solver:
+                self.solver_obj = picmi.ElectrostaticSolver(
+                    grid=self.grid,
+                    required_precision=1e-6,
+                    warpx_effective_potential=True,
+                    warpx_effective_potential_factor=self.C_SI,
+                    warpx_effective_potential_density_floor=self.n_plasma * 0.01,
+                    warpx_self_fields_verbosity=self.test,
+                )
+            else:
+                self.solver_obj = DummyES_Solver(self.grid)
+            simulation.solver = self.solver_obj
+
+        else:
+            self.solver_obj = picmi.HybridPICSolver(
+                grid=self.grid,
+                Te=self.T_plasma,
+                n0=self.n_plasma,
+                plasma_resistivity=self.eta,
+                substeps=self.substeps,
+                use_rkf45=self.use_rkf45,
+            )
+            simulation.solver = self.solver_obj
+
+        B_ext = picmi.AnalyticInitialField(
+            Bx_expression=self.Bx, By_expression=self.By, Bz_expression=self.Bz
         )
+        simulation.add_applied_field(B_ext)
 
         #######################################################################
         # Particle types setup                                                #
@@ -265,46 +355,22 @@ class EMModes(object):
                 grid=self.grid, n_macroparticles_per_cell=self.NPPC
             ),
         )
-        self.electrons = picmi.Species(
-            name="electron",
-            charge=-constants.q_e,
-            mass=constants.m_e,
-            initial_distribution=picmi.UniformDistribution(
-                density=self.n_plasma,
-                rms_velocity=[self.v_te] * 3,
-            ),
-        )
-        simulation.add_species(
-            self.electrons,
-            layout=picmi.PseudoRandomLayout(
-                grid=self.grid, n_macroparticles_per_cell=self.NPPC
-            ),
-        )
-
-        #######################################################################
-        # Field solver and external field                                     #
-        #######################################################################
-
-        if self.include_es_solver:
-            self.solver = picmi.ElectrostaticSolver(
-                grid=self.grid,
-                required_precision=1e-6,
-                warpx_effective_potential=True,
-                warpx_effective_potential_factor=self.C_SI,
-                warpx_effective_potential_density_floor=self.n_plasma * 0.01,
-                warpx_self_fields_verbosity=self.test,
+        if self.solver == "darwin":
+            self.electrons = picmi.Species(
+                name="electron",
+                charge=-constants.q_e,
+                mass=constants.m_e,
+                initial_distribution=picmi.UniformDistribution(
+                    density=self.n_plasma,
+                    rms_velocity=[self.v_te] * 3,
+                ),
             )
-        else:
-            self.solver = DummyES_Solver(self.grid)
-        simulation.solver = self.solver
-
-        B_ext = picmi.AnalyticInitialField(
-            Bx_expression=self.Bx,
-            By_expression=self.By,
-            Bz_expression=self.Bz,
-            warpx_do_initial_div_cleaning=False,
-        )
-        simulation.add_applied_field(B_ext)
+            simulation.add_species(
+                self.electrons,
+                layout=picmi.PseudoRandomLayout(
+                    grid=self.grid, n_macroparticles_per_cell=self.NPPC
+                ),
+            )
 
         #######################################################################
         # Add diagnostics                                                     #
@@ -319,22 +385,25 @@ class EMModes(object):
             particle_diag = picmi.ParticleDiagnostic(
                 name="field_diag",
                 period=self.total_steps,
-                # warpx_format = 'openpmd',
-                # warpx_openpmd_backend = 'h5'
             )
             simulation.add_diagnostic(particle_diag)
+            field_diag_data_list = ["B", "E"]
+            if self.solver == "ohm":
+                field_diag_data_list.append("J_displacement")
             field_diag = picmi.FieldDiagnostic(
                 name="field_diag",
                 grid=self.grid,
                 period=self.total_steps,
-                data_list=["B", "E"],
-                # warpx_verbose=0,
-                # warpx_format = 'openpmd',
-                # warpx_openpmd_backend = 'h5'
+                data_list=field_diag_data_list,
+                warpx_verbose=(0 if self.solver == "ohm" else None),
             )
             simulation.add_diagnostic(field_diag)
 
-        if self.dim == 1:
+        # the Darwin solver only uses the reduced line diagnostic for the
+        # inherently 1d case, while the Ohm solver also uses it for the
+        # parallel-propagating (B_dir == "z") case in higher dimensions
+        use_line_diag = self.dim == 1 or (self.solver == "ohm" and self.B_dir == "z")
+        if use_line_diag:
             line_diag = picmi.ReducedDiagnostic(
                 diag_type="FieldProbe",
                 probe_geometry="Line",
@@ -360,22 +429,23 @@ class EMModes(object):
                     "[3]Ez_lev0-(V/m) [4]Bx_lev0-(T) [5]By_lev0-(T)\n"
                 )
 
-        write_dir = "diags/"
-        field_energy = picmi.ReducedDiagnostic(
-            diag_type="FieldEnergy",
-            name="field_energy",
-            period=self.diag_steps,
-            path=write_dir,
-        )
-        simulation.add_diagnostic(field_energy)
+        if self.solver == "darwin":
+            write_dir = "diags/"
+            field_energy = picmi.ReducedDiagnostic(
+                diag_type="FieldEnergy",
+                name="field_energy",
+                period=self.diag_steps,
+                path=write_dir,
+            )
+            simulation.add_diagnostic(field_energy)
 
-        part_energy = picmi.ReducedDiagnostic(
-            diag_type="ParticleEnergy",
-            name="part_energy",
-            period=self.diag_steps,
-            path=write_dir,
-        )
-        simulation.add_diagnostic(part_energy)
+            part_energy = picmi.ReducedDiagnostic(
+                diag_type="ParticleEnergy",
+                name="part_energy",
+                period=self.diag_steps,
+                path=write_dir,
+            )
+            simulation.add_diagnostic(part_energy)
 
         #######################################################################
         # Initialize simulation                                               #
@@ -394,9 +464,16 @@ class EMModes(object):
         if step % self.diag_steps != 0:
             return
 
-        Bx_warpx = simulation.fields.get("Bfield_aux", dir="x", level=0)[...]
-        By_warpx = simulation.fields.get("Bfield_aux", dir="y", level=0)[...]
-        Ez_warpx = simulation.fields.get("Efield_aux", dir="z", level=0)[...]
+        field_suffix = "aux" if self.solver == "darwin" else "fp"
+        Bx_warpx = simulation.fields.get(f"Bfield_{field_suffix}", dir="x", level=0)[
+            ...
+        ]
+        By_warpx = simulation.fields.get(f"Bfield_{field_suffix}", dir="y", level=0)[
+            ...
+        ]
+        Ez_warpx = simulation.fields.get(f"Efield_{field_suffix}", dir="z", level=0)[
+            ...
+        ]
 
         if libwarpx.amr.ParallelDescriptor.MyProc() != 0:
             return
@@ -426,6 +503,17 @@ class EMModes(object):
 ##########################
 
 parser = argparse.ArgumentParser()
+solver_group = parser.add_mutually_exclusive_group(required=True)
+solver_group.add_argument(
+    "--darwin",
+    help="Run with the semi-implicit Darwin field solver",
+    action="store_true",
+)
+solver_group.add_argument(
+    "--ohm",
+    help="Run with the kinetic-fluid hybrid (Ohm) field solver",
+    action="store_true",
+)
 parser.add_argument(
     "-t",
     "--test",
@@ -444,8 +532,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--include_es_solver",
-    help="Include the electrostatic (effective potential) solver alongside the "
-    "Darwin field solver, instead of the no-op dummy solver",
+    help="Darwin only: include the electrostatic (effective potential) solver "
+    "alongside the Darwin field solver, instead of the no-op dummy solver",
+    action="store_true",
+)
+parser.add_argument(
+    "--use_rkf45",
+    help="Ohm only: use adaptive RKF45 subcycling for the B-field update",
     action="store_true",
 )
 parser.add_argument(
@@ -458,10 +551,12 @@ args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
 run = EMModes(
+    solver="darwin" if args.darwin else "ohm",
     test=args.test,
     dim=args.dim,
     B_dir=args.bdir,
-    include_es_solver=args.include_es_solver,
     verbose=args.verbose,
+    include_es_solver=args.include_es_solver,
+    use_rkf45=args.use_rkf45,
 )
 simulation.step()

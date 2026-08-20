@@ -1,8 +1,8 @@
-/* Copyright 2025 The WarpX Community
+/* Copyright 2026 The WarpX Community
  *
  * This file is part of WarpX.
  *
- * Authors: Roelof Groenewald (TAE Technologies)
+ * Authors: Roelof Groenewald (Realta Fusion)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -28,7 +28,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // The guard-cell handling throughout this solver (SumBoundaryJ and
     // FillBoundaryAndSync calls using the domain periodicity) and the GMRES
-    // operator in ComputeRHS() assume periodic boundaries; with conducting
+    // operator in DarwinLinearFieldOperator assume periodic boundaries; with conducting
     // (PEC) walls the run would proceed but give wrong results near the walls.
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -50,41 +50,16 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
         m_WarpX->m_fields.alloc_init(FieldType::dA_fp, Direction{2}, lev, ba_Ez, dm_E, 1, nge, 0.0_rt);
     }
 
-    // Define WarpXSolverVec instances for the MS equation solution (Z) and source
+    // Define WarpXSolverVec instances for the magnetoinductive equation solution (Z) and source
     m_Z.Define( m_WarpX, "Bfield_fp");
     m_Z.zero();
     m_source.Define(m_Z);
     m_source.zero();
 
-    // Scratch space used by ComputeRHS(), allocated once here (every
-    // iterate of m_Z shares this same layout) rather than on every
-    // GMRES iteration.
-    {
-        const auto& Zvec = m_Z.getArrayVec();
-        const int lev = 0;
-        m_lapZ_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
-                        Zvec[lev][0]->nComp(), Zvec[lev][0]->nGrowVect());
-        m_lapZ_y.define(Zvec[lev][1]->boxArray(), Zvec[lev][1]->DistributionMap(),
-                        Zvec[lev][1]->nComp(), Zvec[lev][1]->nGrowVect());
-        m_lapZ_z.define(Zvec[lev][2]->boxArray(), Zvec[lev][2]->DistributionMap(),
-                        Zvec[lev][2]->nComp(), Zvec[lev][2]->nGrowVect());
-
-        const amrex::IntVect biharmonic_ng =
-            amrex::elemwiseMax(Zvec[lev][0]->nGrowVect(), amrex::IntVect(2));
-        m_Zscratch_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
-                            Zvec[lev][0]->nComp(), biharmonic_ng);
-        m_Zscratch_y.define(Zvec[lev][1]->boxArray(), Zvec[lev][1]->DistributionMap(),
-                            Zvec[lev][1]->nComp(), biharmonic_ng);
-        m_Zscratch_z.define(Zvec[lev][2]->boxArray(), Zvec[lev][2]->DistributionMap(),
-                            Zvec[lev][2]->nComp(), biharmonic_ng);
-    }
-
-    // Parse implicit solver parameters
+    // Set parameters used by `InitializeMassMatrices`
     m_use_mass_matrices = true;
     m_use_mass_matrices_pc = false;
     m_use_mass_matrices_jacobian = true;
-    m_nlsolver_type = NonlinearSolverType::none;
-    m_max_particle_iterations = 1;
 
     // Get the linear solver input parameters
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
@@ -94,14 +69,18 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
 
-    // Define the linear function - Note we could use JacobianFunctionMF if we
-    // write ComputeRHS appropriately, this will add some extra overhead in MF operations
-    // but would reduce code.
-    m_linear_function = std::make_unique<LinearFunctionMF<WarpXSolverVec,SemiImplicitDarwin>>();
+    // Define the linear operator (this also allocates the scratch space it
+    // uses to evaluate the operator on each GMRES iteration)
+    m_linear_function = std::make_unique<DarwinLinearFieldOperator>();
     m_linear_function->define(m_Z, this, PreconditionerType::none);
 
     // Define the linear solver
-    m_linear_solver = std::make_unique<AMReXGMRES<WarpXSolverVec,LinearFunctionMF<WarpXSolverVec,SemiImplicitDarwin>>>();
+    if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
+        m_linear_solver = std::make_unique<AMReXGMRES<WarpXSolverVec,DarwinLinearFieldOperator>>();
+    }
+    else {
+        amrex::Abort("Darwin linear solver: unknown type");
+    }
     m_linear_solver->define(*m_linear_function);
     m_linear_solver->setVerbose( m_linsol_verbose_int );
     m_linear_solver->setRestartLength( m_linsol_restart_length );
@@ -149,7 +128,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // TODO: only save u since we don't need to keep x
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Push particle velocities with E_fp (which currently just contains -∇ phi since
+    // Push particle velocities with E_fp (which currently just contains -grad(phi) since
     // the E-field was cleared during the last Poisson solve)
     for (int lev = 0; lev <= finest_level; ++lev)
     {
@@ -166,21 +145,26 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
         );
     }
 
-    // Prepare current deposition by setting particle velocities to twice the
-    // t = n velocity values (with just the ES acceleration applied for the
-    // advanced velocity)
-    PrepareCurrentDeposition();
+    // Prepare current deposition: the velocities are time centered with
+    // u -> (u^{n+1/2} + u^{n-1/2}) / 2.0 (with just the ES acceleration applied
+    // for the advanced velocity), and the advanced velocity is saved to u_n
+    PrepareVelocitiesForCurrentDeposition();
 
-    // Accumulate current* and susceptibility (mass matrices)
-    AccumulateCurrentAndSusceptibility();
+    // Accumulate current* and the mass matrices
+    AccumulateCurrentAndMassMatrices();
 
     // Python callback insertion
     ExecutePythonCallback("afterdeposition");
 
     // Populate the source vector
+    // i.e. fill m_source with `2 * laplacian(B) + 2 * mu_0 curl(J)`
     CalculateSourceVector();
 
-    // Solve MS equation
+    // Solve the magnetoinductive equation:
+    // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+    // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
+    // ApplyScaledMassMatrices), i.e. the linear response of the deposited
+    // current to the inductive E-field that this solve produces.
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
     // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
@@ -191,8 +175,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
         return exit_status;
     }
 
-    // Update E to E = -dA/dt (B is updated after the corrector push below)
-    UpdateEfromdA(a_step);
+    // Set E = -dA/dt (B is updated after the corrector push below)
+    ComputeInductiveEfromdA(a_step);
 
     // Set particle velocities to 0 since the push below is just calculating
     // the acceleration due to the inductive E-field
@@ -221,116 +205,32 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Push particle positions forward (velocities are already updated)
     m_WarpX->GetPartContainer().PushX(m_dt);
 
-    // Update magnetic field using dB/dt = -∇ x E
+    // Update magnetic field using dB/dt = -curl(E)
     m_WarpX->EvolveB(m_dt, SubcyclingHalf::None, a_step*m_dt);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
 
     return exit_status;
 }
 
-void SemiImplicitDarwin::ComputeRHS ( WarpXSolverVec& a_RHS,
-                                      const WarpXSolverVec& a_Z,
+void SemiImplicitDarwin::ComputeRHS ( [[maybe_unused]] WarpXSolverVec& a_RHS,
+                                      [[maybe_unused]] const WarpXSolverVec& a_Z,
                                       [[maybe_unused]] amrex::Real start_time,
                                       [[maybe_unused]] int a_nl_iter,
                                       [[maybe_unused]] bool a_from_jacobian )
 {
-    BL_PROFILE("SemiImplicitDarwin::ComputeRHS()");
-
-    const int lev = 0;
-    const int ncomps = 1;
-
-    // Evaluate the Darwin MS operator with the given input (a_Z) and
-    // write results into a_RHS.
-    const auto& Zvec = a_Z.getArrayVec();
-    auto& rhs_vec = a_RHS.getArrayVec();
-
-    // The dA_fp and Efield_fp MultiFabs are used to store intermediate calculations.
-    auto dA_fp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, lev);
-    auto E_temp = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, lev);
-
-    // Scratch space (allocated once in Define()), reused below to hold ∇ x (chi ∇ x Z).
-    ablastr::fields::VectorField lapZ = {&m_lapZ_x, &m_lapZ_y, &m_lapZ_z};
-
-    // GMRES builds intermediate Krylov candidates via WarpXSolverVec's
-    // arithmetic (linComb/increment/Saxpy), which only ever touch the valid
-    // region (nghost=0), so a_Z's own guard cells cannot be trusted here.
-    // Copy the candidate into a B-staggered scratch (allocated once in
-    // Define(), with >=2 ghost cells for the nabla^4 stencil below, which
-    // reads i-2..i+2) and FillBoundary on that scratch, which derives its
-    // guard cells from its own (just-copied) valid-region data via the
-    // periodic halo exchange.
-    ablastr::fields::VectorField Zscratch = {&m_Zscratch_x, &m_Zscratch_y, &m_Zscratch_z};
-    for (int ii = 0; ii < 3; ii++)
-    {
-        amrex::MultiFab::Copy(*Zscratch[ii], *Zvec[lev][ii], 0, 0, ncomps, 0);
-        // Plain FillBoundary only reconciles true ghost cells, not two
-        // overlapping valid cells - use FillBoundaryAndSync instead (harmless
-        // no-op for the transverse, cell-centered components, which have no
-        // such duplication).
-        Zscratch[ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-    }
-
-    // Evaluation of the (single) 4th-order field equation:
-    // ∇^4(Z), discretized directly in a single pass. Composing two
-    // separate ComputeVectorLaplacian calls (with an intermediate boundary
-    // fill in between) introduces a parasitic, sign-alternating mode in Z's
-    // nodal component, since each application's guard cells are filled
-    // independently rather than being derived from a single consistent
-    // wide-stencil read of Z.
-    m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeVectorBiLaplacian(
-        rhs_vec[lev], Zscratch, m_WarpX->GetEBUpdateBFlag()[lev], lev
-    );
-
-    // Calculate dA = ∇ x Z (ComputeCurlB resets dA_fp to zero internally).
-    // Use Zscratch (guard cells already filled above) rather than Zvec directly.
-    m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
-        dA_fp[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
-    );
-
-    // include guard cells. dA_fp is E-staggered: use FillBoundaryAndSync so
-    // periodically wrapped cells agree before ApplySusceptibility reads dA_fp below.
-    for (int ii = 0; ii < 3; ii++)
-    {
-        dA_fp[lev][ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-        // clear E_temp since ApplySusceptibility accumulates into its rhs argument
-        E_temp[lev][ii]->setVal(0);
-    }
-    // Calculate chi dA and write into E_temp
-    ApplySusceptibility(E_temp, dA_fp);
-
-    // E_temp (Efield_fp) shares dA_fp's staggering (nodal transverse
-    // components) - sync it too before ComputeCurlA reads it with a stencil.
-    for (int ii = 0; ii < 3; ii++)
-    {
-        E_temp[lev][ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-    }
-
-    // Reuse lapZ as a temporary storage location for the ∇ x E_temp = ∇ x (chi ∇ x Z_vec)
-    m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-        lapZ, E_temp[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
-    );
-
-    for (int ii = 0; ii < 3; ii++)
-    {
-        amrex::MultiFab::Add(*rhs_vec[lev][ii], *lapZ[ii], 0, 0, ncomps, 0);
-    }
-
-    // rhs_vec is the operator's own output (B-staggered, matching Z).
-    // Nothing guarantees the stencil evaluations above produced identical
-    // values at the duplicate periodic-image cells of the nodal
-    // component(s), and GMRES's own linComb/increment arithmetic (used to
-    // build every subsequent Krylov vector from this result) is
-    // element-wise and has no notion of that duplication - so reconcile it
-    // here before handing the result back.
-    for (int ii = 0; ii < 3; ii++)
-    {
-        rhs_vec[lev][ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
-    }
+    // The Darwin scheme is linear in its unknown and never installs a
+    // nonlinear solver, so it has no nonlinear residual to compute. This
+    // override only exists because ImplicitSolver::ComputeRHS() is pure
+    // virtual. The linear operator that GMRES applies each iteration is
+    // DarwinLinearFieldOperator::apply() instead.
+    WARPX_ABORT_WITH_MESSAGE(
+        "SemiImplicitDarwin::ComputeRHS() is not implemented: the semi-implicit "
+        "Darwin solver is linear and uses DarwinLinearFieldOperator::apply() instead.");
 }
 
-void SemiImplicitDarwin::PrepareCurrentDeposition ()
+void SemiImplicitDarwin::PrepareVelocitiesForCurrentDeposition ()
 {
-    BL_PROFILE("SemiImplicitDarwin::PrepareCurrentDeposition()");
+    BL_PROFILE("SemiImplicitDarwin::PrepareVelocitiesForCurrentDeposition()");
     // On entry, u holds the velocity after the electrostatic-only push
     // (PushP in OneStep()) and u_n holds the velocity saved at the start of
     // the step (SaveParticlesAtImplicitStepStart()). This function sets u to
@@ -388,51 +288,14 @@ void SemiImplicitDarwin::PrepareCurrentDeposition ()
     }
 }
 
-void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
+void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 {
-    /*
-        Note: The functionality here deposits current to the Yee grid (and
-        accumulates the susceptibility to a staggered grid). The prototype
-        Darwin solver does the depositions to nodal grids!
-        This should maybe be fixed for > 1d!!
-        (In 1d the z-current component is basically divergence cleaned away.)
 
-        Note: There is an outstanding issue with this function - the
-        `WarpXParticleContainer::DepositCurrentAndMassMatrices` calls
-        `doDirectJandSigmaDeposition` which uses `GetImplicitGammaInverse` to
-        get the Lorentz factor used in the current deposition. That function
-        is not appropriate for the Darwin model since it is hard coded for the
-        electromagnetic implicit methods (it uses u and u_n to get a time
-        centered gamma) - was fixed in 89a8fc3.
-    */
+    BL_PROFILE("SemiImplicitDarwin::AccumulateCurrentAndMassMatrices()");
 
-    BL_PROFILE("SemiImplicitDarwin::AccumulateCurrentAndSusceptibility()");
-
-    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     const int lev = 0;
-
-    amrex::MultiFab * Sxx = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
-    amrex::MultiFab * Sxy = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
-    amrex::MultiFab * Sxz = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
-    amrex::MultiFab * Syx = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
-    amrex::MultiFab * Syy = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev);
-    amrex::MultiFab * Syz = m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
-    amrex::MultiFab * Szx = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
-    amrex::MultiFab * Szy = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
-    amrex::MultiFab * Szz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
-
-    // clear MultiFabs in preparation for new deposit
-    Sxx->setVal(0.0);
-    Sxy->setVal(0.0);
-    Sxz->setVal(0.0);
-    Syx->setVal(0.0);
-    Syy->setVal(0.0);
-    Syz->setVal(0.0);
-    Szx->setVal(0.0);
-    Szy->setVal(0.0);
-    Szz->setVal(0.0);
 
     // Deposit the current density from all species, using the time-centered
     // particle velocities as appropriate for the implicit push. This also
@@ -441,9 +304,11 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev),
         m_dt, 0.0_rt, PushType::Implicit);
 
-    for (auto const& pc : m_WarpX->GetPartContainer()) {
-        pc->DepositMassMatrices(m_WarpX->m_fields, lev, m_dt);
-    }
+    // Zero and accumulate the mass matrices from all species. This shares the
+    // zero-then-deposit machinery with the electromagnetic implicit solvers
+    // (see ImplicitSolver::PreLinearSolve), which drive the same
+    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
+    m_WarpX->DepositMassMatrices();
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
@@ -459,8 +324,10 @@ void SemiImplicitDarwin::AccumulateCurrentAndSusceptibility ()
 
 void SemiImplicitDarwin::CalculateSourceVector ()
 {
-    // This function calculates the "b" vector for the linear MS equation,
-    // i.e., the source vector.
+    // Compute the right-hand side of the magnetoinductive equation
+    // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+    // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
+    // ApplyScaledMassMatrices).
     BL_PROFILE("SemiImplicitDarwin::CalculateSourceVector()");
 
     const int lev = 0;
@@ -508,7 +375,7 @@ void SemiImplicitDarwin::CalculateSourceVector ()
         curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
     );
 
-    // Calculate 2 * ∇^2 B + 2 * mu_0 ∇ x J and write result in m_source
+    // Calculate 2 * laplacian(B) + 2 * mu_0 curl(J) and write result in m_source
     const auto& b = m_source.getArrayVec();
     for (int ii = 0; ii < 3; ii++)
     {
@@ -524,30 +391,29 @@ void SemiImplicitDarwin::CalculateSourceVector ()
     }
 }
 
-void SemiImplicitDarwin::UpdateEfromdA ( int astep )
+void SemiImplicitDarwin::ComputeInductiveEfromdA ( int astep )
 {
     // This function updates the Efield_fp MF to hold the new inductive E-field.
-    BL_PROFILE("SemiImplicitDarwin::UpdateEfromdA()");
+    BL_PROFILE("SemiImplicitDarwin::ComputeInductiveEfromdA()");
 
     const int lev = 0;
 
     // Grab the E-field MultiFabs
     ablastr::fields::MultiLevelVectorField Efield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, lev);
 
-    // Grab the dA_fp MultiFabs to store dA = ∇ x Z (the solved-for Z lives
+    // Grab the dA_fp MultiFabs to store dA = curl(Z) (the solved-for Z lives
     // on B's staggering; dA lives on A/E's staggering)
     ablastr::fields::MultiLevelVectorField dAfield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, lev);
 
-    // Grab m_Z MultiFabs (the solved-for Z). GMRES builds its final answer via
-    // linComb/increment-style arithmetic, which only touches the valid region,
-    // so Zfield's own guard cells cannot be trusted here either - copy into a
-    // scratch and FillBoundary on that, same as in ComputeRHS.
-    // Zscratch is a local MultiFab, not m_Z's own storage, so its ghost width
-    // isn't tied to m_Z's own native ghost width (which is 0, by design - see
-    // note above) - the ComputeCurlB stencil below reads i-1, so at least 1
-    // ghost cell is requested here regardless.
+    // Grab m_Z MultiFabs (the solved-for Z). Z's valid region is sound at this
+    // point - it is a linear combination of vectors that were themselves
+    // consistent, and GMRES's arithmetic is element-wise - but WarpXSolverVec
+    // always allocates with zero guard cells (see its Define()), so there are
+    // none to fill in place, while the ComputeCurlB stencil below reads i-1.
+    // Hence the copy into a local scratch one cell wider, and the boundary fill
+    // on that, same as in the linear operator.
     const auto& Zfield = m_Z.getArrayVec();
-    const amrex::IntVect curl_ng = amrex::elemwiseMax(Zfield[lev][0]->nGrowVect(), amrex::IntVect(1));
+    const amrex::IntVect curl_ng = amrex::IntVect(1);
     amrex::MultiFab Zscratch_x(Zfield[lev][0]->boxArray(), Zfield[lev][0]->DistributionMap(),
                                Zfield[lev][0]->nComp(), curl_ng);
     amrex::MultiFab Zscratch_y(Zfield[lev][1]->boxArray(), Zfield[lev][1]->DistributionMap(),
@@ -565,7 +431,7 @@ void SemiImplicitDarwin::UpdateEfromdA ( int astep )
         Zscratch[ii]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
     }
 
-    // Calculate dA = ∇ x Z
+    // Calculate dA = curl(Z)
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
         dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
     );
@@ -666,301 +532,24 @@ void SemiImplicitDarwin::FinishVelocityUpdate ()
     }
 }
 
-void SemiImplicitDarwin::ApplySusceptibility (
+void SemiImplicitDarwin::ApplyScaledMassMatrices (
     ablastr::fields::MultiLevelVectorField& rhs,
     const ablastr::fields::MultiLevelVectorField& dA )
 {
-    BL_PROFILE("SemiImplicitDarwin::ApplySusceptibility()");
-    // This function applies the susceptibility matrices to the given dA.
-    // The functionality is copied from the ``ImplicitSolver::ComputeJfromMassMatrices``
-    // function rather than calling it directly, since that function is hardcoded to
-    // the registered current_fp/Efield_fp/Efield_fp_save fields, whereas this one
-    // must operate on the caller-supplied rhs/dA vectors used inside the GMRES matvec.
-
+    BL_PROFILE("SemiImplicitDarwin::ApplyScaledMassMatrices()");
     using namespace amrex::literals;
 
-    using warpx::fields::FieldType;
-    using ablastr::fields::Direction;
+    const amrex::Real scale = 2._prt * PhysConst::mu0 / m_dt;
 
-    const int ncomps = 1;
-    const int finest_level = 0;
-    const auto dt = m_dt;
+    ApplyMassMatrices(
+        /* a_out           = */ rhs,
+        /* a_in            = */ dA,
+        /* a_in_ref        = */ nullptr,
+        /* a_baseline      = */ nullptr,
+        /* a_scale         = */ scale,
+        /* a_zero_out_first = */ false);
 
-    for (int lev = 0; lev <= finest_level; ++lev) {
-
-        ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
-        ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
-        ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
-
-        const amrex::IntVect dAx_nodal = dA[lev][0]->ixType().toIntVect();
-        const amrex::IntVect dAy_nodal = dA[lev][1]->ixType().toIntVect();
-        const amrex::IntVect dAz_nodal = dA[lev][2]->ixType().toIntVect();
-
-        // Compute the component offset in each direction (careful with staggering)
-        amrex::IntVect offset_xx, offset_xy, offset_xz;
-        amrex::IntVect offset_yx, offset_yy, offset_yz;
-        amrex::IntVect offset_zx, offset_zy, offset_zz;
-        for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
-            offset_xx[dir] = (m_ncomp_xx[dir]-1)/2;
-            offset_xy[dir] = (dAx_nodal[dir] > dAy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
-                                                               : ((m_ncomp_xy[dir]-1)/2);
-            offset_xz[dir] = (dAx_nodal[dir] > dAz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
-                                                               : ((m_ncomp_xz[dir]-1)/2);
-            offset_yx[dir] = (dAy_nodal[dir] > dAx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
-                                                               : ((m_ncomp_yx[dir]-1)/2);
-            offset_yy[dir] = (m_ncomp_yy[dir]-1)/2;
-            offset_yz[dir] = (dAy_nodal[dir] > dAz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
-                                                               : ((m_ncomp_yz[dir]-1)/2);
-            offset_zx[dir] = (dAz_nodal[dir] > dAx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
-                                                               : ((m_ncomp_zx[dir]-1)/2);
-            offset_zy[dir] = (dAz_nodal[dir] > dAy_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
-                                                               : ((m_ncomp_zy[dir]-1)/2);
-            offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
-        }
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for ( amrex::MFIter mfi(*dA[lev][0], false); mfi.isValid(); ++mfi )
-        {
-            amrex::Array4<amrex::Real> const& Fx = rhs[lev][0]->array(mfi);
-            amrex::Array4<amrex::Real> const& Fy = rhs[lev][1]->array(mfi);
-            amrex::Array4<amrex::Real> const& Fz = rhs[lev][2]->array(mfi);
-
-            amrex::Array4<const amrex::Real> const& dAx = dA[lev][0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& dAy = dA[lev][1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& dAz = dA[lev][2]->array(mfi);
-
-            amrex::Array4<const amrex::Real> const& Sxx = SX[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Sxy = SX[1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Sxz = SX[2]->array(mfi);
-
-            amrex::Array4<const amrex::Real> const& Syx = SY[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Syy = SY[1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Syz = SY[2]->array(mfi);
-
-            amrex::Array4<const amrex::Real> const& Szx = SZ[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
-
-            // The outer loop below reads Sxx/Sxy/Sxz (etc.) directly at (i,j,k),
-            // so it must stay within the mass matrices' own ghost region - grow
-            // by the min of dA's and the mass matrices' ghost widths (dA_fp can
-            // have more ghost cells than current_fp/the mass matrices, since
-            // Efield's ghost width only has to be >= current's, not equal).
-            amrex::Box dAbx = amrex::convert(mfi.validbox(),dA[lev][0]->ixType());
-            amrex::Box dAby = amrex::convert(mfi.validbox(),dA[lev][1]->ixType());
-            amrex::Box dAbz = amrex::convert(mfi.validbox(),dA[lev][2]->ixType());
-            dAbx.grow(amrex::elemwiseMin(dA[lev][0]->nGrowVect(), SX[0]->nGrowVect()));
-            dAby.grow(amrex::elemwiseMin(dA[lev][1]->nGrowVect(), SY[1]->nGrowVect()));
-            dAbz.grow(amrex::elemwiseMin(dA[lev][2]->nGrowVect(), SZ[2]->nGrowVect()));
-
-            // The inner stencil reads of dAx/dAy/dAz, however, are bounded by
-            // dA's own (potentially wider) ghost region, which holds correct
-            // periodic-wrapped data via FillBoundaryAndSync. Clamping those
-            // reads to dAbx/dAby/dAbz above (the S-limited box) would silently
-            // truncate the stencil near the domain edges whenever dA has more
-            // ghost cells than the mass matrices - dropping legitimate
-            // wraparound contributions there, not just avoiding OOB reads.
-            amrex::Box dA_fullbx = amrex::convert(mfi.validbox(),dA[lev][0]->ixType());
-            amrex::Box dA_fullby = amrex::convert(mfi.validbox(),dA[lev][1]->ixType());
-            amrex::Box dA_fullbz = amrex::convert(mfi.validbox(),dA[lev][2]->ixType());
-            dA_fullbx.grow(dA[lev][0]->nGrowVect());
-            dA_fullby.grow(dA[lev][1]->nGrowVect());
-            dA_fullbz.grow(dA[lev][2]->nGrowVect());
-
-            const amrex::IntVect ncomp_xx = m_ncomp_xx;
-            const amrex::IntVect ncomp_xy = m_ncomp_xy;
-            const amrex::IntVect ncomp_xz = m_ncomp_xz;
-            const amrex::IntVect ncomp_yx = m_ncomp_yx;
-            const amrex::IntVect ncomp_yy = m_ncomp_yy;
-            const amrex::IntVect ncomp_yz = m_ncomp_yz;
-            const amrex::IntVect ncomp_zx = m_ncomp_zx;
-            const amrex::IntVect ncomp_zy = m_ncomp_zy;
-            const amrex::IntVect ncomp_zz = m_ncomp_zz;
-
-            amrex::ParallelFor(
-            dAbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-            {
-                const int idx[3] = {i, j, k};
-                amrex::GpuArray<int, 3> index_min = {0, 0, 0};
-                amrex::GpuArray<int, 3> index_max = {0, 0, 0};
-
-                // Compute Sxx*dAx
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_xx[dim],dA_fullbx.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_xx[dim]-1-offset_xx[dim],dA_fullbx.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SxxdAx = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_xx[0],
-                                   + ncomp_xx[0]*( jj+offset_xx[1] ),
-                                   + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
-                            SxxdAx += Sxx(i,j,k,Nc)*dAx(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                // Compute Sxy*dAy
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_xy[dim],dA_fullby.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_xy[dim]-1-offset_xy[dim],dA_fullby.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SxydAy = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_xy[0],
-                                   + ncomp_xy[0]*( jj+offset_xy[1] ),
-                                   + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
-                            SxydAy += Sxy(i,j,k,Nc)*dAy(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                // Compute Sxz*dAz
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_xz[dim],dA_fullbz.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_xz[dim]-1-offset_xz[dim],dA_fullbz.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SxzdAz = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_xz[0],
-                                   + ncomp_xz[0]*( jj+offset_xz[1] ),
-                                   + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
-                            SxzdAz += Sxz(i,j,k,Nc)*dAz(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                Fx(i,j,k,n) += 2._prt * PhysConst::mu0 / dt * (SxxdAx + SxydAy + SxzdAz);
-            });
-            amrex::ParallelFor(
-            dAby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-            {
-                const int idx[3] = {i, j, k};
-                amrex::GpuArray<int, 3> index_min = {0, 0, 0};
-                amrex::GpuArray<int, 3> index_max = {0, 0, 0};
-
-                // Compute Syx*dAx
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_yx[dim],dA_fullbx.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_yx[dim]-1-offset_yx[dim],dA_fullbx.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SyxdAx = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_yx[0],
-                                   + ncomp_yx[0]*( jj+offset_yx[1] ),
-                                   + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
-                            SyxdAx += Syx(i,j,k,Nc)*dAx(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                // Compute Syy*dAy
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_yy[dim],dA_fullby.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_yy[dim]-1-offset_yy[dim],dA_fullby.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SyydAy = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_yy[0],
-                                   + ncomp_yy[0]*( jj+offset_yy[1] ),
-                                   + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
-                            SyydAy += Syy(i,j,k,Nc)*dAy(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                // Compute Syz*dAz
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_yz[dim],dA_fullbz.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_yz[dim]-1-offset_yz[dim],dA_fullbz.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SyzdAz = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_yz[0],
-                                   + ncomp_yz[0]*( jj+offset_yz[1] ),
-                                   + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
-                            SyzdAz += Syz(i,j,k,Nc)*dAz(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                Fy(i,j,k,n) += 2._prt * PhysConst::mu0 / dt * (SyxdAx + SyydAy + SyzdAz);
-            });
-            amrex::ParallelFor(
-            dAbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
-            {
-                const int idx[3] = {i, j, k};
-                amrex::GpuArray<int, 3> index_min = {0, 0, 0};
-                amrex::GpuArray<int, 3> index_max = {0, 0, 0};
-
-                // Compute Szx*dAx
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_zx[dim],dA_fullbx.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_zx[dim]-1-offset_zx[dim],dA_fullbx.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SzxdAx = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_zx[0],
-                                   + ncomp_zx[0]*( jj+offset_zx[1] ),
-                                   + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
-                            SzxdAx += Szx(i,j,k,Nc)*dAx(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                // Compute Szy*dAy
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_zy[dim],dA_fullby.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_zy[dim]-1-offset_zy[dim],dA_fullby.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SzydAy = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_zy[0],
-                                   + ncomp_zy[0]*( jj+offset_zy[1] ),
-                                   + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
-                            SzydAy += Szy(i,j,k,Nc)*dAy(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                // Compute Szz*dAz
-                for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_zz[dim],dA_fullbz.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_zz[dim]-1-offset_zz[dim],dA_fullbz.bigEnd(dim)-idx[dim]);
-                }
-                amrex::Real SzzdAz = 0.0;
-                for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
-                    for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
-                        for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
-                            const int Nc = AMREX_D_TERM( ii+offset_zz[0],
-                                   + ncomp_zz[0]*( jj+offset_zz[1] ),
-                                   + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
-                            SzzdAz += Szz(i,j,k,Nc)*dAz(i+ii,j+jj,k+kk,n);
-                        }
-                    }
-                }
-
-                Fz(i,j,k,n) += 2._prt * PhysConst::mu0 / dt * (SzxdAx + SzydAy + SzzdAz);
-            });
-        }
-
+    for (int lev = 0; lev < static_cast<int>(rhs.size()); ++lev) {
         // Fill and sync guard cells & edges
         rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
         rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());

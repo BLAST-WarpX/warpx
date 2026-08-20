@@ -15,7 +15,7 @@
 #include "Particles/Collision/BinaryCollision/LinearBreitWheeler/LinearBreitWheelerCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/LinearCompton/LinearComptonCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/ParticleCreationFunc.H"
-#include "Particles/Collision/BinaryCollision/ShuffleFisherYates.H"
+#include "Particles/Collision/BinaryCollision/ParticleShufflers.H"
 #include "Particles/Collision/CollisionBase.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/ParticleCreation/SmartUtils.H"
@@ -105,13 +105,22 @@ public:
 
         m_use_global_debye_length = m_binary_collision_functor.use_global_debye_length();
 
+        const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
         pp_collision_name.queryarr("product_species", m_product_species);
 
+        m_shuffling_method = ParticleShufflingMethod::Default;
+        pp_collisions.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+        pp_collision_name.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
+
+        if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+            m_modulus_rounds = 5;
+            pp_collisions.query("modulus_rounds", m_modulus_rounds);
+            pp_collision_name.query("modulus_rounds", m_modulus_rounds);
+        }
 
         if (collision_type == CollisionType::PairwiseCoulomb) {
             // Input parameter set for all pairwise Coulomb collisions
-            const amrex::ParmParse pp_collisions("collisions");
             pp_collisions.query("correct_energy_momentum", m_correct_energy_momentum);
             pp_collisions.query("energy_correction_sort_by_weight", m_energy_correction_sort_by_weight);
             pp_collisions.query("np_warning_threshold", m_np_warning_threshold);
@@ -429,8 +438,9 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
-            // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
-            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs);
+            // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
+            // for other collision types, 1 if particle creation occurs, 0 otherwise
+            amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
             amrex::Gpu::DeviceVector<index_type> pair_indices_1(n_total_pairs);
@@ -546,7 +556,8 @@ public:
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
-                amrex::ParallelFor( np1,
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( np1,
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
                         if (correct_energy_momentum) {
@@ -614,25 +625,16 @@ public:
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // shuffle
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-                {
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    index_type const cell_start_1 = cell_offsets_1[i_cell];
-                    index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-                    // Do not shuffle if there is only one particle in the cell
-                    if ( cell_stop_1 - cell_start_1 <= 1 ) { return; }
-
-                    ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-                }
-            );
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
+            if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
+            } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
+                FisherYatesShuffle(n_cells, cell_offsets_1, indices_1);
+            }
+            ABLASTR_PROFILE_VAR_STOP(prof_shuffle);
 
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
@@ -696,6 +698,7 @@ public:
             ABLASTR_PROFILE_VAR_STOP(prof_loopOverCollisions);
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::copyTransform", prof_copyTransform);
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_1,
@@ -706,6 +709,7 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_copyTransform);
 
             for (int i = 0; i < n_product_species; i++)
             {
@@ -717,7 +721,8 @@ public:
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
-                amrex::ParallelFor( np1,
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
@@ -734,7 +739,8 @@ public:
                     }
                 );
 
-                amrex::ParallelFor( np1,
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( np1,
                     [=] AMREX_GPU_DEVICE (int i1) noexcept
                     {
 
@@ -761,9 +767,10 @@ public:
                 const int energy_correction_sort_by_weight_flag = m_energy_correction_sort_by_weight ? sort : no_sort;
                 auto heapSortDecreasing = ParticleUtils::HeapSortDecreasing();
 
-                amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
-                                   {energy_correction_sort_by_weight_flag},
-                                   n_cells,
+                // amrex::For: iterations share the failed-corrections counter (no SIMD pragma, see issue #7097)
+                amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
+                           {energy_correction_sort_by_weight_flag},
+                           n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell, auto energy_correction_sort_by_weight_control) noexcept
                     {
 
@@ -915,7 +922,8 @@ public:
             index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
-            // mask: equal to 1 if particle creation occurs for a given pair, 0 otherwise
+            // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
+            // for other collision types, 1 if particle creation occurs, 0 otherwise
             amrex::Gpu::DeviceVector<index_type> mask(n_total_pairs, index_type(0));
             index_type* AMREX_RESTRICT p_mask = mask.dataPtr();
             // Will be filled with the index of the first particle of a given pair
@@ -1075,7 +1083,8 @@ public:
 
                 // Loop over particles and compute quantities needed for energy conservation and the collsion parameters
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::atomics", prof_findDensityTemperatures_atomics);
-                amrex::ParallelFor( std::max(np1, np2),
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
                         if (correct_energy_momentum) {
@@ -1201,37 +1210,18 @@ public:
                 }
             );
             ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_finish);
+            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
 
             // shuffle - we launch 2*n_cells threads to compute both species simultaneously
-        ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findDensityTemperatures::shuffle", prof_findDensityTemperatures_shuffle);
-            amrex::ParallelForRNG( 2*n_cells,
-                [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
-                {
-          const int i_cell = i < n_cells ? i : i - n_cells;
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::shuffle", prof_shuffle);
+            if (m_shuffling_method == ParticleShufflingMethod::Modulus) {
+                ModulusShuffle(n_cells, np1, m_modulus_rounds, cell_offsets_1, indices_1);
+            } else if (m_shuffling_method == ParticleShufflingMethod::FisherYates) {
+                FisherYatesShuffle(n_cells, cell_offsets_1, indices_1,
+                                            cell_offsets_2, indices_2);
+        }
+            ABLASTR_PROFILE_VAR_STOP(prof_shuffle);
 
-          // The particles from species1 that are in the cell `i_cell` are
-          // given by the `indices_1[cell_start_1:cell_stop_1]`
-          index_type const cell_start_1 = cell_offsets_1[i_cell];
-          index_type const cell_stop_1  = cell_offsets_1[i_cell+1];
-
-          // Same for species 2
-          index_type const cell_start_2 = cell_offsets_2[i_cell];
-          index_type const cell_stop_2  = cell_offsets_2[i_cell+1];
-
-          // Do not collide if one species is missing in the cell
-          if ( cell_stop_1 - cell_start_1 < 1 ||
-               cell_stop_2 - cell_start_2 < 1 ) { return; }
-
-          if (i < n_cells) {
-            ShuffleFisherYates(indices_1, cell_start_1, cell_stop_1, engine);
-          } else {
-            ShuffleFisherYates(indices_2, cell_start_2, cell_stop_2, engine);
-          }
-                }
-            );
-            ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures_shuffle);
-
-        ABLASTR_PROFILE_VAR_STOP(prof_findDensityTemperatures);
             // Loop over independent particle pairs
             // To speed up binary collisions on GPU, we try to expose as much parallelism
             // as possible (while avoiding race conditions): Instead of looping with one GPU
@@ -1302,6 +1292,7 @@ public:
 
             // Create the new product particles and define their initial values
             // num_added: how many particles of each product species have been created
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::copyTransform", prof_copyTransform);
             //NOLINTNEXTLINE(readability-suspicious-call-argument)
             const amrex::Vector<int> num_added = m_copy_transform_functor(n_total_pairs,
                                                     ptile_1, ptile_2,
@@ -1312,6 +1303,7 @@ public:
                                                     copy_species1, copy_species2,
                                                     p_pair_indices_1, p_pair_indices_2,
                                                     p_pair_reaction_weight, p_product_data);
+            ABLASTR_PROFILE_VAR_STOP(prof_copyTransform);
 
             for (int i = 0; i < n_product_species; i++)
             {
@@ -1323,7 +1315,8 @@ public:
                 amrex::ParticleReal const energy_fraction = m_energy_fraction;
 
                 ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::correctEnergyMomentum", prof_correctEnergyMomentum);
-                amrex::ParallelFor( std::max(np1, np2),
+                // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+                amrex::For( std::max(np1, np2),
                     [=] AMREX_GPU_DEVICE (int ip) noexcept
                     {
 
@@ -1394,9 +1387,10 @@ public:
                 const int energy_correction_sort_by_weight_flag = m_energy_correction_sort_by_weight ? sort : no_sort;
                 auto heapSortDecreasing = ParticleUtils::HeapSortDecreasing();
 
-                amrex::ParallelFor(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
-                                   {energy_correction_sort_by_weight_flag},
-                                   n_cells,
+                // amrex::For: iterations share the failed-corrections counter (no SIMD pragma, see issue #7097)
+                amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_sort,sort>>{},
+                           {energy_correction_sort_by_weight_flag},
+                           n_cells,
                     [=] AMREX_GPU_DEVICE (int i_cell, auto energy_correction_sort_by_weight_control) noexcept
                     {
                         // The particles from species1 that are in the cell `i_cell` are
@@ -1521,6 +1515,9 @@ private:
 
     bool m_isSameSpecies;
     bool m_have_product_species;
+
+    ParticleShufflingMethod m_shuffling_method;
+    int m_modulus_rounds;
 
     bool m_correct_energy_momentum = false;
     bool m_energy_correction_sort_by_weight = false;

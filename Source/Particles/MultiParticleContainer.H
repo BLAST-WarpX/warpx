@@ -92,7 +92,7 @@ public:
         return allcontainers[index]->meanParticleVelocity();
     }
 
-    amrex::ParticleReal maxParticleVelocity();
+    amrex::ParticleReal maxParticleDtInv();
 
     void TransformMomentumToCurvilinear (bool forward);
 
@@ -261,7 +261,7 @@ public:
 
     void deleteInvalidParticles ();
 
-    void RedistributeLocal (int max_cells_travelled);
+    void RedistributeLocal (const amrex::IntVect& max_cells_travelled);
 
     /** Apply BC. For now, just discard particles outside the domain, regardless
      *  of the whole simulation BC. */
@@ -547,6 +547,10 @@ private:
     amrex::Vector<std::unique_ptr<WarpXParticleContainer>> allcontainers;
 
     void ReadParameters ();
+
+    /** Guards ReadParameters against running twice for this instance.
+     */
+    bool m_params_initialized = false;
 
     void mapSpeciesProduct ();
 

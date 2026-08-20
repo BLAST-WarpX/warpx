@@ -390,7 +390,12 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #endif
 
     if (has_load) {
-        m_FC_data_cpu = FC.loadChunk<double>(chunk_offset,chunk_extent);
+        const auto num_cells = std::accumulate(chunk_extent.begin(), chunk_extent.end(),
+                                               1, std::multiplies<>());
+        m_FC_data_cpu.reset(
+            reinterpret_cast<double*>(amrex::The_Pinned_Arena()->alloc(num_cells*sizeof(double))),
+            [](double *p){ amrex::The_Pinned_Arena()->free(reinterpret_cast<void*>(p)); });
+        FC.loadChunk<double>(m_FC_data_cpu, chunk_offset, chunk_extent);
     }
     series.flush();
 
@@ -547,12 +552,12 @@ ExternalFieldView ExternalFieldReader::getView (int li) const
     }
 }
 
-ExternalFieldView ExternalFieldReader::getView () const
+ExternalFieldView ExternalFieldReader::getView () const noexcept
 {
     return make_view(m_fab);
 }
 
-ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& fab) const
+ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& fab) const noexcept
 {
     ExternalFieldView view;
     view.dx = m_dx;
@@ -577,3 +582,22 @@ ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& 
     }
     return view;
 }
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+ExternalFieldVectorView::ExternalFieldVectorView (
+    ExternalFieldReader const* x_reader,
+    ExternalFieldReader const* y_reader,
+    ExternalFieldReader const* z_reader) noexcept
+{
+    if (x_reader) {
+        m_x_view = x_reader->getView();
+    }
+    if (y_reader) {
+        m_y_view = y_reader->getView();
+    }
+    if (z_reader) {
+        m_z_view = z_reader->getView();
+    }
+}
+#endif

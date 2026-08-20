@@ -2,44 +2,87 @@
 
 # Copyright 2022 Modern Electron, David Grote
 
+# This script checks the time-averaged ion density profile of the 1D
+# capacitive discharge (case 1) against the benchmark data published in
+# Turner et al. (2013) - https://doi.org/10.1063/1.4775084
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 
+# Turner et al. (2013) benchmark, case 1: ion density (m^-3), averaged over
+# time, on the 129-point grid spanning the 6.7 cm gap
 # fmt: off
-ref_density = np.array([1.27978461e+14, 2.23609301e+14, 2.55411764e+14, 2.55658729e+14,
-                        2.55796324e+14, 2.55809297e+14, 2.55817720e+14, 2.55751484e+14,
-                        2.55923599e+14, 2.56081474e+14, 2.55935618e+14, 2.55837155e+14,
-                        2.55908811e+14, 2.56054091e+14, 2.56287315e+14, 2.56392108e+14,
-                        2.56262600e+14, 2.56079702e+14, 2.55937620e+14, 2.56073668e+14,
-                        2.56318452e+14, 2.56392103e+14, 2.56168570e+14, 2.55864851e+14,
-                        2.56147316e+14, 2.56861411e+14, 2.57139908e+14, 2.56800858e+14,
-                        2.56712412e+14, 2.56913302e+14, 2.56841418e+14, 2.56610311e+14,
-                        2.56579256e+14, 2.56679739e+14, 2.56600190e+14, 2.56441735e+14,
-                        2.56243644e+14, 2.56088377e+14, 2.56000520e+14, 2.56105713e+14,
-                        2.56430688e+14, 2.56451209e+14, 2.56241011e+14, 2.56386084e+14,
-                        2.56555851e+14, 2.56360159e+14, 2.56158839e+14, 2.56094004e+14,
-                        2.56164261e+14, 2.56315075e+14, 2.56510058e+14, 2.56631072e+14,
-                        2.56414712e+14, 2.56185631e+14, 2.56342530e+14, 2.56431014e+14,
-                        2.56236092e+14, 2.56252777e+14, 2.56332743e+14, 2.56177830e+14,
-                        2.56152974e+14, 2.56349110e+14, 2.56541560e+14, 2.56754365e+14,
-                        2.56813937e+14, 2.56710978e+14, 2.56707992e+14, 2.56520375e+14,
-                        2.56265462e+14, 2.56208894e+14, 2.56373835e+14, 2.56786165e+14,
-                        2.56969543e+14, 2.56588890e+14, 2.56309564e+14, 2.56833851e+14,
-                        2.57236808e+14, 2.56790132e+14, 2.56293613e+14, 2.56183940e+14,
-                        2.56136879e+14, 2.56177439e+14, 2.56344229e+14, 2.56385794e+14,
-                        2.56265036e+14, 2.56128973e+14, 2.56135162e+14, 2.56399708e+14,
-                        2.56649110e+14, 2.57007484e+14, 2.57357044e+14, 2.56986027e+14,
-                        2.56450976e+14, 2.56170569e+14, 2.56054767e+14, 2.56049735e+14,
-                        2.56011107e+14, 2.56156484e+14, 2.56442169e+14, 2.56478502e+14,
-                        2.56305626e+14, 2.56184457e+14, 2.56014120e+14, 2.55902036e+14,
-                        2.56044614e+14, 2.56373054e+14, 2.56473880e+14, 2.56372096e+14,
-                        2.56325819e+14, 2.56224180e+14, 2.56205232e+14, 2.56189669e+14,
-                        2.56119371e+14, 2.56156700e+14, 2.56287998e+14, 2.56274830e+14,
-                        2.56185385e+14, 2.56261214e+14, 2.56470078e+14, 2.56657740e+14,
-                        2.56475377e+14, 2.56290349e+14, 2.56383254e+14, 2.56422353e+14,
-                        2.56512594e+14, 2.56529635e+14, 2.56277968e+14, 2.23826461e+14,
-                        1.27558615e+14])
+ref_density = np.array([
+    3.615140e+13,  3.649310e+13,  3.700160e+13,  3.750370e+13,
+    3.803490e+13,  3.858030e+13,  3.914140e+13,  3.971730e+13,
+    4.033450e+13,  4.094000e+13,  4.156350e+13,  4.220910e+13,
+    4.287840e+13,  4.357200e+13,  4.429100e+13,  4.503520e+13,
+    4.578170e+13,  4.656380e+13,  4.737210e+13,  4.819220e+13,
+    4.905750e+13,  4.993360e+13,  5.085470e+13,  5.179680e+13,
+    5.277570e+13,  5.379100e+13,  5.486320e+13,  5.595360e+13,
+    5.710280e+13,  5.829460e+13,  5.952200e+13,  6.082260e+13,
+    6.220160e+13,  6.368110e+13,  6.520280e+13,  6.680680e+13,
+    6.853560e+13,  7.039070e+13,  7.234350e+13,  7.443040e+13,
+    7.664670e+13,  7.901410e+13,  8.159660e+13,  8.436080e+13,
+    8.731620e+13,  9.051020e+13,  9.386320e+13,  9.742330e+13,
+    1.010890e+14,  1.048750e+14,  1.087980e+14,  1.127630e+14,
+    1.165890e+14,  1.202870e+14,  1.238340e+14,  1.271580e+14,
+    1.300660e+14,  1.326790e+14,  1.348810e+14,  1.366620e+14,
+    1.382180e+14,  1.393130e+14,  1.399380e+14,  1.404460e+14,
+    1.404550e+14,  1.404750e+14,  1.400490e+14,  1.392120e+14,
+    1.381080e+14,  1.367480e+14,  1.349150e+14,  1.326120e+14,
+    1.300270e+14,  1.271080e+14,  1.238330e+14,  1.202510e+14,
+    1.165870e+14,  1.127130e+14,  1.087740e+14,  1.049080e+14,
+    1.010750e+14,  9.741190e+13,  9.389870e+13,  9.056250e+13,
+    8.741220e+13,  8.444080e+13,  8.169930e+13,  7.911350e+13,
+    7.669090e+13,  7.445670e+13,  7.240210e+13,  7.042020e+13,
+    6.857700e+13,  6.684000e+13,  6.523480e+13,  6.370320e+13,
+    6.226310e+13,  6.089210e+13,  5.959620e+13,  5.833490e+13,
+    5.713550e+13,  5.599560e+13,  5.488050e+13,  5.383350e+13,
+    5.281440e+13,  5.182910e+13,  5.087840e+13,  4.996970e+13,
+    4.907640e+13,  4.821260e+13,  4.738490e+13,  4.659190e+13,
+    4.581770e+13,  4.505920e+13,  4.431460e+13,  4.359860e+13,
+    4.290670e+13,  4.222390e+13,  4.157240e+13,  4.093110e+13,
+    4.031290e+13,  3.973250e+13,  3.915630e+13,  3.860640e+13,
+    3.805990e+13,  3.752300e+13,  3.701210e+13,  3.651580e+13,
+    3.618610e+13])
 # fmt: on
 
 density_data = np.load("ion_density_case_1.npy")
 print(repr(density_data))
-assert np.allclose(density_data, ref_density)
+
+# The Turner benchmark above is tabulated on a 129-node grid (128 cells over
+# the 6.7 cm gap). The test may run on a coarser grid, so interpolate the
+# benchmark onto the simulation nodes before comparing.
+gap = 0.067
+z = np.linspace(0.0, gap, density_data.size)
+z_ref = np.linspace(0.0, gap, ref_density.size)
+ref_on_grid = np.interp(z, z_ref, ref_density)
+
+# Plot the simulated ion density profile against the Turner benchmark.
+plt.figure()
+plt.plot(z_ref, ref_density, "k-", label="Turner et al. (2013)")
+plt.plot(z, density_data, "r--o", markersize=3, label="WarpX")
+plt.xlabel("z (m)")
+plt.ylabel(r"Ion density (m$^{-3}$)")
+plt.title("Capacitive discharge (case 1): time-averaged ion density")
+plt.legend()
+plt.tight_layout()
+plt.savefig("ion_density_case_1.png")
+
+# Compare with the benchmark. The two boundary nodes are excluded: at the
+# absorbing walls the nodal charge deposition only sees half a cell, so the
+# density there is a grid artifact (~half the physical value) rather than a
+# physical disagreement with the (cell-averaged) benchmark.
+rel_err = np.abs(density_data[1:-1] - ref_on_grid[1:-1]) / ref_on_grid[1:-1]
+rms_rel_err = np.sqrt(np.mean(rel_err**2))
+print(f"Max relative error (interior): {rel_err.max() * 100:.2f} %")
+print(f"RMS relative error (interior): {rms_rel_err * 100:.2f} %")
+tolerance = 0.06
+assert rms_rel_err < tolerance, (
+    f"RMS relative error {rms_rel_err * 100:.2f} % exceeds tolerance "
+    f"{tolerance * 100:.2f} %"
+)

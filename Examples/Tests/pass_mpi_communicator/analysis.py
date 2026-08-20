@@ -13,7 +13,7 @@ import yt
 yt.funcs.mylog.setLevel(50)
 import numpy as np
 
-sys.path.insert(1, "../../../../warpx/Regression/Checksum/")
+sys.path.insert(1, "../../../Regression/Checksum/")
 import checksum
 
 # this will be the name of the first plot file

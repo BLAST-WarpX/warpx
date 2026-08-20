@@ -79,7 +79,7 @@ PsatdAlgorithmGalileanRZ::pushSpectralFields (SpectralFieldDataRZ & f)
         amrex::Array4<const Complex> const& T_rho_arr = T_rho_coef[mfi].array();
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);
@@ -198,7 +198,7 @@ void PsatdAlgorithmGalileanRZ::InitializeSpectralCoefficients (SpectralFieldData
         // Extract real (for portability on GPU)
         const amrex::Real vz = m_v_galilean[2];
 
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         int const nr = bx.length(0);
         amrex::Real const dt = m_dt;
@@ -303,7 +303,7 @@ PsatdAlgorithmGalileanRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = field_data.getKrArray(mfi);
+        auto const & kr_modes = field_data.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);

@@ -67,7 +67,6 @@
 #include <AMReX_GpuBuffer.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuDevice.H>
-#include <AMReX_GpuElixir.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_INT.H>
@@ -204,6 +203,21 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     );
 
     utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
+
+    // The hybrid-PIC electron-ion temperature relaxation (Q_ei) needs the
+    // shape-aware ion temperature of every charged species, so turn the
+    // deposition on automatically when it is configured. Done here (rather
+    // than in HybridPICModel) because the flag must be known by AllocData.
+    if (!m_do_temperature_deposition && m_charge != 0._prt) {
+        const ParmParse pp_hybrid("hybrid_pic_model");
+        bool solve_electron_energy_equation = false;
+        pp_hybrid.query("solve_electron_energy_equation", solve_electron_energy_equation);
+        std::string nu_ei_expression;
+        if (solve_electron_energy_equation &&
+            pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", nu_ei_expression)) {
+            m_do_temperature_deposition = true;
+        }
+    }
 
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
@@ -351,7 +365,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     m_boundary_conditions.Set_reflect_all_velocities(flag);
 
     // currently supports only isotropic thermal distribution
-    // same distribution is applied to all boundaries
+    // same distribution is applied to all boundaries (the domain faces and,
+    // when boundary.particle_eb = thermal, the embedded boundary)
     const amrex::ParmParse pp_species_boundary("boundary." + species_name);
     if (WarpX::isAnyParticleBoundaryThermal()) {
         amrex::Real boundary_uth = 0;
@@ -566,15 +581,13 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             FArrayBox const* byfab = &By[pti];
             FArrayBox const* bzfab = &Bz[pti];
 
-            Elixir exeli, eyeli, ezeli, bxeli, byeli, bzeli;
-
             if (WarpX::use_fdtd_nci_corr)
             {
                 // Filter arrays Ex[pti], store the result in
                 // filtered_Ex and update pointer exfab so that it
                 // points to filtered_Ex (and do the same for all
                 // components of E and B).
-                applyNCIFilter(lev, pti.tilebox(), exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                applyNCIFilter(lev, pti.tilebox(),
                                filtered_Ex, filtered_Ey, filtered_Ez,
                                filtered_Bx, filtered_By, filtered_Bz,
                                Ex[pti], Ey[pti], Ez[pti], Bx[pti], By[pti], Bz[pti],
@@ -683,7 +696,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         // filtered_Ex and update pointer cexfab so that it
                         // points to filtered_Ex (and do the same for all
                         // components of E and B)
-                        applyNCIFilter(lev-1, cbox, exeli, eyeli, ezeli, bxeli, byeli, bzeli,
+                        applyNCIFilter(lev-1, cbox,
                                        filtered_Ex, filtered_Ey, filtered_Ez,
                                        filtered_Bx, filtered_By, filtered_Bz,
                                        cEx[pti], cEy[pti], cEz[pti],
@@ -914,8 +927,6 @@ PhysicalParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegiste
 void
 PhysicalParticleContainer::applyNCIFilter (
     int lev, const Box& box,
-    Elixir& exeli, Elixir& eyeli, Elixir& ezeli,
-    Elixir& bxeli, Elixir& byeli, Elixir& bzeli,
     FArrayBox& filtered_Ex, FArrayBox& filtered_Ey, FArrayBox& filtered_Ez,
     FArrayBox& filtered_Bx, FArrayBox& filtered_By, FArrayBox& filtered_Bz,
     const FArrayBox& Ex, const FArrayBox& Ey, const FArrayBox& Ez,
@@ -943,9 +954,9 @@ PhysicalParticleContainer::applyNCIFilter (
 #endif
 
     // Filter Ex (Both 2D and 3D)
-    filtered_Ex.resize(amrex::convert(tbox,Ex.box().ixType()));
-    // Safeguard for GPU
-    exeli = filtered_Ex.elixir();
+    // Allocated on the async arena so that the memory of the previous
+    // iteration stays valid until the GPU kernels using it complete
+    filtered_Ex.resize(amrex::convert(tbox,Ex.box().ixType()), 1, amrex::The_Async_Arena());
     // Apply filter on Ex, result stored in filtered_Ex
 
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Ex, Ex, filtered_Ex.box());
@@ -953,37 +964,31 @@ PhysicalParticleContainer::applyNCIFilter (
     ex_ptr = &filtered_Ex;
 
     // Filter Ez
-    filtered_Ez.resize(amrex::convert(tbox,Ez.box().ixType()));
-    ezeli = filtered_Ez.elixir();
+    filtered_Ez.resize(amrex::convert(tbox,Ez.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_Ez, Ez, filtered_Ez.box());
     ez_ptr = &filtered_Ez;
 
     // Filter By
-    filtered_By.resize(amrex::convert(tbox,By.box().ixType()));
-    byeli = filtered_By.elixir();
+    filtered_By.resize(amrex::convert(tbox,By.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_By, By, filtered_By.box());
     by_ptr = &filtered_By;
 #if defined(WARPX_DIM_3D)
     // Filter Ey
-    filtered_Ey.resize(amrex::convert(tbox,Ey.box().ixType()));
-    eyeli = filtered_Ey.elixir();
+    filtered_Ey.resize(amrex::convert(tbox,Ey.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Ey, Ey, filtered_Ey.box());
     ey_ptr = &filtered_Ey;
 
     // Filter Bx
-    filtered_Bx.resize(amrex::convert(tbox,Bx.box().ixType()));
-    bxeli = filtered_Bx.elixir();
+    filtered_Bx.resize(amrex::convert(tbox,Bx.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_bxbyez[lev]->ApplyStencil(filtered_Bx, Bx, filtered_Bx.box());
     bx_ptr = &filtered_Bx;
 
     // Filter Bz
-    filtered_Bz.resize(amrex::convert(tbox,Bz.box().ixType()));
-    bzeli = filtered_Bz.elixir();
+    filtered_Bz.resize(amrex::convert(tbox,Bz.box().ixType()), 1, amrex::The_Async_Arena());
     nci_godfrey_filter_exeybz[lev]->ApplyStencil(filtered_Bz, Bz, filtered_Bz.box());
     bz_ptr = &filtered_Bz;
 #else
-    amrex::ignore_unused(eyeli, bxeli, bzeli,
-        filtered_Ey, filtered_Bx, filtered_Bz,
+    amrex::ignore_unused(filtered_Ey, filtered_Bx, filtered_Bz,
         Ey, Bx, Bz, ey_ptr, bx_ptr, bz_ptr);
 #endif
 }
@@ -1871,13 +1876,16 @@ PhysicalParticleContainer::DepositTemperature (
     // Return if we are not depositing temperature.
     if (!m_do_temperature_deposition) { return; }
 
-    if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
-        || push_type != PushType::Explicit
+    // The temperature deposit runs its own shape-N moment kernels
+    // (doVarianceDepositionShapeN) and works with any current-deposition
+    // algorithm; implicit pushers and shared-memory deposition change the
+    // u/x staging assumptions and are not supported.
+    if (push_type != PushType::Explicit
         || WarpX::do_shared_mem_current_deposition
         )
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "Temperature Deposition only works with explicit solvers, direct current deposition, "
+            "Temperature Deposition only works with explicit solvers "
             "and non-shared memory deposition."
         );
     }
@@ -2130,7 +2138,13 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
         amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
 
-        // Normalize variance after accumulating sums cell by cell
+        // Normalize variance after accumulating sums cell by cell.
+        // Use tilebox(ixType, nGrow) so each component is converted to its
+        // staggered index type (and grown). growntilebox(ixType) treats the
+        // IntVect as extra ghost growth, not an index-type conversion, and can
+        // miss valid staggered points at grid boundaries.
+        const bool single_pass = (depos_type == TemperatureDepositionType::SINGLE_PASS);
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2152,12 +2166,12 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             amrex::Array4<amrex::Real> const& vybar_arr = vbary_mf->array(mfi);
             amrex::Array4<amrex::Real> const& vzbar_arr = vbarz_mf->array(mfi);
 
-            const amrex::Box& tbx  = mfi.growntilebox( T_vf[lev][0]->ixType().toIntVect() );
-            const amrex::Box& tby  = mfi.growntilebox( T_vf[lev][1]->ixType().toIntVect() );
-            const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
-
-
-            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+            const amrex::Box tbx = mfi.tilebox(T_vf[lev][0]->ixType().toIntVect(),
+                                               T_vf[lev][0]->nGrowVect());
+            const amrex::Box tby = mfi.tilebox(T_vf[lev][1]->ixType().toIntVect(),
+                                               T_vf[lev][1]->nGrowVect());
+            const amrex::Box tbz = mfi.tilebox(T_vf[lev][2]->ixType().toIntVect(),
+                                               T_vf[lev][2]->nGrowVect());
 
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
@@ -2203,7 +2217,6 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                         }
                     }
                 });
-
         }
 
         amrex::Gpu::streamSynchronize();

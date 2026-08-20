@@ -13,8 +13,7 @@
 AMREX_ENUM (NonlinearSolverType,
     picard,
     newton,
-    petsc_snes,
-    none
+    petsc_snes
 );
 
 #endif

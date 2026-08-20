@@ -19,7 +19,6 @@ void WarpX::ComputeSpaceChargeField (bool const reset_E_field, bool const reset_
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-
     // Reset E and B fields to 0, before calculating space-charge fields if requested
     for (int lev = 0; lev <= max_level; lev++) {
         for (int comp=0; comp<3; comp++) {

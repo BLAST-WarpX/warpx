@@ -412,7 +412,7 @@ void FieldProbe::ComputeDiags (int step)
         // Under the semi-implicit Darwin scheme, Efield_aux only holds the
         // electrostatic E-field at this point in the step; the inductive
         // component E = -dA/dt is recovered from dA_fp, whose ghost cells
-        // SemiImplicitDarwin::UpdateEandAfromdA() leaves filled (see also
+        // SemiImplicitDarwin::ComputeInductiveEfromdA() leaves filled (see also
         // DarwinEfieldFunctor).
         std::array<std::unique_ptr<amrex::MultiFab>, 3> E_total;
         if (warpx.evolve_scheme == EvolveScheme::Semi_Implicit_Darwin)
