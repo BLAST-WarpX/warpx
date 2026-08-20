@@ -1413,7 +1413,8 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
 void
 WarpXParticleContainer::DepositCurrent (
     ablastr::fields::MultiLevelVectorField const & J,
-    const amrex::Real dt, const amrex::Real relative_time)
+    const amrex::Real dt, const amrex::Real relative_time,
+    const PushType push_type)
 {
     // Loop over the refinement levels
     auto const finest_level = static_cast<int>(J.size() - 1);
@@ -1443,7 +1444,7 @@ WarpXParticleContainer::DepositCurrent (
 
             DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev,
                            J[lev][0], J[lev][1], J[lev][2],
-                           0, np, thread_num, lev, lev, dt, relative_time, PushType::Explicit);
+                           0, np, thread_num, lev, lev, dt, relative_time, push_type);
         }
 #ifdef AMREX_USE_OMP
         }

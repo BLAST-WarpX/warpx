@@ -93,7 +93,7 @@ examples below were generated at that time.
 .. toctree::
    :maxdepth: 1
 
-   examples/ohm_solver_em_modes/README.rst
+   examples/magnetized_plasma_modes/README.rst
    examples/ohm_solver_ion_beam_instability/README.rst
    examples/ohm_solver_ion_Landau_damping/README.rst
    examples/ohm_solver_electron_energy_eq/README.rst

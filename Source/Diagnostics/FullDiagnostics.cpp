@@ -1,6 +1,7 @@
 #include "FullDiagnostics.H"
 
 #include "ComputeDiagFunctors/CellCenterFunctor.H"
+#include "ComputeDiagFunctors/DarwinEfieldFunctor.H"
 #include "ComputeDiagFunctors/DivBFunctor.H"
 #include "ComputeDiagFunctors/DivEFunctor.H"
 #include "ComputeDiagFunctors/EBCoveredFunctor.H"
@@ -919,7 +920,18 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
     for (int comp=0; comp<nvar; comp++){
         for (int idir=0; idir < 3; idir++) {
             if        ( m_varnames[comp] == "E"+field_names[idir] ){
-                m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Efield_aux, Direction{idir}, lev), lev, m_crse_ratio);
+                if (warpx.evolve_scheme == EvolveScheme::Semi_Implicit_Darwin) {
+                    // Efield_aux (like Efield_fp, which it aliases at this level)
+                    // only holds the electrostatic E-field at this point in the
+                    // step; recover the full field using dA_fp (see
+                    // DarwinEfieldFunctor and SemiImplicitDarwin::ComputeInductiveEfromdA).
+                    m_all_field_functors[lev][comp] = std::make_unique<DarwinEfieldFunctor>(
+                        warpx.m_fields.get(FieldType::Efield_aux, Direction{idir}, lev),
+                        warpx.m_fields.get(FieldType::dA_fp, Direction{idir}, lev),
+                        lev, m_crse_ratio);
+                } else {
+                    m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Efield_aux, Direction{idir}, lev), lev, m_crse_ratio);
+                }
             } else if ( m_varnames[comp] == "B"+field_names[idir] ){
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(FieldType::Bfield_aux, Direction{idir}, lev), lev, m_crse_ratio);
             } else if ( m_varnames[comp] == "j"+field_names[idir] ){

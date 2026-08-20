@@ -141,6 +141,7 @@ public:
     // Functions used by implicit solvers
     //
     void SyncMassMatricesPC ();
+    void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
