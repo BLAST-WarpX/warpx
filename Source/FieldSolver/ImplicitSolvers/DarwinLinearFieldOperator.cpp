@@ -41,8 +41,9 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     m_lapZ_z.define(Zvec[lev][2]->boxArray(), Zvec[lev][2]->DistributionMap(),
                     Zvec[lev][2]->nComp(), Zvec[lev][2]->nGrowVect());
 
-    const amrex::IntVect biharmonic_ng =
-        amrex::elemwiseMax(Zvec[lev][0]->nGrowVect(), amrex::IntVect(2));
+    // 2 ghost cells for the nabla^4 stencil in apply(), which reads i-2..i+2.
+    // This is the scratch's own width, unrelated to Z's (which is always zero).
+    const amrex::IntVect biharmonic_ng = amrex::IntVect(2);
     m_Zscratch_x.define(Zvec[lev][0]->boxArray(), Zvec[lev][0]->DistributionMap(),
                         Zvec[lev][0]->nComp(), biharmonic_ng);
     m_Zscratch_y.define(Zvec[lev][1]->boxArray(), Zvec[lev][1]->DistributionMap(),
@@ -97,14 +98,13 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     // Scratch space (allocated once in define()), reused below to hold curl(chi curl(Z)).
     ablastr::fields::VectorField lapZ = {&m_lapZ_x, &m_lapZ_y, &m_lapZ_z};
 
-    // GMRES builds intermediate Krylov candidates via WarpXSolverVec's
-    // arithmetic (linComb/increment/Saxpy), which only ever touch the valid
-    // region (nghost=0), so a_x's own guard cells cannot be trusted here.
-    // Copy the candidate into a B-staggered scratch (allocated once in
-    // define(), with >=2 ghost cells for the nabla^4 stencil below, which
-    // reads i-2..i+2) and FillBoundary on that scratch, which derives its
-    // guard cells from its own (just-copied) valid-region data via the
-    // periodic halo exchange.
+    // WarpXSolverVec always allocates with zero guard cells (see its Define()),
+    // so a_x has none at all - there is nothing to fill in place, and the
+    // stencils below read beyond the valid region. Copy the candidate into a
+    // B-staggered scratch (allocated once in define(), with 2 ghost cells for
+    // the nabla^4 stencil below, which reads i-2..i+2) and FillBoundary on that
+    // scratch, which derives its guard cells from its own (just-copied)
+    // valid-region data via the periodic halo exchange.
     ablastr::fields::VectorField Zscratch = {&m_Zscratch_x, &m_Zscratch_y, &m_Zscratch_z};
     for (int ii = 0; ii < 3; ii++)
     {

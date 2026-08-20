@@ -405,16 +405,15 @@ void SemiImplicitDarwin::ComputeInductiveEfromdA ( int astep )
     // on B's staggering; dA lives on A/E's staggering)
     ablastr::fields::MultiLevelVectorField dAfield = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::dA_fp, lev);
 
-    // Grab m_Z MultiFabs (the solved-for Z). GMRES builds its final answer via
-    // linComb/increment-style arithmetic, which only touches the valid region,
-    // so Zfield's own guard cells cannot be trusted here either - copy into a
-    // scratch and FillBoundary on that, same as in ComputeRHS.
-    // Zscratch is a local MultiFab, not m_Z's own storage, so its ghost width
-    // isn't tied to m_Z's own native ghost width (which is 0, by design - see
-    // note above) - the ComputeCurlB stencil below reads i-1, so at least 1
-    // ghost cell is requested here regardless.
+    // Grab m_Z MultiFabs (the solved-for Z). Z's valid region is sound at this
+    // point - it is a linear combination of vectors that were themselves
+    // consistent, and GMRES's arithmetic is element-wise - but WarpXSolverVec
+    // always allocates with zero guard cells (see its Define()), so there are
+    // none to fill in place, while the ComputeCurlB stencil below reads i-1.
+    // Hence the copy into a local scratch one cell wider, and the boundary fill
+    // on that, same as in the linear operator.
     const auto& Zfield = m_Z.getArrayVec();
-    const amrex::IntVect curl_ng = amrex::elemwiseMax(Zfield[lev][0]->nGrowVect(), amrex::IntVect(1));
+    const amrex::IntVect curl_ng = amrex::IntVect(1);
     amrex::MultiFab Zscratch_x(Zfield[lev][0]->boxArray(), Zfield[lev][0]->DistributionMap(),
                                Zfield[lev][0]->nComp(), curl_ng);
     amrex::MultiFab Zscratch_y(Zfield[lev][1]->boxArray(), Zfield[lev][1]->DistributionMap(),
