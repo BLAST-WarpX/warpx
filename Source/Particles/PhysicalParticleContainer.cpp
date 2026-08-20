@@ -204,6 +204,21 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     utils::parser::queryWithParser(pp_species_name, "do_temperature_deposition", m_do_temperature_deposition);
 
+    // The hybrid-PIC electron-ion temperature relaxation (Q_ei) needs the
+    // shape-aware ion temperature of every charged species, so turn the
+    // deposition on automatically when it is configured. Done here (rather
+    // than in HybridPICModel) because the flag must be known by AllocData.
+    if (!m_do_temperature_deposition && m_charge != 0._prt) {
+        const ParmParse pp_hybrid("hybrid_pic_model");
+        bool solve_electron_energy_equation = false;
+        pp_hybrid.query("solve_electron_energy_equation", solve_electron_energy_equation);
+        std::string nu_ei_expression;
+        if (solve_electron_energy_equation &&
+            pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", nu_ei_expression)) {
+            m_do_temperature_deposition = true;
+        }
+    }
+
     pp_species_name.query("boost_adjust_transverse_positions", boost_adjust_transverse_positions);
     pp_species_name.query("do_backward_propagation", do_backward_propagation);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -350,7 +365,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     m_boundary_conditions.Set_reflect_all_velocities(flag);
 
     // currently supports only isotropic thermal distribution
-    // same distribution is applied to all boundaries
+    // same distribution is applied to all boundaries (the domain faces and,
+    // when boundary.particle_eb = thermal, the embedded boundary)
     const amrex::ParmParse pp_species_boundary("boundary." + species_name);
     if (WarpX::isAnyParticleBoundaryThermal()) {
         amrex::Real boundary_uth = 0;
@@ -1860,13 +1876,16 @@ PhysicalParticleContainer::DepositTemperature (
     // Return if we are not depositing temperature.
     if (!m_do_temperature_deposition) { return; }
 
-    if (WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct
-        || push_type != PushType::Explicit
+    // The temperature deposit runs its own shape-N moment kernels
+    // (doVarianceDepositionShapeN) and works with any current-deposition
+    // algorithm; implicit pushers and shared-memory deposition change the
+    // u/x staging assumptions and are not supported.
+    if (push_type != PushType::Explicit
         || WarpX::do_shared_mem_current_deposition
         )
     {
         WARPX_ABORT_WITH_MESSAGE(
-            "Temperature Deposition only works with explicit solvers, direct current deposition, "
+            "Temperature Deposition only works with explicit solvers "
             "and non-shared memory deposition."
         );
     }
@@ -2119,7 +2138,13 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
         amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
 
-        // Normalize variance after accumulating sums cell by cell
+        // Normalize variance after accumulating sums cell by cell.
+        // Use tilebox(ixType, nGrow) so each component is converted to its
+        // staggered index type (and grown). growntilebox(ixType) treats the
+        // IntVect as extra ghost growth, not an index-type conversion, and can
+        // miss valid staggered points at grid boundaries.
+        const bool single_pass = (depos_type == TemperatureDepositionType::SINGLE_PASS);
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2141,12 +2166,12 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             amrex::Array4<amrex::Real> const& vybar_arr = vbary_mf->array(mfi);
             amrex::Array4<amrex::Real> const& vzbar_arr = vbarz_mf->array(mfi);
 
-            const amrex::Box& tbx  = mfi.growntilebox( T_vf[lev][0]->ixType().toIntVect() );
-            const amrex::Box& tby  = mfi.growntilebox( T_vf[lev][1]->ixType().toIntVect() );
-            const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
-
-
-            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+            const amrex::Box tbx = mfi.tilebox(T_vf[lev][0]->ixType().toIntVect(),
+                                               T_vf[lev][0]->nGrowVect());
+            const amrex::Box tby = mfi.tilebox(T_vf[lev][1]->ixType().toIntVect(),
+                                               T_vf[lev][1]->nGrowVect());
+            const amrex::Box tbz = mfi.tilebox(T_vf[lev][2]->ixType().toIntVect(),
+                                               T_vf[lev][2]->nGrowVect());
 
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
@@ -2192,7 +2217,6 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                         }
                     }
                 });
-
         }
 
         amrex::Gpu::streamSynchronize();

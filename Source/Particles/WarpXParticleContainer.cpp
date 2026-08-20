@@ -160,14 +160,11 @@ WarpXParticleContainer::WarpXParticleContainer (AmrCore* amr_core, int ispecies,
 void
 WarpXParticleContainer::ReadParameters ()
 {
-    static bool initialized = false;
-
-    if (!initialized)
-    {
-        const ParmParse pp_particles("particles");
-        pp_particles.query("do_tiling", do_tiling);
-        initialized = true;
-    }
+    // do_tiling is a static of the
+    // AMReX particle container base, so a process-lifetime guard would make
+    // every WarpX instance after the first ignore particles.do_tiling.
+    const ParmParse pp_particles("particles");
+    pp_particles.query("do_tiling", do_tiling);
 }
 
 void
@@ -1995,22 +1992,55 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uxp = pti.GetAttribs(PIdx::ux).dataPtr();
         amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * thetap = pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * phip = pti.GetAttribs(PIdx::phi).dataPtr();
+#endif
 
         amrex::Array4<amrex::Real> const& N_array = particle_number.array(pti);
         amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(pti);
         amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(pti);
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(pti);
 
-        amrex::ParallelFor(np,
+        // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+        amrex::For(np,
             [=] AMREX_GPU_DEVICE (long ip) {
                 // Get position in AMReX convention to calculate corresponding index.
                 const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w  = wp[ip];
-                const amrex::ParticleReal ux = uxp[ip];
-                const amrex::ParticleReal uy = uyp[ip];
-                const amrex::ParticleReal uz = uzp[ip];
+                const amrex::ParticleReal ux_cartesian = uxp[ip];
+                const amrex::ParticleReal uy_cartesian = uyp[ip];
+                const amrex::ParticleReal uz_cartesian = uzp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                // Particle momenta are Cartesian, while particles at different
+                // azimuths share a cell whose velocity moments are cylindrical.
+                const amrex::ParticleReal theta = thetap[ip];
+                const amrex::ParticleReal costheta = std::cos(theta);
+                const amrex::ParticleReal sintheta = std::sin(theta);
+                const amrex::ParticleReal ux = ux_cartesian*costheta + uy_cartesian*sintheta;
+                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+                const amrex::ParticleReal uz = uz_cartesian;
+#elif defined(WARPX_DIM_RSPHERE)
+                const amrex::ParticleReal theta = thetap[ip];
+                const amrex::ParticleReal phi = phip[ip];
+                const amrex::ParticleReal costheta = std::cos(theta);
+                const amrex::ParticleReal sintheta = std::sin(theta);
+                const amrex::ParticleReal cosphi = std::cos(phi);
+                const amrex::ParticleReal sinphi = std::sin(phi);
+                const amrex::ParticleReal ux = ux_cartesian*costheta*cosphi
+                                             + uy_cartesian*sintheta*cosphi + uz_cartesian*sinphi;
+                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+                const amrex::ParticleReal uz = -ux_cartesian*costheta*sinphi
+                                             - uy_cartesian*sintheta*sinphi + uz_cartesian*cosphi;
+#else
+                const amrex::ParticleReal ux = ux_cartesian;
+                const amrex::ParticleReal uy = uy_cartesian;
+                const amrex::ParticleReal uz = uz_cartesian;
+#endif
                 amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), (amrex::Real)(w));
                 amrex::Gpu::Atomic::AddNoRet(&ux_array(ii, jj, kk), (amrex::Real)(w*ux));
                 amrex::Gpu::Atomic::AddNoRet(&uy_array(ii, jj, kk), (amrex::Real)(w*uy));
@@ -2053,22 +2083,53 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::ParticleReal const * uxp = pti.GetAttribs(PIdx::ux).dataPtr();
         amrex::ParticleReal const * uyp = pti.GetAttribs(PIdx::uy).dataPtr();
         amrex::ParticleReal const * uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * thetap = pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const * phip = pti.GetAttribs(PIdx::phi).dataPtr();
+#endif
 
         amrex::Array4<amrex::Real> const& ux_array = ux_mf.array(pti);
         amrex::Array4<amrex::Real> const& uy_array = uy_mf.array(pti);
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(pti);
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(pti);
 
-        amrex::ParallelFor(np,
+        // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+        amrex::For(np,
             [=] AMREX_GPU_DEVICE (long ip) {
                 // Get position in AMReX convention to calculate corresponding index.
                 const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
                 const amrex::ParticleReal w = wp[ip];
-                const amrex::ParticleReal ux = uxp[ip];
-                const amrex::ParticleReal uy = uyp[ip];
-                const amrex::ParticleReal uz = uzp[ip];
+                const amrex::ParticleReal ux_cartesian = uxp[ip];
+                const amrex::ParticleReal uy_cartesian = uyp[ip];
+                const amrex::ParticleReal uz_cartesian = uzp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                const amrex::ParticleReal theta = thetap[ip];
+                const amrex::ParticleReal costheta = std::cos(theta);
+                const amrex::ParticleReal sintheta = std::sin(theta);
+                const amrex::ParticleReal ux = ux_cartesian*costheta + uy_cartesian*sintheta;
+                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+                const amrex::ParticleReal uz = uz_cartesian;
+#elif defined(WARPX_DIM_RSPHERE)
+                const amrex::ParticleReal theta = thetap[ip];
+                const amrex::ParticleReal phi = phip[ip];
+                const amrex::ParticleReal costheta = std::cos(theta);
+                const amrex::ParticleReal sintheta = std::sin(theta);
+                const amrex::ParticleReal cosphi = std::cos(phi);
+                const amrex::ParticleReal sinphi = std::sin(phi);
+                const amrex::ParticleReal ux = ux_cartesian*costheta*cosphi
+                                             + uy_cartesian*sintheta*cosphi + uz_cartesian*sinphi;
+                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+                const amrex::ParticleReal uz = -ux_cartesian*costheta*sinphi
+                                             - uy_cartesian*sintheta*sinphi + uz_cartesian*cosphi;
+#else
+                const amrex::ParticleReal ux = ux_cartesian;
+                const amrex::ParticleReal uy = uy_cartesian;
+                const amrex::ParticleReal uz = uz_cartesian;
+#endif
                 const amrex::ParticleReal uxr = ux - ux_array(ii, jj, kk);
                 const amrex::ParticleReal uyr = uy - uy_array(ii, jj, kk);
                 const amrex::ParticleReal uzr = uz - uz_array(ii, jj, kk);
@@ -2608,7 +2669,7 @@ std::array<ParticleReal, 3> WarpXParticleContainer::meanParticleVelocity(bool lo
     return mean_v;
 }
 
-amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
+amrex::ParticleReal WarpXParticleContainer::maxParticleDtInv(bool local) {
 
     constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
     ReduceOps<ReduceOpMax> reduce_op;
@@ -2633,19 +2694,60 @@ amrex::ParticleReal WarpXParticleContainer::maxParticleVelocity(bool local) {
             auto *const uy = pti.GetAttribs(PIdx::uy).data();
             auto *const uz = pti.GetAttribs(PIdx::uz).data();
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            const auto GetPosition = GetParticlePosition<PIdx>(pti);
+#endif
+
+            const XDim3 dxi = WarpX::InvCellSize(lev);
+
             reduce_op.eval(np, reduce_data,
                 [=] AMREX_GPU_DEVICE (int ip)
-                { return (ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip]) * inv_c2; });
+                {
+
+                const amrex::ParticleReal usq = ux[ip]*ux[ip] + uy[ip]*uy[ip] + uz[ip]*uz[ip];
+                const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + usq * inv_c2);
+
+#if defined(WARPX_DIM_3D)
+                const amrex::ParticleReal dt_inv = gaminv *
+                                                   amrex::max(std::abs(ux[ip]) * dxi.x,
+                                                              std::abs(uy[ip]) * dxi.y,
+                                                              std::abs(uz[ip]) * dxi.z);
+#elif defined(WARPX_DIM_XZ)
+                const amrex::ParticleReal dt_inv = gaminv *
+                                                   amrex::max(std::abs(ux[ip]) * dxi.x,
+                                                              std::abs(uz[ip]) * dxi.z);
+#elif defined(WARPX_DIM_1D_Z)
+                const amrex::ParticleReal dt_inv = gaminv * std::abs(uz[ip]) * dxi.z;
+#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::ParticleReal rp, tp, zp;
+                GetPosition.AsStored(ip, rp, tp, zp);
+                const amrex::ParticleReal ur = ux[ip]*std::cos(tp) + uy[ip]*std::sin(tp);
+#if defined(WARPX_DIM_RCYLINDER)
+                const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
+#else
+                const amrex::ParticleReal dt_inv = gaminv *
+                                                   amrex::max(std::abs(ur) * dxi.x,
+                                                              std::abs(uz[ip]) * dxi.z);
+#endif
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal rp, tp, pp;
+                GetPosition.AsStored(ip, rp, tp, pp);
+                const amrex::ParticleReal costh = std::cos(tp);
+                const amrex::ParticleReal sinth = std::sin(tp);
+                const amrex::ParticleReal cosph = std::cos(pp);
+                const amrex::ParticleReal sinph = std::sin(pp);
+                const amrex::ParticleReal ur = ux[ip]*costh*cosph + uy[ip]*sinth*cosph + uz[ip]*sinph;
+                const amrex::ParticleReal dt_inv = gaminv * std::abs(ur) * dxi.x;
+#endif
+                return dt_inv;
+                });
         }
     }
 
-    const amrex::ParticleReal max_usq = (np_total > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
+    amrex::ParticleReal max_dt_inv = (np_total > 0 ? amrex::get<0>(reduce_data.value()) : 0._prt);
+    if (!local) { ParallelAllReduce::Max(max_dt_inv, ParallelDescriptor::Communicator()); }
 
-    const amrex::ParticleReal gaminv = 1.0_prt/std::sqrt(1.0_prt + max_usq);
-    amrex::ParticleReal max_v = gaminv * std::sqrt(max_usq) * PhysConst::c;
-
-    if (!local) { ParallelAllReduce::Max(max_v, ParallelDescriptor::Communicator()); }
-    return max_v;
+    return max_dt_inv;
 }
 
 void

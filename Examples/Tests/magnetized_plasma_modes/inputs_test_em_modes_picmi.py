@@ -150,7 +150,6 @@ class EMModes(object):
         if self.solver == "darwin":
             # calculate SIPIC modified plasma quantities
             sipic_factor = np.sqrt(1.0 + self.C_SI * (self.w_pe * self.dt) ** 2 / 4.0)
-            self.lambda_e_SI = self.lambda_e * sipic_factor
             self.w_pe_SI = self.w_pe / sipic_factor
 
         # dump all the current attributes to a dill pickle file

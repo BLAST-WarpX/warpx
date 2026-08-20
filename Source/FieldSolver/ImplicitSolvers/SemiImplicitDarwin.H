@@ -9,8 +9,10 @@
 #ifndef SEMI_IMPLICIT_DARWIN_H_
 #define SEMI_IMPLICIT_DARWIN_H_
 
-#include "NonlinearSolvers/LinearFunctionMF.H"
+#include "DarwinLinearFieldOperator.H"
 #include "WarpXSolverVec.H"
+
+#include "NonlinearSolvers/LinearSolverLibrary.H"
 
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Particles/MultiParticleContainer.H"
@@ -48,19 +50,39 @@ public:
                   amrex::Real  a_dt,
                   int          a_step ) override;
 
+    /**
+     * \brief Not implemented for this solver.
+     *
+     *  `ImplicitSolver::ComputeRHS()` is the residual `RHS(U)` of the nonlinear
+     *  equation `U = b + RHS(U)`, evaluated repeatedly by the Picard and Newton
+     *  solvers. The Darwin scheme is instead linear in its unknown: it never
+     *  builds a nonlinear residual and never installs a nonlinear solver, so
+     *  this override exists only to satisfy the pure-virtual base declaration
+     *  and aborts if it is ever reached. The linear operator applied by GMRES
+     *  is `DarwinLinearFieldOperator::apply()` instead.
+     */
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                       const WarpXSolverVec&  a_Z,
                       amrex::Real      start_time,
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
-    void ApplySusceptibility ( ablastr::fields::MultiLevelVectorField& rhs,
-                               const ablastr::fields::MultiLevelVectorField& dA);
+    /** \brief Pointer back to the main WarpX class, used by DarwinLinearFieldOperator */
+    [[nodiscard]] WarpX* GetWarpX () const { return m_WarpX; }
 
-    void PrepareCurrentDeposition ();
-    void AccumulateCurrentAndSusceptibility ();
+    /**
+     * \brief Accumulate `chi dA` into `rhs`, where `chi` is the deposited mass
+     *  matrix scaled by `2 mu_0 / dt`. This is the plasma response term of the
+     *  magnetoinductive operator, i.e. the linear response of the deposited
+     *  current to the inductive E-field being solved for.
+     */
+    void ApplyScaledMassMatrices ( ablastr::fields::MultiLevelVectorField& rhs,
+                                   const ablastr::fields::MultiLevelVectorField& dA);
+
+    void PrepareVelocitiesForCurrentDeposition ();
+    void AccumulateCurrentAndMassMatrices ();
     void CalculateSourceVector ();
-    void UpdateEfromdA( int astep );
+    void ComputeInductiveEfromdA( int astep );
     void ClearParticleVelocities ();
     void FinishVelocityUpdate ();
 
@@ -77,17 +99,15 @@ private:
     WarpXSolverVec m_Z, m_source;
 
     /**
-     * \brief Scratch space used by ComputeRHS(), allocated once here rather
-     *  than on every GMRES iteration since every iterate of m_Z shares the
-     *  same layout.
+     * \brief The linear operator whose action on a vector the linear solver
+     *  evaluates, i.e. the left-hand side of the magnetoinductive equation
+     *
+     *      bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+     *
+     *  where chi is the mass matrix scaled by 2 * mu_0 / dt. It owns the
+     *  scratch space that evaluation needs.
      */
-    amrex::MultiFab m_lapZ_x, m_lapZ_y, m_lapZ_z;
-    amrex::MultiFab m_Zscratch_x, m_Zscratch_y, m_Zscratch_z;
-
-    /**
-     * \brief The linear function used by linear solver to compute A*v.
-     */
-    std::unique_ptr<LinearFunctionMF<WarpXSolverVec,SemiImplicitDarwin>> m_linear_function;
+    std::unique_ptr<DarwinLinearFieldOperator> m_linear_function;
 
     /**
      * \brief Whether the predictor velocity push in OneStep() should
@@ -105,7 +125,7 @@ private:
     /**
      * \brief The linear solver object.
      */
-    std::unique_ptr<LinearSolver<WarpXSolverVec,LinearFunctionMF<WarpXSolverVec,SemiImplicitDarwin>>> m_linear_solver;
+    std::unique_ptr<LinearSolver<WarpXSolverVec,DarwinLinearFieldOperator>> m_linear_solver;
 
     // Linear solver defaults
     int m_linsol_verbose_int = 2;

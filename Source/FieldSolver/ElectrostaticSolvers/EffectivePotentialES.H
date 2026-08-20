@@ -50,7 +50,7 @@ public:
      * with `rho` as the source.
      * More specifically, this solves the equation
      *  \f[
-     *      \vec{\nabla}\cdot(\sigma\vec{\nabla}) \phi = -\frac{\rho}{\epsilon_0}
+     *      \boldsymbol{\nabla}\cdot(\sigma\boldsymbol{\nabla}) \phi = -\frac{\rho}{\epsilon_0}
      *  \f]
      * \param[in] rho The total charge density
      * \param[out] phi The potential to be computed by this function

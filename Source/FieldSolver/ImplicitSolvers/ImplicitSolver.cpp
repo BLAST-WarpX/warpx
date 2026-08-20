@@ -141,35 +141,47 @@ void ImplicitSolver::SaveE ()
 
 }
 
-void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
+void ImplicitSolver::ApplyMassMatrices (
+    ablastr::fields::MultiLevelVectorField& a_out,
+    const ablastr::fields::MultiLevelVectorField& a_in,
+    const ablastr::fields::MultiLevelVectorField* a_in_ref,
+    const ablastr::fields::MultiLevelVectorField* a_baseline,
+    const amrex::Real a_scale,
+    const bool a_zero_out_first )
 {
-    BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
+    BL_PROFILE("ImplicitSolver::ApplyMassMatrices()");
     using namespace amrex::literals;
 
     using warpx::fields::FieldType;
-    using ablastr::fields::Direction;
-    const int ncomps = 1;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
-        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField J0 = m_WarpX->m_fields.get_alldirs(FieldType::current_fp_non_suborbit, lev);
-        ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
+    const int ncomps = 1;
+    const int nlevs = static_cast<int>(a_out.size());
+    const bool use_delta = (a_in_ref != nullptr);
+    const bool use_baseline = (a_baseline != nullptr);
+
+    AMREX_ALWAYS_ASSERT(a_in.size() == nlevs);
+    if (use_delta) {
+        AMREX_ALWAYS_ASSERT(a_in_ref->size() == nlevs);
+    }
+    if (use_baseline) {
+        AMREX_ALWAYS_ASSERT(a_baseline->size() == nlevs);
+    }
+
+    for (int lev = 0; lev < nlevs; ++lev) {
 
         ablastr::fields::VectorField SX = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_X, lev);
         ablastr::fields::VectorField SY = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Y, lev);
         ablastr::fields::VectorField SZ = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_Z, lev);
 
-        const amrex::IntVect Jx_nodal = J[0]->ixType().toIntVect();
-        const amrex::IntVect Jy_nodal = J[1]->ixType().toIntVect();
-        const amrex::IntVect Jz_nodal = J[2]->ixType().toIntVect();
-
-        if (a_J_from_MM_only) {
-            // Initialize comps of J to zero before adding J from MM
-            J[0]->setVal(0.0);
-            J[1]->setVal(0.0);
-            J[2]->setVal(0.0);
+        if (a_zero_out_first) {
+            a_out[lev][0]->setVal(0.0);
+            a_out[lev][1]->setVal(0.0);
+            a_out[lev][2]->setVal(0.0);
         }
+
+        const amrex::IntVect outx_nodal = a_out[lev][0]->ixType().toIntVect();
+        const amrex::IntVect outy_nodal = a_out[lev][1]->ixType().toIntVect();
+        const amrex::IntVect outz_nodal = a_out[lev][2]->ixType().toIntVect();
 
         // Compute the component offset in each direction (careful with staggering)
         amrex::IntVect offset_xx, offset_xy, offset_xz;
@@ -177,43 +189,44 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
         amrex::IntVect offset_zx, offset_zy, offset_zz;
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
             offset_xx[dir] = (m_ncomp_xx[dir]-1)/2;
-            offset_xy[dir] = (Jx_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
-                                                             : ((m_ncomp_xy[dir]-1)/2);
-            offset_xz[dir] = (Jx_nodal[dir] > Jz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
-                                                             : ((m_ncomp_xz[dir]-1)/2);
-            offset_yx[dir] = (Jy_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
-                                                             : ((m_ncomp_yx[dir]-1)/2);
+            offset_xy[dir] = (outx_nodal[dir] > outy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
+                                                                 : ((m_ncomp_xy[dir]-1)/2);
+            offset_xz[dir] = (outx_nodal[dir] > outz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
+                                                                 : ((m_ncomp_xz[dir]-1)/2);
+            offset_yx[dir] = (outy_nodal[dir] > outx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
+                                                                 : ((m_ncomp_yx[dir]-1)/2);
             offset_yy[dir] = (m_ncomp_yy[dir]-1)/2;
-            offset_yz[dir] = (Jy_nodal[dir] > Jz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
-                                                             : ((m_ncomp_yz[dir]-1)/2);
-            offset_zx[dir] = (Jz_nodal[dir] > Jx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
-                                                             : ((m_ncomp_zx[dir]-1)/2);
-            offset_zy[dir] = (Jz_nodal[dir] > Jy_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
-                                                             : ((m_ncomp_zy[dir]-1)/2);
+            offset_yz[dir] = (outy_nodal[dir] > outz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
+                                                                 : ((m_ncomp_yz[dir]-1)/2);
+            offset_zx[dir] = (outz_nodal[dir] > outx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
+                                                                 : ((m_ncomp_zx[dir]-1)/2);
+            offset_zy[dir] = (outz_nodal[dir] > outy_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
+                                                                 : ((m_ncomp_zy[dir]-1)/2);
             offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
         }
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for ( amrex::MFIter mfi(*J[0], false); mfi.isValid(); ++mfi )
+        for ( amrex::MFIter mfi(*a_out[lev][0], false); mfi.isValid(); ++mfi )
         {
+            amrex::Array4<amrex::Real> const& out_arr_x = a_out[lev][0]->array(mfi);
+            amrex::Array4<amrex::Real> const& out_arr_y = a_out[lev][1]->array(mfi);
+            amrex::Array4<amrex::Real> const& out_arr_z = a_out[lev][2]->array(mfi);
 
-            amrex::Array4<amrex::Real> const& Jx = J[0]->array(mfi);
-            amrex::Array4<amrex::Real> const& Jy = J[1]->array(mfi);
-            amrex::Array4<amrex::Real> const& Jz = J[2]->array(mfi);
+            amrex::Array4<const amrex::Real> const& in_arr_x = a_in[lev][0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& in_arr_y = a_in[lev][1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& in_arr_z = a_in[lev][2]->array(mfi);
 
-            amrex::Array4<const amrex::Real> const& Ex = E[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Ey = E[1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Ez = E[2]->array(mfi);
+            // These are only read when use_delta/use_baseline is true; otherwise
+            // they are left as empty (null) Array4 handles and never dereferenced.
+            amrex::Array4<const amrex::Real> const& ref_arr_x = use_delta ? (*a_in_ref)[lev][0]->array(mfi) : amrex::Array4<const amrex::Real>{};
+            amrex::Array4<const amrex::Real> const& ref_arr_y = use_delta ? (*a_in_ref)[lev][1]->array(mfi) : amrex::Array4<const amrex::Real>{};
+            amrex::Array4<const amrex::Real> const& ref_arr_z = use_delta ? (*a_in_ref)[lev][2]->array(mfi) : amrex::Array4<const amrex::Real>{};
 
-            amrex::Array4<const amrex::Real> const& Jx0 = J0[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Jy0 = J0[1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Jz0 = J0[2]->array(mfi);
-
-            amrex::Array4<const amrex::Real> const& Ex0 = E0[0]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Ey0 = E0[1]->array(mfi);
-            amrex::Array4<const amrex::Real> const& Ez0 = E0[2]->array(mfi);
+            amrex::Array4<const amrex::Real> const& baseline_arr_x = use_baseline ? (*a_baseline)[lev][0]->array(mfi) : amrex::Array4<const amrex::Real>{};
+            amrex::Array4<const amrex::Real> const& baseline_arr_y = use_baseline ? (*a_baseline)[lev][1]->array(mfi) : amrex::Array4<const amrex::Real>{};
+            amrex::Array4<const amrex::Real> const& baseline_arr_z = use_baseline ? (*a_baseline)[lev][2]->array(mfi) : amrex::Array4<const amrex::Real>{};
 
             amrex::Array4<const amrex::Real> const& Sxx = SX[0]->array(mfi);
             amrex::Array4<const amrex::Real> const& Sxy = SX[1]->array(mfi);
@@ -227,18 +240,25 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
             amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
             amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
 
-            // Use grown boxes here with all J guard cells
-            amrex::Box Jbx = amrex::convert(mfi.validbox(),J[0]->ixType());
-            amrex::Box Jby = amrex::convert(mfi.validbox(),J[1]->ixType());
-            amrex::Box Jbz = amrex::convert(mfi.validbox(),J[2]->ixType());
-            Jbx.grow(J[0]->nGrowVect());
-            Jby.grow(J[1]->nGrowVect());
-            Jbz.grow(J[2]->nGrowVect());
+            // The outer loop below reads Sxx/Sxy/Sxz (etc.) directly at (i,j,k),
+            // so it must stay within the mass matrices' own ghost region - grow
+            // by the min of the input's and the mass matrices' ghost widths.
+            amrex::Box outbx = amrex::convert(mfi.validbox(),a_out[lev][0]->ixType());
+            amrex::Box outby = amrex::convert(mfi.validbox(),a_out[lev][1]->ixType());
+            amrex::Box outbz = amrex::convert(mfi.validbox(),a_out[lev][2]->ixType());
+            outbx.grow(amrex::elemwiseMin(a_out[lev][0]->nGrowVect(), SX[0]->nGrowVect()));
+            outby.grow(amrex::elemwiseMin(a_out[lev][1]->nGrowVect(), SY[1]->nGrowVect()));
+            outbz.grow(amrex::elemwiseMin(a_out[lev][2]->nGrowVect(), SZ[2]->nGrowVect()));
 
-            // Use same box for E as for J (requires ngE >= ngJ)
-            const amrex::Box Ebx = Jbx;
-            const amrex::Box Eby = Jby;
-            const amrex::Box Ebz = Jbz;
+            // The inner stencil reads are bounded by the input field's own
+            // (potentially wider) ghost region, which holds correct
+            // periodic-wrapped data via FillBoundaryAndSync.
+            amrex::Box in_fullbx = amrex::convert(mfi.validbox(),a_in[lev][0]->ixType());
+            amrex::Box in_fullby = amrex::convert(mfi.validbox(),a_in[lev][1]->ixType());
+            amrex::Box in_fullbz = amrex::convert(mfi.validbox(),a_in[lev][2]->ixType());
+            in_fullbx.grow(a_in[lev][0]->nGrowVect());
+            in_fullby.grow(a_in[lev][1]->nGrowVect());
+            in_fullbz.grow(a_in[lev][2]->nGrowVect());
 
             const amrex::IntVect ncomp_xx = m_ncomp_xx;
             const amrex::IntVect ncomp_xy = m_ncomp_xy;
@@ -251,197 +271,233 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
             const amrex::IntVect ncomp_zz = m_ncomp_zz;
 
             amrex::ParallelFor(
-            Jbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            outbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 const int idx[3] = {i, j, k};
                 amrex::GpuArray<int, 3> index_min = {0, 0, 0};
                 amrex::GpuArray<int, 3> index_max = {0, 0, 0};
 
-                // Compute Sxx*dEx
+                // Compute Sxx*d_in_x
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_xx[dim],Ebx.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_xx[dim]-1-offset_xx[dim],Ebx.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_xx[dim],in_fullbx.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_xx[dim]-1-offset_xx[dim],in_fullbx.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SxxdEx = 0.0;
+                amrex::Real Sxx_d_in_x = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_xx[0],
                                          + ncomp_xx[0]*( jj+offset_xx[1] ),
                                          + ncomp_xx[0]*ncomp_xx[1]*( kk+offset_xx[2] ) );
-                            SxxdEx += Sxx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
-                                                  -  Ex0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_x(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_x(i+ii,j+jj,k+kk,n); }
+                            Sxx_d_in_x += Sxx(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                // Compute Sxy*dEy
+                // Compute Sxy*d_in_y
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_xy[dim],Eby.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_xy[dim]-1-offset_xy[dim],Eby.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_xy[dim],in_fullby.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_xy[dim]-1-offset_xy[dim],in_fullby.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SxydEy = 0.0;
+                amrex::Real Sxy_d_in_y = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_xy[0],
                                          + ncomp_xy[0]*( jj+offset_xy[1] ),
                                          + ncomp_xy[0]*ncomp_xy[1]*( kk+offset_xy[2] ) );
-                            SxydEy += Sxy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
-                                                   - Ey0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_y(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_y(i+ii,j+jj,k+kk,n); }
+                            Sxy_d_in_y += Sxy(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                // Compute Sxz*dEz
+                // Compute Sxz*d_in_z
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_xz[dim],Ebz.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_xz[dim]-1-offset_xz[dim],Ebz.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_xz[dim],in_fullbz.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_xz[dim]-1-offset_xz[dim],in_fullbz.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SxzdEz = 0.0;
+                amrex::Real Sxz_d_in_z = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_xz[0],
                                          + ncomp_xz[0]*( jj+offset_xz[1] ),
                                          + ncomp_xz[0]*ncomp_xz[1]*( kk+offset_xz[2] ) );
-                            SxzdEz += Sxz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
-                                                   - Ez0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_z(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_z(i+ii,j+jj,k+kk,n); }
+                            Sxz_d_in_z += Sxz(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                Jx(i,j,k,n) += Jx0(i,j,k,n) + SxxdEx + SxydEy + SxzdEz;
+                if (use_baseline) { out_arr_x(i,j,k,n) += baseline_arr_x(i,j,k,n); }
+                out_arr_x(i,j,k,n) += a_scale * (Sxx_d_in_x + Sxy_d_in_y + Sxz_d_in_z);
             });
             amrex::ParallelFor(
-            Jby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            outby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 const int idx[3] = {i, j, k};
                 amrex::GpuArray<int, 3> index_min = {0, 0, 0};
                 amrex::GpuArray<int, 3> index_max = {0, 0, 0};
 
-                // Compute Syx*dEx
+                // Compute Syx*d_in_x
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_yx[dim],Ebx.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_yx[dim]-1-offset_yx[dim],Ebx.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_yx[dim],in_fullbx.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_yx[dim]-1-offset_yx[dim],in_fullbx.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SyxdEx = 0.0;
+                amrex::Real Syx_d_in_x = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_yx[0],
                                          + ncomp_yx[0]*( jj+offset_yx[1] ),
                                          + ncomp_yx[0]*ncomp_yx[1]*( kk+offset_yx[2] ) );
-                            SyxdEx += Syx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
-                                                  -  Ex0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_x(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_x(i+ii,j+jj,k+kk,n); }
+                            Syx_d_in_x += Syx(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                // Compute Syy*dEy
+                // Compute Syy*d_in_y
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_yy[dim],Eby.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_yy[dim]-1-offset_yy[dim],Eby.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_yy[dim],in_fullby.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_yy[dim]-1-offset_yy[dim],in_fullby.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SyydEy = 0.0;
+                amrex::Real Syy_d_in_y = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_yy[0],
                                          + ncomp_yy[0]*( jj+offset_yy[1] ),
                                          + ncomp_yy[0]*ncomp_yy[1]*( kk+offset_yy[2] ) );
-                            SyydEy += Syy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
-                                                  -  Ey0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_y(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_y(i+ii,j+jj,k+kk,n); }
+                            Syy_d_in_y += Syy(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                // Compute Syz*dEz
+                // Compute Syz*d_in_z
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_yz[dim],Ebz.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_yz[dim]-1-offset_yz[dim],Ebz.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_yz[dim],in_fullbz.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_yz[dim]-1-offset_yz[dim],in_fullbz.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SyzdEz = 0.0;
+                amrex::Real Syz_d_in_z = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_yz[0],
                                          + ncomp_yz[0]*( jj+offset_yz[1] ),
                                          + ncomp_yz[0]*ncomp_yz[1]*( kk+offset_yz[2] ) );
-                            SyzdEz += Syz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
-                                                  -  Ez0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_z(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_z(i+ii,j+jj,k+kk,n); }
+                            Syz_d_in_z += Syz(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                Jy(i,j,k,n) += Jy0(i,j,k,n) + SyxdEx + SyydEy + SyzdEz;
+                if (use_baseline) { out_arr_y(i,j,k,n) += baseline_arr_y(i,j,k,n); }
+                out_arr_y(i,j,k,n) += a_scale * (Syx_d_in_x + Syy_d_in_y + Syz_d_in_z);
             });
             amrex::ParallelFor(
-            Jbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+            outbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
                 const int idx[3] = {i, j, k};
                 amrex::GpuArray<int, 3> index_min = {0, 0, 0};
                 amrex::GpuArray<int, 3> index_max = {0, 0, 0};
 
-                // Compute Szx*dEx
+                // Compute Szx*d_in_x
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_zx[dim],Ebx.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_zx[dim]-1-offset_zx[dim],Ebx.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_zx[dim],in_fullbx.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_zx[dim]-1-offset_zx[dim],in_fullbx.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SzxdEx = 0.0;
+                amrex::Real Szx_d_in_x = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_zx[0],
                                          + ncomp_zx[0]*( jj+offset_zx[1] ),
                                          + ncomp_zx[0]*ncomp_zx[1]*( kk+offset_zx[2] ) );
-                            SzxdEx += Szx(i,j,k,Nc)*( Ex(i+ii,j+jj,k+kk,n)
-                                                  -  Ex0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_x(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_x(i+ii,j+jj,k+kk,n); }
+                            Szx_d_in_x += Szx(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                // Compute Szy*dEy
+                // Compute Szy*d_in_y
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_zy[dim],Eby.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_zy[dim]-1-offset_zy[dim],Eby.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_zy[dim],in_fullby.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_zy[dim]-1-offset_zy[dim],in_fullby.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SzydEy = 0.0;
+                amrex::Real Szy_d_in_y = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_zy[0],
                                          + ncomp_zy[0]*( jj+offset_zy[1] ),
                                          + ncomp_zy[0]*ncomp_zy[1]*( kk+offset_zy[2] ) );
-                            SzydEy += Szy(i,j,k,Nc)*( Ey(i+ii,j+jj,k+kk,n)
-                                                  -  Ey0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_y(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_y(i+ii,j+jj,k+kk,n); }
+                            Szy_d_in_y += Szy(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                // Compute Szz*dEz
+                // Compute Szz*d_in_z
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
-                    index_min[dim] = std::max(-offset_zz[dim],Ebz.smallEnd(dim)-idx[dim]);
-                    index_max[dim] = std::min(ncomp_zz[dim]-1-offset_zz[dim],Ebz.bigEnd(dim)-idx[dim]);
+                    index_min[dim] = std::max(-offset_zz[dim],in_fullbz.smallEnd(dim)-idx[dim]);
+                    index_max[dim] = std::min(ncomp_zz[dim]-1-offset_zz[dim],in_fullbz.bigEnd(dim)-idx[dim]);
                 }
-                amrex::Real SzzdEz = 0.0;
+                amrex::Real Szz_d_in_z = 0.0;
                 for (int ii = index_min[0]; ii <= index_max[0]; ++ii) {
                     for (int jj = index_min[1]; jj <= index_max[1]; ++jj) {
                         for (int kk = index_min[2]; kk <= index_max[2]; ++kk) {
                             const int Nc = AMREX_D_TERM( ii+offset_zz[0],
                                          + ncomp_zz[0]*( jj+offset_zz[1] ),
                                          + ncomp_zz[0]*ncomp_zz[1]*( kk+offset_zz[2] ) );
-                            SzzdEz += Szz(i,j,k,Nc)*( Ez(i+ii,j+jj,k+kk,n)
-                                                  -  Ez0(i+ii,j+jj,k+kk,n) );
+                            amrex::Real dval = in_arr_z(i+ii,j+jj,k+kk,n);
+                            if (use_delta) { dval -= ref_arr_z(i+ii,j+jj,k+kk,n); }
+                            Szz_d_in_z += Szz(i,j,k,Nc)*dval;
                         }
                     }
                 }
 
-                Jz(i,j,k,n) += Jz0(i,j,k,n) + SzxdEx + SzydEy + SzzdEz;
+                if (use_baseline) { out_arr_z(i,j,k,n) += baseline_arr_z(i,j,k,n); }
+                out_arr_z(i,j,k,n) += a_scale * (Szx_d_in_x + Szy_d_in_y + Szz_d_in_z);
             });
         }
-
     }
+}
+
+void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
+{
+    BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
+    using warpx::fields::FieldType;
+
+    const int finest_level = m_num_amr_levels - 1;
+
+    ablastr::fields::MultiLevelVectorField J_ml =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
+    const ablastr::fields::MultiLevelVectorField E_ml =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
+    const ablastr::fields::MultiLevelVectorField E0_ml =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp_save, finest_level);
+    const ablastr::fields::MultiLevelVectorField J0_ml =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp_non_suborbit, finest_level);
+
+    ApplyMassMatrices(
+        /* a_out           = */ J_ml,
+        /* a_in            = */ E_ml,
+        /* a_in_ref        = */ &E0_ml,
+        /* a_baseline      = */ &J0_ml,
+        /* a_scale         = */ 1.0_rt,
+        /* a_zero_out_first = */ a_J_from_MM_only);
 }
 
 
@@ -1058,6 +1114,12 @@ void ImplicitSolver::FinishMassMatrices ()
             });
 
 #elif AMREX_SPACEDIM == 2
+            // In-place fold of the mass matrices: for every (ncomp_x, ncomp_y)
+            // combination, the components written at iv_dst are disjoint from
+            // the components read at any i-offset source, so iterations of the
+            // vectorized i loop are independent, as required by ParallelFor
+            // (see issue #7097). Reads across j rely on the serial ascending j
+            // loop on CPU and must not be reordered.
             amrex::ParallelFor( Sbx, Sby, Sbz,
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)

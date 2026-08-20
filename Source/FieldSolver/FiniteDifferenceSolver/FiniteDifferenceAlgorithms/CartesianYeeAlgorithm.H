@@ -258,8 +258,7 @@ struct CartesianYeeAlgorithm {
         amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
         return 0._rt; // 1D Cartesian: derivative along x is 0
 #else
-        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
-        amrex::Real const inv_dx4 = inv_dx2*inv_dx2;
+        amrex::Real const inv_dx4 = amrex::Math::powi<4>(coefs_x[0]);
         return inv_dx4*( F(i-2,j,k,ncomp) - 4._rt*F(i-1,j,k,ncomp) + 6._rt*F(i,j,k,ncomp)
                           - 4._rt*F(i+1,j,k,ncomp) + F(i+2,j,k,ncomp) );
 #endif
@@ -276,8 +275,7 @@ struct CartesianYeeAlgorithm {
 
         using namespace amrex;
 #if defined WARPX_DIM_3D
-        amrex::Real const inv_dy2 = coefs_y[0]*coefs_y[0];
-        amrex::Real const inv_dy4 = inv_dy2*inv_dy2;
+        amrex::Real const inv_dy4 = amrex::Math::powi<4>(coefs_y[0]);
         return inv_dy4*( F(i,j-2,k,ncomp) - 4._rt*F(i,j-1,k,ncomp) + 6._rt*F(i,j,k,ncomp)
                           - 4._rt*F(i,j+1,k,ncomp) + F(i,j+2,k,ncomp) );
 #else
@@ -296,8 +294,7 @@ struct CartesianYeeAlgorithm {
         int const i, int const j, int const k, int const ncomp=0 ) {
 
         using namespace amrex;
-        Real const inv_dz2 = coefs_z[0]*coefs_z[0];
-        Real const inv_dz4 = inv_dz2*inv_dz2;
+        amrex::Real const inv_dz4 = amrex::Math::powi<4>(coefs_z[0]);
 #if defined WARPX_DIM_3D
         return inv_dz4*( F(i,j,k-2,ncomp) - 4._rt*F(i,j,k-1,ncomp) + 6._rt*F(i,j,k,ncomp)
                           - 4._rt*F(i,j,k+1,ncomp) + F(i,j,k+2,ncomp) );

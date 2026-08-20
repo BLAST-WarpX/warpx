@@ -41,7 +41,7 @@ DarwinEfieldFunctor::operator() (amrex::MultiFab& mf_dst, const int dcomp, const
     // which is derived from it) holding only the electrostatic component plus
     // any external field at this point in the step; the inductive component
     // (E = -dA/dt) is recovered from dA_fp, which
-    // SemiImplicitDarwin::UpdateEfromdA() computes once per step and
+    // SemiImplicitDarwin::ComputeInductiveEfromdA() computes once per step and
     // which nothing overwrites before this diagnostic runs.
     amrex::MultiFab total_E(m_mf_Efield->boxArray(), m_mf_Efield->DistributionMap(),
                             m_mf_Efield->nComp(), 0);

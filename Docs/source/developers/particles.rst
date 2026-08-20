@@ -36,7 +36,9 @@ A typical loop over particles reads:
       }
   }
 
-The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` to perform operations on all particles in a portable way. The innermost loop in the code snippet above could look like:
+The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` or ``amrex::For`` to perform operations on all particles in a portable way.
+``amrex::ParallelFor`` may only be used when the loop iterations are independent of each other. Kernels in which particles scatter-add into shared grid cells (e.g., deposition, histogram bins, etc.) must use ``amrex::For`` instead (see :ref:`Developers: Portability <developers-portability>`).
+The innermost loop in the code snippet above could look like:
 
 .. code-block:: cpp
 
