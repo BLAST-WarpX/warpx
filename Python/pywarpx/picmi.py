@@ -4246,7 +4246,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 "Jz_displacement",
             ]
             A_fields_list = ["Ar", "At", "Az"]
-            T_fields_list = ["Tr_", "Tt_", "Tz_"]
         else:
             E_fields_list = ["Ex", "Ey", "Ez"]
             B_fields_list = ["Bx", "By", "Bz"]
@@ -4257,7 +4256,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 "Jz_displacement",
             ]
             A_fields_list = ["Ax", "Ay", "Az"]
-            T_fields_list = ["Tx_", "Ty_", "Tz_"]
         if self.data_list is not None:
             for dataname in self.data_list:
                 if dataname == "E":
@@ -4275,44 +4273,16 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 elif dataname == "A":
                     for field_name in A_fields_list:
                         fields_to_plot.add(field_name)
-                elif dataname in E_fields_list:
-                    fields_to_plot.add(dataname)
-                elif dataname in B_fields_list:
-                    fields_to_plot.add(dataname)
-                elif dataname in A_fields_list:
-                    fields_to_plot.add(dataname)
-                elif dataname in [
-                    "rho",
-                    "phi",
-                    "F",
-                    "G",
-                    "divE",
-                    "divB",
-                    "proc_number",
-                    "part_per_cell",
-                    "eb_covered",
-                    # Electron temperature/pressure of the hybrid-PIC
-                    # (Ohm's law) solver; only valid with that solver.
-                    "Te",
-                    "Pe",
-                ]:
-                    fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
                 elif dataname in J_displacement_fields_list:
                     fields_to_plot.add(dataname.lower())
-                elif dataname.startswith("rho_"):
-                    # Adds rho_species diagnostic
-                    fields_to_plot.add(dataname)
-                elif dataname.startswith("T_"):
-                    # Adds T_species diagnostic
-                    fields_to_plot.add(dataname)
-                elif any([dataname.startswith(tstr) for tstr in T_fields_list]):
-                    fields_to_plot.add(dataname)
                 elif dataname == "dive":
                     fields_to_plot.add("divE")
                 elif dataname == "divb":
                     fields_to_plot.add("divB")
+                elif dataname == "proc_number":
+                    fields_to_plot.add("proc_num")
                 elif dataname == "raw_fields":
                     self.plot_raw_fields = 1
                 elif dataname == "raw_fields_guards":
@@ -4321,19 +4291,11 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     self.plot_finepatch = 1
                 elif dataname == "crsepatch":
                     self.plot_crsepatch = 1
-                elif dataname == "none":
-                    fields_to_plot = set(("none",))
                 else:
-                    # Pass unrecognized names through to C++ for validation.
-                    # Since #7025, the diagnostics resolve any name registered in
-                    # the MultiFabRegister by its registered name. That covers
-                    # fields registered from Python, and internal fields that have
-                    # no short alias in the branches above (e.g. "hybrid_current_fp"
-                    # or "vector_potential_fp"; contrast "Pe"/"Te", which are
-                    # handled explicitly and so never reach here). Dropping unknown
-                    # names would make that capability unreachable through PICMI.
-                    # C++ raises a descriptive error if the name is not registered
-                    # either, so a typo is still reported.
+                    # Pass field names through to C++ for resolution and validation.
+                    # This includes known diagnostic quantities as well as fields
+                    # registered in the MultiFabRegister. C++ raises a descriptive
+                    # error if the name is not valid.
                     fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
