@@ -22,7 +22,7 @@ mkdir -p ${SRC_DIR}
 # clean out caches, e.g., depending on old system modules
 # no pip dependencies installed here
 #python3 -m pip cache purge || true
-rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+#rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
 
 # General extra dependencies ##################################################
 #
