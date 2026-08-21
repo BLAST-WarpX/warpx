@@ -286,7 +286,7 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
                 if (S(i, j, k) <= 0) { return; }
 
-                if (!(flag_info_cell_dim(i, j, k) == 0)) { return; }
+                if (!(flag_info_cell_dim(i, j, k) == FaceInfo::extended)) { return; }
 
                 Venl_dim(i, j, k) = Rho(i, j, k) * S(i, j, k);
                 amrex::Real rho_enl;
@@ -365,13 +365,13 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
             amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
                 if (S(i, j, k) <= 0) { return; }
 
-                if (flag_info_cell_dim(i, j, k) == 0) {
+                if (flag_info_cell_dim(i, j, k) == FaceInfo::extended) {
                     return;
                 }
-                else if (flag_info_cell_dim(i, j, k) == 1) {
+                else if (flag_info_cell_dim(i, j, k) == FaceInfo::available) {
                     //Stable cell which hasn't been intruded
                     B(i, j, k) = B(i, j, k) - dt * Rho(i, j, k);
-                } else if (flag_info_cell_dim(i, j, k) == 2) {
+                } else if (flag_info_cell_dim(i, j, k) == FaceInfo::intruded) {
                     //Stable cell which has been intruded
                     Venl_dim(i, j, k) += Rho(i, j, k) * S_mod(i, j, k);
                     B(i, j, k) = B(i, j, k) - dt * Venl_dim(i, j, k) / S(i, j, k);
