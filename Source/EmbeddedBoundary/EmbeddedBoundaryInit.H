@@ -93,11 +93,12 @@ namespace warpx::embedded_boundary
 
    /**
     * \brief Initialize information for cell extensions.
-    *        The flags convention for m_flag_info_face is as follows
-    *          - 0 for unstable cells
-    *          - 1 for stable cells which have not been intruded
-    *          - 2 for stable cells which have been intruded
-    *        Here we cannot know if a cell is intruded or not so we initialize all stable cells with 1
+    *        The flags convention for m_flag_info_face is given by FaceInfo::Flag:
+    *          - FaceInfo::extended for unstable cells
+    *          - FaceInfo::available for stable cells which have not been intruded
+    *          - FaceInfo::intruded for stable cells which have been intruded
+    *        Here we cannot know if a cell is intruded or not, so we initialize all stable cells
+    *        with FaceInfo::available
     */
     void MarkExtensionCells(
         const std::array<amrex::Real,3>& cell_size,
