@@ -74,6 +74,15 @@ namespace ablastr::warn_manager
         */
         ~WarnManager() = default;
 
+        /**
+        * \brief Returns the WarnManager instance of the current AMReX
+        * initialize/finalize cycle, creating it on first use.
+        *
+        * The instance is destroyed by the next amrex::Finalize, so the
+        * returned reference must not be stored beyond it.
+        *
+        * @return the instance of the WarnManager class
+        */
         static WarnManager& GetInstance();
 
         /**
@@ -211,6 +220,7 @@ namespace ablastr::warn_manager
 
     /**
     * \brief Helper function to abbreviate the call to get a WarnManager instance
+    * (the returned reference must not be stored beyond the next amrex::Finalize)
     *
     * @return the instance of the WarnManager class
     */
