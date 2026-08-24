@@ -110,6 +110,14 @@ private:
     std::unique_ptr<DarwinLinearFieldOperator> m_linear_function;
 
     /**
+     * \brief Whether the predictor velocity push in OneStep() should
+     *  temporarily override the global galerkin_interpolation flag to true.
+     *  Set once in Define(); false if the user explicitly selected
+     *  momentum-conserving gathering, to avoid silently overriding that choice.
+     */
+    bool m_predictor_use_galerkin = false;
+
+    /**
      * \brief Choice of linear solver
      */
     LinearSolverType m_linear_solver_type = LinearSolverType::amrex_gmres;

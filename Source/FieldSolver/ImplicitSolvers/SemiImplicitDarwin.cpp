@@ -11,6 +11,8 @@
 #include "Python/callbacks.H"
 #include "WarpX.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 using warpx::fields::FieldType;
 using namespace amrex::literals;
 
@@ -89,6 +91,20 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Initialize the mass matrices for plasma response
     InitializeMassMatrices();
 
+    // The predictor velocity push in OneStep() temporarily overrides the
+    // global galerkin_interpolation flag to true, to gather with the same
+    // shape-factor order used for deposition. Skip that override, and warn,
+    // if the user has explicitly selected momentum-conserving gathering,
+    // since forcing Galerkin gathering there would silently negate that choice.
+    m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
+    if (!m_predictor_use_galerkin) {
+        ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
+            "algo.field_gathering = momentum_conserving is set; the predictor "
+            "velocity push will keep using momentum-conserving gathering "
+            "rather than switching to the Galerkin scheme.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
+
     m_is_defined = true;
 }
 
@@ -129,7 +145,12 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
-    // the E-field was cleared during the last Poisson solve)
+    // the E-field was cleared during the last Poisson solve). Temporarily force
+    // Galerkin gathering for this predictor push (skipped if the user explicitly
+    // requested momentum-conserving gathering - see the warning issued in Define()).
+    const bool save_galerkin_interpolation = WarpX::galerkin_interpolation;
+    if (m_predictor_use_galerkin) { WarpX::galerkin_interpolation = true; }
+
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushP(
@@ -144,6 +165,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             MomentumPushType::Full
         );
     }
+
+    WarpX::galerkin_interpolation = save_galerkin_interpolation;
 
     // Prepare current deposition: the velocities are time centered with
     // u -> (u^{n+1/2} + u^{n-1/2}) / 2.0 (with just the ES acceleration applied
