@@ -77,8 +77,6 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     // Convert Cartesian B on particle to normalized cyclotron units with dt/2.0.
-    // The rotation vector bp carries the 1/gamma_bar factor; the single 1/gamma
-    // of the current response dJ/dE is already carried by rhop.
     const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (upx*upx + upy*upy + upz*upz)*inv_c2);
     const amrex::ParticleReal alpha = qs/ms*0.5_prt*dt;
     const amrex::ParticleReal bpx = alpha*Bpx/gamma_bar;
