@@ -77,11 +77,11 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     // Convert Cartesian B on particle to normalized cyclotron units with dt/2.0.
-    const amrex::ParticleReal gamma_bar = std::sqrt(1._prt + (upx*upx + upy*upy + upz*upz)*inv_c2);
+    const amrex::ParticleReal inv_gamma_bar = 1._prt/std::sqrt(1._prt + (upx*upx + upy*upy + upz*upz)*inv_c2);
     const amrex::ParticleReal alpha = qs/ms*0.5_prt*dt;
-    const amrex::ParticleReal bpx = alpha*Bpx/gamma_bar;
-    const amrex::ParticleReal bpy = alpha*Bpy/gamma_bar;
-    const amrex::ParticleReal bpz = alpha*Bpz/gamma_bar;
+    const amrex::ParticleReal bpx = alpha*Bpx*inv_gamma_bar;
+    const amrex::ParticleReal bpy = alpha*Bpy*inv_gamma_bar;
+    const amrex::ParticleReal bpz = alpha*Bpz*inv_gamma_bar;
 
     const amrex::ParticleReal bpsq = bpx*bpx + bpy*bpy + bpz*bpz;
     const amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
