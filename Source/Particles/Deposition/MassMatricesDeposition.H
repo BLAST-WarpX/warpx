@@ -84,7 +84,13 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     const amrex::ParticleReal bpz = alpha*Bpz;
 
     const amrex::ParticleReal bpsq = bpx*bpx + bpy*bpy + bpz*bpz;
-    const amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
+    // The mass matrix is the Jacobian dJ/dE of the deposited current. With
+    // J = q w S v / V and v = u_nph/gamma, freezing gamma gives
+    //     dJ/dE = (q w / V) * (1/gamma) * R * (q dt / 2m),
+    // i.e. a single power of 1/gamma, which rhop already carries (see the doc
+    // comment above). Reusing `alpha` as the prefactor would apply 1/gamma a
+    // second time; `alpha` only sets the scale of the rotation vector bp.
+    const amrex::ParticleReal arogp = qs/ms*0.5_prt*dt*rhop/(1.0_prt + bpsq);
 
     // Compute Mass Matrix kernels (non-relativistic for now)
     fpxx = arogp*(bpx*bpx + 1.0_rt);
