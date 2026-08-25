@@ -85,6 +85,27 @@ namespace
 }
 #endif
 
+namespace
+{
+    void
+    AssertPermittivityFunctionValues (
+        amrex::MultiFab const& epsilon,
+        std::string const& material_name)
+    {
+        bool const local = true;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            epsilon.is_finite(0, 1, epsilon.nGrowVect(), local),
+            "Dielectric material '" + material_name +
+            "' has non-finite values from permittivity_function(x,y,z,t). "
+            "Relative permittivity must be finite and greater than or equal to 1.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            epsilon.min(0, epsilon.nGrowVect().min(), local) >= 1.0_rt,
+            "Dielectric material '" + material_name +
+            "' has values less than 1 from permittivity_function(x,y,z,t). "
+            "Relative permittivity must be finite and greater than or equal to 1.");
+    }
+}
+
 DielectricMaterials::DielectricMaterials (int nlevs_max)
     : m_material_id(nlevs_max)
 {}
@@ -201,6 +222,10 @@ DielectricMaterials::ReadMaterial (std::string const& name, int default_stl_use_
         material.permittivity_type = PermittivityType::Function;
         m_has_time_dependent_permittivity = true;
     } else {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::isfinite(material.permittivity) && material.permittivity >= 1.0_rt,
+            "Dielectric material '" + name + "' has invalid permittivity. "
+            "Relative permittivity must be finite and greater than or equal to 1.");
         material.permittivity_type = PermittivityType::Constant;
     }
 
@@ -512,6 +537,7 @@ DielectricMaterials::FillEpsilon (
                         }
                     });
                 }
+                AssertPermittivityFunctionValues(epsilon, material.name);
             }
         } else {
             if (material.permittivity_type == PermittivityType::Constant) {
@@ -562,6 +588,7 @@ DielectricMaterials::FillEpsilon (
                         }
                     });
                 }
+                AssertPermittivityFunctionValues(epsilon, material.name);
             }
         }
     }
