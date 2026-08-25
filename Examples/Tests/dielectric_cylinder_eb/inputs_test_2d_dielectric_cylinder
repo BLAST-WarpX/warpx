@@ -1,15 +1,16 @@
 max_step = 1
-amr.n_cell = 128 128
+warpx.verbose = 0
+amr.n_cell = 192 192
 amr.max_level = 0
 amr.blocking_factor = 8
 amr.max_grid_size = 64
 geometry.dims = 2
-geometry.prob_lo = -3.0 -3.0
-geometry.prob_hi =  3.0  3.0
+geometry.prob_lo = -6.0 -6.0
+geometry.prob_hi =  6.0  6.0
 boundary.field_lo = pec neumann
 boundary.field_hi = pec neumann
-boundary.potential_lo_x = 3.0
-boundary.potential_hi_x = -3.0
+boundary.potential_lo_x = 6.0
+boundary.potential_hi_x = -6.0
 warpx.const_dt = 1e-6
 
 warpx.do_electrostatic = labframe
