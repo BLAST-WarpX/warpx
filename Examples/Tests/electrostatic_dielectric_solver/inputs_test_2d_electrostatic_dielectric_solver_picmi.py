@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 
+import pywarpx
 from pywarpx import picmi
-
-constants = picmi.constants
 
 gap = 0.1  # m
 tVacuum = gap / 2.0
@@ -65,12 +64,11 @@ field_diag = picmi.FieldDiagnostic(
     # warpx_openpmd_backend="h5"
 )
 
-epsilon0 = constants.ep0
-epsilon1 = constants.ep0 * 10.0
-expression = "if(z>(tVacuum),10.0,1.0)"
-epsilon = picmi.MacroscopicProperty(
-    name="epsilon", implicit_function=expression, tVacuum=tVacuum
-)
+dielectrics = pywarpx.warpx.get_bucket("dielectrics")
+dielectrics.names = ["slab"]
+slab = pywarpx.warpx.get_bucket("slab")
+slab.implicit_function = f"z-({tVacuum})"
+slab.permittivity = 10.0
 
 ##########################
 # simulation setup
@@ -84,7 +82,6 @@ sim = picmi.Simulation(
 )
 
 sim.add_diagnostic(field_diag)
-sim.add_macroscopic_property(epsilon)
 ##########################
 # simulation run
 ##########################
