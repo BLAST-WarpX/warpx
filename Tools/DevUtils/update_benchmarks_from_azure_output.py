@@ -83,6 +83,7 @@ def update_benchmarks_from_log_text(log_text):
                 print(json_file_string)
                 with open(json_filepath, "w") as json_f:
                     json.dump(json_file, json_f, sort_keys=True, indent=2)
+                    json_f.write("\n")  # Add trailing newline
                 updated.append(json_filename)
                 # reset to continue searching for more failing tests
                 failing_test = ""
