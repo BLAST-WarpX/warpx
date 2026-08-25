@@ -384,8 +384,15 @@ void WarpX::HybridPICInitializeRhoJandB ()
     m_hybrid_pic_model->CalculateElectronPressure(
         m_hybrid_pic_model->m_solve_electron_energy_equation);
 
-    if (restart_chkfile.empty()) {
-        // Handle field splitting for Hybrid field push
+    // Handle field splitting for the hybrid field push: stage the external
+    // fields and add their contribution to the total field once, at the
+    // true start of the run. This entry point executes at the first step
+    // of EVERY Evolve() call, and beyond the first entry Bfield_fp already
+    // carries the external contribution (segmented stepping through
+    // repeated sim.step() calls re-enters here mid-run) -- adding it again
+    // double-counts the external field on every re-entry. On restart the
+    // checkpointed fields likewise already contain it.
+    if (restart_chkfile.empty() && istep[0] == 0) {
         if (m_hybrid_pic_model->m_add_external_fields) {
             // Get the external fields
             // Currently t_new is what t_old will be when entering the solver since

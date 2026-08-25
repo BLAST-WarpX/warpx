@@ -14,9 +14,11 @@ from openpmd_viewer import OpenPMDTimeSeries
 def main(args):
     # parse test name from test directory
     test_name = os.path.split(os.getcwd())[1]
-    if "_restart" in test_name:
-        # use original test's checksums
-        test_name = test_name.replace("_restart", "")
+    for suffix in ("_restart", "_segmented"):
+        if suffix in test_name:
+            # use original test's checksums: restarted and segmented runs
+            # must reproduce the uninterrupted run
+            test_name = test_name.replace(suffix, "")
     # TODO check environment and reset tolerance (portable, machine precision)
     # compare checksums
     evaluate_checksum(
