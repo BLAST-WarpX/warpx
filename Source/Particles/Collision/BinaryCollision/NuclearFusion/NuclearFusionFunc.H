@@ -142,7 +142,7 @@ public:
          * @param[in] dV is the volume of the corresponding cell.
          * @param[in] coll_idx is the collision index offset.
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
-         * @param[in] i_cell grid cell where collision is taking place
+         * @param[in] global_index grid cell where collision is taking place
          * @param[out] p_mask is a mask that will be set to true if a fusion event occurs for a given
          * pair. It is only needed here to store information that will be used later on when actually
          * creating the product particles.
@@ -168,7 +168,7 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const cell_start_pair, int const i_cell,
+            index_type const cell_start_pair, amrex::IntVectND<3> const global_index,
             index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
@@ -224,7 +224,7 @@ public:
                         m_probability_target_value,
                         m_fusion_type, engine,
                         m_create_products,
-                        i_cell,
+                        global_index,
                         m_particle_production);
 
                     // Remove pair reaction weight from the colliding particles' weights
@@ -255,7 +255,7 @@ public:
         bool m_isSameSpecies;
 
         bool m_create_products = true;
-        amrex::Real * m_particle_production = nullptr;
+        amrex::Array4<amrex::Real> m_particle_production;
     };
 
     [[nodiscard]] Executor const& executor (amrex::MFIter const& mfi) {
@@ -263,7 +263,7 @@ public:
             WarpX & warpx = WarpX::GetInstance();
             int const level = 0;
             amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, level);
-            m_exe.m_particle_production = particle_production_mf->array(mfi).dataPtr();
+            m_exe.m_particle_production = particle_production_mf->array(mfi);
         }
         return m_exe;
     }

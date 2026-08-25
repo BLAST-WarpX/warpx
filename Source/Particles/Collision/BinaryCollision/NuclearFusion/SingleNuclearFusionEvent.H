@@ -49,8 +49,8 @@
  * @param[in] fusion_type the physical fusion process to model
  * @param[in] engine the random engine.
  * @param[in] create_products flags whether or not to create particles
- * @param[in] i_cell the grid cell where the collision is taking place
- * @param[in] particle_production the pointer to where the particle production result is to be added
+ * @param[in] global_index the grid cell where the collision is taking place
+ * @param[in] particle_production the particle production result array
  */
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -69,8 +69,8 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
                                const NuclearFusionType& fusion_type,
                                const amrex::RandomEngine& engine,
                                const bool create_products,
-                               const int i_cell,
-                               amrex::Real * particle_production)
+                               const amrex::IntVectND<3> global_index,
+                               const amrex::Array4<amrex::Real> & particle_production)
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
@@ -123,9 +123,9 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
     const amrex::Real w_new = w_min/fusion_multiplier_eff;
 
     // Save the particle production density if requested
-    if (particle_production) {
+    if (particle_production.ok()) {
         const amrex::Real new_products = probability*w_new/dV;
-        amrex::Gpu::Atomic::AddNoRet(particle_production + i_cell, new_products);
+        amrex::Gpu::Atomic::AddNoRet(&particle_production(global_index), new_products);
 
     }
 

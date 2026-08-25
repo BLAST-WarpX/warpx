@@ -60,6 +60,42 @@
 #include <cmath>
 #include <string>
 
+namespace {
+    /**
+     * \brief Convert flat tile-local cell index to (i,j,k) grid coordinates
+     *
+     * DenseBins uses column-major (Fortran) ordering: i_flat = i + j*nx + k*nx*ny
+     * where (i,j,k) are relative to the tile's lower corner.
+     *
+     * @param[in] i_cell flat tile-local cell index from DenseBins
+     * @param[in] tile_lo lower corner of the tile box
+     * @param[in] tile_dims dimensions of the tile box (nx, ny, nz)
+     * @param[out] i,j,k grid cell coordinates
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::IntVectND<3>
+    flatIndexToGridCell (int const i_cell,
+                         amrex::Dim3 const& tile_lo,
+                         amrex::GpuArray<int, 3> const& tile_dims) noexcept
+    {
+        // i_cell = i + j*nx + k*nx*ny
+        // This works for all dimensionality.
+        int const nx = tile_dims[0];
+        int const ny = tile_dims[1];
+        int const nxy = nx * ny;
+
+        int const i_local = i_cell % nx;
+        int const j_local = (i_cell / nx) % ny;
+        int const k_local = i_cell / nxy;
+
+        int const i = tile_lo.x + i_local;
+        int const j = tile_lo.y + j_local;
+        int const k = tile_lo.z + k_local;
+
+        return amrex::IntVectND<3>(i, j, k);
+    }
+}
+
 /**
  * \brief This class performs generic binary collisions.
  *
@@ -300,6 +336,9 @@ public:
         using namespace amrex::literals;
 
         ABLASTR_PROFILE("BinaryCollision::doCollisionsWithinTile");
+
+        const amrex::Dim3 tile_lo = amrex::lbound(mfi.tilebox());
+        const amrex::GpuArray<int, 3> tile_dims = mfi.tilebox().length3d();
 
         const auto& binary_collision_functor = m_binary_collision_functor.executor(mfi);
         const bool have_product_species = m_have_product_species;
@@ -657,6 +696,7 @@ public:
 
                     // Use a bisection algorithm to find the index of the cell in which this pair is located
                     const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
+                    amrex::IntVectND<3> global_index = flatIndexToGridCell(i_cell, tile_lo, tile_dims);
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -696,7 +736,7 @@ public:
                         soa_1, soa_1, get_position_1, get_position_1,
                         n1, n1, T1, T1, global_lamdb,
                         q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
-                        cell_start_pair, i_cell, p_mask, p_pair_indices_1, p_pair_indices_2,
+                        cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);
                 }
             );
@@ -1243,6 +1283,7 @@ public:
 
                     // Use a bisection algorithm to find the index of the cell in which this pair is located
                     const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
+                    amrex::IntVectND<3> global_index = flatIndexToGridCell(i_cell, tile_lo, tile_dims);
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -1289,7 +1330,7 @@ public:
                         soa_1, soa_2, get_position_1, get_position_2,
                         n1, n2, T1, T2, global_lamdb,
                         q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
-                        cell_start_pair, i_cell, p_mask, p_pair_indices_1, p_pair_indices_2,
+                        cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);
                 }
             );
