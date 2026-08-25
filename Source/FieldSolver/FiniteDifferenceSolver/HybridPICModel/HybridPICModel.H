@@ -385,37 +385,56 @@ public:
     void AdvanceElectronEnergyQDSMC (amrex::Real dt) const;
 
     /**
-     * \brief Compute the per-species resistive overlay vector field added to
-     *        Ohm's-law E alongside the global +eta_global * J term:
+     * \brief Compute the per-species resistive friction added to Ohm's-law E
+     *        alongside the global +eta_global * J term:
      *
-     *           overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
-     *                                       * (V_s_d - V_e_d) ]
+     *           F_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
+     *                                  * (V_s_d - V_e_d) ]
      *
      *        summed over charged species that have a per-species
      *        resistivity parser registered. The total friction term that
      *        Ohm's law sees becomes
      *
-     *           E_friction = +eta_global * J + overlay
+     *           E_friction = +eta_global * J + F
      *                      = +e * Sigma_s Z_s * (eta_global + eta_s_per) * n_s
      *                                       * (V_s - V_e)
      *
      *        i.e. effectively eta_s_eff = eta_global + eta_s_per per species.
      *
-     *        Output multifabs are at the Jx/Jy/Jz staggering (== E
-     *        component staggering); when m_has_per_species_eta is false
-     *        the overlay is set to zero and the function returns early.
+     *        Because V_e = (J_i - J_plasma)/rho and the subcycled B-field
+     *        integration re-evaluates J_plasma from the live B at every
+     *        stage, F is stored in two parts so that its J_plasma response
+     *        stays live inside the substep loop while the slow, per-step
+     *        moments (V_s, J_i, rho_s, T_e) stay lagged:
      *
-     *        Computed once per step (from HybridPICEvolveFields, into the
-     *        registered hybrid_eta_overlay_fp fields) from the start-of-step
-     *        fields and held frozen across the (subcycled) E-solves, which
-     *        only read it -- a deliberate lagged approximation, matching the
-     *        per-step evaluation of Vs_fp, rho_fp_{spec} and T_e.
+     *          hybrid_eta_overlay_coef_fp:
+     *              eta_coef = Sigma_s max(eta_s_per, 0) * max(rho_s, 0) / rho_sum,
+     *              the lagged per-species resistivity coefficient that the
+     *              E-solve multiplies by the live plasma current, exactly
+     *              like the global eta;
+     *          hybrid_eta_overlay_fp:
+     *              F - eta_coef * J_plasma, the ion-drift remainder, frozen
+     *              like the deposited ion moments themselves.
+     *
+     *        The E-solve applies overlay_d + eta_coef_d * J_d, which equals
+     *        F exactly at the J_plasma this function was called with and
+     *        responds dissipatively (like +eta*J) as J_plasma evolves
+     *        through the substeps. Applying F as a fixed vector instead
+     *        would act as a constant source over the half-step: in high-eta
+     *        regions it would keep driving B long after the current it was
+     *        computed from has relaxed, anti-damping the whistler modes the
+     *        friction is meant to damp and collapsing the adaptive substep
+     *        size at plasma-vacuum interfaces.
+     *
+     *        Outputs are the registered hybrid_eta_overlay_fp and
+     *        hybrid_eta_overlay_coef_fp fields at the Jx/Jy/Jz staggering
+     *        (== E component staggering). Returns early when
+     *        m_has_per_species_eta is false (the fields are then not
+     *        allocated). Called from HybridPICEvolveFields before each
+     *        half-step B-advance, so each half integrates about the most
+     *        recent J_plasma linearization point.
      */
-    void ComputeResistiveOverlay (
-        int lev,
-        amrex::MultiFab & overlay_x,
-        amrex::MultiFab & overlay_y,
-        amrex::MultiFab & overlay_z) const;
+    void ComputeResistiveOverlay (int lev) const;
 
     /** Check if rkf45 should be used */
     [[nodiscard]] bool DoRKF45(int step) const { return m_rkf45_intervals.contains(step); }

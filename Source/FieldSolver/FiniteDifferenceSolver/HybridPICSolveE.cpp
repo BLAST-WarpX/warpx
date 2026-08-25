@@ -604,15 +604,18 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
-    // Per-species resistive overlay added to Ohm's-law E alongside
-    // +eta_global J. Computed once per step (HybridPICEvolveFields ->
-    // ComputeResistiveOverlay) into the registered hybrid_eta_overlay_fp
-    // fields and only read here, shared by the subcycled E-solves. The
-    // fields are not allocated when no per-species parser is registered.
+    // Per-species resistive friction added to Ohm's-law E alongside
+    // +eta_global J, as the frozen ion-drift remainder plus the lagged
+    // coefficient times the live plasma current (see
+    // HybridPICModel::ComputeResistiveOverlay, which fills the registered
+    // hybrid_eta_overlay_fp / hybrid_eta_overlay_coef_fp fields read here).
+    // The fields are not allocated when no per-species parser is registered.
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
     ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
+    ablastr::fields::VectorField eta_coef_mf = {nullptr, nullptr, nullptr};
     if (has_eta_overlay) {
         eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+        eta_coef_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
     }
 
     // Loop through the grids, and over the tiles within each grid for the
@@ -719,10 +722,14 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
         // Default-constructed (never indexed) unless has_eta_overlay.
         Array4<Real const> eta_overlay_r, eta_overlay_t, eta_overlay_z;
+        Array4<Real const> eta_coef_r, eta_coef_t, eta_coef_z;
         if (has_eta_overlay) {
             eta_overlay_r = eta_overlay_mf[0]->const_array(mfi);
             eta_overlay_t = eta_overlay_mf[1]->const_array(mfi);
             eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+            eta_coef_r = eta_coef_mf[0]->const_array(mfi);
+            eta_coef_t = eta_coef_mf[1]->const_array(mfi);
+            eta_coef_z = eta_coef_mf[2]->const_array(mfi);
         }
 
         // Extract structures indicating where the fields
@@ -797,8 +804,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
-                    // Per-species resistive overlay (Phys. Plasmas 31, 012902 (2024)).
-                    if (has_eta_overlay) { Er(i, j, 0) += eta_overlay_r(i, j, 0); }
+                    // Per-species resistive friction (Phys. Plasmas 31, 012902 (2024)):
+                    // frozen ion-drift remainder plus the lagged coefficient
+                    // times the live plasma current.
+                    if (has_eta_overlay) {
+                        Er(i, j, 0) += eta_overlay_r(i, j, 0)
+                                       + eta_coef_r(i, j, 0) * Jr(i, j, 0);
+                    }
 
                     if (include_hyper_resistivity_term && solve_for_Faraday) {
 
@@ -870,7 +882,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
-                    if (has_eta_overlay) { Etheta(i, j, 0) += eta_overlay_t(i, j, 0); }
+                    if (has_eta_overlay) {
+                        Etheta(i, j, 0) += eta_overlay_t(i, j, 0)
+                                           + eta_coef_t(i, j, 0) * Jtheta(i, j, 0);
+                    }
 
                     if (include_hyper_resistivity_term && solve_for_Faraday) {
 
@@ -939,7 +954,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
-                    if (has_eta_overlay) { Ez(i, j, 0) += eta_overlay_z(i, j, 0); }
+                    if (has_eta_overlay) {
+                        Ez(i, j, 0) += eta_overlay_z(i, j, 0)
+                                       + eta_coef_z(i, j, 0) * Jz(i, j, 0);
+                    }
 
                     if (include_hyper_resistivity_term && solve_for_Faraday) {
 
@@ -1075,14 +1093,17 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
 
-    // Per-species resistive overlay added to Ohm's-law E alongside
-    // +eta_global J; computed once per step, only read here (see
-    // HybridPICSolveECylindrical). Not allocated when no per-species
-    // parser is registered.
+    // Per-species resistive friction added to Ohm's-law E alongside
+    // +eta_global J: frozen ion-drift remainder plus lagged coefficient
+    // times the live plasma current (see HybridPICSolveECylindrical and
+    // HybridPICModel::ComputeResistiveOverlay). Not allocated when no
+    // per-species parser is registered.
     const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
     ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
+    ablastr::fields::VectorField eta_coef_mf = {nullptr, nullptr, nullptr};
     if (has_eta_overlay) {
         eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+        eta_coef_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
     }
 
     // Loop through the grids, and over the tiles within each grid for the
@@ -1189,10 +1210,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
         // Default-constructed (never indexed) unless has_eta_overlay.
         Array4<Real const> eta_overlay_x, eta_overlay_y, eta_overlay_z;
+        Array4<Real const> eta_coef_x, eta_coef_y, eta_coef_z;
         if (has_eta_overlay) {
             eta_overlay_x = eta_overlay_mf[0]->const_array(mfi);
             eta_overlay_y = eta_overlay_mf[1]->const_array(mfi);
             eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+            eta_coef_x = eta_coef_mf[0]->const_array(mfi);
+            eta_coef_y = eta_coef_mf[1]->const_array(mfi);
+            eta_coef_z = eta_coef_mf[2]->const_array(mfi);
         }
 
         // Extract structures indicating where the fields
@@ -1263,7 +1288,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
-                if (has_eta_overlay) { Ex(i, j, k) += eta_overlay_x(i, j, k); }
+                // Per-species resistive friction: frozen ion-drift remainder
+                // plus the lagged coefficient times the live plasma current.
+                if (has_eta_overlay) {
+                    Ex(i, j, k) += eta_overlay_x(i, j, k)
+                                   + eta_coef_x(i, j, k) * Jx(i, j, k);
+                }
 
                 if (include_hyper_resistivity_term && solve_for_Faraday) {
 
@@ -1328,7 +1358,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
-                if (has_eta_overlay) { Ey(i, j, k) += eta_overlay_y(i, j, k); }
+                if (has_eta_overlay) {
+                    Ey(i, j, k) += eta_overlay_y(i, j, k)
+                                   + eta_coef_y(i, j, k) * Jy(i, j, k);
+                }
 
                 if (include_hyper_resistivity_term && solve_for_Faraday) {
 
@@ -1393,7 +1426,10 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
-                if (has_eta_overlay) { Ez(i, j, k) += eta_overlay_z(i, j, k); }
+                if (has_eta_overlay) {
+                    Ez(i, j, k) += eta_overlay_z(i, j, k)
+                                   + eta_coef_z(i, j, k) * Jz(i, j, k);
+                }
 
                 if (include_hyper_resistivity_term && solve_for_Faraday) {
 

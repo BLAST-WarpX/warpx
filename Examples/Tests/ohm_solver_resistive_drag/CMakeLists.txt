@@ -12,6 +12,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_ohm_solver_resistive_drag_per_species_picmi  # name
+    2  # dims
+    2  # nprocs
+    "inputs_test_2d_ohm_solver_resistive_drag_picmi.py --test --eta-scale 100 --per-species-eta"  # inputs
+    "analysis_resistive_drag.py --eta-scale 100"  # analysis
+    "analysis_default_regression.py --path diags/field_diags"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_rz_ohm_solver_resistive_drag_species_fields_picmi  # name
     RZ  # dims
     2  # nprocs

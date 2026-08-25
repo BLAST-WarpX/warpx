@@ -3809,6 +3809,10 @@ Maxwell solver: kinetic-fluid hybrid
     The species-resolved friction back-reaction on the ions is applied by the ``hybrid_resistive_drag``
     collision (see :pp:param:`\<collision_name\>.type`), which should accompany any per-species overlay.
     In all geometries, ``rho_s`` and ``J_s`` are expressed in physical SI units.
+    Within the subcycled B-field integration the overlay is applied as a lagged resistivity coefficient
+    multiplying the instantaneous plasma current (plus a frozen ion-drift part), so it damps the
+    substepped field dynamics the same way the global resistivity does; the parser itself is
+    evaluated once per half-step.
 
 .. pp:param:: hybrid_pic_model.solve_electron_energy_equation
     :type: ``bool``

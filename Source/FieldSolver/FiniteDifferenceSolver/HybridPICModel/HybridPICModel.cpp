@@ -343,16 +343,23 @@ void HybridPICModel::AllocateLevelMFs (
             lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
     }
 
-    // Species-summed resistive overlay added to Ohm's-law E: one vector
-    // field holding Sigma_s of the per-species friction contributions (see
-    // ComputeResistiveOverlay). Computed once per step and read by every
-    // (subcycled) E-solve; staggered like J (== E component staggering).
+    // Species-summed resistive friction added to Ohm's-law E, stored in two
+    // parts (see ComputeResistiveOverlay): the frozen ion-drift vector
+    // (hybrid_eta_overlay_fp) and the lagged resistivity coefficient
+    // (hybrid_eta_overlay_coef_fp) that the E-solve multiplies by the live
+    // plasma current. Both staggered like J (== E component staggering).
     if (m_has_per_species_eta) {
         fields.alloc_init("hybrid_eta_overlay_fp", Direction{0},
             lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
         fields.alloc_init("hybrid_eta_overlay_fp", Direction{1},
             lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
         fields.alloc_init("hybrid_eta_overlay_fp", Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_coef_fp", Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_coef_fp", Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_coef_fp", Direction{2},
             lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
 
@@ -1040,31 +1047,35 @@ void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
     }
 }
 
-void HybridPICModel::ComputeResistiveOverlay (
-    int const lev,
-    amrex::MultiFab & overlay_x,
-    amrex::MultiFab & overlay_y,
-    amrex::MultiFab & overlay_z) const
+void HybridPICModel::ComputeResistiveOverlay (int const lev) const
 {
     ABLASTR_PROFILE("HybridPICModel::ComputeResistiveOverlay()");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    // Result is the per-species friction contribution added to Ohm's-law E:
-    //   overlay_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum * (V_s_d - V_e_d) ]
-    // summed over charged species with a registered per-species parser.
-    // eta_s_per is evaluated at (rho_s, rho, T_e [K], |J|, |J_s|, |B|, t) per cell
-    // at the d-component staggering. The output is always zeroed first; if
-    // no per-species parsers are registered the function returns early.
-
-    overlay_x.setVal(0.0_rt);
-    overlay_y.setVal(0.0_rt);
-    overlay_z.setVal(0.0_rt);
+    // The per-species friction contribution added to Ohm's-law E is
+    //   F_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum * (V_s_d - V_e_d) ]
+    // summed over charged species with a registered per-species parser, with
+    // eta_s_per evaluated at (rho_s, rho, T_e [K], |J|, |J_s|, |B|, t) per
+    // cell at the d-component staggering. It is emitted split about the
+    // current J_plasma (see the class docstring): the lagged coefficient
+    //   eta_coef_d = Sigma_s max(eta_s_per, 0) * max(rho_s, 0) / rho_sum
+    // that the E-solve multiplies by the live plasma current, and the frozen
+    // ion-drift remainder F_d - eta_coef_d * J_plasma_d.
 
     if (!m_has_per_species_eta) { return; }
 
     auto & warpx = WarpX::GetInstance();
+
+    ablastr::fields::VectorField overlay_mf =
+        warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+    ablastr::fields::VectorField coef_mf =
+        warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
+    for (int idim = 0; idim < 3; ++idim) {
+        overlay_mf[idim]->setVal(0.0_rt);
+        coef_mf[idim]->setVal(0.0_rt);
+    }
     auto const & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
     auto const t_new = warpx.gett_new(lev);
@@ -1119,10 +1130,11 @@ void HybridPICModel::ComputeResistiveOverlay (
         ablastr::fields::VectorField Js_fp =
             warpx.m_fields.get_alldirs("current_fp_" + spec_name, lev);
 
-        // Lambda: accumulate this species's overlay contribution into a
-        // single output multifab at the given d staggering.
+        // Lambda: accumulate this species's friction contribution into the
+        // remainder and coefficient multifabs at the given d staggering.
         auto accumulate_one_direction = [&] (
             amrex::MultiFab       & out,
+            amrex::MultiFab       & coef,
             amrex::GpuArray<int,3>  const d_stag,
             int                     d_idx)
         {
@@ -1132,6 +1144,7 @@ void HybridPICModel::ComputeResistiveOverlay (
             for (amrex::MFIter mfi(out, TilingIfNotGPU()); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real>       const & out_arr     = out.array(mfi);
+                amrex::Array4<amrex::Real>       const & coef_arr    = coef.array(mfi);
                 amrex::Array4<amrex::Real const> const & rho_arr     = rho_total.const_array(mfi);
                 amrex::Array4<amrex::Real const> const & rhos_arr    = rho_s_mf.const_array(mfi);
                 amrex::Array4<amrex::Real const> const & rhosum_arr  = rho_sum.const_array(mfi);
@@ -1188,17 +1201,34 @@ void HybridPICModel::ComputeResistiveOverlay (
                     amrex::Real const dv_d  = Vsd_arr(i,j,k) - Ved_arr(i,j,k);
                     amrex::Real const eta_s = eta_s_per(rhos_val, rho_val, Te_val,
                                                         Jmag, Jsmag, Bmag, t_new);
-                    out_arr(i,j,k) += eta_s * rhos_val * rho_val / rhosum_val * dv_d;
+
+                    // Split about the current J_plasma: the coefficient
+                    // (clamped so the live term stays dissipative) goes to
+                    // coef_arr; subtracting its baseline contribution here
+                    // makes overlay + coef * J_plasma reproduce the full
+                    // friction exactly at this linearization point. The
+                    // d-component of J_plasma at the d staggering is a
+                    // direct read (jpx/jpy/jpz above are identity interps
+                    // for their own direction).
+                    amrex::Real const jp_d =
+                        (d_idx == 0) ? jpx : ((d_idx == 1) ? jpy : jpz);
+                    amrex::Real const coef_s = amrex::max(eta_s, 0._rt)
+                        * amrex::max(rhos_val, 0._rt) / rhosum_val;
+
+                    out_arr(i,j,k) += eta_s * rhos_val * rho_val / rhosum_val * dv_d
+                                      - coef_s * jp_d;
+                    coef_arr(i,j,k) += coef_s;
                 });
             }
         };
 
-        accumulate_one_direction(overlay_x, Jx_stag, 0);
-        accumulate_one_direction(overlay_y, Jy_stag, 1);
-        accumulate_one_direction(overlay_z, Jz_stag, 2);
+        accumulate_one_direction(*overlay_mf[0], *coef_mf[0], Jx_stag, 0);
+        accumulate_one_direction(*overlay_mf[1], *coef_mf[1], Jy_stag, 1);
+        accumulate_one_direction(*overlay_mf[2], *coef_mf[2], Jz_stag, 2);
     }
-    // No ghost exchange: the E-solve kernels only read the overlay at valid
-    // cells (the Yee E updates run on ungrown tileboxes).
+    // No ghost exchange: the E-solve kernels only read the overlay and
+    // coefficient at valid cells (the Yee E updates run on ungrown
+    // tileboxes).
 }
 
 

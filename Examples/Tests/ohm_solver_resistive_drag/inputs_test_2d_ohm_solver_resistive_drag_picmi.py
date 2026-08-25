@@ -68,10 +68,11 @@ class ResistiveDragMomentum(object):
     DIAG_EVERY = 150
     substeps = 20
 
-    def __init__(self, test, verbose, eta_scale):
+    def __init__(self, test, verbose, eta_scale, per_species_eta):
         self.test = test
         self.verbose = verbose or test
         self.eta_scale = eta_scale
+        self.per_species_eta = per_species_eta
 
         if self.test:
             self.NX = 32
@@ -180,17 +181,34 @@ class ResistiveDragMomentum(object):
         # resistive dissipation the drag/push-field pairing tracks in momentum
         # is also returned to the electrons in energy (and the drag
         # consistency warning stays quiet).
+        # With --per-species-eta the same constant eta is registered through
+        # the per-species overlay instead of the global parser. For a single
+        # species the friction eta_s rho_s (V_s - V_e) equals eta J_plasma,
+        # so the momentum-cancellation and resistive-decay observables below
+        # validate the overlay path (including its remainder/coefficient
+        # split consumed by the substepped E-solves) against the same theory
+        # as the global path. RKF45 is enabled in this variant so the
+        # adaptive integrator is the consumer.
+        if self.per_species_eta:
+            resistivity_kwargs = dict(
+                plasma_resistivity=0.0,
+                plasma_resistivity_species={"ions": f"{self.eta}"},
+                use_rkf45=True,
+            )
+        else:
+            resistivity_kwargs = dict(plasma_resistivity=self.eta)
+
         self.solver = picmi.HybridPICSolver(
             grid=self.grid,
             gamma=self.gamma_e,
             Te=self.te_eV,
             n0=self.n0,
             n_floor=0.05 * self.n0,
-            plasma_resistivity=self.eta,
             plasma_hyper_resistivity=self.eta_h,
             substeps=self.substeps,
             solve_electron_energy_equation=True,
             include_joule_heating=True,
+            **resistivity_kwargs,
         )
 
         simulation = picmi.Simulation(
@@ -289,10 +307,19 @@ parser.add_argument(
     "putting nu_drag * t_end ~ 1 so a broken drag/push-field pairing gives "
     "an order-unity spurious ion current)",
 )
+parser.add_argument(
+    "--per-species-eta",
+    help="register eta through the per-species resistivity overlay (with the "
+    "RKF45 adaptive substepping) instead of the global parser",
+    action="store_true",
+)
 args, left = parser.parse_known_args()
 sys.argv = sys.argv[:1] + left
 
 run = ResistiveDragMomentum(
-    test=args.test, verbose=args.verbose, eta_scale=args.eta_scale
+    test=args.test,
+    verbose=args.verbose,
+    eta_scale=args.eta_scale,
+    per_species_eta=args.per_species_eta,
 )
 simulation.step()

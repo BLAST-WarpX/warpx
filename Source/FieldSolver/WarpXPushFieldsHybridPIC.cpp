@@ -76,15 +76,15 @@ void WarpX::HybridPICEvolveFields ()
     // Get the external current
     m_hybrid_pic_model->GetCurrentExternal();
 
-    // Compute the per-species resistive overlay once per step, from the
-    // start-of-step fields; the E-solves below only read it. Ve varies
-    // through the B-substeps, but the overlay is deliberately held fixed
-    // across the step (lagged, like its other inputs Vs, rho_s, T_e).
+    // Compute the per-species resistive friction from the start-of-step
+    // fields, split into the frozen ion-drift remainder and the lagged
+    // coefficient that the E-solves below multiply by the live plasma
+    // current (see ComputeResistiveOverlay). The slow moments (Vs, rho_s,
+    // T_e) are per-step quantities; the plasma-current response stays live
+    // through the coefficient.
     if (m_hybrid_pic_model->m_has_per_species_eta) {
         for (int lev = 0; lev <= finest_level; ++lev) {
-            auto eta_overlay = m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
-            m_hybrid_pic_model->ComputeResistiveOverlay(
-                lev, *eta_overlay[0], *eta_overlay[1], *eta_overlay[2]);
+            m_hybrid_pic_model->ComputeResistiveOverlay(lev);
         }
     }
 
@@ -148,6 +148,19 @@ void WarpX::HybridPICEvolveFields ()
         m_hybrid_pic_model->m_external_vector_potential->UpdateHybridExternalFields(
             gett_old(0) + 0.5_rt*dt[0],
             0.5_rt*dt[0]);
+    }
+
+    // Re-center the per-species friction linearization on the half-step
+    // fields before the second half-step B-advance: refresh J_plasma from
+    // the accepted B^{n+1/2} and recompute the remainder/coefficient pair
+    // about it (see ComputeResistiveOverlay).
+    if (m_hybrid_pic_model->m_has_per_species_eta) {
+        m_hybrid_pic_model->CalculatePlasmaCurrent(
+            m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
+            m_eb_update_E);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            m_hybrid_pic_model->ComputeResistiveOverlay(lev);
+        }
     }
 
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
