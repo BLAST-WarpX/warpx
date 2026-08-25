@@ -19,6 +19,7 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Gpu.H>
+#include <AMReX_GpuControl.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_MFIter.H>
@@ -341,6 +342,13 @@ DielectricMaterials::FillParserSignedDistance (
     auto parser = utils::parser::makeParser(material.implicit_function, {"x", "y", "z"});
     DielectricParserIF const parser_if(parser.compile<3>());
     auto gshop = amrex::EB2::makeShop(parser_if, parser);
+
+    int const box_type = gshop.getBoxType(geom.Domain(), geom, amrex::RunOn::Cpu);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        box_type != decltype(gshop)::allcovered,
+        "Dielectric material " + material.name +
+        " covers the entire simulation domain. Full-domain dielectric materials "
+        "are not supported yet.");
 
     amrex::EB2::Build(gshop, geom, 0, 0, std::max(4, object_sdf.nGrowVect().max()));
     amrex::EB2::IndexSpace* dielectric_index_space = &amrex::EB2::IndexSpace::top();
