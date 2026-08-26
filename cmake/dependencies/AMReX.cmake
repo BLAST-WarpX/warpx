@@ -21,23 +21,23 @@ macro(find_amrex)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
         # see https://amrex-codes.github.io/amrex/docs_html/BuildingAMReX.html#customization-options
-        if(WarpX_ASCENT)
-            set(AMReX_ASCENT ON CACHE INTERNAL "")
+        set(AMReX_ASCENT "${WarpX_ASCENT}" CACHE INTERNAL "")
+        set(AMReX_CATALYST "${WarpX_CATALYST}" CACHE INTERNAL "")
+        if(WarpX_ASCENT OR WarpX_CATALYST)
             set(AMReX_CONDUIT ON CACHE INTERNAL "")
-        endif()
-
-        if(WarpX_CATALYST)
-            set(AMReX_CATALYST ON CACHE INTERNAL "")
-            set(AMReX_CONDUIT ON CACHE INTERNAL "")
-        endif()
-
-        if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
-            set(AMReX_ASSERTIONS ON CACHE BOOL "")
-            # note: floating-point exceptions can slow down debug runs a lot
-            set(AMReX_FPE ON CACHE BOOL "")
         else()
-            set(AMReX_ASSERTIONS OFF CACHE BOOL "")
-            set(AMReX_FPE OFF CACHE BOOL "")
+            set(AMReX_CONDUIT OFF CACHE INTERNAL "")
+        endif()
+
+        # FORCE: we derive these from CMAKE_BUILD_TYPE, so they have to follow it
+        # when an existing build directory is re-configured to another build type
+        if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
+            set(AMReX_ASSERTIONS ON CACHE BOOL "" FORCE)
+            # note: floating-point exceptions can slow down debug runs a lot
+            set(AMReX_FPE ON CACHE BOOL "" FORCE)
+        else()
+            set(AMReX_ASSERTIONS OFF CACHE BOOL "" FORCE)
+            set(AMReX_FPE OFF CACHE BOOL "" FORCE)
         endif()
 
         if(WarpX_COMPUTE STREQUAL OMP)
@@ -105,9 +105,7 @@ macro(find_amrex)
             set(AMReX_PARTICLES_PRECISION "SINGLE" CACHE INTERNAL "")
         endif()
 
-        if(WarpX_SENSEI)
-            set(AMReX_SENSEI ON CACHE INTERNAL "")
-        endif()
+        set(AMReX_SENSEI "${WarpX_SENSEI}" CACHE INTERNAL "")
 
         set(AMReX_AMRLEVEL OFF CACHE INTERNAL "")
         set(AMReX_ENABLE_TESTS OFF CACHE INTERNAL "")
@@ -133,19 +131,25 @@ macro(find_amrex)
         endif()
 
         # shared libs, i.e. for Python bindings, need relocatable code
+        # (the second condition below is a subset of this one)
         if(WarpX_PYTHON OR
            ABLASTR_POSITION_INDEPENDENT_CODE OR
            (WarpX_LIB AND BUILD_SHARED_LIBS))
             set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
+        else()
+            set(AMReX_PIC OFF CACHE INTERNAL "" FORCE)
         endif()
-        if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
-            set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
 
-            # WE NEED AMReX AS SHARED LIB, OTHERWISE WE CANNOT SHARE ITS GLOBALS
-            # BETWEEN MULTIPLE PYTHON MODULES
-            # TODO this is likely an export/symbol hiding issue that we could
-            #      alleviate later on
+        # WE NEED AMReX AS SHARED LIB, OTHERWISE WE CANNOT SHARE ITS GLOBALS
+        # BETWEEN MULTIPLE PYTHON MODULES
+        # TODO this is likely an export/symbol hiding issue that we could
+        #      alleviate later on
+        if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
             set(AMReX_BUILD_SHARED_LIBS ON CACHE BOOL "Build AMReX shared library" FORCE)
+        elseif(DEFINED AMReX_BUILD_SHARED_LIBS)
+            # do not leave a stale ON behind: AMReX_INSTALL below distinguishes
+            # "we forced it" from "the user/BUILD_SHARED_LIBS decides"
+            unset(AMReX_BUILD_SHARED_LIBS CACHE)
         endif()
 
         # IPO/LTO
