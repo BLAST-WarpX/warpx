@@ -35,8 +35,7 @@ def particle_state(plotfile):
     )
     normalized_momentum = np.column_stack(
         [
-            np.asarray(data["test", f"particle_momentum_{axis}"])[order]
-            / (m_e * c)
+            np.asarray(data["test", f"particle_momentum_{axis}"])[order] / (m_e * c)
             for axis in "xyz"
         ]
     )
