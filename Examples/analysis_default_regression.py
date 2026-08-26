@@ -38,6 +38,7 @@ if __name__ == "__main__":
         "--path",
         help="path to output file(s)",
         type=str,
+        required=True,
     )
 
     # add arguments: relative tolerance

@@ -71,15 +71,16 @@ if __name__ == "__main__":
     # add arguments: output file path
     parser.add_argument(
         "--path",
-        help="path to output file(s)",
+        help="path to output file",
         type=str,
+        required=True,
     )
 
     # add arguments: relative tolerance
     default_tolerance = 1e-12
     parser.add_argument(
         "--rtol",
-        help="relative tolerance between restart ad original",
+        help="relative tolerance between restart and original",
         type=float,
         required=False,
         default=default_tolerance,
