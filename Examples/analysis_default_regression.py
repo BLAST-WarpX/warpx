@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # add arguments: output path
     parser.add_argument(
         "--path",
-        help="path to output file(s)",
+        help="path to output file",
         type=str,
         required=True,
     )
