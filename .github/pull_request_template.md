@@ -27,8 +27,8 @@ corner-cases and rejected ideas into the collapsed "Details" block below.
 Prefix the PR title with `[WIP] ` (and/or open the PR as a GitHub *draft*)
 until this list is complete. CI is paused on draft PRs.
 
-If this PR was drafted with an LLM, perform a separate LLM-based review on to of your manual self-review before asking for a human reviewer to read your code.
+If any portion of code has been drafted by an LLM, perform a separate LLM-based review on top of your manual self-review before asking for a human reviewer to read your code.
 -->
 
-- [ ] Self-reviewed: check and understand logic, improve wording, check for outdated and unnecessarily historic documentation; ensure new features are tested with small, fast tests
-- [ ] Finalize: ensure a WarpX developer can understand this
+- [ ] Self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features were tested with small, fast tests
+- [ ] Finalized: documented in a way to ensure a human WarpX developer can understand

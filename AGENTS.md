@@ -176,9 +176,9 @@ Close the description with a `## TODO` check-list and keep the PR title prefixed
 Prefix the PR title with `[WIP] ` until this list is complete.
 
 - [x] Drafted with LLM [optional model details]
-- [ ] Manual self-review: check and understand logic, improve wording, check for outdated and unnecessarily historic documentation; ensure new features are tested with small, fast tests
+- [ ] Manual self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features were tested with small, fast tests
 - [ ] Performed a separate, LLM-based review and fixed all findings
-- [ ] Finalize: present and documented in a way to ensure a human WarpX developer can understand this
+- [ ] Finalized: documented in a way to ensure a human WarpX developer can understand 
 ```
 
-WarpX developers are typically a mix of backgrounds from computational physics, applied mathematics, and computer systems engineering.
+WarpX developers have typically a mix of backgrounds from computational physics, applied mathematics, and computer systems engineering.
