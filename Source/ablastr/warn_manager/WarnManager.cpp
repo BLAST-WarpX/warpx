@@ -17,8 +17,6 @@
 #include <AMReX_ParmParse.H>
 
 #include <algorithm>
-#include <memory>
-#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -27,14 +25,6 @@ using namespace ablastr::warn_manager;
 
 namespace
 {
-    //! the WarnManager instance of the current AMReX initialize/finalize cycle
-    //! (with nested amrex::Initialize, the innermost amrex::Finalize already ends it)
-    std::unique_ptr<WarnManager> warn_manager_instance;
-
-    //! guards creation and teardown of warn_manager_instance - the pointer, not the
-    //! reference GetInstance returns; a namespace-scope pointer has no thread-safe init
-    std::mutex warn_manager_instance_mutex;
-
     WarnPriority MapPriorityToWarnPriority (
         const abl_msg_logger::Priority& priority)
     {
@@ -55,32 +45,8 @@ namespace
 }
 
 WarnManager& WarnManager::GetInstance() {
-    const std::lock_guard<std::mutex> lock{warn_manager_instance_mutex};
-
-    if (!warn_manager_instance)
-    {
-        // The state of the warn manager (recorded warnings, the
-        // warn-immediately flag, the abort threshold and the MPI rank) belongs
-        // to one AMReX initialize/finalize cycle: a process that runs more than
-        // one simulation, e.g., a parameter scan in Python, starts each of them
-        // with a clean warning list and with the default warning settings.
-        // std::make_unique is not an option here, because the constructor is
-        // private.
-        warn_manager_instance = std::unique_ptr<WarnManager>{new WarnManager};
-
-        // Do not record a warning from a finalize hook: amrex::Finalize calls top()() before
-        // pop(), so a teardown pushed from there is dropped and leaks into the next cycle.
-        amrex::ExecOnFinalize([](){
-            // destroyed outside the lock: the non-recursive mutex deadlocks on a warning
-            std::unique_ptr<WarnManager> expiring;
-            {
-                const std::lock_guard<std::mutex> finalize_lock{warn_manager_instance_mutex};
-                expiring = std::move(warn_manager_instance);
-            }
-        });
-    }
-
-    return *warn_manager_instance;
+    static auto warn_manager = WarnManager{};
+    return warn_manager;
 }
 
 WarnManager::WarnManager():
@@ -346,6 +312,11 @@ WarnManager::MsgFormatter(
     return ss_out.str();
 }
 
+void WarnManager::Clear()
+{
+    m_p_logger->clear();
+}
+
 WarnManager& ablastr::warn_manager::GetWMInstance()
 {
     return WarnManager::GetInstance();
@@ -358,4 +329,9 @@ void ablastr::warn_manager::WMRecordWarning(
 {
     WarnManager::GetInstance().RecordWarning(
         topic, text, priority);
+}
+
+void ablastr::warn_manager::WMClear()
+{
+    WarnManager::GetInstance().Clear();
 }

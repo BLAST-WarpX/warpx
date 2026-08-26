@@ -329,6 +329,9 @@ void
 WarpX::Finalize()
 {
     WarpX::ResetInstance();
+
+    // Clear all of the warning messages
+    ablastr::warn_manager::WMClear();
 }
 
 WarpX::WarpX ()
