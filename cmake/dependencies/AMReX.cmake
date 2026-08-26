@@ -123,8 +123,6 @@ macro(find_amrex)
         # CUDA device LTO (AMReX_CUDA_LTO, set for WarpX_IPO below) only works
         # with relocatable device code: without RDC every translation unit is
         # already device linked on its own and AMReX errors out.
-        # FORCE: we derive these from WarpX options, so they must follow them
-        # when an existing build directory is re-configured.
         if(WarpX_ASCENT OR WarpX_SENSEI OR
            (WarpX_IPO AND WarpX_COMPUTE STREQUAL CUDA))
             set(AMReX_GPU_RDC ON CACHE BOOL "" FORCE)
