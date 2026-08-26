@@ -419,9 +419,9 @@ Select GPU Architectures
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 For Nvidia GPUs, WarpX uses the standard CMake interface to select the CUDA architectures to compile for.
-By default, AMReX selects ``native``, i.e., CMake detects the architecture of the GPU(s) visible on the machine that runs ``cmake`` and WarpX is built exactly for those.
+By default, we select ``native``, i.e., CMake detects the architecture of the GPU(s) visible on the machine that runs ``cmake`` and WarpX is built exactly for those.
 
-If no GPU is visible at configuration time - a typical situation on HPC login nodes, in containers and in CI - configuration stops with an error and you need to select the architecture explicitly, either as a CMake option:
+If no GPU is visible at configuration time (a typical situation on HPC login nodes, in containers and in CI) then configuration stops with an error and you need to select the architecture explicitly, either as a CMake option:
 
 .. code-block:: bash
 
