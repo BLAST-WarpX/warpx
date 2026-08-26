@@ -146,9 +146,13 @@ macro(find_amrex)
         #      alleviate later on
         if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
             set(AMReX_BUILD_SHARED_LIBS ON CACHE BOOL "Build AMReX shared library" FORCE)
-        elseif(DEFINED AMReX_BUILD_SHARED_LIBS)
+        elseif(DEFINED AMReX_BUILD_SHARED_LIBS AND
+               CMAKE_SOURCE_DIR STREQUAL WarpX_SOURCE_DIR)
             # do not leave a stale ON behind: AMReX_INSTALL below distinguishes
-            # "we forced it" from "the user/BUILD_SHARED_LIBS decides"
+            # "we forced it" from "the user/BUILD_SHARED_LIBS decides".
+            # Only when WarpX is the top-level project: as a subproject (e.g. of
+            # ImpactX) the parent sets this for its own Python bindings before
+            # adding us, and clearing it would break its install(EXPORT).
             unset(AMReX_BUILD_SHARED_LIBS CACHE)
         endif()
 
