@@ -439,3 +439,20 @@ else:
     )
 if not sim.test:
     plt.show()
+
+if not is_darwin and getattr(sim, "use_implicit", False):
+    # Check the total (field + ion kinetic) energy drift of the theta-implicit
+    # hybrid solver. At theta = 0.5 the field-particle energy exchange of the
+    # scheme is discretely conservative; the remaining drift comes from the
+    # algebraic electron pressure closure (whose grad(Pe) work on the ions has
+    # no paired electron internal energy ledger) and from the small physical
+    # resistive dissipation, both of which are bounded and small here.
+    field_energy = np.loadtxt("diags/field_energy.txt", skiprows=1)
+    part_energy = np.loadtxt("diags/part_energy.txt", skiprows=1)
+    W_tot = field_energy[:, 2] + part_energy[:, 2]
+    max_drift = np.max(np.abs(W_tot - W_tot[0])) / W_tot[0]
+    print(f"Maximum relative energy drift: {max_drift:.3e}")
+    tolerance = 5e-4
+    assert max_drift < tolerance, (
+        f"Total energy drift {max_drift:.3e} exceeds the tolerance {tolerance:.1e}"
+    )

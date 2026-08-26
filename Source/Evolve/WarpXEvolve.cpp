@@ -326,8 +326,11 @@ WarpX::Evolve (int numsteps)
             ExecutePythonCallback("afterEsolve");
         }
 
-        // Hybrid-PIC case
-        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+        // Hybrid-PIC case. With the theta-implicit hybrid evolve scheme the
+        // fields are already advanced self-consistently with the particles in
+        // the implicit solver's OneStep, so this explicit field update is skipped.
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC &&
+            !m_implicit_solver) {
             ExecutePythonCallback("beforeEsolve");
             // The particles are now at p^{n+1/2} and x^{n+1}. The fields
             // are updated according to the hybrid-PIC scheme (Ohm's law

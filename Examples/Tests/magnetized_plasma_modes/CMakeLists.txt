@@ -12,6 +12,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_ohm_solver_em_modes_implicit_picmi  # name
+    1  # dims
+    2  # nprocs
+    "inputs_test_em_modes_picmi.py --test --dim 1 --bdir z --ohm --implicit"  # inputs
+    "analysis.py --analyze_ohm_sim"  # analysis
+    "analysis_default_regression.py --path diags/field_diag000050"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_1d_ohm_solver_em_modes_perp_implicit_picmi  # name
+    1  # dims
+    2  # nprocs
+    "inputs_test_em_modes_picmi.py --test --dim 1 --bdir x --ohm --implicit"  # inputs
+    "analysis.py --analyze_ohm_sim"  # analysis
+    "analysis_default_regression.py --path diags/field_diag000050"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_ohm_solver_em_modes_picmi  # name
     1  # dims
     2  # nprocs

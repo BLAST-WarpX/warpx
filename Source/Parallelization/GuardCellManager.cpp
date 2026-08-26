@@ -170,6 +170,7 @@ guardCellManager::Init (
             ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
         }
     } else if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+               evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid ||
                evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
                evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // When using these implicit schemes, the speed of light Courant limit may be significantly
@@ -382,6 +383,7 @@ guardCellManager::Init (
     }
 
     if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+        evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid ||
         evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
         evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // For these implicit schemes, the number of ghost cells
