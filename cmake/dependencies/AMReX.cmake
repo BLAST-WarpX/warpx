@@ -149,9 +149,7 @@ macro(find_amrex)
         endif()
 
         # IPO/LTO
-        if(WarpX_IPO)
-            set(AMReX_IPO ON CACHE INTERNAL "")
-        endif()
+        set(AMReX_IPO "${WarpX_IPO}" CACHE INTERNAL "")
         if(WarpX_COMPUTE STREQUAL CUDA)
             if(WarpX_IPO)
                 set(AMReX_CUDA_LTO ON CACHE BOOL "" FORCE)
