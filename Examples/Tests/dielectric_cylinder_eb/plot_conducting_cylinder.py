@@ -377,6 +377,59 @@ def interpolate_to_z(data, values, z_line):
     return (1.0 - weight) * values[:, lower] + weight * values[:, upper]
 
 
+def circle_chord_half_width(radius, z_line):
+    radius2 = radius**2
+    z2 = z_line**2
+    if z2 >= radius2:
+        return None
+    return np.sqrt(radius2 - z2)
+
+
+def add_centerline_regions(ax, z_line, params, add_labels):
+    conductor_half_width = circle_chord_half_width(
+        params.conductor_radius, z_line
+    )
+    dielectric_half_width = circle_chord_half_width(
+        params.dielectric_radius, z_line
+    )
+
+    if dielectric_half_width is None:
+        return
+
+    conductor_label = "conductor" if add_labels else None
+    dielectric_label = "dielectric" if add_labels else None
+
+    if conductor_half_width is None:
+        ax.axvspan(
+            -dielectric_half_width,
+            dielectric_half_width,
+            color="#d8f0f3",
+            alpha=0.8,
+            label=dielectric_label,
+        )
+        return
+
+    ax.axvspan(
+        -dielectric_half_width,
+        -conductor_half_width,
+        color="#d8f0f3",
+        alpha=0.8,
+        label=dielectric_label,
+    )
+    ax.axvspan(
+        conductor_half_width,
+        dielectric_half_width,
+        color="#d8f0f3",
+        alpha=0.8,
+    )
+    ax.axvspan(
+        -conductor_half_width,
+        conductor_half_width,
+        color="0.85",
+        label=conductor_label,
+    )
+
+
 def plot_centerline(data, output_dir, suffix, args, params):
     z_line = args.centerline_z
     z = np.full_like(data.x, z_line)
@@ -397,25 +450,7 @@ def plot_centerline(data, output_dir, suffix, args, params):
     )
 
     for ax, (label, sim, analytic) in zip(axes, curves):
-        ax.axvspan(
-            -params.conductor_radius,
-            params.conductor_radius,
-            color="0.85",
-            label="conductor" if ax is axes[0] else None,
-        )
-        ax.axvspan(
-            -params.dielectric_radius,
-            -params.conductor_radius,
-            color="#d8f0f3",
-            alpha=0.8,
-            label="dielectric" if ax is axes[0] else None,
-        )
-        ax.axvspan(
-            params.conductor_radius,
-            params.dielectric_radius,
-            color="#d8f0f3",
-            alpha=0.8,
-        )
+        add_centerline_regions(ax, z_line, params, ax is axes[0])
         ax.plot(data.x, sim, color="#1f77b4", linewidth=1.6, label="WarpX")
         ax.plot(
             data.x,
