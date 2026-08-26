@@ -29,7 +29,7 @@ NVIDIA-H100:
       cmake -S . -B build                                  \
           -DCMAKE_VERBOSE_MAKEFILE=ON                      \
           -DBUILDNAME=GPU-H100-CUDA-SP                     \
-          -DSITE=GitLab                                    \
+          -DSITE=Frank_UO                                  \
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_EB=ON                                    \
           -DWarpX_PYTHON=OFF                               \
@@ -70,7 +70,7 @@ AMD-MI300:
           -DCMAKE_CXX_COMPILER=$(which clang++)        \
           -DCMAKE_VERBOSE_MAKEFILE=ON                  \
           -DBUILDNAME=GPU-MI300-HIP-SP                 \
-          -DSITE=GitLab                                \
+          -DSITE=Frank_UO                              \
           -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
           -DWarpX_EB=ON                                \
@@ -106,8 +106,8 @@ Intel-PVC:
     - |
       cmake -S . -B build                       \
           -DBUILD_SHARED_LIBS=ON                \
-          -DBUILDNAME=GPU-PVC-SYCL-Mixed        \
-          -DSITE=GitLab                         \
+          -DBUILDNAME=GPU-PVC-SYCL-MP           \
+          -DSITE=Frank_UO                       \
           -DCMAKE_VERBOSE_MAKEFILE=ON           \
           -DCMAKE_C_COMPILER=$(which icx)       \
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
