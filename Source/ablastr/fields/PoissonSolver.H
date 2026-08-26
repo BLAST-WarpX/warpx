@@ -320,12 +320,14 @@ computePhi (
         }
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
-        if (eb_enabled || is_rz) {
+        if (is_rz) {
             ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
                 mlmg_options.bottom_solver != amrex::BottomSolver::hypre,
-                "The HYPRE bottom solver is not supported with embedded boundaries or in RZ, "
-                "since amrex::MLEBNodeFDLaplacian does not implement fillIJMatrix/fillRHS "
-                "yet.");
+                "The HYPRE bottom solver is not supported in RZ, since "
+                "amrex::MLEBNodeFDLaplacian::fillIJMatrix does not handle the radial "
+                "metrics yet.");
+        }
+        if (eb_enabled || is_rz) {
             // In the presence of EB or RZ: the solver assumes that the beam is
             // propagating along  one of the axes of the grid, i.e. that only *one*
             // of the components of `beta` is non-negligible.

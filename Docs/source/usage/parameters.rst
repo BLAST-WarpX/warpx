@@ -522,9 +522,9 @@ Overall simulation parameters
     ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre`` and ``petsc``.
 
     ``hypre`` requires compiling with ``-DWarpX_HYPRE=ON`` and is only
-    available in 2D and 3D. It is currently not supported together with
-    embedded boundaries or in RZ geometry, since the corresponding AMReX
-    linear operator (``MLEBNodeFDLaplacian``) cannot assemble its matrix yet.
+    available in 2D and 3D. It is currently not supported in RZ geometry, since
+    the corresponding AMReX linear operator (``MLEBNodeFDLaplacian``) cannot
+    assemble its matrix for the radial metrics yet.
     HYPRE itself is configured through its own input file namespace, e.g.
     ``hypre.hypre_solver = BoomerAMG`` and
     ``hypre.bamg_strong_threshold = 0.5``; see the AMReX documentation for the

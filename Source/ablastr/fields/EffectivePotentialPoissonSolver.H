@@ -163,12 +163,12 @@ computeEffectivePotentialPhi (
         rho[lev]->mult(-1._rt/epsilon_0);
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
-        if (eb_enabled || is_rz) {
+        if (is_rz) {
             ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
                 mlmg_options.bottom_solver != amrex::BottomSolver::hypre,
-                "The HYPRE bottom solver is not supported with embedded boundaries or in RZ, "
-                "since amrex::MLEBNodeFDLaplacian does not implement fillIJMatrix/fillRHS "
-                "yet.");
+                "The HYPRE bottom solver is not supported in RZ, since "
+                "amrex::MLEBNodeFDLaplacian::fillIJMatrix does not handle the radial "
+                "metrics yet.");
         }
         // In the presence of EB or RZ the EB enabled linear solver is used
         if (eb_enabled)
