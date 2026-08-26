@@ -171,7 +171,7 @@ in ``Examples/Tests/python/CMakeLists.txt`` picks it up automatically.
 Two fixtures are provided:
 
 * ``warpx_lifecycle`` (in ``Examples/Tests/python/conftest.py``, applied automatically) runs
-  each test in its own temporary directory and calls :meth:`pywarpx.WarpX.finalize` afterwards,
+  each test in its own temporary directory and calls ``pywarpx.WarpX.finalize`` afterwards,
   which tears down WarpX and AMReX and clears all module-level input state. This is what
   allows a single process to run several independent simulations, for instance to compare
   deposition algorithms. A test that wants to drive initialization and finalization itself
