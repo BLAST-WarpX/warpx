@@ -40,6 +40,10 @@ python3 -m pip uninstall -qq -y pywarpx
 python3 -m pip uninstall -qq -y warpx
 python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 
 # General extra dependencies ##################################################
 #
@@ -131,7 +135,6 @@ rm -rf ${build_dir}/lapackpp-pm-gpu-build
 #
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade virtualenv
-python3 -m pip cache purge
 rm -rf ${SW_DIR}/venvs/warpx-gpu
 python3 -m venv ${SW_DIR}/venvs/warpx-gpu
 source ${SW_DIR}/venvs/warpx-gpu/bin/activate
@@ -150,9 +153,9 @@ python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies
 python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
-python3 -m pip install --upgrade cupy-cuda12x  # CUDA 12 compatible wheel
+python3 -m pip install --upgrade cupy-cuda13x  # CUDA 13 compatible wheel
 # optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-python3 -m pip install --upgrade torch  # CUDA 12 compatible wheel
+python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu132  # CUDA 13.2 compatible wheel
 python3 -m pip install --upgrade optimas[all]
 python3 -m pip install --upgrade lasy
 

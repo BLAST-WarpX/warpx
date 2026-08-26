@@ -23,7 +23,7 @@
 #
 
 # Base System and Essential Tools Installation
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS warpx-dev
+FROM nvidia/cuda:13.2.1-devel-ubuntu22.04 AS warpx-dev
 
 # WarpX version
 ARG warpx_version=25.11
@@ -213,8 +213,8 @@ RUN python3 -m venv /opt/venv && \
         --upgrade        \
         build            \
         cmake            \
-        "nvidia-cuda-runtime-cu12==12.4.*" \
-        cupy-cuda12x     \
+        "nvidia-cuda-runtime==13.2.*" \
+        cupy-cuda13x     \
         cython           \
         h5py             \
         lasy             \
@@ -236,7 +236,7 @@ RUN python3 -m venv /opt/venv && \
 #    uv pip install       \
 #        --no-cache-dir                                      \
 #        --upgrade                                           \
-#        --index-url https://download.pytorch.org/whl/cu126  \
+#        --index-url https://download.pytorch.org/whl/cu132  \
 #        torch
 #        optimas[all]
 
@@ -274,7 +274,7 @@ RUN git clone                       \
     rm -rf /opt/warpx/lib/*.a
 
 # Reduce to runtime
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS warpx
+FROM nvidia/cuda:13.2.1-runtime-ubuntu22.04 AS warpx
 
 # Install essential system dependencies (runtime)
 RUN apt-get update            && \
