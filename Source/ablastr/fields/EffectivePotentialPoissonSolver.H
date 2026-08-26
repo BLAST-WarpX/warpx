@@ -19,6 +19,7 @@
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
+#include <ablastr/fields/MLMGOptions.H>
 #include "PoissonSolver.H"
 
 #if defined(WARPX_USE_FFT) && defined(WARPX_DIM_3D)
@@ -89,6 +90,7 @@ namespace ablastr::fields {
  * \param[in] eb_enabled whether embedded boundaries are enabled
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
+ * \param[in] mlmg_options Optional settings for the MLMG bottom solve and coarsening (default: AMReX defaults)
  * \param[in] post_phi_calculation perform a calculation per level directly after phi was calculated; required for embedded boundaries (default: none)
  * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] current_time the current time; required for embedded boundaries (default: none)
@@ -116,6 +118,7 @@ computeEffectivePotentialPhi (
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
+    MLMGOptions const & mlmg_options = MLMGOptions{},
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
     [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
@@ -150,7 +153,8 @@ computeEffectivePotentialPhi (
 
     auto const finest_level = static_cast<int>(rho.size() - 1);
 
-    const amrex::LPInfo info;
+    amrex::LPInfo info;
+    applyMLMGOptions(info, mlmg_options);
 
     for (int lev=0; lev<=finest_level; lev++) {
 
@@ -159,6 +163,13 @@ computeEffectivePotentialPhi (
         rho[lev]->mult(-1._rt/epsilon_0);
 
         std::unique_ptr<amrex::MLNodeLinOp> linop;
+        if (eb_enabled || is_rz) {
+            ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
+                mlmg_options.bottom_solver != amrex::BottomSolver::hypre,
+                "The HYPRE bottom solver is not supported with embedded boundaries or in RZ, "
+                "since amrex::MLEBNodeFDLaplacian does not implement fillIJMatrix/fillRHS "
+                "yet.");
+        }
         // In the presence of EB or RZ the EB enabled linear solver is used
         if (eb_enabled)
         {
@@ -230,6 +241,7 @@ computeEffectivePotentialPhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
+        applyMLMGOptions(mlmg, mlmg_options);
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
 

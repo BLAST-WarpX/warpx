@@ -2482,6 +2482,31 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the labframe electrostatic solver
 
+    warpx_self_fields_bottom_solver: string, default='default'
+        Bottom solver used by the MLMG labframe electrostatic solver. Options are
+        'default', 'smoother', 'bicgstab', 'cg', 'bicgcg', 'cgbicg', 'hypre' and
+        'petsc'. Using 'hypre' requires compiling with `-DWarpX_HYPRE=ON` and is
+        not supported with embedded boundaries or in RZ. HYPRE itself is
+        configured through `pywarpx.hypre`, e.g.
+        `pywarpx.hypre.bamg_strong_threshold = 0.5`.
+
+    warpx_self_fields_bottom_verbosity: integer, default=0
+        Level of verbosity of the bottom solver of the labframe electrostatic
+        solver
+
+    warpx_self_fields_bottom_max_iters: integer, optional
+        Maximum number of bottom solver iterations (AMReX default: 200)
+
+    warpx_self_fields_bottom_relative_tolerance: float, optional
+        Relative tolerance of the bottom solve (AMReX default: 1e-4)
+
+    warpx_self_fields_bottom_absolute_tolerance: float, optional
+        Absolute tolerance of the bottom solve (AMReX default: unused)
+
+    warpx_self_fields_max_coarsening_level: integer, optional
+        Maximum number of MLMG coarsening levels (AMReX default: 30). Lowering
+        this leaves a larger problem to the bottom solver.
+
     warpx_magnetostatic: bool, default=False
         Whether to also solve for self-consistent magnetic fields from currents.
 
@@ -2532,6 +2557,23 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.relativistic = kw.pop("warpx_relativistic", False)
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
+        # MLMG bottom solver parameters
+        self.self_fields_bottom_solver = kw.pop("warpx_self_fields_bottom_solver", None)
+        self.self_fields_bottom_verbosity = kw.pop(
+            "warpx_self_fields_bottom_verbosity", None
+        )
+        self.self_fields_bottom_max_iters = kw.pop(
+            "warpx_self_fields_bottom_max_iters", None
+        )
+        self.self_fields_bottom_relative_tolerance = kw.pop(
+            "warpx_self_fields_bottom_relative_tolerance", None
+        )
+        self.self_fields_bottom_absolute_tolerance = kw.pop(
+            "warpx_self_fields_bottom_absolute_tolerance", None
+        )
+        self.self_fields_max_coarsening_level = kw.pop(
+            "warpx_self_fields_max_coarsening_level", None
+        )
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
         # Explicit magnetostatic solver parameters (override self_fields_* defaults)
         self.magnetostatic_required_precision = kw.pop(
@@ -2589,6 +2631,22 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
             pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance
             pywarpx.warpx.self_fields_max_iters = self.maximum_iterations
             pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
+            pywarpx.warpx.self_fields_bottom_solver = self.self_fields_bottom_solver
+            pywarpx.warpx.self_fields_bottom_verbosity = (
+                self.self_fields_bottom_verbosity
+            )
+            pywarpx.warpx.self_fields_bottom_max_iters = (
+                self.self_fields_bottom_max_iters
+            )
+            pywarpx.warpx.self_fields_bottom_relative_tolerance = (
+                self.self_fields_bottom_relative_tolerance
+            )
+            pywarpx.warpx.self_fields_bottom_absolute_tolerance = (
+                self.self_fields_bottom_absolute_tolerance
+            )
+            pywarpx.warpx.self_fields_max_coarsening_level = (
+                self.self_fields_max_coarsening_level
+            )
             # Explicit magnetostatic solver parameters (if provided)
             pywarpx.warpx.magnetostatic_solver_required_precision = (
                 self.magnetostatic_required_precision

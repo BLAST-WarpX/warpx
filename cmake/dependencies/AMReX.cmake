@@ -75,6 +75,13 @@ macro(find_amrex)
             set(AMReX_EB OFF CACHE INTERNAL "")
         endif()
 
+        # HYPRE support in AMReX
+        if(WarpX_HYPRE)
+            set(AMReX_HYPRE ON CACHE INTERNAL "")
+        else()
+            set(AMReX_HYPRE OFF CACHE INTERNAL "")
+        endif()
+
         # PETSc support in AMReX
         if(WarpX_PETSC)
             set(AMReX_PETSC ON CACHE INTERNAL "")
@@ -289,6 +296,11 @@ macro(find_amrex)
         else()
             set(COMPONENT_EB)
         endif()
+        if(WarpX_HYPRE)
+            set(COMPONENT_HYPRE HYPRE)
+        else()
+            set(COMPONENT_HYPRE)
+        endif()
         if(WarpX_PETSC)
             set(COMPONENT_PETSC PETSC)
         else()
@@ -306,7 +318,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PETSC} ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
+        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} ${COMPONENT_HYPRE} PARTICLES ${COMPONENT_PETSC} ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts

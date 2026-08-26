@@ -512,6 +512,68 @@ Overall simulation parameters
 
     Must be greater than zero when specified.
 
+.. pp:param:: warpx.self_fields_bottom_solver
+    :type: ``string``
+    :default: ``default``
+
+    The solver used by AMReX MLMG on the coarsest multigrid level ("bottom
+    solve") of the electrostatic self-field solve. Options are ``default``
+    (the linear operator's own default, usually BiCGStab), ``smoother``,
+    ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre`` and ``petsc``.
+
+    ``hypre`` requires compiling with ``-DWarpX_HYPRE=ON`` and is only
+    available in 2D and 3D. It is currently not supported together with
+    embedded boundaries or in RZ geometry, since the corresponding AMReX
+    linear operator (``MLEBNodeFDLaplacian``) cannot assemble its matrix yet.
+    HYPRE itself is configured through its own input file namespace, e.g.
+    ``hypre.hypre_solver = BoomerAMG`` and
+    ``hypre.bamg_strong_threshold = 0.5``; see the AMReX documentation for the
+    full list of options.
+
+    A strong bottom solver such as HYPRE's BoomerAMG mostly pays off when the
+    coarsest multigrid level is still a large problem, e.g. when coarsening is
+    limited by ``warpx.self_fields_max_coarsening_level``, by embedded
+    boundaries or by the grid decomposition.
+
+.. pp:param:: warpx.self_fields_bottom_verbosity
+    :type: ``integer``
+    :default: 0
+
+    The verbosity of the bottom solver used in the electrostatic self-field
+    MLMG solve. Setting this to 1 or higher prints the number of bottom solver
+    iterations, which is useful to assess whether the bottom solve is a
+    bottleneck.
+
+.. pp:param:: warpx.self_fields_bottom_max_iters
+    :type: ``integer``
+    :default: 200 (AMReX default)
+
+    Maximum number of iterations of the bottom solver in the electrostatic
+    self-field MLMG solve.
+
+.. pp:param:: warpx.self_fields_bottom_relative_tolerance
+    :type: ``float``
+    :default: 1e-4 (AMReX default)
+
+    Relative tolerance to which the bottom solve of the electrostatic
+    self-field MLMG solve is converged.
+
+.. pp:param:: warpx.self_fields_bottom_absolute_tolerance
+    :type: ``float``
+    :default: unused (AMReX default)
+
+    Absolute tolerance to which the bottom solve of the electrostatic
+    self-field MLMG solve is converged.
+
+.. pp:param:: warpx.self_fields_max_coarsening_level
+    :type: ``integer``
+    :default: 30 (AMReX default)
+
+    Maximum number of multigrid coarsening levels used in the electrostatic
+    self-field MLMG solve. Setting this to a low value leaves a larger problem
+    to the bottom solver; setting it to 0 turns MLMG into a single-level solve
+    performed entirely by the bottom solver.
+
 .. pp:param:: warpx.magnetostatic_solver_required_precision
     :type: ``float``
     :default: value of ``self_fields_required_precision``
