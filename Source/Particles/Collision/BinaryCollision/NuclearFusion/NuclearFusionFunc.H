@@ -258,14 +258,17 @@ public:
         amrex::Array4<amrex::Real> m_particle_production;
     };
 
-    [[nodiscard]] Executor const& executor (amrex::MFIter const& mfi) {
+    [[nodiscard]] Executor executor (amrex::MFIter const& mfi) const {
+        // Note that a copy is needed since with m_save_particle_production, it will be modified
+        // in a way that is thread dependent.
+        Executor exe = m_exe;
         if (m_save_particle_production) {
             WarpX & warpx = WarpX::GetInstance();
             int const level = 0;
             amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, level);
-            m_exe.m_particle_production = particle_production_mf->array(mfi);
+            exe.m_particle_production = particle_production_mf->array(mfi);
         }
-        return m_exe;
+        return exe;
     }
 
     bool use_global_debye_length() { return false; }
