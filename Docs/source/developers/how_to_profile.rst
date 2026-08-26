@@ -15,7 +15,10 @@ AMReX's Tiny Profiler
 ---------------------
 
 By default, WarpX uses the AMReX baseline tool, the TINYPROFILER, to evaluate the time information for different parts of the code (functions) between the different MPI ranks.
-The results, timers, are stored into four tables in the standard output, stdout, that are located below the simulation steps information and above the warnings regarding unused input file parameters (if there were any).
+The results, timers, are stored into four tables.
+By default, WarpX writes them to ``diags/performance.txt`` (controlled by :pp:param:`tiny_profiler.output_file`).
+Set that parameter to ``stdout`` to print them to the standard output instead.
+When printed to stdout, the tables are located below the simulation steps information and above the warnings regarding unused input file parameters (if there were any).
 
 The timers are displayed in tables for which the columns correspond to:
 

@@ -73,11 +73,13 @@
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
 #include <AMReX_SPACE.H>
+#include <AMReX_Utility.H>
 #include <AMReX_Vector.H>
 
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -814,6 +816,59 @@ WarpX::InitData ()
 
     /** create object for reduced diagnostics */
     reduced_diags = std::make_unique<MultiReducedDiags>();
+
+    // By default, write the AMReX tiny profiler report into the diagnostics
+    // directory (e.g. diags/performance.txt) instead of stdout. The directory is
+    // derived from the configured diagnostics, so the report follows a user-set
+    // <diag_name>.file_prefix (full/back-transformed diagnostics) or
+    // reduced_diags.path (reduced diagnostics). If no diagnostics are configured,
+    // the profiler is turned off (/dev/null) so that no diagnostics folder is
+    // created. A user-set tiny_profiler.output_file always takes precedence, and
+    // nothing is done if the profiler is disabled via tiny_profiler.enabled.
+    // AMReX reads output_file lazily at Finalize, so setting it here is early enough.
+    {
+        ParmParse pp_tiny_profiler("tiny_profiler");
+        bool profiler_enabled = true;
+        pp_tiny_profiler.query("enabled", profiler_enabled);
+        std::string output_file;
+        if (profiler_enabled && !pp_tiny_profiler.query("output_file", output_file))
+        {
+            const bool any_diags =
+                (multi_diags->GetTotalDiags() > 0) || !reduced_diags->m_rd_names.empty();
+            if (!any_diags) {
+                output_file = "/dev/null";
+            } else {
+                // Determine the directory under which WarpX writes its diagnostics.
+                std::string diags_dir;
+                if (multi_diags->GetTotalDiags() > 0) {
+                    // Full/back-transformed diagnostics: <diag>.file_prefix, e.g. "diags/diag1".
+                    diags_dir = std::filesystem::path(multi_diags->GetDiag(0).GetFilePrefix())
+                        .parent_path().generic_string();
+                } else {
+                    // Reduced diagnostics: reduced_diags.path, e.g. "./diags/reducedfiles/".
+                    std::string reduced_path = "./diags/reducedfiles/";
+                    const ParmParse pp_reduced_diags("reduced_diags");
+                    pp_reduced_diags.query("path", reduced_path);
+                    diags_dir = std::filesystem::path(reduced_path).lexically_normal()
+                        .parent_path().generic_string();
+                }
+
+                if (diags_dir.empty()) {
+                    // The diagnostics resolve to the current working directory.
+                    output_file = "performance.txt";
+                } else {
+                    output_file = diags_dir + "/performance.txt";
+                    // Ensure the directory exists so the report can be written at
+                    // Finalize (full diagnostics create it lazily, only on output steps).
+                    if (ParallelDescriptor::IOProcessor()) {
+                        constexpr int permission_flag_rwxrxrx = 0755;
+                        UtilCreateDirectory(diags_dir, permission_flag_rwxrxrx);
+                    }
+                }
+            }
+            pp_tiny_profiler.add("output_file", output_file);
+        }
+    }
 
     // WarpX::computeMaxStepBoostAccelerator
     // needs to start from the initial zmin_domain_boost,

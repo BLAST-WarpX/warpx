@@ -5854,5 +5854,37 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
     Run all ``FillBoundary`` operations on ``MultiFab`` to force-synchronize shared nodal points.
     This slightly increases communication cost and can help to spot missing ``nodal_sync`` flags in these operations.
 
+.. _running-cpp-parameters-tiny-profiler:
+
+Tiny Profiler
+^^^^^^^^^^^^^
+
+By default, WarpX is compiled with the :ref:`AMReX Tiny Profiler <developers-profiling-tiny-profiler>`, which collects timers for the main functions of the code as well as a device memory profile.
+The profiler is controlled with `AMReX runtime parameters <https://amrex-codes.github.io/amrex/docs_html/RuntimeParameters.html#tiny-profiler>`__, the most commonly used of which are documented below.
+
+.. pp:param:: tiny_profiler.enabled
+    :type: ``bool``
+    :default: ``1`` for true
+
+    Enable or disable tiny profiling (including memory profiling) at runtime.
+    If disabled, no report is written and WarpX does not create a diagnostics directory for it.
+
+.. pp:param:: tiny_profiler.output_file
+    :type: ``string``
+    :default: ``diags/performance.txt``
+
+    File name for the tiny profiler report.
+    By default, WarpX writes the report as ``performance.txt`` into the directory where the
+    diagnostics are written (``diags/performance.txt`` for the default file prefix), instead of
+    stdout.
+    The directory follows a user-set ``<diag_name>.file_prefix`` (full/back-transformed
+    diagnostics) or :pp:param:`reduced_diags.path` (reduced diagnostics).
+    If no diagnostics are configured (no :pp:param:`diagnostics.diags_names` and no
+    :pp:param:`warpx.reduced_diags_names`, or :pp:param:`diagnostics.enable` ``= 0``), the profiler
+    is turned off (``/dev/null``) so that no diagnostics folder is created.
+
+    Set this to a path to choose a specific file, to ``stdout`` or ``stderr`` to print the
+    report to the standard output or error stream, or to ``/dev/null`` to disable the output.
+
 .. bibliography::
     :keyprefix: param-
