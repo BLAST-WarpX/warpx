@@ -74,9 +74,6 @@ AMD-MI300:
     - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
 
 Intel-PVC:
-  # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
-  rules:
-    - when: never
   extends: .install-dependencies
   tags: [intel-data-center-max-1100]
   image: intel/oneapi-basekit:2025.3.0-0-devel-ubuntu24.04
@@ -91,15 +88,14 @@ Intel-PVC:
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
           -DCMAKE_CXX_FLAGS="-fp-model=precise" \
           -DWarpX_COMPUTE=SYCL                  \
-          -DAMReX_INTEL_ARCH=pvc                \
           -DAMReX_PARALLEL_LINK_JOBS=4          \
           -DWarpX_EB=ON                         \
           -DWarpX_FFT=ON                        \
           -DWarpX_PYTHON=OFF                    \
-          -DWarpX_MPI=ON                        \
+          -DWarpX_MPI=OFF                       \
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=SINGLE
     - cmake --build build -j 16
-    - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
-    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+    - export AMREX_THE_ARENA_INIT_SIZE=1e9
+    - ctest --test-dir build -R test_3d_collision_xyz.run --output-on-failure --no-tests=error
