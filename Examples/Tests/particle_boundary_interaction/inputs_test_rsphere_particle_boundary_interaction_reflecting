@@ -1,0 +1,3 @@
+FILE = inputs_base_rsphere_radial_boundary
+
+boundary.particle_hi = reflecting
