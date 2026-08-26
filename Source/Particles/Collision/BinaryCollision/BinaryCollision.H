@@ -340,7 +340,7 @@ public:
         const amrex::Dim3 tile_lo = amrex::lbound(mfi.tilebox());
         const amrex::GpuArray<int, 3> tile_dims = mfi.tilebox().length3d();
 
-        const auto& binary_collision_functor = m_binary_collision_functor.executor(mfi);
+        const auto& binary_collision_functor = m_binary_collision_functor.executor(lev, mfi);
         const bool have_product_species = m_have_product_species;
 
         // Store product species data in vectors

@@ -147,7 +147,7 @@ public:
         bool m_isSameSpecies;
     };
 
-    [[nodiscard]] Executor const& executor (amrex::MFIter const& /*mfi*/) const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 

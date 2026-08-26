@@ -223,7 +223,7 @@ public:
         bool m_need_product_data = false;
     };
 
-    [[nodiscard]] Executor const& executor (amrex::MFIter const& /*mfi*/) const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     bool use_global_debye_length() { return false; }
 

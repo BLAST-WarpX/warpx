@@ -186,7 +186,7 @@ public:
         ScatteringProcess::Executor* m_scattering_processes_data;
     };
 
-    [[nodiscard]] Executor const& executor (amrex::MFIter const& /*mfi*/) const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     bool use_global_debye_length() { return false; }
 

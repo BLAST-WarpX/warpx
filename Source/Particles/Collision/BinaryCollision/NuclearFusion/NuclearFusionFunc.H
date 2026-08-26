@@ -100,18 +100,19 @@ public:
     void AllocData () override {
         if (m_save_particle_production) {
             WarpX & warpx = WarpX::GetInstance();
+            for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
 
-            int const level = 0;
-            amrex::BoxArray const & ba = warpx.boxArray(level);
-            amrex::DistributionMapping const & dmap = warpx.DistributionMap(level);
-            int const ncomps = 1;
-            amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
-            amrex::Real const initial_value = 0.;
-            bool const remake = true;
-            bool const redistribute_on_remake = true;
-            bool const checkpoint_restart = true;
-            warpx.m_fields.alloc_init(m_particle_production_mf_name, level, ba, dmap, ncomps, ng,
-                                      initial_value, remake, redistribute_on_remake, checkpoint_restart);
+                amrex::BoxArray const & ba = warpx.boxArray(lev);
+                amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+                int const ncomps = 1;
+                amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
+                amrex::Real const initial_value = 0.;
+                bool const remake = true;
+                bool const redistribute_on_remake = true;
+                bool const checkpoint_restart = true;
+                warpx.m_fields.alloc_init(m_particle_production_mf_name, lev, ba, dmap, ncomps, ng,
+                                          initial_value, remake, redistribute_on_remake, checkpoint_restart);
+            }
         }
     }
 
@@ -258,14 +259,13 @@ public:
         amrex::Array4<amrex::Real> m_particle_production;
     };
 
-    [[nodiscard]] Executor executor (amrex::MFIter const& mfi) const {
+    [[nodiscard]] Executor executor (int const lev, amrex::MFIter const& mfi) const {
         // Note that a copy is needed since with m_save_particle_production, it will be modified
         // in a way that is thread dependent.
         Executor exe = m_exe;
         if (m_save_particle_production) {
             WarpX & warpx = WarpX::GetInstance();
-            int const level = 0;
-            amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, level);
+            amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, lev);
             exe.m_particle_production = particle_production_mf->array(mfi);
         }
         return exe;
