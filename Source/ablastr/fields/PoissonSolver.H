@@ -15,6 +15,7 @@
 #include <ablastr/math/fft/AnyFFT.H>
 #include <ablastr/fields/Interpolate.H>
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/fields/MLMGWrapper.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 
 #if defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D)
@@ -220,6 +221,8 @@ computePhi (
     [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
 )
 {
+    amrex::ignore_unused(dmap,grids);
+
     using namespace amrex::literals;
 
     ABLASTR_PROFILE("computePhi");
@@ -264,8 +267,6 @@ computePhi (
             [](const auto b){return (b<1.0_rt);}),
         "Components of beta_solver must be < 1.");
 
-    amrex::LPInfo info;
-
     for (int lev=0; lev<=finest_level; lev++) {
         amrex::Array<amrex::Real,AMREX_SPACEDIM> const dx_scaled
                 {AMREX_D_DECL(geom[lev].CellSize(0)/std::sqrt(1._rt-beta_solver[0]*beta_solver[0]),
@@ -289,6 +290,7 @@ computePhi (
         // Use the Multigrid (MLMG) solver if selected or on refined patches
         // but first scale rho appropriately
         rho[lev]->mult(-1._rt / ablastr::constant::SI::epsilon_0);
+        rho[lev]->OverrideSync(geom[lev].periodicity());
 
 #ifdef WARPX_DIM_RZ
         constexpr bool is_rz = true;
@@ -296,137 +298,17 @@ computePhi (
         constexpr bool is_rz = false;
 #endif
 
-        if (!eb_enabled && !is_rz) {
-            // Determine whether to use semi-coarsening
-            int max_semicoarsening_level = 0;
-            int semicoarsening_direction = -1;
-            const auto min_dir = static_cast<int>(std::distance(dx_scaled.begin(),
-                                                                std::min_element(dx_scaled.begin(), dx_scaled.end())));
-            const auto max_dir = static_cast<int>(std::distance(dx_scaled.begin(),
-                                                                std::max_element(dx_scaled.begin(), dx_scaled.end())));
-            if (dx_scaled[max_dir] > dx_scaled[min_dir]) {
-                semicoarsening_direction = max_dir;
-                max_semicoarsening_level = static_cast<int>(std::log2(dx_scaled[max_dir] / dx_scaled[min_dir]));
-            }
-            if (max_semicoarsening_level > 0) {
-                info.setSemicoarsening(true);
-                info.setMaxSemicoarseningLevel(max_semicoarsening_level);
-                info.setSemicoarseningDirection(semicoarsening_direction);
-            }
-        }
-
-        std::unique_ptr<amrex::MLNodeLinOp> linop;
-        if (eb_enabled || is_rz) {
-            // In the presence of EB or RZ: the solver assumes that the beam is
-            // propagating along  one of the axes of the grid, i.e. that only *one*
-            // of the components of `beta` is non-negligible.
-            auto linop_nodelap = std::make_unique<amrex::MLEBNodeFDLaplacian>();
-            if (eb_enabled) {
-#if defined(AMREX_USE_EB)
-                if constexpr(std::is_same_v<void, T_FArrayBoxFactory>) {
-                    throw std::runtime_error("EB requested by eb_farray_box_factory not provided!");
-                } else {
-                    linop_nodelap->define(
-                        amrex::Vector<amrex::Geometry>{geom[lev]},
-                        amrex::Vector<amrex::BoxArray>{grids[lev]},
-                        amrex::Vector<amrex::DistributionMapping>{dmap[lev]},
-                        info,
-                        amrex::Vector<amrex::EBFArrayBoxFactory const*>{eb_farray_box_factory.value()[lev]}
-                    );
-                }
-#endif
-            }
-            else {
-                // TODO: rather use MLNodeTensorLaplacian (for RZ w/o EB) here? Semi-Coarsening would be nice here
-                linop_nodelap->define(
-                    amrex::Vector<amrex::Geometry>{geom[lev]},
-                    amrex::Vector<amrex::BoxArray>{grids[lev]},
-                    amrex::Vector<amrex::DistributionMapping>{dmap[lev]},
-                    info
-                );
-            }
-
-            // Note: this assumes that the beam is propagating along
-            // one of the axes of the grid, i.e. that only *one* of the
-            // components of `beta` is non-negligible. // we use this
-#if defined(WARPX_DIM_RZ)
-            linop_nodelap->setRZ(true);
-            linop_nodelap->setSigma({0._rt, 1._rt-beta_solver[1]*beta_solver[1]});
-#else
-            linop_nodelap->setSigma({AMREX_D_DECL(
-                1._rt-beta_solver[0]*beta_solver[0],
-                1._rt-beta_solver[1]*beta_solver[1],
-                1._rt-beta_solver[2]*beta_solver[2])});
-#endif
-#if defined(AMREX_USE_EB)
-            if (eb_enabled) {
-                if constexpr (!std::is_same_v<T_BoundaryHandler, std::nullopt_t>) {
-                    // if the EB potential only depends on time, the potential can be passed
-                    // as a float instead of a callable
-                    if (boundary_handler.phi_EB_only_t) {
-                        linop_nodelap->setEBDirichlet(boundary_handler.potential_eb_t(current_time.value()));
-                    } else {
-                        linop_nodelap->setEBDirichlet(boundary_handler.getPhiEB(current_time.value()));
-                    }
-                } else
-                {
-                    ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE( !is_solver_igf_on_lev0,
-                        "EB Poisson solver enabled but no 'boundary_handler' passed!");
-                }
-            }
-#endif
-            linop = std::move(linop_nodelap);
-        } else {
-            // In the absence of EB and RZ: use a more generic solver
-            // that can handle beams propagating in any direction
-            auto linop_tenslap = std::make_unique<amrex::MLNodeTensorLaplacian>(
-                amrex::Vector<amrex::Geometry>{geom[lev]},
-                amrex::Vector<amrex::BoxArray>{grids[lev]},
-                amrex::Vector<amrex::DistributionMapping>{dmap[lev]},
-                info
-            );
-            linop_tenslap->setBeta(beta_solver); // for the non-axis-aligned solver
-            linop = std::move(linop_tenslap);
-        }
-
-        // Level 0 domain boundary
-        if constexpr (std::is_same_v<T_BoundaryHandler, std::nullopt_t>) {
-            amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const lobc = {AMREX_D_DECL(
-                amrex::LinOpBCType::Dirichlet,
-                amrex::LinOpBCType::Dirichlet,
-                amrex::LinOpBCType::Dirichlet
-            )};
-            amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const hibc = lobc;
-            linop->setDomainBC(lobc, hibc);
-        } else {
-            linop->setDomainBC(boundary_handler.lobc, boundary_handler.hibc);
-        }
-
-        // Solve the Poisson equation
-        amrex::MLMG mlmg(*linop); // actual solver defined here
-        mlmg.setVerbose(verbosity);
-        mlmg.setMaxIter(max_iters);
-        if (num_final_sweeps) {
-            mlmg.setFinalSmooth(*num_final_sweeps);
-        }
-        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
-        mlmg.setNoGpuSync(true);
-
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
-        if (ng) {
-            // In this case, computeE needs to use ghost nodes data. So we
-            // ask MLMG to fill BC for us after it solves the problem.
-            mlmg.setFinalFillBC(true);
-        }
 
-        rho[lev]->OverrideSync(geom[lev].periodicity());
+        MLMGWrapper<T_BoundaryHandler> mlmg_wrapper
+            (lev, eb_enabled, is_rz, is_solver_igf_on_lev0,
+             dx_scaled, beta_solver, geom[lev], *rho[lev], boundary_handler,
+             current_time ? current_time.value() : 0,
+             eb_farray_box_factory ? eb_farray_box_factory.value()[lev] : nullptr,
+             max_iters, verbosity, num_final_sweeps,
+             relative_tolerance, absolute_tolerance, ng);
 
-        // Solve Poisson equation at lev
-        mlmg.solve( {phi[lev]}, {rho[lev]},
-                     relative_tolerance, absolute_tolerance );
-
-        const amrex::IntVect& refratio = rel_ref_ratio.value()[lev];
-        const int ncomp = linop->getNComp();
+        mlmg_wrapper.solve(*phi[lev], *rho[lev], relative_tolerance, absolute_tolerance);
 
         // needed for solving the levels by levels:
         // - coarser level is initial guess for finer level
@@ -434,6 +316,8 @@ computePhi (
         // Interpolation from phi[lev] to phi[lev+1]
         // (This provides both the boundary conditions and initial guess for phi[lev+1])
         if (lev < finest_level) {
+            const amrex::IntVect& refratio = rel_ref_ratio.value()[lev];
+            const int ncomp = 1;
             interpolatePhiBetweenLevels(phi[lev],
                                         phi[lev+1],
                                         geom[lev],
@@ -446,7 +330,7 @@ computePhi (
         // Run additional operations, such as calculation of the E field for embedded boundaries
         if constexpr (!std::is_same_v<T_PostPhiCalculationFunctor, std::nullopt_t>) {
             if (post_phi_calculation.has_value()) {
-                post_phi_calculation.value()(mlmg, lev);
+                post_phi_calculation.value()(mlmg_wrapper.getMLMG(), lev); // xxxxx TODO
             }
         }
         rho[lev]->mult(-ablastr::constant::SI::epsilon_0);  // Multiply rho by epsilon again
