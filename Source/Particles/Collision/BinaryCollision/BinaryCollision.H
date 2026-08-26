@@ -696,7 +696,7 @@ public:
 
                     // Use a bisection algorithm to find the index of the cell in which this pair is located
                     const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
-                    amrex::IntVectND<3> global_index = flatIndexToGridCell(i_cell, tile_lo, tile_dims);
+                    const amrex::IntVectND<3> global_index = flatIndexToGridCell(i_cell, tile_lo, tile_dims);
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -1283,7 +1283,7 @@ public:
 
                     // Use a bisection algorithm to find the index of the cell in which this pair is located
                     const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
-                    amrex::IntVectND<3> global_index = flatIndexToGridCell(i_cell, tile_lo, tile_dims);
+                    const amrex::IntVectND<3> global_index = flatIndexToGridCell(i_cell, tile_lo, tile_dims);
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
