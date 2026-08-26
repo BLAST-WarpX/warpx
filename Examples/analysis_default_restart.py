@@ -54,8 +54,8 @@ def check_restart(filename, tolerance=1e-12):
     print(f"\ntolerance = {tolerance}")
     print()
     for field in ds_benchmark.field_list:
-        dr = ad_restart[field].squeeze().v
-        db = ad_benchmark[field].squeeze().v
+        dr = ad_restart["boxlib", field].squeeze().v
+        db = ad_benchmark["boxlib", field].squeeze().v
         error = np.amax(np.abs(dr - db))
         if np.amax(np.abs(db)) != 0.0:
             error /= np.amax(np.abs(db))
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     # add arguments: output file path
     parser.add_argument(
-        "output_file",
+        "--path",
         help="path to output file(s)",
         type=str,
     )
@@ -89,4 +89,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # compare restart results against original results
-    check_restart(filename=args.output_file, tolerance=args.rtol)
+    check_restart(filename=args.path, tolerance=args.rtol)
