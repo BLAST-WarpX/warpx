@@ -3024,7 +3024,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``nuclearfusion``.
     When true, the integrated product particle density is saved in a MultiFab with the name ``<collision_name>_particle_production``.
     The data can be written out by adding that name to the ``<diag_name>.fields_to_plot`` input parameter.
-    The option can be used in conjunction with <collision_name>.create_products to save only the product density and not create particles.
+    The option can be used in conjunction with ``<collision_name>.create_products`` to save only the product density and not create particles.
 
 .. pp:param:: <collision_name>.background_density
     :type: ``float``
