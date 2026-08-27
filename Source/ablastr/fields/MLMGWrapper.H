@@ -15,9 +15,6 @@
 
 namespace ablastr::fields {
 
-// xxxxx make sure exception is handled once the solver fails
-// xxxxx addd a special profiler for tests
-
 template <typename T_BoundaryHandler>
 class MLMGWrapper
 {
@@ -62,7 +59,8 @@ public:
         }
 
         auto make_mlmg_linop = [&] (LPInfo const& info, BoxArray const& ba,
-                                    DistributionMapping const& dm)
+                                    DistributionMapping const& dm,
+                                    FabFactory<FArrayBox> const* fac)
         {
             std::unique_ptr<amrex::MLMG> l_mlmg;
             std::unique_ptr<amrex::MLNodeLinOp> l_linop;
@@ -74,7 +72,7 @@ public:
                 auto linop_nodelap = std::make_unique<MLEBNodeFDLaplacian>();
                 if (eb_enabled) {
 #if defined(AMREX_USE_EB)
-                    auto const* eb_factory = dynamic_cast<EBFArrayBoxFactory const*>(factory);
+                    auto const* eb_factory = dynamic_cast<EBFArrayBoxFactory const*>(fac);
                     if (eb_factory) {
                         linop_nodelap->define(
                             Vector<Geometry>{geom},
@@ -184,7 +182,7 @@ public:
             Real tsolve;
             int mcl0, niter0;
             { // base line
-                auto tmp = make_mlmg_linop(info0, rho.boxArray(), rho.DistributionMap());
+                auto tmp = make_mlmg_linop(info0, rho.boxArray(), rho.DistributionMap(), factory);
                 phi.setVal(0);
                 Gpu::synchronize();
                 auto t0 = amrex::second();
@@ -197,19 +195,30 @@ public:
             }
 
             if (niter0 > 0) {
-                // let's test single Box first // xxxxx we could support EB later.
-                if ((lev == 0) && !eb_enabled && (rho.size() > 1)
+                // let's test single Box first
+                if ((lev == 0) && (rho.size() > 1)
                     && (geom.Domain().numPts() <= (Long(256)*Long(256)*Long(256))))
                 {
                     BoxArray ba(geom.Domain());
                     ba.convert(rho.ixType());
                     DistributionMapping dm(Vector<int>{0});
 
+                    auto const* fac = factory;
+#if defined(AMREX_USE_EB)
+                    std::unique_ptr<EBFArrayBoxFactory> eb_fac;
+                    if (eb_enabled) {
+                        eb_fac = amrex::makeEBFabFactory
+                            (static_cast<EBFArrayBoxFactory const*>(factory)->getEBIndexSpace(),
+                             geom, ba, dm, {1,1,1}, EBSupport::full);
+                        fac = static_cast<FabFactory<FArrayBox> const*>(eb_fac.get());
+                    }
+#endif
+
                     // For single Box case, agg_grid_size does not matter
                     for (int mcl = 0; mcl <= mcl0; ++mcl) {
                         auto info = info0;
                         info.setMaxCoarseningLevel(mcl);
-                        auto tmp = make_mlmg_linop(info, ba, dm);
+                        auto tmp = make_mlmg_linop(info, ba, dm, fac);
                         tmp.first->setMaxIter(std::min(max_iters, 2*niter0));
                         double tsolve_tmp = std::numeric_limits<double>::max();
                         Parms parms_tmp{};
@@ -248,7 +257,7 @@ public:
                     for (int ags : agg_grid_size) {
                         auto info = info0;
                         info.setMaxCoarseningLevel(mcl).setAgglomerationGridSize(ags);
-                        auto tmp = make_mlmg_linop(info, ba, dm);
+                        auto tmp = make_mlmg_linop(info, ba, dm, factory);
                         tmp.first->setMaxIter(std::min(max_iters, 2*niter0));
                         double tsolve_tmp = std::numeric_limits<double>::max();
                         Parms parms_tmp{};
@@ -291,10 +300,22 @@ public:
             } // end of if (niter0 > 0)
         }
 
+        auto const* fac = factory;
+#if defined(AMREX_USE_EB)
+        std::unique_ptr<EBFArrayBoxFactory> eb_fac;
+#endif
         if (m_parms.single_box) {
             m_ba = BoxArray(geom.Domain());
             m_ba.convert(rho.ixType());
             m_dm = DistributionMapping(Vector<int>{0});
+#if defined(AMREX_USE_EB)
+            if (eb_enabled) {
+                eb_fac = amrex::makeEBFabFactory
+                    (static_cast<EBFArrayBoxFactory const*>(factory)->getEBIndexSpace(),
+                     m_geom, m_ba, m_dm, {1,1,1}, EBSupport::full);
+                fac = static_cast<FabFactory<FArrayBox> const*>(eb_fac.get());
+            }
+#endif
         } else {
             m_ba = rho.boxArray();
             m_dm = rho.DistributionMap();
@@ -303,7 +324,7 @@ public:
         auto info = info0;
         info.setMaxCoarseningLevel(m_parms.mcl).setAgglomerationGridSize(m_parms.ags);
 
-        auto tmp = make_mlmg_linop(info, m_ba, m_dm);
+        auto tmp = make_mlmg_linop(info, m_ba, m_dm, fac);
         m_mlmg = std::move(tmp.first);
         m_linop = std::move(tmp.second);
     }

@@ -330,7 +330,7 @@ computePhi (
         // Run additional operations, such as calculation of the E field for embedded boundaries
         if constexpr (!std::is_same_v<T_PostPhiCalculationFunctor, std::nullopt_t>) {
             if (post_phi_calculation.has_value()) {
-                post_phi_calculation.value()(mlmg_wrapper.getMLMG(), lev); // xxxxx TODO
+                post_phi_calculation.value()(mlmg_wrapper.getMLMG(), lev);
             }
         }
         rho[lev]->mult(-ablastr::constant::SI::epsilon_0);  // Multiply rho by epsilon again
