@@ -26,19 +26,20 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     m_num_amr_levels = 1;
 
     m_hybrid_pic_model = m_WarpX->get_pointer_HybridPICModel();
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_hybrid_pic_model != nullptr,
-        "ThetaImplicitHybrid solver requires the hybrid-PIC model to be defined");
+    if (m_hybrid_pic_model == nullptr) {
+        WARPX_ABORT_WITH_MESSAGE(
+            "ThetaImplicitHybrid solver requires the hybrid-PIC model to be defined");
+    } else {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_hybrid_pic_model->m_solve_electron_energy_equation,
+            "hybrid_pic_model.solve_electron_energy_equation is not yet supported with "
+            "algo.evolve_scheme = theta_implicit_hybrid");
 
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_hybrid_pic_model->m_solve_electron_energy_equation,
-        "hybrid_pic_model.solve_electron_energy_equation is not yet supported with "
-        "algo.evolve_scheme = theta_implicit_hybrid");
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_hybrid_pic_model->m_add_external_fields,
-        "External fields from vector potentials are not yet supported with "
-        "algo.evolve_scheme = theta_implicit_hybrid");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_hybrid_pic_model->m_add_external_fields,
+            "External fields from vector potentials are not yet supported with "
+            "algo.evolve_scheme = theta_implicit_hybrid");
+    }
 
     // Define E and Eold vectors
     m_E.Define( m_WarpX, "Efield_fp" );
@@ -154,13 +155,13 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     const amrex::Real theta_time = start_time + m_theta * m_dt;
 
-    ablastr::fields::MultiLevelVectorField Efield_fp =
+    const ablastr::fields::MultiLevelVectorField Efield_fp =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, m_num_amr_levels - 1);
-    ablastr::fields::MultiLevelVectorField Bfield_fp =
+    const ablastr::fields::MultiLevelVectorField Bfield_fp =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, m_num_amr_levels - 1);
-    ablastr::fields::MultiLevelVectorField current_fp =
+    const ablastr::fields::MultiLevelVectorField current_fp =
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, m_num_amr_levels - 1);
-    ablastr::fields::MultiLevelScalarField rho_fp =
+    const ablastr::fields::MultiLevelScalarField rho_fp =
         m_WarpX->m_fields.get_mr_levels(FieldType::rho_fp, m_num_amr_levels - 1);
 
     // Total (plasma) current from Ampere's law, mu0*J = curl(B^{n+theta})
