@@ -6,11 +6,21 @@
 #
 # Author: Axel Huebl, David Grote
 # License: BSD-3-Clause-LBNL
+#
+# This must be run in batch since it is compute intensive.
+# Also, the dane_warpx.profile script must already have been sourced.
+# Run like this:
+#    runNode path/to/warpx/Tools/machines/dane-llnl/install_dependencies.sh
 
 # Exit on first error encountered #############################################
 #
 set -eu -o pipefail
 
+# Make sure the script is running in batch
+if [[ -z "${SLURM_JOB_ID:-}" ]]; then
+    echo "Error: this script must be run as a SLURM batch job." >&2
+    exit 1
+fi
 
 # Check: ######################################################################
 #
@@ -55,7 +65,7 @@ else
   git clone -b v1.21.6 https://github.com/Blosc/c-blosc.git ${WARPX_SW_DIR}/src/c-blosc
 fi
 cmake -S ${WARPX_SW_DIR}/src/c-blosc -B ${build_dir}/c-blosc-dane-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/c-blosc-1.21.6
-cmake --build ${build_dir}/c-blosc-dane-build --target install --parallel 6
+cmake --build ${build_dir}/c-blosc-dane-build --target install --parallel
 
 # ADIOS2
 if [ -d ${WARPX_SW_DIR}/src/adios2 ]
@@ -67,8 +77,8 @@ then
 else
   git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${WARPX_SW_DIR}/src/adios2
 fi
-cmake -S ${WARPX_SW_DIR}/src/adios2 -B ${build_dir}/adios2-dane-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/adios2-2.10.2
-cmake --build ${build_dir}/adios2-dane-build --target install -j 6
+cmake -S ${WARPX_SW_DIR}/src/adios2 -B ${build_dir}/adios2-dane-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DADIOS2_USE_HDF5=OFF -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/adios2-2.10.2
+cmake --build ${build_dir}/adios2-dane-build --target install -parallel
 
 # BLAS++ (for PSATD+RZ)
 if [ -d ${WARPX_SW_DIR}/src/blaspp ]
@@ -81,7 +91,7 @@ else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/blaspp.git ${WARPX_SW_DIR}/src/blaspp
 fi
 cmake -S ${WARPX_SW_DIR}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/blaspp-2024.10.26
-cmake --build ${build_dir}/blaspp-dane-build --target install --parallel 6
+cmake --build ${build_dir}/blaspp-dane-build --target install --parallel
 
 # LAPACK++ (for PSATD+RZ)
 if [ -d ${WARPX_SW_DIR}/src/lapackpp ]
@@ -94,8 +104,25 @@ else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/lapackpp.git ${WARPX_SW_DIR}/src/lapackpp
 fi
 CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${WARPX_SW_DIR}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/lapackpp-2024.10.26
-cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel 6
+cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel
 
+if [[ "${PETSC_DIR:-}" == "${WARPX_SW_DIR}/src/petsc" ]]; then
+  # PETSC
+  # Only build it if PERSC_DIR points to this work space
+  if [ -d ${WARPX_SW_DIR}/src/petsc ]
+  then
+    cd ${WARPX_SW_DIR}/src/petsc
+    git fetch --prune
+    git checkout release
+  else
+    cd ${WARPX_SW_DIR}/src
+    git clone -b release https://gitlab.com/petsc/petsc.git petsc
+    cd ${WARPX_SW_DIR}/src/petsc
+  fi
+  ./configure --with-batch --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx COPTFLAGS="-O2" FOPTFLAGS="-O2" CXXOPTFLAGS="-O2" --with-shared-libraries --with-debugging=0 --download-hypre --download-superlu --download-superlu_dist --download-parmetis --download-metis --with-cxx-dialect=C++20
+  make -j all
+  cd -
+fi
 
 # Python ######################################################################
 #
