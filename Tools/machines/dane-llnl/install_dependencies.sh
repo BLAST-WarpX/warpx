@@ -39,7 +39,6 @@ python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 
 # clean out caches, e.g., depending on old system modules
 python3 -m pip cache purge || true
-rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
 
 # Setup the directories where the packages will be installed
 if [ -z "${WARPX_SW_DIR+x}" ]; then
