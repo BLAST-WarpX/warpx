@@ -12,7 +12,7 @@ corner-cases and rejected ideas into the collapsed "Details" block below.
 ## What was tested?
 
 
-## Does this change break user interfaces?
+## Does this break user interfaces?
 
 
 <details><summary>Details</summary>
@@ -30,5 +30,5 @@ until this list is complete. CI is paused on draft PRs.
 If any portion of code has been drafted by an LLM, perform a separate LLM-based review on top of your manual self-review before asking for a human reviewer to read your code.
 -->
 
-- [ ] Self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features were tested with small, fast tests
+- [ ] Self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features are tested with small, fast tests
 - [ ] Finalized: documented in a way to ensure a human WarpX developer can understand

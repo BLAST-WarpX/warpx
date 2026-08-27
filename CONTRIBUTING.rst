@@ -178,7 +178,7 @@ Right after you push changes, a banner should appear on the Github page of your 
 
   * **What was achieved?** The feature/fix you propose, and why.
   * **What was tested?** How you tested it and what output you got.
-  * **Does this change break user interfaces?** For example: renamed or removed input parameters, changed defaults, or changed Python APIs.
+  * **Does this break user interfaces?** For example: renamed or removed input parameters, changed defaults, or changed Python APIs.
 
   Keep this part focused and short: stay below one page on GitHub, i.e., less than 15 lines.
   A short description gets read, a long one gets skimmed.

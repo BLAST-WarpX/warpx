@@ -155,7 +155,7 @@ Stay below one page on GitHub, i.e., less than 15 lines, and answer:
 
 - What was achieved?
 - What was tested?
-- Does this change break user interfaces?
+- Does this break user interfaces?
 
 Put additional system details, corner-cases and rejected ideas in a collapsed block, so the summary stays short:
 
@@ -176,7 +176,7 @@ Close the description with a `## TODO` check-list and keep the PR title prefixed
 Prefix the PR title with `[WIP] ` until this list is complete.
 
 - [x] Drafted with LLM [optional model details]
-- [ ] Manual self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features were tested with small, fast tests
+- [ ] Manually self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features are tested with small, fast tests
 - [ ] Performed a separate, LLM-based review and fixed all findings
 - [ ] Finalized: documented in a way to ensure a human WarpX developer can understand
 ```
