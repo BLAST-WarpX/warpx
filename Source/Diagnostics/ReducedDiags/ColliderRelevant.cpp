@@ -462,10 +462,10 @@ void ColliderRelevant::ComputeDiags (int step)
             {
                 const auto GetPosition = GetParticlePosition<PIdx>(pti);
                 // get particle arrays
-                amrex::ParticleReal* const AMREX_RESTRICT ux = pti.GetAttribs()[PIdx::ux].dataPtr();
-                amrex::ParticleReal* const AMREX_RESTRICT uy = pti.GetAttribs()[PIdx::uy].dataPtr();
-                amrex::ParticleReal* const AMREX_RESTRICT uz = pti.GetAttribs()[PIdx::uz].dataPtr();
-                amrex::ParticleReal* const AMREX_RESTRICT w = pti.GetAttribs()[PIdx::w].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT ux = pti.GetAttribs()[PIdx::ux].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT uy = pti.GetAttribs()[PIdx::uy].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT uz = pti.GetAttribs()[PIdx::uz].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT w = pti.GetAttribs()[PIdx::w].dataPtr();
                 // declare external fields
                 const int offset = 0;
                 const auto getExternalEB = GetExternalEBField(pti, offset);

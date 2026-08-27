@@ -103,14 +103,14 @@ WarpX::DampPML_Cartesian (const int lev, PatchType patch_type)
 
         amrex::IntVect F_stag;
         if (m_fields.has(FieldType::pml_F_fp, lev)) {
-            amrex::MultiFab* pml_F = (patch_type == PatchType::fine) ?
+            const amrex::MultiFab* pml_F = (patch_type == PatchType::fine) ?
                 m_fields.get(FieldType::pml_F_fp, lev) : m_fields.get(FieldType::pml_F_cp, lev);
             F_stag = pml_F->ixType().toIntVect();
         }
 
         amrex::IntVect G_stag;
         if (m_fields.has(FieldType::pml_G_fp, lev)) {
-            amrex::MultiFab* pml_G = (patch_type == PatchType::fine) ?
+            const amrex::MultiFab* pml_G = (patch_type == PatchType::fine) ?
                 m_fields.get(FieldType::pml_G_fp, lev) : m_fields.get(FieldType::pml_G_cp, lev);
             G_stag = pml_G->ixType().toIntVect();
         }
