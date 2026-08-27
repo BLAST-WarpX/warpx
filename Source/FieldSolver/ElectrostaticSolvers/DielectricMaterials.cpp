@@ -104,6 +104,188 @@ namespace
             "' has values less than 1 from permittivity_function(x,y,z,t). "
             "Relative permittivity must be finite and greater than or equal to 1.");
     }
+
+    void
+    MergeSignedDistanceAndMaskOnGrid (
+        amrex::MultiFab& sdf,
+        amrex::iMultiFab& material_id,
+        amrex::MultiFab const& object_sdf,
+        int const object_id)
+    {
+        bool const first_object = (object_id == 1);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(sdf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const& bx = mfi.growntilebox();
+            amrex::Array4<amrex::Real> const& s = sdf.array(mfi);
+            amrex::Array4<amrex::Real const> const& os = object_sdf.const_array(mfi);
+            amrex::Array4<int> const& m = material_id.array(mfi);
+
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+                amrex::Real const d = os(i, j, k);
+                if (first_object) {
+                    s(i, j, k) = d;
+                } else {
+                    s(i, j, k) = amrex::min(s(i, j, k), d);
+                }
+                if (d <= 0.0_rt) {
+                    m(i, j, k) = object_id;
+                }
+            });
+        }
+    }
+
+    void
+    SetImplicitConstantPermittivity (
+        amrex::MultiFab& epsilon,
+        amrex::Geometry const& geom,
+        amrex::ParserExecutor<3> const shape_exec,
+        amrex::Real const permittivity)
+    {
+        auto const dx = geom.CellSizeArray();
+        auto const problo = geom.ProbLoArray();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const& bx = mfi.growntilebox();
+            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
+
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+#if defined(WARPX_DIM_3D)
+                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
+                amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::Real const y = 0.0_rt;
+                amrex::Real const z = problo[1] + (j + 0.5_rt) * dx[1];
+                amrex::ignore_unused(k);
+#else
+                amrex::Real const x = 0.0_rt;
+                amrex::Real const y = 0.0_rt;
+                amrex::Real const z = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::ignore_unused(j, k);
+#endif
+                if (shape_exec(x, y, z) >= 0.0_rt) {
+                    eps(i, j, k) = permittivity;
+                }
+            });
+        }
+    }
+
+    void
+    SetImplicitFunctionPermittivity (
+        amrex::MultiFab& epsilon,
+        amrex::Geometry const& geom,
+        amrex::ParserExecutor<3> const shape_exec,
+        amrex::ParserExecutor<4> const permittivity_exec,
+        amrex::Real const time)
+    {
+        auto const dx = geom.CellSizeArray();
+        auto const problo = geom.ProbLoArray();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const& bx = mfi.growntilebox();
+            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
+
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+#if defined(WARPX_DIM_3D)
+                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
+                amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::Real const y = 0.0_rt;
+                amrex::Real const z = problo[1] + (j + 0.5_rt) * dx[1];
+                amrex::ignore_unused(k);
+#else
+                amrex::Real const x = 0.0_rt;
+                amrex::Real const y = 0.0_rt;
+                amrex::Real const z = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::ignore_unused(j, k);
+#endif
+                if (shape_exec(x, y, z) >= 0.0_rt) {
+                    eps(i, j, k) = permittivity_exec(x, y, z, time);
+                }
+            });
+        }
+    }
+
+    void
+    SetSTLConstantPermittivity (
+        amrex::MultiFab& epsilon,
+        amrex::MultiFab const& stl_sdf,
+        amrex::Real const permittivity)
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const& bx = mfi.growntilebox();
+            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
+            amrex::Array4<amrex::Real const> const& d = stl_sdf.const_array(mfi);
+
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+                if (d(i, j, k) <= 0.0_rt) {
+                    eps(i, j, k) = permittivity;
+                }
+            });
+        }
+    }
+
+    void
+    SetSTLFunctionPermittivity (
+        amrex::MultiFab& epsilon,
+        amrex::MultiFab const& stl_sdf,
+        amrex::Geometry const& geom,
+        amrex::ParserExecutor<4> const permittivity_exec,
+        amrex::Real const time)
+    {
+#if defined(WARPX_DIM_3D)
+        auto const dx = geom.CellSizeArray();
+        auto const problo = geom.ProbLoArray();
+#else
+        amrex::ignore_unused(geom);
+#endif
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            amrex::Box const& bx = mfi.growntilebox();
+            amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
+            amrex::Array4<amrex::Real const> const& d = stl_sdf.const_array(mfi);
+
+            amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+            {
+#if defined(WARPX_DIM_3D)
+                amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
+                amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
+                amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
+#else
+                amrex::Real const x = 0.0_rt;
+                amrex::Real const y = 0.0_rt;
+                amrex::Real const z = 0.0_rt;
+                amrex::ignore_unused(i, j, k);
+#endif
+                if (d(i, j, k) <= 0.0_rt) {
+                    eps(i, j, k) = permittivity_exec(x, y, z, time);
+                }
+            });
+        }
+    }
+
 }
 
 DielectricMaterials::DielectricMaterials (int nlevs_max)
@@ -421,30 +603,7 @@ DielectricMaterials::MergeSignedDistanceAndMask (
     amrex::MultiFab const& object_sdf,
     int const object_id) const
 {
-    bool const first_object = (object_id == 1);
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-    for (amrex::MFIter mfi(sdf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-        amrex::Box const& bx = mfi.growntilebox();
-        amrex::Array4<amrex::Real> const& s = sdf.array(mfi);
-        amrex::Array4<amrex::Real const> const& os = object_sdf.const_array(mfi);
-        amrex::Array4<int> const& m = material_id.array(mfi);
-
-        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-        {
-            amrex::Real const d = os(i, j, k);
-            if (first_object) {
-                s(i, j, k) = d;
-            } else {
-                s(i, j, k) = amrex::min(s(i, j, k), d);
-            }
-            if (d <= 0.0_rt) {
-                m(i, j, k) = object_id;
-            }
-        });
-    }
+    MergeSignedDistanceAndMaskOnGrid(sdf, material_id, object_sdf, object_id);
 }
 
 void
@@ -454,9 +613,6 @@ DielectricMaterials::FillEpsilon (
     amrex::Real const time) const
 {
     epsilon.setVal(1.0_rt);
-
-    auto const dx = geom.CellSizeArray();
-    auto const problo = geom.ProbLoArray();
 
     for (auto const& material : m_materials) {
         std::unique_ptr<amrex::MultiFab> stl_sdf;
@@ -472,122 +628,24 @@ DielectricMaterials::FillEpsilon (
             auto shape_exec = shape_parser.compile<3>();
 
             if (material.permittivity_type == PermittivityType::Constant) {
-                amrex::Real const permittivity = material.permittivity;
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    amrex::Box const& bx = mfi.growntilebox();
-                    amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-
-                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                    {
-#if defined(WARPX_DIM_3D)
-                        amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
-                        amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                        amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::Real const y = 0.0_rt;
-                        amrex::Real const z = problo[1] + (j + 0.5_rt) * dx[1];
-                        amrex::ignore_unused(k);
-#else
-                        amrex::Real const x = 0.0_rt;
-                        amrex::Real const y = 0.0_rt;
-                        amrex::Real const z = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::ignore_unused(j, k);
-#endif
-                        if (shape_exec(x, y, z) >= 0.0_rt) {
-                            eps(i, j, k) = permittivity;
-                        }
-                    });
-                }
+                SetImplicitConstantPermittivity(
+                    epsilon, geom, shape_exec, material.permittivity);
             } else {
                 auto permittivity_parser = utils::parser::makeParser(
                     material.permittivity_function, {"x", "y", "z", "t"});
                 auto permittivity_exec = permittivity_parser.compile<4>();
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    amrex::Box const& bx = mfi.growntilebox();
-                    amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-
-                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                    {
-#if defined(WARPX_DIM_3D)
-                        amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
-                        amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                        amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::Real const y = 0.0_rt;
-                        amrex::Real const z = problo[1] + (j + 0.5_rt) * dx[1];
-                        amrex::ignore_unused(k);
-#else
-                        amrex::Real const x = 0.0_rt;
-                        amrex::Real const y = 0.0_rt;
-                        amrex::Real const z = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::ignore_unused(j, k);
-#endif
-                        if (shape_exec(x, y, z) >= 0.0_rt) {
-                            eps(i, j, k) = permittivity_exec(x, y, z, time);
-                        }
-                    });
-                }
+                SetImplicitFunctionPermittivity(
+                    epsilon, geom, shape_exec, permittivity_exec, time);
                 AssertPermittivityFunctionValues(epsilon, material.name);
             }
         } else {
             if (material.permittivity_type == PermittivityType::Constant) {
-                amrex::Real const permittivity = material.permittivity;
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    amrex::Box const& bx = mfi.growntilebox();
-                    amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-                    amrex::Array4<amrex::Real const> const& d = stl_sdf->const_array(mfi);
-
-                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                    {
-                        if (d(i, j, k) <= 0.0_rt) {
-                            eps(i, j, k) = permittivity;
-                        }
-                    });
-                }
+                SetSTLConstantPermittivity(epsilon, *stl_sdf, material.permittivity);
             } else {
                 auto permittivity_parser = utils::parser::makeParser(
                     material.permittivity_function, {"x", "y", "z", "t"});
                 auto permittivity_exec = permittivity_parser.compile<4>();
-
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (amrex::MFIter mfi(epsilon, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-                    amrex::Box const& bx = mfi.growntilebox();
-                    amrex::Array4<amrex::Real> const& eps = epsilon.array(mfi);
-                    amrex::Array4<amrex::Real const> const& d = stl_sdf->const_array(mfi);
-
-                    amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
-                    {
-#if defined(WARPX_DIM_3D)
-                        amrex::Real const x = problo[0] + (i + 0.5_rt) * dx[0];
-                        amrex::Real const y = problo[1] + (j + 0.5_rt) * dx[1];
-                        amrex::Real const z = problo[2] + (k + 0.5_rt) * dx[2];
-#else
-                        amrex::Real const x = 0.0_rt;
-                        amrex::Real const y = 0.0_rt;
-                        amrex::Real const z = 0.0_rt;
-                        amrex::ignore_unused(i, j, k);
-#endif
-                        if (d(i, j, k) <= 0.0_rt) {
-                            eps(i, j, k) = permittivity_exec(x, y, z, time);
-                        }
-                    });
-                }
+                SetSTLFunctionPermittivity(epsilon, *stl_sdf, geom, permittivity_exec, time);
                 AssertPermittivityFunctionValues(epsilon, material.name);
             }
         }
