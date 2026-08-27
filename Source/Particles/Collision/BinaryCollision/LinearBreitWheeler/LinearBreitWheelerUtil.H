@@ -62,8 +62,6 @@ namespace {
         constexpr auto c2 = PhysConst::c2_v<amrex::ParticleReal>;
         constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
         constexpr amrex::ParticleReal me = PhysConst::m_e;
-        constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
-        constexpr auto one_pr = amrex::ParticleReal(1.);
 
         // Compute momenta
         const amrex::ParticleReal p1x_in = u1x_in * me;
@@ -80,7 +78,7 @@ namespace {
 
         // Energy squared of each of the two colliding photons in the center of momentum frame,
         // calculated using the Lorentz invariance of the total four-momentum norm
-        const amrex::ParticleReal E_star_sq = one_half_pr*c2*p1_in*p2_in*(one_pr - cos_ang);
+        const amrex::ParticleReal E_star_sq = 0.5_prt*c2*p1_in*p2_in*(1._prt - cos_ang);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle:

@@ -10,6 +10,7 @@
 
 #include "Utils/WarpXConst.H"
 
+#include <AMReX_Math.H>
 #include <AMReX_REAL.H>
 
 #include <cmath>
@@ -35,18 +36,15 @@ amrex::ParticleReal LinearBreitWheelerCrossSection (const amrex::ParticleReal& E
 
     if (E_star < me*c2) {return 0._prt;}
 
-    constexpr auto one_half_pr = amrex::ParticleReal(1./2.);
     constexpr amrex::ParticleReal pi = MathConst::pi;
     constexpr amrex::ParticleReal re2 = PhysConst::r_e * PhysConst::r_e;
-    auto constexpr pow2 = [](auto const x) { return x*x; };
-    auto constexpr pow4 = [](auto const x) { return x*x*x*x; };
 
-    const amrex::ParticleReal s = pow2(E_star/(me * c2));
+    const amrex::ParticleReal s = amrex::Math::powi<2>(E_star/(me * c2));
     const amrex::ParticleReal beta = std::sqrt(1._prt-1._prt/s);
 
-    const amrex::ParticleReal term1 = (3._prt-pow4(beta))*std::log((1._prt+beta)/(1._prt-beta));
-    const amrex::ParticleReal term2 = 2._prt*beta*(pow2(beta)-2._prt);
-    const amrex::ParticleReal cross_section = one_half_pr*pi*re2*(1._prt-pow2(beta))*(term1+term2);
+    const amrex::ParticleReal term1 = (3._prt-amrex::Math::powi<4>(beta))*std::log((1._prt+beta)/(1._prt-beta));
+    const amrex::ParticleReal term2 = 2._prt*beta*(amrex::Math::powi<2>(beta)-2._prt);
+    const amrex::ParticleReal cross_section = 0.5_prt*pi*re2*(1._prt-amrex::Math::powi<2>(beta))*(term1+term2);
 
     return cross_section;
 }
