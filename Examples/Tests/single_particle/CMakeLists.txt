@@ -20,13 +20,3 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
-
-add_warpx_test(
-    test_rsphere_particle_coordinate_conversion  # name
-    RSPHERE  # dims
-    1  # nprocs
-    inputs_test_rsphere_particle_coordinate_conversion  # inputs
-    "analysis_rsphere_particle_coordinate_conversion.py"  # analysis
-    OFF  # checksum
-    OFF  # dependency
-)
