@@ -254,6 +254,11 @@ Related works using WarpX:
 Nuclear Fusion and Plasma Confinement
 *************************************
 
+#. Groenewald R. E., Karbashewski S., Gupta S., Drobny J., Bondarenko A., Kamio S., Nations M., Titus J., Barnes D. C. and Dettrick S.
+   **Validation of hybrid-PIC simulations for advanced beam-driven FRC modeling**.
+   Nuclear Fusion, **66**, Number 9, 2026.
+   `DOI:10.1088/1741-4326/ae96c0 <https://doi.org/10.1088/1741-4326/ae96c0>`__
+
 #. Groenewald R. E., Gupta S., Veksler A., Tobin M., Galeotti L., Onofri M., Ceccherini F., Barnes D. C., Belova E. and Dettrick S. A.
    **Fast ion stabilization of tilt in large radius FRCs**.
    Physics of Plasmas **32**, 072503, 2025.

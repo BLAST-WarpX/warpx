@@ -1,11 +1,12 @@
 # WarpX
 
-[![Code Status development](https://dev.azure.com/BLAST-WarpX/warpx/_apis/build/status/ECP-WarpX.WarpX?branchName=development)](https://dev.azure.com/BLAST-WarpX/warpx/_build/latest?definitionId=1&branchName=development)
-[![Nightly Installation Tests](https://dev.azure.com/BLAST-WarpX/warpx/_apis/build/status/ECP-WarpX.Nightly?branchName=nightly&label=nightly%20packages)](https://dev.azure.com/BLAST-WarpX/warpx/_build?definitionId=2)
+[![Code Status development](https://dev.azure.com/BLAST-WarpX/warpx/_apis/build/status/BLAST-WarpX.WarpX?branchName=development)](https://dev.azure.com/BLAST-WarpX/warpx/_build/latest?definitionId=1&branchName=development)
+[![Nightly Installation Tests](https://dev.azure.com/BLAST-WarpX/warpx/_apis/build/status/BLAST-WarpX.Nightly?branchName=nightly&label=nightly%20packages)](https://dev.azure.com/BLAST-WarpX/warpx/_build?definitionId=2)
 [![Documentation Status](https://readthedocs.org/projects/warpx/badge/?version=latest)](https://warpx.readthedocs.io)
+[![CDash](https://img.shields.io/badge/CDash-WarpX-blue?logo=cdash)](https://my.cdash.org/index.php?project=WarpX)
 [![Spack Version](https://img.shields.io/spack/v/warpx)](https://spack.readthedocs.io/en/latest/package_list.html#warpx)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/warpx)](https://anaconda.org/conda-forge/warpx)
-[![Discussions](https://img.shields.io/badge/chat-discussions-turquoise.svg)](https://github.com/BLAST-WarpX/warpx/discussions)  
+[![Discussions](https://img.shields.io/badge/chat-discussions-turquoise.svg)](https://github.com/BLAST-WarpX/warpx/discussions)
 [![Supported Platforms](https://img.shields.io/badge/platforms-linux%20|%20osx%20|%20win-blue)](https://warpx.readthedocs.io/en/latest/install/users.html)
 [![GitHub commits since last release](https://img.shields.io/github/commits-since/BLAST-WarpX/warpx/latest/development.svg)](https://github.com/BLAST-WarpX/warpx/compare/development)
 [![HPSF](https://img.shields.io/badge/hosted%20by-HPSF-orange)](https://hpsf.io)

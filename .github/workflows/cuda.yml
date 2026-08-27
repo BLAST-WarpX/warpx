@@ -88,7 +88,7 @@ jobs:
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
           -DWarpX_PYTHON=ON            \
-          -DAMReX_CUDA_ARCH=6.0        \
+          -DCMAKE_CUDA_ARCHITECTURES=60 \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_openpmd_internal=OFF \
           -DWarpX_PRECISION=SINGLE     \
@@ -213,7 +213,7 @@ jobs:
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
           -DWarpX_PYTHON=OFF           \
-          -DAMReX_CUDA_ARCH=8.0        \
+          -DCMAKE_CUDA_ARCHITECTURES=80 \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \

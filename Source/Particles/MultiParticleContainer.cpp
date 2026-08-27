@@ -587,7 +587,8 @@ MultiParticleContainer::GetZeroChargeDensity (const int lev)
 void
 MultiParticleContainer::DepositCurrent (
     ablastr::fields::MultiLevelVectorField const & J,
-    const amrex::Real dt, const amrex::Real relative_time)
+    const amrex::Real dt, const amrex::Real relative_time,
+    const PushType push_type)
 {
     // Reset the J arrays
     for (const auto& J_lev : J)
@@ -600,7 +601,7 @@ MultiParticleContainer::DepositCurrent (
     // Call the deposition kernel for each species
     for (auto& pc : allcontainers)
     {
-        pc->DepositCurrent(J, dt, relative_time);
+        pc->DepositCurrent(J, dt, relative_time, push_type);
     }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)

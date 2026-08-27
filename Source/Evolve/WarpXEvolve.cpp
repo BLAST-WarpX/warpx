@@ -288,44 +288,51 @@ WarpX::Evolve (int numsteps)
             ExecutePythonCallback("aftercollisions");
         }
 
-        // Field solve step for electrostatic or hybrid-PIC solvers
-        if( electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
-            electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC )
+        // Electrostatic field solve step for electrostatic or Darwin solvers
+        if( electrostatic_solver_id != ElectrostaticSolverAlgo::None )
         {
             ExecutePythonCallback("beforeEsolve");
 
-            if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
-                // Electrostatic solver:
-                // The E-field is always reset to hold just the electrostatic component
-                bool const reset_E_field = true;
-                // The B-field is also reset unless the Darwin solver is used
-                bool const reset_B_field = true;
+            // Electrostatic solver:
+            // The E-field is always reset to hold just the electrostatic component
+            bool const reset_E_field = true;
+            // The B-field is also reset unless the Darwin solver is used
+            bool const reset_B_field = (evolve_scheme != EvolveScheme::Semi_Implicit_Darwin);
 
-                // For each species: deposit charge and add the associated space-charge
-                // E and B field to the grid ; this is done at the end of the PIC
-                // loop (i.e. immediately after a `Redistribute` and before particle
-                // positions are next pushed) so that the particles do not deposit out of bounds
-                // and so that the fields are at the correct time in the output.
-                ComputeSpaceChargeField( reset_E_field, reset_B_field );
-                if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
-                    // Call Magnetostatic Solver to solve for the vector potential A and compute the
-                    // B field.  Time varying A contribution to E field is neglected.
-                    // This is currently a lab frame calculation.
-                    ComputeMagnetostaticField();
-                }
-                // Since the fields were reset above, the external fields are added
-                // back on to the fine patch fields. This make it so that the net fields
-                // are the sum of the field solution and any external field.
+            // For each species: deposit charge and add the associated space-charge
+            // E and B field to the grid ; this is done at the end of the PIC
+            // loop (i.e. immediately after a `Redistribute` and before particle
+            // positions are next pushed) so that the particles do not deposit out of bounds
+            // and so that the fields are at the correct time in the output.
+            ComputeSpaceChargeField( reset_E_field, reset_B_field );
+            if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
+                // Call Magnetostatic Solver to solve for the vector potential A and compute the
+                // B field.  Time varying A contribution to E field is neglected.
+                // This is currently a lab frame calculation.
+                ComputeMagnetostaticField();
+            }
+
+            // The external fields are added back on to the fine patch fields
+            // (which were overwritten by electrostatic / magnetostatic solvers)
+            // so that the net fields are the sum of the field solutions and any
+            // external fields.
+            // This is skipped for Darwin since in that case the "external" fields
+            // are just treated as initial conditions (as for other EM solvers).
+            if (evolve_scheme != EvolveScheme::Semi_Implicit_Darwin) {
                 for (int lev = 0; lev <= max_level; ++lev) {
                     AddExternalFields(lev);
                 }
-            } else if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
-                // Hybrid-PIC case:
-                // The particles are now at p^{n+1/2} and x^{n+1}. The fields
-                // are updated according to the hybrid-PIC scheme (Ohm's law
-                // and Ampere's law).
-                HybridPICEvolveFields();
             }
+            ExecutePythonCallback("afterEsolve");
+        }
+
+        // Hybrid-PIC case
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+            ExecutePythonCallback("beforeEsolve");
+            // The particles are now at p^{n+1/2} and x^{n+1}. The fields
+            // are updated according to the hybrid-PIC scheme (Ohm's law
+            // and Ampere's law).
+            HybridPICEvolveFields();
             ExecutePythonCallback("afterEsolve");
         }
 

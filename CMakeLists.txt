@@ -4,7 +4,7 @@ string(JSON warpx_version GET "${dependencies_data}" version_warpx)
 
 # Preamble ####################################################################
 #
-cmake_minimum_required(VERSION 3.24.0)
+cmake_minimum_required(VERSION 3.25.0)
 project(WarpX VERSION ${warpx_version})
 
 include(${WarpX_SOURCE_DIR}/cmake/WarpXFunctions.cmake)
@@ -15,22 +15,6 @@ if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     message(FATAL_ERROR "Building in-source is not supported! "
             "Create a build directory and remove "
             "${CMAKE_SOURCE_DIR}/CMakeCache.txt ${CMAKE_SOURCE_DIR}/CMakeFiles/")
-endif()
-
-
-# CMake policies ##############################################################
-#
-# Setting a cmake_policy to OLD is deprecated by definition and will raise a
-# verbose warning
-if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-    set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
-endif()
-
-# AMReX 21.06+ supports CUDA_ARCHITECTURES with CMake 3.20+
-# CMake 3.18+: CMAKE_CUDA_ARCHITECTURES
-# https://cmake.org/cmake/help/latest/policy/CMP0104.html
-if(POLICY CMP0104)
-    cmake_policy(SET CMP0104 OLD)
 endif()
 
 

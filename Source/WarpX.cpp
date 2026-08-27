@@ -740,9 +740,18 @@ WarpX::ReadParameters ()
 
         // query_enum_sloppy with "-" needed to map "labframe-electromagnetostatic" to "LabFrameElectroMagnetostatic"
         pp_warpx.query_enum_sloppy("do_electrostatic", electrostatic_solver_id, "-");
-        // if an electrostatic solver is used, set the Maxwell solver to None
-        if (electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
+        // if an electrostatic solver is used, set the electromagnetic solver to None,
+        // unless Darwin is used in which case the Yee solver must be used
+        if (electrostatic_solver_id != ElectrostaticSolverAlgo::None &&
+            evolve_scheme != EvolveScheme::Semi_Implicit_Darwin) {
             electromagnetic_solver_id = ElectromagneticSolverAlgo::None;
+        }
+        else if (evolve_scheme == EvolveScheme::Semi_Implicit_Darwin) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee,
+                "Only the Yee electromagnetic solver can be used with Darwin");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(electrostatic_solver_id != ElectrostaticSolverAlgo::None,
+                "The Darwin solver requires an electrostatic solver to also be set, "
+                "e.g. warpx.do_electrostatic = labframe");
         }
 
         // Sub-cycling is only implemented for the finite-difference electromagnetic
@@ -1273,7 +1282,8 @@ WarpX::ReadParameters ()
         //       because its default depends on the solver selection
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC ||
-            electrostatic_solver_id != ElectrostaticSolverAlgo::None) {
+            electrostatic_solver_id != ElectrostaticSolverAlgo::None ||
+            evolve_scheme == EvolveScheme::Semi_Implicit_Darwin) {
             current_deposition_algo = CurrentDepositionAlgo::Direct;
         }
         pp_algo.query_enum_case_insensitive("current_deposition", current_deposition_algo);
@@ -1290,10 +1300,14 @@ WarpX::ReadParameters ()
         else if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
+        else if (evolve_scheme == EvolveScheme::Semi_Implicit_Darwin) {
+            m_implicit_solver = std::make_unique<SemiImplicitDarwin>();
+        }
 
         // implicit evolve schemes not setup to use mirrors
         if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
-            evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
+            evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Semi_Implicit_Darwin ) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
         }
@@ -1394,7 +1408,8 @@ WarpX::ReadParameters ()
 
         if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
             evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
-            evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
+            evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM ||
+            evolve_scheme == EvolveScheme::Semi_Implicit_Darwin ) {
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||

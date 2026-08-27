@@ -1,23 +1,25 @@
-.. _examples-ohm-solver-em-modes:
+.. _examples-magnetized-plasma-modes:
 
-Ohm solver: Electromagnetic modes
-=================================
+Magnetized plasma: Electromagnetic modes
+=========================================
 
 In this example a simulation is seeded with a thermal plasma while an initial magnetic field is applied in either the
 :math:`z` or :math:`x` direction. The simulation is progressed for a large number of steps and the resulting fields are
-Fourier analyzed for Alfvén mode excitations.
+Fourier analyzed for Alfvén mode excitations. The same physical setup can be evolved with either the kinetic-fluid
+hybrid (Ohm's law) solver or the semi-implicit Darwin solver.
 
 Run
 ---
 
-The same input script can be used for 1d, 2d or 3d Cartesian simulations as well
-as replicating either the parallel propagating or ion-Bernstein modes as indicated below.
+The same input script can be used for 1d, 2d or 3d Cartesian simulations, with either field solver, as well as
+replicating either the parallel propagating or ion-Bernstein modes as indicated below. Pass ``--ohm`` to use the
+kinetic-fluid hybrid solver or ``--darwin`` to use the semi-implicit Darwin solver.
 
-.. dropdown:: Script ``inputs_test_1d_ohm_solver_em_modes_picmi.py``
+.. dropdown:: Script ``inputs_test_em_modes_picmi.py``
 
-   .. literalinclude:: inputs_test_1d_ohm_solver_em_modes_picmi.py
+   .. literalinclude:: inputs_test_em_modes_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_EM_modes/inputs_test_1d_ohm_solver_em_modes_picmi.py``.
+      :caption: You can copy this file from ``Examples/Tests/magnetized_plasma_modes/inputs_test_em_modes_picmi.py``.
 
 For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with ``mpiexec -n 4 ...`` or ``srun -n 4 ...``, depending on the system.
 
@@ -29,7 +31,7 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       .. code-block:: bash
 
-         python3 inputs_test_1d_ohm_solver_em_modes_picmi.py -dim {1/2/3} --bdir z
+         python3 inputs_test_em_modes_picmi.py --ohm --dim {1/2/3} --bdir z
 
    .. tab-item:: Perpendicular propagating waves
 
@@ -37,20 +39,24 @@ For `MPI-parallel <https://www.mpi-forum.org>`__ runs, prefix these lines with `
 
       .. code-block:: bash
 
-         python3 inputs_test_1d_ohm_solver_em_modes_picmi.py -dim {1/2/3} --bdir {x/y}
+         python3 inputs_test_em_modes_picmi.py --ohm --dim {1/2/3} --bdir {x/y}
+
+Substitute ``--ohm`` with ``--darwin`` to run the same case with the semi-implicit Darwin solver instead
+(add ``--include_es_solver`` to additionally evolve an effective-potential electrostatic solver alongside it).
 
 Analyze
 -------
 
 The following script reads the simulation output from the above example, performs
 Fourier transforms of the field data and compares the calculated spectrum
-to the theoretical dispersions.
+to the theoretical dispersions. Pass ``--analyze_ohm_sim`` or ``--analyze_darwin_sim`` to match
+the solver that was used to generate the data.
 
 .. dropdown:: Script ``analysis.py``
 
    .. literalinclude:: analysis.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_EM_modes/analysis.py``.
+      :caption: You can copy this file from ``Examples/Tests/magnetized_plasma_modes/analysis.py``.
 
 Right and left circularly polarized electromagnetic waves are supported through the cyclotron motion of the ions, except
 in a region of thermal resonances as indicated on the plot below.
@@ -69,11 +75,11 @@ Perpendicularly propagating modes are also supported, commonly referred to as io
 
    Calculated ion Bernstein waves spectrum with the theoretical dispersion overlaid.
 
-Ohm solver: Cylindrical normal modes
-====================================
+Magnetized plasma: Cylindrical normal modes
+============================================
 
 A RZ-geometry example case for normal modes propagating along an applied magnetic
-field in a cylinder is also available. The analytical solution for these modes
+field in a cylinder is also available, using the kinetic-fluid hybrid solver. The analytical solution for these modes
 are described in :cite:t:`ex-Stix1992` Chapter 6, Sec. 2.
 
 Run
@@ -86,7 +92,7 @@ periodic boundaries at the cylinder ends.
 
    .. literalinclude:: inputs_test_rz_ohm_solver_em_modes_picmi.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_EM_modes/inputs_test_rz_ohm_solver_em_modes_picmi.py``.
+      :caption: You can copy this file from ``Examples/Tests/magnetized_plasma_modes/inputs_test_rz_ohm_solver_em_modes_picmi.py``.
 
 The example can be executed using:
 
@@ -106,7 +112,7 @@ radial direction.
 
    .. literalinclude:: analysis_rz.py
       :language: python3
-      :caption: You can copy this file from ``Examples/Tests/ohm_solver_EM_modes/analysis_rz.py``.
+      :caption: You can copy this file from ``Examples/Tests/magnetized_plasma_modes/analysis_rz.py``.
 
 The following figure was produced with the above analysis script, showing excellent
 agreement between the calculated and theoretical dispersion relations.
