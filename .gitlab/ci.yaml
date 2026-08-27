@@ -20,7 +20,7 @@
     - python3 -m venv venv
     - source venv/bin/activate
 
-Nvidia-H100-single-precision:
+NVIDIA-H100:
   extends: .install-dependencies
   tags: [nvidia-h100]
   image: nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu24.04
@@ -28,10 +28,12 @@ Nvidia-H100-single-precision:
     - |
       cmake -S . -B build                                  \
           -DCMAKE_VERBOSE_MAKEFILE=ON                      \
+          -DBUILDNAME=GPU-H100-CUDA-SP                     \
+          -DSITE=Frank_UO                                  \
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_EB=ON                                    \
           -DWarpX_PYTHON=OFF                               \
-          -DAMReX_CUDA_ARCH=9.0                            \
+          -DCMAKE_CUDA_ARCHITECTURES=90                    \
           -DWarpX_OPENPMD=ON                               \
           -DWarpX_PRECISION=SINGLE                         \
           -DWarpX_FFT=ON                                   \
@@ -41,7 +43,15 @@ Nvidia-H100-single-precision:
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
-    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+    - |
+      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
+        # run tests and submit results to CDash as Experimental
+        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
+      else
+        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+          --output-on-failure --no-tests=error
+      fi
 
 AMD-MI300:
   extends: .install-dependencies
@@ -59,6 +69,8 @@ AMD-MI300:
           -DCMAKE_C_COMPILER=$(which clang)            \
           -DCMAKE_CXX_COMPILER=$(which clang++)        \
           -DCMAKE_VERBOSE_MAKEFILE=ON                  \
+          -DBUILDNAME=GPU-MI300-HIP-SP                 \
+          -DSITE=Frank_UO                              \
           -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
           -DWarpX_EB=ON                                \
@@ -71,7 +83,15 @@ AMD-MI300:
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
-    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+    - |
+      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
+        # run tests and submit results to CDash as Experimental
+        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
+      else
+        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+          --output-on-failure --no-tests=error
+      fi
 
 Intel-PVC:
   # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
@@ -86,6 +106,8 @@ Intel-PVC:
     - |
       cmake -S . -B build                       \
           -DBUILD_SHARED_LIBS=ON                \
+          -DBUILDNAME=GPU-PVC-SYCL-MP           \
+          -DSITE=Frank_UO                       \
           -DCMAKE_VERBOSE_MAKEFILE=ON           \
           -DCMAKE_C_COMPILER=$(which icx)       \
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
@@ -102,4 +124,12 @@ Intel-PVC:
           -DWarpX_PARTICLE_PRECISION=SINGLE
     - cmake --build build -j 16
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
-    - ctest --test-dir build -R test_3d_laser_acceleration_btd.run --output-on-failure --no-tests=error
+    - |
+      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
+        # run tests and submit results to CDash as Experimental
+        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
+      else
+        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+          --output-on-failure --no-tests=error
+      fi
