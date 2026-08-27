@@ -612,9 +612,11 @@ DielectricMaterials::FillEpsilon (
     amrex::Geometry const& geom,
     amrex::Real const time) const
 {
+    // Start from vacuum on every fill so time-dependent updates remove stale material values.
     epsilon.setVal(1.0_rt);
 
     for (auto const& material : m_materials) {
+        // STL materials need a grid signed-distance function; parser materials evaluate directly.
         std::unique_ptr<amrex::MultiFab> stl_sdf;
         if (material.shape_type == ShapeType::STL) {
             stl_sdf = std::make_unique<amrex::MultiFab>(
@@ -636,6 +638,7 @@ DielectricMaterials::FillEpsilon (
                 auto permittivity_exec = permittivity_parser.compile<4>();
                 SetImplicitFunctionPermittivity(
                     epsilon, geom, shape_exec, permittivity_exec, time);
+                // Function-valued permittivity is validated after evaluating every covered cell.
                 AssertPermittivityFunctionValues(epsilon, material.name);
             }
         } else {
@@ -646,6 +649,7 @@ DielectricMaterials::FillEpsilon (
                     material.permittivity_function, {"x", "y", "z", "t"});
                 auto permittivity_exec = permittivity_parser.compile<4>();
                 SetSTLFunctionPermittivity(epsilon, *stl_sdf, geom, permittivity_exec, time);
+                // Function-valued permittivity is validated after evaluating every covered cell.
                 AssertPermittivityFunctionValues(epsilon, material.name);
             }
         }

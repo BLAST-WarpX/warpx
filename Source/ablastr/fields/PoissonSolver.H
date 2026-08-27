@@ -54,6 +54,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 
@@ -277,9 +279,11 @@ computePhi (
         "Components of beta_solver must be < 1.");
 
     if (has_dielectric) {
+        constexpr amrex::Real beta_zero_tolerance =
+            std::numeric_limits<amrex::Real>::epsilon();
         ABLASTR_ALWAYS_ASSERT_WITH_MESSAGE(
             std::all_of(beta_solver.begin(), beta_solver.end(),
-                [](const auto b){return (b == 0.0_rt);}),
+                [=](const auto b){return std::abs(b) <= beta_zero_tolerance;}),
             "Dielectric permittivity is currently supported only for lab-frame "
             "Poisson solves with beta = 0.");
     }
