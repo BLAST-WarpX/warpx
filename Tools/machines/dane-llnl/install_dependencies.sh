@@ -126,6 +126,12 @@ fi
 # Python ######################################################################
 #
 # Create a virtual environment and install the Python packages there.
+EXPECTED_VENV="${WARPX_SW_DIR}/venvs/warpx-dane"
+if [[ -n "${VIRTUAL_ENV:-}" &&
+      "$(realpath "$VIRTUAL_ENV")" == "$(realpath "$EXPECTED_VENV")" ]]; then
+  # If it is activated
+  deactivate
+fi
 rm -rf ${WARPX_SW_DIR}/venvs/warpx-dane
 python3 -m venv ${WARPX_SW_DIR}/venvs/warpx-dane
 source ${WARPX_SW_DIR}/venvs/warpx-dane/bin/activate
