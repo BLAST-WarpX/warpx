@@ -52,9 +52,9 @@ using namespace amrex::literals;
 
 namespace {
 
-    enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
-    enum depos_order_flags : int { order_one = 1, order_two, order_three, order_four };
+    enum exteb_flags : int { no_exteb, has_exteb };                                        // NOLINT(cppcoreguidelines-use-enum-class)
+    enum qed_flags : int { no_qed, has_qed };                                              // NOLINT(cppcoreguidelines-use-enum-class)
+    enum depos_order_flags : int { order_one = 1, order_two, order_three, order_four };    // NOLINT(cppcoreguidelines-use-enum-class)
 
     template<int exteb_control, int qed_control>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE

@@ -538,9 +538,9 @@ void SemiImplicitDarwin::FinishVelocityUpdate ()
                 amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
                 amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-                amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
-                amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
-                amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+                const amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                const amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                const amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
                 const long np = pti.numParticles();
 

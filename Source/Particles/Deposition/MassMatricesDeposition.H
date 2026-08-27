@@ -639,8 +639,8 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    enum exteb_flags : int { no_exteb, has_exteb };
-    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+    enum exteb_flags : int { no_exteb, has_exteb };                               // NOLINT(cppcoreguidelines-use-enum-class)
+    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb; // NOLINT(cppcoreguidelines-use-enum-class)
 
     // Loop over particles and deposit mass matrices.
     // amrex::For: iterations scatter-add into shared J/Sigma nodes (no SIMD pragma, see issue #7097)
@@ -1880,8 +1880,8 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    enum exteb_flags : int { no_exteb, has_exteb };
-    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
+    enum exteb_flags : int { no_exteb, has_exteb };                               // NOLINT(cppcoreguidelines-use-enum-class)
+    const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb; // NOLINT(cppcoreguidelines-use-enum-class)
 
     // Loop over particles and deposit mass matrices.
     // amrex::For: iterations scatter-add into shared J/Sigma nodes (no SIMD pragma, see issue #7097)

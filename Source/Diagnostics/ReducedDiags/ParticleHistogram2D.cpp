@@ -200,10 +200,10 @@ void ParticleHistogram2D::ComputeDiags (int step)
                 auto const GetPosition = GetParticlePosition<PIdx>(pti);
 
                 auto & attribs = pti.GetAttribs();
-                ParticleReal* const AMREX_RESTRICT d_w = attribs[PIdx::w].dataPtr();
-                ParticleReal* const AMREX_RESTRICT d_ux = attribs[PIdx::ux].dataPtr();
-                ParticleReal* const AMREX_RESTRICT d_uy = attribs[PIdx::uy].dataPtr();
-                ParticleReal* const AMREX_RESTRICT d_uz = attribs[PIdx::uz].dataPtr();
+                const ParticleReal* const AMREX_RESTRICT d_w = attribs[PIdx::w].dataPtr();
+                const ParticleReal* const AMREX_RESTRICT d_ux = attribs[PIdx::ux].dataPtr();
+                const ParticleReal* const AMREX_RESTRICT d_uy = attribs[PIdx::uy].dataPtr();
+                const ParticleReal* const AMREX_RESTRICT d_uz = attribs[PIdx::uz].dataPtr();
 
                 long const np = pti.numParticles();
 

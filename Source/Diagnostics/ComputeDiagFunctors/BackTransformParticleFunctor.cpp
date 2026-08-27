@@ -8,7 +8,6 @@
 
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
-#include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
 #include <AMReX.H>
@@ -40,8 +39,7 @@ LorentzTransformParticles::LorentzTransformParticles (
 )
     : m_t_boost(t_boost), m_dt(dt), m_t_lab(t_lab),
       m_gammaboost(WarpX::gamma_boost), m_betaboost(WarpX::beta_boost),
-      m_Phys_c(PhysConst::c), m_inv_c2(amrex::Real(1.0)/(m_Phys_c * m_Phys_c)),
-      m_uzfrm(-m_gammaboost*m_betaboost*m_Phys_c)
+      m_uzfrm(-m_gammaboost*m_betaboost*PhysConst::c)
 {
     using namespace amrex::literals;
 

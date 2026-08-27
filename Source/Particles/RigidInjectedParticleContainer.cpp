@@ -399,7 +399,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             const auto pusher_algo = WarpX::particle_pusher_algo;
             const auto do_crr = do_classical_radiation_reaction;
 
-            enum exteb_flags : int { no_exteb, has_exteb };
+            enum exteb_flags : int { no_exteb, has_exteb }; // NOLINT(cppcoreguidelines-use-enum-class)
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 

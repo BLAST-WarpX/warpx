@@ -1282,7 +1282,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const auto t_do_not_gather = do_not_gather;
 
-            enum exteb_flags : int { no_exteb, has_exteb };
+            enum exteb_flags : int { no_exteb, has_exteb }; // NOLINT(cppcoreguidelines-use-enum-class)
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
@@ -1489,8 +1489,8 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     }
 #endif
 
-    enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
+    enum exteb_flags : int { no_exteb, has_exteb }; // NOLINT(cppcoreguidelines-use-enum-class)
+    enum qed_flags : int { no_qed, has_qed };       // NOLINT(cppcoreguidelines-use-enum-class)
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED

@@ -184,7 +184,7 @@ void WarpXFluidContainer::InitData(
     const amrex::Real clight = PhysConst::c;
 
     // Create local copies of pointers for GPU kernels
-    InjectorMomentum* inj_mom = d_inj_mom;
+    const InjectorMomentum* inj_mom = d_inj_mom;
 
     if (h_inj_rho && h_inj_rho->needPreparation()) {
         auto get_zlab = [=] (amrex::Real z) -> amrex::Real
@@ -1204,9 +1204,9 @@ void WarpXFluidContainer::GatherAndPush (
         // Here, we do not perform any coarsening.
         const amrex::GpuArray<int, 3U> coarsening_ratio = {1, 1, 1};
 
-        enum exte_flags : int { no_exte, has_exte };
-        enum extb_flags : int { no_extb, has_extb };
-        enum boost_flags : int { no_gamma_boost, has_gamma_boost };
+        enum exte_flags : int { no_exte, has_exte };                // NOLINT(cppcoreguidelines-use-enum-class)
+        enum extb_flags : int { no_extb, has_extb };                // NOLINT(cppcoreguidelines-use-enum-class)
+        enum boost_flags : int { no_gamma_boost, has_gamma_boost }; // NOLINT(cppcoreguidelines-use-enum-class)
         const int exte_runtime_flag = external_e_fields ? has_exte : no_exte;
         const int extb_runtime_flag = external_b_fields ? has_extb : no_extb;
         const int boost_runtime_flag = (gamma_boost > 1._rt) ? has_gamma_boost : no_gamma_boost;
