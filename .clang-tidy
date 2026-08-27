@@ -32,6 +32,7 @@ Checks: '
     google-explicit-constructor,
     google-global-names-in-headers,
     misc-*,
+        -misc-confusable-identifiers,
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
         -misc-include-cleaner,
