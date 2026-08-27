@@ -29,16 +29,21 @@ macro(find_amrex)
             set(AMReX_CONDUIT OFF CACHE INTERNAL "")
         endif()
 
-        # FORCE: we derive these from CMAKE_BUILD_TYPE, so they have to follow it
-        # when an existing build directory is re-configured to another build type
+        # Set re-evaluated defaults without caching them. With CMP0077 NEW, AMReX's
+        # option() honors these normal variables, while explicit caller values win.
         if("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
-            set(AMReX_ASSERTIONS ON CACHE BOOL "" FORCE)
-            # note: floating-point exceptions can slow down debug runs a lot
-            set(AMReX_FPE ON CACHE BOOL "" FORCE)
+            set(_WarpX_AMReX_DEBUG_DEFAULT ON)
         else()
-            set(AMReX_ASSERTIONS OFF CACHE BOOL "" FORCE)
-            set(AMReX_FPE OFF CACHE BOOL "" FORCE)
+            set(_WarpX_AMReX_DEBUG_DEFAULT OFF)
         endif()
+        if(NOT DEFINED AMReX_ASSERTIONS)
+            set(AMReX_ASSERTIONS "${_WarpX_AMReX_DEBUG_DEFAULT}")
+        endif()
+        if(NOT DEFINED AMReX_FPE)
+            # note: floating-point exceptions can slow down debug runs a lot
+            set(AMReX_FPE "${_WarpX_AMReX_DEBUG_DEFAULT}")
+        endif()
+        unset(_WarpX_AMReX_DEBUG_DEFAULT)
 
         if(WarpX_COMPUTE STREQUAL OMP)
             set(AMReX_GPU_BACKEND  "NONE" CACHE INTERNAL "")
@@ -135,9 +140,9 @@ macro(find_amrex)
         if(WarpX_PYTHON OR
            ABLASTR_POSITION_INDEPENDENT_CODE OR
            (WarpX_LIB AND BUILD_SHARED_LIBS))
-            set(AMReX_PIC ON CACHE INTERNAL "" FORCE)
-        else()
-            set(AMReX_PIC OFF CACHE INTERNAL "" FORCE)
+            # A normal variable applies the requirement without overwriting a
+            # caller-owned cache entry when the requirement later disappears.
+            set(AMReX_PIC ON)
         endif()
 
         # WE NEED AMReX AS SHARED LIB, OTHERWISE WE CANNOT SHARE ITS GLOBALS
@@ -145,15 +150,10 @@ macro(find_amrex)
         # TODO this is likely an export/symbol hiding issue that we could
         #      alleviate later on
         if(WarpX_PYTHON OR (WarpX_LIB AND BUILD_SHARED_LIBS))
-            set(AMReX_BUILD_SHARED_LIBS ON CACHE BOOL "Build AMReX shared library" FORCE)
-        elseif(DEFINED AMReX_BUILD_SHARED_LIBS AND
-               CMAKE_SOURCE_DIR STREQUAL WarpX_SOURCE_DIR)
-            # do not leave a stale ON behind: AMReX_INSTALL below distinguishes
-            # "we forced it" from "the user/BUILD_SHARED_LIBS decides".
-            # Only when WarpX is the top-level project: as a subproject (e.g. of
-            # ImpactX) the parent sets this for its own Python bindings before
-            # adding us, and clearing it would break its install(EXPORT).
-            unset(AMReX_BUILD_SHARED_LIBS CACHE)
+            # Do not cache this requirement. AMReX's option() honors the normal
+            # variable for this configure, and a caller-owned cache entry becomes
+            # visible again if the requirement later disappears.
+            set(AMReX_BUILD_SHARED_LIBS ON)
         endif()
 
         # IPO/LTO
