@@ -312,6 +312,10 @@ DielectricMaterials::ReadParameters ()
         return;
     }
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !WarpX::do_moving_window,
+        "Dielectric materials are not compatible with the moving window.");
+
 #if !defined(AMREX_USE_EB)
     WARPX_ABORT_WITH_MESSAGE(
         "Dielectric materials require an AMReX EB build because AMReX EB "
