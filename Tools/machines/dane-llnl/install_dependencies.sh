@@ -78,7 +78,7 @@ else
   git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${WARPX_SW_DIR}/src/adios2
 fi
 cmake -S ${WARPX_SW_DIR}/src/adios2 -B ${build_dir}/adios2-dane-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DADIOS2_USE_HDF5=OFF -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/adios2-2.10.2
-cmake --build ${build_dir}/adios2-dane-build --target install -parallel
+cmake --build ${build_dir}/adios2-dane-build --target install --parallel
 
 # BLAS++ (for PSATD+RZ)
 if [ -d ${WARPX_SW_DIR}/src/blaspp ]
