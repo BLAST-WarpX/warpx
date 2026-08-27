@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import numpy as np
 import yt
 
-
 CONDUCTOR_RADIUS = 0.5
 DIELECTRIC_RADIUS = 1.0
 EPSILON_R = 5.0
@@ -78,9 +77,7 @@ def analytic_fields(
     r = np.sqrt(r2)
 
     alpha = (conductor_radius / dielectric_radius) ** 2
-    shell_coeff = -2.0 * applied_field / (
-        epsilon_r * (1.0 + alpha) + (1.0 - alpha)
-    )
+    shell_coeff = -2.0 * applied_field / (epsilon_r * (1.0 + alpha) + (1.0 - alpha))
     shell_image_coeff = -shell_coeff * conductor_radius**2
     outer_image_coeff = applied_field * dielectric_radius**2 + shell_coeff * (
         dielectric_radius**2 - conductor_radius**2
@@ -99,9 +96,9 @@ def analytic_fields(
     ):
         radius2 = r2[mask]
         phi[mask] = potential_coeff * x[mask] + image_coeff * x[mask] / radius2
-        ex[mask] = -potential_coeff + image_coeff * (
-            x[mask] ** 2 - z[mask] ** 2
-        ) / radius2**2
+        ex[mask] = (
+            -potential_coeff + image_coeff * (x[mask] ** 2 - z[mask] ** 2) / radius2**2
+        )
         ez[mask] = 2.0 * image_coeff * x[mask] * z[mask] / radius2**2
 
     return phi, ex, ez
@@ -156,7 +153,9 @@ def load_plotfile(filename):
     )
 
 
-def make_error_masks(data, params=ProblemParameters(), edge_margin=1.0, interface_cells=3.0):
+def make_error_masks(
+    data, params=ProblemParameters(), edge_margin=1.0, interface_cells=3.0
+):
     interface_margin = interface_cells * min(data.dx[0], data.dx[1])
     away_from_edges = (
         (data.xx > data.left_edge[0] + edge_margin)

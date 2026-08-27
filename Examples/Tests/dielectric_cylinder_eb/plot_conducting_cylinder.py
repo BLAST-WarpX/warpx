@@ -10,15 +10,13 @@ matplotlib.use("Agg")
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Circle
-
 from conducting_cylinder_solution import (
     ProblemParameters,
     analytic_fields,
     analytic_solution,
     load_plotfile,
 )
-
+from matplotlib.patches import Circle
 
 PLOT_PREFIX = "conducting_cylinder_dielectric_shell"
 DPI = 180
@@ -386,12 +384,8 @@ def circle_chord_half_width(radius, z_line):
 
 
 def add_centerline_regions(ax, z_line, params, add_labels):
-    conductor_half_width = circle_chord_half_width(
-        params.conductor_radius, z_line
-    )
-    dielectric_half_width = circle_chord_half_width(
-        params.dielectric_radius, z_line
-    )
+    conductor_half_width = circle_chord_half_width(params.conductor_radius, z_line)
+    dielectric_half_width = circle_chord_half_width(params.dielectric_radius, z_line)
 
     if dielectric_half_width is None:
         return

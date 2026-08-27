@@ -3,7 +3,6 @@
 import sys
 
 import numpy as np
-
 from conducting_cylinder_solution import (
     EPSILON_R,
     ProblemParameters,
@@ -25,8 +24,7 @@ def main():
 
     print(f"Field RMS relative error: {metrics.field_rms_relative_error:.6e}")
     print(
-        "Shell field RMS relative error: "
-        f"{metrics.shell_field_rms_relative_error:.6e}"
+        f"Shell field RMS relative error: {metrics.shell_field_rms_relative_error:.6e}"
     )
     print(f"Phi RMS relative error: {metrics.phi_rms_relative_error:.6e}")
 
@@ -47,8 +45,7 @@ def main():
     assert np.allclose(data.dielectric_mask[masks.inside_dielectric_object], 1.0)
     assert np.allclose(data.dielectric_mask[masks.far_outside], 0.0)
     assert np.all(
-        (data.dielectric_mask >= -1.0e-12)
-        & (data.dielectric_mask <= 1.0 + 1.0e-12)
+        (data.dielectric_mask >= -1.0e-12) & (data.dielectric_mask <= 1.0 + 1.0e-12)
     )
 
 

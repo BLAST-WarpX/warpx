@@ -8,7 +8,6 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-
 from conducting_cylinder_solution import (
     ProblemParameters,
     analytic_solution,

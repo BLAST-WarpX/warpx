@@ -25,9 +25,9 @@ def analytic_fields(x, z, radius, epsilon_r, applied_field):
 
     dipole = applied_field * dielectric_factor * radius**2
     phi[outside] = -applied_field * x[outside] + dipole * x[outside] / r2[outside]
-    ex[outside] = applied_field + dipole * (
-        x[outside] ** 2 - z[outside] ** 2
-    ) / r2[outside] ** 2
+    ex[outside] = (
+        applied_field + dipole * (x[outside] ** 2 - z[outside] ** 2) / r2[outside] ** 2
+    )
     ez[outside] = 2.0 * dipole * x[outside] * z[outside] / r2[outside] ** 2
 
     return phi, ex, ez
