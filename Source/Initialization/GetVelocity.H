@@ -61,17 +61,17 @@ struct GetVelocityVector
     {
         switch (m_type)
         {
-            case (VelConstantVector):
+            case (VelocityInitType::VelConstantVector):
             {
                 return amrex::XDim3{ m_ux_mean, m_uy_mean, m_uz_mean };
             }
-            case (VelParserFunctionVector):
+            case (VelocityInitType::VelParserFunctionVector):
             {
                 return amrex::XDim3{ m_ux_mean_parser(x,y,z), m_uy_mean_parser(x,y,z), m_uz_mean_parser(x,y,z) };
             }
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-            case (VelFromFileVector):
+            case (VelocityInitType::VelFromFileVector):
             {
                 return m_from_file.getValue(x, y, z);
             }

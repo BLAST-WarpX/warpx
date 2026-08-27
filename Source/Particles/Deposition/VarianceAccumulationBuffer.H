@@ -27,7 +27,7 @@ class VarianceAccumulationBuffer {
     VarianceAccumulationBuffer (ablastr::fields::MultiLevelVectorField const& T_vf, std::string const& species_name );
 
     // This public member functions
-    void reset ();
+    void Reset ();
     void ConvertVarianceToTemperatureAndFilter (ablastr::fields::MultiLevelVectorField const& var_vf,
                                                 amrex::Real normalization_factor,
                                                 bool apply_filter);

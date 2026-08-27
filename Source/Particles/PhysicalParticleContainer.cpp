@@ -2036,7 +2036,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         auto const& periodicity = warpx.Geom(lev).periodicity();
 
         // Clear accumulation arrays
-        local_temperature_arrays->reset();
+        local_temperature_arrays->Reset();
 
         // Loop over particle tiles and deposit current on each level
 #ifdef AMREX_USE_OMP
@@ -2125,15 +2125,15 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         }
 
         // Get MF pointers for all deposition multifabs
-        amrex::iMultiFab* nx_mf    = local_temperature_arrays->get_n(Direction{0}, lev);
-        amrex::iMultiFab* ny_mf    = local_temperature_arrays->get_n(Direction{1}, lev);
-        amrex::iMultiFab* nz_mf    = local_temperature_arrays->get_n(Direction{2}, lev);
-        amrex::MultiFab*  wx_mf    = local_temperature_arrays->get("w", Direction{0}, lev);
-        amrex::MultiFab*  wy_mf    = local_temperature_arrays->get("w", Direction{1}, lev);
-        amrex::MultiFab*  wz_mf    = local_temperature_arrays->get("w", Direction{2}, lev);
-        amrex::MultiFab*  w2x_mf   = local_temperature_arrays->get("w2", Direction{0}, lev);
-        amrex::MultiFab*  w2y_mf   = local_temperature_arrays->get("w2", Direction{1}, lev);
-        amrex::MultiFab*  w2z_mf   = local_temperature_arrays->get("w2", Direction{2}, lev);
+        const amrex::iMultiFab* nx_mf    = local_temperature_arrays->get_n(Direction{0}, lev);
+        const amrex::iMultiFab* ny_mf    = local_temperature_arrays->get_n(Direction{1}, lev);
+        const amrex::iMultiFab* nz_mf    = local_temperature_arrays->get_n(Direction{2}, lev);
+        const amrex::MultiFab*  wx_mf    = local_temperature_arrays->get("w", Direction{0}, lev);
+        const amrex::MultiFab*  wy_mf    = local_temperature_arrays->get("w", Direction{1}, lev);
+        const amrex::MultiFab*  wz_mf    = local_temperature_arrays->get("w", Direction{2}, lev);
+        const amrex::MultiFab*  w2x_mf   = local_temperature_arrays->get("w2", Direction{0}, lev);
+        const amrex::MultiFab*  w2y_mf   = local_temperature_arrays->get("w2", Direction{1}, lev);
+        const amrex::MultiFab*  w2z_mf   = local_temperature_arrays->get("w2", Direction{2}, lev);
         amrex::MultiFab*  vbarx_mf = local_temperature_arrays->get("vbar", Direction{0}, lev);
         amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
         amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);

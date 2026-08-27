@@ -20,7 +20,7 @@
 #include <string>
 
 /* Type of temperature initialization. Used by TemperatureProperties and GetTemperature. */
-enum TemperatureInitType {
+enum class TemperatureInitType {
     TempConstantValue,
     TempParserFunction,
     TempParserFunctionVector,

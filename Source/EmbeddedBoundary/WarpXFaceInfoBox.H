@@ -26,6 +26,7 @@
 */
 namespace FaceInfo
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-use-enum-class)
     enum Flag : int {
         //! The face is too small to be stable and could be extended neither with the one-way
         //! nor with the eight-ways extension: it is stabilized with the BCK correction instead

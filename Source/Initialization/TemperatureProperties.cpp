@@ -47,7 +47,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 "Temperature parameter theta = " + std::to_string(theta) +
                 " is less than zero, which is not allowed");
 
-            m_type = TempConstantValue;
+            m_type = TemperatureInitType::TempConstantValue;
             m_temperature = theta;
         }
         else if (temp_dist_s == "parser") {
@@ -56,7 +56,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_ptr_temperature_parser =
                 std::make_unique<amrex::Parser>(
                     utils::parser::makeParser(str_theta_function,{"x","y","z"}));
-            m_type = TempParserFunction;
+            m_type = TemperatureInitType::TempParserFunction;
         }
         else {
             std::stringstream ss;
@@ -73,7 +73,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);
             utils::parser::queryWithParser(pp, source_name, "uy_std", m_uy_std);
             utils::parser::queryWithParser(pp, source_name, "uz_std", m_uz_std);
-            m_type = TempConstantVector;
+            m_type = TemperatureInitType::TempConstantVector;
         }
         else if (u_std_dist_s == "parser") {
             std::string sx, sy, sz;
@@ -86,7 +86,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                 std::make_unique<amrex::Parser>(utils::parser::makeParser(sy, {"x", "y", "z"}));
             m_ptr_uz_std_parser =
                 std::make_unique<amrex::Parser>(utils::parser::makeParser(sz, {"x", "y", "z"}));
-            m_type = TempParserFunctionVector;
+            m_type = TemperatureInitType::TempParserFunctionVector;
         }
         else if (u_std_dist_s == "read_from_file") {
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
@@ -113,7 +113,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_u_std_x_reader->prepare(grids, dmap, amrex::IntVect(0));
             m_u_std_y_reader->prepare(grids, dmap, amrex::IntVect(0));
             m_u_std_z_reader->prepare(grids, dmap, amrex::IntVect(0));
-            m_type = TempFromFileVector;
+            m_type = TemperatureInitType::TempFromFileVector;
 #else
             WARPX_ABORT_WITH_MESSAGE(
                 "maxwellian_u_std_distribution_type = read_from_file requires "

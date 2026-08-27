@@ -40,7 +40,7 @@ namespace {
             utils::parser::queryWithParser(pp, source_name, "ux_mean", vel.m_ux_mean);
             utils::parser::queryWithParser(pp, source_name, "uy_mean", vel.m_uy_mean);
             utils::parser::queryWithParser(pp, source_name, "uz_mean", vel.m_uz_mean);
-            vel.m_type = VelConstantVector;
+            vel.m_type = VelocityInitType::VelConstantVector;
         } else if (u_mean_dist_s == "parser") {
             std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
             utils::parser::Store_parserString(pp, source_name, "ux_mean_function(x,y,z)", str_ux_mean_function);
@@ -55,7 +55,7 @@ namespace {
             vel.m_ptr_uz_mean_parser =
                 std::make_unique<amrex::Parser>(
                     utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
-            vel.m_type = VelParserFunctionVector;
+            vel.m_type = VelocityInitType::VelParserFunctionVector;
         } else if (u_mean_dist_s == "read_from_file") {
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
@@ -82,7 +82,7 @@ namespace {
             vel.m_u_mean_x_reader->prepare(grids, dmap, amrex::IntVect(0));
             vel.m_u_mean_y_reader->prepare(grids, dmap, amrex::IntVect(0));
             vel.m_u_mean_z_reader->prepare(grids, dmap, amrex::IntVect(0));
-            vel.m_type = VelFromFileVector;
+            vel.m_type = VelocityInitType::VelFromFileVector;
 #else
             WARPX_ABORT_WITH_MESSAGE(
                 dist_type_param + " = read_from_file requires WarpX built with "
@@ -130,7 +130,7 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
         m_ptr_uz_mean_parser =
             std::make_unique<amrex::Parser>(
                 utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
-        m_type = VelParserFunctionVector;
+        m_type = VelocityInitType::VelParserFunctionVector;
     }
     else {
         WARPX_ABORT_WITH_MESSAGE(
