@@ -39,7 +39,7 @@ LorentzTransformParticles::LorentzTransformParticles (
 )
     : m_t_boost(t_boost), m_dt(dt), m_t_lab(t_lab),
       m_gammaboost(WarpX::gamma_boost), m_betaboost(WarpX::beta_boost),
-      m_uzfrm(-m_gammaboost*m_betaboost*PhysConst::c)
+      m_uzfrm{-m_gammaboost*m_betaboost*PhysConst::c}
 {
     using namespace amrex::literals;
 
