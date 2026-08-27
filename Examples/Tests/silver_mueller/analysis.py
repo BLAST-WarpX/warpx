@@ -11,11 +11,13 @@ A laser pulse is emitted and propagates towards the boundaries ; the
 test check that the reflected field at the boundary is negligible.
 """
 
-import re
 import sys
 
 import numpy as np
 import yt
+
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
 
 yt.funcs.mylog.setLevel(0)
 
@@ -25,8 +27,8 @@ ds = yt.load(filename)
 all_data_level_0 = ds.covering_grid(
     level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
 )
-warpx_used_inputs = open("./warpx_used_inputs", "r").read()
-geom_RZ = re.search("geometry.dims = RZ", warpx_used_inputs)
+input_dict = parse_input_file("./warpx_used_inputs")
+geom_RZ = input_has_value(input_dict, "geometry.dims", "RZ")
 if geom_RZ:
     Er = all_data_level_0["boxlib", "Er"].v.squeeze()
     Et = all_data_level_0["boxlib", "Et"].v.squeeze()

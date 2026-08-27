@@ -21,8 +21,6 @@
 #   include "Utils/WarpX_Complex.H"
 #endif
 
-#include "WarpX.H" // todo: remove include and pass globals as args
-
 #include "TemperatureDepositionTypes.H"
 
 #include <AMReX.H>
@@ -60,9 +58,9 @@ void varianceDepositionSubKernel(
     const TemperatureDepositionPass pass
 )
 {
-    const amrex::Real vxr = static_cast<amrex::Real>(vx);
-    const amrex::Real vyr = static_cast<amrex::Real>(vy);
-    const amrex::Real vzr = static_cast<amrex::Real>(vz);
+    const auto vxr = static_cast<amrex::Real>(vx);
+    const auto vyr = static_cast<amrex::Real>(vy);
+    const auto vzr = static_cast<amrex::Real>(vz);
 
     if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
     {
@@ -202,6 +200,8 @@ void doVarianceDepositionShapeNKernel(
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
+    const amrex::Real costheta_mid = (rpmid > 0._rt) ? xpmid/rpmid : 1._rt;
+    const amrex::Real sintheta_mid = (rpmid > 0._rt) ? ypmid/rpmid : 0._rt;
 
     const double xmid = (rpmid - xyzmin.x)*dinv.x;
 #elif defined(WARPX_DIM_RSPHERE)
@@ -209,7 +209,12 @@ void doVarianceDepositionShapeNKernel(
     const amrex::Real xpmid = xp + relative_time*vx;
     const amrex::Real ypmid = yp + relative_time*vy;
     const amrex::Real zpmid = zp + relative_time*vz;
+    const amrex::Real rpxymid = std::sqrt(xpmid*xpmid + ypmid*ypmid);
     const amrex::Real rpmid = std::sqrt(xpmid*xpmid + ypmid*ypmid + zpmid*zpmid);
+    const amrex::Real costheta_mid = (rpxymid > 0._rt) ? xpmid/rpxymid : 1._rt;
+    const amrex::Real sintheta_mid = (rpxymid > 0._rt) ? ypmid/rpxymid : 0._rt;
+    const amrex::Real cosphi_mid = (rpmid > 0._rt) ? rpxymid/rpmid : 1._rt;
+    const amrex::Real sinphi_mid = (rpmid > 0._rt) ? zpmid/rpmid : 0._rt;
 
     const double xmid = (rpmid - xyzmin.x)*dinv.x;
 #else
@@ -304,15 +309,29 @@ void doVarianceDepositionShapeNKernel(
     int const l_jz = ((varz_type[zdir] == NODE) ? l_node : l_cell);
 #endif
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    // Deposit velocity moments in the cylindrical basis used by the mesh.
+    const amrex::ParticleReal v1 = vx*costheta_mid + vy*sintheta_mid;
+    const amrex::ParticleReal v2 = -vx*sintheta_mid + vy*costheta_mid;
+    const amrex::ParticleReal v3 = vz;
+#elif defined(WARPX_DIM_RSPHERE)
+    // Deposit velocity moments in the spherical basis used by the mesh.
+    const amrex::ParticleReal v1 = vx*costheta_mid*cosphi_mid
+                                 + vy*sintheta_mid*cosphi_mid + vz*sinphi_mid;
+    const amrex::ParticleReal v2 = -vx*sintheta_mid + vy*costheta_mid;
+    const amrex::ParticleReal v3 = -vx*costheta_mid*sinphi_mid
+                                 - vy*sintheta_mid*sinphi_mid + vz*cosphi_mid;
+#endif
+
 #if defined(WARPX_DIM_1D_Z)
     for (int iz=0; iz<=depos_order; iz++){
         const amrex::Real wpx_var = static_cast<amrex::Real>(wp)*sz_jx[iz];
         const amrex::Real wpy_var = static_cast<amrex::Real>(wp)*sz_jy[iz];
         const amrex::Real wpz_var = static_cast<amrex::Real>(wp)*sz_jz[iz];
 
-        amrex::IntVectND<3> ixv{lo.z+l_jx+iz, 0, 0};
-        amrex::IntVectND<3> iyv{lo.z+l_jy+iz, 0, 0};
-        amrex::IntVectND<3> izv{lo.z+l_jz+iz, 0, 0};
+        const amrex::IntVectND<3> ixv{lo.z+l_jx+iz, 0, 0};
+        const amrex::IntVectND<3> iyv{lo.z+l_jy+iz, 0, 0};
+        const amrex::IntVectND<3> izv{lo.z+l_jz+iz, 0, 0};
 
         varianceDepositionSubKernel(
             vx, vy, vz,
@@ -331,12 +350,12 @@ void doVarianceDepositionShapeNKernel(
         const amrex::Real wpy_var = wp*sx_jy[ix];
         const amrex::Real wpz_var = wp*sx_jz[ix];
 
-        amrex::IntVectND<3> ixv{lo.x+j_jx+ix, 0, 0};
-        amrex::IntVectND<3> iyv{lo.x+j_jy+ix, 0, 0};
-        amrex::IntVectND<3> izv{lo.x+j_jz+ix, 0, 0};
+        amrex::IntVectND<3> const ixv{lo.x+j_jx+ix, 0, 0};
+        amrex::IntVectND<3> const iyv{lo.x+j_jy+ix, 0, 0};
+        amrex::IntVectND<3> const izv{lo.x+j_jz+ix, 0, 0};
 
         varianceDepositionSubKernel(
-            vx, vy, vz,
+            v1, v2, v3,
             ixv, iyv, izv,
             wpx_var, wpy_var, wpz_var,
             nx_arr, ny_arr, nz_arr,
@@ -353,12 +372,16 @@ void doVarianceDepositionShapeNKernel(
             const amrex::Real wpy_var = wp*sx_jy[ix]*sz_jy[iz];
             const amrex::Real wpz_var = wp*sx_jz[ix]*sz_jz[iz];
 
-            amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.z+l_jx+iz, 0};
-            amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.z+l_jy+iz, 0};
-            amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.z+l_jz+iz, 0};
+            const amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.z+l_jx+iz, 0};
+            const amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.z+l_jy+iz, 0};
+            const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.z+l_jz+iz, 0};
 
             varianceDepositionSubKernel(
+#if defined(WARPX_DIM_RZ)
+                v1, v2, v3,
+#else
                 vx, vy, vz,
+#endif
                 ixv, iyv, izv,
                 wpx_var, wpy_var, wpz_var,
                 nx_arr, ny_arr, nz_arr,
@@ -377,9 +400,9 @@ void doVarianceDepositionShapeNKernel(
                 const amrex::Real wpy_var = wp*sx_jy[ix]*sy_jy[iy]*sz_jy[iz];
                 const amrex::Real wpz_var = wp*sx_jz[ix]*sy_jz[iy]*sz_jz[iz];
 
-                amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz};
-                amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz};
-                amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz};
+                const amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.y+k_jx+iy, lo.z+l_jx+iz};
+                const amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.y+k_jy+iy, lo.z+l_jy+iz};
+                const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.y+k_jz+iy, lo.z+l_jz+iz};
 
                 varianceDepositionSubKernel(
                     vx, vy, vz,
@@ -464,7 +487,7 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     );
 #endif
 
-    const amrex::Real clightsq = 1.0_rt/PhysConst::c/PhysConst::c;
+    const amrex::Real inv_c2 = PhysConst::inv_c2;
 
     const amrex::Array4<int> & nx_arr = nx_iab.array();
     const amrex::Array4<int> & ny_arr = ny_iab.array();
@@ -482,17 +505,18 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     const amrex::IntVect & vary_type = vary_fab.box().type();
     const amrex::IntVect & varz_type = varz_fab.box().type();
 
-    // Loop over particles and deposit into the deposition buffers
-    amrex::ParallelFor(
+    // Loop over particles and deposit into the deposition buffers.
+    // amrex::For: iterations scatter-add into shared cells (no SIMD pragma, see issue #7097)
+    amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long ip) {
             amrex::ParticleReal xp, yp, zp;
             GetPosition(ip, xp, yp, zp);
 
             // --- Get particle quantities
-            const amrex::ParticleReal gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*clightsq
-                                                        + uyp[ip]*uyp[ip]*clightsq
-                                                        + uzp[ip]*uzp[ip]*clightsq);
+            const amrex::ParticleReal gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                        + uyp[ip]*uyp[ip]*inv_c2
+                                                        + uzp[ip]*uzp[ip]*inv_c2);
             const amrex::ParticleReal vx  = uxp[ip]*gaminv;
             const amrex::ParticleReal vy  = uyp[ip]*gaminv;
             const amrex::ParticleReal vz  = uzp[ip]*gaminv;

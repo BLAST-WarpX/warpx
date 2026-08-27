@@ -274,6 +274,8 @@ def plot_data(data, comp, pml, title, name):
     # Save figure
     figname = "figure_" + name + ".png"
     fig.savefig(figname, dpi=100)
+    # Close figure to avoid memory issues
+    plt.close(fig)
 
 
 # Initialize fields data (unit pulse) and apply smoothing

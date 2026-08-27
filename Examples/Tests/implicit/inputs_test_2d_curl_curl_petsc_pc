@@ -4,12 +4,10 @@
 
 ###   characteristic plasma values
 my_constants.n0 = 1.e23    # plasma density [1/m^3]
-my_constants.T0 = 1.       # plasma temperature [eV]
 my_constants.R0 = 1.5e-2   # plasma radius [m]
 my_constants.I0 = 200.e3   # pinch current [Amps]
 
 my_constants.AD = 2.01410  # atomic number deuterium
-my_constants.mD = AD*m_u - m_e   # deuterium mass [kg]
 
 ###   derived characteristic pinch values
 my_constants.B0 = mu0*I0/(2*pi*R0)  # B at r=R0 [Tesla]
@@ -22,7 +20,6 @@ my_constants.t0 = R0/u0             # implosion time [m/s]
 my_constants.tsim = 220.e-9       # sim time = 1.35*t0 [s]
 my_constants.rise_time = t0/20.0  # current rise time [s]
 my_constants.dt = 1.0e-3*1.0e-9   # time step [s]
-my_constants.Nppc_z = 10          # particles per cell per dim
 
 #################################
 ####### GENERAL PARAMETERS ######
@@ -64,8 +61,6 @@ algo.maxwell_solver = Yee
 algo.evolve_scheme = "theta_implicit_em"
 
 implicit_evolve.theta = 0.5
-implicit_evolve.max_particle_iterations = 21
-implicit_evolve.particle_tolerance = 1.0e-12
 
 implicit_evolve.nonlinear_solver = "newton"
 newton.verbose = true
@@ -82,62 +77,18 @@ gmres.max_iterations = 1000
 gmres.relative_tolerance = 1.0e-3
 gmres.absolute_tolerance = 0.0
 
-implicit_evolve.use_mass_matrices_jacobian = true
-implicit_evolve.skip_particle_picard_init = true
-implicit_evolve.use_mass_matrices_pc = true
 jacobian.pc_type = "pc_petsc"
 pc_petsc.verbose = true
 pc_petsc.type = "lu"
 
-particles.max_grid_crossings = 2
-algo.particle_pusher = "higuera"
-algo.particle_shape = 2
-algo.current_deposition = "villasenor"
-
-#################################
-############ PLASMA #############
-#################################
-particles.species_names = electrons deuterium
-
-electrons.charge = -q_e
-electrons.mass = m_e
-electrons.injection_style = "NUniformPerCell"
-electrons.num_particles_per_cell_each_dim = Nppc_z Nppc_z
-electrons.profile = constant
-electrons.density = n0
-electrons.xmax = 0.0
-electrons.momentum_distribution_type = "gaussian"
-electrons.ux_th = sqrt(T0*q_e/m_e)/clight
-electrons.uy_th = sqrt(T0*q_e/m_e)/clight
-electrons.uz_th = sqrt(T0*q_e/m_e)/clight
-
-deuterium.charge = q_e
-deuterium.mass = mD
-deuterium.injection_style = "NUniformPerCell"
-deuterium.num_particles_per_cell_each_dim = Nppc_z Nppc_z
-deuterium.profile = constant
-deuterium.density = n0
-deuterium.xmax = 0.0
-deuterium.momentum_distribution_type = "gaussian"
-deuterium.ux_th = sqrt(T0*q_e/mD)/clight
-deuterium.uy_th = sqrt(T0*q_e/mD)/clight
-deuterium.uz_th = sqrt(T0*q_e/mD)/clight
-
 ###   Diagnostics
 diagnostics.diags_names = diag1
-diag1.intervals = 20
+diag1.intervals = 200
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho divE
-diag1.electrons.variables = x z w ux uy uz
-diag1.deuterium.variables = x z w ux uy uz
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz
 
 ###   reduced diagnostics
-warpx.reduced_diags_names = particle_energy field_energy poynting_flux
-
-particle_energy.type = ParticleEnergy
-particle_energy.intervals = 10
-particle_energy.precision = 18
-particle_energy.path = diags/reduced_files/
+warpx.reduced_diags_names = field_energy poynting_flux
 
 field_energy.type = FieldEnergy
 field_energy.intervals = 10
@@ -148,15 +99,3 @@ poynting_flux.type = FieldPoyntingFlux
 poynting_flux.intervals = 10
 poynting_flux.precision = 18
 poynting_flux.path = diags/reduced_files/
-
-#################################
-############ COLLISION ##########
-#################################
-collisions.collision_names = collision1 collision2 collision3
-
-collision1.species = electrons electrons
-collision2.species = deuterium deuterium
-collision3.species = electrons deuterium
-collision1.CoulombLog = 10.0
-collision2.CoulombLog = 10.0
-collision3.CoulombLog = 10.0

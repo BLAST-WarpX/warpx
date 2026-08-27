@@ -33,7 +33,7 @@ ablastr::math::set_random_seed (std::string const & random_seed)
             const unsigned long gpu_seed = (myproc_1 + nprocs) * seed_long;
             amrex::ResetRandomSeed(cpu_seed, gpu_seed);
         } else {
-            throw std::runtime_error("random_seed must be \"default\", \"random\" or an integer > 0.");
+            throw std::runtime_error(R"(random_seed must be "default", "random" or an integer > 0.)");
         }
     }
 }

@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build import build
@@ -44,10 +45,14 @@ class CopyPreBuild(build):
                 "PYWARPX_LIB_DIR='{}'".format(PYWARPX_LIB_DIR)
             )
 
-        # copy external libs into collection of files in a temporary build dir
+        # copy Python module artifacts and sources
         dst_path = os.path.join(self.build_lib, "pywarpx")
-        for lib_path in libs_found:
-            shutil.copy(lib_path, dst_path)
+        shutil.copytree(
+            PYWARPX_LIB_DIR,
+            dst_path,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("diags", "diags.*"),
+        )
 
 
 class CMakeExtension(Extension):
@@ -64,14 +69,14 @@ class CMakeBuild(build_ext):
             out = subprocess.check_output(["cmake", "--version"])
         except OSError:
             raise RuntimeError(
-                "CMake 3.24.0+ must be installed to build the following "
+                "CMake 3.25.0+ must be installed to build the following "
                 + "extensions: "
                 + ", ".join(e.name for e in self.extensions)
             )
 
         cmake_version = parse(re.search(r"version\s*([\d.]+)", out.decode()).group(1))
-        if cmake_version < parse("3.24.0"):
-            raise RuntimeError("CMake >= 3.24.0 is required")
+        if cmake_version < parse("3.25.0"):
+            raise RuntimeError("CMake >= 3.25.0 is required")
 
         for ext in self.extensions:
             self.build_extension(ext)
@@ -86,13 +91,18 @@ class CMakeBuild(build_ext):
         dims = r_dim.group(1).upper()
 
         pyv = sys.version_info
+        # cross-compiling (e.g. Pyodide)? host & target Python differ
+        emscripten = sysconfig.get_platform().startswith("emscripten")
         cmake_args = [
             # Python: use the calling interpreter in CMake
             # https://cmake.org/cmake/help/latest/module/FindPython.html#hints
             # https://cmake.org/cmake/help/latest/command/find_package.html#config-mode-version-selection
+            #   cross builds (e.g. Pyodide) keep these host hints to resolve the
+            #   interpreter/library, but relax the exact-version match and
+            #   override the target headers (Python_INCLUDE_DIR) below
             f"-DPython_ROOT_DIR={sys.prefix}",
             f"-DPython_FIND_VERSION={pyv.major}.{pyv.minor}.{pyv.micro}",
-            "-DPython_FIND_VERSION_EXACT=TRUE",
+            "-DPython_FIND_VERSION_EXACT=" + ("FALSE" if emscripten else "TRUE"),
             "-DPython_FIND_STRATEGY=LOCATION",
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + os.path.join(extdir, "pywarpx"),
             "-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=" + extdir,
@@ -126,6 +136,11 @@ class CMakeBuild(build_ext):
             # Windows: has no RPath concept, all `.dll`s must be in %PATH%
             #          or same dir as calling executable
         ]
+        if emscripten:
+            # Pyodide cross-compile: point at the target (WASM) Python headers
+            cmake_args.append(
+                "-DPython_INCLUDE_DIR=" + sysconfig.get_config_var("INCLUDEPY")
+            )
         if WARPX_QED.upper() in ["1", "ON", "TRUE", "YES"]:
             cmake_args.append("-DWarpX_picsar_internal=" + WARPX_PICSAR_INTERNAL)
         if WARPX_OPENPMD.upper() in ["1", "ON", "TRUE", "YES"]:
@@ -172,7 +187,10 @@ class CMakeBuild(build_ext):
                     cfg.upper(), os.path.join(extdir, "pywarpx")
                 )
             ]
-            if sys.maxsize > 2**32:
+            generator_platform = os.environ.get("CMAKE_GENERATOR_PLATFORM")
+            if generator_platform:
+                cmake_args += ["-A", generator_platform]
+            elif sys.maxsize > 2**32:
                 cmake_args += ["-A", "x64"]
         else:
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
@@ -322,7 +340,7 @@ setup(
     cmdclass=cmdclass,
     # scripts=['warpx_1d', 'warpx_2d', 'warpx_rz', 'warpx_3d'],
     zip_safe=False,
-    python_requires=">=3.8",  # left for CI, truly ">=3.9"
+    python_requires=">=3.8",  # left for CI, truly ">=3.11"
     # tests_require=['pytest'],
     install_requires=install_requires,
     # see: src/bindings/python/cli
@@ -351,11 +369,10 @@ setup(
         "Topic :: Scientific/Engineering :: Physics",
         "Programming Language :: C++",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         (
             "License :: OSI Approved :: BSD License"
         ),  # TODO: use real SPDX: BSD-3-Clause-LBNL

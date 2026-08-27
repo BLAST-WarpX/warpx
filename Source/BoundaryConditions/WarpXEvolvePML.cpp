@@ -14,10 +14,10 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "PML_current.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX_PML_kernels.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/profiler/ProfilerWrapper.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -62,7 +62,7 @@ WarpX::DampPML (const int lev, PatchType patch_type)
 {
     if (!do_pml) { return; }
 
-    WARPX_PROFILE("WarpX::DampPML()");
+    ABLASTR_PROFILE("WarpX::DampPML()");
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     if (pml_rz[lev]) {
         using ablastr::fields::Direction;
@@ -253,7 +253,7 @@ WarpX::DampJPML (int lev, PatchType patch_type)
     if (!do_pml_j_damping) { return; }
     if (!pml[lev]) { return; }
 
-    WARPX_PROFILE("WarpX::DampJPML()");
+    ABLASTR_PROFILE("WarpX::DampJPML()");
 
     if (pml[lev]->ok())
     {
@@ -286,15 +286,15 @@ WarpX::DampJPML (int lev, PatchType patch_type)
 #endif
 
             // Skip the field update if this gridpoint is inside the embedded boundary
-            amrex::Array4<amrex::Real> eb_lxfab, eb_lyfab, eb_lzfab;
+            amrex::Array4<int> update_Ex_arr, update_Ey_arr, update_Ez_arr;
             if (EB::enabled()) {
-                const auto &pml_edge_lenghts = m_fields.get_alldirs(FieldType::pml_edge_lengths, lev);
+                const auto &eb_update_E = pml[lev]->GetEBUpdateEFlag();
 
-                eb_lxfab = pml_edge_lenghts[0]->array(mfi);
-                eb_lyfab = pml_edge_lenghts[1]->array(mfi);
-                eb_lzfab = pml_edge_lenghts[2]->array(mfi);
+                update_Ex_arr = eb_update_E[0]->array(mfi);
+                update_Ey_arr = eb_update_E[1]->array(mfi);
+                update_Ez_arr = eb_update_E[2]->array(mfi);
             } else {
-                amrex::ignore_unused(eb_lxfab, eb_lyfab, eb_lzfab);
+                amrex::ignore_unused(update_Ex_arr, update_Ey_arr, update_Ez_arr);
             }
 
             const Box& tjx  = mfi.tilebox( pml_j[0]->ixType().toIntVect() );
@@ -321,21 +321,21 @@ WarpX::DampJPML (int lev, PatchType patch_type)
 
             amrex::ParallelFor( tjx, tjy, tjz,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (eb_lxfab && eb_lxfab(i, j, k) <= 0) { return; }
+                    if (update_Ex_arr && update_Ex_arr(i, j, k) == 0) { return; }
 
                     damp_jx_pml(i, j, k, pml_jxfab, sigma_star_cumsum_fac_j_x,
                                 sigma_cumsum_fac_j_y, sigma_cumsum_fac_j_z,
                                 xs_lo,y_lo, z_lo);
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (eb_lyfab && eb_lyfab(i, j, k) <= 0) { return; }
+                    if (update_Ey_arr && update_Ey_arr(i, j, k) == 0) { return; }
 
                     damp_jy_pml(i, j, k, pml_jyfab, sigma_cumsum_fac_j_x,
                                 sigma_star_cumsum_fac_j_y, sigma_cumsum_fac_j_z,
                                 x_lo,ys_lo, z_lo);
                 },
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (eb_lzfab && eb_lzfab(i, j, k) <= 0) { return; }
+                    if (update_Ez_arr && update_Ez_arr(i, j, k) == 0) { return; }
 
                     damp_jz_pml(i, j, k, pml_jzfab, sigma_cumsum_fac_j_x,
                                 sigma_cumsum_fac_j_y, sigma_star_cumsum_fac_j_z,

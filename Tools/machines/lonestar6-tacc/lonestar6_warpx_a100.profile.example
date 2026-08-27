@@ -47,7 +47,7 @@ alias getNode="salloc -N 1 --ntasks-per-node=2 -t 1:00:00 -p gpu-100 --gpu-bind=
 alias runNode="srun -N 1 --ntasks-per-node=2 -t 0:30:00 -p gpu-100 --gpu-bind=single:1 -c 32 -G 2 -A $proj"
 
 # optimize CUDA compilation for A100
-export AMREX_CUDA_ARCH=8.0
+export CUDAARCHS=80
 
 # compiler environment hints
 export CC=$(which gcc)

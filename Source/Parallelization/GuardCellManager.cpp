@@ -169,9 +169,9 @@ guardCellManager::Init (
             ng_alloc_Rho[i] += static_cast<int>(std::ceil(PhysConst::c * dt_Rho / dx[i]));
             ng_alloc_J[i]   += static_cast<int>(std::ceil(PhysConst::c * dt_J / dx[i]));
         }
-    } else if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-               evolve_scheme == EvolveScheme::SemiImplicitEM ||
-               evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    } else if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+               evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+               evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // When using these implicit schemes, the speed of light Courant limit may be significantly
         // violated, but the number of guard cells only need to be adjusted based on the particle motion.
         for (int i = 0; i < AMREX_SPACEDIM; i++) {
@@ -186,7 +186,9 @@ guardCellManager::Init (
 
     if (use_filter)
     {
-        ng_alloc_J += bilinear_filter_stencil_length - amrex::IntVect(1);
+        const amrex::IntVect extra = bilinear_filter_stencil_length - amrex::IntVect(1);
+        ng_alloc_J += extra;
+        ng_alloc_Rho += extra;
     }
 
     // After pushing particle
@@ -312,6 +314,13 @@ guardCellManager::Init (
     }
 #endif
 
+    // For the hybrid-PIC solver a minimum of 2 guard cells are required to
+    // avoid the need for parallel communication after calculating curl x B.
+    if ((electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) &&
+        (ng_FieldSolver < IntVect(AMREX_D_DECL(2, 2, 2)))) {
+        ng_FieldSolver += 1;
+    }
+
     // Number of guard cells is the max of that determined by particle shape factor and
     // the stencil used in the field solve
     ng_alloc_EB.max( ng_FieldSolver );
@@ -372,9 +381,9 @@ guardCellManager::Init (
         }
     }
 
-    if (evolve_scheme == EvolveScheme::ThetaImplicitEM ||
-        evolve_scheme == EvolveScheme::SemiImplicitEM ||
-        evolve_scheme == EvolveScheme::StrangImplicitSpectralEM) {
+    if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+        evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
+        evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // For these implicit schemes, the number of ghost cells
         // for EB gather must be consistent with those for J.
         ng_alloc_EB.max( ng_alloc_J );

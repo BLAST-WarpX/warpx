@@ -22,8 +22,8 @@ be changed as needed):
     LBC.type = LoadBalanceCosts
     LBC.intervals = 100
 
-The line ``warpx.reduced_diags_names = LBC`` sets the name of the reduced diagnostics
-output file to ``LBC``.  The next line ``LBC.type = LoadBalanceCosts`` tells WarpX
+The line :pp:param:`warpx.reduced_diags_names = LBC` sets the name of the reduced diagnostics
+output file to ``LBC``.  The next line :pp:param:`LBC.type = LoadBalanceCosts <<reduced_diags_name>.type>` tells WarpX
 that the reduced diagnostics is a ``LoadBalanceCosts`` diagnostic, and instructs
 WarpX to record costs and rank layouts.  The final line, ``LBC.intervals = 100``,
 controls the interval for output of this reduced diagnostic's data.

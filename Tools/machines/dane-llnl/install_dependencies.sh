@@ -27,6 +27,10 @@ python3 -m pip uninstall -qq -y pywarpx
 python3 -m pip uninstall -qq -y warpx
 python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 # Setup the directories where the packages will be installed
 if [ -z "${WARPX_SW_DIR+x}" ]; then
     WARPX_SW_DIR="/usr/workspace/${USER}/dane"
@@ -76,7 +80,7 @@ then
 else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/blaspp.git ${WARPX_SW_DIR}/src/blaspp
 fi
-cmake -S ${WARPX_SW_DIR}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=17 -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/blaspp-2024.10.26
+cmake -S ${WARPX_SW_DIR}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/blaspp-2024.10.26
 cmake --build ${build_dir}/blaspp-dane-build --target install --parallel 6
 
 # LAPACK++ (for PSATD+RZ)
@@ -89,7 +93,7 @@ then
 else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/lapackpp.git ${WARPX_SW_DIR}/src/lapackpp
 fi
-CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${WARPX_SW_DIR}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=17 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/lapackpp-2024.10.26
+CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${WARPX_SW_DIR}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/lapackpp-2024.10.26
 cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel 6
 
 
@@ -100,7 +104,6 @@ rm -rf ${WARPX_SW_DIR}/venvs/warpx-dane
 python3 -m venv ${WARPX_SW_DIR}/venvs/warpx-dane
 source ${WARPX_SW_DIR}/venvs/warpx-dane/bin/activate
 python3 -m pip install --upgrade pip
-#python3 -m pip cache purge
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel

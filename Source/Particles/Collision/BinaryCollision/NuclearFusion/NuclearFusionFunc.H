@@ -166,10 +166,6 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
-#if (defined WARPX_DIM_RZ)
-            amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-            amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
-#endif
             index_type i1 = I1s + coll_idx;
             index_type i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
@@ -185,21 +181,6 @@ public:
                 }
                 else {
 
-#if (defined WARPX_DIM_RZ)
-                    /* In RZ geometry, macroparticles can collide with other macroparticles
-                     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                     * are actually not local in space. In this case, the underlying assumption is that
-                     * particles within the same cylindrical cell represent a cylindrically-symmetry
-                     * momentum distribution function. Therefore, here, we temporarily rotate the
-                     * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                     * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                     * there is a corresponding assert statement at initialization.) */
-                    amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
-                    amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-                    u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
-#endif
-
                     SingleNuclearFusionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
@@ -209,12 +190,6 @@ public:
                         m_probability_threshold,
                         m_probability_target_value,
                         m_fusion_type, engine);
-
-#if (defined WARPX_DIM_RZ)
-                    amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-                    u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
-#endif
 
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {

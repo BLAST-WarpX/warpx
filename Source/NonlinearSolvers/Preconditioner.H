@@ -53,7 +53,7 @@ class Preconditioner
         /**
          * \brief Define the preconditioner
          */
-        virtual void Define (const T&, Ops* const) = 0;
+        virtual void Define (const T&, Ops*) = 0;
 
         /**
          * \brief Update the preconditioner

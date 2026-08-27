@@ -279,12 +279,14 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
             // Extract tileboxes for which to loop
             Box const &tb = mfi.tilebox(Bfield[idim]->ixType().toIntVect());
 
-            //Take care of the unstable cells
-            amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            //Take care of the unstable cells.
+            // amrex::For: iterations scatter-add into neighboring faces of Venl
+            // (no SIMD pragma, see issue #7097)
+            amrex::For(tb, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
 
                 if (S(i, j, k) <= 0) { return; }
 
-                if (!(flag_info_cell_dim(i, j, k) == 0)) { return; }
+                if (!(flag_info_cell_dim(i, j, k) == FaceInfo::extended)) { return; }
 
                 Venl_dim(i, j, k) = Rho(i, j, k) * S(i, j, k);
                 amrex::Real rho_enl;
@@ -348,7 +350,10 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
                         kp = k;
                     }
 
-                    Venl_dim(ip, jp, kp) += rho_enl * borrowing_dim_area[ind];
+                    // Atomic because different unstable faces can borrow area
+                    // from the same intruded face, i.e., different iterations can
+                    // update the same element.
+                    amrex::Gpu::Atomic::AddNoRet(&Venl_dim(ip, jp, kp), rho_enl * borrowing_dim_area[ind]);
 
                 }
 
@@ -360,13 +365,13 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
             amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
                 if (S(i, j, k) <= 0) { return; }
 
-                if (flag_info_cell_dim(i, j, k) == 0) {
+                if (flag_info_cell_dim(i, j, k) == FaceInfo::extended) {
                     return;
                 }
-                else if (flag_info_cell_dim(i, j, k) == 1) {
+                else if (flag_info_cell_dim(i, j, k) == FaceInfo::available) {
                     //Stable cell which hasn't been intruded
                     B(i, j, k) = B(i, j, k) - dt * Rho(i, j, k);
-                } else if (flag_info_cell_dim(i, j, k) == 2) {
+                } else if (flag_info_cell_dim(i, j, k) == FaceInfo::intruded) {
                     //Stable cell which has been intruded
                     Venl_dim(i, j, k) += Rho(i, j, k) * S_mod(i, j, k);
                     B(i, j, k) = B(i, j, k) - dt * Venl_dim(i, j, k) / S(i, j, k);

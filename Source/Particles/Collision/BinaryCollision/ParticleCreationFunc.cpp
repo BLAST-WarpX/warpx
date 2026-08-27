@@ -34,11 +34,9 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
         m_num_products_device.push_back(3);
 #endif
     }
-    else if ((m_collision_type == CollisionType::DeuteriumTritiumToNeutronHeliumFusion)
-             || (m_collision_type == CollisionType::DeuteriumDeuteriumToProtonTritiumFusion)
-             || (m_collision_type == CollisionType::DeuteriumDeuteriumToNeutronHeliumFusion)
-             || (m_collision_type == CollisionType::LinearBreitWheeler)
-             || (m_collision_type == CollisionType::LinearCompton))
+    else if ((BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
+        || (m_collision_type == CollisionType::LinearBreitWheeler)
+        || (m_collision_type == CollisionType::LinearCompton))
     {
         m_num_product_species = 2;
         m_num_products_host.push_back(1);
@@ -52,6 +50,12 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
     else
     {
         WARPX_ABORT_WITH_MESSAGE("Unknown collision type in ParticleCreationFunc");
+    }
+
+    if (m_collision_type == CollisionType::ProtonBoronToAlphasFusion
+        || BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
+    {
+        pp_collision_name.query_enum_case_insensitive("scattering_angle_model", m_scattering_angle_model);
     }
 
 #ifdef AMREX_USE_GPU

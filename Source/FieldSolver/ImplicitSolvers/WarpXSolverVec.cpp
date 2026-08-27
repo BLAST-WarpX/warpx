@@ -50,9 +50,9 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_array_type = FieldType::vector_potential_fp;
     }
     else if (m_vector_type_name!="none") {
-        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name
-                    +"is not a valid option for array type used in Definining"
-                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp,"
+        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name+" "
+                    +"is not a valid option for array type used in Definining "
+                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp, "
                     +"and vector_potential_fp_nodal");
     }
 
@@ -60,8 +60,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_scalar_type = FieldType::phi_fp;
     }
     else if (m_scalar_type_name!="none") {
-        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name
-                    +"is not a valid option for scalar type used in Definining"
+        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name+" "
+                    +"is not a valid option for scalar type used in Definining "
                     +"a WarpXSolverVec. Valid scalar types are: phi_fp");
     }
 
@@ -111,8 +111,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
     m_is_defined = true;
 }
 
-void WarpXSolverVec::Copy ( FieldType  a_array_type,
-                            FieldType  a_scalar_type,
+void WarpXSolverVec::Copy ( warpx::fields::FieldType  a_array_type,
+                            warpx::fields::FieldType  a_scalar_type,
                             bool allow_type_mismatch)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -159,7 +159,7 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         for (int v = 0; v < ncomp; v++) {
-                            int dof = dof_arr(i,j,k,2*v); // local
+                            const  int dof = dof_arr(i,j,k,2*v); // local
                             if (dof >= 0) {
                                 data_arr(i,j,k,v) = a_arr[dof];
                             }
@@ -178,7 +178,7 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     for (int v = 0; v < ncomp; v++) {
-                        int dof = dof_arr(i,j,k,2*v); // local
+                        const int dof = dof_arr(i,j,k,2*v); // local
                         if (dof >= 0) {
                             data_arr(i,j,k,v) = a_arr[dof];
                         }
@@ -210,7 +210,7 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                     ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                     {
                         for (int v = 0; v < ncomp; v++) {
-                            int dof = dof_arr(i,j,k,2*v); // local
+                            const int dof = dof_arr(i,j,k,2*v); // local
                             if (dof >= 0) {
                                 a_arr[dof] = data_arr(i,j,k,v);
                             }
@@ -228,7 +228,7 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                 ParallelFor( bx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     for (int v = 0; v < ncomp; v++) {
-                        int dof = dof_arr(i,j,k,2*v); // local
+                        const int dof = dof_arr(i,j,k,2*v); // local
                         if (dof >= 0) {
                             a_arr[dof] = data_arr(i,j,k,v);
                         }

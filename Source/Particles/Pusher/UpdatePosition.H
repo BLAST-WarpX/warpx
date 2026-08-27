@@ -34,7 +34,7 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
 
     // massive particles
     if (mass > 0.0_rt) {
-        constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+        constexpr amrex::ParticleReal inv_c2 = 1._prt/PhysConst::c2;
         const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + u2*inv_c2);
 
         // Update positions over one time step
@@ -83,7 +83,7 @@ amrex::ParticleReal GetImplicitGammaInverse (const amrex::ParticleReal uxp_n,
 {
     using namespace amrex::literals;
 
-    constexpr amrex::ParticleReal inv_c2 = 1.0_prt/(PhysConst::c*PhysConst::c);
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     const amrex::ParticleReal uxp_np1 = 2._prt*uxp_nph - uxp_n;
     const amrex::ParticleReal uyp_np1 = 2._prt*uyp_nph - uyp_n;

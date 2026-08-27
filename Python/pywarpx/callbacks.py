@@ -29,6 +29,7 @@ Functions can be called at the following times:
 * ``beforeInitEsolve``: before the initial solve for the E fields (i.e. before the PIC loop starts)
 * ``afterInitEsolve``: after the initial solve for the E fields (i.e. before the PIC loop starts)
 * ``afterinit``: immediately after the init is complete
+* ``allocdata``: during initialization (from scratch and from restart), when new MultiFabs should be allocated
 * ``beforeEsolve``: before the solve for E fields (not called during init E solve, use beforeInitEsolve to apply to first solve)
 * ``poissonsolver``: In place of the computePhi call but only in an electrostatic simulation
 * ``afterEsolve``: after the solve for E fields (not called after init E solve, use afterInitEsolve to apply to first solve)
@@ -41,8 +42,7 @@ Functions can be called at the following times:
 * ``afterdiagnostics``: after diagnostic output
 * ``oncheckpointsignal``: on a checkpoint signal
 * ``onbreaksignal``: on a break signal. These callbacks will be the last ones executed before the simulation ends.
-* ``particlescraper``: just after the particle boundary conditions are applied
-  but before lost particles are processed
+* ``particlescraper``: before particle boundary conditions are applied
 * ``particleloader``: at the time that the standard particle loader is called
 * ``particleinjection``: called when particle injection happens, after the position
   advance and before deposition is called, allowing a user
@@ -120,7 +120,14 @@ class CallbackFunctions(object):
     def clearlist(self):
         """Unregister/clear out all registered C callbacks"""
         self.funcs = []
-        libwarpx.libwarpx_so.remove_python_callback(self.name)
+        # timings of a finalized simulation must not be added to the next one
+        self.time = 0.0
+        self.timers = {}
+        # only reach into the compiled module if it is already loaded:
+        # accessing libwarpx_so would otherwise load it, which needs the
+        # geometry and thus fails if no simulation was initialized
+        if libwarpx.libwarpx_so_loaded:
+            libwarpx.libwarpx_so.remove_python_callback(self.name)
 
     def __bool__(self):
         """Returns True if functions are installed, otherwise False"""
@@ -283,6 +290,7 @@ callback_instances = {
     "afterInitEsolve": {},
     "afterInitatRestart": {},
     "afterinit": {},
+    "allocdata": {},
     "beforecollisions": {},
     "aftercollisions": {},
     "beforeEsolve": {},
@@ -426,6 +434,16 @@ def callfromafterinit(f):
 
 def installafterinit(f):
     installcallback("afterinit", f)
+
+
+# ----------------------------------------------------------------------------
+def callfromallocdata(f):
+    installcallback("allocdata", f)
+    return f
+
+
+def installallocdata(f):
+    installcallback("allocdata", f)
 
 
 # ----------------------------------------------------------------------------

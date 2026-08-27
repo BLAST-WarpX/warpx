@@ -27,7 +27,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    DifferentialLuminosity(const std::string& rd_name);
+    explicit DifferentialLuminosity(const std::string& rd_name);
 
     /// name of the two colliding species
     std::vector<std::string> m_beam_name;
@@ -55,7 +55,7 @@ private:
     /// map to store header texts and indices of the reduced diagnostics
     std::map<std::string, aux_header_index> m_headers_indices;
 
-    // Array in which to accumulate the luminosity across timesteps
+    // Array in which to accumulate the total and binned luminosity across timesteps
     amrex::Gpu::DeviceVector< amrex::Real > d_data;
 };
 

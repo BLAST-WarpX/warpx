@@ -20,3 +20,4 @@ This section collects typical user workflows and best practices for WarpX.
    workflows/archiving
    workflows/ml_dataset_training
    workflows/optimas
+   workflows/ai_input_design
