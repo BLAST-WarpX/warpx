@@ -68,7 +68,8 @@ Checks: '
         -readability-redundant-casting,
         -readability-redundant-inline-specifier,
         -readability-redundant-member-init,
-        -readability-reference-to-constructed-temporary
+        -readability-reference-to-constructed-temporary,
+        -readability-use-concise-preprocessor-directives
     '
 
 CheckOptions:
@@ -82,6 +83,8 @@ CheckOptions:
   value:        "H,"
 - key:          performance-move-const-arg.CheckTriviallyCopyableMove
   value:        "false"
+- key:          cppcoreguidelines-use-enum-class.IgnoreUnscopedEnumsInClasses
+  value:        "true"
 
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 
