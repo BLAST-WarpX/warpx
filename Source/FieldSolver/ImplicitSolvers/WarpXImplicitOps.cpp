@@ -150,9 +150,9 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
                 const auto getPosition = GetParticlePosition(pti);
 
                 auto& attribs = pti.GetAttribs();
-                amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
-                amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
-                amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+                const amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
 #if !defined(WARPX_DIM_1D_Z)
                 amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
