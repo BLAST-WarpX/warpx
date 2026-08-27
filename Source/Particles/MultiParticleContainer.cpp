@@ -393,7 +393,6 @@ MultiParticleContainer::ReadParameters ()
             utils::parser::queryWithParser(
                 pp_qed_schwinger, "zmax", m_qed_schwinger_zmax);
         }
-#endif
         m_params_initialized = true;
     }
 }
