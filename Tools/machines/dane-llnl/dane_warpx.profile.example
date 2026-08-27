@@ -32,7 +32,7 @@ export LD_LIBRARY_PATH=${WARPX_SW_DIR}/install/lapackpp-2024.10.26/lib64:$LD_LIB
 # optional: for implicit solvers
 # only do this is PETSC_DIR is not already defined
 if [[ -z "${PETSC_DIR:-}" ]]; then
-    export PETSC_DIR="${WARPX_SW_DIR}/install/petsc"
+    export PETSC_DIR="${WARPX_SW_DIR}/src/petsc"
     export PETSC_ARCH="arch-opt"
 fi
 
