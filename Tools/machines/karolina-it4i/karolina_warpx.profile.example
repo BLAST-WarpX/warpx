@@ -50,7 +50,7 @@ function getNode() {
 
 # Environment #####################################################
 # optimize CUDA compilation for A100
-export AMREX_CUDA_ARCH="8.0"
+export CUDAARCHS="80"
 export SCRATCH="/scratch/project/${proj,,}/${USER}"
 
 # optimize CPU microarchitecture for AMD EPYC 7763 (zen3)

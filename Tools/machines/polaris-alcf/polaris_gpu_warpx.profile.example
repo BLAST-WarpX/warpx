@@ -49,7 +49,7 @@ fi
 export CRAY_ACCEL_TARGET=nvidia80
 
 # optimize CUDA compilation for A100
-export AMREX_CUDA_ARCH=8.0
+export CUDAARCHS=80
 
 # optimize CPU microarchitecture for AMD EPYC 3rd Gen (Milan/Zen3)
 # note: the cc/CC/ftn wrappers below add those

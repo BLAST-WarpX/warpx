@@ -11,6 +11,8 @@ trigger:
     exclude:
     - 'Docs/**'
     - 'Tools/machines/**'
+    - '*.rst'
+    - '*.md'
     - '**/*.rst'
     - '**/*.md'
 pr:
@@ -20,6 +22,8 @@ pr:
     exclude:
     - 'Docs/**'
     - 'Tools/machines/**'
+    - '*.rst'
+    - '*.md'
     - '**/*.rst'
     - '**/*.md'
 
@@ -41,19 +45,24 @@ jobs:
     matrix:
       # 1D Cartesian, Cylindrical, Spherical
       1d:
+        CDASH_BUILD_NAME: CPU-1D
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 2D
       cartesian_2d:
+        CDASH_BUILD_NAME: CPU-2D
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 3D
       cartesian_3d:
+        CDASH_BUILD_NAME: CPU-3D
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cylindrical RZ
       cylindrical_rz:
+        CDASH_BUILD_NAME: CPU-RZ
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RZ -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
         WARPX_RZ_FFT: 'TRUE'
       # single precision
       #single_precision:
+      #  CDASH_BUILD_NAME: CPU-All-SP
       #  WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;2;3;RZ' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PRECISION=SINGLE
       #  WARPX_RZ_FFT: 'TRUE'
 
@@ -178,9 +187,11 @@ jobs:
       # configure
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
       export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
-      cmake -S . -B build    \
-        ${AMReX_CMAKE_FLAGS} \
-        ${WARPX_CMAKE_FLAGS} \
+      cmake -S . -B build                    \
+        -DBUILDNAME="${CDASH_BUILD_NAME}"    \
+        -DSITE=Azure                         \
+        ${AMReX_CMAKE_FLAGS}                 \
+        ${WARPX_CMAKE_FLAGS}                 \
         ${WARPX_TEST_FLAGS}
       # build
       cmake --build build -j 2

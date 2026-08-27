@@ -34,8 +34,7 @@ ENV NJOBS=$NJOBS
 
 # Perlmutter GPU: A100
 # Perlmutter CPU: Zen v3
-ENV AMREX_CUDA_ARCH=8.0        \
-    CUDAARCHS=80               \
+ENV CUDAARCHS=80               \
     CXXFLAGS="-march=znver3"   \
     CFLAGS="-march=znver3"
 
