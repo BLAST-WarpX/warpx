@@ -147,3 +147,38 @@ When a change removes or renames a user-facing input parameter, add a guard to t
 - Main branch: `development` (not `main`)
 - Fork-and-branch workflow; PRs target `development`
 - Pull requests with new features need to add a test for coverage.
+
+## Pull Requests
+
+Focus the PR description on the new feature and the tests performed.
+Stay below one page on GitHub, i.e., less than 15 lines, and answer:
+
+- What was achieved?
+- What was tested?
+- Does this break user interfaces?
+
+Put additional system details, corner-cases and rejected ideas in a collapsed block, so the summary stays short:
+
+```markdown
+<details><summary>Details</summary>
+<summary>Short title</summary>
+
+...
+
+</details>
+```
+
+Close the description with a `## TODO` check-list and keep the PR title prefixed with `[WIP] ` until the list is complete:
+
+```markdown
+## TODO
+
+Prefix the PR title with `[WIP] ` until this list is complete.
+
+- [x] Drafted with LLM [optional model details]
+- [ ] Manually self-reviewed: checked and understand logic, improved wording, checked for outdated and unnecessarily historic documentation; ensured new features are tested with small, fast tests
+- [ ] Performed a separate, LLM-based review and fixed all findings
+- [ ] Finalized: documented in a way to ensure a human WarpX developer can understand
+```
+
+WarpX developers have typically a mix of backgrounds from computational physics, applied mathematics, and computer systems engineering.

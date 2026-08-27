@@ -156,12 +156,26 @@ Right after you push changes, a banner should appear on the Github page of your 
 
 - Click on the `compare & pull request` button to prepare your PR.
 - It is time to communicate your changes: write a title and a description for your PR.
-  People who review your PR are happy to know
+  The description is pre-filled with our [pull request template](https://github.com/BLAST-WarpX/warpx/blob/development/.github/pull_request_template.md), which asks the three questions that reviewers need answered:
 
-  * what feature/fix you propose, and why
-  * how you made it (added new/edited files, created a new class than inherits from...)
-  * how you tested it and what was the output you got
-  * and anything else relevant to your PR (attach images and scripts, link papers, *etc.*)
+  * **What was achieved?** The feature/fix you propose, and why.
+  * **What was tested?** How you tested it and what output you got.
+  * **Does this break user interfaces?** For example: renamed or removed input parameters, changed defaults, or changed Python APIs.
+
+  Keep this part focused and short: stay below one page on GitHub, i.e., less than 15 lines.
+  A short description gets read, a long one gets skimmed.
+- Everything else goes into the collapsed `<details>` block at the end of the template: system details, corner-cases, rejected ideas, benchmark numbers, attached images and scripts, linked papers, *etc.*
+
+  ```markdown
+  <details><summary>Details</summary>
+
+  ...
+
+  </details>
+  ```
+
+- Work through the `## TODO` check-list of the template before you ask for a review, especially the manual self-review.
+  This matters most if you drafted the changes with an LLM, see [LLM-Assisted WarpX Development](#developers-llm).
 - Press `Create pull request`.
   Now you can navigate through your PR, which highlights the changes you made.
 
@@ -174,8 +188,25 @@ If you want to implement a feature and are not too sure how to split it, just op
 Generally, write helper functionality first, test it and then write implementation code.
 Submit tests, documentation changes and implementation of a feature together for pull request review.
 
+#### Work-in-progress pull requests
+
 Even before your work is ready to merge, it can be convenient to create a PR (so you can use Github tools to visualize your changes).
-In this case, please put the `[WIP]` tag (for Work-In-Progress) at the beginning of the PR title.
+There are two ways to mark such a PR, which serve different purposes and can be combined:
+
+- **`[WIP]` in the PR title**
+
+  A signal to reviewers: *"this is not ready yet, please do not spend review time on it."*
+  This is a WarpX convention and does not change anything on GitHub itself: CI still runs on every push.
+  Remove the tag as soon as the PR is ready for review.
+
+- **GitHub *draft* state**
+
+  Open the PR with *Create draft pull request*, or press *Convert to draft* on an existing PR.
+  On top of the reviewer signal, this **pauses our CI**: the compile-and-test workflows on GitHub Actions and Azure Pipelines skip draft PRs and only start once you press *Ready for review*.
+  Use this while you still iterate quickly and push many small commits.
+  It saves energy and keeps the CI queue short for other contributors.
+  The lightweight source and style checks, as well as the documentation build, still run on drafts, so you get early feedback on formatting.
+
 You can also use the GitHub project tab in your fork to organize the work into separate tasks/PRs and share it with the WarpX community to get feedback.
 
 #### Include a test to your PR
@@ -200,7 +231,7 @@ in `Docs/`. Then open `Docs/build/html/index.html` with your favorite web browse
 for your changes.
 
 Once your code is ready with documentation and automated test, congratulations!
-You can create the PR (or remove the `[WIP]` tag if you already created it).
+You can create the PR (or, if you already created it, remove the `[WIP]` tag and press *Ready for review* on a draft PR).
 Reviewers will interact with you if they have comments/questions.
 
 (developers-contributing-style-conventions)=
