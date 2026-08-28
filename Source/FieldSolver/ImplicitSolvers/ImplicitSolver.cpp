@@ -331,6 +331,19 @@ void ImplicitSolver::ApplyMassMatrices (
             amrex::Array4<const amrex::Real> const& baseline_arr_y = use_baseline ? (*a_baseline)[lev][1]->array(mfi)
                                                                                   : amrex::Array4<const amrex::Real>{};
 #endif
+
+            amrex::Array4<const amrex::Real> const& Sxx = SX[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Sxz = SX[2]->array(mfi);
+#if !defined(WARPX_EM_TEY)
+            amrex::Array4<const amrex::Real> const& Sxy = SX[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Syx = SY[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Syy = SY[1]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Syz = SY[2]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Szy = SZ[1]->array(mfi);
+#endif
+            amrex::Array4<const amrex::Real> const& Szx = SZ[0]->array(mfi);
+            amrex::Array4<const amrex::Real> const& Szz = SZ[2]->array(mfi);
+
             // The outer loop below reads Sxx/Sxy/Sxz (etc.) directly at (i,j,k),
             // so it must stay within the mass matrices' own ghost region - grow
             // by the min of the input's and the mass matrices' ghost widths.
@@ -393,7 +406,6 @@ void ImplicitSolver::ApplyMassMatrices (
                     }
                 }
 
-                amrex::Real SxydEy = 0.0;
 #if !defined(WARPX_EM_TEY)
                 // Compute Sxy*d_in_y
                 for (int dim=0; dim<AMREX_SPACEDIM; ++dim) {
@@ -436,7 +448,11 @@ void ImplicitSolver::ApplyMassMatrices (
                 }
 
                 if (use_baseline) { out_arr_x(i,j,k,n) += baseline_arr_x(i,j,k,n); }
+#if defined(WARPX_EM_TEY)
+                out_arr_x(i,j,k,n) += a_scale * (Sxx_d_in_x + Sxz_d_in_z);
+#else
                 out_arr_x(i,j,k,n) += a_scale * (Sxx_d_in_x + Sxy_d_in_y + Sxz_d_in_z);
+#endif
             });
             }
 #if !defined(WARPX_EM_TEY)
@@ -580,7 +596,11 @@ void ImplicitSolver::ApplyMassMatrices (
                 }
 
                 if (use_baseline) { out_arr_z(i,j,k,n) += baseline_arr_z(i,j,k,n); }
+#if defined(WARPX_EM_TEY)
+                out_arr_z(i,j,k,n) += a_scale * (Szx_d_in_x + Szz_d_in_z);
+#else
                 out_arr_z(i,j,k,n) += a_scale * (Szx_d_in_x + Szy_d_in_y + Szz_d_in_z);
+#endif
             });
             }
         }
