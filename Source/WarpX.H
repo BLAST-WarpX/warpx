@@ -433,7 +433,7 @@ public:
      */
     amrex::Real GlobalPlasmaFrequencyMax ();
     amrex::Real GlobalCyclotronFrequencyMax ();
-    void ApplyDtLimiters (int const step);
+    void ApplyDtLimiters (int step);
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
