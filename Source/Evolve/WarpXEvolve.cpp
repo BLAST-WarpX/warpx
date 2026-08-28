@@ -199,7 +199,7 @@ WarpX::Evolve (int numsteps)
         // (electrostatic and theta-implicit EM), provided const_dt is not specified.
         if (m_dt_update_interval.contains(step+1) || (step == 0 && m_max_dt.has_value())) {
             SynchronizeVelocityWithPosition();
-            ApplyDtLimiters();
+            ApplyDtLimiters(step);
             if (verbose_step) {
                 std::ostringstream oss;
                 oss << "updating timestep to DT = " << std::scientific << std::setprecision(6) << dt[0];

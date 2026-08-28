@@ -3384,6 +3384,13 @@ Time step
 
     When adaptive timestepping is activated, information about the new time step and the simulation conditions are output to the file specified by this parameter.
 
+.. pp:param:: warpx.dt_update_write_interval
+    :type: ``string``
+    :optional:
+
+    When adaptive timestepping is activated and :pp:param:`warpx.dt_update_diagnostic_file` is specified, this specifies the interval when data is written to the diagnostic file.
+    The default is to write every time the time step is updated.
+
 .. pp:param:: warpx.max_omegap_dt
     :type: ``float``
     :optional:

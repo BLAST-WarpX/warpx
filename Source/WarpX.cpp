@@ -848,6 +848,9 @@ WarpX::ReadParameters ()
         m_dt_update_interval = ablastr::utils::text::IntervalsParser(dt_interval_vec);
         if (m_dt_update_interval.isActivated()) {
             pp_warpx.query("dt_update_diagnostic_file", m_dt_update_diagnostic_file);
+            std::vector<std::string> dt_write_interval_vec = {"1"};
+            pp_warpx.queryarr("dt_update_write_interval", dt_write_interval_vec);
+            m_dt_update_write_interval = ablastr::utils::text::IntervalsParser(dt_write_interval_vec);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 !m_const_dt.has_value(),
                 "warpx.const_dt and warpx.dt_update_interval cannot be defined simultaneously."

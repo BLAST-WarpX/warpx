@@ -815,6 +815,9 @@ WarpX::InitData ()
     /** create object for reduced diagnostics */
     reduced_diags = std::make_unique<MultiReducedDiags>();
 
+    // Set the header for the file saving dt_update data
+    WriteDtUpdateFileHeader();
+
     // WarpX::computeMaxStepBoostAccelerator
     // needs to start from the initial zmin_domain_boost,
     // even if restarting from a checkpoint file
