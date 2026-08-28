@@ -2,7 +2,6 @@
 #
 
 if(WarpX_EB)
-
     add_warpx_test(
         test_3d_electrostatic_sphere_eb  # name
         3  # dims
