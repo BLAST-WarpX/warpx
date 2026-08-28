@@ -323,12 +323,11 @@ public:
         auto *tile_products_data = tile_products.data();
 
         bool const use_global_debye_length = m_use_global_debye_length;
-        amrex::Real * global_debye_length_data = nullptr;
+        amrex::Array4<amrex::Real> global_debye_length_array;
         if (use_global_debye_length) {
             WarpX & warpx = WarpX::GetInstance();
-            amrex::MultiFab & global_debye_length = *warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
-            amrex::FArrayBox & global_debye_length_fab = global_debye_length[mfi];
-            global_debye_length_data = global_debye_length_fab.dataPtr();
+            amrex::MultiFab * global_debye_length = warpx.m_fields.get(warpx::fields::FieldType::global_debye_length, lev);
+            global_debye_length_array = global_debye_length->array(mfi);
         }
 
         const amrex::Box tilebox = mfi.tilebox();
@@ -686,7 +685,7 @@ public:
 
                     amrex::Real global_lamdb = 0.;
                     if (use_global_debye_length) {
-                        global_lamdb = global_debye_length_data[i_cell];
+                        global_lamdb = global_debye_length_array(global_index);
                     }
 
                     // Call the function in order to perform collisions
@@ -1281,7 +1280,7 @@ public:
 
                     amrex::Real global_lamdb = 0.;
                     if (use_global_debye_length) {
-                        global_lamdb = global_debye_length_data[i_cell];
+                        global_lamdb = global_debye_length_array(global_index);
                     }
 
                     // Call the function in order to perform collisions
