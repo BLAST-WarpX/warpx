@@ -14,11 +14,14 @@ boundary.potential_hi_x = -4.0
 warpx.const_dt = 1e-6
 
 warpx.do_electrostatic = labframe
-warpx.eb_implicit_function = "-(x**2+y**2+z**2-0.5**2)"
+eb2.geom_type = stl
+# CMake supplies eb2.stl_file and shell.stl_file as absolute paths.
+eb2.stl_scale = 0.5
+eb2.stl_center = 0.0 0.0 0.0
+eb2.stl_reverse_normal = 0
 warpx.eb_potential(x,y,z,t) = "0.0"
 
 dielectrics.names = shell
-# CMake supplies shell.stl_file as an absolute path.
 shell.stl_scale = 1.0
 shell.stl_center = 0.0 0.0 0.0
 shell.stl_reverse_normal = 0

@@ -14,6 +14,7 @@ if(WarpX_EB)
 
     set(_unit_sphere_stl "${CMAKE_CURRENT_SOURCE_DIR}/unit_sphere.stl")
     set(_stl_inputs inputs_test_3d_conducting_sphere_dielectric_shell_stl)
+    list(APPEND _stl_inputs "eb2.stl_file=${_unit_sphere_stl}")
     list(APPEND _stl_inputs "shell.stl_file=${_unit_sphere_stl}")
     list(JOIN _stl_inputs " " _stl_inputs)
     add_warpx_test(
