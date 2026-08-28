@@ -69,7 +69,7 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
                                const NuclearFusionType& fusion_type,
                                const amrex::RandomEngine& engine,
                                const bool create_products,
-                               const amrex::IntVectND<3> global_index,
+                               const amrex::IntVect global_index,
                                const amrex::Array4<amrex::Real> & particle_production)
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;

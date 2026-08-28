@@ -148,7 +148,7 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  /*m1*/, amrex::ParticleReal const  /*m2*/,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const cell_start_pair, amrex::IntVectND<3> const /*global_index*/,
+            index_type const cell_start_pair, amrex::IntVect const /*global_index*/,
             index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
