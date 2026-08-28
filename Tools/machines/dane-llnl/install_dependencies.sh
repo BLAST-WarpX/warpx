@@ -110,7 +110,7 @@ cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel ${PAR
 
 if [[ "${PETSC_DIR:-}" == "${WARPX_SW_DIR}/src/petsc" ]]; then
   # PETSC
-  # Only build it if PERSC_DIR points to this work space
+  # Only build it if PETSC_DIR points to this work space
   if [ -d ${WARPX_SW_DIR}/src/petsc ]
   then
     cd ${WARPX_SW_DIR}/src/petsc
