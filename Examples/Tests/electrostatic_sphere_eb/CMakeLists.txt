@@ -2,7 +2,7 @@
 #
 
 if(WarpX_EB)
-    set(_unit_sphere_stl "${CMAKE_CURRENT_SOURCE_DIR}/../dielectric_cylinder_eb/unit_sphere.stl")
+    set(_unit_sphere_stl "${CMAKE_CURRENT_SOURCE_DIR}/../dielectric_sphere/unit_sphere.stl")
 
     add_warpx_test(
         test_3d_electrostatic_sphere_eb  # name
