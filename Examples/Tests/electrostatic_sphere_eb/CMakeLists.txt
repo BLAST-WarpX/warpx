@@ -2,6 +2,8 @@
 #
 
 if(WarpX_EB)
+    set(_unit_sphere_stl "${CMAKE_CURRENT_SOURCE_DIR}/../dielectric_cylinder_eb/unit_sphere.stl")
+
     add_warpx_test(
         test_3d_electrostatic_sphere_eb  # name
         3  # dims
@@ -9,6 +11,18 @@ if(WarpX_EB)
         inputs_test_3d_electrostatic_sphere_eb  # inputs
         "analysis.py"  # analysis
         "analysis_default_regression.py --path diags/diag1/"  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
+        test_3d_electrostatic_sphere_eb_stl  # name
+        3  # dims
+        2  # nprocs
+        "inputs_test_3d_electrostatic_sphere_eb_stl eb2.stl_file=${_unit_sphere_stl}"  # inputs
+        "analysis.py"  # analysis
+        OFF  # checksum
         OFF  # dependency
     )
 endif()
