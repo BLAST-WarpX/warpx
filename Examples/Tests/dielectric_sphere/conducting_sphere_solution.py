@@ -81,8 +81,8 @@ def analytic_fields(
     r = np.sqrt(r2)
 
     alpha = (conductor_radius / dielectric_radius) ** 3
-    shell_coeff = -3.0 * applied_field / (
-        epsilon_r * (1.0 + 2.0 * alpha) + 2.0 * (1.0 - alpha)
+    shell_coeff = (
+        -3.0 * applied_field / (epsilon_r * (1.0 + 2.0 * alpha) + 2.0 * (1.0 - alpha))
     )
     shell_image_coeff = -shell_coeff * conductor_radius**3
     outer_image_coeff = applied_field * dielectric_radius**3 + shell_coeff * (
@@ -106,8 +106,7 @@ def analytic_fields(
         radius5 = radius2 * radius3
         phi[mask] = potential_coeff * x[mask] + image_coeff * x[mask] / radius3
         ex[mask] = (
-            -potential_coeff
-            + image_coeff * (3.0 * x[mask] ** 2 - radius2) / radius5
+            -potential_coeff + image_coeff * (3.0 * x[mask] ** 2 - radius2) / radius5
         )
         ey[mask] = 3.0 * image_coeff * x[mask] * y[mask] / radius5
         ez[mask] = 3.0 * image_coeff * x[mask] * z[mask] / radius5
