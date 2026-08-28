@@ -50,6 +50,9 @@ mkdir -p ${WARPX_SW_DIR}/install
 # General extra dependencies ##################################################
 #
 
+# Use all available cpus on a batch node
+PARALLEL=112
+
 # tmpfs build directory: avoids issues often seen with ${HOME} and is faster
 build_dir=$(mktemp -d)
 
@@ -64,7 +67,7 @@ else
   git clone -b v1.21.6 https://github.com/Blosc/c-blosc.git ${WARPX_SW_DIR}/src/c-blosc
 fi
 cmake -S ${WARPX_SW_DIR}/src/c-blosc -B ${build_dir}/c-blosc-dane-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/c-blosc-1.21.6
-cmake --build ${build_dir}/c-blosc-dane-build --target install --parallel
+cmake --build ${build_dir}/c-blosc-dane-build --target install --parallel ${PARALLEL}
 
 # ADIOS2
 if [ -d ${WARPX_SW_DIR}/src/adios2 ]
@@ -77,7 +80,7 @@ else
   git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git ${WARPX_SW_DIR}/src/adios2
 fi
 cmake -S ${WARPX_SW_DIR}/src/adios2 -B ${build_dir}/adios2-dane-build -DBUILD_TESTING=OFF -DADIOS2_BUILD_EXAMPLES=OFF -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_SST=OFF -DADIOS2_USE_ZeroMQ=OFF -DADIOS2_USE_HDF5=OFF -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/adios2-2.10.2
-cmake --build ${build_dir}/adios2-dane-build --target install --parallel
+cmake --build ${build_dir}/adios2-dane-build --target install --parallel ${PARALLEL}
 
 # BLAS++ (for PSATD+RZ)
 if [ -d ${WARPX_SW_DIR}/src/blaspp ]
@@ -90,7 +93,7 @@ else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/blaspp.git ${WARPX_SW_DIR}/src/blaspp
 fi
 cmake -S ${WARPX_SW_DIR}/src/blaspp -B ${build_dir}/blaspp-dane-build -Duse_openmp=ON -Duse_cmake_find_blas=ON -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/blaspp-2024.10.26
-cmake --build ${build_dir}/blaspp-dane-build --target install --parallel
+cmake --build ${build_dir}/blaspp-dane-build --target install --parallel ${PARALLEL}
 
 # LAPACK++ (for PSATD+RZ)
 if [ -d ${WARPX_SW_DIR}/src/lapackpp ]
@@ -103,7 +106,7 @@ else
   git clone -b v2024.10.26 https://github.com/icl-utk-edu/lapackpp.git ${WARPX_SW_DIR}/src/lapackpp
 fi
 CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${WARPX_SW_DIR}/src/lapackpp -B ${build_dir}/lapackpp-dane-build -Duse_cmake_find_lapack=ON -DCMAKE_CXX_STANDARD=20 -Dbuild_tests=OFF -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON -DCMAKE_INSTALL_PREFIX=${WARPX_SW_DIR}/install/lapackpp-2024.10.26
-cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel
+cmake --build ${build_dir}/lapackpp-dane-build --target install --parallel ${PARALLEL}
 
 if [[ "${PETSC_DIR:-}" == "${WARPX_SW_DIR}/src/petsc" ]]; then
   # PETSC
@@ -112,26 +115,20 @@ if [[ "${PETSC_DIR:-}" == "${WARPX_SW_DIR}/src/petsc" ]]; then
   then
     cd ${WARPX_SW_DIR}/src/petsc
     git fetch --prune
-    git checkout release
+    git checkout v3.24.0
   else
     cd ${WARPX_SW_DIR}/src
-    git clone -b release https://gitlab.com/petsc/petsc.git petsc
+    git clone -b v3.24.0 https://gitlab.com/petsc/petsc.git petsc
     cd ${WARPX_SW_DIR}/src/petsc
   fi
   ./configure --with-batch --with-fortran-bindings=no --with-x=no --with-cc=mpicc --with-fc=mpif90 --with-cxx=mpicxx COPTFLAGS="-O2" FOPTFLAGS="-O2" CXXOPTFLAGS="-O2" --with-shared-libraries --with-debugging=0 --download-hypre --download-superlu --download-superlu_dist --download-parmetis --download-metis --with-cxx-dialect=C++20
-  make -j all
+  make -j ${PARALLEL} all
   cd -
 fi
 
 # Python ######################################################################
 #
 # Create a virtual environment and install the Python packages there.
-EXPECTED_VENV="${WARPX_SW_DIR}/venvs/warpx-dane"
-if [[ -n "${VIRTUAL_ENV:-}" &&
-      "$(realpath "$VIRTUAL_ENV")" == "$(realpath "$EXPECTED_VENV")" ]]; then
-  # If it is activated
-  deactivate
-fi
 rm -rf ${WARPX_SW_DIR}/venvs/warpx-dane
 python3 -m venv ${WARPX_SW_DIR}/venvs/warpx-dane
 source ${WARPX_SW_DIR}/venvs/warpx-dane/bin/activate
