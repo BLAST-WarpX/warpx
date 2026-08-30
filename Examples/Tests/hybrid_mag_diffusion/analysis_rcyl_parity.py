@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """RCYLINDER hybrid magnetic-diffusion PETSc parity oracle (T2 + T3).
 
-Compares the PETSc (exact_curl_curl) run's final state to the AMReX GMRES
+Compares the PETSc assembled curl-curl run's final state to the AMReX GMRES
 reference run (test_rcylinder_hybrid_mag_diffusion_mild, a ctest dependency whose
 output directory survives until this test finishes). Same physics (mild eta,
 PEC r_hi, theta=1, rtol=1e-10), differing only in the linear solver.

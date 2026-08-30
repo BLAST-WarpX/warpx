@@ -2,7 +2,7 @@
 # IDENTICAL physics to inputs_test_rcylinder_hybrid_mag_diffusion_harsh (same eta=129,
 # dt, grid, PEC r_hi, theta=1, rtol=1e-8, atol=0), differing ONLY in the linear
 # solver: PETSc KSP (MATSHELL matvec = the same matrix-free cylindrical operator)
-# with the assembled frozen-η curl-curl Pmat (exact_curl_curl PC). The Pmat
+# with the assembled frozen-η curl-curl Pmat. The Pmat
 # now carries the cylindrical 1/r metric in the radial stencil and the Bt -1/r^2
 # diagonal term (off-axis), so it is a usable proxy at stiff eta=129 -- the case
 # the old Cartesian Pmat was never exercised on.
@@ -78,7 +78,6 @@ hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
 # PETSc KSP + cylindrical frozen-η curl-curl Pmat (assembled PC proxy; the
 # matvec is the true cylindrical operator). rtol=1e-8, atol=0 (CI linear tols).
 hybrid_pic_model.mag_diff_linear_solver = petsc
-hybrid_pic_model.mag_diff_petsc_pc = exact_curl_curl
 hybrid_pic_model.mag_diff_rtol = 1.0e-8
 hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 500

@@ -13,11 +13,10 @@
  * `ReductionType`, petscvec.h). Only pure AMReX headers are used here, mirroring
  * the WarpX_PETSc.cpp isolation precedent.
  *
- * The matrix-free operator (matvec) and the scaled-Jacobi preconditioner are
- * supplied as callbacks by HybridMagDiffusion.cpp, which owns the Yee/RZ
- * curl-curl apply() and the field MultiFabs. This file owns the PETSc objects
- * (Vec, MatShell, assembled Pmat, KSP, PC), the DOF layout, and the assembled
- * frozen-η curl-curl Pmat (exact_curl_curl).
+ * The matrix-free operator (matvec) is supplied as a callback by
+ * HybridMagDiffusion.cpp, which owns the Yee/RZ curl-curl apply() and the field
+ * MultiFabs. This file owns the PETSc objects (Vec, MatShell, assembled Pmat,
+ * KSP, PC), the DOF layout, and the assembled frozen-η curl-curl Pmat.
  */
 #include "HybridMagDiffusionPetsc.H"
 
@@ -40,6 +39,7 @@
 #include <petscvec.h>
 #endif
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <memory>
@@ -47,7 +47,7 @@
 
 #ifdef AMREX_USE_PETSC
 // PetscCall (PETSc's macro) can only be used inside functions returning
-// PetscErrorCode (the static callbacks and assembleExactCurlCurl). In other
+// PetscErrorCode (the static callbacks and assemblePreconditioner). In other
 // functions (ctor, make, solve) we abort on a non-zero PETSc error.
 #define MAGDIFF_PETSC_CHK(call) do { \
     PetscErrorCode const _magdiff_ierr = (call); \
@@ -67,8 +67,8 @@ namespace {
  * DOF layout: component-major (B0, B1, B2), per-rank MFIter order, interior
  * (nghost=0) cells only. A per-component global-index iMultiFab (nghost=1,
  * -1 = exterior) maps each interior cell to its PETSc row/column; the matvec
- * and PC callbacks (in HybridMagDiffusion.cpp) read this same index to
- * scatter/gather their field MultiFabs, so the Vec and the assembled Pmat stay
+ * callback (in HybridMagDiffusion.cpp) reads this same index to scatter/gather
+ * its field MultiFabs, so the Vec and the assembled Pmat stay
  * self-consistent regardless of tiling. Norms use the nghost=0 interior only
  * (the FPE-trap invariant).
  */
@@ -78,16 +78,14 @@ public:
     MagDiffPetscSolverImpl (
         amrex::Array<amrex::MultiFab const*,3> const& B_proto,
         amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
-        amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
         amrex::Geometry const& geom, amrex::Real theta_dt, amrex::Real mu0,
-        MagDiffPetscPC pc_choice,
         amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
-        MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx,
+        MagDiffPetscOptions const& options,
+        MagDiffMatvecFn matvec, void* opctx,
         amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B)
         : m_geom(geom), m_theta_dt(theta_dt), m_mu0(mu0),
-          m_pc_choice(pc_choice), m_rtol(rtol), m_atol(atol),
-          m_max_iter(max_iter), m_verbose(verbose),
-          m_matvec(matvec), m_pcapply(pcapply), m_opctx(opctx)
+          m_rtol(rtol), m_atol(atol), m_max_iter(max_iter),
+          m_verbose(verbose), m_matvec(matvec), m_opctx(opctx)
     {
         // EB masks live on the device under CUDA. Copy to pinned host once so
         // all LoopOnCpu DOF counting / indexing is host-safe (raw device
@@ -124,15 +122,8 @@ public:
         m_n_global = ng;
 
         buildGlobalIndex(B_proto);
-        // RZ/Rcyl exact curl-curl Pmat selects η on E/J faces (match matvec).
-        // Cartesian proxy still uses B-sampled η (same BA as each B component).
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        amrex::ignore_unused(eta_pc);
+        // Exact curl-curl rows select η on E/J faces to match the matvec.
         buildEtaGhosts(eta_edge);
-#else
-        amrex::ignore_unused(eta_edge);
-        buildEtaGhosts(eta_pc);
-#endif
 
         // MatShell operator: matvec = caller's apply (homogeneous A_lin).
         MAGDIFF_PETSC_CHK(MatCreateShell(
@@ -145,33 +136,33 @@ public:
         MAGDIFF_PETSC_CHK(KSPCreate(PETSC_COMM_WORLD, &m_ksp));
         MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_A));
 
-        PC pc = nullptr;
-        MAGDIFF_PETSC_CHK(KSPGetPC(m_ksp, &pc));
-        if (m_pc_choice == MagDiffPetscPC::exact_curl_curl) {
-            // Assembled frozen-η curl-curl Pmat (see assembleExactCurlCurl).
-            // Lets runtime -pc_type asm/ilu/hypre factor a real matrix; default
-            // PC for an assembled Pmat is block-Jacobi ILU(0).
-            // RZ/Rcyl: up to ~7 nonzeros/row (Br–Bz cross terms). Cartesian:
-            // face-averaged Laplacian proxy (5/7-point).
+        // Assembled frozen-η curl-curl Pmat (see assemblePreconditioner).
+        // Lets runtime -pc_type asm/ilu/hypre factor a real matrix; default PC
+        // for an assembled Pmat is block-Jacobi ILU(0). Preallocation follows
+        // the maximum exact stencil width in each geometry.
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-            PetscInt const nz = 9;
+        PetscInt const nz = 9;
+#elif defined(WARPX_DIM_3D)
+        // Four same-component neighbors, eight mixed couplings, and diagonal.
+        PetscInt const nz = 13;
+#elif defined(WARPX_DIM_XZ)
+        PetscInt const nz = 7;
 #else
-            PetscInt const nz = 1 + 2 * AMREX_SPACEDIM;
+        PetscInt const nz = 3;
 #endif
-            MAGDIFF_PETSC_CHK(MatCreateAIJ(
-                PETSC_COMM_WORLD, m_n_local, m_n_local, m_n_global, m_n_global,
-                nz, nullptr, nz, nullptr, &m_P));
-            // Fail loudly if a row exceeds preallocation (heap corruption risk).
-            MAGDIFF_PETSC_CHK(MatSetOption(
-                m_P, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-            assembleExactCurlCurl();
-            MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
-        } else {
-            // Shell PC reusing the caller's scaled Jacobi (precond callback).
-            MAGDIFF_PETSC_CHK(PCSetType(pc, PCSHELL));
-            MAGDIFF_PETSC_CHK(PCShellSetApply(pc, applyShellPC));
-            MAGDIFF_PETSC_CHK(PCShellSetContext(pc, this));
-        }
+        MAGDIFF_PETSC_CHK(MatCreateAIJ(
+            PETSC_COMM_WORLD, m_n_local, m_n_local, m_n_global, m_n_global,
+            nz, nullptr, nz, nullptr, &m_P));
+        // Variable eta can activate a stencil coefficient that was initially
+        // zero. Store those structural zeros so later updates only change
+        // values, not the matrix graph.
+        MAGDIFF_PETSC_CHK(MatSetOption(
+            m_P, MAT_IGNORE_ZERO_ENTRIES, PETSC_FALSE));
+        // Fail loudly if a row exceeds preallocation (heap corruption risk).
+        MAGDIFF_PETSC_CHK(MatSetOption(
+            m_P, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
+        MAGDIFF_PETSC_CHK(assemblePreconditioner());
+        MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
         MAGDIFF_PETSC_CHK(KSPSetPCSide(m_ksp, PC_RIGHT));
         MAGDIFF_PETSC_CHK(KSPSetType(m_ksp, KSPGMRES));
         MAGDIFF_PETSC_CHK(KSPSetTolerances(
@@ -183,6 +174,7 @@ public:
             MAGDIFF_PETSC_CHK(KSPMonitorSet(
                 m_ksp, monitorResidual, nullptr, nullptr));
         }
+        setOptions(options);
         // Let -ksp_type / -pc_type / -ksp_rtol ... from argv or PETSC_OPTIONS win.
         MAGDIFF_PETSC_CHK(KSPSetFromOptions(m_ksp));
     }
@@ -247,6 +239,31 @@ public:
     }
 
 private:
+    void setOptions (MagDiffPetscOptions const& options)
+    {
+        PetscBool pc_specified = PETSC_FALSE;
+        MAGDIFF_PETSC_CHK(PetscOptionsHasName(
+            nullptr, nullptr, "-pc_type", &pc_specified));
+        if (pc_specified || options.pc_type.empty()) { return; }
+
+        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
+            nullptr, "-pc_type", options.pc_type.c_str()));
+        if (options.pc_type != "asm") { return; }
+
+        std::string const overlap = std::to_string(options.asm_overlap);
+        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
+            nullptr, "-pc_asm_overlap", overlap.c_str()));
+        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
+            nullptr, "-sub_ksp_type", options.sub_ksp_type.c_str()));
+        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
+            nullptr, "-sub_pc_type", options.sub_pc_type.c_str()));
+        if (options.sub_pc_type == "ilu") {
+            std::string const levels = std::to_string(options.ilu_factor_levels);
+            MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
+                nullptr, "-sub_pc_factor_levels", levels.c_str()));
+        }
+    }
+
     static PetscErrorCode applyMatOp (Mat A, Vec in, Vec out) {
         PetscFunctionBeginUser;
         MagDiffPetscSolverImpl* self = nullptr;
@@ -258,22 +275,6 @@ private:
                        reinterpret_cast<amrex::Real const*>(x),
                        reinterpret_cast<amrex::Real*>(y),
                        self->gindexView(), self->m_rstart);
-        PetscCall(VecRestoreArrayRead(in, &x));
-        PetscCall(VecRestoreArray(out, &y));
-        PetscFunctionReturn(PETSC_SUCCESS);
-    }
-
-    static PetscErrorCode applyShellPC (PC pc, Vec in, Vec out) {
-        PetscFunctionBeginUser;
-        MagDiffPetscSolverImpl* self = nullptr;
-        PetscCall(PCShellGetContext(pc, reinterpret_cast<void**>(&self)));
-        const PetscScalar* x = nullptr; PetscScalar* y = nullptr;
-        PetscCall(VecGetArrayRead(in, &x));
-        PetscCall(VecGetArray(out, &y));
-        self->m_pcapply(self->m_opctx,
-                        reinterpret_cast<amrex::Real const*>(x),
-                        reinterpret_cast<amrex::Real*>(y),
-                        self->gindexView(), self->m_rstart);
         PetscCall(VecRestoreArrayRead(in, &x));
         PetscCall(VecRestoreArray(out, &y));
         PetscFunctionReturn(PETSC_SUCCESS);
@@ -354,25 +355,25 @@ private:
         }
     }
 
-    // nghost=1 copy of B-centered eta for neighbor reads in the assembled Pmat.
-    // Pinned host: assembleExactCurlCurl uses LoopOnCpu host access.
-    void buildEtaGhosts (amrex::Array<amrex::MultiFab const*,3> const& eta_pc) {
+    // nghost=1 copy of edge-centered eta for neighbor reads in the assembled Pmat.
+    // Pinned host: assemblePreconditioner uses LoopOnCpu host access.
+    void buildEtaGhosts (amrex::Array<amrex::MultiFab const*,3> const& eta_edge) {
         amrex::MFInfo const host_info =
             amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
         for (int idim = 0; idim < 3; ++idim) {
             if (!m_eta_g[idim].ok()) {
-                m_eta_g[idim].define(eta_pc[idim]->boxArray(),
-                                     eta_pc[idim]->DistributionMap(), 1,
+                m_eta_g[idim].define(eta_edge[idim]->boxArray(),
+                                     eta_edge[idim]->DistributionMap(), 1,
                                      amrex::IntVect::Unit, host_info);
             }
             m_eta_g[idim].setVal(amrex::Real(0.0));
-            // eta_pc may be device memory under CUDA; Copy handles H<->D.
-            amrex::MultiFab::Copy(m_eta_g[idim], *eta_pc[idim], 0, 0, 1, 0);
+            // eta_edge may be device memory under CUDA; Copy handles H<->D.
+            amrex::MultiFab::Copy(m_eta_g[idim], *eta_edge[idim], 0, 0, 1, 0);
             m_eta_g[idim].FillBoundary(m_geom.periodicity());
         }
     }
 
-    // Assemble frozen-η Pmat for the exact_curl_curl PC (P != A; matvec stays
+    // Assemble frozen-η curl-curl Pmat (P != A; matvec stays
     // matrix-free computeAFull). Exterior neighbors (global index -1) are
     // dropped, matching the homogeneous-operator BC the matvec imposes.
     //
@@ -382,10 +383,10 @@ private:
     // uses the 4/dr^2 J_z correction. η is face-selected per term (et_r/t/z).
     // See notes/2026-07-20_exact_curl_curl_pc.md.
     //
-    // Cartesian (XZ / 3D / 1D_Z): still the face-averaged scalar Laplacian
-    // proxy per component (block-diagonal; no cross-component terms yet).
+    // Cartesian: exact algebraic expansion of the staggered Yee operator,
+    // C_up diag(eta/mu0) C_down. Inactive derivatives vanish in XZ and 1D_Z.
 
-    PetscErrorCode assembleExactCurlCurl () {
+    PetscErrorCode assemblePreconditioner () {
         PetscFunctionBeginUser;
         if (m_P) {
             PetscCall(MatZeroEntries(m_P));
@@ -399,16 +400,27 @@ private:
         amrex::Real const dz2 = dz * dz;
         amrex::Real const drdz = dr * dz;
 #else
-        amrex::Real dxinv2[3] = {amrex::Real(0.0), amrex::Real(0.0), amrex::Real(0.0)};
-        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-            dxinv2[d] = amrex::Real(1.0) / (dx[d] * dx[d]);
-        }
+        // Map physical x/y/z derivatives to AMReX index directions. A value
+        // of -1 marks an invariant direction that contributes no curl term.
+#if defined(WARPX_DIM_3D)
+        std::array<int,3> const phys_to_amrex{0, 1, 2};
+        std::array<amrex::Real,3> const spacing{dx[0], dx[1], dx[2]};
+#elif defined(WARPX_DIM_XZ)
+        std::array<int,3> const phys_to_amrex{0, -1, 1};
+        std::array<amrex::Real,3> const spacing{dx[0], 1.0, dx[1]};
+#elif defined(WARPX_DIM_1D_Z)
+        std::array<int,3> const phys_to_amrex{-1, -1, 0};
+        std::array<amrex::Real,3> const spacing{1.0, 1.0, dx[0]};
+#else
+        std::array<int,3> const phys_to_amrex{-1, -1, -1};
+        std::array<amrex::Real,3> const spacing{1.0, 1.0, 1.0};
+#endif
 #endif
 
         std::vector<PetscInt> cols;
         std::vector<PetscScalar> vals;
-        cols.reserve(1 + 4 * AMREX_SPACEDIM);
-        vals.reserve(1 + 4 * AMREX_SPACEDIM);
+        cols.reserve(13);
+        vals.reserve(13);
 
         for (int idim = 0; idim < 3; ++idim) {
             for (amrex::MFIter mfi(*m_gindex[idim]); mfi.isValid(); ++mfi) {
@@ -421,7 +433,14 @@ private:
                 auto const& et_t = m_eta_g[1].const_array(mfi);
                 auto const& et_z = m_eta_g[2].const_array(mfi);
 #else
-                auto const& et = m_eta_g[idim].const_array(mfi);
+                amrex::Array<amrex::Array4<int const>,3> const gix_b{
+                    m_gindex[0]->const_array(mfi),
+                    m_gindex[1]->const_array(mfi),
+                    m_gindex[2]->const_array(mfi)};
+                amrex::Array<amrex::Array4<amrex::Real const>,3> const eta_j{
+                    m_eta_g[0].const_array(mfi),
+                    m_eta_g[1].const_array(mfi),
+                    m_eta_g[2].const_array(mfi)};
 #endif
                 amrex::Box const& tb = mfi.tilebox();
                 amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
@@ -598,41 +617,81 @@ private:
                     }
 
 #else
-                    // Cartesian (1D_Z, 2D XZ, 3D)
-                    // Unchanged face-averaged Laplacian proxy
-                    amrex::Real const chi_c = std::max(et(i, j, k), amrex::Real(0.0)) / m_mu0;
-                    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-                        int ip = i, jp = j, kp = k;
-                        int im = i, jm = j, km = k;
-                        if (d == 0) { ip += 1; im -= 1; }
-                        else if (d == 1) { jp += 1; jm -= 1; }
-                        else { kp += 1; km -= 1; }
-                        PetscInt const cp = gix(ip, jp, kp);
-                        PetscInt const cm = gix(im, jm, km);
+                    // Expand C_up diag(eta/mu0) C_down directly. For each
+                    // output curl term, q is either p+e_d or p; the nested curl
+                    // contributes B(q)-B(q-e_e). This is the exact Yee stencil
+                    // in 3D and naturally removes invariant directions in XZ
+                    // and 1D_Z.
+                    int const curl_component[3][2] = {
+                        {2, 1}, {0, 2}, {1, 0}};
+                    int const curl_direction[3][2] = {
+                        {1, 2}, {2, 0}, {0, 1}};
+                    int const curl_sign[2] = {1, -1};
 
-                        if (cp >= 0) {
-                            amrex::Real const chi_n = std::max(et(ip, jp, kp), amrex::Real(0.0)) / m_mu0;
-                            amrex::Real const chi_f = amrex::Real(0.5) * (chi_c + chi_n);
-                            PetscScalar const v = -m_theta_dt * chi_f * dxinv2[d];
-                            diag -= v;
-                            cols.push_back(cp);
-                            vals.push_back(v);
+                    auto shift = [] (int direction, int amount,
+                                     int& ii, int& jj, int& kk) {
+                        if (direction == 0) { ii += amount; }
+                        else if (direction == 1) { jj += amount; }
+                        else { kk += amount; }
+                    };
+                    auto add_value = [&] (PetscInt column, PetscScalar value) {
+                        if (column < 0) { return; }
+                        if (column == row) {
+                            diag += value;
+                            return;
                         }
-                        if (cm >= 0) {
-                            amrex::Real const chi_n = std::max(et(im, jm, km), amrex::Real(0.0)) / m_mu0;
-                            amrex::Real const chi_f = amrex::Real(0.5) * (chi_c + chi_n);
-                            PetscScalar const v = -m_theta_dt * chi_f * dxinv2[d];
-                            diag -= v;
-                            cols.push_back(cm);
-                            vals.push_back(v);
+                        auto const iter = std::find(cols.begin(), cols.end(), column);
+                        if (iter == cols.end()) {
+                            cols.push_back(column);
+                            vals.push_back(value);
+                        } else {
+                            auto const index = static_cast<std::size_t>(iter - cols.begin());
+                            vals[index] += value;
+                        }
+                    };
+
+                    for (int outer_term = 0; outer_term < 2; ++outer_term) {
+                        int const jcomp = curl_component[idim][outer_term];
+                        int const outer_phys = curl_direction[idim][outer_term];
+                        int const outer_dir = phys_to_amrex[outer_phys];
+                        if (outer_dir < 0) { continue; }
+
+                        for (int outer_side = 0; outer_side < 2; ++outer_side) {
+                            int qi = i, qj = j, qk = k;
+                            if (outer_side == 0) {
+                                shift(outer_dir, 1, qi, qj, qk);
+                            }
+                            amrex::Real const outer_coeff =
+                                curl_sign[outer_term] *
+                                ((outer_side == 0) ? amrex::Real(1.0) : amrex::Real(-1.0)) /
+                                spacing[outer_phys];
+                            amrex::Real const chi =
+                                std::max(eta_j[jcomp](qi, qj, qk), amrex::Real(0.0)) /
+                                m_mu0;
+
+                            for (int inner_term = 0; inner_term < 2; ++inner_term) {
+                                int const bcomp = curl_component[jcomp][inner_term];
+                                int const inner_phys = curl_direction[jcomp][inner_term];
+                                int const inner_dir = phys_to_amrex[inner_phys];
+                                if (inner_dir < 0) { continue; }
+
+                                PetscScalar const value = m_theta_dt * chi * outer_coeff *
+                                    curl_sign[inner_term] / spacing[inner_phys];
+                                add_value(gix_b[bcomp](qi, qj, qk), value);
+
+                                int mi = qi, mj = qj, mk = qk;
+                                shift(inner_dir, -1, mi, mj, mk);
+                                add_value(gix_b[bcomp](mi, mj, mk), -value);
+                            }
                         }
                     }
 #endif
                     cols.push_back(row);
                     vals.push_back(diag);
                     PetscInt const ncol = static_cast<PetscInt>(cols.size());
-                    MatSetValues(m_P, 1, &row, ncol,
-                                 cols.data(), vals.data(), INSERT_VALUES);
+                    MAGDIFF_PETSC_CHK(MatSetValues(
+                        m_P, 1, &row, ncol,
+                        cols.data(), vals.data(), INSERT_VALUES));
                 });
             }
         }
@@ -644,42 +703,31 @@ private:
 public:
     void update (
         amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
-        amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
         amrex::Real theta_dt,
         void* opctx)
     {
         m_theta_dt = theta_dt;
         m_opctx = opctx;
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        amrex::ignore_unused(eta_pc);
         buildEtaGhosts(eta_edge);
-#else
-        amrex::ignore_unused(eta_edge);
-        buildEtaGhosts(eta_pc);
-#endif
 
-        if (m_pc_choice == MagDiffPetscPC::exact_curl_curl) {
-            // Drop stale PC factors before rewriting P (avoids use-after-free
-            // when ILU/BJACOBI held internal refs into the previous P values).
-            PC pc = nullptr;
-            MAGDIFF_PETSC_CHK(KSPGetPC(m_ksp, &pc));
-            MAGDIFF_PETSC_CHK(PCReset(pc));
-            assembleExactCurlCurl();
-            MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
-        }
+        // Drop stale PC factors before rewriting P (avoids use-after-free when
+        // ILU/BJACOBI held internal refs into the previous P values).
+        PC pc = nullptr;
+        MAGDIFF_PETSC_CHK(KSPGetPC(m_ksp, &pc));
+        MAGDIFF_PETSC_CHK(PCReset(pc));
+        MAGDIFF_PETSC_CHK(assemblePreconditioner());
+        MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
     }
 
     amrex::Geometry m_geom;
     amrex::Real m_theta_dt = amrex::Real(0.0);
     amrex::Real m_mu0 = amrex::Real(0.0);
-    MagDiffPetscPC m_pc_choice = MagDiffPetscPC::shell_jacobi;
     amrex::Real m_rtol = amrex::Real(0.0);
     amrex::Real m_atol = amrex::Real(0.0);
     int m_max_iter = 0;
     int m_verbose = 0;
     MagDiffMatvecFn m_matvec = nullptr;
-    MagDiffPCFn m_pcapply = nullptr;
     void* m_opctx = nullptr;
 
     PetscInt m_n_local = 0;
@@ -704,17 +752,16 @@ struct MagDiffPetscSolver { std::unique_ptr<MagDiffPetscSolverImpl> impl; };
 MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Array<amrex::MultiFab const*,3> const& B_proto,
     amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
-    amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
     amrex::Geometry const& geom, amrex::Real theta_dt, amrex::Real mu0,
-    MagDiffPetscPC pc_choice, amrex::Real rtol, amrex::Real atol,
-    int max_iter, int verbose,
-    MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx,
+    amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
+    MagDiffPetscOptions const& options,
+    MagDiffMatvecFn matvec, void* opctx,
     amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B)
 {
     auto* s = new MagDiffPetscSolver;
     s->impl = std::make_unique<MagDiffPetscSolverImpl>(
-        B_proto, eta_edge, eta_pc, geom, theta_dt, mu0, pc_choice,
-        rtol, atol, max_iter, verbose, matvec, pcapply, opctx, eb_update_B);
+        B_proto, eta_edge, geom, theta_dt, mu0,
+        rtol, atol, max_iter, verbose, options, matvec, opctx, eb_update_B);
     return s;
 }
 
@@ -738,11 +785,10 @@ int magdiff_petsc_solve (MagDiffPetscSolver* s, amrex::Real const* rhs,
 void magdiff_petsc_update (
     MagDiffPetscSolver* s,
     amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
-    amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
     amrex::Real theta_dt,
     void* opctx)
 {
-    s->impl->update(eta_edge, eta_pc, theta_dt, opctx);
+    s->impl->update(eta_edge, theta_dt, opctx);
 }
 
 void magdiff_petsc_destroy (MagDiffPetscSolver* s) {
@@ -757,10 +803,9 @@ void magdiff_petsc_destroy (MagDiffPetscSolver* s) {
 MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Array<amrex::MultiFab const*,3> const& /*B_proto*/,
     amrex::Array<amrex::MultiFab const*,3> const& /*eta_edge*/,
-    amrex::Array<amrex::MultiFab const*,3> const& /*eta_pc*/,
     amrex::Geometry const& /*geom*/, amrex::Real /*theta_dt*/, amrex::Real /*mu0*/,
-    MagDiffPetscPC, amrex::Real, amrex::Real, int, int,
-    MagDiffMatvecFn, MagDiffPCFn, void*,
+    amrex::Real, amrex::Real, int, int, MagDiffPetscOptions const&,
+    MagDiffMatvecFn, void*,
     amrex::Array<amrex::iMultiFab const*,3> const*)
 {
     amrex::Abort("magdiff_petsc_make: WarpX was not built with PETSc "
@@ -778,7 +823,6 @@ int magdiff_petsc_solve (MagDiffPetscSolver*, amrex::Real const*, amrex::Real*,
 
 void magdiff_petsc_update (
     MagDiffPetscSolver*,
-    amrex::Array<amrex::MultiFab const*,3> const&,
     amrex::Array<amrex::MultiFab const*,3> const&,
     amrex::Real,
     void*) {}

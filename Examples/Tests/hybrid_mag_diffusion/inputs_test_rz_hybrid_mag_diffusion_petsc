@@ -1,7 +1,7 @@
 # RZ hybrid implicit magnetic-diffusion vacuum stability smoke driven through
 # the optional PETSc KSP path (mag_diff_linear_solver = petsc). Same matrix-free
 # curl-curl operator as the default AMReX-GMRES path; only the solver driver
-# differs. The frozen-η curl-curl Pmat (mag_diff_petsc_pc = exact_curl_curl)
+# differs. The frozen-η curl-curl Pmat
 # is assembled so PETSc's default block-Jacobi ILU PC factors a real matrix
 # (runtime -pc_type asm/ilu/hypre can also be set). The oracle is the same
 # finite/damped-Bt smoke as the variable-eta case. Requires WarpX_PETSC=ON
@@ -63,7 +63,6 @@ hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
 # Route the matrix-free operator through a PETSc KSP (MATSHELL matvec) instead
 # of the default AMReX GMRES. rtol/atol/max_iter are reused by the PETSc KSP.
 hybrid_pic_model.mag_diff_linear_solver = petsc
-hybrid_pic_model.mag_diff_petsc_pc = exact_curl_curl
 hybrid_pic_model.mag_diff_rtol = 1.0e-8
 hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 300

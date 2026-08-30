@@ -19,37 +19,33 @@
 #define WARPX_HYBRID_MAG_DIFFUSION_PETSC_H_
 
 #include <AMReX_Array.H>
-#include <AMReX_Enum.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 #include <AMReX_iMultiFab.H>
 
-/**
- * \brief Preconditioner choice for the optional PETSc mag-diffusion KSP path.
- * Declared outside any AMREX_USE_PETSC guard so non-PETSc builds still parse it
- * (same convention as PreconditionerLibrary.H).
- *
- * - shell_jacobi: scaled Jacobi shell PC (callback from HybridMagDiffusion).
- * - exact_curl_curl: assembled frozen-η curl-curl Pmat (RZ/Rcyl exact stencil
- *   with Br–Bz coupling; Cartesian remains the face-averaged Laplacian proxy).
- * - frozen_laplacian: deprecated input alias for exact_curl_curl (same value).
- */
-AMREX_ENUM(MagDiffPetscPC,
-    shell_jacobi,
-    exact_curl_curl,
-    frozen_laplacian = 1
-);
+#include <string>
+
+/** PETSc preconditioner defaults read from hybrid_pic_model.mag_diff_petsc_*. */
+struct MagDiffPetscOptions
+{
+    // Empty keeps PETSc's default PC unless -pc_type is supplied externally.
+    std::string pc_type;
+    int asm_overlap = 0;
+    std::string sub_ksp_type = "preonly";
+    std::string sub_pc_type = "ilu";
+    int ilu_factor_levels = 2;
+};
 
 /**
  * \brief Opaque PETSc solver handle (defined in HybridMagDiffusionPetsc.cpp).
  *
- * Operator (matvec) and preconditioner are supplied as callbacks so the PETSc
- * translation unit never needs the WarpX-internal curl-curl operator. Each
- * callback receives flat local arrays (n_local entries, component-major over
- * the 3 B components, interior nghost=0 cells) plus the shared global-DOF index
- * map and row offset so the caller can scatter/gather its field MultiFabs
- * consistently with the PETSc Vec layout.
+ * The matrix-free operator is supplied as a callback so the PETSc translation
+ * unit never needs the WarpX-internal curl-curl operator. The callback receives
+ * flat local arrays (n_local entries, component-major over the 3 B components,
+ * interior nghost=0 cells) plus the shared global-DOF index map and row offset
+ * so the caller can scatter/gather its field MultiFabs consistently with the
+ * PETSc Vec layout.
  */
 struct MagDiffPetscSolver;
 
@@ -57,30 +53,23 @@ using MagDiffMatvecFn = void (*)(
     void* opctx, amrex::Real const* x, amrex::Real* y,
     amrex::Array<amrex::iMultiFab const*,3> const& gindex, amrex::Long rstart);
 
-using MagDiffPCFn = void (*)(
-    void* opctx, amrex::Real const* x, amrex::Real* y,
-    amrex::Array<amrex::iMultiFab const*,3> const& gindex, amrex::Long rstart);
-
 /**
  * \brief Create the PETSc KSP. The 3 B-component MultiFabs (`B_proto`) define the
  * DOF layout (boxArray/DistributionMap/IndexType).
  *
- * `eta_edge` is the E/J-face resistivity (matvec staggering); on RZ/Rcyl the
- * assembled exact_curl_curl Pmat is built from these faces. `eta_pc` is the
- * B-sampled resistivity used for the Cartesian Laplacian proxy Pmat (and kept
- * for API symmetry with the Jacobi shell path). Both are copied to nghost=1
- * host buffers as needed. `mu0` keeps this header free of WarpX constants.
+ * `eta_edge` is the E/J-face resistivity used by both the matrix-free operator
+ * and the assembled curl-curl Pmat. It is copied to nghost=1 host buffers as
+ * needed. `mu0` keeps this header free of WarpX constants.
  *
  * Returns nullptr if built without PETSc (AMREX_USE_PETSC undefined).
  */
 MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Array<amrex::MultiFab const*,3> const& B_proto,
     amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
-    amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
     amrex::Geometry const& geom, amrex::Real theta_dt, amrex::Real mu0,
-    MagDiffPetscPC pc_choice,
     amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
-    MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx,
+    MagDiffPetscOptions const& options,
+    MagDiffMatvecFn matvec, void* opctx,
     amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B = nullptr);
 
 [[nodiscard]] amrex::Long magdiff_petsc_nlocal (MagDiffPetscSolver const* s);
@@ -90,9 +79,8 @@ magdiff_petsc_gindex (MagDiffPetscSolver const* s);
 
 /**
  * \brief Solve A x = b with x and b as flat local arrays (n_local entries).
- * Seeds x with the initial guess, overwrites x with the solution. Returns the
- * KSP iteration count (>=0) on success, or a negative PETSc converged reason on
- * divergence.
+ * Seeds x with the initial guess and overwrites x with the solution. Returns
+ * the PETSc KSP converged reason (positive on success, negative on divergence).
  */
 int magdiff_petsc_solve (MagDiffPetscSolver* s,
                          amrex::Real const* rhs, amrex::Real* sol,
@@ -101,7 +89,6 @@ int magdiff_petsc_solve (MagDiffPetscSolver* s,
 void magdiff_petsc_update (
     MagDiffPetscSolver* s,
     amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
-    amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
     amrex::Real theta_dt,
     void* opctx);
 

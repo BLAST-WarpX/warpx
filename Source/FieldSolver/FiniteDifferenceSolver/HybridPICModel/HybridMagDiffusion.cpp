@@ -19,7 +19,6 @@
 
 #include <ablastr/coarsen/sample.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
-#include <ablastr/utils/Communication.H>
 
 #include <AMReX_Array.H>
 #include <AMReX_Arena.H>
@@ -69,7 +68,11 @@ HybridMagDiffusion::ReadParameters ()
     pp.query("mag_diff_use_variable_eta", m_use_variable_eta);
 
     pp.query("mag_diff_linear_solver", m_linear_solver);
-    pp.query("mag_diff_petsc_pc", m_petsc_pc);
+    pp.query("mag_diff_petsc_pc_type", m_petsc_options.pc_type);
+    pp.query("mag_diff_petsc_asm_overlap", m_petsc_options.asm_overlap);
+    pp.query("mag_diff_petsc_sub_ksp_type", m_petsc_options.sub_ksp_type);
+    pp.query("mag_diff_petsc_sub_pc_type", m_petsc_options.sub_pc_type);
+    pp.query("mag_diff_petsc_ilu_factor_levels", m_petsc_options.ilu_factor_levels);
 
     if (utils::parser::queryWithParser(pp, "mag_diff_constant_eta", m_constant_eta)) {
         m_has_constant_eta = true;
@@ -94,6 +97,32 @@ HybridMagDiffusion::ReadParameters ()
         m_rtol > 0.0_rt && m_atol >= 0.0_rt,
         "hybrid_pic_model.mag_diff_rtol/atol must be non-negative (rtol > 0)");
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_max_iter > 0,
+        "hybrid_pic_model.mag_diff_max_iter must be positive");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_eta_explicit_max >= 0.0_rt,
+        "hybrid_pic_model.mag_diff_eta_explicit_max must be non-negative");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_has_constant_eta || m_constant_eta >= 0.0_rt,
+        "hybrid_pic_model.mag_diff_constant_eta must be non-negative");
+
+    if (m_linear_solver == MagDiffLinearSolver::petsc) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_petsc_options.asm_overlap >= 0 && m_petsc_options.ilu_factor_levels >= 0,
+            "hybrid_pic_model.mag_diff_petsc_asm_overlap and "
+            "mag_diff_petsc_ilu_factor_levels must be non-negative");
+
+#ifdef AMREX_USE_GPU
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_petsc_options.pc_type != "lu",
+            "hybrid_pic_model.mag_diff_petsc_pc_type = lu is not available on GPUs; "
+            "use pc_type = asm with sub_pc_type = lu for local subdomain solves");
+#endif
+    }
+
     // theta=1 is backward Euler. For theta in (0,1), the same linear system is
     // used with a modified RHS that includes an explicit curl-curl term.
     amrex::Print() << "HybridMagDiffusion: enabled"
@@ -102,10 +131,22 @@ HybridMagDiffusion::ReadParameters ()
                    << "  atol=" << m_atol
                    << "  eta_explicit_max=" << m_eta_explicit_max
                    << "  use_variable_eta=" << m_use_variable_eta
-                   << "  linear_solver=" << amrex::getEnumNameString(m_linear_solver)
-                   << "  petsc_pc=" << amrex::getEnumNameString(m_petsc_pc);
+                   << "  linear_solver=" << amrex::getEnumNameString(m_linear_solver);
     if (m_has_constant_eta) {
         amrex::Print() << "  constant_eta=" << m_constant_eta << " Ohm m";
+    }
+    if (m_linear_solver == MagDiffLinearSolver::petsc &&
+        !m_petsc_options.pc_type.empty()) {
+        amrex::Print() << "  petsc_pc_type=" << m_petsc_options.pc_type;
+        if (m_petsc_options.pc_type == "asm") {
+            amrex::Print() << "  petsc_asm_overlap=" << m_petsc_options.asm_overlap
+                           << "  petsc_sub_ksp_type=" << m_petsc_options.sub_ksp_type
+                           << "  petsc_sub_pc_type=" << m_petsc_options.sub_pc_type;
+            if (m_petsc_options.sub_pc_type == "ilu") {
+                amrex::Print() << "  petsc_ilu_factor_levels="
+                               << m_petsc_options.ilu_factor_levels;
+            }
+        }
     }
     amrex::Print() << "\n";
 }
@@ -184,9 +225,9 @@ struct MagDiffJacobiPrecond
     Real diag_factor = 0.0_rt;   // Cartesian Laplacian diagonal (scalar; cyl unused)
     Real denom = 1.0_rt;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    // Cylindrical metric for the per-DOF Laplacian diagonal (matches the
-    // assembled frozen-Laplacian P). ishift_r = 1 if the component is NODE in
-    // r (Br), 0 if CELL in r (Bt/Bz); is_bt = (idim == 1) -> subtract 1/r^2.
+    // Cylindrical metric for the scaled-Jacobi approximation of the per-DOF
+    // curl-curl diagonal. ishift_r = 1 if the component is NODE in r (Br), 0 if
+    // CELL in r (Bt/Bz); is_bt = (idim == 1) -> subtract 1/r^2.
     Real rmin = 0.0_rt;
     Real dr = 1.0_rt;
     Real dr_inv2 = 0.0_rt;
@@ -449,12 +490,7 @@ public:
         // (computeAFull / copy-back), not the Cartesian FillBoundaryAndSync.
         // BC policy mirrors RZ minus the z dimension:
         //   - r_lo (r=0): None (axis; ApplyFieldBoundaryOnAxis).
-        //   - r_hi: None (unforced) or PEC (tangential-mirror wall).
-        // pec_insulator (Dirichlet B_t feed) is NOT wired into the mag-diff
-        // affine-feed split for RCYLINDER yet (prepareFeed is RZ-only); assert
-        // here so a feed deck fails fast instead of silently treating an affine
-        // operator as linear. Extending the feed to Rcyl is a documented
-        // follow-up (notes/2026-07-19_rcyl_mag_diff_port.md Sec 2/7).
+        //   - r_hi: None (unforced), PEC, or PEC_Insulator.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             WarpX::field_boundary_lo[0] == FieldBoundaryType::None,
             "RCYLINDER matrix-free hybrid magnetic diffusion requires the "
@@ -474,10 +510,21 @@ public:
             "Matrix-free hybrid magnetic diffusion is not yet supported in "
             "RSPHERE geometry");
 #else
+        auto const fb_is_supported = [] (FieldBoundaryType fb) {
+            return fb == FieldBoundaryType::Periodic ||
+                   fb == FieldBoundaryType::PEC ||
+                   fb == FieldBoundaryType::PEC_Insulator;
+        };
+        bool cartesian_bcs_supported = true;
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            cartesian_bcs_supported = cartesian_bcs_supported &&
+                fb_is_supported(WarpX::field_boundary_lo[idim]) &&
+                fb_is_supported(WarpX::field_boundary_hi[idim]);
+        }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_geom.isAllPeriodic(),
-            "Variable-coefficient hybrid magnetic diffusion currently requires "
-            "periodic field boundaries");
+            cartesian_bcs_supported,
+            "Cartesian matrix-free hybrid magnetic diffusion supports Periodic, "
+            "PEC, or PEC_Insulator field boundaries");
 #endif
         // EB is supported on the matrix-free path via the stair-case masks
         // m_eb_update_E/B (MarkUpdateCellsStairCase): covered E faces carry
@@ -633,7 +680,7 @@ public:
         // Laplacian diagonal used as the denom reference scale (uniform eta ->
         // identity after PC). The per-DOF metric-aware diagonal (radial 1/r and
         // the Bt -1/r^2 term) is computed inside MagDiffJacobiPrecond from the
-        // geometry passed below -- mirroring assembleExactCurlCurl diagonals.
+        // geometry passed below, mirroring the assembled PETSc diagonals.
         Real const dr_inv2 = 1.0_rt / (dx[0]*dx[0]);
         Real const diag_factor = 2.0_rt * dr_inv2;
 #else
@@ -721,8 +768,8 @@ public:
     }
 
     // Compute A_full(x) = x + alpha_dt * curl(eta/mu0 curl x), staging through
-    // the registered B field so ApplyBfieldBoundary imposes RZ axis, PEC walls,
-    // and any pec_insulator Dirichlet B_t feed (ghost = g(t_new)). With a nonzero
+    // the registered B field so ApplyBfieldBoundary imposes geometry axes, PEC
+    // walls, and any pec_insulator Dirichlet B_t feed (ghost = g(t_new)). With a nonzero
     // feed, A_full is affine (A_full(x) = A_lin(x) + c); apply() subtracts c so
     // GMRES/PETSc see the homogeneous A_lin, and c is carried on the RHS.
     //
@@ -735,10 +782,9 @@ public:
     void computeAFull (MagDiffVector& output, MagDiffVector const& input, Real alpha_dt)
     {
         auto const& input_fields = input.fields();
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         auto& warpx = WarpX::GetInstance();
-        // Stage valid cells into the registered B field so WarpX applies RZ
-        // axis and field boundaries, then pull the filled ghost region into
+        // Stage valid cells into the registered B field so WarpX applies the
+        // geometry axis and physical field boundaries, then pull the filled ghost region into
         // work arrays. (Krylov MagDiffVectors may carry ghost storage, but
         // norms use nghost=0; BC fill goes through registered B.)
         for (int idim = 0; idim < 3; ++idim) {
@@ -752,12 +798,6 @@ public:
             MultiFab::Copy(m_Bwork[idim], *m_source[idim], 0, 0, 1,
                            m_Bwork[idim].nGrowVect());
         }
-#else
-        for (int idim = 0; idim < 3; ++idim) {
-            MultiFab::Copy(m_Bwork[idim], input_fields[idim], 0, 0, 1, 0);
-            m_Bwork[idim].FillBoundaryAndSync(m_geom.periodicity());
-        }
-#endif
 
 
         MultiFab * const Bwork_ptr = m_Bwork.data();
@@ -819,7 +859,6 @@ public:
     void prepareFeed ()
     {
         m_has_feed = false;
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         auto& warpx = WarpX::GetInstance();
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             for (int iside = 0; iside < 2; ++iside) {
@@ -834,7 +873,6 @@ public:
                 }
             }
         }
-#endif
         if (!m_has_feed) { return; }
 
         MagDiffVector zero;
@@ -850,18 +888,13 @@ public:
     [[nodiscard]] bool hasFeed () const { return m_has_feed; }
     [[nodiscard]] MagDiffVector const& feedOffset () const { return m_feed_offset; }
 
-    // Accessors used by the optional PETSc KSP path (MagDiffPetscKSP): the
-    // homogeneous apply()/precond() are reused directly. The assembled
-    // exact_curl_curl Pmat uses E/J-face eta (m_eta) on RZ/Rcyl to match the
-    // matvec face selection; Cartesian still uses B-sampled m_eta_pc. Jacobi
-    // shell PC always uses m_eta_pc. apply()/precond() are non-const because
-    // they stage through internal work MultiFabs.
+    // Accessors used by the optional PETSc KSP path. The homogeneous apply() is
+    // reused directly. The assembled curl-curl Pmat uses E/J-face eta (m_eta)
+    // in every supported geometry to match the matvec face selection. apply()
+    // is non-const because it stages through internal work MultiFabs.
     void applyPetsc (MagDiffVector& output, MagDiffVector const& input) { apply(output, input); }
-    void precondPetsc (MagDiffVector& destination, MagDiffVector const& source)
-    { precond(destination, source); }
     [[nodiscard]] Real thetaDt () const { return m_theta_dt; }
     [[nodiscard]] Geometry const& geom () const { return m_geom; }
-    [[nodiscard]] Array<MultiFab,3> const& etaPC () const { return m_eta_pc; }
     [[nodiscard]] Array<MultiFab const*,3> const& etaEdge () const { return m_eta; }
 
 private:
@@ -892,7 +925,7 @@ private:
 // matrix-free operator (apply/precond) and the field MultiFabs. The glue below
 // scatters flat local arrays <-> MagDiffVector interior (nghost=0) using the
 // shared per-component global-DOF index owned by the PETSc side, and supplies
-// the matvec/PC callbacks the PETSc side invokes. The whole block is compiled
+// the matvec callback the PETSc side invokes. The whole block is compiled
 // only when PETSc is on; the caller in AdvanceVariable is guarded the same way.
 #ifdef AMREX_USE_PETSC
 
@@ -911,8 +944,6 @@ struct PetscOpCtx
     VariableCoeffMagDiffusionOp* linop = nullptr;
     MagDiffVector U;       // matvec input buffer
     MagDiffVector F;       // matvec output buffer
-    MagDiffVector PCsrc;   // PC input buffer
-    MagDiffVector PCdst;   // PC output buffer
 #ifdef AMREX_USE_GPU
     // Cached pinned host staging for PETSc flat <-> device MultiFab. Allocated
     // once per AdvanceVariable (not per matvec): the naive GPU-safe path that
@@ -1025,24 +1056,6 @@ petscMatvec (void* ctx, Real const* x, Real* y,
     petscScatter(c->U, x, gindex, rstart);
     c->linop->applyPetsc(c->F, c->U);
     petscGather(y, c->F, gindex, rstart);
-#endif
-}
-
-// PC callback: y = M^{-1} x = linop.precond (scaled Jacobi).
-void
-petscPCApply (void* ctx, Real const* x, Real* y,
-              Array<iMultiFab const*,3> const& gindex, amrex::Long rstart)
-{
-    auto* c = static_cast<PetscOpCtx*>(ctx);
-#ifdef AMREX_USE_GPU
-    // Reuse host_U / host_F staging (PC is not concurrent with matvec).
-    petscScatter(c->PCsrc, x, gindex, rstart, c->host_U);
-    c->linop->precondPetsc(c->PCdst, c->PCsrc);
-    petscGather(y, c->PCdst, gindex, rstart, c->host_F);
-#else
-    petscScatter(c->PCsrc, x, gindex, rstart);
-    c->linop->precondPetsc(c->PCdst, c->PCsrc);
-    petscGather(y, c->PCdst, gindex, rstart);
 #endif
 }
 
@@ -1171,8 +1184,6 @@ HybridMagDiffusion::AdvanceVariable (
         opctx = PetscOpCtx{};
         opctx.U.Define(makeVectorFieldView(solution.fields()));
         opctx.F.Define(makeVectorFieldView(solution.fields()));
-        opctx.PCsrc.Define(makeVectorFieldView(solution.fields()));
-        opctx.PCdst.Define(makeVectorFieldView(solution.fields()));
 #ifdef AMREX_USE_GPU
         opctx.ensureHostBufs(solution.fields());
 #endif
@@ -1240,12 +1251,9 @@ HybridMagDiffusion::AdvanceVariable (
 
     if (m_linear_solver == MagDiffLinearSolver::petsc) {
 #ifdef AMREX_USE_PETSC
-        auto& eta_pc = linop.etaPC();
         auto const& eta_edge = linop.etaEdge();
         amrex::Array<MultiFab const*,3> const B_proto{
             &solution.fields()[0], &solution.fields()[1], &solution.fields()[2]};
-        amrex::Array<MultiFab const*,3> const eta_pc_proto{
-            &eta_pc[0], &eta_pc[1], &eta_pc[2]};
 
         // Pass the EB B-field mask (if any) so covered DOFs are skipped from
         // the PETSc system. Must be nullptr when EB is off (the mask MultiFabs
@@ -1256,12 +1264,13 @@ HybridMagDiffusion::AdvanceVariable (
 
         if (!m_petsc_solver) {
             m_petsc_solver = magdiff_petsc_make(
-                B_proto, eta_edge, eta_pc_proto, linop.geom(), linop.thetaDt(),
-                PhysConst::mu0, m_petsc_pc, m_rtol, m_atol, m_max_iter, m_verbose,
-                &petscMatvec, &petscPCApply, &opctx,
+                B_proto, eta_edge, linop.geom(), linop.thetaDt(),
+                PhysConst::mu0, m_rtol, m_atol, m_max_iter, m_verbose,
+                m_petsc_options,
+                &petscMatvec, &opctx,
                 petsc_eb_on ? &eb_update_B_ptrs : nullptr);
         } else {
-            magdiff_petsc_update(m_petsc_solver, eta_edge, eta_pc_proto, linop.thetaDt(), &opctx);
+            magdiff_petsc_update(m_petsc_solver, eta_edge, linop.thetaDt(), &opctx);
         }
 
         const amrex::Long n_local = magdiff_petsc_nlocal(m_petsc_solver);
@@ -1333,26 +1342,12 @@ HybridMagDiffusion::AdvanceVariable (
     // never write a nonzero value into the solid.
     zeroCoveredB(solution, eb_update_B);
     auto& warpx = WarpX::GetInstance();
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
-    Geometry const& geom = warpx.Geom(lev);
-#endif
     for (int idim = 0; idim < 3; ++idim) {
         MultiFab::Copy(*Bfield[idim], solution_fields[idim], 0, 0, 1, 0);
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
-        ablastr::utils::communication::FillBoundary(
-            *Bfield[idim],
-            WarpX::do_single_precision_comms,
-            geom.periodicity(),
-            true);
-#endif
     }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-    // Re-apply the axis (r=0 mirror) and any PEC wall via the same boundary
-    // path the RZ matvec uses, then refill ghosts. RCYLINDER mirrors RZ here
-    // (ApplyFieldBoundaryOnAxis supports both); the Cartesian FillBoundary
-    // tail above is for 3D/XZ/1D_Z only.
+    // Re-apply physical boundaries through the same path used by the matvec,
+    // then exchange periodic and inter-box ghosts.
     warpx.ApplyBfieldBoundary(
         lev, PatchType::fine, SubcyclingHalf::None, warpx.gett_new(lev));
     warpx.FillBoundaryB(lev, Bfield[0]->nGrowVect(), true);
-#endif
 }

@@ -11,7 +11,7 @@
 
 #include <ablastr/fields/MultiFabRegister.H>
 
-#include "HybridMagDiffusionPetsc.H"  // MagDiffPetscPC (PETSc-free enum)
+#include "HybridMagDiffusionPetsc.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_Enum.H>
@@ -71,7 +71,6 @@ public:
     [[nodiscard]] bool UsesVariableEta () const { return m_use_variable_eta; }
     [[nodiscard]] int Verbose () const { return m_verbose; }
     [[nodiscard]] MagDiffLinearSolver LinearSolver () const { return m_linear_solver; }
-    [[nodiscard]] MagDiffPetscPC PetscPC () const { return m_petsc_pc; }
 
     /**
      * \brief Theta-method curl-curl magnetic diffusion on one level.
@@ -129,7 +128,7 @@ private:
     amrex::Real m_constant_eta = 0.0;
     bool m_use_variable_eta = false;
     MagDiffLinearSolver m_linear_solver = MagDiffLinearSolver::amrex_gmres;
-    MagDiffPetscPC m_petsc_pc = MagDiffPetscPC::shell_jacobi;
+    MagDiffPetscOptions m_petsc_options;
 #ifdef AMREX_USE_PETSC
     mutable MagDiffPetscSolver* m_petsc_solver = nullptr;
 #endif

@@ -52,7 +52,17 @@ def get_runtime_parameters():
 
 
 def by_minmax_from_diag(diag_dir):
-    """Return (min, max) of By (component 0) from Level_0/Cell_H."""
+    """Return the By extrema using the component order in the plotfile header."""
+    header = os.path.join(diag_dir, "Header")
+    with open(header) as fh:
+        header_lines = [line.strip() for line in fh]
+    ncomp = int(header_lines[1])
+    component_names = header_lines[2 : 2 + ncomp]
+    try:
+        by_component = component_names.index("By")
+    except ValueError as exc:
+        raise RuntimeError(f"By is absent from {header}: {component_names}") from exc
+
     cell_h = os.path.join(diag_dir, "Level_0", "Cell_H")
     if not os.path.isfile(cell_h):
         raise FileNotFoundError(cell_h)
@@ -68,13 +78,13 @@ def by_minmax_from_diag(diag_dir):
                 vals = [float(p) for p in parts]
             except ValueError:
                 continue
-            if len(vals) >= 3:
+            if len(vals) >= ncomp:
                 float_lines.append(vals)
     if len(float_lines) < 2:
         raise RuntimeError(f"Could not parse By min/max from {cell_h}:\n{text}")
     # mins then maxs
     mins, maxs = float_lines[-2], float_lines[-1]
-    return mins[0], maxs[0]
+    return mins[by_component], maxs[by_component]
 
 
 def main():

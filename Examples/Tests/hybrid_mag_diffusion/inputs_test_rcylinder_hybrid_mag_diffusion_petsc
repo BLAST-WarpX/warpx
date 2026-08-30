@@ -2,7 +2,7 @@
 # IDENTICAL physics to inputs_test_rcylinder_hybrid_mag_diffusion_mild (same eta=1e-2,
 # dt, grid, PEC r_hi, theta=1, rtol=1e-10), differing ONLY in the linear solver:
 # PETSc KSP (MATSHELL matvec = the same matrix-free operator) with the assembled
-# frozen-η curl-curl Pmat (exact_curl_curl PC). The analysis
+# frozen-η curl-curl Pmat. The analysis
 # (analysis_rcyl_parity.py) compares this deck's final Bt plotfile to the AMReX
 # GMRES reference plotfile produced by test_rcylinder_hybrid_mag_diffusion_mild (its
 # ctest dependency) and asserts L2 relative error < 1e-6 -- a strong solver-
@@ -65,10 +65,9 @@ hybrid_pic_model.mag_diff_rtol = 1.0e-8
 hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 500
 hybrid_pic_model.mag_diff_verbose = 0
-# PETSc KSP + frozen-η curl-curl Pmat (assembled, Cartesian-face Lap as PC
-# only -- a documented v1 approximation; the matvec is the true cylindrical op).
+# PETSc KSP + assembled frozen-η cylindrical curl-curl Pmat. The matrix-free
+# matvec remains the true cylindrical operator.
 hybrid_pic_model.mag_diff_linear_solver = petsc
-hybrid_pic_model.mag_diff_petsc_pc = exact_curl_curl
 
 diagnostics.diags_names = diag1
 diag1.intervals = 5

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RZ hybrid magnetic diffusion with a Dirichlet B_t feed (pec_insulator).
+"""Cylindrical hybrid magnetic diffusion with a Dirichlet B_t feed.
 
 The upper-r pec_insulator feed drives toroidal B_t toward a cylindrical
 profile with B_t ~ B0 at the feed face and small B_t near the axis
@@ -65,10 +65,10 @@ def component_minmax(diag_dir, component):
 def main():
     plotfiles = sorted(glob.glob("diags/diag1*"))
     if len(plotfiles) < 2:
-        print("FAILED: expected initial and final RZ plotfiles")
+        print("FAILED: expected initial and final cylindrical plotfiles")
         return 1
 
-    # component 1 = Bt (toroidal) in RZ plot output (Br, Bt, Bz).
+    # component 1 = Bt (toroidal) in cylindrical plot output (Br, Bt, Bz).
     bt_min0, bt_max0 = component_minmax(plotfiles[0], 1)
     bt_min1, bt_max1 = component_minmax(plotfiles[-1], 1)
 
@@ -99,7 +99,7 @@ def main():
         print("FAILED: Bt amplitude did not grow under the feed")
         return 1
 
-    print("PASSED: RZ hybrid magnetic-diffusion Dirichlet B_t feed smoke")
+    print("PASSED: cylindrical hybrid magnetic-diffusion Dirichlet B_t feed smoke")
     return 0
 
 
