@@ -11,12 +11,25 @@
 
 #include <ablastr/fields/MultiFabRegister.H>
 
+#include "HybridMagDiffusionPetsc.H"  // MagDiffPetscPC (PETSc-free enum)
+
 #include <AMReX_Array.H>
+#include <AMReX_Enum.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_LO_BCTYPES.H>
 #include <AMReX_MLLinOp.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
+
+// Solver driver for the matrix-free variable-eta / RZ curl-curl path. Default
+// is AMReX GMRES + scaled Jacobi; `petsc` routes the same matrix-free operator
+// through a PETSc KSP (MATSHELL matvec) when WarpX is built with PETSc. The enum
+// is declared outside the AMREX_USE_PETSC guard so non-PETSc builds still parse
+// it (see PreconditionerLibrary.H for the same pattern).
+AMREX_ENUM(MagDiffLinearSolver,
+    amrex_gmres,
+    petsc
+);
 
 /**
  * \brief Implicit magnetic diffusion for hybrid-PIC (operator-split).
@@ -51,6 +64,8 @@ public:
     [[nodiscard]] amrex::Real ConstantEta () const { return m_constant_eta; }
     [[nodiscard]] bool UsesVariableEta () const { return m_use_variable_eta; }
     [[nodiscard]] int Verbose () const { return m_verbose; }
+    [[nodiscard]] MagDiffLinearSolver LinearSolver () const { return m_linear_solver; }
+    [[nodiscard]] MagDiffPetscPC PetscPC () const { return m_petsc_pc; }
 
     /**
      * \brief Theta-method curl-curl magnetic diffusion on one level.
@@ -104,6 +119,8 @@ private:
     bool m_has_constant_eta = false;
     amrex::Real m_constant_eta = 0.0;
     bool m_use_variable_eta = false;
+    MagDiffLinearSolver m_linear_solver = MagDiffLinearSolver::amrex_gmres;
+    MagDiffPetscPC m_petsc_pc = MagDiffPetscPC::shell_jacobi;
 };
 
 #endif // WARPX_HYBRID_MAG_DIFFUSION_H_

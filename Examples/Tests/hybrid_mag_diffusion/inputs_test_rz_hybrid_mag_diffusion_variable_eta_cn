@@ -1,0 +1,77 @@
+# RZ hybrid implicit magnetic-diffusion Crank-Nicolson variable-eta smoke.
+# A uniform parser eta (1e-2 Ohm m, mild) drives the matrix-free GMRES path with
+# theta=0.5, exercising the (1-theta) explicit curl RHS term. The oracle
+# (analysis_rz.py) checks finite, damped Bt after five steps.
+#
+# Mild eta (not 129) is used deliberately: CN is not L-stable, so for stiff
+# vacuum eta (dt >> R^2/chi, axis 1/r^2 singularity) the operator is ill
+# conditioned and rtol=1e-4 leaves the max|Bt| non-monotonic (stiff modes
+# oscillate with g -> -1). Mild eta keeps the system well conditioned so the
+# CN damping is genuine (not under-converged noise). The stiff-eta CN feed case
+# is covered by test_rz_hybrid_mag_diffusion_pec_feed_cn (honest finite/stable).
+
+max_step = 5
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 2.0e-2 1.0
+
+# r=0 is the axis, r_hi is unforced (none), and z is periodic (no feed here).
+boundary.field_lo = none periodic
+boundary.field_hi = none periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+# RZ component order is Br, Bt, Bz. Constant initialization supports Bt.
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 1.0e-4 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "1.0e-2"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 0.5
+hybrid_pic_model.mag_diff_use_variable_eta = 1
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+# Matrix-free GMRES with scaled Jacobi (Laplacian-diagonal) preconditioner.
+# Mild eta -> well conditioned; rtol=1e-8 resolves the CN damping cleanly.
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile

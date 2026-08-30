@@ -37,7 +37,8 @@ def component_minmax(diag_dir, component):
     cell_h = os.path.join(diag_dir, "Level_0", "Cell_H")
     if not os.path.isfile(cell_h):
         raise FileNotFoundError(cell_h)
-    text = open(cell_h).read()
+    with open(cell_h) as fh:
+        text = fh.read()
     sections = re.split(r"^\s*\d+,\s*\d+\s*$", text, flags=re.MULTILINE)
     float_sections = [s for s in (_float_rows(sec) for sec in sections) if s]
     if len(float_sections) < 2:

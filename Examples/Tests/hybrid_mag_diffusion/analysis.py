@@ -56,7 +56,8 @@ def by_minmax_from_diag(diag_dir):
     cell_h = os.path.join(diag_dir, "Level_0", "Cell_H")
     if not os.path.isfile(cell_h):
         raise FileNotFoundError(cell_h)
-    text = open(cell_h).read()
+    with open(cell_h) as fh:
+        text = fh.read()
     # VisMF trailing lines: "1,ncomp" then mins, blank, "1,ncomp" then maxs
     # Find last two float-list lines with 3 comma-separated values
     float_lines = []
