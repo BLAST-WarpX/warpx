@@ -52,11 +52,19 @@ class HybridMagDiffusion
 {
 public:
     HybridMagDiffusion () = default;
+    ~HybridMagDiffusion ();
+
+    // Owns optional PETSc solver state (raw pointer); non-copyable/non-movable.
+    HybridMagDiffusion (HybridMagDiffusion const&) = delete;
+    HybridMagDiffusion& operator= (HybridMagDiffusion const&) = delete;
+    HybridMagDiffusion (HybridMagDiffusion&&) = delete;
+    HybridMagDiffusion& operator= (HybridMagDiffusion&&) = delete;
 
     void ReadParameters ();
 
     [[nodiscard]] bool Enabled () const { return m_enabled; }
     [[nodiscard]] amrex::Real Theta () const { return m_theta; }
+    /** Max Ohm resistivity; mag-diff uses residual max(eta - this, 0). */
     [[nodiscard]] amrex::Real EtaExplicitMax () const { return m_eta_explicit_max; }
     [[nodiscard]] bool HasConstantEta () const { return m_has_constant_eta; }
     [[nodiscard]] amrex::Real ConstantEta () const { return m_constant_eta; }
@@ -122,6 +130,9 @@ private:
     bool m_use_variable_eta = false;
     MagDiffLinearSolver m_linear_solver = MagDiffLinearSolver::amrex_gmres;
     MagDiffPetscPC m_petsc_pc = MagDiffPetscPC::shell_jacobi;
+#ifdef AMREX_USE_PETSC
+    mutable MagDiffPetscSolver* m_petsc_solver = nullptr;
+#endif
 };
 
 #endif // WARPX_HYBRID_MAG_DIFFUSION_H_

@@ -154,13 +154,16 @@ public:
             // RZ/Rcyl: up to ~7 nonzeros/row (Br–Bz cross terms). Cartesian:
             // face-averaged Laplacian proxy (5/7-point).
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-            PetscInt const nz = 7;
+            PetscInt const nz = 9;
 #else
             PetscInt const nz = 1 + 2 * AMREX_SPACEDIM;
 #endif
             MAGDIFF_PETSC_CHK(MatCreateAIJ(
                 PETSC_COMM_WORLD, m_n_local, m_n_local, m_n_global, m_n_global,
                 nz, nullptr, nz, nullptr, &m_P));
+            // Fail loudly if a row exceeds preallocation (heap corruption risk).
+            MAGDIFF_PETSC_CHK(MatSetOption(
+                m_P, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
             assembleExactCurlCurl();
             MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
         } else {
@@ -185,11 +188,13 @@ public:
     }
 
     ~MagDiffPetscSolverImpl () {
-        if (m_x)   { VecDestroy(&m_x); }
-        if (m_b)   { VecDestroy(&m_b); }
-        if (m_A)   { MatDestroy(&m_A); }
-        if (m_P)   { MatDestroy(&m_P); }
-        if (m_ksp) { KSPDestroy(&m_ksp); }
+        // Destroy KSP before Mats/Vecs it references (PETSc refcounts make
+        // reverse order usually safe, but KSP-first is the documented pattern).
+        if (m_ksp) { KSPDestroy(&m_ksp); m_ksp = nullptr; }
+        if (m_A)   { MatDestroy(&m_A);   m_A = nullptr; }
+        if (m_P)   { MatDestroy(&m_P);   m_P = nullptr; }
+        if (m_x)   { VecDestroy(&m_x);   m_x = nullptr; }
+        if (m_b)   { VecDestroy(&m_b);   m_b = nullptr; }
     }
 
     MagDiffPetscSolverImpl (MagDiffPetscSolverImpl const&) = delete;
@@ -355,9 +360,11 @@ private:
         amrex::MFInfo const host_info =
             amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
         for (int idim = 0; idim < 3; ++idim) {
-            m_eta_g[idim].define(eta_pc[idim]->boxArray(),
-                                 eta_pc[idim]->DistributionMap(), 1,
-                                 amrex::IntVect::Unit, host_info);
+            if (!m_eta_g[idim].ok()) {
+                m_eta_g[idim].define(eta_pc[idim]->boxArray(),
+                                     eta_pc[idim]->DistributionMap(), 1,
+                                     amrex::IntVect::Unit, host_info);
+            }
             m_eta_g[idim].setVal(amrex::Real(0.0));
             // eta_pc may be device memory under CUDA; Copy handles H<->D.
             amrex::MultiFab::Copy(m_eta_g[idim], *eta_pc[idim], 0, 0, 1, 0);
@@ -380,6 +387,9 @@ private:
 
     PetscErrorCode assembleExactCurlCurl () {
         PetscFunctionBeginUser;
+        if (m_P) {
+            PetscCall(MatZeroEntries(m_P));
+        }
         auto const* const dx = m_geom.CellSize();
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         amrex::Real const rmin = m_geom.ProbLo(0);
@@ -631,6 +641,35 @@ private:
         PetscFunctionReturn(PETSC_SUCCESS);
     }
 
+public:
+    void update (
+        amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
+        amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
+        amrex::Real theta_dt,
+        void* opctx)
+    {
+        m_theta_dt = theta_dt;
+        m_opctx = opctx;
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        amrex::ignore_unused(eta_pc);
+        buildEtaGhosts(eta_edge);
+#else
+        amrex::ignore_unused(eta_edge);
+        buildEtaGhosts(eta_pc);
+#endif
+
+        if (m_pc_choice == MagDiffPetscPC::exact_curl_curl) {
+            // Drop stale PC factors before rewriting P (avoids use-after-free
+            // when ILU/BJACOBI held internal refs into the previous P values).
+            PC pc = nullptr;
+            MAGDIFF_PETSC_CHK(KSPGetPC(m_ksp, &pc));
+            MAGDIFF_PETSC_CHK(PCReset(pc));
+            assembleExactCurlCurl();
+            MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
+        }
+    }
+
     amrex::Geometry m_geom;
     amrex::Real m_theta_dt = amrex::Real(0.0);
     amrex::Real m_mu0 = amrex::Real(0.0);
@@ -696,6 +735,16 @@ int magdiff_petsc_solve (MagDiffPetscSolver* s, amrex::Real const* rhs,
     return s->impl->solve(rhs, sol, residual_norm);
 }
 
+void magdiff_petsc_update (
+    MagDiffPetscSolver* s,
+    amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
+    amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
+    amrex::Real theta_dt,
+    void* opctx)
+{
+    s->impl->update(eta_edge, eta_pc, theta_dt, opctx);
+}
+
 void magdiff_petsc_destroy (MagDiffPetscSolver* s) {
     delete s;
 }
@@ -726,6 +775,13 @@ magdiff_petsc_gindex (MagDiffPetscSolver const*) { return {nullptr, nullptr, nul
 
 int magdiff_petsc_solve (MagDiffPetscSolver*, amrex::Real const*, amrex::Real*,
                          amrex::Real&) { return -1; }
+
+void magdiff_petsc_update (
+    MagDiffPetscSolver*,
+    amrex::Array<amrex::MultiFab const*,3> const&,
+    amrex::Array<amrex::MultiFab const*,3> const&,
+    amrex::Real,
+    void*) {}
 
 void magdiff_petsc_destroy (MagDiffPetscSolver*) {}
 

@@ -98,6 +98,13 @@ int magdiff_petsc_solve (MagDiffPetscSolver* s,
                          amrex::Real const* rhs, amrex::Real* sol,
                          amrex::Real& residual_norm);
 
+void magdiff_petsc_update (
+    MagDiffPetscSolver* s,
+    amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
+    amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
+    amrex::Real theta_dt,
+    void* opctx);
+
 void magdiff_petsc_destroy (MagDiffPetscSolver* s);
 
 #endif // WARPX_HYBRID_MAG_DIFFUSION_PETSC_H_

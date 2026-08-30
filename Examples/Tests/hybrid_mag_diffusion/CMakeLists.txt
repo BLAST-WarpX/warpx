@@ -85,6 +85,30 @@ add_warpx_test(
     OFF  # dependency
 )
 
+# Residual-eta partition: pure-explicit Ohm (ref) vs operator-split with
+# mag_diff_eta_explicit_max = eta (so eta_D = max(eta-eta_max,0) must be 0).
+# After the residual fix the split run matches the explicit ref; without it
+# mag-diff double-counts soft eta and analysis_rz_split_parity.py fails.
+add_warpx_test(
+    test_rz_hybrid_mag_diffusion_split_parity_ref  # name
+    RZ  # dims
+    1  # nprocs
+    "inputs_test_rz_hybrid_mag_diffusion_split_parity_ref"  # inputs
+    "analysis_rz.py"  # analysis (finite + damped Bt smoke on the explicit ref)
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_hybrid_mag_diffusion_split_parity  # name
+    RZ  # dims
+    1  # nprocs
+    "inputs_test_rz_hybrid_mag_diffusion_split_parity"  # inputs
+    "analysis_rz_split_parity.py"  # analysis
+    OFF  # checksum (parity oracle vs pure-explicit ref)
+    test_rz_hybrid_mag_diffusion_split_parity_ref  # dependency
+)
+
 # Crank-Nicolson (theta=0.5) companion to the RZ variable-eta smoke. A uniform
 # parser eta (mild 1e-2 Ohm m) drives the matrix-free GMRES path with the
 # (1-theta) explicit RHS term; analysis_rz.py checks finite, damped Bt. Mild eta

@@ -1569,6 +1569,13 @@ void HybridPICModel::ApplyImplicitMagDiffusion (
             eta = m_eta(rho_sample, 0.0_rt, t);
         }
 
+        // Residual resistivity: Ohm already advances min(eta, eta_explicit_max).
+        // Implicit mag-diff must only apply the stiff excess so the split does
+        // not double-count soft eta. With the default eta_explicit_max = 0 this
+        // leaves the full map for D (CI / pure-implicit tests).
+        const amrex::Real eta_ohm_max = m_mag_diffusion.EtaExplicitMax();
+        eta = std::max(eta - eta_ohm_max, 0.0_rt);
+
         if (eta <= 0.0_rt) { return; }
 
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc, hibc;
@@ -1621,6 +1628,10 @@ void HybridPICModel::BuildMagDiffResistivity (
     auto const eta_parser = m_eta;
     auto const t_new = warpx.gett_new(lev);
     auto const has_J_dependence = m_resistivity_has_J_dependence;
+    // Residual for the operator split: Ohm uses min(eta, eta_explicit_max);
+    // mag-diff uses max(eta - eta_explicit_max, 0) so soft and stiff branches
+    // partition eta without double-counting.
+    amrex::Real const eta_ohm_max = m_mag_diffusion.EtaExplicitMax();
     amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
     amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
     amrex::GpuArray<int, 3> const Jx_stag = Jx_IndexType;
@@ -1666,9 +1677,14 @@ void HybridPICModel::BuildMagDiffResistivity (
                         Jz_arr, Jz_stag, eta_stag, coarsen, i, j, k, 0);
                     Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
                 }
-                amrex::Real const eta_val = eta_parser(rho_val, Jmag, t_new);
-                eta_arr(i, j, k) = (eta_val == eta_val) // NaN check (device-safe)
-                    ? std::max(eta_val, 0.0_rt) : 0.0_rt;
+                amrex::Real eta_val = eta_parser(rho_val, Jmag, t_new);
+                if (!(eta_val == eta_val)) { // NaN check (device-safe)
+                    eta_val = 0.0_rt;
+                } else {
+                    eta_val = std::max(eta_val, 0.0_rt);
+                }
+                // Residual after the Ohm cap: max(eta - eta_explicit_max, 0).
+                eta_arr(i, j, k) = std::max(eta_val - eta_ohm_max, 0.0_rt);
             });
 
             // Zero η on covered E faces (eb_update_E == 0): no diffusion into

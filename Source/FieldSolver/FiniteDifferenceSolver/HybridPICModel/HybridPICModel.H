@@ -514,9 +514,11 @@ public:
      * \brief Implicit magnetic diffusion (operator-split, default off).
      *
      * When hybrid_pic_model.implicit_mag_diffusion is enabled, advances
-     * dB/dt = -curl((eta/mu0) curl B) after each hybrid B half-step.
-     * Ohm's-law resistivity is capped by mag_diff_eta_explicit_max so the
-     * same eta is not applied twice on the explicit Faraday path.
+     * dB/dt = -curl((eta_D/mu0) curl B) after each hybrid B half-step, where
+     * eta_D = max(eta - mag_diff_eta_explicit_max, 0) is the residual after
+     * Ohm's law (which uses eta_Ohm = min(eta, mag_diff_eta_explicit_max)).
+     * With mag_diff_eta_explicit_max = 0 (default), eta_D = eta and all
+     * resistive diffusion is implicit.
      */
     HybridMagDiffusion m_mag_diffusion;
 
