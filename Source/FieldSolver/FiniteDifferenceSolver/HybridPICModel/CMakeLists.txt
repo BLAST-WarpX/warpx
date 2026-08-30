@@ -4,5 +4,6 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
       HybridPICModel.cpp
       ExternalVectorPotential.cpp
+      HybridMagDiffusion.cpp
     )
 endforeach()

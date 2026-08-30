@@ -1,0 +1,77 @@
+# Constant-eta magnetic diffusion analytic test (2D XZ hybrid).
+#
+# Physics: operator-split θ-method curl-curl diffusion of a Fourier mode
+#   By = B0 cos(kx x), kx = 2π/Lx
+# with plasma_resistivity = 0 in Ohm (Faraday free of η) and
+# mag_diff_constant_eta driving the implicit MLCurlCurl step.
+# High n_floor / density keeps Hall negligible so the pure diffusion
+# solution By(t) = B0 cos(kx x) exp(-χ kx^2 t), χ = η/μ0, applies.
+#
+# Inspired by FLASH MagDiff unit tests; reimplemented for WarpX SI hybrid.
+
+max_step = 20
+amr.n_cell = 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = 2
+geometry.prob_lo = 0.0  0.0
+geometry.prob_hi = 1.0  1.0
+
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+# Dense cold background so Hall and pressure are negligible vs diffusion
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+# Pure By Fourier mode (div-free for d/dz = 0). Loaded into Bfield at init.
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = "0.0"
+warpx.By_external_grid_function(x,y,z) = "1.0e-4 * cos(2.*pi*x/1.0)"
+warpx.Bz_external_grid_function(x,y,z) = "0.0"
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+# Implicit magnetic diffusion (MVP)
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_constant_eta = 1.0e-2
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+hybrid_pic_model.mag_diff_rtol = 1.0e-10
+hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_max_iter = 200
+hybrid_pic_model.mag_diff_verbose = 0
+
+# Diagnostics: dump By at end (plotfile; openPMD not required)
+diagnostics.diags_names = diag1
+diag1.intervals = 20
+diag1.diag_type = Full
+diag1.fields_to_plot = By Bx Bz
+diag1.format = plotfile

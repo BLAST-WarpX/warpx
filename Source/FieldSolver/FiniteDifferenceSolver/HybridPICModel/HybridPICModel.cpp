@@ -82,6 +82,10 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
+    // Operator-split (semi)implicit magnetic diffusion (default off).
+    // See HybridMagDiffusion and hybrid_implicit_mag_diffusion notes.
+    m_mag_diffusion.ReadParameters();
+
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
     // Master gate for the electron-energy equation. When enabled, K_e is
@@ -1540,6 +1544,129 @@ void HybridPICModel::BfieldEvolve (
             Bfield, Efield, Jfield, rhofield, eb_update_E,
             step, dt_half, lev, subcycling_half, ng, nodal_sync
         );
+    }
+
+    // Operator-split magnetic diffusion over the same half-step interval.
+    // Stiff vacuum η is advanced implicitly so Faraday substeps need not resolve
+    // the resistive CFL. No-op when hybrid_pic_model.implicit_mag_diffusion=0.
+    ApplyImplicitMagDiffusion(Bfield, dt_half);
+}
+
+void HybridPICModel::ApplyImplicitMagDiffusion (
+    ablastr::fields::MultiLevelVectorField const& Bfield,
+    amrex::Real dt) const
+{
+    if (!m_mag_diffusion.Enabled()) { return; }
+
+    auto& warpx = WarpX::GetInstance();
+
+
+    if (!m_mag_diffusion.UsesVariableEta()) {
+        amrex::Real eta = 0.0_rt;
+        if (m_mag_diffusion.HasConstantEta()) {
+            eta = m_mag_diffusion.ConstantEta();
+        } else {
+            const amrex::Real t = warpx.gett_new(0);
+            const amrex::Real rho_sample = m_n_floor * PhysConst::q_e;
+            eta = m_eta(rho_sample, 0.0_rt, t);
+        }
+
+        if (eta <= 0.0_rt) { return; }
+
+        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc, hibc;
+        HybridMagDiffusion::GetLinOpBCs(lobc, hibc);
+
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            m_mag_diffusion.Advance(Bfield[lev], eta, dt, lev, lobc, hibc);
+        }
+        return;
+    }
+
+    amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc, hibc;
+    HybridMagDiffusion::GetLinOpBCs(lobc, hibc);
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        CalculatePlasmaCurrent(Bfield[lev], warpx.GetEBUpdateEFlag()[lev], lev);
+        auto const Jfield = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+        auto const rhofield = warpx.m_fields.get(FieldType::rho_fp, lev);
+
+        amrex::Array<amrex::MultiFab,3> eta_storage;
+        for (int idim = 0; idim < 3; ++idim) {
+            eta_storage[idim].define(Jfield[idim]->boxArray(), Jfield[idim]->DistributionMap(),
+                                     1, Jfield[idim]->nGrowVect());
+        }
+        ablastr::fields::VectorField eta_field = {
+            &eta_storage[0], &eta_storage[1], &eta_storage[2]};
+        BuildMagDiffResistivity(eta_field, Jfield, *rhofield, lev);
+        m_mag_diffusion.AdvanceVariable(Bfield[lev], eta_field, dt, lev, lobc, hibc);
+    }
+}
+
+void HybridPICModel::BuildMagDiffResistivity (
+    ablastr::fields::VectorField& eta_field,
+    ablastr::fields::VectorField const& Jfield,
+    amrex::MultiFab const& rhofield,
+    int lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::BuildMagDiffResistivity()");
+
+    using namespace ablastr::coarsen::sample;
+
+    auto& warpx = WarpX::GetInstance();
+    auto const eta_parser = m_eta;
+    auto const t_new = warpx.gett_new(lev);
+    auto const has_J_dependence = m_resistivity_has_J_dependence;
+    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    amrex::GpuArray<int, 3> const Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const Jz_stag = Jz_IndexType;
+
+    auto fill_eta = [&] (amrex::MultiFab& eta_mf,
+                         amrex::GpuArray<int, 3> const& eta_stag)
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(eta_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            auto const eta_arr = eta_mf.array(mfi);
+            auto const rho_arr = rhofield.const_array(mfi);
+            auto const Jx_arr = Jfield[0]->const_array(mfi);
+            auto const Jy_arr = Jfield[1]->const_array(mfi);
+            auto const Jz_arr = Jfield[2]->const_array(mfi);
+            amrex::Box const& box = mfi.tilebox();
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real const rho_val = Interp(
+                    rho_arr, nodal, eta_stag, coarsen, i, j, k, 0);
+                amrex::Real Jmag = 0.0_rt;
+                if (has_J_dependence) {
+                    amrex::Real const jx = Interp(
+                        Jx_arr, Jx_stag, eta_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jy = Interp(
+                        Jy_arr, Jy_stag, eta_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jz = Interp(
+                        Jz_arr, Jz_stag, eta_stag, coarsen, i, j, k, 0);
+                    Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
+                }
+                eta_arr(i, j, k) = std::max(eta_parser(rho_val, Jmag, t_new), 0.0_rt);
+            });
+        }
+        eta_mf.FillBoundaryAndSync(warpx.Geom(lev).periodicity());
+    };
+
+    fill_eta(*eta_field[0], Jx_IndexType);
+    fill_eta(*eta_field[1], Jy_IndexType);
+    fill_eta(*eta_field[2], Jz_IndexType);
+
+    if (m_mag_diffusion.Verbose() > 0) {
+        amrex::Print() << "HybridMagDiffusion frozen eta ranges:";
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::Print() << " [" << eta_field[idim]->min(0, 0)
+                           << ", " << eta_field[idim]->max(0, 0) << "]";
+        }
+        amrex::Print() << " Ohm m\n";
     }
 }
 

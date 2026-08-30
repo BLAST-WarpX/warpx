@@ -1,0 +1,69 @@
+# RZ hybrid implicit magnetic-diffusion vacuum stability smoke.
+# A constant Bt initialization exercises the r=0 cylindrical update but is not
+# an analytic eigenmode. The oracle checks finite, damped Bt after five steps.
+
+max_step = 5
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 2.0e-2 1.0
+
+# r=0 is the axis, r_hi is unforced (none), and z is periodic.
+boundary.field_lo = none periodic
+boundary.field_hi = none periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+# RZ component order is Br, Bt, Bz. Constant initialization supports Bt.
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 1.0e-4 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_constant_eta = 129.0
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+# Matrix-free RZ has no multigrid preconditioner yet. This tolerance is
+# sufficient for the five-step large-vacuum-eta stability smoke.
+hybrid_pic_model.mag_diff_rtol = 1.0e-4
+hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile
