@@ -10,8 +10,7 @@
 # r_hi = PEC (Neumann dBt/dr = 0) is REQUIRED for a well-posed Bt solve: with
 # "none" at r_hi the cylindrical operator has a Bt proportional-to-r steady-
 # state NULL MODE (K(Bt=r) = 0), leaving the system singular. PEC excludes
-# Bt=r (dBt/dr=k!=0) -> unique, well-posed solution. See the harsh test header
-# and notes/2026-07-19_rcyl_mag_diff_port.md.
+# Bt=r (dBt/dr=k!=0) -> unique, well-posed solution.
 #
 # Oracle (analysis_rcyl.py, reused): finite Bt; final Bt amplitude < 1e-3 *
 # initial (>99.9% damped in 5 steps at eta=129, dt=1ns -- the slowest Bessel
@@ -32,7 +31,6 @@ geometry.prob_lo = 0.0
 geometry.prob_hi = 2.0e-2
 
 # r=0 axis (none). r_hi = PEC (Neumann for Bt; excludes the Bt~r null mode).
-# No pec_insulator: the Rcyl affine-feed split is a documented follow-up.
 boundary.field_lo = none
 boundary.field_hi = pec
 boundary.particle_lo = none

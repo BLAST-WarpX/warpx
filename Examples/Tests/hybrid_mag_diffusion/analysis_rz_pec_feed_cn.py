@@ -15,9 +15,8 @@ steady state:
   - near-axis B_t stays well below the feed value (axis regularity)
   - the run is finite/stable (no NaN/abort)
 
-It deliberately does NOT assert the feed face is held at B0 (a steady-state
-check appropriate for L-stable backward Euler, not for stiff CN). See the
-design note (notes/2026-07-17_theta_method_variable_eta_design.md, Sec. 7).
+It deliberately does NOT assert the feed face is held at B0, which is a
+steady-state check appropriate for L-stable backward Euler rather than stiff CN.
 """
 
 import glob

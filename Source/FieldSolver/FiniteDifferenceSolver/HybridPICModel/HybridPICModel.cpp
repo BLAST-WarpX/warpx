@@ -25,6 +25,8 @@
 
 #include <AMReX_Random.H>
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -1578,17 +1580,12 @@ void HybridPICModel::ApplyImplicitMagDiffusion (
 
         if (eta <= 0.0_rt) { return; }
 
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc, hibc;
-        HybridMagDiffusion::GetLinOpBCs(lobc, hibc);
-
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            m_mag_diffusion.Advance(Bfield[lev], eta, dt, lev, lobc, hibc);
+            m_mag_diffusion.Advance(Bfield[lev], eta, dt, lev);
         }
         return;
     }
 
-    amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc, hibc;
-    HybridMagDiffusion::GetLinOpBCs(lobc, hibc);
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
         // Only needed when eta depends on J; avoids an extra Ampere-like
         // plasma-current rebuild each mag-diff call.
@@ -1610,7 +1607,7 @@ void HybridPICModel::ApplyImplicitMagDiffusion (
         ablastr::fields::VectorField eta_field = {
             eta_ptr, eta_ptr + 1, eta_ptr + 2};
         BuildMagDiffResistivity(eta_field, Jfield, *rhofield, lev);
-        m_mag_diffusion.AdvanceVariable(Bfield[lev], eta_field, dt, lev, lobc, hibc);
+        m_mag_diffusion.AdvanceVariable(Bfield[lev], eta_field, dt, lev);
     }
 }
 

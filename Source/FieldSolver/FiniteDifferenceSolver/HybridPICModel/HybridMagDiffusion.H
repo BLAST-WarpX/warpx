@@ -16,10 +16,12 @@
 #include <AMReX_Array.H>
 #include <AMReX_Enum.H>
 #include <AMReX_Geometry.H>
-#include <AMReX_LO_BCTYPES.H>
-#include <AMReX_MLLinOp.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
+
+#include <memory>
+
+struct HybridMagDiffusionWorkspace;
 
 // Solver driver for the matrix-free variable-eta / RZ curl-curl path. Default
 // is AMReX GMRES + scaled Jacobi; `petsc` routes the same matrix-free operator
@@ -51,10 +53,9 @@ AMREX_ENUM(MagDiffLinearSolver,
 class HybridMagDiffusion
 {
 public:
-    HybridMagDiffusion () = default;
+    HybridMagDiffusion ();
     ~HybridMagDiffusion ();
 
-    // Owns optional PETSc solver state (raw pointer); non-copyable/non-movable.
     HybridMagDiffusion (HybridMagDiffusion const&) = delete;
     HybridMagDiffusion& operator= (HybridMagDiffusion const&) = delete;
     HybridMagDiffusion (HybridMagDiffusion&&) = delete;
@@ -84,42 +85,23 @@ public:
      * \param[in]     eta_SI  resistivity [Ohm m]
      * \param[in]     dt      diffusion step size [s]
      * \param[in]     lev     AMR level (hybrid is single-level)
-     * \param[in]     lobc    low-side linear-operator boundary types
-     * \param[in]     hibc    high-side linear-operator boundary types
      */
     void Advance (
         ablastr::fields::VectorField const& Bfield,
         amrex::Real eta_SI,
         amrex::Real dt,
-        int lev,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& lobc,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& hibc) const;
+        int lev) const;
 
     void AdvanceVariable (
         ablastr::fields::VectorField const& Bfield,
         ablastr::fields::VectorField const& eta_SI,
         amrex::Real dt,
-        int lev,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& lobc,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& hibc) const;
-
-    /**
-     * \brief Map WarpX field boundary types to AMReX LinOpBCType values.
-     *
-     * Unmapped types default to Neumann. PEC_Insulator maps to Dirichlet
-     * (tangential B prescribed). Callers may still fill these arrays even
-     * though the matrix-free op primarily uses WarpX field BCs.
-     */
-    static void GetLinOpBCs (
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM>& lobc,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM>& hibc);
+        int lev) const;
 
 private:
     bool m_enabled = false;
     amrex::Real m_theta = 1.0;
-    /** Relative KSP/GMRES tolerance (FLASH MagDiff-class; CI uses 1e-8). */
     amrex::Real m_rtol = 1.e-8;
-    /** Absolute tolerance; 0 = relative-only (FLASH-like). */
     amrex::Real m_atol = 0.0;
     int m_max_iter = 200;
     int m_verbose = 0;
@@ -129,8 +111,16 @@ private:
     bool m_use_variable_eta = false;
     MagDiffLinearSolver m_linear_solver = MagDiffLinearSolver::amrex_gmres;
     MagDiffPetscOptions m_petsc_options;
+    mutable std::unique_ptr<HybridMagDiffusionWorkspace> m_workspace;
 #ifdef AMREX_USE_PETSC
-    mutable MagDiffPetscSolver* m_petsc_solver = nullptr;
+    struct PetscSolverDeleter
+    {
+        void operator() (MagDiffPetscSolver* solver) const noexcept
+        {
+            magdiff_petsc_destroy(solver);
+        }
+    };
+    mutable std::unique_ptr<MagDiffPetscSolver, PetscSolverDeleter> m_petsc_solver;
 #endif
 };
 

@@ -29,7 +29,7 @@
 /** PETSc preconditioner defaults read from hybrid_pic_model.mag_diff_petsc_*. */
 struct MagDiffPetscOptions
 {
-    // Empty keeps PETSc's default PC unless -pc_type is supplied externally.
+    // Empty keeps PETSc's default PC unless -magdiff_pc_type is supplied.
     std::string pc_type;
     int asm_overlap = 0;
     std::string sub_ksp_type = "preonly";
@@ -79,7 +79,7 @@ magdiff_petsc_gindex (MagDiffPetscSolver const* s);
 
 /**
  * \brief Solve A x = b with x and b as flat local arrays (n_local entries).
- * Seeds x with the initial guess and overwrites x with the solution. Returns
+ * Uses PETSc's zero initial guess and overwrites x with the solution. Returns
  * the PETSc KSP converged reason (positive on success, negative on divergence).
  */
 int magdiff_petsc_solve (MagDiffPetscSolver* s,

@@ -510,6 +510,7 @@ public:
     amrex::GpuArray<int, 3> Ey_IndexType;
     /** Gpu Vector with index type of the Ez multifab */
     amrex::GpuArray<int, 3> Ez_IndexType;
+
     /**
      * \brief Implicit magnetic diffusion (operator-split, default off).
      *

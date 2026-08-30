@@ -42,24 +42,23 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <memory>
+#include <sstream>
+#include <type_traits>
 #include <vector>
 
 #ifdef AMREX_USE_PETSC
-// PetscCall (PETSc's macro) can only be used inside functions returning
-// PetscErrorCode (the static callbacks and assemblePreconditioner). In other
-// functions (ctor, make, solve) we abort on a non-zero PETSc error.
-#define MAGDIFF_PETSC_CHK(call) do { \
-    PetscErrorCode const _magdiff_ierr = (call); \
-    if (_magdiff_ierr != 0) { \
-        amrex::Abort("HybridMagDiffusion PETSc call failed"); } \
-} while (0)
+#define MAGDIFF_PETSC_CHK(call) PetscCallAbort(PETSC_COMM_WORLD, call)
 #endif
 
 
 #ifdef AMREX_USE_PETSC
 
 namespace {
+
+static_assert(std::is_same_v<PetscScalar, amrex::Real>,
+    "Hybrid magnetic diffusion requires PETSc and AMReX to use the same real precision");
 
 /**
  * \brief PETSc KSP driver for the matrix-free mag-diff operator.
@@ -120,6 +119,13 @@ public:
         PetscInt ng = 0;
         MAGDIFF_PETSC_CHK(VecGetSize(m_x, &ng));
         m_n_global = ng;
+        if (m_n_global > 0 &&
+            m_n_global - 1 > static_cast<PetscInt>(std::numeric_limits<int>::max()))
+        {
+            amrex::Abort(
+                "Hybrid magnetic diffusion currently stores PETSc global indices in an "
+                "AMReX iMultiFab and cannot represent more than INT_MAX + 1 unknowns");
+        }
 
         buildGlobalIndex(B_proto);
         // Exact curl-curl rows select η on E/J faces to match the matvec.
@@ -134,11 +140,12 @@ public:
         MAGDIFF_PETSC_CHK(MatSetUp(m_A));
 
         MAGDIFF_PETSC_CHK(KSPCreate(PETSC_COMM_WORLD, &m_ksp));
+        MAGDIFF_PETSC_CHK(KSPSetOptionsPrefix(m_ksp, "magdiff_"));
         MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_A));
 
         // Assembled frozen-η curl-curl Pmat (see assemblePreconditioner).
-        // Lets runtime -pc_type asm/ilu/hypre factor a real matrix; default PC
-        // for an assembled Pmat is block-Jacobi ILU(0). Preallocation follows
+        // Runtime -magdiff_pc_type can select a PC for the assembled matrix.
+        // PETSc otherwise defaults to block-Jacobi ILU(0). Preallocation follows
         // the maximum exact stencil width in each geometry.
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         PetscInt const nz = 9;
@@ -170,12 +177,13 @@ public:
         MAGDIFF_PETSC_CHK(KSPSetNormType(m_ksp, KSP_NORM_UNPRECONDITIONED));
         MAGDIFF_PETSC_CHK(KSPGMRESSetRestart(
             m_ksp, std::min(m_max_iter, 50)));
+        MAGDIFF_PETSC_CHK(KSPSetInitialGuessNonzero(m_ksp, PETSC_FALSE));
         if (m_verbose > 0) {
             MAGDIFF_PETSC_CHK(KSPMonitorSet(
                 m_ksp, monitorResidual, nullptr, nullptr));
         }
         setOptions(options);
-        // Let -ksp_type / -pc_type / -ksp_rtol ... from argv or PETSC_OPTIONS win.
+        // Let -magdiff_ksp_type, -magdiff_pc_type, and related options win.
         MAGDIFF_PETSC_CHK(KSPSetFromOptions(m_ksp));
     }
 
@@ -205,16 +213,7 @@ public:
         for (amrex::Long i = 0; i < m_n_local; ++i) { barr[i] = rhs[i]; }
         MAGDIFF_PETSC_CHK(VecRestoreArray(m_b, &barr));
 
-        PetscScalar* xarr = nullptr;
-        MAGDIFF_PETSC_CHK(VecGetArray(m_x, &xarr));
-        for (amrex::Long i = 0; i < m_n_local; ++i) { xarr[i] = sol[i]; }
-        MAGDIFF_PETSC_CHK(VecRestoreArray(m_x, &xarr));
-
         MAGDIFF_PETSC_CHK(KSPSolve(m_ksp, m_b, m_x));
-
-        MAGDIFF_PETSC_CHK(VecGetArray(m_x, &xarr));
-        for (amrex::Long i = 0; i < m_n_local; ++i) { sol[i] = static_cast<amrex::Real>(xarr[i]); }
-        MAGDIFF_PETSC_CHK(VecRestoreArray(m_x, &xarr));
 
         PetscInt iters = 0;
         KSPConvergedReason reason = static_cast<KSPConvergedReason>(0);
@@ -224,13 +223,27 @@ public:
         MAGDIFF_PETSC_CHK(KSPGetResidualNorm(m_ksp, &rnorm));
         rnorm_out = static_cast<amrex::Real>(rnorm);
 
-        if (reason <= 0) {
-            amrex::Print() << "### WARNING: HybridMagDiffusion PETSc KSP did not"
-                           << " converge (iters=" << iters
-                           << " residual=" << rnorm
-                           << " reason=" << reason
-                           << "). Keeping last iterate.\n";
-        } else if (m_verbose > 0) {
+        if (reason <= 0 || !std::isfinite(rnorm_out)) {
+            std::ostringstream msg;
+            msg << "Hybrid magnetic-diffusion PETSc solve failed: reason="
+                << static_cast<int>(reason) << ", iterations=" << iters
+                << ", residual=" << rnorm;
+            amrex::Abort(msg.str());
+        }
+
+        PetscScalar* xarr = nullptr;
+        MAGDIFF_PETSC_CHK(VecGetArray(m_x, &xarr));
+        bool solution_is_finite = true;
+        for (amrex::Long i = 0; i < m_n_local; ++i) {
+            solution_is_finite = solution_is_finite && std::isfinite(xarr[i]);
+            sol[i] = static_cast<amrex::Real>(xarr[i]);
+        }
+        MAGDIFF_PETSC_CHK(VecRestoreArray(m_x, &xarr));
+        if (!solution_is_finite) {
+            amrex::Abort("Hybrid magnetic-diffusion PETSc solve returned a non-finite solution");
+        }
+
+        if (m_verbose > 0) {
             amrex::Print() << "HybridMagDiffusion PETSc KSP iterations=" << iters
                            << " residual=" << rnorm
                            << " reason=" << reason << "\n";
@@ -241,26 +254,25 @@ public:
 private:
     void setOptions (MagDiffPetscOptions const& options)
     {
-        PetscBool pc_specified = PETSC_FALSE;
-        MAGDIFF_PETSC_CHK(PetscOptionsHasName(
-            nullptr, nullptr, "-pc_type", &pc_specified));
-        if (pc_specified || options.pc_type.empty()) { return; }
+        auto set_default = [] (char const* name, std::string const& value) {
+            PetscBool specified = PETSC_FALSE;
+            MAGDIFF_PETSC_CHK(PetscOptionsHasName(nullptr, nullptr, name, &specified));
+            if (!specified && !value.empty()) {
+                MAGDIFF_PETSC_CHK(PetscOptionsSetValue(nullptr, name, value.c_str()));
+            }
+        };
 
-        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
-            nullptr, "-pc_type", options.pc_type.c_str()));
-        if (options.pc_type != "asm") { return; }
-
-        std::string const overlap = std::to_string(options.asm_overlap);
-        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
-            nullptr, "-pc_asm_overlap", overlap.c_str()));
-        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
-            nullptr, "-sub_ksp_type", options.sub_ksp_type.c_str()));
-        MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
-            nullptr, "-sub_pc_type", options.sub_pc_type.c_str()));
+        set_default("-magdiff_pc_type", options.pc_type);
+        set_default("-magdiff_pc_asm_overlap", std::to_string(options.asm_overlap));
+        set_default("-magdiff_sub_ksp_type", options.sub_ksp_type);
+        set_default("-magdiff_sub_pc_type", options.sub_pc_type);
         if (options.sub_pc_type == "ilu") {
-            std::string const levels = std::to_string(options.ilu_factor_levels);
-            MAGDIFF_PETSC_CHK(PetscOptionsSetValue(
-                nullptr, "-sub_pc_factor_levels", levels.c_str()));
+            set_default("-magdiff_sub_pc_factor_levels",
+                        std::to_string(options.ilu_factor_levels));
+            // Restore the operator's identity-scale pivot when ILU produces
+            // a near-zero pivot on an overlap submatrix.
+            set_default("-magdiff_sub_pc_factor_shift_type", "inblocks");
+            set_default("-magdiff_sub_pc_factor_shift_amount", "1.0");
         }
     }
 
@@ -272,8 +284,8 @@ private:
         PetscCall(VecGetArrayRead(in, &x));
         PetscCall(VecGetArray(out, &y));
         self->m_matvec(self->m_opctx,
-                       reinterpret_cast<amrex::Real const*>(x),
-                       reinterpret_cast<amrex::Real*>(y),
+                       static_cast<amrex::Real const*>(x),
+                       static_cast<amrex::Real*>(y),
                        self->gindexView(), self->m_rstart);
         PetscCall(VecRestoreArrayRead(in, &x));
         PetscCall(VecRestoreArray(out, &y));
@@ -381,8 +393,6 @@ private:
     // operator — uncoupled Bt 5-point block; Br and Bz coupled via J_θ mixed
     // derivatives (~7-point). Axis: Br(0,*) is diagonal-only (pin); Bt on-axis
     // uses the 4/dr^2 J_z correction. η is face-selected per term (et_r/t/z).
-    // See notes/2026-07-20_exact_curl_curl_pc.md.
-    //
     // Cartesian: exact algebraic expansion of the staggered Yee operator,
     // C_up diag(eta/mu0) C_down. Inactive derivatives vanish in XZ and 1D_Z.
 

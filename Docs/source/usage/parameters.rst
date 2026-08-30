@@ -3942,7 +3942,8 @@ Maxwell solver: kinetic-fluid hybrid
     Common values include ``asm``, ``bjacobi`` and, on a single CPU rank, ``lu``.
     Global ``lu`` is not supported in GPU builds; use ``asm`` with
     :pp:param:`hybrid_pic_model.mag_diff_petsc_sub_pc_type` = ``lu`` instead.
-    An external PETSc ``-pc_type`` option takes precedence over this input group.
+    The prefixed PETSc option ``-magdiff_pc_type`` takes precedence over this
+    input group without changing other PETSc solvers in the process.
 
 .. pp:param:: hybrid_pic_model.mag_diff_petsc_asm_overlap
     :type: ``int``

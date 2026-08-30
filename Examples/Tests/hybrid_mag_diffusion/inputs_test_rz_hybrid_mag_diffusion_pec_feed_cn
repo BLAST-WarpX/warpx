@@ -2,9 +2,7 @@
 # the upper-r face, Crank-Nicolson (theta=0.5). pec_insulator drives B_t through
 # insulator.By_x_hi(y,z,t). The matrix-free CN solve includes the feed in the
 # operator (homogeneous part) and RHS (affine offset), plus the (1-theta)
-# explicit curl term; the feed is evaluated at g(t_new) for both implicit and
-# explicit terms (a stable extension of the BE feed to general theta; see the
-# design note).
+# explicit curl term; the feed is evaluated at g(t_new) for both terms.
 #
 # CN is not L-stable: with stiff vacuum eta=129 and dt >> R^2/chi, the stiff
 # modes have amplification g -> -1 and so reach the diffusion equilibrium only

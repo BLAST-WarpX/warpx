@@ -9,9 +9,7 @@
 # Bt proportional-to-r steady-state NULL MODE (K(Bt=r) = 0: (1/r)d(r*kr)/dr = 2k
 # = const -> d/dr = 0), leaving the linear system singular so AMReX GMRES and
 # PETSc converge to different particular solutions. PEC (Neumann dBt/dr = 0)
-# EXCLUDES Bt=r (which has dBt/dr = k != 0) -> unique, well-posed solution
-# (verified: AMReX == PETSc to ~1e-10 with PEC r_hi). See
-# notes/2026-07-19_rcyl_mag_diff_port.md.
+# EXCLUDES Bt=r (which has dBt/dr = k != 0) -> unique, well-posed solution.
 #
 # Oracle (analysis_rcyl.py): finite Bt; final Bt amplitude < 1e-3 * initial
 # (>99.9% damped in 5 steps at eta=129, dt=1ns -- the slowest Bessel mode damps

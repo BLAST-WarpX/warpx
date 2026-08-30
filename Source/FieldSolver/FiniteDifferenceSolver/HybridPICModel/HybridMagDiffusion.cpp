@@ -36,22 +36,12 @@
 #include <array>
 #include <cmath>
 #include <limits>
-#include <map>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 
 using namespace amrex;
-
-HybridMagDiffusion::~HybridMagDiffusion ()
-{
-#ifdef AMREX_USE_PETSC
-    if (m_petsc_solver != nullptr) {
-        magdiff_petsc_destroy(m_petsc_solver);
-        m_petsc_solver = nullptr;
-    }
-#endif
-}
 
 void
 HybridMagDiffusion::ReadParameters ()
@@ -94,6 +84,7 @@ HybridMagDiffusion::ReadParameters ()
         "(theta=0 explicit diffusion is not supported)");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        std::isfinite(m_rtol) && std::isfinite(m_atol) &&
         m_rtol > 0.0_rt && m_atol >= 0.0_rt,
         "hybrid_pic_model.mag_diff_rtol/atol must be non-negative (rtol > 0)");
 
@@ -102,11 +93,12 @@ HybridMagDiffusion::ReadParameters ()
         "hybrid_pic_model.mag_diff_max_iter must be positive");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_eta_explicit_max >= 0.0_rt,
+        std::isfinite(m_eta_explicit_max) && m_eta_explicit_max >= 0.0_rt,
         "hybrid_pic_model.mag_diff_eta_explicit_max must be non-negative");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_has_constant_eta || m_constant_eta >= 0.0_rt,
+        !m_has_constant_eta ||
+            (std::isfinite(m_constant_eta) && m_constant_eta >= 0.0_rt),
         "hybrid_pic_model.mag_diff_constant_eta must be non-negative");
 
     if (m_linear_solver == MagDiffLinearSolver::petsc) {
@@ -149,33 +141,6 @@ HybridMagDiffusion::ReadParameters ()
         }
     }
     amrex::Print() << "\n";
-}
-
-void
-HybridMagDiffusion::GetLinOpBCs (
-    Array<LinOpBCType, AMREX_SPACEDIM>& lobc,
-    Array<LinOpBCType, AMREX_SPACEDIM>& hibc)
-{
-    // Map WarpX field BCs to LinOp types (same idea as ProjectionDivCleaner).
-    // Unmapped types default to Neumann. PEC_Insulator is treated as Dirichlet
-    // for tangential B. On the matrix-free path the feed is enforced via
-    // ApplyBfieldBoundary and an affine RHS term (VariableCoeffMagDiffusionOp);
-    // this map is retained for callers that still fill LinOpBC arrays.
-    const std::map<FieldBoundaryType, LinOpBCType> bcmap{
-        {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
-        {FieldBoundaryType::Neumann, LinOpBCType::Neumann},
-        {FieldBoundaryType::PMC, LinOpBCType::Neumann},
-        {FieldBoundaryType::Periodic, LinOpBCType::Periodic},
-        {FieldBoundaryType::PEC_Insulator, LinOpBCType::Dirichlet},
-        {FieldBoundaryType::None, LinOpBCType::Neumann}
-    };
-
-    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
-        auto itlo = bcmap.find(WarpX::field_boundary_lo[idim]);
-        auto ithi = bcmap.find(WarpX::field_boundary_hi[idim]);
-        lobc[idim] = (itlo != bcmap.end()) ? itlo->second : LinOpBCType::Neumann;
-        hibc[idim] = (ithi != bcmap.end()) ? ithi->second : LinOpBCType::Neumann;
-    }
 }
 
 namespace {
@@ -279,9 +244,7 @@ struct MagDiffJacobiPrecond
 #endif
         Real const diag = (1.0_rt + theta_dt * chi_val * lap_diag) / denom;
         Real const inv = Real(1.0) / std::max(diag, tiny);
-        Real const out = src(i, j, k) * inv;
-        // Device-safe finite check (avoid std::isfinite on CUDA device).
-        dest(i, j, k) = (out == out) ? out : src(i, j, k);
+        dest(i, j, k) = src(i, j, k) * inv;
     }
 };
 
@@ -347,10 +310,7 @@ public:
         }
     }
 
-    // Krylov vector algebra must use nghost=0 to match norm2/dotProduct.
-    // Ghosts are filled inside apply()/precond when needed. Touching ghosts
-    // with 1/tiny_residual (or Gram–Schmidt coeffs) overflows under PETSc
-    // FPE traps (Azure WarpX_PETSC + WarpX_TEST_FPETRAP).
+    // Krylov algebra uses valid cells; apply/precond fill ghosts as needed.
     static bool isFiniteReal (Real v)
     {
         return (v == v) &&
@@ -361,7 +321,9 @@ public:
     void increment (MagDiffVector const& source, Real scale_factor)
     {
         AMREX_ALWAYS_ASSERT(m_is_defined && source.m_is_defined);
-        if (!isFiniteReal(scale_factor)) { return; }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            isFiniteReal(scale_factor),
+            "Hybrid magnetic-diffusion GMRES produced a non-finite increment coefficient");
         for (int idim = 0; idim < 3; ++idim) {
             MultiFab::Saxpy(m_fields[idim], scale_factor, source.m_fields[idim],
                             0, 0, m_fields[idim].nComp(), 0);
@@ -371,7 +333,9 @@ public:
     void scale (Real scale_factor)
     {
         AMREX_ALWAYS_ASSERT(m_is_defined);
-        if (!isFiniteReal(scale_factor)) { return; }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            isFiniteReal(scale_factor),
+            "Hybrid magnetic-diffusion GMRES produced a non-finite scale coefficient");
         for (auto& field : m_fields) {
             field.mult(scale_factor, 0, field.nComp(), 0);
         }
@@ -380,7 +344,9 @@ public:
     void linComb (Real a, MagDiffVector const& x, Real b, MagDiffVector const& y)
     {
         AMREX_ALWAYS_ASSERT(m_is_defined && x.m_is_defined && y.m_is_defined);
-        if (!isFiniteReal(a) || !isFiniteReal(b)) { return; }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            isFiniteReal(a) && isFiniteReal(b),
+            "Hybrid magnetic-diffusion GMRES produced a non-finite linear-combination coefficient");
         for (int idim = 0; idim < 3; ++idim) {
             MultiFab::LinComb(m_fields[idim], a, x.m_fields[idim], 0,
                                b, y.m_fields[idim], 0, 0,
@@ -441,15 +407,12 @@ public:
     VariableCoeffMagDiffusionOp (
         ablastr::fields::VectorField const& Bfield,
         ablastr::fields::VectorField const& eta,
-        Real theta_dt, int lev,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& lobc,
-        amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& hibc)
+        Real theta_dt, int lev)
         : m_theta_dt(theta_dt), m_lev(lev),
           m_source{Bfield[0], Bfield[1], Bfield[2]},
           m_eta{eta[0], eta[1], eta[2]},
           m_geom(WarpX::GetInstance().Geom(lev))
     {
-        amrex::ignore_unused(lobc, hibc);
 #if defined(WARPX_DIM_RZ)
         // Lower radial face (r=0) must be None (axis; ApplyFieldBoundaryOnAxis).
         // Upper radial face: None, PEC, or PEC_Insulator (Dirichlet tangential B).
@@ -481,16 +444,7 @@ public:
             "or PEC_Insulator at each axial (z) boundary (None is not "
             "well-posed for the z edge ghosts)");
 #elif defined(WARPX_DIM_RCYLINDER)
-        // RCYLINDER is 1D (r only), axisymmetric (single azimuthal mode). The
-        // cylindrical FDTD curl kernels (CalculateCurrentAmpereCylindrical /
-        // ComputeCurlACylindrical) and WarpX::ApplyBfieldBoundary (axis at r=0
-        // via ApplyFieldBoundaryOnAxis) already support RCYLINDER -- they are
-        // the same operators the RCYLINDER hybrid-PIC EM solve uses -- so the
-        // matrix-free path reuses them by mirroring the RZ staging branch
-        // (computeAFull / copy-back), not the Cartesian FillBoundaryAndSync.
-        // BC policy mirrors RZ minus the z dimension:
-        //   - r_lo (r=0): None (axis; ApplyFieldBoundaryOnAxis).
-        //   - r_hi: None (unforced), PEC, or PEC_Insulator.
+        // RCYLINDER reuses the cylindrical hybrid-PIC curl and axis handling.
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             WarpX::field_boundary_lo[0] == FieldBoundaryType::None,
             "RCYLINDER matrix-free hybrid magnetic diffusion requires the "
@@ -526,14 +480,8 @@ public:
             "Cartesian matrix-free hybrid magnetic diffusion supports Periodic, "
             "PEC, or PEC_Insulator field boundaries");
 #endif
-        // EB is supported on the matrix-free path via the stair-case masks
-        // m_eb_update_E/B (MarkUpdateCellsStairCase): covered E faces carry
-        // η=0 (no diffusion into the solid) and covered B DOFs stay inert
-        // (identity in apply/precond; zeroed in init-guess/RHS/copy-back). The
-        // matvec is already EB-safe — computeAFull zeros m_Jwork before
-        // CalculateCurrentAmpere (so J=0 on covered E faces) and ComputeCurlA
-        // zeros covered B — so these masks are defensive + PC cleanliness +
-        // PETSc-Pmat prep. See notes/2026-07-18_eb_parser_eta.md.
+        // Covered E faces carry eta=0 and covered B rows are identities. The
+        // operator and preconditioners use the same stair-case masks.
 
         auto& warpx = WarpX::GetInstance();
         m_fdtd = warpx.get_pointer_fdtd_solver_fp(lev);
@@ -572,11 +520,7 @@ public:
             }
         }
 
-        // Sample resistivity onto each B face by averaging the three E/J-centered
-        // eta components interpolated to that face. Never index E-staggered eta
-        // MultiFabs with B indices (that OOB-read is why variable-eta GMRES
-        // residual went NaN while constant eta looked "stable" — any in-fab
-        // index still returned the same constant).
+        // Average the three E/J-centered eta components onto each B face.
         amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
         for (int idim = 0; idim < 3; ++idim) {
 #ifdef AMREX_USE_OMP
@@ -755,38 +699,20 @@ public:
 
     void apply (MagDiffVector& output, MagDiffVector const& input)
     {
-        // A_full(x) = (I + theta_dt * curl(eta/mu0 * curl(.))) x, with Dirichlet
-        // feed ghosts set to g(t_new) by ApplyBfieldBoundary. With a nonzero
-        // feed, A_full is affine: A_full(x) = A_lin(x) + c, where A_lin is the
-        // homogeneous operator (zero feed ghost) and c = A_full(0). GMRES needs
-        // a linear operator, so this returns A_lin(x) = A_full(x) - c; the RHS
-        // carries +c (see AdvanceVariable). c is precomputed in prepareFeed.
+        // Remove the affine feed offset so Krylov solvers see a linear operator.
         computeAFull(output, input, m_theta_dt);
         if (m_has_feed) {
             output.increment(m_feed_offset, -1.0_rt);
         }
     }
 
-    // Compute A_full(x) = x + alpha_dt * curl(eta/mu0 curl x), staging through
-    // the registered B field so ApplyBfieldBoundary imposes geometry axes, PEC
-    // walls, and any pec_insulator Dirichlet B_t feed (ghost = g(t_new)). With a nonzero
-    // feed, A_full is affine (A_full(x) = A_lin(x) + c); apply() subtracts c so
-    // GMRES/PETSc see the homogeneous A_lin, and c is carried on the RHS.
-    //
-    // alpha_dt is the coefficient on curl(eta J): m_theta_dt (= theta*dt) for the
-    // implicit operator A_lin and the feed offset c; (1-theta)*dt for the explicit
-    // (1-theta) CN term A_e used to build the theta-method RHS (AdvanceVariable).
-    // Staging, BC fill, J = curl(B)/mu0, eta*J, and curl(eta J) all use the frozen
-    // eta MultiFabs and are independent of alpha_dt; only the final Saxpy scales
-    // by alpha_dt.
+    // Compute A_full(x) = x + alpha_dt curl(eta/mu0 curl x). Physical boundary
+    // handling is applied by staging through the registered B field.
     void computeAFull (MagDiffVector& output, MagDiffVector const& input, Real alpha_dt)
     {
         auto const& input_fields = input.fields();
         auto& warpx = WarpX::GetInstance();
-        // Stage valid cells into the registered B field so WarpX applies the
-        // geometry axis and physical field boundaries, then pull the filled ghost region into
-        // work arrays. (Krylov MagDiffVectors may carry ghost storage, but
-        // norms use nghost=0; BC fill goes through registered B.)
+        // Stage through the registered field to apply physical boundaries.
         for (int idim = 0; idim < 3; ++idim) {
             MultiFab::Copy(*m_source[idim], input_fields[idim], 0, 0, 1, 0);
         }
@@ -806,9 +732,7 @@ public:
             Bwork_ptr, Bwork_ptr + 1, Bwork_ptr + 2};
         ablastr::fields::VectorField Jwork = {
             Jwork_ptr, Jwork_ptr + 1, Jwork_ptr + 2};
-        // Zero J work so any unwritten ghost/edge cell does not retain
-        // stale values that would pollute curl(eta J) (especially Jr from
-        // DownwardDz(B_t) on the axial path).
+        // Curl kernels do not write every exterior ghost.
         for (int idim = 0; idim < 3; ++idim) {
             m_Jwork[idim].setVal(0.0_rt);
         }
@@ -816,11 +740,7 @@ public:
 
 
         for (int idim = 0; idim < 3; ++idim) {
-            // No OpenMP tiling: ParallelFor(fabbox) with TilingIfNotGPU would
-            // race if this loop is ever parallelized, and serial fabbox is fine.
-            // Cover valid+ghost so curl(eta J) sees domain-edge faces that
-            // FillBoundary cannot invent on non-periodic sides; setVal(0) on J
-            // (above) keeps unfilled exterior ghosts safe.
+            // Cover valid and ghost cells needed by curl(eta J).
             for (MFIter mfi(m_etaJ[idim]); mfi.isValid(); ++mfi) {
                 FormEtaTimesJ const kernel{
                     m_etaJ[idim].array(mfi),
@@ -850,12 +770,7 @@ public:
         }
     }
 
-    // Precompute the affine feed offset c = A_full(0): the curl driven by the
-    // Dirichlet feed value g(t_new) on a zero interior (axis/periodic ghosts
-    // are homogeneous, so they contribute nothing). Subtracted from the
-    // operator in apply() and from the RHS in AdvanceVariable() so GMRES sees
-    // the linear homogeneous operator A_lin and rhs = B^n - c. No-op (c=0)
-    // when no pec_insulator B_t feed is active.
+    // Precompute c=A_full(0) for an inhomogeneous pec_insulator feed.
     void prepareFeed ()
     {
         m_has_feed = false;
@@ -920,13 +835,7 @@ private:
     MagDiffVector m_feed_offset;
 };
 
-// ---- Optional PETSc KSP path (operator/vec glue) ---------------------------
-// HybridMagDiffusionPetsc.{H,cpp} own the PETSc objects; this file owns the
-// matrix-free operator (apply/precond) and the field MultiFabs. The glue below
-// scatters flat local arrays <-> MagDiffVector interior (nghost=0) using the
-// shared per-component global-DOF index owned by the PETSc side, and supplies
-// the matvec callback the PETSc side invokes. The whole block is compiled
-// only when PETSc is on; the caller in AdvanceVariable is guarded the same way.
+// PETSc glue between flat local vectors and the matrix-free field operator.
 #ifdef AMREX_USE_PETSC
 
 // View of an Array<MultiFab,3> as an ablastr VectorField (three MultiFab*), used
@@ -967,10 +876,7 @@ struct PetscOpCtx
 #endif
 };
 
-// PETSc Vec is host memory. On CUDA, MagDiffVector MultiFabs are device:
-// LoopOnCpu into Array4(device) SEGVs. Stage via cached pinned host MultiFabs
-// (PetscOpCtx), then MultiFab::Copy. On CPU, write MultiFabs directly (baseline
-// walltime_W5 C path — no extra alloc/copy).
+// PETSc Vecs are host-resident, so GPU builds stage through pinned MultiFabs.
 // gindex is on The_Pinned_Arena (host-readable). gix < 0 => covered/exterior.
 void
 petscScatter (MagDiffVector& dst, Real const* flat,
@@ -1063,14 +969,28 @@ petscMatvec (void* ctx, Real const* x, Real* y,
 
 } // namespace
 
+struct HybridMagDiffusionWorkspace
+{
+    MagDiffVector solution;
+    MagDiffVector rhs;
+    MagDiffVector Ae;
+#ifdef AMREX_USE_PETSC
+    PetscOpCtx opctx;
+#endif
+    BoxArray box_array;
+    DistributionMapping distribution_map;
+    bool is_defined = false;
+};
+
+HybridMagDiffusion::HybridMagDiffusion () = default;
+HybridMagDiffusion::~HybridMagDiffusion () = default;
+
 void
 HybridMagDiffusion::Advance (
     ablastr::fields::VectorField const& Bfield,
     Real eta_SI,
     Real dt,
-    int lev,
-    Array<LinOpBCType, AMREX_SPACEDIM> const& lobc,
-    Array<LinOpBCType, AMREX_SPACEDIM> const& hibc) const
+    int lev) const
 {
     ABLASTR_PROFILE("HybridMagDiffusion::Advance()");
 
@@ -1127,7 +1047,7 @@ HybridMagDiffusion::Advance (
     MultiFab * const eta_ptr = eta_storage.data();
     ablastr::fields::VectorField const eta_field = {
         eta_ptr, eta_ptr + 1, eta_ptr + 2};
-    AdvanceVariable(Bfield, eta_field, dt, lev, lobc, hibc);
+    AdvanceVariable(Bfield, eta_field, dt, lev);
 }
 
 void
@@ -1135,9 +1055,7 @@ HybridMagDiffusion::AdvanceVariable (
     ablastr::fields::VectorField const& Bfield,
     ablastr::fields::VectorField const& eta_SI,
     Real dt,
-    int lev,
-    Array<LinOpBCType, AMREX_SPACEDIM> const& lobc,
-    Array<LinOpBCType, AMREX_SPACEDIM> const& hibc) const
+    int lev) const
 {
     ABLASTR_PROFILE("HybridMagDiffusion::AdvanceVariable()");
 
@@ -1152,30 +1070,26 @@ HybridMagDiffusion::AdvanceVariable (
     // A_lin = I + theta*dt*K_hom (homogeneous; feed carried on the RHS) is the
     // same for every theta; only the RHS gains the explicit (1-theta) term.
 
-    VariableCoeffMagDiffusionOp linop(Bfield, eta_SI, m_theta * dt, lev, lobc, hibc);
+    VariableCoeffMagDiffusionOp linop(Bfield, eta_SI, m_theta * dt, lev);
 
-    // Reuse field work buffers across half-steps (same BA/DM for single-level
-    // hybrid mag-diff). Avoids MultiFab alloc/free churn every AdvanceVariable.
-    static thread_local MagDiffVector solution;
-    static thread_local MagDiffVector rhs;
-    static thread_local MagDiffVector Ae;
+    if (!m_workspace) {
+        m_workspace = std::make_unique<HybridMagDiffusionWorkspace>();
+    }
+    auto& workspace = *m_workspace;
+    auto& solution = workspace.solution;
+    auto& rhs = workspace.rhs;
+    auto& Ae = workspace.Ae;
 #ifdef AMREX_USE_PETSC
-    static thread_local PetscOpCtx opctx;
+    auto& opctx = workspace.opctx;
 #endif
-    static thread_local BoxArray cached_ba;
-    static thread_local DistributionMapping cached_dm;
-    static thread_local bool bufs_defined = false;
 
-    bool const layout_changed = !bufs_defined
-        || !BoxArray::SameRefs(cached_ba, Bfield[0]->boxArray())
-        || !DistributionMapping::SameRefs(cached_dm, Bfield[0]->DistributionMap());
+    bool const layout_changed = !workspace.is_defined
+        || !BoxArray::SameRefs(workspace.box_array, Bfield[0]->boxArray())
+        || !DistributionMapping::SameRefs(
+            workspace.distribution_map, Bfield[0]->DistributionMap());
     if (layout_changed) {
 #ifdef AMREX_USE_PETSC
-        // DOF map / PETSc layout tied to BA/DM — rebuild solver.
-        if (m_petsc_solver != nullptr) {
-            magdiff_petsc_destroy(m_petsc_solver);
-            m_petsc_solver = nullptr;
-        }
+        m_petsc_solver.reset();
 #endif
         solution.Define(Bfield);
         rhs.Define(Bfield);
@@ -1188,9 +1102,9 @@ HybridMagDiffusion::AdvanceVariable (
         opctx.ensureHostBufs(solution.fields());
 #endif
 #endif
-        cached_ba = Bfield[0]->boxArray();
-        cached_dm = Bfield[0]->DistributionMap();
-        bufs_defined = true;
+        workspace.box_array = Bfield[0]->boxArray();
+        workspace.distribution_map = Bfield[0]->DistributionMap();
+        workspace.is_defined = true;
     }
 #ifdef AMREX_USE_PETSC
     opctx.linop = &linop;
@@ -1202,44 +1116,17 @@ HybridMagDiffusion::AdvanceVariable (
     solution.CopyFrom(Bfield);
     rhs.CopyFrom(Bfield);
 
-    // Covered B is inert (identity operator row; see VariableCoeffMagDiffusionOp
-    // and MagDiffJacobiPrecond). Zero it in the init-guess and RHS so the
-    // Krylov solve keeps covered B = 0 even if B^n carried nonzero there
-    // (defensive; B^n is normally 0 on covered from the hybrid EM update, and
-    // the feed offset c is 0 on covered). Reused before copy-back below.
+    // Covered B rows are identities with zero initial values and RHS entries.
     auto const& eb_update_B = WarpX::GetInstance().GetEBUpdateBFlag()[lev];
     zeroCoveredB(solution, eb_update_B);
     zeroCoveredB(rhs, eb_update_B);
 
-    // Bake the inhomogeneous Dirichlet B_t feed (pec_insulator) into the RHS.
-    // c = A_full(0) = theta*dt*K_feed(g_new) is the constant curl from the feed
-    // value g(t_new); the operator seen by GMRES/PETSc is the homogeneous
-    // A_lin = A_full - c (see VariableCoeffMagDiffusionOp::apply). prepareFeed
-    // stages a zero probe through m_source (clobbering the registered B), so it
-    // must run after the B^n copy above. It is a no-op (c = 0) with no feed.
+    // prepareFeed stages a zero probe through m_source, so B^n must be saved first.
     linop.prepareFeed();
     bool const has_feed = linop.hasFeed();
 
-    // Theta-method RHS for  (I + theta*dt*K) B^{n+1} = rhs, where
-    //   rhs = B^n - (1-theta)*dt*K_hom B^n - feed_RHS
-    // built in the theta-method form  rhs = 2*B^n - A_e(B^n) - c,
-    // with A_e(x) = computeAFull(x, alpha=(1-theta)*dt) = x + (1-theta)*dt*K_full(x)
-    // using the same frozen eta and feed ghost g(t_new) as the implicit operator.
-    // Expanding (K_full = K_hom + K_feed) gives rhs = B^n - (1-theta)*dt*K_hom B^n
-    // - dt*K_feed(g_new): the feed is injected once total (theta*dt implicit +
-    // (1-theta)*dt explicit), not double-counted on the explicit L(B^n) term.
-    // NOTE: both the implicit and explicit terms sample the pec_insulator feed at
-    // g(t_new) (computeAFull calls ApplyBfieldBoundary at t_new). For a TIME-
-    // VARYING feed this makes the boundary-driven component first-order in time
-    // for CN (the interior stays second-order); backward Euler is unaffected.
-    // The full trapezoidal BC blend (g_old + g_new) would need
-    // ApplyBfieldBoundary at t_old = t_new - dt and is a documented follow-up
-    // (design note Sec. 4); the affine feed split itself is correct here.
-    // - theta == 1: A_e uses alpha = 0, so A_e(B^n) = B^n and rhs = B^n - c, the
-    //   existing backward-Euler path (skipped here to stay bit-/test-identical
-    //   and avoid a wasted matrix-free apply).
-    // - theta < 1: one extra matrix-free apply per step (same cost as the
-    //   constant-eta CN path). c = 0 with no feed -> rhs = 2*B^n - A_e.
+    // Theta RHS: 2*B^n - A_e(B^n) - c, where
+    // A_e=I+(1-theta)dt*K_full and c=theta*dt*K_feed. This injects the feed once.
     if (m_theta < 1.0_rt) {
         const Real alpha_e = (1.0_rt - m_theta) * dt;
         linop.computeAFull(Ae, solution, alpha_e);
@@ -1263,40 +1150,35 @@ HybridMagDiffusion::AdvanceVariable (
         bool const petsc_eb_on = EB::enabled();
 
         if (!m_petsc_solver) {
-            m_petsc_solver = magdiff_petsc_make(
+            m_petsc_solver.reset(magdiff_petsc_make(
                 B_proto, eta_edge, linop.geom(), linop.thetaDt(),
                 PhysConst::mu0, m_rtol, m_atol, m_max_iter, m_verbose,
                 m_petsc_options,
                 &petscMatvec, &opctx,
-                petsc_eb_on ? &eb_update_B_ptrs : nullptr);
+                petsc_eb_on ? &eb_update_B_ptrs : nullptr));
         } else {
-            magdiff_petsc_update(m_petsc_solver, eta_edge, linop.thetaDt(), &opctx);
+            magdiff_petsc_update(m_petsc_solver.get(), eta_edge, linop.thetaDt(), &opctx);
         }
 
-        const amrex::Long n_local = magdiff_petsc_nlocal(m_petsc_solver);
-        const amrex::Long rstart = magdiff_petsc_rstart(m_petsc_solver);
-        auto const gindex = magdiff_petsc_gindex(m_petsc_solver);
+        const amrex::Long n_local = magdiff_petsc_nlocal(m_petsc_solver.get());
+        const amrex::Long rstart = magdiff_petsc_rstart(m_petsc_solver.get());
+        auto const gindex = magdiff_petsc_gindex(m_petsc_solver.get());
 
-        // Initial guess (B^n) and RHS (B^n - feed offset), flat / DOF-mapped.
+        // PETSc uses a zero initial guess; gather only the DOF-mapped RHS.
         std::vector<Real> sol_flat(static_cast<std::size_t>(n_local), Real(0.0));
         std::vector<Real> rhs_flat(static_cast<std::size_t>(n_local), Real(0.0));
 #ifdef AMREX_USE_GPU
-        // Same host staging as matvec/PC callbacks (CUDA: device MultiFabs).
-        petscGather(sol_flat.data(), solution, gindex, rstart, opctx.host_F);
         petscGather(rhs_flat.data(), rhs, gindex, rstart, opctx.host_F);
 #else
-        petscGather(sol_flat.data(), solution, gindex, rstart);
         petscGather(rhs_flat.data(), rhs, gindex, rstart);
 #endif
 
         Real rnorm = 0.0_rt;
         const int reason = magdiff_petsc_solve(
-            m_petsc_solver, rhs_flat.data(), sol_flat.data(), rnorm);
+            m_petsc_solver.get(), rhs_flat.data(), sol_flat.data(), rnorm);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            std::isfinite(rnorm),
-            "HybridMagDiffusion PETSc KSP residual is non-finite (NaN/Inf). "
-            "Variable-eta operator or preconditioner is broken.");
-        amrex::ignore_unused(reason);
+            reason > 0 && std::isfinite(rnorm),
+            "Hybrid magnetic-diffusion PETSc solve did not converge");
 
 #ifdef AMREX_USE_GPU
         petscScatter(solution, sol_flat.data(), gindex, rstart, opctx.host_U);
@@ -1316,33 +1198,29 @@ HybridMagDiffusion::AdvanceVariable (
         solver.setVerbose(m_verbose);
         solver.solve(solution, rhs, m_rtol, m_atol);
 
-        if (solver.getStatus() != 0) {
-            const Real rnorm = solver.getResidualNorm();
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                std::isfinite(rnorm),
-                "HybridMagDiffusion GMRES residual is non-finite (NaN/Inf). "
-                "Variable-eta operator or preconditioner is broken.");
-            // Non-converged but finite: keep last iterate and warn.
-            amrex::Print() << "### WARNING: HybridMagDiffusion GMRES did not converge"
-                           << " (iters=" << solver.getNumIters()
-                           << " residual=" << rnorm
-                           << " status=" << solver.getStatus()
-                           << "). Keeping last iterate.\n";
-        } else if (m_verbose > 0) {
+        const Real rnorm = solver.getResidualNorm();
+        if (solver.getStatus() != 0 || !std::isfinite(rnorm)) {
+            std::ostringstream msg;
+            msg << "Hybrid magnetic-diffusion GMRES solve failed: status="
+                << solver.getStatus() << ", iterations=" << solver.getNumIters()
+                << ", residual=" << rnorm;
+            WARPX_ABORT_WITH_MESSAGE(msg.str());
+        }
+        if (m_verbose > 0) {
             amrex::Print() << "HybridMagDiffusion matrix-free GMRES iterations="
                            << solver.getNumIters()
-                           << " residual=" << solver.getResidualNorm() << "\n";
+                           << " residual=" << rnorm << "\n";
         }
     }
 
     auto const& solution_fields = solution.fields();
-    // Defensive: ensure covered B stays 0 in the registered field. The solve
-    // keeps it 0 when the RHS is 0 there, but force it here so a non-converged
-    // last iterate (kept by the GMRES non-finite/failed-conv branch above) can
-    // never write a nonzero value into the solid.
+    // Keep covered degrees of freedom exactly zero before installation.
     zeroCoveredB(solution, eb_update_B);
     auto& warpx = WarpX::GetInstance();
     for (int idim = 0; idim < 3; ++idim) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            solution_fields[idim].is_finite(),
+            "Hybrid magnetic-diffusion solve returned a non-finite field");
         MultiFab::Copy(*Bfield[idim], solution_fields[idim], 0, 0, 1, 0);
     }
     // Re-apply physical boundaries through the same path used by the matvec,

@@ -1,6 +1,5 @@
 # RZ hybrid implicit magnetic-diffusion smoke WITH a stair-case embedded boundary.
-# Outer "wall" solid for r > r_wall (fluid on axis), phi > 0 = solid (WarpX EB
-# convention; see notes/2026-07-18_eb_parser_eta.md). Variable-eta (parser)
+# Outer "wall" solid for r > r_wall (fluid on axis), phi > 0 = solid. Variable-eta
 # matrix-free path; theta = 1 (backward Euler). Mild eta (1e-2 Ohm*m) so the fluid Bt
 # persists (does not annihilate in 5 steps) and the EB distinction is crisp:
 # covered Bt -> 0 (inert), fluid Bt finite. analysis_rz_eb.py checks finite Bt,
@@ -24,8 +23,7 @@ boundary.particle_lo = none periodic
 boundary.particle_hi = absorbing periodic
 
 # Stair-case EB: solid where phi > 0. phi = x - 0.015 -> solid for r > 0.015 (outer
-# wall), fluid for r < 0.015 (incl. the axis). Same sign convention as the Cart
-# 2D EB smoke (warpx-eb-implicit-function-sign memory).
+# wall), fluid for r < 0.015 (including the axis).
 warpx.eb_implicit_function = "x - 0.015"
 
 warpx.const_dt = 1.0e-9

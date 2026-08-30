@@ -37,7 +37,7 @@ else()
         test_2d_hybrid_mag_diffusion  # name
         2  # dims
         1  # nprocs
-        "inputs_test_2d_hybrid_mag_diffusion"  # inputs
+        "inputs_base_2d_hybrid_mag_diffusion"  # inputs
         "analysis.py"  # analysis
         OFF  # checksum (analytic comparison in analysis.py)
         OFF  # dependency
@@ -69,6 +69,29 @@ add_warpx_test(
     "analysis_2d_smoke.py"  # analysis
     OFF  # checksum (finite/damping smoke in analysis_2d_smoke.py)
     OFF  # dependency
+)
+
+# Smooth constant-eta mode with both resistivity branches active. The explicit
+# reference advances all eta through Ohm; the split run advances 40% explicitly
+# and 60% implicitly, then compares every magnetic-field cell.
+add_warpx_test(
+    test_2d_hybrid_mag_diffusion_split_partial_ref  # name
+    2  # dims
+    1  # nprocs
+    "inputs_base_2d_hybrid_mag_diffusion hybrid_pic_model.implicit_mag_diffusion=0 hybrid_pic_model.plasma_resistivity(rho,J,t)=1.0e-2"  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_2d_hybrid_mag_diffusion_split_partial  # name
+    2  # dims
+    1  # nprocs
+    "inputs_base_2d_hybrid_mag_diffusion hybrid_pic_model.plasma_resistivity(rho,J,t)=1.0e-2 hybrid_pic_model.mag_diff_eta_explicit_max=4.0e-3"  # inputs
+    "analysis_rz_split_parity.py ../test_2d_hybrid_mag_diffusion_split_partial_ref require_partial"  # analysis
+    OFF  # checksum
+    test_2d_hybrid_mag_diffusion_split_partial_ref  # dependency
 )
 
 add_warpx_test(
@@ -222,7 +245,7 @@ if(AMReX_PETSC)
         test_2d_hybrid_mag_diffusion_coupled  # name
         2  # dims
         1  # nprocs
-        "inputs_test_2d_hybrid_mag_diffusion_coupled"  # inputs
+        "inputs_base_2d_hybrid_mag_diffusion_coupled"  # inputs
         OFF  # analysis (reference data consumed by PETSc companion)
         OFF  # checksum
         OFF  # dependency
@@ -231,7 +254,7 @@ if(AMReX_PETSC)
         test_2d_hybrid_mag_diffusion_coupled_petsc  # name
         2  # dims
         1  # nprocs
-        "inputs_test_2d_hybrid_mag_diffusion_coupled_petsc"  # inputs
+        "inputs_base_2d_hybrid_mag_diffusion_coupled_petsc"  # inputs
         "analysis_cartesian_coupled_parity.py"  # analysis
         OFF  # checksum (solver parity + exact-Pmat iteration oracle)
         test_2d_hybrid_mag_diffusion_coupled  # dependency (AMReX reference)
@@ -245,6 +268,44 @@ if(AMReX_PETSC)
             TEST test_2d_hybrid_mag_diffusion_coupled_petsc.run
             PROPERTY FAIL_REGULAR_EXPRESSION
             "PETSc KSP iterations=([2-9]|[1-9][0-9]);did not converge"
+        )
+    endif()
+
+    # Two ranks and four boxes exercise PETSc ownership, off-process columns,
+    # ghosted indices, ASM overlap, and the independently distributed AMReX
+    # matrix-free path. The dependent analysis compares every field cell.
+    add_warpx_test(
+        test_2d_hybrid_mag_diffusion_coupled_mpi  # name
+        2  # dims
+        2  # nprocs
+        "inputs_base_2d_hybrid_mag_diffusion_coupled amr.max_grid_size=16"  # inputs
+        "analysis_cartesian_coupled_parity.py ../test_2d_hybrid_mag_diffusion_coupled"  # analysis
+        OFF  # checksum
+        test_2d_hybrid_mag_diffusion_coupled  # dependency (one-rank reference)
+    )
+    add_warpx_test(
+        test_2d_hybrid_mag_diffusion_coupled_mpi_petsc  # name
+        2  # dims
+        2  # nprocs
+        "inputs_base_2d_hybrid_mag_diffusion_coupled_petsc amr.max_grid_size=16 hybrid_pic_model.mag_diff_petsc_pc_type=asm hybrid_pic_model.mag_diff_petsc_asm_overlap=1 hybrid_pic_model.mag_diff_petsc_sub_ksp_type=preonly hybrid_pic_model.mag_diff_petsc_sub_pc_type=ilu hybrid_pic_model.mag_diff_petsc_ilu_factor_levels=0"  # inputs
+        "analysis_cartesian_coupled_parity.py"  # analysis
+        OFF  # checksum
+        test_2d_hybrid_mag_diffusion_coupled_mpi  # dependency
+    )
+
+    add_warpx_test(
+        test_2d_hybrid_mag_diffusion_nonconvergence  # name
+        2  # dims
+        2  # nprocs
+        "inputs_base_2d_hybrid_mag_diffusion_coupled_petsc max_step=1 amr.max_grid_size=16 hybrid_pic_model.mag_diff_max_iter=1 hybrid_pic_model.mag_diff_petsc_pc_type=asm hybrid_pic_model.mag_diff_petsc_sub_pc_type=ilu"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+    if(TEST test_2d_hybrid_mag_diffusion_nonconvergence.run)
+        set_property(
+            TEST test_2d_hybrid_mag_diffusion_nonconvergence.run
+            PROPERTY WILL_FAIL TRUE
         )
     endif()
 
@@ -281,12 +342,8 @@ if(AMReX_PETSC)
     endif()
 endif()
 
-# Stair-case embedded boundary on the RZ matrix-free variable-eta path (θ=1):
-# outer-wall solid for r > r_wall, fluid on axis. Covered Bt stays inert (0),
-# fluid Bt persists (mild eta). analysis_rz_eb.py checks finite Bt, fluid Bt
-# nonzero, damping, and covered-region Bt ~ 0 (global min). EB is a build-time
-# option, so only register when WarpX_EB is ON (EB-off CI skips cleanly, as the
-# other embedded_boundary_* tests do).
+# RZ matrix-free variable-eta EB test. The analysis inspects fluid and covered
+# regions separately. Register only when EB support is enabled.
 if(WarpX_EB)
     # XZ and 3D each combine a PEC wall, a pec_insulator feed, and an interior
     # stair-step EB. This proves the interactions without multiplying separate
@@ -295,11 +352,23 @@ if(WarpX_EB)
         test_2d_hybrid_mag_diffusion_boundaries_eb  # name
         2  # dims
         1  # nprocs
-        "inputs_test_2d_hybrid_mag_diffusion_boundaries_eb"  # inputs
+        "inputs_base_2d_hybrid_mag_diffusion_boundaries_eb"  # inputs
         "analysis_cartesian_boundaries_eb.py"  # analysis
         OFF  # checksum (PEC/feed/covered-field checks in analysis)
         OFF  # dependency
     )
+
+    if(AMReX_PETSC)
+        add_warpx_test(
+            test_2d_hybrid_mag_diffusion_boundaries_eb_mpi_petsc  # name
+            2  # dims
+            2  # nprocs
+            "inputs_base_2d_hybrid_mag_diffusion_boundaries_eb amr.max_grid_size=16 hybrid_pic_model.mag_diff_linear_solver=petsc hybrid_pic_model.mag_diff_petsc_pc_type=asm hybrid_pic_model.mag_diff_petsc_asm_overlap=1 hybrid_pic_model.mag_diff_petsc_sub_ksp_type=preonly hybrid_pic_model.mag_diff_petsc_sub_pc_type=ilu hybrid_pic_model.mag_diff_petsc_ilu_factor_levels=0"  # inputs
+            "analysis_cartesian_boundaries_eb.py"  # analysis
+            OFF  # checksum
+            OFF  # dependency
+        )
+    endif()
 
     add_warpx_test(
         test_3d_hybrid_mag_diffusion_boundaries_eb  # name
@@ -322,21 +391,8 @@ if(WarpX_EB)
     )
 endif()
 
-# ---- RCYLINDER (1D r-only, axisymmetric) matrix-free mag-diff ----------------
-# RCYLINDER reuses the RZ cylindrical curl kernels + axis BC, so it routes
-# through the matrix-free AdvanceVariable path.
-# r_hi = PEC (Neumann dBt/dr=0) is REQUIRED for a well-posed Bt solve: with
-# "none" at r_hi the cylindrical operator has a Bt proportional-to-r steady-
-# state null mode (K(Bt=r)=0) leaving the system singular, so AMReX GMRES and
-# PETSc converge to different particular solutions. PEC excludes Bt=r
-# (dBt/dr=k!=0) -> unique solution (verified AMReX==PETSc to ~1e-10). See
-# notes/2026-07-19_rcyl_mag_diff_port.md. theta=1 only.
-
-# T1: harsh vacuum (eta=129, dt=1ns) AMReX GMRES. Oracle (analysis_rcyl.py):
-# finite Bt; >99.9% damped in 5 steps (slowest Bessel mode annihilated); AND a
-# paired analytic explicit-resistive CFL-violation analysis (const_dt /
-# dt_resistive_explicit ~ 2e6 -> explicit Faraday wildly unstable at this eta;
-# the operator-split implicit mag-diff is what makes the deck run).
+# RCYLINDER uses the cylindrical matrix-free operator. A PEC outer boundary
+# excludes the Bt proportional-to-r null mode and makes the solve unique.
 add_warpx_test(
     test_rcylinder_hybrid_mag_diffusion_harsh  # name
     RCYLINDER  # dims
@@ -347,10 +403,7 @@ add_warpx_test(
     OFF  # dependency
 )
 
-# T2 reference: mild eta (1e-2) AMReX GMRES. Persists a nonzero Bt (slowest mode
-# damps only ~0.03%/step) so the field is meaningful for the PETSc parity L2.
-# analysis_rcyl_mild.py checks finite + damped; the plotfile + reduced
-# field_energy are the parity reference for test_rcylinder_hybrid_mag_diffusion_petsc.
+# Mild-eta AMReX reference for PETSc full-field parity.
 add_warpx_test(
     test_rcylinder_hybrid_mag_diffusion_mild  # name
     RCYLINDER  # dims
@@ -373,14 +426,6 @@ add_warpx_test(
     OFF  # dependency
 )
 
-# T2 + T3: PETSc assembled curl-curl solver parity to the AMReX GMRES reference.
-# IDENTICAL physics to test_rcylinder_hybrid_mag_diffusion_mild, differing only in
-# mag_diff_linear_solver. analysis_rcyl_parity.py compares this run's reduced
-# B-energy + Bt Cell_H min/max to the sibling reference test's (a ctest
-# `dependency` keeps the reference dir alive through this test). Manual yt
-# full-field L2 ~1e-10; the ctest uses stdlib-readable reduced B-energy + Cell_H
-# (the test python has no yt/numpy). Only registered with PETSc (mirrors the RZ
-# PETSc test gating).
 if(AMReX_PETSC)
     add_warpx_test(
         test_rcylinder_hybrid_mag_diffusion_petsc  # name
@@ -392,12 +437,7 @@ if(AMReX_PETSC)
         test_rcylinder_hybrid_mag_diffusion_mild  # dependency (AMReX GMRES reference)
     )
 
-    # T2: harsh vacuum (eta=129, dt=1ns, PEC r_hi, 5 steps) through the PETSc
-    # KSP + cylindrical assembled curl-curl Pmat. Same finite/>99.9%-damped oracle
-    # as the AMReX GMRES harsh test (analysis_rcyl.py, reused) -- a parity L2 of
-    # the annihilated ~1e-7 Bt fields would be too noisy, so the absolute damping
-    # oracle is the strong check. The metric-aware Pmat is what makes the frozen
-    # path usable at stiff eta=129 (the Cartesian Pmat was never exercised here).
+    # Stiff-eta PETSc path with the metric-aware cylindrical Pmat.
     add_warpx_test(
         test_rcylinder_hybrid_mag_diffusion_harsh_petsc  # name
         RCYLINDER  # dims

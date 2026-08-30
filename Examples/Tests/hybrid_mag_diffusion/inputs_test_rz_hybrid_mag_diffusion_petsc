@@ -3,7 +3,7 @@
 # curl-curl operator as the default AMReX-GMRES path; only the solver driver
 # differs. The frozen-η curl-curl Pmat
 # is assembled so PETSc's default block-Jacobi ILU PC factors a real matrix
-# (runtime -pc_type asm/ilu/hypre can also be set). The oracle is the same
+# (runtime -magdiff_pc_type can also be set). The oracle is the same
 # finite/damped-Bt smoke as the variable-eta case. Requires WarpX_PETSC=ON
 # (gated in CMakeLists.txt under if(AMReX_PETSC)).
 

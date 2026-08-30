@@ -28,6 +28,17 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
+namespace {
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real ohmResistivity (
+    amrex::Real eta, bool cap_enabled, amrex::Real eta_max) noexcept
+{
+    return cap_enabled ? amrex::min(eta, eta_max) : eta;
+}
+
+}
+
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
     ablastr::fields::VectorField & Jfield,
     ablastr::fields::VectorField const& Bfield,
@@ -771,7 +782,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Er(i, j, 0) += (cap_eta_for_ohm ? amrex::min(eta(rho_val, jtot_val, t_new), eta_ohm_max) : eta(rho_val, jtot_val, t_new)) * Jr(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Er(i, j, 0) += eta_val * Jr(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -842,7 +855,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Etheta(i, j, 0) += (cap_eta_for_ohm ? amrex::min(eta(rho_val, jtot_val, t_new), eta_ohm_max) : eta(rho_val, jtot_val, t_new)) * Jtheta(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Etheta(i, j, 0) += eta_val * Jtheta(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -910,7 +925,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Ez(i, j, 0) += (cap_eta_for_ohm ? amrex::min(eta(rho_val, jtot_val, t_new), eta_ohm_max) : eta(rho_val, jtot_val, t_new)) * Jz(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Ez(i, j, 0) += eta_val * Jz(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -1217,7 +1234,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ex(i, j, k) += (cap_eta_for_ohm ? amrex::min(eta(rho_val, jtot_val, t_new), eta_ohm_max) : eta(rho_val, jtot_val, t_new)) * Jx(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ex(i, j, k) += eta_val * Jx(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1281,7 +1300,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ey(i, j, k) += (cap_eta_for_ohm ? amrex::min(eta(rho_val, jtot_val, t_new), eta_ohm_max) : eta(rho_val, jtot_val, t_new)) * Jy(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ey(i, j, k) += eta_val * Jy(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1345,7 +1366,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ez(i, j, k) += (cap_eta_for_ohm ? amrex::min(eta(rho_val, jtot_val, t_new), eta_ohm_max) : eta(rho_val, jtot_val, t_new)) * Jz(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ez(i, j, k) += eta_val * Jz(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
