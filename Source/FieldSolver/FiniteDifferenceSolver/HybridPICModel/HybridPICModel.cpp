@@ -1627,8 +1627,15 @@ void HybridPICModel::BuildMagDiffResistivity (
     amrex::GpuArray<int, 3> const Jy_stag = Jy_IndexType;
     amrex::GpuArray<int, 3> const Jz_stag = Jz_IndexType;
 
+    // Stair-case EB mask for E/J faces (1 = active, 0 = covered). Used below to
+    // zero η on covered E faces (no diffusion into the solid). Safe to bind
+    // unconditionally; only dereferenced inside `if (eb_on)`.
+    bool const eb_on = EB::enabled();
+    auto const& eb_update_E = warpx.GetEBUpdateEFlag()[lev];
+
     auto fill_eta = [&] (amrex::MultiFab& eta_mf,
-                         amrex::GpuArray<int, 3> const& eta_stag)
+                         amrex::GpuArray<int, 3> const& eta_stag,
+                         int idim)
     {
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -1663,13 +1670,25 @@ void HybridPICModel::BuildMagDiffResistivity (
                 eta_arr(i, j, k) = (eta_val == eta_val) // NaN check (device-safe)
                     ? std::max(eta_val, 0.0_rt) : 0.0_rt;
             });
+
+            // Zero η on covered E faces (eb_update_E == 0): no diffusion into
+            // the solid. The matvec is already safe (computeAFull zeros Jwork,
+            // so J = 0 on covered E faces), but this keeps the B-face PC
+            // (SampleEtaOntoBFace) and the frozen-η PETSc Pmat (M2) clean near
+            // the EB. eta_field[idim] and eb_update_E[idim] share the E/J BA/DM.
+            if (eb_on) {
+                auto const mask_arr = eb_update_E[idim]->const_array(mfi);
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    if (mask_arr(i, j, k) == 0) { eta_arr(i, j, k) = 0.0_rt; }
+                });
+            }
         }
         eta_mf.FillBoundaryAndSync(warpx.Geom(lev).periodicity());
     };
 
-    fill_eta(*eta_field[0], Jx_IndexType);
-    fill_eta(*eta_field[1], Jy_IndexType);
-    fill_eta(*eta_field[2], Jz_IndexType);
+    fill_eta(*eta_field[0], Jx_IndexType, 0);
+    fill_eta(*eta_field[1], Jy_IndexType, 1);
+    fill_eta(*eta_field[2], Jz_IndexType, 2);
 
     if (m_mag_diffusion.Verbose() > 0) {
         amrex::Print() << "HybridMagDiffusion frozen eta ranges:";

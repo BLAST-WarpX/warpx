@@ -22,8 +22,10 @@
 #include "HybridMagDiffusionPetsc.H"
 
 #include <AMReX.H>
+#include <AMReX_Arena.H>
 #include <AMReX_Config.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_Gpu.H>
 #include <AMReX_Loop.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_Print.H>
@@ -79,16 +81,34 @@ public:
         amrex::Geometry const& geom, amrex::Real theta_dt, amrex::Real mu0,
         MagDiffPetscPC pc_choice,
         amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
-        MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx)
+        MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx,
+        amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B)
         : m_geom(geom), m_theta_dt(theta_dt), m_mu0(mu0),
           m_pc_choice(pc_choice), m_rtol(rtol), m_atol(atol),
           m_max_iter(max_iter), m_verbose(verbose),
           m_matvec(matvec), m_pcapply(pcapply), m_opctx(opctx)
     {
-        // Local DOF count over interior (nghost=0) cells, component-major.
+        // EB masks live on the device under CUDA. Copy to pinned host once so
+        // all LoopOnCpu DOF counting / indexing is host-safe (raw device
+        // Array4 from eb_update_B in LoopOnCpu SEGVs on GPU builds).
+        if (eb_update_B) {
+            copyEbMasksToHost(*eb_update_B);
+        }
+
+        // Local DOF count over interior (nghost=0) cells, component-major,
+        // skipping covered B DOFs when the EB mask is provided.
         for (int idim = 0; idim < 3; ++idim) {
             for (amrex::MFIter mfi(*B_proto[idim]); mfi.isValid(); ++mfi) {
-                m_n_local += mfi.tilebox().numPts();
+                if (m_eb_mask_host[0]) {
+                    auto const& mask_arr = m_eb_mask_host[idim]->const_array(mfi);
+                    amrex::Box const& tb = mfi.tilebox();
+                    amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
+                        [&] (int i, int j, int k) {
+                            if (mask_arr(i, j, k) != 0) { ++m_n_local; }
+                        });
+                } else {
+                    m_n_local += mfi.tilebox().numPts();
+                }
             }
         }
 
@@ -248,28 +268,65 @@ private:
         PetscFunctionReturn(PETSC_SUCCESS);
     }
 
+    // Copy device (or host) EB B-masks onto pinned host iMultiFabs for safe
+    // LoopOnCpu access. Called once from the ctor when eb_update_B is non-null.
+    void copyEbMasksToHost (
+        amrex::Array<amrex::iMultiFab const*,3> const& eb_update_B)
+    {
+        amrex::MFInfo const host_info =
+            amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
+        for (int idim = 0; idim < 3; ++idim) {
+            m_eb_mask_host[idim] = std::make_unique<amrex::iMultiFab>(
+                eb_update_B[idim]->boxArray(),
+                eb_update_B[idim]->DistributionMap(), 1, 0, host_info);
+            // iMultiFab::Copy handles device -> pinned host under CUDA.
+            amrex::iMultiFab::Copy(*m_eb_mask_host[idim], *eb_update_B[idim],
+                                   0, 0, 1, 0);
+        }
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::streamSynchronize();
+#endif
+    }
+
     // Per-component global DOF index for interior cells (component-major).
-    // nghost=1 so neighbor columns resolve; -1 marks exterior/unknown.
+    // nghost=1 so neighbor columns resolve; -1 marks exterior/unknown or covered
+    // B DOFs (when an EB mask is provided). Pinned host arena: PETSc scatter/gather
+    // and Mat assembly use LoopOnCpu host access; device-arena iMultiFab would SEGV
+    // under CUDA WarpX.
     void buildGlobalIndex (amrex::Array<amrex::MultiFab const*,3> const& B_proto) {
+        amrex::MFInfo const host_info =
+            amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
         for (int idim = 0; idim < 3; ++idim) {
             m_gindex[idim] = std::make_unique<amrex::iMultiFab>(
                 B_proto[idim]->boxArray(),
-                B_proto[idim]->DistributionMap(), 1, amrex::IntVect::Unit);
+                B_proto[idim]->DistributionMap(), 1, amrex::IntVect::Unit,
+                host_info);
             m_gindex[idim]->setVal(-1);
         }
         // amrex::Box is BoxND<AMREX_SPACEDIM>, so iterate with the dim-agnostic
         // LoopOnCpu(lbound,ubound,(i,j,k)) (k pads to 0 in 2D/1D), not explicit
         // smallEnd(2)/bigEnd(2) which is out of range for BoxND<2>.
         PetscInt run = static_cast<PetscInt>(m_rstart);
+        bool const skip_covered = (m_eb_mask_host[0] != nullptr);
         for (int idim = 0; idim < 3; ++idim) {
             for (amrex::MFIter mfi(*B_proto[idim]); mfi.isValid(); ++mfi) {
                 auto gix = m_gindex[idim]->array(mfi);
                 amrex::Box const& tb = mfi.tilebox();
-                amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
-                    [&] (int i, int j, int k) {
-                        gix(i, j, k) = static_cast<int>(run);
-                        ++run;
-                    });
+                if (skip_covered) {
+                    auto const& mask_arr = m_eb_mask_host[idim]->const_array(mfi);
+                    amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
+                        [&] (int i, int j, int k) {
+                            if (mask_arr(i, j, k) == 0) { return; }
+                            gix(i, j, k) = static_cast<int>(run);
+                            ++run;
+                        });
+                } else {
+                    amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
+                        [&] (int i, int j, int k) {
+                            gix(i, j, k) = static_cast<int>(run);
+                            ++run;
+                        });
+                }
             }
         }
         for (int idim = 0; idim < 3; ++idim) {
@@ -278,12 +335,16 @@ private:
     }
 
     // nghost=1 copy of B-centered eta for neighbor reads in the assembled Pmat.
+    // Pinned host: assembleFrozenLaplacian uses LoopOnCpu host access.
     void buildEtaGhosts (amrex::Array<amrex::MultiFab const*,3> const& eta_pc) {
+        amrex::MFInfo const host_info =
+            amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
         for (int idim = 0; idim < 3; ++idim) {
             m_eta_g[idim].define(eta_pc[idim]->boxArray(),
                                  eta_pc[idim]->DistributionMap(), 1,
-                                 amrex::IntVect::Unit);
+                                 amrex::IntVect::Unit, host_info);
             m_eta_g[idim].setVal(amrex::Real(0.0));
+            // eta_pc may be device memory under CUDA; Copy handles H<->D.
             amrex::MultiFab::Copy(m_eta_g[idim], *eta_pc[idim], 0, 0, 1, 0);
             m_eta_g[idim].FillBoundary(m_geom.periodicity());
         }
@@ -313,6 +374,7 @@ private:
                 amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
                 [&] (int i, int j, int k) {
                     PetscInt const row = gix(i, j, k);
+                    if (row < 0) { return; }  // covered B DOF (EB), skip
                     amrex::Real const chi_c =
                         std::max(et(i, j, k), amrex::Real(0.0)) / m_mu0;
                     PetscScalar diag = 1.0;
@@ -382,6 +444,9 @@ private:
     KSP m_ksp = nullptr;
     std::array<std::unique_ptr<amrex::iMultiFab>,3> m_gindex;
     amrex::Array<amrex::MultiFab,3> m_eta_g;
+    // Host (pinned) copy of eb_update_B when EB is on. Empty when EB off.
+    // Never LoopOnCpu into the live device eb_update_B MultiFabs.
+    std::array<std::unique_ptr<amrex::iMultiFab>,3> m_eb_mask_host;
 };
 
 } // namespace
@@ -394,12 +459,13 @@ MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Geometry const& geom, amrex::Real theta_dt, amrex::Real mu0,
     MagDiffPetscPC pc_choice, amrex::Real rtol, amrex::Real atol,
     int max_iter, int verbose,
-    MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx)
+    MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx,
+    amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B)
 {
     auto* s = new MagDiffPetscSolver;
     s->impl = std::make_unique<MagDiffPetscSolverImpl>(
         B_proto, eta_pc, geom, theta_dt, mu0, pc_choice,
-        rtol, atol, max_iter, verbose, matvec, pcapply, opctx);
+        rtol, atol, max_iter, verbose, matvec, pcapply, opctx, eb_update_B);
     return s;
 }
 
@@ -434,7 +500,8 @@ MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Array<amrex::MultiFab const*,3> const&,
     amrex::Geometry const&, amrex::Real, amrex::Real,
     MagDiffPetscPC, amrex::Real, amrex::Real, int, int,
-    MagDiffMatvecFn, MagDiffPCFn, void*)
+    MagDiffMatvecFn, MagDiffPCFn, void*,
+    amrex::Array<amrex::iMultiFab const*,3> const*)
 {
     amrex::Abort("magdiff_petsc_make: WarpX was not built with PETSc "
                  "(AMREX_USE_PETSC undefined).");

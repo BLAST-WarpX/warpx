@@ -191,3 +191,21 @@ if(AMReX_PETSC)
         OFF  # dependency
     )
 endif()
+
+# Stair-case embedded boundary on the RZ matrix-free variable-eta path (θ=1):
+# outer-wall solid for r > r_wall, fluid on axis. Covered Bt stays inert (0),
+# fluid Bt persists (mild eta). analysis_rz_eb.py checks finite Bt, fluid Bt
+# nonzero, damping, and covered-region Bt ~ 0 (global min). EB is a build-time
+# option, so only register when WarpX_EB is ON (EB-off CI skips cleanly, as the
+# other embedded_boundary_* tests do).
+if(WarpX_EB)
+    add_warpx_test(
+        test_rz_hybrid_mag_diffusion_variable_eta_eb  # name
+        RZ  # dims
+        1  # nprocs
+        "inputs_test_rz_hybrid_mag_diffusion_variable_eta_eb"  # inputs
+        "analysis_rz_eb.py"  # analysis
+        OFF  # checksum (finite/covered-inert oracle in analysis_rz_eb.py)
+        OFF  # dependency
+    )
+endif()

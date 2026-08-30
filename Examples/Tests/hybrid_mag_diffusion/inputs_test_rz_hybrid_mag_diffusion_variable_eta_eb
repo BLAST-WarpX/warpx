@@ -1,0 +1,81 @@
+# RZ hybrid implicit magnetic-diffusion smoke WITH a stair-case embedded boundary.
+# Outer "wall" solid for r > r_wall (fluid on axis), phi > 0 = solid (WarpX EB
+# convention; see notes/2026-07-18_eb_parser_eta.md). Variable-eta (parser)
+# matrix-free path; theta = 1 (backward Euler). Mild eta (1e-2 Ohm*m) so the fluid Bt
+# persists (does not annihilate in 5 steps) and the EB distinction is crisp:
+# covered Bt -> 0 (inert), fluid Bt finite. analysis_rz_eb.py checks finite Bt,
+# fluid Bt nonzero, and covered-region Bt ~ 0 (global min ~ 0).
+
+max_step = 5
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 2.0e-2 1.0
+
+# r=0 axis (none), r_hi unforced (none), z periodic. Solid is interior geometry;
+# it stays away from the axis (fluid on axis) and reaches the r_hi domain edge.
+boundary.field_lo = none periodic
+boundary.field_hi = none periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+
+# Stair-case EB: solid where phi > 0. phi = x - 0.015 -> solid for r > 0.015 (outer
+# wall), fluid for r < 0.015 (incl. the axis). Same sign convention as the Cart
+# 2D EB smoke (warpx-eb-implicit-function-sign memory).
+warpx.eb_implicit_function = "x - 0.015"
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+# RZ component order is Br, Bt, Bz. Uniform Bt init (cell-centered in r); the EB
+# does NOT touch the init, so Bt starts at 1e-4 everywhere and the mag-diff +
+# hybrid EM drive covered Bt -> 0 (zeroCoveredB "leave-0" policy).
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 1.0e-4 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+# Mild eta so the fluid Bt persists (stiff 129 would annihilate uniform Bt and
+# obscure the covered-vs-fluid distinction).
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "1.0e-2"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_use_variable_eta = 1
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+hybrid_pic_model.mag_diff_rtol = 1.0e-4
+hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_max_iter = 300
+hybrid_pic_model.mag_diff_verbose = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile

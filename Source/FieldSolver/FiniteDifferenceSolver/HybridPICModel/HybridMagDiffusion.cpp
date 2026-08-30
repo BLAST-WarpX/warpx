@@ -22,6 +22,7 @@
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX_Array.H>
+#include <AMReX_Arena.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
 #include <AMReX_DistributionMapping.H>
@@ -198,6 +199,10 @@ struct MagDiffJacobiPrecond
     Array4<Real> dest;
     Array4<Real const> src;
     Array4<Real const> eta;
+    // Stair-case EB mask for B (1 = active fluid face, 0 = covered). Default
+    // (empty) when EB is off; on covered faces the operator row is identity,
+    // so the PC is identity there too. Mirrors ComputeCurlA's mask pattern.
+    Array4<int const> mask;
     Real theta_dt = 0.0_rt;
     Real diag_factor = 0.0_rt;
     Real denom = 1.0_rt;
@@ -205,6 +210,13 @@ struct MagDiffJacobiPrecond
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void operator() (int i, int j, int k) const noexcept
     {
+        // Covered B face: operator row is identity (curl is zeroed), so the
+        // diagonal PC must be identity too (M^{-1} x = x). Keeps covered B
+        // inert and prevents the PC from scaling a nonzero covered residual.
+        if (mask && mask(i, j, k) == 0) {
+            dest(i, j, k) = src(i, j, k);
+            return;
+        }
         // Use a precision-safe floor (1e-30 underflows to 0 in single precision).
         Real const tiny = Real(1.e-3) * std::numeric_limits<Real>::min();
         Real const eta_val = std::max(eta(i, j, k), Real(0.0));
@@ -339,6 +351,32 @@ private:
     bool m_is_defined = false;
 };
 
+// Zero covered B DOFs (eb_update_B[comp] == 0) in a Krylov vector. B^n is
+// already 0 on covered B from the hybrid EM update and the matvec is identity
+// there (ComputeCurlA zeros covered B), so this is defensive: it keeps the
+// init-guess, RHS, and copy-back robust against any nonzero leaking onto
+// covered B (feed offset, restart, single-precision noise). No-op when EB is
+// off (returns before dereferencing the mask, which may be null then).
+void zeroCoveredB (MagDiffVector& vec,
+                   std::array<std::unique_ptr<iMultiFab>,3> const& eb_update_B)
+{
+    if (!EB::enabled()) { return; }
+    auto& f = vec.fields();
+    for (int idim = 0; idim < 3; ++idim) {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(f[idim], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            auto arr = f[idim].array(mfi);
+            auto const mask_arr = eb_update_B[idim]->const_array(mfi);
+            ParallelFor(mfi.tilebox(),
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    if (mask_arr(i, j, k) == 0) { arr(i, j, k) = 0.0_rt; }
+                });
+        }
+    }
+}
+
 class VariableCoeffMagDiffusionOp
 {
 public:
@@ -396,10 +434,14 @@ public:
             "Variable-coefficient hybrid magnetic diffusion currently requires "
             "periodic field boundaries");
 #endif
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !EB::enabled(),
-            "Variable-coefficient hybrid magnetic diffusion does not support "
-            "embedded boundaries yet");
+        // EB is supported on the matrix-free path via the stair-case masks
+        // m_eb_update_E/B (MarkUpdateCellsStairCase): covered E faces carry
+        // η=0 (no diffusion into the solid) and covered B DOFs stay inert
+        // (identity in apply/precond; zeroed in init-guess/RHS/copy-back). The
+        // matvec is already EB-safe — computeAFull zeros m_Jwork before
+        // CalculateCurrentAmpere (so J=0 on covered E faces) and ComputeCurlA
+        // zeros covered B — so these masks are defensive + PC cleanliness +
+        // PETSc-Pmat prep. See notes/2026-07-18_eb_parser_eta.md.
 
         auto& warpx = WarpX::GetInstance();
         m_fdtd = warpx.get_pointer_fdtd_solver_fp(lev);
@@ -561,12 +603,20 @@ public:
             1.0_rt + m_theta_dt * chi_max * diag_factor,
             Real(1.e-3) * std::numeric_limits<Real>::min());
 
+        bool const eb_on = EB::enabled();
         for (int idim = 0; idim < 3; ++idim) {
             for (MFIter mfi(dest_fields[idim], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                // Covered B faces are identity in the operator; the PC mirrors
+                // that (see MagDiffJacobiPrecond). Empty Array4 when EB is off.
+                Array4<int const> mask_arr;
+                if (eb_on) {
+                    mask_arr = (*m_eb_update_B)[idim]->const_array(mfi);
+                }
                 MagDiffJacobiPrecond const kernel{
                     dest_fields[idim].array(mfi),
                     src_fields[idim].const_array(mfi),
                     m_eta_pc[idim].const_array(mfi),
+                    mask_arr,
                     m_theta_dt, diag_factor, denom};
                 ParallelFor(mfi.tilebox(), kernel);
             }
@@ -778,41 +828,98 @@ struct PetscOpCtx
     MagDiffVector F;       // matvec output buffer
     MagDiffVector PCsrc;   // PC input buffer
     MagDiffVector PCdst;   // PC output buffer
+#ifdef AMREX_USE_GPU
+    // Cached pinned host staging for PETSc flat <-> device MultiFab. Allocated
+    // once per AdvanceVariable (not per matvec): the naive GPU-safe path that
+    // new'd MultiFab every scatter/gather cost ~25-30% wall on CPU/CUDA.
+    Array<MultiFab,3> host_U;
+    Array<MultiFab,3> host_F;
+    bool host_bufs_defined = false;
+
+    void ensureHostBufs (Array<MultiFab,3> const& proto)
+    {
+        if (host_bufs_defined) { return; }
+        MFInfo const info = MFInfo().SetArena(The_Pinned_Arena());
+        for (int idim = 0; idim < 3; ++idim) {
+            host_U[idim].define(proto[idim].boxArray(),
+                                proto[idim].DistributionMap(), 1, 0, info);
+            host_F[idim].define(proto[idim].boxArray(),
+                                proto[idim].DistributionMap(), 1, 0, info);
+        }
+        host_bufs_defined = true;
+    }
+#endif
 };
 
-// PETSc flat local array -> MagDiffVector interior (nghost=0 cells only).
+// PETSc Vec is host memory. On CUDA, MagDiffVector MultiFabs are device:
+// LoopOnCpu into Array4(device) SEGVs. Stage via cached pinned host MultiFabs
+// (PetscOpCtx), then MultiFab::Copy. On CPU, write MultiFabs directly (baseline
+// walltime_W5 C path — no extra alloc/copy).
+// gindex is on The_Pinned_Arena (host-readable). gix < 0 => covered/exterior.
 void
 petscScatter (MagDiffVector& dst, Real const* flat,
-              Array<iMultiFab const*,3> const& gindex, amrex::Long rstart)
+              Array<iMultiFab const*,3> const& gindex, amrex::Long rstart
+#ifdef AMREX_USE_GPU
+              , Array<MultiFab,3>& host_bufs
+#endif
+              )
 {
     auto& f = dst.fields();
     for (int idim = 0; idim < 3; ++idim) {
+#ifdef AMREX_USE_GPU
+        MultiFab& host = host_bufs[idim];
+        for (MFIter mfi(host); mfi.isValid(); ++mfi) {
+            auto arr = host.array(mfi);
+#else
+        // Only write active gix >= 0; covered DOFs are omitted from the PETSc
+        // system (gather skips them). Stale covered values never re-enter KSP.
         for (MFIter mfi(f[idim]); mfi.isValid(); ++mfi) {
-            auto const& gix = gindex[idim]->const_array(mfi);
             auto arr = f[idim].array(mfi);
+#endif
+            auto const& gix = gindex[idim]->const_array(mfi);
             Box const& tb = mfi.tilebox();
             LoopOnCpu(lbound(tb), ubound(tb),
                 [&] (int i, int j, int k) {
-                    arr(i, j, k) = flat[gix(i, j, k) - rstart];
+                    auto const gixv = gix(i, j, k);
+                    if (gixv < 0) { return; }  // covered B DOF, skip
+                    auto const lid = static_cast<amrex::Long>(gixv) - rstart;
+                    arr(i, j, k) = flat[lid];
                 });
         }
+#ifdef AMREX_USE_GPU
+        MultiFab::Copy(f[idim], host, 0, 0, 1, 0);
+#endif
     }
 }
 
 // MagDiffVector interior (nghost=0 cells only) -> PETSc flat local array.
 void
 petscGather (Real* flat, MagDiffVector const& src,
-             Array<iMultiFab const*,3> const& gindex, amrex::Long rstart)
+             Array<iMultiFab const*,3> const& gindex, amrex::Long rstart
+#ifdef AMREX_USE_GPU
+             , Array<MultiFab,3>& host_bufs
+#endif
+             )
 {
     auto const& f = src.fields();
     for (int idim = 0; idim < 3; ++idim) {
+#ifdef AMREX_USE_GPU
+        MultiFab& host = host_bufs[idim];
+        MultiFab::Copy(host, f[idim], 0, 0, 1, 0);
+        for (MFIter mfi(host); mfi.isValid(); ++mfi) {
+            auto const& arrf = host.const_array(mfi);
+#else
         for (MFIter mfi(f[idim]); mfi.isValid(); ++mfi) {
-            auto const& gix = gindex[idim]->const_array(mfi);
             auto const& arrf = f[idim].const_array(mfi);
+#endif
+            auto const& gix = gindex[idim]->const_array(mfi);
             Box const& tb = mfi.tilebox();
             LoopOnCpu(lbound(tb), ubound(tb),
                 [&] (int i, int j, int k) {
-                    flat[gix(i, j, k) - rstart] = arrf(i, j, k);
+                    auto const gixv = gix(i, j, k);
+                    if (gixv < 0) { return; }  // covered B DOF, skip
+                    auto const lid = static_cast<amrex::Long>(gixv) - rstart;
+                    flat[lid] = arrf(i, j, k);
                 });
         }
     }
@@ -825,9 +932,15 @@ petscMatvec (void* ctx, Real const* x, Real* y,
              Array<iMultiFab const*,3> const& gindex, amrex::Long rstart)
 {
     auto* c = static_cast<PetscOpCtx*>(ctx);
+#ifdef AMREX_USE_GPU
+    petscScatter(c->U, x, gindex, rstart, c->host_U);
+    c->linop->applyPetsc(c->F, c->U);
+    petscGather(y, c->F, gindex, rstart, c->host_F);
+#else
     petscScatter(c->U, x, gindex, rstart);
     c->linop->applyPetsc(c->F, c->U);
     petscGather(y, c->F, gindex, rstart);
+#endif
 }
 
 // PC callback: y = M^{-1} x = linop.precond (scaled Jacobi).
@@ -836,9 +949,16 @@ petscPCApply (void* ctx, Real const* x, Real* y,
               Array<iMultiFab const*,3> const& gindex, amrex::Long rstart)
 {
     auto* c = static_cast<PetscOpCtx*>(ctx);
+#ifdef AMREX_USE_GPU
+    // Reuse host_U / host_F staging (PC is not concurrent with matvec).
+    petscScatter(c->PCsrc, x, gindex, rstart, c->host_U);
+    c->linop->precondPetsc(c->PCdst, c->PCsrc);
+    petscGather(y, c->PCdst, gindex, rstart, c->host_F);
+#else
     petscScatter(c->PCsrc, x, gindex, rstart);
     c->linop->precondPetsc(c->PCdst, c->PCsrc);
     petscGather(y, c->PCdst, gindex, rstart);
+#endif
 }
 
 #endif // AMREX_USE_PETSC
@@ -893,11 +1013,80 @@ HybridMagDiffusion::Advance (
             1, current_layout[idim]->nGrowVect());
         eta_storage[idim].setVal(eta_SI);
     }
+    // Zero η on covered E faces (eb_update_E == 0): no diffusion into the
+    // solid. Mirrors the Cartesian EB branch and BuildMagDiffResistivity; the
+    // matvec is already safe (computeAFull zeros Jwork), but this keeps the
+    // B-face PC and the frozen-η PETSc Pmat clean near the EB. No-op EB-off.
+    if (EB::enabled()) {
+        auto const& eb_update_E = warpx.GetEBUpdateEFlag()[lev];
+        amrex::Periodicity const& eb_period = warpx.Geom(lev).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (MFIter mfi(eta_storage[idim], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                auto arr = eta_storage[idim].array(mfi);
+                auto const mask_arr = eb_update_E[idim]->const_array(mfi);
+                ParallelFor(mfi.tilebox(),
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                        if (mask_arr(i, j, k) == 0) { arr(i, j, k) = 0.0_rt; }
+                    });
+            }
+            eta_storage[idim].FillBoundaryAndSync(eb_period);
+        }
+    }
     MultiFab * const eta_ptr = eta_storage.data();
     ablastr::fields::VectorField const eta_field = {
         eta_ptr, eta_ptr + 1, eta_ptr + 2};
     AdvanceVariable(Bfield, eta_field, dt, lev, lobc, hibc);
 #else
+    // EB: plain MLCurlCurl has no embedded-boundary API and would silently
+    // solve the wrong operator. Route to the matrix-free path (same as RZ),
+    // which is EB-aware as of Milestone 1 (stair-case masks: covered E faces
+    // carry η=0, covered B inert). See notes/2026-07-18_eb_parser_eta.md.
+    if (EB::enabled()) {
+        ablastr::fields::VectorField const current_layout =
+            warpx.m_fields.get_alldirs(
+                warpx::fields::FieldType::hybrid_current_fp_plasma, lev);
+        Array<MultiFab,3> eta_storage;
+        for (int idim = 0; idim < 3; ++idim) {
+            eta_storage[idim].define(
+                current_layout[idim]->boxArray(),
+                current_layout[idim]->DistributionMap(),
+                1, current_layout[idim]->nGrowVect());
+            eta_storage[idim].setVal(eta_SI);
+        }
+        // Zero η on covered E faces (eb_update_E == 0): no diffusion into the
+        // solid. The matvec is already safe (computeAFull zeros Jwork, so
+        // J = 0 on covered E faces), but this makes the B-face PC
+        // (SampleEtaOntoBFace) and the frozen-η PETSc Pmat (M2) see fluid η
+        // only near the EB. Mirrors BuildMagDiffResistivity's masking.
+        {
+            auto const& eb_update_E = warpx.GetEBUpdateEFlag()[lev];
+            amrex::Periodicity const& eb_period = warpx.Geom(lev).periodicity();
+            for (int idim = 0; idim < 3; ++idim) {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+                for (MFIter mfi(eta_storage[idim], TilingIfNotGPU());
+                     mfi.isValid(); ++mfi) {
+                    auto arr = eta_storage[idim].array(mfi);
+                    auto const mask_arr = eb_update_E[idim]->const_array(mfi);
+                    ParallelFor(mfi.tilebox(),
+                        [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                            if (mask_arr(i, j, k) == 0) { arr(i, j, k) = 0.0_rt; }
+                        });
+                }
+                eta_storage[idim].FillBoundaryAndSync(eb_period);
+            }
+        }
+        MultiFab * const eta_ptr = eta_storage.data();
+        ablastr::fields::VectorField const eta_field = {
+            eta_ptr, eta_ptr + 1, eta_ptr + 2};
+        AdvanceVariable(Bfield, eta_field, dt, lev, lobc, hibc);
+        return;
+    }
+
     // Cartesian constant-eta path via AMReX MLCurlCurl.
     Geometry const& geom = warpx.Geom(lev);
     // MLCurlCurl expects cell-centered BoxArray (enclosedCells of edge BA)
@@ -1038,6 +1227,15 @@ HybridMagDiffusion::AdvanceVariable (
     solution.CopyFrom(Bfield);
     rhs.CopyFrom(Bfield);
 
+    // Covered B is inert (identity operator row; see VariableCoeffMagDiffusionOp
+    // and MagDiffJacobiPrecond). Zero it in the init-guess and RHS so the
+    // Krylov solve keeps covered B = 0 even if B^n carried nonzero there
+    // (defensive; B^n is normally 0 on covered from the hybrid EM update, and
+    // the feed offset c is 0 on covered). Reused before copy-back below.
+    auto const& eb_update_B = WarpX::GetInstance().GetEBUpdateBFlag()[lev];
+    zeroCoveredB(solution, eb_update_B);
+    zeroCoveredB(rhs, eb_update_B);
+
     // Bake the inhomogeneous Dirichlet B_t feed (pec_insulator) into the RHS.
     // c = A_full(0) = theta*dt*K_feed(g_new) is the constant curl from the feed
     // value g(t_new); the operator seen by GMRES/PETSc is the homogeneous
@@ -1091,6 +1289,10 @@ HybridMagDiffusion::AdvanceVariable (
         opctx.F.Define(makeVectorFieldView(solution.fields()));
         opctx.PCsrc.Define(makeVectorFieldView(solution.fields()));
         opctx.PCdst.Define(makeVectorFieldView(solution.fields()));
+#ifdef AMREX_USE_GPU
+        // One-time pinned host staging for the whole KSP (not per matvec).
+        opctx.ensureHostBufs(solution.fields());
+#endif
 
         auto& eta_pc = linop.etaPC();
         amrex::Array<MultiFab const*,3> const B_proto{
@@ -1098,10 +1300,18 @@ HybridMagDiffusion::AdvanceVariable (
         amrex::Array<MultiFab const*,3> const eta_proto{
             &eta_pc[0], &eta_pc[1], &eta_pc[2]};
 
+        // Pass the EB B-field mask (if any) so covered DOFs are skipped from
+        // the PETSc system. Must be nullptr when EB is off (the mask MultiFabs
+        // are undefined then), matching the default parameter in the header.
+        amrex::Array<iMultiFab const*,3> const eb_update_B_ptrs{
+            eb_update_B[0].get(), eb_update_B[1].get(), eb_update_B[2].get()};
+        bool const petsc_eb_on = EB::enabled();
+
         MagDiffPetscSolver* petsc_solver = magdiff_petsc_make(
             B_proto, eta_proto, linop.geom(), linop.thetaDt(), PhysConst::mu0,
             m_petsc_pc, m_rtol, m_atol, m_max_iter, m_verbose,
-            &petscMatvec, &petscPCApply, &opctx);
+            &petscMatvec, &petscPCApply, &opctx,
+            petsc_eb_on ? &eb_update_B_ptrs : nullptr);
 
         const amrex::Long n_local = magdiff_petsc_nlocal(petsc_solver);
         const amrex::Long rstart = magdiff_petsc_rstart(petsc_solver);
@@ -1110,8 +1320,14 @@ HybridMagDiffusion::AdvanceVariable (
         // Initial guess (B^n) and RHS (B^n - feed offset), flat / DOF-mapped.
         std::vector<Real> sol_flat(static_cast<std::size_t>(n_local), Real(0.0));
         std::vector<Real> rhs_flat(static_cast<std::size_t>(n_local), Real(0.0));
+#ifdef AMREX_USE_GPU
+        // Same host staging as matvec/PC callbacks (CUDA: device MultiFabs).
+        petscGather(sol_flat.data(), solution, gindex, rstart, opctx.host_F);
+        petscGather(rhs_flat.data(), rhs, gindex, rstart, opctx.host_F);
+#else
         petscGather(sol_flat.data(), solution, gindex, rstart);
         petscGather(rhs_flat.data(), rhs, gindex, rstart);
+#endif
 
         Real rnorm = 0.0_rt;
         const int reason = magdiff_petsc_solve(
@@ -1122,7 +1338,11 @@ HybridMagDiffusion::AdvanceVariable (
             "Variable-eta operator or preconditioner is broken.");
         amrex::ignore_unused(reason);
 
+#ifdef AMREX_USE_GPU
+        petscScatter(solution, sol_flat.data(), gindex, rstart, opctx.host_U);
+#else
         petscScatter(solution, sol_flat.data(), gindex, rstart);
+#endif
         magdiff_petsc_destroy(petsc_solver);
 #else
         WARPX_ABORT_WITH_MESSAGE(
@@ -1157,6 +1377,11 @@ HybridMagDiffusion::AdvanceVariable (
     }
 
     auto const& solution_fields = solution.fields();
+    // Defensive: ensure covered B stays 0 in the registered field. The solve
+    // keeps it 0 when the RHS is 0 there, but force it here so a non-converged
+    // last iterate (kept by the GMRES non-finite/failed-conv branch above) can
+    // never write a nonzero value into the solid.
+    zeroCoveredB(solution, eb_update_B);
     auto& warpx = WarpX::GetInstance();
 #if !defined(WARPX_DIM_RZ)
     Geometry const& geom = warpx.Geom(lev);
