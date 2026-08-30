@@ -2,7 +2,7 @@
  *
  * This file is part of WarpX.
  *
- * Authors: Hybrid implicit magnetic diffusion (FLASH MagDiff-inspired)
+ * Authors: Bowen Zhu
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -19,20 +19,23 @@
 #include <AMReX_REAL.H>
 
 /**
- * \brief Operator-split (semi)implicit magnetic diffusion for hybrid-PIC.
+ * \brief Implicit magnetic diffusion for hybrid-PIC (operator-split).
  *
  * Advances the Yee magnetic field with a theta-method discretization of
  *
  *   dB/dt = - curl( (eta/mu0) curl B )
  *
- * using AMReX MLCurlCurl (same operator family as CurlCurlMLMGPC) in
- * Cartesian geometry. In RZ, AMReX MLCurlCurl does not support a
- * cylindrical 2D operator, so constant eta uses a matrix-free FDTD curl
- * chain with GMRES.
- * Inspired by FLASH 4.8 MagDiff / Grid_advanceMagDiffusion (theta scheme +
- * linear solve); reimplemented in C++/AMReX — no FLASH source.
+ * after each hybrid B half-step when enabled. Resistivity may be constant
+ * or spatially varying (parser / MultiFab).
  *
- * Default-off: Enable with hybrid_pic_model.implicit_mag_diffusion = 1.
+ * Implementation paths:
+ *  - Cartesian, constant eta: AMReX MLCurlCurl.
+ *  - Cartesian variable eta and RZ: matrix-free FDTD curl(eta curl B)/mu0
+ *    with AMReX GMRES and a scaled Laplacian-diagonal Jacobi preconditioner.
+ *    (MLCurlCurl is Cartesian-only in 2D; uniform eta reduces the PC to a
+ *    constant scale.)
+ *
+ * Disabled by default. Enable with hybrid_pic_model.implicit_mag_diffusion = 1.
  */
 class HybridMagDiffusion
 {
@@ -59,10 +62,10 @@ public:
      *
      * \param[in,out] Bfield  Yee B components (WarpX ordering)
      * \param[in]     eta_SI  resistivity [Ohm m]
-     * \param[in]     dt      step length for this operator-split advance [s]
-     * \param[in]     lev     AMR level (must be 0 for hybrid)
-     * \param[in]     lobc    low domain BCs for MLCurlCurl
-     * \param[in]     hibc    high domain BCs for MLCurlCurl
+     * \param[in]     dt      diffusion step size [s]
+     * \param[in]     lev     AMR level (hybrid is single-level)
+     * \param[in]     lobc    low-side linear-operator boundary types
+     * \param[in]     hibc    high-side linear-operator boundary types
      */
     void Advance (
         ablastr::fields::VectorField const& Bfield,
@@ -81,8 +84,10 @@ public:
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> const& hibc) const;
 
     /**
-     * \brief Map WarpX field boundary types on this geometry to LinOp BCs.
-     * Periodic/PEC→Dirichlet-like for edge data / Neumann / default Neumann.
+     * \brief Map WarpX field boundary types to AMReX LinOpBCType values.
+     *
+     * Used by the Cartesian MLCurlCurl path. Unmapped types default to
+     * Neumann. PEC_Insulator maps to Dirichlet (tangential B prescribed).
      */
     static void GetLinOpBCs (
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM>& lobc,

@@ -545,8 +545,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
-    // When operator-split implicit mag diffusion owns stiff η, cap Ohm's η
-    // so Faraday substeps are not resistively CFL-limited (default max=0).
+    // Cap Ohm resistivity when implicit magnetic diffusion is enabled so the
+    // same eta is not applied on both the Faraday path and the diffusion step
+    // (default mag_diff_eta_explicit_max = 0).
     const bool cap_eta_for_ohm = hybrid_model->ImplicitMagDiffusionEnabled();
     const amrex::Real eta_ohm_max = hybrid_model->MagDiffEtaExplicitMax();
 
@@ -993,8 +994,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
-    // When operator-split implicit mag diffusion owns stiff η, cap Ohm's η
-    // so Faraday substeps are not resistively CFL-limited (default max=0).
+    // Cap Ohm resistivity when implicit magnetic diffusion is enabled so the
+    // same eta is not applied on both the Faraday path and the diffusion step
+    // (default mag_diff_eta_explicit_max = 0).
     const bool cap_eta_for_ohm = hybrid_model->ImplicitMagDiffusionEnabled();
     const amrex::Real eta_ohm_max = hybrid_model->MagDiffEtaExplicitMax();
 

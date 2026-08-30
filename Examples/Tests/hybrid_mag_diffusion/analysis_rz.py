@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""RZ constant-eta magnetic-diffusion vacuum stability smoke."""
+"""RZ hybrid magnetic-diffusion vacuum stability smoke.
+
+Oracle (not an analytic Fourier solution):
+  - Bt min/max finite
+  - initial |Bt| amplitude nonzero
+  - final peak amplitude strictly smaller than initial (damping)
+
+Used for both constant-eta and parser variable-eta RZ smokes.
+"""
+
 import glob
 import math
 import os
@@ -20,7 +29,11 @@ def component_minmax(diag_dir, component):
     for line in text.splitlines():
         if re.match(r"^-?[0-9]", line.strip()):
             try:
-                values = [float(value) for value in line.strip().rstrip(",").split(",") if value]
+                values = [
+                    float(value)
+                    for value in line.strip().rstrip(",").split(",")
+                    if value
+                ]
             except ValueError:
                 continue
             if len(values) >= 3:

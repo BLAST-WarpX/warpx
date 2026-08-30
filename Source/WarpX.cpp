@@ -2001,6 +2001,13 @@ int WarpX::GetPECInsulator_IsESet ( const int  bdry_dir,
     return pec_insulator_boundary->IsESet(bdry_dir,bdry_side);
 }
 
+int WarpX::GetPECInsulator_IsBSet ( const int  bdry_dir,
+                                    const int  bdry_side,
+                                    const int  ifield ) const
+{
+    return pec_insulator_boundary->IsBSet(bdry_dir,bdry_side,ifield);
+}
+
 void
 WarpX::BackwardCompatibility ()
 {

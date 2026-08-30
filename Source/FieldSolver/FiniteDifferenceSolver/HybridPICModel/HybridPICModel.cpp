@@ -82,8 +82,7 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
-    // Operator-split (semi)implicit magnetic diffusion (default off).
-    // See HybridMagDiffusion and hybrid_implicit_mag_diffusion notes.
+    // Implicit magnetic diffusion (default off).
     m_mag_diffusion.ReadParameters();
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
@@ -1546,9 +1545,8 @@ void HybridPICModel::BfieldEvolve (
         );
     }
 
-    // Operator-split magnetic diffusion over the same half-step interval.
-    // Stiff vacuum η is advanced implicitly so Faraday substeps need not resolve
-    // the resistive CFL. No-op when hybrid_pic_model.implicit_mag_diffusion=0.
+    // Implicit magnetic diffusion over the same half-step interval.
+    // No-op when hybrid_pic_model.implicit_mag_diffusion is off.
     ApplyImplicitMagDiffusion(Bfield, dt_half);
 }
 
@@ -1585,17 +1583,25 @@ void HybridPICModel::ApplyImplicitMagDiffusion (
     amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM> lobc, hibc;
     HybridMagDiffusion::GetLinOpBCs(lobc, hibc);
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        CalculatePlasmaCurrent(Bfield[lev], warpx.GetEBUpdateEFlag()[lev], lev);
+        // Only needed when eta depends on J; avoids an extra Ampere-like
+        // plasma-current rebuild each mag-diff call.
+        if (m_resistivity_has_J_dependence) {
+            CalculatePlasmaCurrent(Bfield[lev], warpx.GetEBUpdateEFlag()[lev], lev);
+        }
         auto const Jfield = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-        auto const rhofield = warpx.m_fields.get(FieldType::rho_fp, lev);
+        auto * const rhofield = warpx.m_fields.get(FieldType::rho_fp, lev);
 
         amrex::Array<amrex::MultiFab,3> eta_storage;
         for (int idim = 0; idim < 3; ++idim) {
             eta_storage[idim].define(Jfield[idim]->boxArray(), Jfield[idim]->DistributionMap(),
                                      1, Jfield[idim]->nGrowVect());
+            // Initialize fully (including ghosts) so FormEtaTimesJ over fabbox
+            // never multiplies stale ghost values.
+            eta_storage[idim].setVal(0.0_rt);
         }
+        amrex::MultiFab * const eta_ptr = eta_storage.data();
         ablastr::fields::VectorField eta_field = {
-            &eta_storage[0], &eta_storage[1], &eta_storage[2]};
+            eta_ptr, eta_ptr + 1, eta_ptr + 2};
         BuildMagDiffResistivity(eta_field, Jfield, *rhofield, lev);
         m_mag_diffusion.AdvanceVariable(Bfield[lev], eta_field, dt, lev, lobc, hibc);
     }
@@ -1634,7 +1640,10 @@ void HybridPICModel::BuildMagDiffResistivity (
             auto const Jx_arr = Jfield[0]->const_array(mfi);
             auto const Jy_arr = Jfield[1]->const_array(mfi);
             auto const Jz_arr = Jfield[2]->const_array(mfi);
-            amrex::Box const& box = mfi.tilebox();
+            // Valid tile only: growntilebox + OpenMP races on shared ghost faces
+            // and can OOB-read rho/J when interpolating. Ghosts are filled by
+            // setVal(0) (above) and FillBoundaryAndSync (below).
+            amrex::Box const box = mfi.tilebox();
 
             amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
@@ -1650,7 +1659,9 @@ void HybridPICModel::BuildMagDiffResistivity (
                         Jz_arr, Jz_stag, eta_stag, coarsen, i, j, k, 0);
                     Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
                 }
-                eta_arr(i, j, k) = std::max(eta_parser(rho_val, Jmag, t_new), 0.0_rt);
+                amrex::Real const eta_val = eta_parser(rho_val, Jmag, t_new);
+                eta_arr(i, j, k) = (eta_val == eta_val) // NaN check (device-safe)
+                    ? std::max(eta_val, 0.0_rt) : 0.0_rt;
             });
         }
         eta_mf.FillBoundaryAndSync(warpx.Geom(lev).periodicity());

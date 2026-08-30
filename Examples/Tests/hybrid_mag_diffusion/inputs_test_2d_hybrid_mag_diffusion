@@ -7,8 +7,6 @@
 # High n_floor / density keeps Hall negligible so the pure diffusion
 # solution By(t) = B0 cos(kx x) exp(-χ kx^2 t), χ = η/μ0, applies.
 #
-# Inspired by FLASH MagDiff unit tests; reimplemented for WarpX SI hybrid.
-
 max_step = 20
 amr.n_cell = 64 64
 amr.max_level = 0
@@ -59,7 +57,7 @@ hybrid_pic_model.substeps = 4
 hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
 hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
 
-# Implicit magnetic diffusion (MVP)
+# Implicit magnetic diffusion
 hybrid_pic_model.implicit_mag_diffusion = 1
 hybrid_pic_model.mag_diff_theta = 1.0
 hybrid_pic_model.mag_diff_constant_eta = 1.0e-2

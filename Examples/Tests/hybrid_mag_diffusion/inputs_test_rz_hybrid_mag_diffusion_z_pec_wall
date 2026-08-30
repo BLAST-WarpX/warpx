@@ -1,6 +1,7 @@
-# RZ hybrid implicit magnetic-diffusion vacuum stability variable eta smoke.
-# The uniform parser value drives the variable-coefficient GMRES path.
-# The oracle checks finite, damped Bt after five steps.
+# RZ hybrid magnetic diffusion with non-periodic z and PEC endwalls.
+# Both axial faces are PEC: B_normal (Bz) is zero; tangential B is mirrored.
+# For a z-uniform Bt field this is comparable to the periodic-z smoke test.
+# analysis_rz_z_pec_wall.py checks finite damped Bt and Bz ~ 0.
 
 max_step = 5
 amr.n_cell = 32 64
@@ -12,11 +13,11 @@ geometry.dims = RZ
 geometry.prob_lo = 0.0 0.0
 geometry.prob_hi = 2.0e-2 1.0
 
-# r=0 is the axis, r_hi is unforced (none), and z is periodic.
-boundary.field_lo = none periodic
-boundary.field_hi = none periodic
-boundary.particle_lo = none periodic
-boundary.particle_hi = absorbing periodic
+# r=0 is the axis (None), r_hi is free (None), z endwalls are PEC.
+boundary.field_lo = none pec
+boundary.field_hi = none pec
+boundary.particle_lo = none absorbing
+boundary.particle_hi = absorbing absorbing
 
 warpx.const_dt = 1.0e-9
 warpx.cfl = -1.
@@ -39,7 +40,8 @@ protons.ux = 0.0
 protons.uy = 0.0
 protons.uz = 0.0
 
-# RZ component order is Br, Bt, Bz. Constant initialization supports Bt.
+# RZ component order is Br, Bt, Bz. Constant Bt initialization (tangential to
+# the z endwalls, so PEC mirrors it without damping it at the wall).
 warpx.B_ext_grid_init_style = constant
 warpx.B_external_grid = 0.0 1.0e-4 0.0
 
@@ -48,20 +50,17 @@ hybrid_pic_model.gamma = 1.0
 hybrid_pic_model.n0_ref = 1.0e26
 hybrid_pic_model.n_floor = 1.0e20
 hybrid_pic_model.substeps = 4
-hybrid_pic_model.plasma_resistivity(rho,J,t) = "129.0"
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "0.0"
 hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
 
 hybrid_pic_model.implicit_mag_diffusion = 1
 hybrid_pic_model.mag_diff_theta = 1.0
-hybrid_pic_model.mag_diff_use_variable_eta = 1
+hybrid_pic_model.mag_diff_constant_eta = 129.0
 hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
-# Matrix-free GMRES with scaled Jacobi (Laplacian-diagonal) preconditioner.
-# Not a cylindrical multigrid PC; rtol=1e-4 is appropriate for this smoke.
-# Uniform parser eta reduces the PC to identity scaling.
 hybrid_pic_model.mag_diff_rtol = 1.0e-4
 hybrid_pic_model.mag_diff_atol = 1.0e-14
 hybrid_pic_model.mag_diff_max_iter = 300
-hybrid_pic_model.mag_diff_verbose = 0
+hybrid_pic_model.mag_diff_verbose = 1
 
 diagnostics.diags_names = diag1
 diag1.intervals = 5

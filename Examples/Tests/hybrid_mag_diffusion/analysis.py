@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Analytic check for constant-η magnetic diffusion of a Fourier By mode.
+Analytic check for constant-eta magnetic diffusion of a Fourier By mode.
 
-The primary oracle is the fully discrete theta-method result. Each PIC step
-contains two magnetic-diffusion half steps, with amplification
+Each PIC step applies two magnetic-diffusion half-steps with amplification
 
-    g = (1 - (1-theta) lambda dt_half) / (1 + theta lambda dt_half)
+    g = (1 - (1-theta) * lambda * dt_half) / (1 + theta * lambda * dt_half)
 
-where lambda uses the second-order finite-difference Fourier symbol. The
-continuous exp(-chi*kx^2*t) result is also reported as an accuracy diagnostic.
+where lambda is the second-order finite-difference Fourier symbol. The
+continuous exp(-chi * kx^2 * t) decay is also reported as a diagnostic.
 
-Reads AMReX plotfile VisMF min/max for By from Cell_H (no yt/openPMD required).
-Pass if relative amplitude error vs exp-decay of the measured t=0 peak is < 1%.
+Reads By min/max from the AMReX plotfile Cell_H (no yt/openPMD).
+Passes if the relative amplitude error versus continuous exponential decay
+of the measured t=0 peak is below 1%.
 """
+
 import glob
 import os
 import re
@@ -40,7 +41,9 @@ def get_runtime_parameters():
     prob_hi = get_input_value(inputs, "geometry.prob_hi")
     return {
         "dt": float(get_input_value(inputs, "warpx.const_dt")[0]),
-        "eta": float(get_input_value(inputs, "hybrid_pic_model.mag_diff_constant_eta")[0]),
+        "eta": float(
+            get_input_value(inputs, "hybrid_pic_model.mag_diff_constant_eta")[0]
+        ),
         "nsteps": int(get_input_value(inputs, "max_step")[0]),
         "n_cell_x": int(get_input_value(inputs, "amr.n_cell")[0]),
         "theta": float(get_input_value(inputs, "hybrid_pic_model.mag_diff_theta")[0]),
@@ -90,8 +93,6 @@ def main():
     discrete_decay = abs(amplification) ** (2 * nsteps)
     continuous_decay = np.exp(-chi * kx * kx * t_end)
 
-    d0 = glob.glob("diags/diag1*")
-    # Prefer numbered plotfiles
     candidates = sorted(glob.glob("diags/diag1*"))
     if not candidates:
         print("FAILED: no diags/diag1* plotfiles")
