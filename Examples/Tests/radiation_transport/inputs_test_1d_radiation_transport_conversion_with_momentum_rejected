@@ -1,0 +1,4 @@
+FILE = inputs_test_1d_radiation_transport_conversion
+
+radiation_transport.enable_momentum_coupling = 1
+radiation_transport.momentum_species = ions

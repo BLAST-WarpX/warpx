@@ -1,0 +1,81 @@
+# Conservative streaming-photon recoil in Cartesian 3-D.
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 50.0
+my_constants.photon_weight = 1.0e16
+my_constants.alpha = 40.0
+
+max_step = 1
+amr.n_cell = 8 8 8
+amr.max_level = 0
+amr.max_grid_size = 8
+
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 0.08 0.08 0.08
+
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+warpx.const_dt = 1.0e-10
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 0.01*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+
+particles.species_names = ions photons
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 2 2 2
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+ions.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.01 0.04 0.04
+photons.single_particle_u = 1.0 0.0 0.0
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = alpha
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 1
+radiation_transport.momentum_species = ions
+radiation_transport.path_cell_fraction = 0.5
+
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17

@@ -1,0 +1,61 @@
+# RAD-P0-003b: RZ metric companion for constant-CV implicit LTE.
+#
+# The 8x8 domain is split into two 8x4 z FABs.  This leaves four valid z
+# cells per FAB, wider than the two hybrid guard cells, while the radial axis
+# and the two physical z faces exercise all RZ corner-volume cases.
+
+FILE = inputs_base_radiation_transport_matter_exchange
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 1.0
+my_constants.alpha_planck = 1.0e5
+my_constants.dt = 1.0e-10
+my_constants.dr = 1.0e-3
+my_constants.dz = dr
+
+max_step = 2
+amr.n_cell = 8 8
+amr.blocking_factor = 1 1
+amr.max_grid_size = 8 4
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -4.0*dz
+geometry.prob_hi = 8.0*dr 4.0*dz
+warpx.n_rz_azimuthal_modes = 1
+
+boundary.field_lo = none pec
+boundary.field_hi = pec pec
+boundary.particle_lo = none reflecting
+boundary.particle_hi = reflecting reflecting
+
+warpx.const_dt = dt
+warpx.serialize_initial_conditions = 1
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = n0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+ions.density = 0.25*n0
+ions.num_particles_per_cell_each_dim = 64 1 8
+ions.radial_numpercell_power = 1.0
+ions.do_not_push = 1
+
+photons.single_particle_pos = 0.5*dr 0.0 0.0
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 0.0
+
+radiation_transport.minimum_electron_density = 0.05*n0
+radiation_transport.lte_exchange_tolerance = 1.0e-11
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, alpha_planck, 0.0)
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diag.intervals = 1
+diag.fields_to_plot = rho Te Pe radiation_material_energy \
+    radiation_diffusion_energy

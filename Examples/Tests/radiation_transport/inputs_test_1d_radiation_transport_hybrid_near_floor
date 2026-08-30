@@ -1,0 +1,23 @@
+# RAD-P0-004b2: make a positive radiation request smaller than one DP ULP of
+# the floor-density electron internal energy.  Radiation remains representable
+# while the EOS inverse therefore realizes d=0 and exposes R=q.
+
+FILE = inputs_test_1d_radiation_transport_lte_hybrid_implicit_boundary
+
+my_constants.Te0_eV = 1.0e-3
+my_constants.alpha_planck = 1.9881969996639316e-6
+my_constants.n0 = 1.0e20
+my_constants.dt = 1.0e-10
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.n_floor = n0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+ions.density = 0.25*n0
+radiation_transport.minimum_electron_density = 0.05*n0
+radiation_transport.lte_exchange_solver = frozen_temperature
+
+# The inherited opacity callback activates only on the second step, after the
+# zero-opacity warm-up.  All geometry, physical faces, and the 8-cell/two-FAB
+# decomposition come from the boundary fixture.

@@ -1,0 +1,61 @@
+# Grey photon absorption resolved along a multi-cell path.
+
+my_constants.photon_weight = 1.0e16
+my_constants.alpha_lo = 5.0
+my_constants.alpha_hi = 20.0
+
+max_step = 1
+amr.n_cell = 16
+amr.max_level = 0
+amr.max_grid_size = 8
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 4.0e-10
+warpx.verbose = 0
+warpx.use_filter = 0
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+
+photons.species_type = photon
+photons.injection_style = MultipleParticles
+photons.multiple_particles_pos_x = 0.0 0.0
+photons.multiple_particles_pos_y = 0.0 0.0
+photons.multiple_particles_pos_z = 0.42 0.42
+photons.multiple_particles_ux = 0.0 0.0
+photons.multiple_particles_uy = 0.0 0.0
+photons.multiple_particles_uz = 1.0 2.0
+photons.multiple_particles_weight = photon_weight photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(photon_energy < 1.2e-13, 1.0, 2.0) * if(z < 0.5, alpha_lo, alpha_hi)
+radiation_transport.path_cell_fraction = 0.5
+radiation_transport.material_coupling = none
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = particle_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17

@@ -1,0 +1,63 @@
+# Nonperiodic constant-CV implicit-LTE cell gather/remap consistency.
+#
+# Step 1 initializes the hybrid state with zero opacity. Step 2 permits the
+# same LTE emission in every cell. A corner-volume-consistent gather and remap
+# therefore leave one uniform analytic temperature, including at both physical
+# faces; either legacy full-node operation creates a boundary artifact. Eight
+# cells are split into two four-cell FABs so each valid grid is wider than the
+# two hybrid guard cells and the two-rank variant crosses an MPI boundary.
+
+FILE = inputs_base_radiation_transport_matter_exchange
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 1.0
+my_constants.alpha_planck = 1.0e5
+my_constants.dt = 1.0e-10
+my_constants.dx = 1.0
+
+max_step = 2
+amr.n_cell = 8
+amr.blocking_factor = 1
+amr.max_grid_size = 4
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 8.0*dx
+
+boundary.field_lo = pec
+boundary.field_hi = pec
+boundary.particle_lo = reflecting
+boundary.particle_hi = reflecting
+
+warpx.const_dt = dt
+warpx.serialize_initial_conditions = 1
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = n0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+ions.density = 0.25*n0
+ions.num_particles_per_cell_each_dim = 64
+ions.do_not_push = 1
+
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.0 0.0 7.5*dx
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 0.0
+
+radiation_transport.minimum_electron_density = 0.05*n0
+radiation_transport.lte_exchange_solver = implicit_temperature
+radiation_transport.lte_exchange_tolerance = 1.0e-11
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, alpha_planck, 0.0)
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diag.intervals = 1
+diag.fields_to_plot = rho Te Pe radiation_material_energy \
+    radiation_diffusion_energy

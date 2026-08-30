@@ -1,0 +1,7 @@
+FILE = inputs_test_1d_radiation_transport_restart
+
+radiation_transport.energy_group_boundaries = 1.602176634e-19
+radiation_transport.group_photon_energies = 0.801088317e-19 3.204353268e-19
+
+diag1.fields_to_plot = rho Te radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1
