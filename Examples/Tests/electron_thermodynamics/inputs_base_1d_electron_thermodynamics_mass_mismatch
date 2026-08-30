@@ -1,0 +1,59 @@
+# Initialization must reject a particle/electron-thermodynamics composition
+# mass mismatch.
+# The proton particle mass is approximately 1.007276466621 atomic mass units,
+# while this deliberately configured composition uses 1.0.  No timestep is
+# taken: the invariant is checked while the hybrid model initializes.
+
+my_constants.n0 = 1.0e20
+
+max_step = 0
+amr.n_cell = 4
+amr.max_level = 0
+amr.blocking_factor = 4
+amr.max_grid_size = 4
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 1.0e-12
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = 10.0
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 1.0e-6*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+hybrid_pic_model.electron_composition_species = ions
+hybrid_pic_model.electron_composition_atomic_mass = 1.0
+hybrid_pic_model.electron_composition_atomic_number = 1
+
+particles.species_names = ions
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 1
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+ions.do_not_push = 1
+
+amrex.abort_on_unused_inputs = 1

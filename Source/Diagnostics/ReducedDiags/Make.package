@@ -21,6 +21,8 @@ CEXE_sources += ParticleHistogram2D.cpp
 CEXE_sources += ParticleMomentum.cpp
 CEXE_sources += ParticleNumber.cpp
 CEXE_sources += RhoMaximum.cpp
+CEXE_sources += RadiationEnergy.cpp
+CEXE_sources += RadiationMomentum.cpp
 CEXE_sources += Timestep.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Diagnostics/ReducedDiags

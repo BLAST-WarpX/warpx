@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # --- Test suite for the hybrid-PIC (Ohm's law) electron energy equation.
-# --- One script, four cases (selected with --case), each isolating one
+# --- One script, seven cases (selected with --case), each isolating one
 # --- term of the equation in a 2D Cartesian (x,z) periodic box:
 # ---
 # ---   adiabat : transport terms only (B=0, eta=0, all sources off),
@@ -14,6 +14,19 @@
 # ---                 T_e(x,t) = T_e0 (n(x,t)/n0)^(gamma_e-1).
 # ---             Analyse with analysis_adiabat.py.
 # ---
+# ---   latent_adiabat : the same sources-off compression with the analytic
+# ---             fixed-charge latent-energy EOS,
+# ---                 epsilon(T) = T/(gamma_e-1)
+# ---                            + L T^2/(T^2 + Ta^2)   [eV/electron].
+# ---             Electron internal energy is advanced by conservative
+# ---             finite-volume fluxes and receives -P_e div(V_e) pressure
+# ---             work.  The exact nonlinear
+# ---             adiabat is G(T)-G(T0) = ln(n/n0), where
+# ---                 G(T)-G(T0) = ln(T/T0)/(gamma_e-1)
+# ---                   + L [F(T)-F(T0)],
+# ---                 F(T) = T/(T^2+Ta^2) + atan(T/Ta)/Ta.
+# ---             Analyse with analysis_latent_adiabat.py.
+# ---
 # ---   joule   : eta*J^2 source only.  A linear force-free field
 # ---                 B(x) = B0 [0, sin(kx), cos(kx)],  k = 2 pi/Lx,
 # ---             carries the uniform, parallel current J = curl(B)/mu0
@@ -23,6 +36,12 @@
 # ---             a linear ramp turning sub-linear on the resistive-decay
 # ---             time tau_R = mu0/(eta k^2).  Analyse with
 # ---             analysis_joule.py (B-energy decay + T_e ramp).
+# ---
+# ---   latent_joule : the same force-free eta*J^2 source with the analytic
+# ---             fixed-charge latent caloric EOS.  The source is integrated
+# ---             in U_e and inverted to T_e, so its temperature rise is
+# ---             reduced across the latent heat-capacity shoulder while the
+# ---             magnetic-loss/electron-gain energy ledger is unchanged.
 # ---
 # ---   qei     : electron-ion thermal-equilibration sink only (B=0, eta=0),
 # ---                 dU_e/dt = -Q_ei,  Q_ei = 3 n_e k_B nu_ei (T_e - T_i),
@@ -35,6 +54,11 @@
 # ---                 rate = [3(gamma_e-1) + 2] nu_ei,
 # ---             and C_e T_e + C_i T_i is conserved.  Analyse with
 # ---             analysis_qei.py (difference rate + budget).
+# ---
+# ---   latent_qei : the same conservative two-temperature exchange with the
+# ---             fixed-charge latent electron caloric EOS.  An independent
+# ---             frozen-capacity recurrence verifies both temperatures and
+# ---             the electron-caloric plus kinetic-ion energy ledger.
 # ---
 # ---   vacuum  : transport through a below-floor halo (B=0, eta=0, all
 # ---             sources off).  A slab (n = n0) drifts at c_s through a
@@ -81,6 +105,11 @@ class ElectronEnergyCase(object):
     set_temperature_deposition = True
     load_B = False  # joule only: force-free initial field
     reduced_diags = False  # joule only: field/particle energy
+    electron_thermodynamics = "ideal_gas"
+    electron_latent_transition_temperature_eV = None
+    electron_latent_energy_eV = None
+    electron_latent_sharpness = None
+    use_filter = True
 
     def __init__(self, test, verbose):
         self.test = test
@@ -128,6 +157,12 @@ class ElectronEnergyCase(object):
             plasma_resistivity=self.eta,
             substeps=self.substeps,
             solve_electron_energy_equation=True,
+            electron_thermodynamics=self.electron_thermodynamics,
+            electron_latent_transition_temperature_eV=(
+                self.electron_latent_transition_temperature_eV
+            ),
+            electron_latent_energy_eV=self.electron_latent_energy_eV,
+            electron_latent_sharpness=self.electron_latent_sharpness,
             include_joule_heating=self.include_joule_heating,
             **solver_kwargs,
         )
@@ -140,7 +175,7 @@ class ElectronEnergyCase(object):
             particle_shape=1,
             warpx_serialize_initial_conditions=True,
             warpx_current_deposition_algo="direct",
-            warpx_use_filter=True,
+            warpx_use_filter=self.use_filter,
         )
 
         if self.load_B:
@@ -288,6 +323,46 @@ class AdiabaticCompression(ElectronEnergyCase):
             f"  steps     = {self.total_steps},  diag every {self.diag_steps}\n"
             f"  B = 0,  eta = 0  ->  Joule OFF, pure advection+compression\n"
             f"  CHECK:  T_e(x,t) = Te0 (n/n0)^(gamma_e-1)  pointwise\n"
+        )
+
+
+class LatentEnergyAdiabaticCompression(AdiabaticCompression):
+    """Nonlinear-caloric transport test with an exactly integrable adiabat."""
+
+    transition_temperature_eV = 100.0
+    latent_energy_eV = 1000.0
+    latent_sharpness = 2.0
+
+    electron_thermodynamics = "fixed_charge_latent_energy"
+    # Nonlinear conservative transport currently requires the density and
+    # auxiliary charge flux to retain the same unfiltered continuity stencil.
+    use_filter = False
+    electron_latent_transition_temperature_eV = [transition_temperature_eV]
+    electron_latent_energy_eV = [latent_energy_eV]
+    electron_latent_sharpness = [latent_sharpness]
+
+    def configure(self):
+        super().configure()
+        # Lower the deposited-density noise so the CI test resolves the
+        # nonlinear adiabat well below its separation from the ideal curve.
+        if self.test:
+            self.NPPC = 256
+
+    def _print_params(self):
+        print(
+            f"\n[setup] Fixed-charge latent-energy adiabatic-compression test\n"
+            f"  Te0 = Ta = {self.te_eV:.1f} eV,  Ti = {self.ti_eV:.1f} eV,  gamma_e = {self.gamma_e:.4f}\n"
+            f"  latent energy L = {self.latent_energy_eV:.1f} eV/electron,  sharpness = {self.latent_sharpness:.1f}\n"
+            f"  n0        = {self.n0:.3e} m^-3\n"
+            f"  c_s       = {self.c_s:.3e} m/s   (electron-pressure sound speed)\n"
+            f"  V0        = {self.V0:.3e} m/s   (= {self.pert_frac:.2f} c_s)\n"
+            f"  k         = {self.k:.4e} 1/m   ({self.n_wave} wavelength(s))\n"
+            f"  T_period  = {self.T_period:.3e} s   (acoustic)\n"
+            f"  Grid      = {self.NX} x {self.NZ},  Lx x Lz = {self.Lx:.3f} x {self.Lz:.4f} m\n"
+            f"  dt        = {self.dt:.3e} s   ({self.steps_per_period}/period)\n"
+            f"  steps     = {self.total_steps},  diag every {self.diag_steps}\n"
+            f"  B = 0, eta = 0 -> pure extensive-energy transport + pressure work\n"
+            f"  CHECK: G(Te)-G(Te0) = ln(n/n0), distinct from the ideal-gas adiabat\n"
         )
 
 
@@ -492,6 +567,37 @@ class ForceFreeJoule(ElectronEnergyCase):
         comm.Barrier()
 
 
+class LatentForceFreeJoule(ForceFreeJoule):
+    """Force-free Joule source routed through a nonlinear caloric inverse."""
+
+    transition_temperature_eV = 500.0
+    latent_energy_eV = 2000.0
+    latent_sharpness = 6.0
+    electron_thermodynamics = "fixed_charge_latent_energy"
+    electron_latent_transition_temperature_eV = [transition_temperature_eV]
+    electron_latent_energy_eV = [latent_energy_eV]
+    electron_latent_sharpness = [latent_sharpness]
+    # Nonlinear finite-volume thermodynamic state requires the deposited
+    # charge and conservative auxiliary flux to share one stencil.
+    use_filter = False
+
+    def configure(self):
+        super().configure()
+        if self.test:
+            # Without the filter, 64 PPC leaves a high-k current floor large
+            # enough to obscure the manufactured smooth-mode Joule source.
+            self.NPPC = 256
+
+    def _print_params(self):
+        super()._print_params()
+        print(
+            "  nonlinear caloric source: "
+            f"Ta={self.transition_temperature_eV:g} eV, "
+            f"L={self.latent_energy_eV:g} eV/electron, "
+            f"sharpness={self.latent_sharpness:g}\n"
+        )
+
+
 class QeiRelaxation(ElectronEnergyCase):
     """Q_ei electron-ion thermal-equilibration test: pure exponential."""
 
@@ -565,9 +671,34 @@ class QeiRelaxation(ElectronEnergyCase):
         )
 
 
+class LatentQeiRelaxation(QeiRelaxation):
+    """Q_ei exchange with a nonlinear fixed-charge electron caloric EOS."""
+
+    transition_temperature_eV = 200.0
+    latent_energy_eV = 1000.0
+    latent_sharpness = 4.0
+    electron_thermodynamics = "fixed_charge_latent_energy"
+    electron_latent_transition_temperature_eV = [transition_temperature_eV]
+    electron_latent_energy_eV = [latent_energy_eV]
+    electron_latent_sharpness = [latent_sharpness]
+    use_filter = False
+
+    def _print_params(self):
+        super()._print_params()
+        print(
+            "  nonlinear Qei caloric inverse: "
+            f"Ta={self.transition_temperature_eV:g} eV, "
+            f"L={self.latent_energy_eV:g} eV/electron, "
+            f"sharpness={self.latent_sharpness:g}\n"
+        )
+
+
 CASES = {
     "adiabat": AdiabaticCompression,
     "joule": ForceFreeJoule,
+    "latent_adiabat": LatentEnergyAdiabaticCompression,
+    "latent_joule": LatentForceFreeJoule,
+    "latent_qei": LatentQeiRelaxation,
     "qei": QeiRelaxation,
     "vacuum": VacuumSlabTransport,
 }

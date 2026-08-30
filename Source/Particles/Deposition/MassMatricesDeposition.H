@@ -62,15 +62,15 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
                              const amrex::ParticleReal Bpx,
                              const amrex::ParticleReal Bpy,
                              const amrex::ParticleReal Bpz,
-                             amrex::ParticleReal& fpxx,
-                             amrex::ParticleReal& fpxy,
-                             amrex::ParticleReal& fpxz,
-                             amrex::ParticleReal& fpyx,
-                             amrex::ParticleReal& fpyy,
-                             amrex::ParticleReal& fpyz,
-                             amrex::ParticleReal& fpzx,
-                             amrex::ParticleReal& fpzy,
-                             amrex::ParticleReal& fpzz)
+                             amrex::Real& fpxx,
+                             amrex::Real& fpxy,
+                             amrex::Real& fpxz,
+                             amrex::Real& fpyx,
+                             amrex::Real& fpyy,
+                             amrex::Real& fpyz,
+                             amrex::Real& fpzx,
+                             amrex::Real& fpzy,
+                             amrex::Real& fpzz)
 {
     using namespace amrex::literals;
 
@@ -87,17 +87,17 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     const amrex::ParticleReal arogp = alpha*rhop/(1.0_prt + bpsq);
 
     // Compute Mass Matrix kernels (non-relativistic for now)
-    fpxx = arogp*(bpx*bpx + 1.0_rt);
-    fpxy = arogp*(bpx*bpy + bpz);
-    fpxz = arogp*(bpx*bpz - bpy);
+    amrex::ParticleReal const fpxx_prt = arogp*(bpx*bpx + 1.0_prt);
+    amrex::ParticleReal const fpxy_prt = arogp*(bpx*bpy + bpz);
+    amrex::ParticleReal const fpxz_prt = arogp*(bpx*bpz - bpy);
 
-    fpyx = arogp*(bpy*bpx - bpz);
-    fpyy = arogp*(bpy*bpy + 1.0_rt);
-    fpyz = arogp*(bpy*bpz + bpx);
+    amrex::ParticleReal const fpyx_prt = arogp*(bpy*bpx - bpz);
+    amrex::ParticleReal const fpyy_prt = arogp*(bpy*bpy + 1.0_prt);
+    amrex::ParticleReal const fpyz_prt = arogp*(bpy*bpz + bpx);
 
-    fpzx = arogp*(bpz*bpx + bpy);
-    fpzy = arogp*(bpz*bpy - bpx);
-    fpzz = arogp*(bpz*bpz + 1.0_rt);
+    amrex::ParticleReal const fpzx_prt = arogp*(bpz*bpx + bpy);
+    amrex::ParticleReal const fpzy_prt = arogp*(bpz*bpy - bpx);
+    amrex::ParticleReal const fpzz_prt = arogp*(bpz*bpz + 1.0_prt);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 
@@ -107,25 +107,40 @@ void setMassMatricesKernels (const amrex::ParticleReal qs,
     const amrex::ParticleReal c2 = costh*costh;
     const amrex::ParticleReal s2 = sinth*sinth;
     const amrex::ParticleReal cs = costh*sinth;
-    const amrex::ParticleReal fprr = c2*fpxx + cs*(fpxy + fpyx) + s2*fpyy;
-    const amrex::ParticleReal fprt = cs*(fpyy - fpxx) + c2*fpxy - s2*fpyx;
-    const amrex::ParticleReal fprz = costh*fpxz + sinth*fpyz;
-    const amrex::ParticleReal fptr = cs*(fpyy - fpxx) - s2*fpxy + c2*fpyx;
-    const amrex::ParticleReal fptt = s2*fpxx + c2*fpyy - cs*(fpxy + fpyx);
-    const amrex::ParticleReal fptz = -sinth*fpxz + costh*fpyz;
-    const amrex::ParticleReal fpzr =  costh*fpzx + sinth*fpzy;
-    const amrex::ParticleReal fpzt = -sinth*fpzx + costh*fpzy;
+    const amrex::ParticleReal fprr =
+        c2*fpxx_prt + cs*(fpxy_prt + fpyx_prt) + s2*fpyy_prt;
+    const amrex::ParticleReal fprt =
+        cs*(fpyy_prt - fpxx_prt) + c2*fpxy_prt - s2*fpyx_prt;
+    const amrex::ParticleReal fprz = costh*fpxz_prt + sinth*fpyz_prt;
+    const amrex::ParticleReal fptr =
+        cs*(fpyy_prt - fpxx_prt) - s2*fpxy_prt + c2*fpyx_prt;
+    const amrex::ParticleReal fptt =
+        s2*fpxx_prt + c2*fpyy_prt - cs*(fpxy_prt + fpyx_prt);
+    const amrex::ParticleReal fptz = -sinth*fpxz_prt + costh*fpyz_prt;
+    const amrex::ParticleReal fpzr = costh*fpzx_prt + sinth*fpzy_prt;
+    const amrex::ParticleReal fpzt = -sinth*fpzx_prt + costh*fpzy_prt;
 
-    // Returned values are named for Cartesian, but they are indeed mapped
-    fpxx = fprr;
-    fpxy = fprt;
-    fpxz = fprz;
-    fpyx = fptr;
-    fpyy = fptt;
-    fpyz = fptz;
-    fpzx = fpzr;
-    fpzy = fpzt;
+    // Returned values are named for Cartesian, but they are indeed mapped.
+    fpxx = static_cast<amrex::Real>(fprr);
+    fpxy = static_cast<amrex::Real>(fprt);
+    fpxz = static_cast<amrex::Real>(fprz);
+    fpyx = static_cast<amrex::Real>(fptr);
+    fpyy = static_cast<amrex::Real>(fptt);
+    fpyz = static_cast<amrex::Real>(fptz);
+    fpzx = static_cast<amrex::Real>(fpzr);
+    fpzy = static_cast<amrex::Real>(fpzt);
+#else
+    fpxx = static_cast<amrex::Real>(fpxx_prt);
+    fpxy = static_cast<amrex::Real>(fpxy_prt);
+    fpxz = static_cast<amrex::Real>(fpxz_prt);
+    fpyx = static_cast<amrex::Real>(fpyx_prt);
+    fpyy = static_cast<amrex::Real>(fpyy_prt);
+    fpyz = static_cast<amrex::Real>(fpyz_prt);
+    fpzx = static_cast<amrex::Real>(fpzx_prt);
+    fpzy = static_cast<amrex::Real>(fpzy_prt);
 #endif
+
+    fpzz = static_cast<amrex::Real>(fpzz_prt);
 
 }
 
@@ -158,15 +173,15 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
                                         const amrex::ParticleReal vx,
                                         [[maybe_unused]] const amrex::ParticleReal vy,
                                         const amrex::ParticleReal vz,
-                                        const amrex::ParticleReal fpxx,
-                                        [[maybe_unused]] const amrex::ParticleReal fpxy,
-                                        [[maybe_unused]] const amrex::ParticleReal fpxz,
-                                        [[maybe_unused]] const amrex::ParticleReal fpyx,
-                                        const amrex::ParticleReal fpyy,
-                                        [[maybe_unused]] const amrex::ParticleReal fpyz,
-                                        [[maybe_unused]] const amrex::ParticleReal fpzx,
-                                        [[maybe_unused]] const amrex::ParticleReal fpzy,
-                                        const amrex::ParticleReal fpzz,
+                                        const amrex::Real fpxx,
+                                        [[maybe_unused]] const amrex::Real fpxy,
+                                        [[maybe_unused]] const amrex::Real fpxz,
+                                        [[maybe_unused]] const amrex::Real fpyx,
+                                        const amrex::Real fpyy,
+                                        [[maybe_unused]] const amrex::Real fpyz,
+                                        [[maybe_unused]] const amrex::Real fpzx,
+                                        [[maybe_unused]] const amrex::Real fpzy,
+                                        const amrex::Real fpzz,
                                         amrex::Array4<amrex::Real> const& jx_arr,
                                         [[maybe_unused]] amrex::Array4<amrex::Real> const& jy_arr,
                                         amrex::Array4<amrex::Real> const& jz_arr,
@@ -696,9 +711,9 @@ void doDirectSigmaDeposition (const GetParticlePosition<PIdx>& GetPosition,
 #endif
 
             // Set the Mass Matrices kernels
-            amrex::ParticleReal fpxx, fpxy, fpxz;
-            amrex::ParticleReal fpyx, fpyy, fpyz;
-            amrex::ParticleReal fpzx, fpzy, fpzz;
+            amrex::Real fpxx, fpxy, fpxz;
+            amrex::Real fpyx, fpyy, fpyz;
+            amrex::Real fpzx, fpzy, fpzz;
             setMassMatricesKernels(qs, ms, dt, rhop,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                                    costh, sinth,
@@ -769,15 +784,15 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                                             [[maybe_unused]] const amrex::ParticleReal uyp_mid,
                                             [[maybe_unused]] const amrex::ParticleReal uzp_mid,
                                             [[maybe_unused]] const amrex::ParticleReal gaminv,
-                                            const amrex::ParticleReal fpxx,
-                                            [[maybe_unused]] const amrex::ParticleReal fpxy,
-                                            [[maybe_unused]] const amrex::ParticleReal fpxz,
-                                            [[maybe_unused]] const amrex::ParticleReal fpyx,
-                                            const amrex::ParticleReal fpyy,
-                                            [[maybe_unused]] const amrex::ParticleReal fpyz,
-                                            [[maybe_unused]] const amrex::ParticleReal fpzx,
-                                            [[maybe_unused]] const amrex::ParticleReal fpzy,
-                                            const amrex::ParticleReal fpzz,
+                                            const amrex::Real fpxx,
+                                            [[maybe_unused]] const amrex::Real fpxy,
+                                            [[maybe_unused]] const amrex::Real fpxz,
+                                            [[maybe_unused]] const amrex::Real fpyx,
+                                            const amrex::Real fpyy,
+                                            [[maybe_unused]] const amrex::Real fpyz,
+                                            [[maybe_unused]] const amrex::Real fpzx,
+                                            [[maybe_unused]] const amrex::Real fpzy,
+                                            const amrex::Real fpzz,
                                             amrex::Array4<amrex::Real> const& Jx_arr,
                                             [[maybe_unused]] amrex::Array4<amrex::Real> const& Jy_arr,
                                             amrex::Array4<amrex::Real> const& Jz_arr,
@@ -1982,9 +1997,9 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
             const amrex::Real rhop = wq_invvol*gaminv;
 
             // Set the Mass Matrices kernels
-            amrex::ParticleReal fpxx, fpxy, fpxz;
-            amrex::ParticleReal fpyx, fpyy, fpyz;
-            amrex::ParticleReal fpzx, fpzy, fpzz;
+            amrex::Real fpxx, fpxy, fpxz;
+            amrex::Real fpyx, fpyy, fpyz;
+            amrex::Real fpzx, fpzy, fpzz;
             setMassMatricesKernels(qs, ms, dt, rhop,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                                    costh, sinth,

@@ -25,6 +25,7 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Python/callbacks.H"
+#include "Radiation/RadiationTransport.H"
 #include "Utils/TextMsg.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -425,6 +426,7 @@ WarpX::InitFromCheckpoint ()
 
     if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
 
+    GetRadiationTransport().ReadCheckpointData(restart_chkfile);
     reduced_diags->ReadCheckpointData(restart_chkfile);
 
     // Initialize particles

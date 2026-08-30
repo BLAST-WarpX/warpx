@@ -21,24 +21,1081 @@
 #include "Fluids/QdsmcParticleContainer.H"
 #include "Particles/MultiParticleContainer.H"
 #include "ExternalVectorPotential.H"
+#include "QdsmcMetricTransport.H"
+#include "TwoTemperatureExchange.H"
+#include "Utils/MaterialRegistry.H"
 #include "WarpX.H"
 
+#include <AMReX_GpuAtomic.H>
+#include <AMReX_GpuContainers.H>
+#include <AMReX_Math.H>
 #include <AMReX_Random.H>
+#include <AMReX_Reduce.H>
 
+#include <cmath>
+#include <limits>
+#include <set>
 #include <string>
 #include <vector>
 
 using namespace amrex;
 using warpx::fields::FieldType;
 
-HybridPICModel::HybridPICModel ()
+namespace
 {
-    ReadParameters();
+    /** Physical dual volume associated with a nodal hybrid field value. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real hybrid_node_volume (
+        int const i,
+        int const j,
+        int const k,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& probhi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::Dim3 const domain_lo,
+        amrex::Dim3 const domain_hi,
+        amrex::GpuArray<int, 3> const& periodic) noexcept
+    {
+        amrex::Real node_volume = 1.0_rt;
+#if defined(WARPX_DIM_RCYLINDER)
+        amrex::Real const r = problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_lo = amrex::max(problo[0], r - 0.5_rt * dx[0]);
+        amrex::Real const r_hi = amrex::min(probhi[0], r + 0.5_rt * dx[0]);
+        node_volume = MathConst::pi * (r_hi * r_hi - r_lo * r_lo);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::Real const r = problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_lo = amrex::max(problo[0], r - 0.5_rt * dx[0]);
+        amrex::Real const r_hi = amrex::min(probhi[0], r + 0.5_rt * dx[0]);
+        node_volume = 4.0_rt / 3.0_rt * MathConst::pi
+            * (r_hi * r_hi * r_hi - r_lo * r_lo * r_lo);
+#elif defined(WARPX_DIM_RZ)
+        amrex::Real const r = problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_lo = amrex::max(problo[0], r - 0.5_rt * dx[0]);
+        amrex::Real const r_hi = amrex::min(probhi[0], r + 0.5_rt * dx[0]);
+        amrex::Real const dz =
+            periodic[1] || (j != domain_lo.y && j != domain_hi.y + 1)
+            ? dx[1] : 0.5_rt * dx[1];
+        node_volume = MathConst::pi * (r_hi * r_hi - r_lo * r_lo) * dz;
+#else
+        node_volume *=
+            periodic[0] || (i != domain_lo.x && i != domain_hi.x + 1)
+            ? dx[0] : 0.5_rt * dx[0];
+#if AMREX_SPACEDIM >= 2
+        node_volume *=
+            periodic[1] || (j != domain_lo.y && j != domain_hi.y + 1)
+            ? dx[1] : 0.5_rt * dx[1];
+#endif
+#if AMREX_SPACEDIM == 3
+        node_volume *=
+            periodic[2] || (k != domain_lo.z && k != domain_hi.z + 1)
+            ? dx[2] : 0.5_rt * dx[2];
+#endif
+#endif
+        amrex::ignore_unused(
+            j, k, problo, probhi, domain_lo, domain_hi, periodic);
+        return node_volume;
+    }
+
+    constexpr int nonlinear_lte_temperature_increment_comp = 0;
+    constexpr int nonlinear_lte_represented_energy_comp = 1;
+    constexpr int nonlinear_lte_remap_components = 2;
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+    /** Volume consistent with a radially inverse-volume-scaled nodal charge
+     * deposit.  Unlike hybrid_node_volume, this keeps the full exterior
+     * half-cell at a non-periodic radial face because the scaled deposit
+     * represents a full-cell density even when that face is a wall. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real hybrid_transport_node_volume (
+        int const i,
+        int const j,
+        int const k,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::Dim3 const domain_lo,
+        amrex::Real const axis_volume_factor) noexcept
+    {
+#if defined(WARPX_DIM_RCYLINDER)
+        amrex::Real const r =
+            problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::ignore_unused(j, k);
+        return warpx::hybrid::cylindricalTransportNodeVolume(
+            r, dx[0], 1.0_rt, axis_volume_factor);
+#elif defined(WARPX_DIM_RZ)
+        amrex::Real const r =
+            problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::ignore_unused(j, k);
+        return warpx::hybrid::cylindricalTransportNodeVolume(
+            r, dx[0], dx[1], axis_volume_factor);
+#else
+        amrex::ignore_unused(i, j, k, problo, dx, domain_lo, axis_volume_factor);
+        return std::numeric_limits<amrex::Real>::quiet_NaN();
+#endif
+    }
+#endif
+
+    /** Physical part of one cell represented by one nodal corner. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real hybrid_cell_corner_volume (
+        int const i,
+        int const j,
+        int const k,
+        int const di,
+        int const dj,
+        int const dk,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::Dim3 const domain_lo) noexcept
+    {
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE) \
+    || defined(WARPX_DIM_RZ)
+        amrex::Real const r_lo =
+            problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_mid = r_lo + 0.5_rt * dx[0];
+        amrex::Real const r_hi = r_lo + dx[0];
+        amrex::Real const corner_r_lo = di == 0 ? r_lo : r_mid;
+        amrex::Real const corner_r_hi = di == 0 ? r_mid : r_hi;
+#endif
+#if defined(WARPX_DIM_RCYLINDER)
+        amrex::ignore_unused(j, k, dj, dk);
+        return MathConst::pi
+            * (corner_r_hi * corner_r_hi - corner_r_lo * corner_r_lo);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ignore_unused(j, k, dj, dk);
+        return 4.0_rt / 3.0_rt * MathConst::pi
+            * (corner_r_hi * corner_r_hi * corner_r_hi
+               - corner_r_lo * corner_r_lo * corner_r_lo);
+#elif defined(WARPX_DIM_RZ)
+        // Uniform dz makes the two z-halves equal, so dj does not enter.
+        amrex::ignore_unused(j, k, dj, dk);
+        return MathConst::pi
+            * (corner_r_hi * corner_r_hi - corner_r_lo * corner_r_lo)
+            * 0.5_rt * dx[1];
+#else
+        amrex::ignore_unused(i, j, k, di, dj, dk, problo, domain_lo);
+        return AMREX_D_TERM(
+            0.5_rt * dx[0], * 0.5_rt * dx[1], * 0.5_rt * dx[2]);
+#endif
+    }
+
+    /** Physical volume of one cell-centered kinetic-ion moment bin. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real hybrid_cell_volume (
+        int const i,
+        int const j,
+        int const k,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::Dim3 const domain_lo) noexcept
+    {
+#if defined(WARPX_DIM_RCYLINDER)
+        amrex::Real const r_lo =
+            problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_hi = r_lo + dx[0];
+        amrex::ignore_unused(j, k);
+        return MathConst::pi * (r_hi * r_hi - r_lo * r_lo);
+#elif defined(WARPX_DIM_RZ)
+        amrex::Real const r_lo =
+            problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_hi = r_lo + dx[0];
+        amrex::ignore_unused(j, k);
+        return MathConst::pi * (r_hi * r_hi - r_lo * r_lo) * dx[1];
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::Real const r_lo =
+            problo[0] + (i - domain_lo.x) * dx[0];
+        amrex::Real const r_hi = r_lo + dx[0];
+        amrex::ignore_unused(j, k);
+        return 4.0_rt / 3.0_rt * MathConst::pi
+            * (r_hi * r_hi * r_hi - r_lo * r_lo * r_lo);
+#else
+        amrex::ignore_unused(i, j, k, problo, domain_lo);
+#if AMREX_SPACEDIM == 1
+        return dx[0];
+#elif AMREX_SPACEDIM == 2
+        return dx[0] * dx[1];
+#else
+        return dx[0] * dx[1] * dx[2];
+#endif
+#endif
+    }
+
+    /** Whether a cell neighbor of a node is physical or periodic. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool hybrid_source_cell_is_addressable (
+        int const i,
+        int const j,
+        int const k,
+        amrex::Dim3 const domain_lo,
+        amrex::Dim3 const domain_hi,
+        amrex::GpuArray<int, 3> const& periodic) noexcept
+    {
+        bool const addressable =
+            (periodic[0] || (i >= domain_lo.x && i <= domain_hi.x))
+#if AMREX_SPACEDIM >= 2
+            && (periodic[1] || (j >= domain_lo.y && j <= domain_hi.y))
+#endif
+#if AMREX_SPACEDIM == 3
+            && (periodic[2] || (k >= domain_lo.z && k <= domain_hi.z))
+#endif
+            ;
+        amrex::ignore_unused(j, k);
+        return addressable;
+    }
+
+    /** Nonlinear LTE contribution from one adjacent cell to one node. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real hybrid_nonlinear_lte_node_energy (
+        int const i,
+        int const j,
+        int const k,
+        int const ci,
+        int const cj,
+        int const ck,
+        amrex::Array4<amrex::Real const> const& source,
+        amrex::Array4<amrex::Real const> const& remap,
+        amrex::Array4<amrex::Real const> const& thermodynamic_state,
+        amrex::Array4<amrex::Real const> const& rho,
+        amrex::Array4<amrex::Real const> const& temperature,
+        ElectronThermodynamicsExecutor::MaterialChargeDensityArrays const&
+            material_charge_density,
+        ElectronThermodynamicsExecutor const thermodynamics,
+        amrex::Real const material_rho_threshold,
+        amrex::Real const thermodynamic_rho_floor,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::Dim3 const domain_lo,
+        amrex::Dim3 const domain_hi,
+        amrex::GpuArray<int, 3> const& periodic,
+        bool& valid) noexcept
+    {
+        if (!hybrid_source_cell_is_addressable(
+                ci, cj, ck, domain_lo, domain_hi, periodic))
+        {
+            return 0.0_rt;
+        }
+        amrex::Real const cell_energy = source(ci, cj, ck);
+        amrex::Real const temperature_increment = remap(
+            ci, cj, ck, nonlinear_lte_temperature_increment_comp);
+        amrex::Real const represented_energy = remap(
+            ci, cj, ck, nonlinear_lte_represented_energy_comp);
+        if (!amrex::Math::isfinite(cell_energy)
+            || !amrex::Math::isfinite(temperature_increment)
+            || !amrex::Math::isfinite(represented_energy))
+        {
+            valid = false;
+            return 0.0_rt;
+        }
+        if (cell_energy == 0.0_rt && temperature_increment == 0.0_rt
+            && represented_energy == 0.0_rt)
+        {
+            return 0.0_rt;
+        }
+
+        int const di = i - ci;
+        int const dj = AMREX_SPACEDIM >= 2 ? j - cj : 0;
+        int const dk = AMREX_SPACEDIM == 3 ? k - ck : 0;
+        if (di < 0 || di > 1 || dj < 0 || dj > 1 || dk < 0 || dk > 1) {
+            valid = false;
+            return 0.0_rt;
+        }
+        amrex::Real const node_corner_volume = hybrid_cell_corner_volume(
+            ci, cj, ck, di, dj, dk, problo, dx, domain_lo);
+        amrex::Real const node_capacity =
+            thermodynamic_state(i, j, k, 1) * node_corner_volume;
+        amrex::Real cell_capacity = 0.0_rt;
+        for (int corner_dk = 0;
+             corner_dk < (AMREX_SPACEDIM == 3 ? 2 : 1); ++corner_dk)
+        {
+            for (int corner_dj = 0;
+                 corner_dj < (AMREX_SPACEDIM >= 2 ? 2 : 1); ++corner_dj)
+            {
+                for (int corner_di = 0; corner_di < 2; ++corner_di) {
+                    int const ni = ci + corner_di;
+                    int const nj = cj + corner_dj;
+                    int const nk = ck + corner_dk;
+                    if (rho(ni, nj, nk) <= material_rho_threshold) {
+                        continue;
+                    }
+                    amrex::Real const corner_volume =
+                        hybrid_cell_corner_volume(
+                            ci, cj, ck, corner_di, corner_dj, corner_dk,
+                            problo, dx, domain_lo);
+                    amrex::Real const corner_capacity =
+                        thermodynamic_state(ni, nj, nk, 1) * corner_volume;
+                    if (!(corner_capacity > 0.0_rt)
+                        || !amrex::Math::isfinite(corner_capacity))
+                    {
+                        valid = false;
+                        return 0.0_rt;
+                    }
+                    cell_capacity += corner_capacity;
+                }
+            }
+        }
+        if (!(node_corner_volume > 0.0_rt)
+            || !(node_capacity > 0.0_rt)
+            || !(cell_capacity > 0.0_rt)
+            || !amrex::Math::isfinite(node_corner_volume)
+            || !amrex::Math::isfinite(node_capacity)
+            || !amrex::Math::isfinite(cell_capacity))
+        {
+            valid = false;
+            return 0.0_rt;
+        }
+
+        amrex::Real const trial_temperature =
+            temperature(i, j, k) + temperature_increment;
+        auto const material_mass_density = thermodynamics
+            .materialMassDensitiesFromChargeDensityArrays(
+                material_charge_density, i, j, k);
+        ElectronThermodynamicState const trial_state = thermodynamics
+            .stateFromMaterialMassDensitiesTemperature(
+                amrex::max(rho(i, j, k), thermodynamic_rho_floor),
+                material_mass_density, trial_temperature);
+        amrex::Real const old_internal_energy_density =
+            thermodynamic_state(i, j, k, 0);
+        amrex::Real const represented_node_energy =
+            (trial_state.internal_energy_density - old_internal_energy_density)
+            * node_corner_volume;
+        amrex::Real const residual_energy =
+            cell_energy - represented_energy;
+        amrex::Real const node_energy = represented_node_energy
+            + residual_energy * node_capacity / cell_capacity;
+        if (trial_temperature < thermodynamics.minimumTemperature()
+            || trial_temperature > thermodynamics.maximumTemperature()
+            || !amrex::Math::isfinite(trial_temperature)
+            || trial_state.pressure < 0.0_rt
+            || !(trial_state.heat_capacity_density > 0.0_rt)
+            || !amrex::Math::isfinite(trial_state.pressure)
+            || !amrex::Math::isfinite(
+                trial_state.internal_energy_density)
+            || !amrex::Math::isfinite(
+                trial_state.heat_capacity_density)
+            || !amrex::Math::isfinite(represented_node_energy)
+            || !amrex::Math::isfinite(residual_energy)
+            || !amrex::Math::isfinite(node_energy))
+        {
+            valid = false;
+            return 0.0_rt;
+        }
+        return node_energy;
+    }
+
+    /** Constant-LTE contribution from one adjacent cell to one node. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real hybrid_constant_lte_node_energy (
+        int const i,
+        int const j,
+        int const k,
+        int const ci,
+        int const cj,
+        int const ck,
+        amrex::Array4<amrex::Real const> const& source,
+        amrex::Array4<amrex::Real const> const& thermodynamic_state,
+        amrex::Array4<amrex::Real const> const& rho,
+        amrex::Real const material_rho_threshold,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::Dim3 const domain_lo,
+        amrex::Dim3 const domain_hi,
+        amrex::GpuArray<int, 3> const& periodic,
+        bool& valid) noexcept
+    {
+        if (!hybrid_source_cell_is_addressable(
+                ci, cj, ck, domain_lo, domain_hi, periodic))
+        {
+            return 0.0_rt;
+        }
+        amrex::Real const cell_energy = source(ci, cj, ck);
+        if (!amrex::Math::isfinite(cell_energy)) {
+            valid = false;
+            return 0.0_rt;
+        }
+        if (cell_energy == 0.0_rt) { return 0.0_rt; }
+
+        int const di = i - ci;
+        int const dj = AMREX_SPACEDIM >= 2 ? j - cj : 0;
+        int const dk = AMREX_SPACEDIM == 3 ? k - ck : 0;
+        if (di < 0 || di > 1 || dj < 0 || dj > 1 || dk < 0 || dk > 1) {
+            valid = false;
+            return 0.0_rt;
+        }
+        amrex::Real const node_corner_volume = hybrid_cell_corner_volume(
+            ci, cj, ck, di, dj, dk, problo, dx, domain_lo);
+        amrex::Real const node_capacity =
+            thermodynamic_state(i, j, k, 1) * node_corner_volume;
+        amrex::Real cell_capacity = 0.0_rt;
+        for (int corner_dk = 0;
+             corner_dk < (AMREX_SPACEDIM == 3 ? 2 : 1); ++corner_dk)
+        {
+            for (int corner_dj = 0;
+                 corner_dj < (AMREX_SPACEDIM >= 2 ? 2 : 1); ++corner_dj)
+            {
+                for (int corner_di = 0; corner_di < 2; ++corner_di) {
+                    int const ni = ci + corner_di;
+                    int const nj = cj + corner_dj;
+                    int const nk = ck + corner_dk;
+                    if (rho(ni, nj, nk) <= material_rho_threshold) {
+                        continue;
+                    }
+                    amrex::Real const corner_volume =
+                        hybrid_cell_corner_volume(
+                            ci, cj, ck, corner_di, corner_dj, corner_dk,
+                            problo, dx, domain_lo);
+                    amrex::Real const corner_capacity =
+                        thermodynamic_state(ni, nj, nk, 1) * corner_volume;
+                    if (!(corner_capacity > 0.0_rt)
+                        || !amrex::Math::isfinite(corner_capacity))
+                    {
+                        valid = false;
+                        return 0.0_rt;
+                    }
+                    cell_capacity += corner_capacity;
+                }
+            }
+        }
+        if (!(node_corner_volume > 0.0_rt)
+            || !(node_capacity > 0.0_rt)
+            || !(cell_capacity > 0.0_rt)
+            || !amrex::Math::isfinite(node_corner_volume)
+            || !amrex::Math::isfinite(node_capacity)
+            || !amrex::Math::isfinite(cell_capacity))
+        {
+            valid = false;
+            return 0.0_rt;
+        }
+        amrex::Real const node_energy =
+            cell_energy * node_capacity / cell_capacity;
+        if (!amrex::Math::isfinite(node_energy)) {
+            valid = false;
+            return 0.0_rt;
+        }
+        return node_energy;
+    }
+
+    struct QdsmcCartesianTransportTerms
+    {
+        amrex::Real energy_flux_divergence = 0.0_rt;
+        amrex::Real charge_flux_divergence = 0.0_rt;
+        amrex::Real velocity_divergence = 0.0_rt;
+        amrex::Real outgoing_charge_flux_per_volume = 0.0_rt;
+        amrex::Real absolute_energy_flux_per_volume = 0.0_rt;
+        amrex::Real absolute_charge_flux_per_volume = 0.0_rt;
+        amrex::GpuArray<amrex::Real, 6>
+        outgoing_face_charge_flux_per_volume{};
+    };
+
+    struct QdsmcVelocityMetric
+    {
+        bool radial = false;
+        amrex::Real left_radius = 0.0_rt;
+        amrex::Real center_radius = 0.0_rt;
+        amrex::Real right_radius = 0.0_rt;
+        amrex::Real low_face_radius = 0.0_rt;
+        amrex::Real high_face_radius = 0.0_rt;
+    };
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) \
+    || defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) \
+    || defined(WARPX_DIM_RZ)
+    /** Mass-consistent first-order fluxes through one direction of a nodal
+     * dual control volume.  The electron charge flux is
+     *
+     *     F_rho = J_i - J_plasma = rho_e V_e,
+     *
+     * on the staggered current face.  The internal-energy flux carries the
+     * donor specific energy, F_U = F_rho (U/rho)_upwind.  Thus charge and
+     * internal energy use exactly the same transported amount, including at
+     * a material/vacuum front.  At a non-periodic domain edge the exterior
+     * flux and face velocity are zero, matching the existing impermeable
+     * energy boundary; the boundary control volume has half the interior
+     * width. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    QdsmcCartesianTransportTerms qdsmc_nodal_direction_terms (
+        amrex::Array4<amrex::Real const> const& energy,
+        amrex::Array4<amrex::Real const> const& old_charge_density,
+        amrex::Array4<amrex::Real const> const& midpoint_charge_density,
+        amrex::Array4<amrex::Real const> const& ion_current,
+        amrex::Array4<amrex::Real const> const& plasma_current,
+        amrex::Array4<amrex::Real const> const& nodal_velocity,
+        int const i, int const j, int const k,
+        int const direction, int const lo, int const hi,
+        bool const periodic,
+        bool const plasma_current_is_face_centered,
+        amrex::Real const face_area_lo,
+        amrex::Real const face_area_hi,
+        amrex::Real const inv_control_volume,
+        QdsmcVelocityMetric const& velocity_metric) noexcept
+    {
+        int const di = direction == 0 ? 1 : 0;
+        int const dj = direction == 1 ? 1 : 0;
+        int const dk = direction == 2 ? 1 : 0;
+        int const index = direction == 0 ? i : (direction == 1 ? j : k);
+        bool const low_wall = !periodic && index == lo;
+        bool const high_wall = !periodic && index == hi;
+
+        amrex::Real const u_center = energy(i, j, k);
+        amrex::Real const rho_center = old_charge_density(i, j, k);
+        amrex::Real velocity_lo = 0.0_rt;
+        amrex::Real velocity_hi = 0.0_rt;
+        amrex::Real charge_flux_lo = 0.0_rt;
+        amrex::Real charge_flux_hi = 0.0_rt;
+        amrex::Real flux_lo = 0.0_rt;
+        amrex::Real flux_hi = 0.0_rt;
+        if (!low_wall) {
+            amrex::Real const u_left = energy(i-di, j-dj, k-dk);
+            amrex::Real const rho_left =
+                old_charge_density(i-di, j-dj, k-dk);
+            // A current component is cell centered in its own direction and
+            // nodal in the transverse directions.  Index (i-di,j-dj,k-dk)
+            // therefore labels the low face of nodal control volume (i,j,k).
+            amrex::Real const plasma_flux_lo =
+                plasma_current_is_face_centered
+                ? plasma_current(i-di, j-dj, k-dk)
+                : 0.5_rt * (
+                    plasma_current(i-di, j-dj, k-dk)
+                    + plasma_current(i, j, k));
+            charge_flux_lo =
+                ion_current(i-di, j-dj, k-dk) - plasma_flux_lo;
+            amrex::Real const donor_density = charge_flux_lo >= 0.0_rt
+                ? rho_left : rho_center;
+            amrex::Real const donor_energy = charge_flux_lo >= 0.0_rt
+                ? u_left : u_center;
+            if (donor_density > 0.0_rt) {
+                flux_lo = charge_flux_lo * donor_energy / donor_density;
+            } else if (charge_flux_lo != 0.0_rt) {
+                flux_lo = std::numeric_limits<amrex::Real>::quiet_NaN();
+            }
+            amrex::Real const rho_mid_left =
+                midpoint_charge_density(i-di, j-dj, k-dk);
+            amrex::Real const rho_mid_center =
+                midpoint_charge_density(i, j, k);
+            bool const left_has_material =
+                rho_mid_left > 0.0_rt;
+            bool const center_has_material =
+                rho_mid_center > 0.0_rt;
+            velocity_lo = left_has_material && center_has_material
+                ? (velocity_metric.radial
+                    ? warpx::hybrid::cylindricalRadialFaceVelocity(
+                        nodal_velocity(i-di, j-dj, k-dk),
+                        nodal_velocity(i, j, k),
+                        velocity_metric.left_radius,
+                        velocity_metric.center_radius,
+                        velocity_metric.low_face_radius)
+                    : 0.5_rt * (
+                        nodal_velocity(i-di, j-dj, k-dk)
+                        + nodal_velocity(i, j, k)))
+                : (left_has_material
+                    ? nodal_velocity(i-di, j-dj, k-dk)
+                    : (center_has_material
+                        ? nodal_velocity(i, j, k) : 0.0_rt));
+        }
+        if (!high_wall) {
+            amrex::Real const u_right = energy(i+di, j+dj, k+dk);
+            amrex::Real const rho_right =
+                old_charge_density(i+di, j+dj, k+dk);
+            // Index (i,j,k) labels the high face of this nodal control volume.
+            amrex::Real const plasma_flux_hi =
+                plasma_current_is_face_centered
+                ? plasma_current(i, j, k)
+                : 0.5_rt * (
+                    plasma_current(i, j, k)
+                    + plasma_current(i+di, j+dj, k+dk));
+            charge_flux_hi = ion_current(i, j, k) - plasma_flux_hi;
+            amrex::Real const donor_density = charge_flux_hi >= 0.0_rt
+                ? rho_center : rho_right;
+            amrex::Real const donor_energy = charge_flux_hi >= 0.0_rt
+                ? u_center : u_right;
+            if (donor_density > 0.0_rt) {
+                flux_hi = charge_flux_hi * donor_energy / donor_density;
+            } else if (charge_flux_hi != 0.0_rt) {
+                flux_hi = std::numeric_limits<amrex::Real>::quiet_NaN();
+            }
+            amrex::Real const rho_mid_center =
+                midpoint_charge_density(i, j, k);
+            amrex::Real const rho_mid_right =
+                midpoint_charge_density(i+di, j+dj, k+dk);
+            bool const center_has_material =
+                rho_mid_center > 0.0_rt;
+            bool const right_has_material =
+                rho_mid_right > 0.0_rt;
+            velocity_hi = center_has_material && right_has_material
+                ? (velocity_metric.radial
+                    ? warpx::hybrid::cylindricalRadialFaceVelocity(
+                        nodal_velocity(i, j, k),
+                        nodal_velocity(i+di, j+dj, k+dk),
+                        velocity_metric.center_radius,
+                        velocity_metric.right_radius,
+                        velocity_metric.high_face_radius)
+                    : 0.5_rt * (
+                        nodal_velocity(i, j, k)
+                        + nodal_velocity(i+di, j+dj, k+dk)))
+                : (center_has_material
+                    ? nodal_velocity(i, j, k)
+                    : (right_has_material
+                        ? nodal_velocity(i+di, j+dj, k+dk) : 0.0_rt));
+        }
+
+        QdsmcCartesianTransportTerms result;
+        result.energy_flux_divergence =
+            warpx::hybrid::metricFluxDivergence(
+                flux_lo, flux_hi, face_area_lo, face_area_hi,
+                inv_control_volume);
+        result.charge_flux_divergence =
+            warpx::hybrid::metricFluxDivergence(
+                charge_flux_lo, charge_flux_hi, face_area_lo, face_area_hi,
+                inv_control_volume);
+        result.velocity_divergence =
+            warpx::hybrid::metricFluxDivergence(
+                velocity_lo, velocity_hi, face_area_lo, face_area_hi,
+                inv_control_volume);
+        result.outgoing_charge_flux_per_volume = (
+            amrex::max(charge_flux_hi, 0.0_rt) * face_area_hi
+            + amrex::max(-charge_flux_lo, 0.0_rt) * face_area_lo)
+            * inv_control_volume;
+        result.absolute_energy_flux_per_volume =
+            (std::abs(flux_lo) * face_area_lo
+            + std::abs(flux_hi) * face_area_hi) * inv_control_volume;
+        result.absolute_charge_flux_per_volume =
+            (std::abs(charge_flux_lo) * face_area_lo
+            + std::abs(charge_flux_hi) * face_area_hi) * inv_control_volume;
+        result.outgoing_face_charge_flux_per_volume[2 * direction] =
+            amrex::max(-charge_flux_lo, 0.0_rt) * face_area_lo
+            * inv_control_volume;
+        result.outgoing_face_charge_flux_per_volume[2 * direction + 1] =
+            amrex::max(charge_flux_hi, 0.0_rt) * face_area_hi
+            * inv_control_volume;
+        return result;
+    }
+#endif
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+    /** Metric-aware transport through the radial and axial faces of a
+     * cylindrical nodal control volume.  The caller supplies physical current
+     * densities; multiplying by these face areas and dividing by the nodal
+     * volume gives the correct cylindrical divergence. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    QdsmcCartesianTransportTerms qdsmc_cylindrical_transport_terms (
+        amrex::Array4<amrex::Real const> const& energy,
+        amrex::Array4<amrex::Real const> const& old_charge_density,
+        amrex::Array4<amrex::Real const> const& midpoint_charge_density,
+        amrex::Array4<amrex::Real const> const& ion_current_x,
+        amrex::Array4<amrex::Real const> const& ion_current_z,
+        amrex::Array4<amrex::Real const> const& plasma_current_x,
+        amrex::Array4<amrex::Real const> const& plasma_current_z,
+        amrex::Array4<amrex::Real const> const& vr,
+        amrex::Array4<amrex::Real const> const& vz,
+        int const i, int const j, int const k,
+        amrex::Dim3 const nodal_lo, amrex::Dim3 const nodal_hi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx,
+        amrex::GpuArray<int, 3> const& periodic,
+        amrex::GpuArray<int, 3> const& plasma_current_face_centered,
+        amrex::Real const axis_volume_factor,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& problo,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& probhi,
+        amrex::Dim3 const physical_domain_lo,
+        amrex::Dim3 const physical_domain_hi) noexcept
+    {
+        amrex::ignore_unused(probhi, physical_domain_hi);
+        amrex::Real const r =
+            problo[0] + (i - physical_domain_lo.x) * dx[0];
+        amrex::Real const r_lo =
+            amrex::max(problo[0], r - 0.5_rt * dx[0]);
+        amrex::Real const r_hi = r + 0.5_rt * dx[0];
+        amrex::Real const node_volume = hybrid_transport_node_volume(
+            i, j, k, problo, dx, physical_domain_lo, axis_volume_factor);
+        QdsmcVelocityMetric const radial_velocity_metric{
+            true, r - dx[0], r, r + dx[0], r_lo, r_hi};
+
+#ifdef WARPX_DIM_RCYLINDER
+        amrex::ignore_unused(
+            ion_current_z, plasma_current_z, vz, nodal_lo, nodal_hi,
+            periodic);
+        return qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_x, plasma_current_x, vr,
+            i, j, k, 0, nodal_lo.x, nodal_hi.x,
+            periodic[0] != 0,
+            plasma_current_face_centered[0] != 0,
+            warpx::hybrid::cylindricalRadialFaceArea(r_lo, 1.0_rt),
+            warpx::hybrid::cylindricalRadialFaceArea(r_hi, 1.0_rt),
+            1.0_rt / node_volume, radial_velocity_metric);
+#else
+        amrex::Real const radial_face_area =
+            warpx::hybrid::cylindricalAxialFaceArea(r_lo, r_hi);
+        QdsmcCartesianTransportTerms const radial = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_x, plasma_current_x, vr,
+            i, j, k, 0, nodal_lo.x, nodal_hi.x,
+            periodic[0] != 0,
+            plasma_current_face_centered[0] != 0,
+            warpx::hybrid::cylindricalRadialFaceArea(r_lo, dx[1]),
+            warpx::hybrid::cylindricalRadialFaceArea(r_hi, dx[1]),
+            1.0_rt / node_volume, radial_velocity_metric);
+        QdsmcCartesianTransportTerms const axial = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_z, plasma_current_z, vz,
+            i, j, k, 1, nodal_lo.y, nodal_hi.y,
+            periodic[1] != 0,
+            plasma_current_face_centered[1] != 0,
+            radial_face_area, radial_face_area, 1.0_rt / node_volume,
+            QdsmcVelocityMetric{});
+        QdsmcCartesianTransportTerms result;
+        result.energy_flux_divergence =
+            radial.energy_flux_divergence + axial.energy_flux_divergence;
+        result.charge_flux_divergence =
+            radial.charge_flux_divergence + axial.charge_flux_divergence;
+        result.velocity_divergence =
+            radial.velocity_divergence + axial.velocity_divergence;
+        result.outgoing_charge_flux_per_volume =
+            radial.outgoing_charge_flux_per_volume
+            + axial.outgoing_charge_flux_per_volume;
+        result.absolute_energy_flux_per_volume =
+            radial.absolute_energy_flux_per_volume
+            + axial.absolute_energy_flux_per_volume;
+        result.absolute_charge_flux_per_volume =
+            radial.absolute_charge_flux_per_volume
+            + axial.absolute_charge_flux_per_volume;
+        for (int face = 0; face < 4; ++face) {
+            result.outgoing_face_charge_flux_per_volume[face] =
+                face < 2
+                    ? radial.outgoing_face_charge_flux_per_volume[face]
+                    : axial.outgoing_face_charge_flux_per_volume[face];
+        }
+        return result;
+#endif
+    }
+#endif
+
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RZ)
+    /** Conservative Cartesian finite-volume transport terms for
+     * dU/dt + div(U V_e) = -P_e div(V_e). Energy advection uses the
+     * charge-conserving mass flux, while pressure work uses the separately
+     * co-deposited physical velocity so rigid translation has exactly zero
+     * discrete compression. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    QdsmcCartesianTransportTerms qdsmc_cartesian_transport_terms (
+        amrex::Array4<amrex::Real const> const& energy,
+        amrex::Array4<amrex::Real const> const& old_charge_density,
+        amrex::Array4<amrex::Real const> const& midpoint_charge_density,
+        amrex::Array4<amrex::Real const> const& ion_current_x,
+        amrex::Array4<amrex::Real const> const& ion_current_y,
+        amrex::Array4<amrex::Real const> const& ion_current_z,
+        amrex::Array4<amrex::Real const> const& plasma_current_x,
+        amrex::Array4<amrex::Real const> const& plasma_current_y,
+        amrex::Array4<amrex::Real const> const& plasma_current_z,
+        amrex::Array4<amrex::Real const> const& vx,
+        amrex::Array4<amrex::Real const> const& vy,
+        amrex::Array4<amrex::Real const> const& vz,
+        int const i, int const j, int const k,
+        amrex::Dim3 const nodal_lo, amrex::Dim3 const nodal_hi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& inv_dx,
+        amrex::GpuArray<int, 3> const& periodic,
+        amrex::GpuArray<int, 3> const& plasma_current_face_centered) noexcept
+    {
+        amrex::ignore_unused(
+            ion_current_x, ion_current_y, ion_current_z,
+            plasma_current_x, plasma_current_y, plasma_current_z,
+            vx, vy, vz);
+        QdsmcCartesianTransportTerms result;
+#if defined(WARPX_DIM_3D)
+        auto const tx = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_x, plasma_current_x, vx,
+            i, j, k, 0, nodal_lo.x, nodal_hi.x,
+            periodic[0] != 0,
+            plasma_current_face_centered[0] != 0, 1.0_rt, 1.0_rt,
+            inv_dx[0] * ((!periodic[0] && (i == nodal_lo.x
+                || i == nodal_hi.x)) ? 2.0_rt : 1.0_rt),
+            QdsmcVelocityMetric{});
+        auto const ty = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_y, plasma_current_y, vy,
+            i, j, k, 1, nodal_lo.y, nodal_hi.y,
+            periodic[1] != 0,
+            plasma_current_face_centered[1] != 0, 1.0_rt, 1.0_rt,
+            inv_dx[1] * ((!periodic[1] && (j == nodal_lo.y
+                || j == nodal_hi.y)) ? 2.0_rt : 1.0_rt),
+            QdsmcVelocityMetric{});
+        auto const tz = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_z, plasma_current_z, vz,
+            i, j, k, 2, nodal_lo.z, nodal_hi.z,
+            periodic[2] != 0,
+            plasma_current_face_centered[2] != 0, 1.0_rt, 1.0_rt,
+            inv_dx[2] * ((!periodic[2] && (k == nodal_lo.z
+                || k == nodal_hi.z)) ? 2.0_rt : 1.0_rt),
+            QdsmcVelocityMetric{});
+        result.energy_flux_divergence = tx.energy_flux_divergence
+            + ty.energy_flux_divergence + tz.energy_flux_divergence;
+        result.charge_flux_divergence = tx.charge_flux_divergence
+            + ty.charge_flux_divergence + tz.charge_flux_divergence;
+        result.velocity_divergence = tx.velocity_divergence
+            + ty.velocity_divergence + tz.velocity_divergence;
+        result.outgoing_charge_flux_per_volume =
+            tx.outgoing_charge_flux_per_volume
+            + ty.outgoing_charge_flux_per_volume
+            + tz.outgoing_charge_flux_per_volume;
+        result.absolute_energy_flux_per_volume =
+            tx.absolute_energy_flux_per_volume
+            + ty.absolute_energy_flux_per_volume
+            + tz.absolute_energy_flux_per_volume;
+        result.absolute_charge_flux_per_volume =
+            tx.absolute_charge_flux_per_volume
+            + ty.absolute_charge_flux_per_volume
+            + tz.absolute_charge_flux_per_volume;
+        for (int face = 0; face < 6; ++face) {
+            result.outgoing_face_charge_flux_per_volume[face] =
+                tx.outgoing_face_charge_flux_per_volume[face]
+                + ty.outgoing_face_charge_flux_per_volume[face]
+                + tz.outgoing_face_charge_flux_per_volume[face];
+        }
+#elif defined(WARPX_DIM_XZ)
+        auto const tx = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_x, plasma_current_x, vx,
+            i, j, k, 0, nodal_lo.x, nodal_hi.x,
+            periodic[0] != 0,
+            plasma_current_face_centered[0] != 0, 1.0_rt, 1.0_rt,
+            inv_dx[0] * ((!periodic[0] && (i == nodal_lo.x
+                || i == nodal_hi.x)) ? 2.0_rt : 1.0_rt),
+            QdsmcVelocityMetric{});
+        auto const tz = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_z, plasma_current_z, vz,
+            i, j, k, 1, nodal_lo.y, nodal_hi.y,
+            periodic[1] != 0,
+            plasma_current_face_centered[1] != 0, 1.0_rt, 1.0_rt,
+            inv_dx[1] * ((!periodic[1] && (j == nodal_lo.y
+                || j == nodal_hi.y)) ? 2.0_rt : 1.0_rt),
+            QdsmcVelocityMetric{});
+        result.energy_flux_divergence =
+            tx.energy_flux_divergence + tz.energy_flux_divergence;
+        result.charge_flux_divergence =
+            tx.charge_flux_divergence + tz.charge_flux_divergence;
+        result.velocity_divergence =
+            tx.velocity_divergence + tz.velocity_divergence;
+        result.outgoing_charge_flux_per_volume =
+            tx.outgoing_charge_flux_per_volume
+            + tz.outgoing_charge_flux_per_volume;
+        result.absolute_energy_flux_per_volume =
+            tx.absolute_energy_flux_per_volume
+            + tz.absolute_energy_flux_per_volume;
+        result.absolute_charge_flux_per_volume =
+            tx.absolute_charge_flux_per_volume
+            + tz.absolute_charge_flux_per_volume;
+        for (int face = 0; face < 6; ++face) {
+            result.outgoing_face_charge_flux_per_volume[face] =
+                tx.outgoing_face_charge_flux_per_volume[face]
+                + tz.outgoing_face_charge_flux_per_volume[face];
+        }
+#elif defined(WARPX_DIM_1D_Z)
+        result = qdsmc_nodal_direction_terms(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_z, plasma_current_z, vz,
+            i, j, k, 0, nodal_lo.x, nodal_hi.x,
+            periodic[0] != 0,
+            plasma_current_face_centered[0] != 0, 1.0_rt, 1.0_rt,
+            inv_dx[0] * ((!periodic[0] && (i == nodal_lo.x
+                || i == nodal_hi.x)) ? 2.0_rt : 1.0_rt),
+            QdsmcVelocityMetric{});
+#else
+        amrex::ignore_unused(
+            energy, old_charge_density, midpoint_charge_density,
+            ion_current_x, ion_current_y,
+            ion_current_z, plasma_current_x, plasma_current_y,
+            plasma_current_z, vx, vy, vz, i, j, k, nodal_lo, nodal_hi,
+            inv_dx, periodic,
+            plasma_current_face_centered);
+        result.energy_flux_divergence =
+            std::numeric_limits<amrex::Real>::quiet_NaN();
+        result.charge_flux_divergence =
+            std::numeric_limits<amrex::Real>::quiet_NaN();
+        result.velocity_divergence =
+            std::numeric_limits<amrex::Real>::quiet_NaN();
+        result.outgoing_charge_flux_per_volume =
+            std::numeric_limits<amrex::Real>::quiet_NaN();
+        result.absolute_energy_flux_per_volume =
+            std::numeric_limits<amrex::Real>::quiet_NaN();
+        result.absolute_charge_flux_per_volume =
+            std::numeric_limits<amrex::Real>::quiet_NaN();
+#endif
+        return result;
+    }
+#endif
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    /** Support-aware divergence of a nodal current divided by nodal charge
+     * density.  This mirrors the face construction used by the nonlinear FV
+     * electron velocity, so subtracting its V_e divergence isolates the
+     * retained div(J_plasma/rho) pressure-work channel without changing the
+     * reviewed material/vacuum interface rule. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real qdsmc_ratio_velocity_direction_divergence (
+        amrex::Array4<amrex::Real const> const& numerator,
+        amrex::Array4<amrex::Real const> const& density,
+        int const i, int const j, int const k,
+        int const direction, int const lo, int const hi,
+        amrex::Real const inv_dx, bool const periodic) noexcept
+    {
+        int const di = direction == 0 ? 1 : 0;
+        int const dj = direction == 1 ? 1 : 0;
+        int const dk = direction == 2 ? 1 : 0;
+        int const index = direction == 0 ? i : (direction == 1 ? j : k);
+        bool const low_wall = !periodic && index == lo;
+        bool const high_wall = !periodic && index == hi;
+
+        amrex::Real const rho_center = density(i, j, k);
+        bool const center_has_material = rho_center > 0.0_rt;
+        amrex::Real const velocity_center = center_has_material
+            ? numerator(i, j, k) / rho_center : 0.0_rt;
+        amrex::Real velocity_lo = 0.0_rt;
+        amrex::Real velocity_hi = 0.0_rt;
+        if (!low_wall) {
+            amrex::Real const rho_left = density(i-di, j-dj, k-dk);
+            bool const left_has_material = rho_left > 0.0_rt;
+            amrex::Real const velocity_left = left_has_material
+                ? numerator(i-di, j-dj, k-dk) / rho_left : 0.0_rt;
+            velocity_lo = left_has_material && center_has_material
+                ? 0.5_rt * (velocity_left + velocity_center)
+                : (left_has_material ? velocity_left
+                                     : (center_has_material
+                                         ? velocity_center : 0.0_rt));
+        }
+        if (!high_wall) {
+            amrex::Real const rho_right = density(i+di, j+dj, k+dk);
+            bool const right_has_material = rho_right > 0.0_rt;
+            amrex::Real const velocity_right = right_has_material
+                ? numerator(i+di, j+dj, k+dk) / rho_right : 0.0_rt;
+            velocity_hi = center_has_material && right_has_material
+                ? 0.5_rt * (velocity_center + velocity_right)
+                : (center_has_material ? velocity_center
+                                       : (right_has_material
+                                           ? velocity_right : 0.0_rt));
+        }
+        amrex::Real const inv_control_width = inv_dx
+            * ((!periodic && (index == lo || index == hi)) ? 2.0_rt : 1.0_rt);
+        return (velocity_hi - velocity_lo) * inv_control_width;
+    }
+#endif
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real qdsmc_cartesian_ratio_velocity_divergence (
+        amrex::Array4<amrex::Real const> const& numerator_x,
+        amrex::Array4<amrex::Real const> const& numerator_y,
+        amrex::Array4<amrex::Real const> const& numerator_z,
+        amrex::Array4<amrex::Real const> const& density,
+        int const i, int const j, int const k,
+        amrex::Dim3 const nodal_lo, amrex::Dim3 const nodal_hi,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& inv_dx,
+        amrex::GpuArray<int, 3> const& periodic) noexcept
+    {
+        amrex::ignore_unused(numerator_x, numerator_y);
+#if defined(WARPX_DIM_3D)
+        return qdsmc_ratio_velocity_direction_divergence(
+                   numerator_x, density, i, j, k, 0,
+                   nodal_lo.x, nodal_hi.x, inv_dx[0], periodic[0] != 0)
+            + qdsmc_ratio_velocity_direction_divergence(
+                   numerator_y, density, i, j, k, 1,
+                   nodal_lo.y, nodal_hi.y, inv_dx[1], periodic[1] != 0)
+            + qdsmc_ratio_velocity_direction_divergence(
+                   numerator_z, density, i, j, k, 2,
+                   nodal_lo.z, nodal_hi.z, inv_dx[2], periodic[2] != 0);
+#elif defined(WARPX_DIM_XZ)
+        return qdsmc_ratio_velocity_direction_divergence(
+                   numerator_x, density, i, j, k, 0,
+                   nodal_lo.x, nodal_hi.x, inv_dx[0], periodic[0] != 0)
+            + qdsmc_ratio_velocity_direction_divergence(
+                   numerator_z, density, i, j, k, 1,
+                   nodal_lo.y, nodal_hi.y, inv_dx[1], periodic[1] != 0);
+#elif defined(WARPX_DIM_1D_Z)
+        return qdsmc_ratio_velocity_direction_divergence(
+            numerator_z, density, i, j, k, 0,
+            nodal_lo.x, nodal_hi.x, inv_dx[0], periodic[0] != 0);
+#else
+        amrex::ignore_unused(
+            numerator_x, numerator_y, numerator_z, density,
+            i, j, k, nodal_lo, nodal_hi, inv_dx, periodic);
+        return std::numeric_limits<amrex::Real>::quiet_NaN();
+#endif
+    }
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real qdsmc_masked_pressure_work_velocity (
+        amrex::Array4<amrex::Real const> const& work_current,
+        amrex::Array4<amrex::Real const> const& pressure_work_state,
+        int const i, int const j, int const k) noexcept
+    {
+        return work_current(i, j, k)
+            * pressure_work_state(i, j, k, 1);
+    }
+#endif
+
+    /** D(V_work) for the exact collocated pressure-force adjoint.  The nodal
+     * Ohm-law pressure gradient is centered in every active Cartesian
+     * direction, hence on a periodic uniform grid D=-G*=G. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real qdsmc_pressure_work_velocity_divergence (
+        amrex::Array4<amrex::Real const> const& work_current_x,
+        amrex::Array4<amrex::Real const> const& work_current_y,
+        amrex::Array4<amrex::Real const> const& work_current_z,
+        amrex::Array4<amrex::Real const> const& pressure_work_state,
+        int const i, int const j, int const k,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& inv_dx) noexcept
+    {
+        amrex::ignore_unused(work_current_x, work_current_y);
+        amrex::Real divergence = 0.0_rt;
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+        divergence += 0.5_rt * inv_dx[0] * (
+            qdsmc_masked_pressure_work_velocity(
+                work_current_x, pressure_work_state, i+1, j, k)
+            - qdsmc_masked_pressure_work_velocity(
+                work_current_x, pressure_work_state, i-1, j, k));
+#endif
+#if defined(WARPX_DIM_3D)
+        divergence += 0.5_rt * inv_dx[1] * (
+            qdsmc_masked_pressure_work_velocity(
+                work_current_y, pressure_work_state, i, j+1, k)
+            - qdsmc_masked_pressure_work_velocity(
+                work_current_y, pressure_work_state, i, j-1, k));
+        divergence += 0.5_rt * inv_dx[2] * (
+            qdsmc_masked_pressure_work_velocity(
+                work_current_z, pressure_work_state, i, j, k+1)
+            - qdsmc_masked_pressure_work_velocity(
+                work_current_z, pressure_work_state, i, j, k-1));
+#elif defined(WARPX_DIM_XZ)
+        divergence += 0.5_rt * inv_dx[1] * (
+            qdsmc_masked_pressure_work_velocity(
+                work_current_z, pressure_work_state, i, j+1, k)
+            - qdsmc_masked_pressure_work_velocity(
+                work_current_z, pressure_work_state, i, j-1, k));
+#elif defined(WARPX_DIM_1D_Z)
+        divergence += 0.5_rt * inv_dx[0] * (
+            qdsmc_masked_pressure_work_velocity(
+                work_current_z, pressure_work_state, i+1, j, k)
+            - qdsmc_masked_pressure_work_velocity(
+                work_current_z, pressure_work_state, i-1, j, k));
+#else
+        amrex::ignore_unused(
+            work_current_x, work_current_y, work_current_z,
+            pressure_work_state, i, j, k, inv_dx);
+        divergence = std::numeric_limits<amrex::Real>::quiet_NaN();
+#endif
+        return divergence;
+    }
+}
+
+HybridPICModel::HybridPICModel (
+    warpx::materials::MaterialRegistry const* const material_registry)
+{
+    ReadParameters(material_registry);
 }
 
 HybridPICModel::~HybridPICModel () = default;
 
-void HybridPICModel::ReadParameters ()
+void HybridPICModel::ReadParameters (
+    warpx::materials::MaterialRegistry const* const material_registry)
 {
     const ParmParse pp_hybrid("hybrid_pic_model");
 
@@ -78,30 +1135,48 @@ void HybridPICModel::ReadParameters ()
     if (m_gamma != 1.0 && !n0_ref_given) {
         Abort("hybrid_pic_model.n0_ref should be specified if hybrid_pic_model.gamma != 1");
     }
+    m_electron_thermodynamics.ReadParameters(
+        pp_hybrid, m_gamma, material_registry);
 
     pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
-    // Master gate for the electron-energy equation. When enabled, K_e is
-    // advected each step by fictitious Lagrangian particles moving with V_e
-    // (see Phys. Plasmas 31, 012902 (2024)); T_e is recovered from K_e and n_e
-    // via the polytropic relation; operator-split source terms are added;
-    // Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. Default off
-    // preserves the legacy algebraic adiabatic closure.
+    // Master gate for the electron-energy equation. Ideal-gas states use the
+    // published QDSMC entropy markers; supported nonlinear Cartesian states
+    // use conservative finite-volume U_e transport with pressure work.
+    // Operator-split sources are then applied and P_e is emitted for Ohm's
+    // law. Default off preserves the legacy algebraic adiabatic closure.
     pp_hybrid.query("solve_electron_energy_equation",
                     m_solve_electron_energy_equation);
-#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    pp_hybrid.query("conservative_pressure_work",
+                    m_conservative_pressure_work);
+#if defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_solve_electron_energy_equation,
         "hybrid_pic_model.solve_electron_energy_equation is not supported in "
-        "RCYLINDER/RSPHERE geometries yet.");
+        "RSPHERE geometry yet.");
 #endif
+
+    // The finite-volume U_e update covers Cartesian and cylindrical nodal
+    // control volumes. Spherical geometry and multi-material tables still
+    // require their own metric/composition operators; retain the reviewed
+    // ideal-entropy fallback for those configurations and warn below.
+    m_fv_transport_internal_energy =
+        !m_electron_thermodynamics.executor().isIdealGas();
+#if defined(WARPX_DIM_RSPHERE)
+    m_fv_transport_internal_energy = false;
+#endif
+    if (m_electron_thermodynamics.isSingularitySpiner()
+        && m_electron_thermodynamics.numMaterials() != 1)
+    {
+        m_fv_transport_internal_energy = false;
+    }
 
     // Resistive electron-heating source (Phys. Plasmas 31, 012902 (2024), Eq. 12):
     //   S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,  nu_{s,e} = Z_s e^2 eta n_e / m_s
-    // added per cell to T_e by QDSMCAddJouleHeating, using the e-i relative
+    // added per cell to U_e by QDSMCAddJouleHeating, using the e-i relative
     // drift J_plasma/(e n_e) and rho_fp(_s). Reduces to eta J^2 in single species.
     // Default off; only consulted when solve_electron_energy_equation is on.
     pp_hybrid.query("include_joule_heating", m_include_joule_heating);
@@ -116,11 +1191,50 @@ void HybridPICModel::ReadParameters ()
     //   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),  applied per ion species weighted by
     //   n_s/n_e, cooling T_e toward T_i. nu_ei[1/s] comes from the
     //   electron_ion_relaxation_rate(rho,Te,Ti,t) parser (rho [C/m^3], Te,Ti [eV]).
-    //   The matching ion heating is deposited conservatively, so the exchange
-    //   conserves energy. Enabled by specifying the rate expression (only
-    //   consulted when solve_electron_energy_equation is on).
+    //   The exact electron energy change is ledgered for the conjugate ion
+    //   operator. A cell-local ion moment projection consumes that ledger
+    //   while preserving cell ion momentum. Enabled by specifying the rate
+    //   expression (only consulted when solve_electron_energy_equation is on).
     m_include_temperature_relaxation =
         pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
+
+    if (m_electron_thermodynamics.isFixedChargeLatentEnergy()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_electron_thermodynamics.supportsEnergyCoupling(),
+            "hybrid_pic_model.electron_thermodynamics="
+            "fixed_charge_latent_energy requires gamma > 1.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_solve_electron_energy_equation,
+            "hybrid_pic_model.electron_thermodynamics="
+            "fixed_charge_latent_energy requires "
+            "solve_electron_energy_equation=1.");
+        if (!m_fv_transport_internal_energy) {
+            ablastr::warn_manager::WMRecordWarning(
+                "HybridPICModel",
+                "fixed_charge_latent_energy is a fixed-charge analytic caloric "
+                "reservoir. This unsupported geometry or multi-material state "
+                "still uses the reviewed ideal-entropy QDSMC fallback; "
+                "compression and expansion are not yet nonlinear-EOS-"
+                "consistent until its finite-volume operator is implemented.",
+                ablastr::warn_manager::WarnPriority::medium);
+        }
+    }
+    if (m_electron_thermodynamics.isSingularitySpiner()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_solve_electron_energy_equation,
+            "hybrid_pic_model.electron_thermodynamics=singularity_spiner "
+            "requires solve_electron_energy_equation=1.");
+        if (!m_fv_transport_internal_energy) {
+            ablastr::warn_manager::WMRecordWarning(
+                "HybridPICModel",
+                "singularity_spiner is restricted to fixed-charge host-only "
+                "material coupling. Unsupported geometries and multi-material "
+                "tables still use the reviewed ideal-entropy QDSMC fallback; "
+                "compression and expansion are not table-EOS-consistent in "
+                "those configurations.",
+                ablastr::warn_manager::WarnPriority::medium);
+        }
+    }
 
     // The electron-energy equation's Joule and Q_ei sources read the
     // per-species charge densities; this flag gates their allocation and
@@ -180,6 +1294,43 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, rho_nodal_flag),
         dm, ncomps, ngRho, 0.0_rt);
 
+    if (m_conservative_pressure_work) {
+        // Preserve the pressure component that was actually present in the
+        // checkpointed total E field.  Reconstructing it from a later rho/Pe
+        // state on restart would debit electron energy for a force that did not
+        // produce the restored particle trajectory.
+        fields.alloc_init(
+            FieldType::hybrid_pressure_E_fp, Direction{0}, lev,
+            amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt,
+            /*remake=*/true, /*redistribute_on_remake=*/true,
+            /*checkpoint_restart=*/true);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_E_fp, Direction{1}, lev,
+            amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt,
+            /*remake=*/true, /*redistribute_on_remake=*/true,
+            /*checkpoint_restart=*/true);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_E_fp, Direction{2}, lev,
+            amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt,
+            /*remake=*/true, /*redistribute_on_remake=*/true,
+            /*checkpoint_restart=*/true);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_work_current_fp, Direction{0}, lev,
+            amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_work_current_fp, Direction{1}, lev,
+            amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_work_current_fp, Direction{2}, lev,
+            amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_work_state_fp, lev,
+            amrex::convert(ba, rho_nodal_flag), dm,
+            /*ncomp=*/2, ngRho, 0.0_rt,
+            /*remake=*/true, /*redistribute_on_remake=*/true,
+            /*checkpoint_restart=*/true);
+    }
+
     // Electron temperature T_e (Kelvin). Allocated unconditionally (one
     // cheap scalar field) so the "Te" diagnostic can always read it: with
     // the energy equation on it is the QDSMC state variable, otherwise it
@@ -187,18 +1338,21 @@ void HybridPICModel::AllocateLevelMFs (
     // filled alongside P_e in CalculateElectronPressure.
     fields.alloc_init(FieldType::hybrid_electron_temperature_fp,
         lev, amrex::convert(ba, rho_nodal_flag),
-        dm, ncomps, ngRho, 0.0_rt);
+        dm, ncomps, ngRho, 0.0_rt,
+        /*remake=*/true,
+        /*redistribute_on_remake=*/true,
+        /*checkpoint_restart=*/m_solve_electron_energy_equation);
 
-    // QDSMC electron-energy-equation working fields, only touched (and
+    // Electron-energy-equation working fields, only touched (and
     // therefore only allocated) when the energy equation is solved:
-    //   * hybrid_entropy_fp              : K_e = T_e * n_e^(1-gamma)
-    //   * hybrid_qdsmc_weights_fp        : scratch for deposited N_e
+    //   * hybrid_qdsmc_thermodynamic_fp  : K_e or transported U_e scratch
+    //   * hybrid_qdsmc_weights_fp        : deposited N_e scratch
     //   * hybrid_electron_velocity_fp    : three-component V_e on a NODAL
     //     grid, computed each step from V_e = -(J_plasma - J_i)/(q_e n_e)
-    //     and consumed by the QDSMC particle SetV step to advect the
-    //     entropy carriers.
+    //     and consumed by either QDSMC marker advection or nonlinear FV
+    //     transport.
     if (m_solve_electron_energy_equation) {
-        fields.alloc_init(FieldType::hybrid_entropy_fp,
+        fields.alloc_init(FieldType::hybrid_qdsmc_thermodynamic_fp,
             lev, amrex::convert(ba, rho_nodal_flag),
             dm, ncomps, ngRho, 0.0_rt);
         fields.alloc_init(FieldType::hybrid_qdsmc_weights_fp,
@@ -213,6 +1367,153 @@ void HybridPICModel::AllocateLevelMFs (
         fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{2},
             lev, amrex::convert(ba, rho_nodal_flag),
             dm, ncomps, ngRho, 0.0_rt);
+
+        if (m_include_joule_heating) {
+            // Realized electron-side Joule increments [J/m^3].  The step
+            // field exposes the exact caloric update; the cumulative field is
+            // checkpointed so a run/restart energy audit has one continuous
+            // ledger.  Redirected-to-ion energy is intentionally excluded.
+            fields.alloc_init(
+                "hybrid_joule_electron_energy_fp", lev,
+                amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                0.0_rt);
+            fields.alloc_init(
+                "hybrid_joule_electron_energy_cumulative_fp", lev,
+                amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                0.0_rt, /*remake=*/true,
+                /*redistribute_on_remake=*/true,
+                /*checkpoint_restart=*/true);
+        }
+
+        if (m_include_temperature_relaxation) {
+            // Electron-side Q_ei source ledgers [J/m^3]. The step field is
+            // the contract for the conjugate kinetic-ion update; cumulative
+            // exchange remains auditable across checkpoints and restarts.
+            fields.alloc_init(
+                "hybrid_qei_electron_energy_fp", lev,
+                amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                0.0_rt);
+            fields.alloc_init(
+                "hybrid_qei_electron_energy_cumulative_fp", lev,
+                amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                0.0_rt, /*remake=*/true,
+                /*redistribute_on_remake=*/true,
+                /*checkpoint_restart=*/true);
+
+            // The Q_ei operator consumes the shape-aware, cell-centered ion
+            // temperature after interpolating it to the nodal electron grid.
+            // Expose that exact per-species operand [eV] for diagnostics and
+            // manufactured-solution tests.  This is deliberately distinct
+            // from the legacy T_<species> diagnostic, which recomputes an NGP
+            // temperature and therefore is not an oracle for this operator.
+            auto const& mypc = WarpX::GetInstance().GetPartContainer();
+            for (auto const& spec : mypc.GetSpeciesNames()) {
+                if (mypc.GetParticleContainerFromName(spec).getCharge()
+                    == 0.0_prt)
+                {
+                    continue;
+                }
+                fields.alloc_init(
+                    "hybrid_qei_ion_temperature_fp_" + spec, lev,
+                    amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                    0.0_rt);
+                fields.alloc_init(
+                    "hybrid_qei_electron_temperature_before_fp_" + spec,
+                    lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps,
+                    ngRho, 0.0_rt);
+                // Per-species electron-side exchange [J/m^3].  Its negative,
+                // integrated over the nodal dual volumes adjoining a particle
+                // cell, is the exact kinetic-ion thermal-energy request.
+                fields.alloc_init(
+                    "hybrid_qei_electron_energy_fp_" + spec, lev,
+                    amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                    0.0_rt);
+                // Conservative particle-cell request after the nodal source
+                // is partitioned over adjacent local ion support [J/m^3].
+                fields.alloc_init(
+                    "hybrid_qei_ion_energy_cc_" + spec, lev,
+                    amrex::convert(ba, amrex::IntVect::TheCellVector()), dm,
+                    ncomps, amrex::IntVect::TheZeroVector(), 0.0_rt);
+            }
+        }
+
+        if (m_fv_transport_internal_energy) {
+            // Dedicated Yee-face current used solely as the conservative
+            // electron charge/mass flux.  It intentionally keeps this
+            // staggering when the primary hybrid field grid is collocated.
+#if defined(WARPX_DIM_1D_Z)
+            IntVect const flux_x_flag(1);
+            IntVect const flux_y_flag(1);
+            IntVect const flux_z_flag(0);
+#elif defined(WARPX_DIM_XZ)
+            IntVect const flux_x_flag(0, 1);
+            IntVect const flux_y_flag(1, 1);
+            IntVect const flux_z_flag(1, 0);
+#elif defined(WARPX_DIM_3D)
+            IntVect const flux_x_flag(0, 1, 1);
+            IntVect const flux_y_flag(1, 0, 1);
+            IntVect const flux_z_flag(1, 1, 0);
+#elif defined(WARPX_DIM_RZ)
+            IntVect const flux_x_flag(0, 1);
+            IntVect const flux_y_flag(1, 1);
+            IntVect const flux_z_flag(1, 0);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            IntVect const flux_x_flag(0);
+            IntVect const flux_y_flag(1);
+            IntVect const flux_z_flag(1);
+#else
+            IntVect const flux_x_flag = jx_nodal_flag;
+            IntVect const flux_y_flag = jy_nodal_flag;
+            IntVect const flux_z_flag = jz_nodal_flag;
+#endif
+            fields.alloc_init(
+                FieldType::hybrid_energy_charge_flux_fp, Direction{0}, lev,
+                amrex::convert(ba, flux_x_flag), dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init(
+                FieldType::hybrid_energy_charge_flux_fp, Direction{1}, lev,
+                amrex::convert(ba, flux_y_flag), dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init(
+                FieldType::hybrid_energy_charge_flux_fp, Direction{2}, lev,
+                amrex::convert(ba, flux_z_flag), dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init(
+                FieldType::hybrid_energy_rho_mid_fp, lev,
+                amrex::convert(ba, rho_nodal_flag),
+                dm, ncomps, ngRho, 0.0_rt);
+            fields.alloc_init(
+                FieldType::hybrid_energy_velocity_current_fp, Direction{0},
+                lev, amrex::convert(ba, rho_nodal_flag),
+                dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init(
+                FieldType::hybrid_energy_velocity_current_fp, Direction{1},
+                lev, amrex::convert(ba, rho_nodal_flag),
+                dm, ncomps, ngJ, 0.0_rt);
+            fields.alloc_init(
+                FieldType::hybrid_energy_velocity_current_fp, Direction{2},
+                lev, amrex::convert(ba, rho_nodal_flag),
+                dm, ncomps, ngJ, 0.0_rt);
+        }
+
+        if (WarpX::GetInstance().GetPartContainer().hasHybridIonization()) {
+            // Old charge density is scratch. The last-step liberated-electron
+            // and binding-energy densities are physical diagnostic ledgers and
+            // are checkpointed so diagnostics written immediately on restart
+            // reproduce the checkpoint state.
+            fields.alloc_init("hybrid_ionization_rho_old_fp",
+                lev, amrex::convert(ba, rho_nodal_flag),
+                dm, 1, ngRho, 0.0_rt);
+            fields.alloc_init("hybrid_ionization_electron_source_fp",
+                lev, amrex::convert(ba, rho_nodal_flag),
+                dm, 1, ngRho, 0.0_rt,
+                /*remake=*/true,
+                /*redistribute_on_remake=*/true,
+                /*checkpoint_restart=*/true);
+            fields.alloc_init("hybrid_ionization_binding_energy_fp",
+                lev, amrex::convert(ba, rho_nodal_flag),
+                dm, 1, ngRho, 0.0_rt,
+                /*remake=*/true,
+                /*redistribute_on_remake=*/true,
+                /*checkpoint_restart=*/true);
+        }
     }
 
     // The "hybrid_rho_fp_temp" multifab is used to store the ion charge density
@@ -256,6 +1557,15 @@ void HybridPICModel::AllocateLevelMFs (
             fields.alloc_init("rho_fp_" + spec,
                 lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
         }
+        for (int material = 0;
+             material < m_electron_thermodynamics.numMaterials(); ++material)
+        {
+            fields.alloc_init(
+                "ni_charge_fp_"
+                    + m_electron_thermodynamics.materialSpeciesName(material),
+                lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho,
+                0.0_rt);
+        }
         // Species-summed physical charge density Sigma_s rho_fp_s, filled
         // once per step in HybridPICDepositRhoAndJ (volume-scaled in radial
         // geometries like the totals, but unfiltered: the same processing as
@@ -295,6 +1605,28 @@ void HybridPICModel::AllocateLevelMFs (
         (ncomps == 1),
         "Ohm's law solver only support m = 0 azimuthal mode at present.");
 #endif
+}
+
+void HybridPICModel::AllocateAuxiliaryLevelMFs (
+    ablastr::fields::MultiFabRegister& fields,
+    int const lev) const
+{
+    if (!m_conservative_pressure_work) { return; }
+
+    using ablastr::fields::Direction;
+    auto const E_aux = fields.get_alldirs(FieldType::Efield_aux, lev);
+    for (int idim = 0; idim < 3; ++idim) {
+        auto const* const layout = E_aux[idim];
+        fields.alloc_init(
+            FieldType::hybrid_pressure_E_aux, Direction{idim}, lev,
+            layout->boxArray(), layout->DistributionMap(), layout->nComp(),
+            layout->nGrowVect(), 0.0_rt);
+        fields.alloc_init(
+            FieldType::hybrid_pressure_work_current_aux,
+            Direction{idim}, lev, layout->boxArray(),
+            layout->DistributionMap(), layout->nComp(),
+            layout->nGrowVect(), 0.0_rt);
+    }
 }
 
 void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
@@ -351,6 +1683,341 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 
     auto& warpx = WarpX::GetInstance();
     using ablastr::fields::Direction;
+
+    if (m_conservative_pressure_work) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_solve_electron_energy_equation
+                && m_fv_transport_internal_energy,
+            "hybrid_pic_model.conservative_pressure_work requires the "
+            "nonlinear finite-volume electron-energy equation.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::numeric_limits<amrex::Real>::digits >= 53,
+            "hybrid_pic_model.conservative_pressure_work currently requires "
+            "double-precision fields. The moving-vacuum-front cancellation "
+            "cleanup has not yet been validated with single-precision "
+            "continuity and flux arithmetic.");
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::Abort(
+            "hybrid_pic_model.conservative_pressure_work is initially "
+            "restricted to periodic Cartesian geometry. Radial adjoint "
+            "metrics require a separate analytic validation.");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::grid_type == GridType::Collocated,
+            "hybrid_pic_model.conservative_pressure_work initially requires "
+            "warpx.grid_type=collocated so pressure-field gather and work-"
+            "current scatter are an exact transpose pair.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::galerkin_interpolation,
+            "hybrid_pic_model.conservative_pressure_work initially requires "
+            "warpx.galerkin_interpolation=0. Galerkin's reduced longitudinal "
+            "particle shape needs its matching transpose deposition.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::particle_pusher_algo == ParticlePusherAlgo::Boris,
+            "hybrid_pic_model.conservative_pressure_work currently supports "
+            "only the full explicit Boris momentum pusher.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::nox >= 1 && WarpX::nox <= 4,
+            "hybrid_pic_model.conservative_pressure_work currently supports "
+            "particle shape orders 1 through 4.");
+        bool synchronize_velocity_for_diagnostics = true;
+        amrex::ParmParse const pp_warpx("warpx");
+        pp_warpx.query(
+            "synchronize_velocity_for_diagnostics",
+            synchronize_velocity_for_diagnostics);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !synchronize_velocity_for_diagnostics,
+            "hybrid_pic_model.conservative_pressure_work currently requires "
+            "warpx.synchronize_velocity_for_diagnostics=0. The diagnostic "
+            "half momentum push is temporary and has no matching electron-"
+            "energy debit; unsynchronized leapfrog kinetic energy is the "
+            "conserved pressure-work ledger quantity.");
+        std::vector<std::string> rigid_injected_species;
+        amrex::ParmParse const pp_particles("particles");
+        pp_particles.queryarr(
+            "rigid_injected_species", rigid_injected_species);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            rigid_injected_species.empty(),
+            "hybrid_pic_model.conservative_pressure_work does not yet "
+            "support particles.rigid_injected_species. Rigid injection "
+            "rescales or suppresses gathered fields before the particle "
+            "push and therefore needs the same transformation in the "
+            "pressure-work adjoint.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_add_external_fields,
+            "hybrid_pic_model.conservative_pressure_work initially requires "
+            "hybrid_pic_model.add_external_fields=0. Split external fields "
+            "need an explicit initialization-time pressure-component audit.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::use_fdtd_nci_corr,
+            "hybrid_pic_model.conservative_pressure_work requires "
+            "warpx.use_fdtd_nci_corr=0 until the identical filter is applied "
+            "to the isolated pressure field.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            warpx.Geom(0).isAllPeriodic(),
+            "hybrid_pic_model.conservative_pressure_work initially requires "
+            "periodic field boundaries; reflecting and conducting boundaries "
+            "need an even pressure-energy boundary adjoint.");
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::particle_boundary_lo[d]
+                        == ParticleBoundaryType::Periodic
+                    && WarpX::particle_boundary_hi[d]
+                        == ParticleBoundaryType::Periodic,
+                "hybrid_pic_model.conservative_pressure_work initially "
+                "requires periodic particle boundaries.");
+        }
+    }
+
+    if (m_fv_transport_internal_energy) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::use_filter,
+            "Nonlinear finite-volume electron-energy transport currently "
+            "requires warpx.use_filter=0 so rho and its auxiliary charge "
+            "flux retain the same continuity stencil.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::do_single_precision_comms,
+            "Nonlinear finite-volume electron-energy transport currently "
+            "requires warpx.do_single_precision_comms=0 so its rho/current "
+            "continuity ledger is evaluated at one precision.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::do_shared_mem_current_deposition,
+            "Nonlinear finite-volume electron-energy transport requires a "
+            "dedicated Esirkepov auxiliary current, which is incompatible "
+            "with shared-memory current deposition.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::do_moving_window,
+            "Nonlinear finite-volume electron-energy transport does not yet "
+            "shift its evolved temperature, old density, and auxiliary "
+            "current state with a moving window.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !warpx.DoFluidSpecies(),
+            "Nonlinear finite-volume electron-energy transport does not yet "
+            "deposit conservative auxiliary moments for cold-fluid species.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !EB::enabled(),
+            "Nonlinear finite-volume electron-energy transport does not yet "
+            "include embedded-boundary face metrics and masks.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_has_external_current,
+            "Nonlinear finite-volume electron-energy transport currently "
+            "requires zero parser-defined volume current. A future external-"
+            "current path must preserve discrete solenoidality.");
+
+        auto const boundary_is_impermeable_or_periodic = [&warpx] (
+            ParticleBoundaryType const boundary,
+            int const d,
+            bool const is_lower_face) noexcept
+        {
+            if (boundary == ParticleBoundaryType::Periodic
+                || boundary == ParticleBoundaryType::Reflecting) {
+                return true;
+            }
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+            return boundary == ParticleBoundaryType::None && is_lower_face
+                && d == 0 && warpx.Geom(0).ProbLo(0) == 0._rt;
+#else
+            amrex::ignore_unused(d, is_lower_face, warpx);
+            return false;
+#endif
+        };
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                boundary_is_impermeable_or_periodic(
+                    WarpX::particle_boundary_lo[d], d, true)
+                    && boundary_is_impermeable_or_periodic(
+                        WarpX::particle_boundary_hi[d], d, false),
+                "Nonlinear finite-volume electron-energy transport currently "
+                "supports periodic or specular-reflecting particle boundaries, "
+                "plus ParticleBoundaryType::None at the low radial coordinate "
+                "axis in RCYLINDER/RZ. Open, absorbing, thermal, and other "
+                "None boundaries need an explicit material-energy flux/source "
+                "ledger.");
+        }
+
+        auto& particles = warpx.GetPartContainer();
+        for (auto const& species_name : particles.GetSpeciesNames()) {
+            auto const& species =
+                particles.GetParticleContainerFromName(species_name);
+            if (species.getCharge() == 0.0_prt || species.do_not_deposit) {
+                continue;
+            }
+            bool const is_fixed_positive_material =
+                std::isfinite(static_cast<double>(species.getMass()))
+                && std::isfinite(static_cast<double>(species.getCharge()))
+                && species.getMass() > 0.0_prt
+                && species.getCharge() > 0.0_prt
+                && !species.HasEvolvingChargeState();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                is_fixed_positive_material,
+                "Every depositing charged species in nonlinear finite-volume "
+                "electron-energy transport must be a massive, fixed, "
+                "positively charged material carrier. Unsupported species '"
+                    + species_name + "'.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species.doContinuousInjection(),
+                "Nonlinear finite-volume electron-energy transport does not "
+                "yet include a charge/internal-energy ledger for continuous "
+                "injection. Unsupported species '" + species_name + "'.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species.DoResampling(),
+                "Nonlinear finite-volume electron-energy transport does not "
+                "yet support particle resampling because it breaks the "
+                "old-density/trajectory continuity ledger. Unsupported "
+                "species '" + species_name + "'.");
+        }
+    }
+
+    if (m_electron_thermodynamics.numMaterials() > 0) {
+        bool const tabulated_eos =
+            m_electron_thermodynamics.isSingularitySpiner();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_solve_electron_energy_equation,
+            "Material-aware electron thermodynamics requires "
+            "hybrid_pic_model.solve_electron_energy_equation=1.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !warpx.DoFluidSpecies(),
+            "Material-aware electron thermodynamics currently requires "
+            "particle materials only. Cold-fluid charge "
+            "does not yet have a matching per-material mass-density field.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::use_filter,
+            "Material-aware electron thermodynamics currently requires "
+            "warpx.use_filter=0. Total charge and material ion-number "
+            "densities must undergo compatible "
+            "deposition operators before evaluating the tabulated EOS.");
+        auto& particles = warpx.GetPartContainer();
+        std::set<std::string> material_species;
+        auto const configured_thermodynamics =
+            m_electron_thermodynamics.executor();
+        for (int material = 0;
+             material < m_electron_thermodynamics.numMaterials(); ++material)
+        {
+            std::string const& species_name =
+                m_electron_thermodynamics.materialSpeciesName(material);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                material_species.insert(species_name).second,
+                "Electron-thermodynamics material lists contain duplicate "
+                "species '" + species_name + "'.");
+            auto const& species =
+                particles.GetParticleContainerFromName(species_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species.getMass() > 0.0_prt
+                    && species.getCharge() > 0.0_prt
+                    && !species.do_not_deposit,
+                "Electron-thermodynamics material species '" + species_name
+                + "' must be a depositing, massive, positively charged ion "
+                  "species.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !tabulated_eos || !species.HasEvolvingChargeState(),
+                "Singularity-EOS material species '" + species_name
+                + "' must have a fixed charge state. ElectronOnly equilibrium "
+                  "tables cannot be combined with explicit hybrid ionization "
+                  "without double-counting ionization physics.");
+            amrex::Real const configured_mass =
+                configured_thermodynamics.m_atomic_mass[material]
+                * PhysConst::m_u;
+            auto const particle_mass =
+                static_cast<amrex::Real>(species.getMass());
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::abs(particle_mass - configured_mass)
+                    <= amrex::Real(1.0e-6) * configured_mass,
+                "Configured electron-thermodynamics atomic mass for species '"
+                    + species_name
+                    + "' does not match particle mass; effective-mass mappings "
+                      "are currently unsupported.");
+            m_electron_thermodynamics.setMaterialMassPerUnitCharge(
+                material,
+                particle_mass / PhysConst::q_e);
+            m_electron_thermodynamics.setMaterialMassPerPhysicalCharge(
+                material,
+                particle_mass / static_cast<amrex::Real>(species.getCharge()));
+        }
+        for (auto const& species_name : particles.GetSpeciesNames()) {
+            auto const& species =
+                particles.GetParticleContainerFromName(species_name);
+            if (species.getCharge() == 0.0_prt || species.do_not_deposit) {
+                continue;
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species.getMass() > 0.0_prt
+                    && species.getCharge() > 0.0_prt
+                    && material_species.count(species_name) == 1,
+                "Every depositing charged particle in a material-aware "
+                "hybrid simulation must be one of the configured positive "
+                "material species. Unsupported "
+                "species '" + species_name + "'.");
+        }
+        if (tabulated_eos) {
+            auto const thermodynamics =
+                m_electron_thermodynamics.executor();
+            amrex::Real const initial_temperature =
+                m_elec_temp / PhysConst::kb;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                initial_temperature >= thermodynamics.minimumTemperature()
+                    && initial_temperature
+                        <= thermodynamics.maximumTemperature(),
+                "hybrid_pic_model.elec_temp lies outside the common "
+                "temperature range of the configured Singularity-EOS "
+                "electron tables.");
+        }
+        if (tabulated_eos
+            && m_electron_thermodynamics.numMaterials() > 1) {
+            ablastr::warn_manager::WMRecordWarning(
+                "HybridPICModel",
+                "Registered multi-material Singularity-EOS selects exactly "
+                "one dominant material table per resolved node. Vacuum has "
+                "zero material state; unresolved mixed nodes are rejected. "
+                "This is not an EOS mixture closure.",
+                ablastr::warn_manager::WarnPriority::medium);
+        }
+    }
+
+    if (warpx.GetPartContainer().hasHybridIonization()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_solve_electron_energy_equation,
+            "do_hybrid_ionization requires "
+            "hybrid_pic_model.solve_electron_energy_equation=1.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_electron_thermodynamics.executor().isIdealGas(),
+            "do_hybrid_ionization currently requires "
+            "hybrid_pic_model.electron_thermodynamics=ideal_gas. The "
+            "fixed-charge latent reservoir would double-count energy when "
+            "the free-electron density changes.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_electron_thermodynamics.supportsEnergyCoupling(),
+            "do_hybrid_ionization requires a finite "
+            "hybrid_pic_model.gamma > 1 so the ideal-gas electron internal "
+            "energy and heat capacity are finite and positive.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::use_filter,
+            "do_hybrid_ionization currently requires warpx.use_filter=0. "
+            "Filtering rho without applying the identical conservative "
+            "filter to the ionization binding-energy ledger would break "
+            "local electron-energy conservation.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_joule_redirect_to_ions,
+            "do_hybrid_ionization currently requires disabling "
+            "hybrid_pic_model.joule_redirect_Te_threshold because that "
+            "ion-heating path does not yet use each particle's runtime "
+            "charge state.");
+        amrex::ParmParse const pp_warpx("warpx");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !pp_warpx.contains("max_omegac_dt"),
+            "do_hybrid_ionization currently cannot be combined with "
+            "warpx.max_omegac_dt because that adaptive limiter uses each "
+            "species' base charge instead of its runtime charge state.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !pp_warpx.contains("max_omegap_dt"),
+            "do_hybrid_ionization currently cannot be combined with "
+            "warpx.max_omegap_dt because that adaptive limiter uses each "
+            "species' base charge instead of its runtime charge state.");
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
+        amrex::Abort(
+            "do_hybrid_ionization is initially supported in Cartesian and "
+            "RCYLINDER geometry; RZ and RSPHERE validation is pending.");
+#endif
+    }
 
     // Get the grid staggering of the fields involved in calculating E
     amrex::IntVect Jx_stag = fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect();
@@ -426,14 +2093,18 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     // Joules after ReadParameters, so dividing by k_B gives Kelvin). The
     // iter-0 diagnostic dump -- which WarpX::InitData() flushes BEFORE the
     // first field-solve -- then sees a meaningful T_e rather than the
-    // zero-initialized allocation. This value does not survive into the
-    // solve: CalculateElectronPressure overwrites T_e from the closure, both
-    // each step on the algebraic path and once from HybridPICInitializeRhoJandB
-    // (on the floored density) to seed the energy-equation path.
-    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-        amrex::MultiFab & Te_mf = *warpx.m_fields.get(
-            FieldType::hybrid_electron_temperature_fp, lev);
-        Te_mf.setVal(m_elec_temp / PhysConst::kb);
+    // zero-initialized allocation. On restart, InitData runs after the field
+    // checkpoint has been read, so it must leave the restored QDSMC state
+    // untouched.
+    std::string restart_checkpoint;
+    amrex::ParmParse const pp_amr("amr");
+    pp_amr.query("restart", restart_checkpoint);
+    if (restart_checkpoint.empty()) {
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            amrex::MultiFab & Te_mf = *warpx.m_fields.get(
+                FieldType::hybrid_electron_temperature_fp, lev);
+            Te_mf.setVal(m_elec_temp / PhysConst::kb);
+        }
     }
 
     // QDSMC: lazy-construct the fictitious-particle container and lay one
@@ -552,14 +2223,71 @@ void HybridPICModel::HybridPICSolveE (
 
     ablastr::fields::VectorField current_fp_plasma = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
     auto* const electron_pressure_fp = warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    ablastr::fields::VectorField pressure_Efield{};
+    if (m_conservative_pressure_work && !solve_for_Faraday) {
+        pressure_Efield =
+            warpx.m_fields.get_alldirs(FieldType::hybrid_pressure_E_fp, lev);
+    }
 
     // Solve E field in regular cells
     warpx.get_pointer_fdtd_solver_fp(lev)->HybridPICSolveE(
-        Efield, current_fp_plasma, Jfield, Bfield, rhofield,
+        Efield, pressure_Efield, current_fp_plasma, Jfield, Bfield, rhofield,
         *electron_pressure_fp, eb_update_E, lev, this, solve_for_Faraday
     );
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
+    if (m_conservative_pressure_work && !solve_for_Faraday) {
+        auto const& period = warpx.Geom(lev).periodicity();
+        for (auto* pressure_component : pressure_Efield) {
+            ablastr::utils::communication::FillBoundary(
+                *pressure_component, pressure_component->nGrowVect(),
+                /*do_single_precision_comms=*/false, period,
+                /*nodal_sync=*/true);
+        }
+
+        // Freeze the scalar state that generated this pressure component.
+        // Checkpointing P and the exact masked reciprocal denominator makes
+        // the later adjoint debit independent of roundoff in rho/Pe
+        // reconstruction after a rank-changing restart.
+        auto& pressure_work_state = *warpx.m_fields.get(
+            FieldType::hybrid_pressure_work_state_fp, lev);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            pressure_work_state.nComp() == 2
+                && pressure_work_state.boxArray()
+                    == electron_pressure_fp->boxArray()
+                && pressure_work_state.DistributionMap()
+                    == electron_pressure_fp->DistributionMap(),
+            "The checkpointed pressure-work state must share the electron-"
+            "pressure layout.");
+        amrex::Real const rho_floor = PhysConst::q_e * m_n_floor;
+        bool const holmstrom_vacuum_region = m_holmstrom_vacuum_region;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(
+                 pressure_work_state, amrex::TilingIfNotGPU());
+             mfi.isValid(); ++mfi)
+        {
+            amrex::Box const box = mfi.tilebox();
+            auto const state = pressure_work_state.array(mfi);
+            auto const pressure = electron_pressure_fp->const_array(mfi);
+            auto const rho = rhofield.const_array(mfi);
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+                int i, int j, int k) noexcept
+            {
+                amrex::Real const rho_value = rho(i, j, k);
+                state(i, j, k, 0) = pressure(i, j, k);
+                state(i, j, k, 1) =
+                    holmstrom_vacuum_region && rho_value < rho_floor
+                    ? 0.0_rt
+                    : 1.0_rt / amrex::max(rho_value, rho_floor);
+            });
+        }
+        ablastr::utils::communication::FillBoundary(
+            pressure_work_state, pressure_work_state.nGrowVect(),
+            /*do_single_precision_comms=*/false, period,
+            /*nodal_sync=*/true);
+    }
 }
 
 void HybridPICModel::CalculateElectronPressure(bool const floor_density) const
@@ -624,7 +2352,8 @@ void HybridPICModel::FillElectronPressureMF (
         // Extract tileboxes for which to loop
         Box tilebox = mfi.tilebox();
         // Cover the ghosts too.
-        // QDSMCInitializeKe reads T_e over its own ghost-grown box
+        // QDSMC thermodynamic initialization reads T_e over its own
+        // ghost-grown box
         // so the seed has to leave T_e's ghosts valid itself.
         // Out-of-domain ghosts are handled at the density floor.
         tilebox.grow(Pe_field.nGrowVect());
@@ -667,18 +2396,35 @@ void HybridPICModel::QDSMCInitializeUe (int const lev) const
     amrex::MultiFab       & Vey = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{1}, lev);
     amrex::MultiFab       & Vez = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{2}, lev);
 
-    amrex::MultiFab const & rho_temp = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp, lev);
+    amrex::MultiFab const & rho_velocity = *warpx.m_fields.get(
+        m_fv_transport_internal_energy
+            ? FieldType::hybrid_energy_rho_mid_fp
+            : FieldType::hybrid_rho_fp_temp,
+        lev);
 
     ablastr::fields::VectorField J_plasma =
         warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    ablastr::fields::VectorField J_i =
-        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
+    // The nonlinear conservative update runs after the particle push and
+    // uses a direct nodal current co-deposited with rho at the particle
+    // midpoint.  Retain the reviewed old-current choice for ideal QDSMC.
+    ablastr::fields::VectorField J_i = m_fv_transport_internal_energy
+        ? warpx.m_fields.get_alldirs(
+            FieldType::hybrid_energy_velocity_current_fp, lev)
+        : warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_temp, lev);
 
+    amrex::GpuArray<int, 3> const Jpx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const Jpy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const Jpz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> Jix_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> Jiy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> Jiz_stag = Jz_IndexType;
+    if (m_fv_transport_internal_energy) {
+        Jix_stag = {1, 1, 1};
+        Jiy_stag = {1, 1, 1};
+        Jiz_stag = {1, 1, 1};
+    }
     amrex::Real const rho_floor = PhysConst::q_e * m_n_floor;
-
-    amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
-    amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
-    amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
+    bool const use_positive_support = m_fv_transport_internal_energy;
     amrex::GpuArray<int, 3> const nodal     = {1, 1, 1};
     amrex::GpuArray<int, 3> const coarsen   = {1, 1, 1};
 
@@ -691,7 +2437,8 @@ void HybridPICModel::QDSMCInitializeUe (int const lev) const
 #endif
     for (MFIter mfi(Vex, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        amrex::Array4<amrex::Real const> const & rho_arr = rho_temp.const_array(mfi);
+        amrex::Array4<amrex::Real const> const & rho_arr =
+            rho_velocity.const_array(mfi);
         amrex::Array4<amrex::Real const> const & Jpx     = J_plasma[0]->const_array(mfi);
         amrex::Array4<amrex::Real const> const & Jpy     = J_plasma[1]->const_array(mfi);
         amrex::Array4<amrex::Real const> const & Jpz     = J_plasma[2]->const_array(mfi);
@@ -706,16 +2453,25 @@ void HybridPICModel::QDSMCInitializeUe (int const lev) const
 
         amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            if (rho_arr(i,j,k) <= rho_floor) { return; }
-
             amrex::Real const rho_val = rho_arr(i,j,k);
+            // The nonlinear path uses the deposited PIC support, not the
+            // Ohm-law density floor, as its material topology.  A swept
+            // shape tail below n_floor still carries a finite co-deposited
+            // current/rho velocity and must not become an artificial
+            // zero-velocity gap at a material/vacuum interface.
+            if (use_positive_support
+                    ? rho_val <= 0.0_rt
+                    : rho_val <= rho_floor)
+            {
+                return;
+            }
 
-            auto const jx  = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
-            auto const jy  = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
-            auto const jz  = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
-            auto const jix = ablastr::coarsen::sample::Interp(Jix, Jx_stag, nodal, coarsen, i, j, k, 0);
-            auto const jiy = ablastr::coarsen::sample::Interp(Jiy, Jy_stag, nodal, coarsen, i, j, k, 0);
-            auto const jiz = ablastr::coarsen::sample::Interp(Jiz, Jz_stag, nodal, coarsen, i, j, k, 0);
+            auto const jx  = ablastr::coarsen::sample::Interp(Jpx, Jpx_stag, nodal, coarsen, i, j, k, 0);
+            auto const jy  = ablastr::coarsen::sample::Interp(Jpy, Jpy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jz  = ablastr::coarsen::sample::Interp(Jpz, Jpz_stag, nodal, coarsen, i, j, k, 0);
+            auto const jix = ablastr::coarsen::sample::Interp(Jix, Jix_stag, nodal, coarsen, i, j, k, 0);
+            auto const jiy = ablastr::coarsen::sample::Interp(Jiy, Jiy_stag, nodal, coarsen, i, j, k, 0);
+            auto const jiz = ablastr::coarsen::sample::Interp(Jiz, Jiz_stag, nodal, coarsen, i, j, k, 0);
 
             // V_e = -(J_plasma - J_i) / (q_e * n_e) = -(J_plasma - J_i) / rho_val
             Vex_arr(i,j,k) = -(jx - jix) / rho_val;
@@ -724,23 +2480,98 @@ void HybridPICModel::QDSMCInitializeUe (int const lev) const
         });
     }
 
-    Vex.FillBoundary(Vex.nGrowVect(), period);
-    Vey.FillBoundary(Vey.nGrowVect(), period);
-    Vez.FillBoundary(Vez.nGrowVect(), period);
+    if (m_fv_transport_internal_energy) {
+        // The nonlinear FV path requires one identical face velocity on both
+        // sides of every FAB/MPI interface. Synchronize overlapping nodal
+        // valid points and guards in full precision so paired fluxes cancel.
+        ablastr::utils::communication::FillBoundary(
+            Vex, Vex.nGrowVect(), false, period, true);
+        ablastr::utils::communication::FillBoundary(
+            Vey, Vey.nGrowVect(), false, period, true);
+        ablastr::utils::communication::FillBoundary(
+            Vez, Vez.nGrowVect(), false, period, true);
+    } else {
+        // Preserve the reviewed ideal-entropy QDSMC communication path.
+        Vex.FillBoundary(Vex.nGrowVect(), period);
+        Vey.FillBoundary(Vey.nGrowVect(), period);
+        Vez.FillBoundary(Vez.nGrowVect(), period);
+    }
 }
 
 
-void HybridPICModel::QDSMCInitializeKe (int const lev) const
+void HybridPICModel::QDSMCInitializeThermodynamicQuantity (
+    int const lev) const
 {
-    ABLASTR_PROFILE("HybridPICModel::QDSMCInitializeKe()");
+    ABLASTR_PROFILE(
+        "HybridPICModel::QDSMCInitializeThermodynamicQuantity()");
 
     auto & warpx = WarpX::GetInstance();
 
-    amrex::MultiFab       & Ke  = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,                lev);
+    amrex::MultiFab       & Ke  = *warpx.m_fields.get(FieldType::hybrid_qdsmc_thermodynamic_fp,    lev);
     amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp,   lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp,               lev);
 
     Ke.setVal(0.0_rt);
+
+    if (m_fv_transport_internal_energy) {
+        auto const thermodynamics = m_electron_thermodynamics.executor();
+        int const num_materials =
+            m_electron_thermodynamics.numMaterials();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            num_materials <= 1,
+            "Nonlinear finite-volume electron-energy transport currently "
+            "requires at most one fixed material table.");
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(Ke, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real> const& energy = Ke.array(mfi);
+            amrex::Array4<amrex::Real const> const& temperature =
+                Te.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& charge_density =
+                rho.const_array(mfi);
+
+            amrex::Box const box = amrex::convert(
+                mfi.tilebox(), Ke.ixType().toIntVect());
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+                int i, int j, int k) noexcept
+            {
+                amrex::Real const deposited_rho_node =
+                    charge_density(i, j, k);
+                amrex::Real const rho_node =
+                    amrex::max(deposited_rho_node, 0.0_rt);
+                ElectronThermodynamicsExecutor::MaterialMassDensities
+                    material_mass_density{};
+                if (num_materials == 1) {
+                    material_mass_density[0] = thermodynamics
+                        .materialMassDensityFromPhysicalChargeDensity(
+                            0, rho_node);
+                }
+                ElectronThermodynamicState const state = thermodynamics
+                    .stateFromMaterialMassDensitiesTemperature(
+                        rho_node, material_mass_density,
+                        temperature(i, j, k));
+                energy(i, j, k) =
+                    amrex::Math::isfinite(state.internal_energy_density)
+                    ? state.internal_energy_density
+                    : std::numeric_limits<amrex::Real>::quiet_NaN();
+            });
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            Ke.is_finite(0, 1, Ke.nGrowVect()),
+            "Nonlinear electron-energy initialization encountered an invalid "
+            "electron internal-energy state.");
+        // Compute each valid node once, then make all overlapping nodal
+        // representations and neighbor guards identical. Full precision is
+        // required so paired finite-volume face fluxes cancel exactly.
+        auto const& geom = warpx.Geom(lev);
+        ablastr::utils::communication::FillBoundary(
+            Ke, Ke.nGrowVect(), false, geom.periodicity(), true);
+        return;
+    }
 
     auto const gamma     = m_gamma;
     auto const rho_floor = PhysConst::q_e * m_n_floor;
@@ -779,23 +2610,835 @@ void HybridPICModel::QDSMCInitializeKe (int const lev) const
 }
 
 
-void HybridPICModel::QDSMCUpdateTe (int const lev) const
+void HybridPICModel::QDSMCUpdateThermodynamics (
+    int const lev, amrex::Real const dt) const
 {
-    ABLASTR_PROFILE("HybridPICModel::QDSMCUpdateTe()");
+    ABLASTR_PROFILE("HybridPICModel::QDSMCUpdateThermodynamics()");
 
     auto & warpx = WarpX::GetInstance();
-    // After the QDSMC scatter, weights_fp holds the deposited extensive
-    // electron count and entropy_fp holds K_e times that count. Recover T_e:
-    //
-    //   K_e_new = entropy_fp / weights_fp
-    //   T_e_new = K_e_new / (n_e_new^(1-gamma) * k_B / q_e)
-    //
-    // n_e_new comes from rho_fp (post-deposit, post-particle-push).
+    // Nonlinear thermodynamics advance U_e with a conservative Cartesian
+    // finite-volume operator and invert U_e(rho,T_e). Ideal thermodynamics
+    // recover T_e from the entropy and count scattered by QDSMC markers.
 
     amrex::MultiFab       & Te      = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
-    amrex::MultiFab const & Ke      = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,              lev);
+    amrex::MultiFab const & Ke      = *warpx.m_fields.get(FieldType::hybrid_qdsmc_thermodynamic_fp,  lev);
     amrex::MultiFab const & weights = *warpx.m_fields.get(FieldType::hybrid_qdsmc_weights_fp,        lev);
-    amrex::MultiFab const & rho     = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
+    amrex::MultiFab       & rho     = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
+
+    if (m_fv_transport_internal_energy) {
+        using ablastr::fields::Direction;
+        amrex::MultiFab const& Vex = *warpx.m_fields.get(
+            FieldType::hybrid_electron_velocity_fp, Direction{0}, lev);
+        amrex::MultiFab const& Vey = *warpx.m_fields.get(
+            FieldType::hybrid_electron_velocity_fp, Direction{1}, lev);
+        amrex::MultiFab const& Vez = *warpx.m_fields.get(
+            FieldType::hybrid_electron_velocity_fp, Direction{2}, lev);
+        amrex::MultiFab const& old_rho = *warpx.m_fields.get(
+            FieldType::hybrid_rho_fp_temp, lev);
+        amrex::MultiFab const& midpoint_rho = *warpx.m_fields.get(
+            FieldType::hybrid_energy_rho_mid_fp, lev);
+        ablastr::fields::VectorField const ion_current =
+            warpx.m_fields.get_alldirs(
+                FieldType::hybrid_energy_charge_flux_fp, lev);
+        ablastr::fields::VectorField const plasma_current =
+            warpx.m_fields.get_alldirs(
+                FieldType::hybrid_current_fp_plasma, lev);
+        ablastr::fields::VectorField pressure_work_current{};
+        if (m_conservative_pressure_work) {
+            pressure_work_current = warpx.m_fields.get_alldirs(
+                FieldType::hybrid_pressure_work_current_fp, lev);
+        }
+        amrex::MultiFab const* pressure_work_state = nullptr;
+        if (m_conservative_pressure_work) {
+            pressure_work_state = warpx.m_fields.get(
+                FieldType::hybrid_pressure_work_state_fp, lev);
+        }
+        auto const thermodynamics = m_electron_thermodynamics.executor();
+        int const num_materials =
+            m_electron_thermodynamics.numMaterials();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            num_materials <= 1,
+            "Nonlinear finite-volume electron-energy transport currently "
+            "requires at most one fixed material table.");
+
+        // The dedicated Esirkepov field must remain face staggered even when
+        // the primary hybrid fields use the recommended collocated/direct
+        // configuration.
+#if defined(WARPX_DIM_3D)
+        bool const currents_are_dual_face_staggered =
+            ion_current[0]->ixType().cellCentered(0)
+            && ion_current[1]->ixType().cellCentered(1)
+            && ion_current[2]->ixType().cellCentered(2);
+        amrex::GpuArray<int, 3> const plasma_current_face_centered{
+            Jx_IndexType[0] == 0 ? 1 : 0,
+            Jy_IndexType[1] == 0 ? 1 : 0,
+            Jz_IndexType[2] == 0 ? 1 : 0};
+#elif defined(WARPX_DIM_XZ)
+        bool const currents_are_dual_face_staggered =
+            ion_current[0]->ixType().cellCentered(0)
+            && ion_current[2]->ixType().cellCentered(1);
+        amrex::GpuArray<int, 3> const plasma_current_face_centered{
+            Jx_IndexType[0] == 0 ? 1 : 0,
+            Jz_IndexType[1] == 0 ? 1 : 0, 0};
+#elif defined(WARPX_DIM_1D_Z)
+        bool const currents_are_dual_face_staggered =
+            ion_current[2]->ixType().cellCentered(0);
+        amrex::GpuArray<int, 3> const plasma_current_face_centered{
+            Jz_IndexType[0] == 0 ? 1 : 0, 0, 0};
+#elif defined(WARPX_DIM_RCYLINDER)
+        bool const currents_are_dual_face_staggered =
+            ion_current[0]->ixType().cellCentered(0);
+        amrex::GpuArray<int, 3> const plasma_current_face_centered{
+            Jx_IndexType[0] == 0 ? 1 : 0, 0, 0};
+#elif defined(WARPX_DIM_RZ)
+        bool const currents_are_dual_face_staggered =
+            ion_current[0]->ixType().cellCentered(0)
+            && ion_current[2]->ixType().cellCentered(1);
+        amrex::GpuArray<int, 3> const plasma_current_face_centered{
+            Jx_IndexType[0] == 0 ? 1 : 0, 0,
+            Jz_IndexType[1] == 0 ? 1 : 0};
+#else
+        bool const currents_are_dual_face_staggered = false;
+        amrex::GpuArray<int, 3> const plasma_current_face_centered{0, 0, 0};
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            currents_are_dual_face_staggered,
+            "The nonlinear electron-energy auxiliary current lost its "
+            "required dual-face staggering.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !WarpX::use_filter,
+            "Nonlinear finite-volume electron-energy transport currently "
+            "requires warpx.use_filter=0 so rho and the electron charge flux "
+            "satisfy the same discrete continuity equation.");
+
+        auto const& geom = warpx.Geom(lev);
+        ablastr::utils::communication::FillBoundary(
+            rho, rho.nGrowVect(), false, geom.periodicity(), true);
+        auto const inv_dx = geom.InvCellSizeArray();
+        auto const dx = geom.CellSizeArray();
+        auto const problo = geom.ProbLoArray();
+        auto const probhi = geom.ProbHiArray();
+        amrex::Dim3 const physical_domain_lo =
+            amrex::lbound(geom.Domain());
+        amrex::Dim3 const physical_domain_hi =
+            amrex::ubound(geom.Domain());
+        amrex::Box const nodal_domain =
+            amrex::convert(geom.Domain(), Te.ixType().toIntVect());
+        amrex::Dim3 const nodal_lo = amrex::lbound(nodal_domain);
+        amrex::Dim3 const nodal_hi = amrex::ubound(nodal_domain);
+        amrex::GpuArray<int, 3> periodic{0, 0, 0};
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            periodic[d] = geom.isPeriodic(d) ? 1 : 0;
+        }
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+        amrex::Real const axis_volume_factor =
+            warpx.verboncoeurAxisCorrection() ? 1.0_rt / 3.0_rt
+                                              : 1.0_rt / 4.0_rt;
+#endif
+        bool const conservative_pressure_work = m_conservative_pressure_work;
+
+        // The exact particle/electron pressure-work pair is evaluated from
+        // the frozen old pressure state.  Apply the electron-side increment
+        // before the mass-consistent finite-volume remap.  This ordering is
+        // essential at a moving material/vacuum front: the shared upwind
+        // charge flux transports the increment with its material carrier, so
+        // a node that becomes exact vacuum cannot retain an EOS-unrepresentable
+        // nonzero energy density.  Periodic FV conservation leaves the global
+        // particle/electron work identity unchanged.
+        amrex::MultiFab pressure_work_loaded_energy;
+        if (conservative_pressure_work) {
+            pressure_work_loaded_energy.define(
+                Ke.boxArray(), Ke.DistributionMap(), 1, Ke.nGrowVect(),
+                amrex::MFInfo(), Ke.Factory());
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (MFIter mfi(
+                     pressure_work_loaded_energy, TilingIfNotGPU());
+                 mfi.isValid(); ++mfi)
+            {
+                amrex::Array4<amrex::Real> const& loaded_energy =
+                    pressure_work_loaded_energy.array(mfi);
+                amrex::Array4<amrex::Real const> const& old_energy =
+                    Ke.const_array(mfi);
+                amrex::Array4<amrex::Real const> const& old_charge_density =
+                    old_rho.const_array(mfi);
+                amrex::Array4<amrex::Real const> const& pressure_state =
+                    pressure_work_state->const_array(mfi);
+                amrex::Array4<amrex::Real const> const& work_current_x =
+                    pressure_work_current[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const& work_current_y =
+                    pressure_work_current[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const& work_current_z =
+                    pressure_work_current[2]->const_array(mfi);
+
+                amrex::Box const box = amrex::convert(
+                    mfi.tilebox(), Ke.ixType().toIntVect());
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+                    int i, int j, int k) noexcept
+                {
+                    amrex::Real const raw_old_rho =
+                        old_charge_density(i, j, k);
+                    amrex::Real const old_rho_node =
+                        amrex::max(raw_old_rho, 0.0_rt);
+                    amrex::Real const work_divergence =
+                        qdsmc_pressure_work_velocity_divergence(
+                            work_current_x, work_current_y, work_current_z,
+                            pressure_state, i, j, k, inv_dx);
+                    amrex::Real const source_loaded_energy =
+                        old_energy(i, j, k) - dt
+                            * pressure_state(i, j, k, 0)
+                            * work_divergence;
+
+                    ElectronThermodynamicsExecutor::MaterialMassDensities
+                        material_mass_density{};
+                    if (num_materials == 1) {
+                        material_mass_density[0] = thermodynamics
+                            .materialMassDensityFromPhysicalChargeDensity(
+                                0, old_rho_node);
+                    }
+                    amrex::Real const source_loaded_temperature =
+                        thermodynamics
+                            .temperatureFromMaterialMassDensitiesThermalEnergyDensity(
+                                old_rho_node, material_mass_density,
+                                source_loaded_energy);
+                    ElectronThermodynamicState const source_loaded_state =
+                        thermodynamics
+                            .stateFromMaterialMassDensitiesTemperature(
+                                old_rho_node, material_mass_density,
+                                source_loaded_temperature);
+                    amrex::Real const energy_scale = amrex::max(
+                        amrex::max(
+                            std::abs(source_loaded_energy),
+                            std::abs(
+                                source_loaded_state.internal_energy_density)),
+                        std::numeric_limits<amrex::Real>::min());
+                    amrex::Real const energy_tolerance = 512.0_rt
+                        * std::numeric_limits<amrex::Real>::epsilon()
+                        * energy_scale;
+                    if (raw_old_rho < 0.0_rt
+                        || !amrex::Math::isfinite(work_divergence)
+                        || !amrex::Math::isfinite(source_loaded_energy)
+                        || !amrex::Math::isfinite(source_loaded_temperature)
+                        || !amrex::Math::isfinite(
+                            source_loaded_state.pressure)
+                        || source_loaded_state.pressure < 0.0_rt
+                        || !amrex::Math::isfinite(
+                            source_loaded_state.internal_energy_density)
+                        || std::abs(
+                            source_loaded_state.internal_energy_density
+                            - source_loaded_energy) > energy_tolerance)
+                    {
+                        loaded_energy(i, j, k) =
+                            std::numeric_limits<amrex::Real>::quiet_NaN();
+                        return;
+                    }
+                    loaded_energy(i, j, k) = source_loaded_energy;
+                });
+            }
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                pressure_work_loaded_energy.is_finite(0, 1, 0),
+                "Conservative hybrid pressure work produced an old-state "
+                "electron energy outside the EOS domain before its "
+                "mass-consistent finite-volume transport. Reduce the "
+                "timestep or check the pressure-work state.");
+            ablastr::utils::communication::FillBoundary(
+                pressure_work_loaded_energy,
+                pressure_work_loaded_energy.nGrowVect(), false,
+                geom.periodicity(), true);
+        }
+
+        // Keep failure categories separate.  Exact-vacuum fronts exercise
+        // several distinct invariants, and a single NaN assertion otherwise
+        // obscures whether the remedy is a smaller CFL timestep, a continuity
+        // fix, or an EOS-domain change.
+        amrex::Gpu::DeviceScalar<int> invalid_cfl(0);
+        amrex::Gpu::DeviceScalar<int> invalid_flux_state(0);
+        amrex::Gpu::DeviceScalar<int> invalid_continuity(0);
+        amrex::Gpu::DeviceScalar<int> invalid_density(0);
+        amrex::Gpu::DeviceScalar<int> invalid_vacuum_cleanup_bound(0);
+        amrex::Gpu::DeviceScalar<int> invalid_vacuum_cleanup_path(0);
+        amrex::Gpu::DeviceScalar<int> invalid_advected_eos(0);
+        amrex::Gpu::DeviceScalar<int> invalid_predicted_eos(0);
+        amrex::Gpu::DeviceScalar<int> invalid_final_eos(0);
+        int* const invalid_cfl_ptr = invalid_cfl.dataPtr();
+        int* const invalid_flux_state_ptr = invalid_flux_state.dataPtr();
+        int* const invalid_continuity_ptr = invalid_continuity.dataPtr();
+        int* const invalid_density_ptr = invalid_density.dataPtr();
+        int* const invalid_vacuum_cleanup_bound_ptr =
+            invalid_vacuum_cleanup_bound.dataPtr();
+        int* const invalid_vacuum_cleanup_path_ptr =
+            invalid_vacuum_cleanup_path.dataPtr();
+        int* const invalid_advected_eos_ptr = invalid_advected_eos.dataPtr();
+        int* const invalid_predicted_eos_ptr = invalid_predicted_eos.dataPtr();
+        int* const invalid_final_eos_ptr = invalid_final_eos.dataPtr();
+
+        // First form the conservative FV result without attempting an EOS
+        // inverse.  A material node can become exact vacuum while the two
+        // floating-point subtractions U* - dt div(F_U) leave a one-ulp
+        // residual even though rho^n - dt div(F_rho) and deposited rho^{n+1}
+        // are both exactly zero.  Store a deterministic face-paired cleanup
+        // state for only that cancellation-sized residue.  Each source records
+        // integrated energy removed from itself plus fixed outflow-face shares;
+        // a later gather pass transfers those shares to endpoint material
+        // support without atomics or decomposition-dependent accumulation.
+        amrex::MultiFab advected_energy(
+            Ke.boxArray(), Ke.DistributionMap(), 1, 0,
+            amrex::MFInfo(), Ke.Factory());
+        constexpr int vacuum_cleanup_components = 1 + 2 * AMREX_SPACEDIM;
+        amrex::MultiFab vacuum_cleanup_source(
+            Ke.boxArray(), Ke.DistributionMap(), vacuum_cleanup_components,
+            amrex::IntVect::TheUnitVector(),
+            amrex::MFInfo(), Ke.Factory());
+        vacuum_cleanup_source.setVal(
+            0.0_rt, 0, vacuum_cleanup_source.nComp(),
+            vacuum_cleanup_source.nGrowVect());
+        amrex::Real const cleanup_roundoff_factor = 4096.0_rt
+            * std::numeric_limits<amrex::Real>::epsilon();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(advected_energy, TilingIfNotGPU());
+             mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real> const& advected =
+                advected_energy.array(mfi);
+            amrex::Array4<amrex::Real> const& cleanup =
+                vacuum_cleanup_source.array(mfi);
+            amrex::Array4<amrex::Real const> transport_energy =
+                Ke.const_array(mfi);
+            if (conservative_pressure_work) {
+                transport_energy =
+                    pressure_work_loaded_energy.const_array(mfi);
+            }
+            amrex::Array4<amrex::Real const> const& charge_density =
+                rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& old_charge_density =
+                old_rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& midpoint_charge_density =
+                midpoint_rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& ion_current_x =
+                ion_current[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& ion_current_y =
+                ion_current[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& ion_current_z =
+                ion_current[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& plasma_current_x =
+                plasma_current[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& plasma_current_y =
+                plasma_current[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& plasma_current_z =
+                plasma_current[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& vx =
+                Vex.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& vy =
+                Vey.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& vz =
+                Vez.const_array(mfi);
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+            amrex::ignore_unused(ion_current_y, plasma_current_y, vy);
+#endif
+
+            amrex::Box const box = amrex::convert(
+                mfi.tilebox(), Te.ixType().toIntVect());
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+                int i, int j, int k) noexcept
+            {
+                amrex::Real const deposited_rho_node =
+                    charge_density(i, j, k);
+                amrex::Real const old_rho_node =
+                    old_charge_density(i, j, k);
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                QdsmcCartesianTransportTerms const transport =
+                    qdsmc_cylindrical_transport_terms(
+                        transport_energy, old_charge_density,
+                        midpoint_charge_density,
+                        ion_current_x, ion_current_z,
+                        plasma_current_x, plasma_current_z, vx, vz,
+                        i, j, k, nodal_lo, nodal_hi, dx, periodic,
+                        plasma_current_face_centered, axis_volume_factor,
+                        problo, probhi,
+                        physical_domain_lo, physical_domain_hi);
+#else
+                QdsmcCartesianTransportTerms const transport =
+                    qdsmc_cartesian_transport_terms(
+                        transport_energy, old_charge_density,
+                        midpoint_charge_density,
+                        ion_current_x, ion_current_y, ion_current_z,
+                        plasma_current_x, plasma_current_y,
+                        plasma_current_z, vx, vy, vz, i, j, k,
+                        nodal_lo, nodal_hi, inv_dx, periodic,
+                        plasma_current_face_centered);
+#endif
+                amrex::Real const outgoing_charge_flux =
+                    transport.outgoing_charge_flux_per_volume;
+                amrex::Real const cfl = old_rho_node > 0.0_rt
+                    ? dt * outgoing_charge_flux / old_rho_node
+                    : (outgoing_charge_flux == 0.0_rt
+                        ? 0.0_rt
+                        : std::numeric_limits<amrex::Real>::quiet_NaN());
+                amrex::Real const predicted_charge_density =
+                    old_rho_node - dt * transport.charge_flux_divergence;
+                amrex::Real const advected_energy_density =
+                    transport_energy(i, j, k)
+                    - dt * transport.energy_flux_divergence;
+                advected(i, j, k) = advected_energy_density;
+
+                amrex::Real const continuity_scale = amrex::max(
+                    amrex::max(
+                        amrex::max(
+                            std::abs(old_rho_node),
+                            std::abs(deposited_rho_node)),
+                        std::abs(predicted_charge_density)),
+                    std::numeric_limits<amrex::Real>::min());
+                amrex::Real const continuity_residual = std::abs(
+                    predicted_charge_density - deposited_rho_node)
+                    / continuity_scale;
+                amrex::Real const continuity_tolerance = amrex::max(
+                    1.0e-7_rt,
+                    1024.0_rt * std::numeric_limits<amrex::Real>::epsilon());
+                bool const bad_cfl = !amrex::Math::isfinite(cfl)
+                    || cfl > 1.0_rt + 64.0_rt
+                        * std::numeric_limits<amrex::Real>::epsilon();
+                bool const bad_flux_state = !amrex::Math::isfinite(
+                        transport.energy_flux_divergence)
+                    || !amrex::Math::isfinite(
+                        transport.velocity_divergence)
+                    || !amrex::Math::isfinite(
+                        transport.charge_flux_divergence)
+                    || !amrex::Math::isfinite(
+                        transport.absolute_energy_flux_per_volume)
+                    || !amrex::Math::isfinite(
+                        transport.absolute_charge_flux_per_volume)
+                    || !amrex::Math::isfinite(advected_energy_density);
+                bool const bad_continuity =
+                    !amrex::Math::isfinite(continuity_residual)
+                    || continuity_residual > continuity_tolerance;
+                bool const bad_density = deposited_rho_node < 0.0_rt;
+                if (bad_cfl || bad_flux_state || bad_continuity || bad_density)
+                {
+                    if (bad_cfl) {
+                        amrex::HostDevice::Atomic::Add(invalid_cfl_ptr, 1);
+                    }
+                    if (bad_flux_state) {
+                        amrex::HostDevice::Atomic::Add(
+                            invalid_flux_state_ptr, 1);
+                    }
+                    if (bad_continuity) {
+                        amrex::HostDevice::Atomic::Add(
+                            invalid_continuity_ptr, 1);
+                    }
+                    if (bad_density) {
+                        amrex::HostDevice::Atomic::Add(
+                            invalid_density_ptr, 1);
+                    }
+                    advected(i, j, k) =
+                        std::numeric_limits<amrex::Real>::quiet_NaN();
+                    return;
+                }
+
+                if (deposited_rho_node != 0.0_rt
+                    || advected_energy_density == 0.0_rt)
+                {
+                    return;
+                }
+
+                amrex::Real const charge_cancellation_scale = amrex::max(
+                    std::abs(old_rho_node)
+                        + dt * transport.absolute_charge_flux_per_volume,
+                    std::numeric_limits<amrex::Real>::min());
+                amrex::Real const energy_cancellation_scale = amrex::max(
+                    std::abs(transport_energy(i, j, k))
+                        + dt * transport.absolute_energy_flux_per_volume,
+                    std::numeric_limits<amrex::Real>::min());
+                bool const roundoff_sized = old_rho_node > 0.0_rt
+                    && std::abs(predicted_charge_density)
+                        <= cleanup_roundoff_factor
+                            * charge_cancellation_scale
+                    && std::abs(advected_energy_density)
+                        <= cleanup_roundoff_factor
+                            * energy_cancellation_scale;
+                if (!roundoff_sized) {
+                    amrex::HostDevice::Atomic::Add(
+                        invalid_vacuum_cleanup_bound_ptr, 1);
+                    return;
+                }
+
+                amrex::Real total_outflow = 0.0_rt;
+                int last_face = -1;
+                bool invalid_path = false;
+                for (int face = 0; face < 2 * AMREX_SPACEDIM; ++face) {
+                    amrex::Real const face_outflow = dt
+                        * transport
+                            .outgoing_face_charge_flux_per_volume[face];
+                    if (!(face_outflow > 0.0_rt)) { continue; }
+                    int const direction = face / 2;
+                    int const side = (face % 2 == 0) ? -1 : 1;
+                    int const ni = i + (direction == 0 ? side : 0);
+                    int const nj = j + (direction == 1 ? side : 0);
+                    int const nk = k + (direction == 2 ? side : 0);
+                    if (!(charge_density(ni, nj, nk) > 0.0_rt)) {
+                        invalid_path = true;
+                    } else {
+                        total_outflow += face_outflow;
+                        last_face = face;
+                    }
+                }
+                if (invalid_path || !(total_outflow > 0.0_rt)) {
+                    amrex::HostDevice::Atomic::Add(
+                        invalid_vacuum_cleanup_path_ptr, 1);
+                    return;
+                }
+
+                amrex::Real const source_volume =
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                    hybrid_transport_node_volume(
+                        i, j, k, problo, dx, physical_domain_lo,
+                        axis_volume_factor);
+#else
+                    hybrid_node_volume(
+                        i, j, k, problo, probhi, dx,
+                        physical_domain_lo, physical_domain_hi, periodic);
+#endif
+                amrex::Real const integrated_residual =
+                    advected_energy_density * source_volume;
+                cleanup(i, j, k, 0) = integrated_residual;
+                amrex::Real assigned_energy = 0.0_rt;
+                for (int face = 0; face < 2 * AMREX_SPACEDIM; ++face) {
+                    amrex::Real const face_outflow = dt
+                        * transport
+                            .outgoing_face_charge_flux_per_volume[face];
+                    if (!(face_outflow > 0.0_rt)) { continue; }
+                    amrex::Real const face_energy = face == last_face
+                        ? integrated_residual - assigned_energy
+                        : integrated_residual
+                            * face_outflow / total_outflow;
+                    cleanup(i, j, k, face + 1) = face_energy;
+                    assigned_energy += face_energy;
+                }
+            });
+        }
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_cfl.dataValue() == 0,
+            "Nonlinear finite-volume electron-energy transport exceeded its "
+            "upwind CFL limit. Reduce the timestep.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_flux_state.dataValue() == 0,
+            "Nonlinear finite-volume electron-energy transport encountered "
+            "a non-finite charge, energy, or velocity flux. Check material/"
+            "vacuum donor support and deposited currents.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_continuity.dataValue() == 0,
+            "Nonlinear finite-volume electron-energy transport found that "
+            "the endpoint charge and dedicated charge flux violate their "
+            "discrete continuity equation.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_density.dataValue() == 0,
+            "Nonlinear finite-volume electron-energy transport encountered "
+            "a negative deposited electron charge-density magnitude.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_vacuum_cleanup_bound.dataValue() == 0,
+            "An exact-vacuum endpoint retained electron energy larger than "
+            "the finite-volume roundoff-cancellation bound. This is a "
+            "physical transport/EOS failure, not roundoff cleanup.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_vacuum_cleanup_path.dataValue() == 0,
+            "Finite-volume roundoff energy at an evacuated node has no "
+            "positive-support endpoint along every material outflow face.");
+
+        ablastr::utils::communication::FillBoundary(
+            vacuum_cleanup_source,
+            vacuum_cleanup_source.nGrowVect(), false,
+            geom.periodicity(), true);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(advected_energy, TilingIfNotGPU());
+             mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real> const& advected =
+                advected_energy.array(mfi);
+            amrex::Array4<amrex::Real const> const& cleanup =
+                vacuum_cleanup_source.const_array(mfi);
+            amrex::Box const box = amrex::convert(
+                mfi.tilebox(), Te.ixType().toIntVect());
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+                int i, int j, int k) noexcept
+            {
+                amrex::Real const target_volume =
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                    hybrid_transport_node_volume(
+                        i, j, k, problo, dx, physical_domain_lo,
+                        axis_volume_factor);
+#else
+                    hybrid_node_volume(
+                        i, j, k, problo, probhi, dx,
+                        physical_domain_lo, physical_domain_hi, periodic);
+#endif
+                amrex::Real const removed_energy = cleanup(i, j, k, 0);
+                amrex::Real incoming_energy = 0.0_rt;
+#if AMREX_SPACEDIM >= 1
+                incoming_energy += cleanup(i-1, j, k, 2);
+                incoming_energy += cleanup(i+1, j, k, 1);
+#endif
+#if AMREX_SPACEDIM >= 2
+                incoming_energy += cleanup(i, j-1, k, 4);
+                incoming_energy += cleanup(i, j+1, k, 3);
+#endif
+#if AMREX_SPACEDIM == 3
+                incoming_energy += cleanup(i, j, k-1, 6);
+                incoming_energy += cleanup(i, j, k+1, 5);
+#endif
+                // Multiplying U_res by V and dividing it back can leave the
+                // same one-ulp residue.  No cleanup path may target an
+                // endpoint-vacuum source, so enforce its representable state
+                // bitwise and gather only incoming energy onto material.
+                if (removed_energy != 0.0_rt) {
+                    advected(i, j, k) = 0.0_rt;
+                }
+                advected(i, j, k) += incoming_energy / target_volume;
+            });
+        }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (MFIter mfi(Te, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            amrex::Array4<amrex::Real> const& temperature = Te.array(mfi);
+            amrex::Array4<amrex::Real const> const& advected_energy_arr =
+                advected_energy.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& old_energy =
+                Ke.const_array(mfi);
+            amrex::Array4<amrex::Real const> transport_energy = old_energy;
+            if (conservative_pressure_work) {
+                transport_energy =
+                    pressure_work_loaded_energy.const_array(mfi);
+            }
+            amrex::Array4<amrex::Real const> const& charge_density =
+                rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& old_charge_density =
+                old_rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& midpoint_charge_density =
+                midpoint_rho.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& ion_current_x =
+                ion_current[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& ion_current_y =
+                ion_current[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& ion_current_z =
+                ion_current[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& plasma_current_x =
+                plasma_current[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& plasma_current_y =
+                plasma_current[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& plasma_current_z =
+                plasma_current[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const& vx =
+                Vex.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& vy =
+                Vey.const_array(mfi);
+            amrex::Array4<amrex::Real const> const& vz =
+                Vez.const_array(mfi);
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+            amrex::ignore_unused(ion_current_y, plasma_current_y, vy);
+#endif
+
+            amrex::Box const box = amrex::convert(
+                mfi.tilebox(), Te.ixType().toIntVect());
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+                int i, int j, int k) noexcept
+            {
+                amrex::Real const deposited_rho_node =
+                    charge_density(i, j, k);
+                amrex::Real const rho_node =
+                    amrex::max(deposited_rho_node, 0.0_rt);
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                QdsmcCartesianTransportTerms const transport =
+                    qdsmc_cylindrical_transport_terms(
+                        transport_energy, old_charge_density,
+                        midpoint_charge_density,
+                        ion_current_x, ion_current_z,
+                        plasma_current_x, plasma_current_z, vx, vz,
+                        i, j, k, nodal_lo, nodal_hi, dx, periodic,
+                        plasma_current_face_centered, axis_volume_factor,
+                        problo, probhi,
+                        physical_domain_lo, physical_domain_hi);
+#else
+                QdsmcCartesianTransportTerms const transport =
+                    qdsmc_cartesian_transport_terms(
+                        transport_energy, old_charge_density,
+                        midpoint_charge_density,
+                        ion_current_x, ion_current_y, ion_current_z,
+                        plasma_current_x, plasma_current_y,
+                        plasma_current_z, vx, vy, vz, i, j, k,
+                        nodal_lo, nodal_hi, inv_dx, periodic,
+                        plasma_current_face_centered);
+#endif
+                amrex::Real pressure_heun_divergence =
+                    transport.velocity_divergence;
+                amrex::Real plasma_ratio_divergence = 0.0_rt;
+                if (conservative_pressure_work) {
+                    // V_e = V_i - J_plasma/rho.  The ion part is replaced by
+                    // the frozen exact Boris work pair source-loaded into
+                    // transport_energy before this FV remap.  Evaluate the
+                    // sole retained +P div(J_plasma/rho) term directly rather
+                    // than subtracting two independently discretized ion and
+                    // electron divergences.  The latter leaves a spurious
+                    // residual at an exact-vacuum front even when J_plasma=0.
+                    plasma_ratio_divergence =
+                        qdsmc_cartesian_ratio_velocity_divergence(
+                            plasma_current_x, plasma_current_y,
+                            plasma_current_z, midpoint_charge_density,
+                            i, j, k, nodal_lo, nodal_hi, inv_dx, periodic);
+                    pressure_heun_divergence = -plasma_ratio_divergence;
+                }
+                amrex::Real const advected_energy_density =
+                    advected_energy_arr(i, j, k);
+
+                ElectronThermodynamicsExecutor::MaterialMassDensities
+                    material_mass_density{};
+                if (num_materials == 1) {
+                    material_mass_density[0] = thermodynamics
+                        .materialMassDensityFromPhysicalChargeDensity(
+                            0, rho_node);
+                }
+                amrex::Real const advected_temperature = thermodynamics
+                    .temperatureFromMaterialMassDensitiesThermalEnergyDensity(
+                        rho_node, material_mass_density,
+                        advected_energy_density);
+                ElectronThermodynamicState const advected_state =
+                    thermodynamics.stateFromMaterialMassDensitiesTemperature(
+                        rho_node, material_mass_density,
+                        advected_temperature);
+                amrex::Real const advected_energy_scale = amrex::max(
+                    amrex::max(
+                        std::abs(advected_energy_density),
+                        std::abs(advected_state.internal_energy_density)),
+                    std::numeric_limits<amrex::Real>::min());
+                amrex::Real const advected_energy_tolerance = 512.0_rt
+                    * std::numeric_limits<amrex::Real>::epsilon()
+                    * advected_energy_scale;
+                amrex::Real const predicted_energy_density =
+                    advected_energy_density
+                    - dt * pressure_heun_divergence
+                        * advected_state.pressure;
+                amrex::Real const predicted_temperature = thermodynamics
+                    .temperatureFromMaterialMassDensitiesThermalEnergyDensity(
+                        rho_node, material_mass_density,
+                        predicted_energy_density);
+                ElectronThermodynamicState const predicted_state =
+                    thermodynamics.stateFromMaterialMassDensitiesTemperature(
+                        rho_node, material_mass_density,
+                        predicted_temperature);
+                amrex::Real const predicted_energy_scale = amrex::max(
+                    amrex::max(
+                        std::abs(predicted_energy_density),
+                        std::abs(predicted_state.internal_energy_density)),
+                    std::numeric_limits<amrex::Real>::min());
+                amrex::Real const predicted_energy_tolerance = 512.0_rt
+                    * std::numeric_limits<amrex::Real>::epsilon()
+                    * predicted_energy_scale;
+                amrex::Real const final_energy_density =
+                    advected_energy_density
+                    - 0.5_rt * dt * pressure_heun_divergence
+                        * (advected_state.pressure + predicted_state.pressure);
+                amrex::Real const final_temperature = thermodynamics
+                    .temperatureFromMaterialMassDensitiesThermalEnergyDensity(
+                        rho_node, material_mass_density,
+                        final_energy_density);
+                ElectronThermodynamicState const final_state =
+                    thermodynamics.stateFromMaterialMassDensitiesTemperature(
+                        rho_node, material_mass_density, final_temperature);
+                amrex::Real const energy_scale = amrex::max(
+                    amrex::max(
+                        std::abs(final_energy_density),
+                        std::abs(final_state.internal_energy_density)),
+                    std::numeric_limits<amrex::Real>::min());
+                amrex::Real const energy_tolerance = 512.0_rt
+                    * std::numeric_limits<amrex::Real>::epsilon()
+                    * energy_scale;
+                bool const bad_advected_eos =
+                    !amrex::Math::isfinite(advected_temperature)
+                    || !amrex::Math::isfinite(advected_state.pressure)
+                    || advected_state.pressure < 0.0_rt
+                    || !amrex::Math::isfinite(
+                        advected_state.internal_energy_density)
+                    || std::abs(
+                        advected_state.internal_energy_density
+                        - advected_energy_density)
+                        > advected_energy_tolerance;
+                bool const bad_predicted_eos =
+                    !amrex::Math::isfinite(predicted_energy_density)
+                    || !amrex::Math::isfinite(predicted_temperature)
+                    || !amrex::Math::isfinite(predicted_state.pressure)
+                    || predicted_state.pressure < 0.0_rt
+                    || !amrex::Math::isfinite(
+                        predicted_state.internal_energy_density)
+                    || std::abs(
+                        predicted_state.internal_energy_density
+                        - predicted_energy_density)
+                        > predicted_energy_tolerance;
+                bool const bad_final_eos =
+                    !amrex::Math::isfinite(final_energy_density)
+                    || !amrex::Math::isfinite(final_temperature)
+                    || !amrex::Math::isfinite(final_state.pressure)
+                    || final_state.pressure < 0.0_rt
+                    || !amrex::Math::isfinite(
+                        final_state.internal_energy_density)
+                    || std::abs(
+                        final_state.internal_energy_density
+                        - final_energy_density) > energy_tolerance;
+                if (bad_advected_eos || bad_predicted_eos || bad_final_eos)
+                {
+                    if (bad_advected_eos) {
+                        amrex::HostDevice::Atomic::Add(
+                            invalid_advected_eos_ptr, 1);
+                    }
+                    if (bad_predicted_eos) {
+                        amrex::HostDevice::Atomic::Add(
+                            invalid_predicted_eos_ptr, 1);
+                    }
+                    if (bad_final_eos) {
+                        amrex::HostDevice::Atomic::Add(
+                            invalid_final_eos_ptr, 1);
+                    }
+                    temperature(i, j, k) =
+                        std::numeric_limits<amrex::Real>::quiet_NaN();
+                    return;
+                }
+                temperature(i, j, k) = final_temperature;
+            });
+        }
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_advected_eos.dataValue() == 0,
+            "The mass-consistent nonlinear electron-energy remap produced an "
+            "advected state outside the configured EOS domain.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_predicted_eos.dataValue() == 0,
+            "The predicted nonlinear electron pressure-work state is outside "
+            "the configured EOS domain. Reduce the timestep.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            invalid_final_eos.dataValue() == 0,
+            "The corrected nonlinear electron pressure-work state is outside "
+            "the configured EOS domain. Reduce the timestep.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            Te.is_finite(0, 1, 0),
+            "Nonlinear finite-volume electron-energy transport exceeded its "
+            "upwind CFL limit, violated discrete rho/current continuity, or "
+            "encountered an invalid EOS/pressure-work state. Reduce the "
+            "timestep and check for particle creation/deletion, injection, "
+            "reactive collisions, resampling, or unsupported material "
+            "boundary fluxes.");
+        ablastr::utils::communication::FillBoundary(
+            Te, Te.nGrowVect(), false, geom.periodicity(), true);
+        return;
+    }
 
     // Note: T_e is NOT zeroed here. Cells that received no QDSMC weight
     // keep their previous T_e -- zeroing them would erase valid state (and
@@ -829,7 +3472,8 @@ void HybridPICModel::QDSMCUpdateTe (int const lev) const
             // denominator carry the same small factor.
             if (weights_arr(i,j,k) <= 0.0_rt) { return; }
             amrex::Real const w = weights_arr(i,j,k);
-            // Floored density, mirroring QDSMCInitializeKe: below-floor
+            // Floored density, mirroring ideal-gas QDSMC initialization:
+            // below-floor
             // cells are updated too (insulating halo), and the K <-> T_e
             // conversion uses the same n_e^(gamma-1) factor on both sides of
             // the step, so a cell whose marker did not move keeps its T_e
@@ -870,13 +3514,30 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
 
     amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
+    amrex::MultiFab& joule_step =
+        *warpx.m_fields.get("hybrid_joule_electron_energy_fp", lev);
+    amrex::MultiFab& joule_cumulative = *warpx.m_fields.get(
+        "hybrid_joule_electron_energy_cumulative_fp", lev);
+    joule_step.setVal(0.0_rt);
     ablastr::fields::VectorField J_plasma =
         warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
 
-    auto const gamma_minus_1 = m_gamma - 1.0_rt;
     auto const rho_floor     = PhysConst::q_e * m_n_floor;
     auto const eta           = m_eta;
     auto const t_new         = warpx.gett_new(0);
+    auto const thermodynamics = m_electron_thermodynamics.executor();
+    int const num_materials = m_electron_thermodynamics.numMaterials();
+    amrex::GpuArray<amrex::MultiFab const*,
+                    ElectronThermodynamicsExecutor::max_materials>
+        material_unit_charge_density_fields{};
+    for (int material = 0; material < num_materials; ++material) {
+        auto& material_field = *warpx.m_fields.get(
+            "ni_charge_fp_"
+            + m_electron_thermodynamics.materialSpeciesName(material), lev);
+        material_field.FillBoundary(
+            material_field.nGrowVect(), period);
+        material_unit_charge_density_fields[material] = &material_field;
+    }
 
     amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
     amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
@@ -894,10 +3555,12 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
 
     auto & mypc = warpx.GetPartContainer();
 
-    // Loop over every charged ion species and accumulate its per-cell
-    // contribution to S_e into T_e directly. Each species contributes
-    //   dT_e_s = dt (gamma-1) * Z_s e^2 eta n_s |dV|^2 / k_B
-    // (the n_e factor in nu_{s,e} cancels the 1/n_e from the T_e update).
+    // Loop over every charged ion species and apply its per-cell contribution
+    // through the configured caloric inverse:
+    //   Delta U_e,s = dt Z_s e^2 eta n_e n_s |dV|^2.
+    // For an ideal gas this is algebraically the historical direct dT update;
+    // for latent and table EOS it deposits the same Joule energy without
+    // assuming a constant heat capacity.
     //
     // n_s is recovered from the species charge fraction rather than from
     // rho_fp_s/q_e directly: the per-species deposits are physical (volume-
@@ -942,6 +3605,17 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
             amrex::Array4<amrex::Real const> const & Jpx        = J_plasma[0]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jpy        = J_plasma[1]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jpz        = J_plasma[2]->const_array(mfi);
+            amrex::Array4<amrex::Real> const& joule_step_arr =
+                joule_step.array(mfi);
+            amrex::Array4<amrex::Real> const& joule_cumulative_arr =
+                joule_cumulative.array(mfi);
+            ElectronThermodynamicsExecutor::MaterialChargeDensityArrays
+                material_unit_charge_density{};
+            for (int material = 0; material < num_materials; ++material) {
+                material_unit_charge_density[material] =
+                    material_unit_charge_density_fields[material]
+                        ->const_array(mfi);
+            }
 
             // Redirect output (default Array4 when redirect off -> never indexed
             // because do_redirect gates the write).
@@ -984,13 +3658,10 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 amrex::Real const dvz = jz * inv_ene;
                 amrex::Real const dv2 = dvx*dvx + dvy*dvy + dvz*dvz;
 
-                // Per-species contribution to S_e at this cell.
-                //   nu_{s,e} n_s m_s |V_s - V_e|^2 = Z_s e^2 eta_s_eff n_e n_s |dV|^2
-                // Dividing by (n_e k_B) for the T_e update:
-                //   dT_e_s = dt (gamma-1) * Z_s e^2 eta_s_eff n_s |dV|^2 / k_B
-                amrex::Real const dTe_s = dt * gamma_minus_1
-                               * Z_s * PhysConst::q_e * PhysConst::q_e
-                               * eta_s_eff * ns * dv2 / PhysConst::kb;
+                // Per-species source integrated over this PIC step [J/m^3].
+                amrex::Real const source_energy_density = dt * Z_s
+                    * PhysConst::q_e * PhysConst::q_e * eta_s_eff
+                    * ne * ns * dv2;
                 // Te-threshold redirection: below threshold heat electrons (the
                 // usual Joule deposit); at/above it write this species'
                 // m_i-independent redirected energy E_s = (2/3) n_e Z_s e^2 eta
@@ -999,13 +3670,39 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                     redirect_arr(i,j,k,ion_comp) = (2.0_rt/3.0_rt) * ne
                         * Z_s * PhysConst::q_e * PhysConst::q_e * eta_s_eff * dv2 * dt;
                 } else {
-                    Te_arr(i,j,k) += dTe_s;
+                    auto const material_mass_density = thermodynamics
+                        .materialMassDensitiesFromChargeDensityArrays(
+                            material_unit_charge_density, i, j, k);
+                    ElectronEnergySourceUpdate const source_update =
+                        thermodynamics.applyEnergyDensityIncrement(
+                            rho_val, material_mass_density,
+                            Te_arr(i,j,k), source_energy_density);
+                    if (!source_update.valid) {
+                        Te_arr(i,j,k) =
+                            std::numeric_limits<amrex::Real>::quiet_NaN();
+                        joule_step_arr(i,j,k) =
+                            std::numeric_limits<amrex::Real>::quiet_NaN();
+                        return;
+                    }
+                    Te_arr(i,j,k) = source_update.temperature;
+                    joule_step_arr(i,j,k) +=
+                        source_update.energy_change_density;
+                    joule_cumulative_arr(i,j,k) +=
+                        source_update.energy_change_density;
                 }
             });
         }
     }
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        Te.is_finite(0, 1, 0) && joule_step.is_finite(0, 1, 0)
+            && joule_cumulative.is_finite(0, 1, 0),
+        "The hybrid Joule source could not realize the requested electron "
+        "energy increment inside the configured caloric EOS domain.");
     Te.FillBoundary(Te.nGrowVect(), period);
+    joule_step.FillBoundary(joule_step.nGrowVect(), period);
+    joule_cumulative.FillBoundary(
+        joule_cumulative.nGrowVect(), period);
 }
 
 
@@ -1023,15 +3720,19 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
     // where n_s/n_e = f_s/Z_s, f_s = rho_fp_s/Sigma_t rho_fp_t. T_e is stored in
     // Kelvin; T_i (deposited per species, cell-centered, in eV) is interpolated
     // to the nodal T_e grid and converted to K. This is the electron-side sink;
-    // QDSMCApplyIonHeating deposits the matching ion heating so the pair
-    // conserves energy.
+    // QDSMCApplyIonHeating projects a stochastic ion proposal onto the exact
+    // per-species ledger while preserving cell ion momentum.
     auto & warpx = WarpX::GetInstance();
     amrex::Periodicity const & period = warpx.Geom(lev).periodicity();
 
     amrex::MultiFab       & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
+    amrex::MultiFab& qei_step =
+        *warpx.m_fields.get("hybrid_qei_electron_energy_fp", lev);
+    amrex::MultiFab& qei_cumulative = *warpx.m_fields.get(
+        "hybrid_qei_electron_energy_cumulative_fp", lev);
+    qei_step.setVal(0.0_rt);
 
-    auto const gamma_minus_1 = m_gamma - 1.0_rt;
     auto const rho_floor     = PhysConst::q_e * m_n_floor;
     auto const nu_ei         = m_nu_ei;
     auto const t_new         = warpx.gett_new(0);
@@ -1044,6 +3745,19 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
 
     auto & mypc = warpx.GetPartContainer();
     auto const species_names = mypc.GetSpeciesNames();
+    auto const thermodynamics = m_electron_thermodynamics.executor();
+    int const num_materials = m_electron_thermodynamics.numMaterials();
+    amrex::GpuArray<amrex::MultiFab const*,
+                    ElectronThermodynamicsExecutor::max_materials>
+        material_unit_charge_density_fields{};
+    for (int material = 0; material < num_materials; ++material) {
+        auto& material_field = *warpx.m_fields.get(
+            "ni_charge_fp_"
+            + m_electron_thermodynamics.materialSpeciesName(material), lev);
+        material_field.FillBoundary(
+            material_field.nGrowVect(), period);
+        material_unit_charge_density_fields[material] = &material_field;
+    }
 
     // Sigma_t rho_fp_t (physical per-species charge densities) -> species
     // fraction. Filled once per step by HybridPICDepositRhoAndJ.
@@ -1058,8 +3772,23 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
         auto & pc = mypc.GetParticleContainerFromName(spec_name);
         if (pc.getCharge() == 0._prt) { continue; }
         amrex::Real const Z_s = pc.getCharge() / PhysConst::q_e;
+        int material_index = -1;
+        for (int material = 0; material < num_materials; ++material) {
+            if (spec_name
+                == m_electron_thermodynamics.materialSpeciesName(material))
+            {
+                material_index = material;
+            }
+        }
 
         amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+        amrex::MultiFab& qei_ion_temperature = *warpx.m_fields.get(
+            "hybrid_qei_ion_temperature_fp_" + spec_name, lev);
+        amrex::MultiFab& qei_electron_temperature_before = *warpx.m_fields.get(
+            "hybrid_qei_electron_temperature_before_fp_" + spec_name, lev);
+        amrex::MultiFab& qei_species_step = *warpx.m_fields.get(
+            "hybrid_qei_electron_energy_fp_" + spec_name, lev);
+        qei_species_step.setVal(0.0_rt);
 
         // Per-cell ion temperature [eV] (NGP velocity-variance deposit, done once
         // by the caller and shared via Ti_dep_by_species), moved onto the field's
@@ -1088,31 +3817,106 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
             amrex::Array4<amrex::Real const> const & rhos_arr   = rho_s.const_array(mfi);
             amrex::Array4<amrex::Real const> const & rhosum_arr = rhos_sum.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Ti_arr     = Ti_cc.const_array(mfi);
+            amrex::Array4<amrex::Real> const& qei_step_arr =
+                qei_step.array(mfi);
+            amrex::Array4<amrex::Real> const& qei_cumulative_arr =
+                qei_cumulative.array(mfi);
+            amrex::Array4<amrex::Real> const& qei_ion_temperature_arr =
+                qei_ion_temperature.array(mfi);
+            amrex::Array4<amrex::Real> const&
+                qei_electron_temperature_before_arr =
+                    qei_electron_temperature_before.array(mfi);
+            amrex::Array4<amrex::Real> const& qei_species_step_arr =
+                qei_species_step.array(mfi);
+            ElectronThermodynamicsExecutor::MaterialChargeDensityArrays
+                material_unit_charge_density{};
+            for (int material = 0; material < num_materials; ++material) {
+                material_unit_charge_density[material] =
+                    material_unit_charge_density_fields[material]
+                        ->const_array(mfi);
+            }
 
             amrex::Box const & tbox = mfi.tilebox();
             amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 amrex::Real const rho_val = rho_arr(i,j,k);
                 if (rho_val <= rho_floor) { return; }
-                amrex::Real const rhos_sum_val = std::max(rhosum_arr(i,j,k), rho_floor);
-                amrex::Real const f_s = rhos_arr(i,j,k) / rhos_sum_val;   // = Z_s n_s/n_e
+                amrex::Real const rhos_sum_val =
+                    std::max(rhosum_arr(i,j,k), rho_floor);
+                amrex::Real const f_s =
+                    rhos_arr(i,j,k) / rhos_sum_val;
+                amrex::Real const electron_density =
+                    rho_val / PhysConst::q_e;
+                // A material composition field deposits q_e*n_i without the
+                // runtime ionization level. This is required for evolving
+                // high-Z charge states. Fixed-charge legacy species retain
+                // n_s/n_e=f_s/Z_s exactly.
+                amrex::Real const ion_density = material_index >= 0
+                    ? material_unit_charge_density[material_index](i,j,k)
+                        / PhysConst::q_e
+                    : f_s * electron_density / Z_s;
+                if (!(ion_density > 0.0_rt)) { return; }
 
                 amrex::Real const Ti_eV = ablastr::coarsen::sample::Interp(
                     Ti_arr, cc_stag, nodal, coarsen, i, j, k, 0);
+                qei_ion_temperature_arr(i,j,k) = Ti_eV;
                 amrex::Real const Te_K  = Te_arr(i,j,k);
                 amrex::Real const Te_eV = Te_K / K_per_eV;
                 amrex::Real const Ti_K  = Ti_eV * K_per_eV;
+                qei_electron_temperature_before_arr(i, j, k) = Te_eV;
 
                 amrex::Real const nu = nu_ei(rho_val, amrex::max(Te_eV, Te_floor_eV), Ti_eV, t_new);
-                // Exact exponential integration of dT_e/dt = -alpha nu (T_e - T_i),
-                // with alpha = (gamma-1) 3 n_s/n_e and n_s/n_e = f_s/Z_s.
-                amrex::Real const alpha = gamma_minus_1 * 3.0_rt * (f_s / Z_s);
-                Te_arr(i,j,k) = Ti_K + (Te_K - Ti_K) * std::exp(-alpha * nu * dt);
+                auto const material_mass_density = thermodynamics
+                    .materialMassDensitiesFromChargeDensityArrays(
+                        material_unit_charge_density, i, j, k);
+                ElectronThermodynamicState const old_state = thermodynamics
+                    .stateFromMaterialMassDensitiesTemperature(
+                        rho_val, material_mass_density, Te_K);
+                amrex::Real const ion_heat_capacity_density =
+                    1.5_rt * ion_density * PhysConst::kb;
+                amrex::Real const conductance_density =
+                    3.0_rt * ion_density * PhysConst::kb * nu;
+                TwoTemperatureExchangeState const exchange =
+                    exactTwoTemperatureExchange(
+                        Te_K, Ti_K, old_state.heat_capacity_density,
+                        ion_heat_capacity_density, conductance_density, dt);
+                if (!exchange.valid) {
+                    Te_arr(i,j,k) =
+                        std::numeric_limits<amrex::Real>::quiet_NaN();
+                    return;
+                }
+                ElectronEnergySourceUpdate const source_update =
+                    thermodynamics.applyEnergyDensityIncrement(
+                        rho_val, material_mass_density, Te_K,
+                        exchange.electron_energy_change_density);
+                if (!source_update.valid) {
+                    Te_arr(i,j,k) =
+                        std::numeric_limits<amrex::Real>::quiet_NaN();
+                    return;
+                }
+                Te_arr(i,j,k) = source_update.temperature;
+                qei_step_arr(i,j,k) +=
+                    source_update.energy_change_density;
+                qei_cumulative_arr(i,j,k) +=
+                    source_update.energy_change_density;
+                qei_species_step_arr(i, j, k) =
+                    source_update.energy_change_density;
             });
         }
+        qei_species_step.FillBoundary(qei_species_step.nGrowVect(), period);
+        qei_electron_temperature_before.FillBoundary(
+            qei_electron_temperature_before.nGrowVect(), period);
     }
 
     Te.FillBoundary(Te.nGrowVect(), period);
+    for (auto const& spec_name : species_names) {
+        auto& pc = mypc.GetParticleContainerFromName(spec_name);
+        if (pc.getCharge() == 0.0_prt) { continue; }
+        auto& qei_ion_temperature = *warpx.m_fields.get(
+            "hybrid_qei_ion_temperature_fp_" + spec_name, lev);
+        qei_ion_temperature.FillBoundary(
+            qei_ion_temperature.nGrowVect(), period);
+    }
 }
 
 
@@ -1124,19 +3928,27 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 
     using warpx::fields::FieldType;
 
-    // Stochastic Ornstein-Uhlenbeck ion-heating operator delivering both e-i energy
-    // channels per particle over dt:
-    //   v_p <- u_e + (v_p - u_e) exp(-nu_ei dt) + sig R,   R ~ N(0,1) per component.
-    // Q_ei (when do_relax) sets the drag toward the electron fluid u_e and the thermal
-    // diffusion sig^2 = k_B T_e/m_i (1 - exp(-2 nu_ei dt)). The Te-threshold redirect
+    // Ornstein-Uhlenbeck proposal for the kinetic-ion response:
+    //   v_p <- u_e + (v_p - u_e) exp(-nu_ei dt) + sig R,
+    //   R ~ N(0,1) per component.
+    // Q_ei (when do_relax) sets the drag toward the electron fluid u_e and the
+    // thermal diffusion sig^2 = k_B T_e/m_i (1 - exp(-2 nu_ei dt)). The
+    // realized proposal is then projected cell-locally to preserve the pre-step
+    // ion momentum and to make its nonrelativistic thermal-energy change
+    // exactly equal the negative electron ledger. The Te-threshold redirect
     // (when do_redir) adds pure-diffusion heating E_s/m_i, with the per-species
-    // redirected energy E_s [J] read from redirect_E. Both channels are per-species
-    // correct (own mass, own T_i, own redirect_E comp).
+    // redirected energy E_s [J] read from redirect_E. Both channels are
+    // per-species correct (own mass, own T_i, own redirect_E comp).
     auto & warpx = WarpX::GetInstance();
 
-    bool const do_relax = m_include_temperature_relaxation;
+    bool const do_relax = (Ti_dep_by_species != nullptr);
     bool const do_redir = (redirect_E != nullptr);
     if (!do_relax && !do_redir) { return; }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !(do_relax && do_redir),
+        "Qei relaxation and stochastic Joule-to-ion redirection must be "
+        "applied in separate ion-heating calls so the Qei moment projection "
+        "has one unambiguous energy ledger.");
 
     amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
@@ -1170,6 +3982,7 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         ++ion_comp;
         auto const m_i = pc.getMass();
         if (m_i <= 0._prt) { continue; }
+        auto const mass_real = static_cast<amrex::Real>(m_i);
 
         // Ion temperature [eV] (NGP) -- only needed as the nu_ei parser argument
         // (Q_ei drag/diffusion). Skipped when only the redirect is active. When
@@ -1240,6 +4053,16 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         coef_p.setVal(0.0_rt);
         coef_p.ParallelCopy(coef, 0, 0, 6);
 
+        // Components 0:4 are the pre-proposal weighted moments
+        // (sum w, sum w*u[3], sum w*|u|^2); 5:9 are the corresponding
+        // moments after the OU proposal. NGP bins are the same bins used by
+        // the coefficient lookup and by the local correction below.
+        std::unique_ptr<amrex::MultiFab> ion_moments;
+        if (do_relax) {
+            ion_moments = std::make_unique<amrex::MultiFab>(pba, pdm, 10, 1);
+            ion_moments->setVal(0.0_rt);
+        }
+
         // Apply the drag-diffusion update to each ion (NGP cell lookup).
         auto const plo = warpx.Geom(lev).ProbLoArray();
         auto const dxi = warpx.Geom(lev).InvCellSizeArray();
@@ -1252,36 +4075,491 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             long const np = pti.numParticles();
             auto & tile = pti.GetParticleTile();
             auto ptd = tile.getParticleTileData();
-            amrex::ParticleReal* AMREX_RESTRICT uxp = pti.GetAttribs(PIdx::ux).dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT uyp = pti.GetAttribs(PIdx::uy).dataPtr();
-            amrex::ParticleReal* AMREX_RESTRICT uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+            amrex::ParticleReal const* AMREX_RESTRICT wp =
+                pti.GetAttribs(PIdx::w).dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT uxp =
+                pti.GetAttribs(PIdx::ux).dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT uyp =
+                pti.GetAttribs(PIdx::uy).dataPtr();
+            amrex::ParticleReal* AMREX_RESTRICT uzp =
+                pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) ||                   \
+    defined(WARPX_DIM_RSPHERE)
+            amrex::ParticleReal const* AMREX_RESTRICT thetap =
+                pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+            amrex::ParticleReal const* AMREX_RESTRICT phip =
+                pti.GetAttribs(PIdx::phi).dataPtr();
+#endif
 
-            amrex::Array4<amrex::Real const> const & coef_arr = coef_p.const_array(pti);
+            amrex::Array4<amrex::Real const> const& coef_arr =
+                coef_p.const_array(pti);
+            amrex::Array4<amrex::Real> moment_arr;
+            if (do_relax) {
+                moment_arr = ion_moments->array(pti);
+            }
 
-            amrex::ParallelForRNG(np,
-                [=] AMREX_GPU_DEVICE (long ip, amrex::RandomEngine const& engine)
-            {
+            amrex::ParallelForRNG(np, [=] AMREX_GPU_DEVICE(
+                                          long ip,
+                                          amrex::RandomEngine const& engine) {
                 auto const p = WarpXParticleContainer::ParticleType(ptd, ip);
-                const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
-                amrex::ParticleReal const nu   = coef_arr(ii,jj,kk,0);
-                amrex::ParticleReal const Te_K = coef_arr(ii,jj,kk,4);
-                amrex::ParticleReal const E_s  = coef_arr(ii,jj,kk,5);
+                const auto [ii, jj, kk] =
+                    amrex::getParticleCell(p, plo, dxi).dim3();
+                amrex::ParticleReal const nu = coef_arr(ii, jj, kk, 0);
+                amrex::ParticleReal const Te_K = coef_arr(ii, jj, kk, 4);
+                amrex::ParticleReal const E_s = coef_arr(ii, jj, kk, 5);
+                // Ion moments are stored in amrex::Real even when particle
+                // attributes use reduced precision.  Promote the weight
+                // before forming every atomic contribution so that the
+                // atomic value exactly matches the destination type.
+                auto const weight = static_cast<amrex::Real>(wp[ip]);
+                amrex::ParticleReal const ux_old = uxp[ip];
+                amrex::ParticleReal const uy_old = uyp[ip];
+                amrex::ParticleReal const uz_old = uzp[ip];
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                amrex::ParticleReal const theta = thetap[ip];
+                amrex::ParticleReal const costheta = std::cos(theta);
+                amrex::ParticleReal const sintheta = std::sin(theta);
+                amrex::ParticleReal const u0_old =
+                    ux_old * costheta + uy_old * sintheta;
+                amrex::ParticleReal const u1_old =
+                    -ux_old * sintheta + uy_old * costheta;
+                amrex::ParticleReal const u2_old = uz_old;
+#elif defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const theta = thetap[ip];
+                amrex::ParticleReal const phi = phip[ip];
+                amrex::ParticleReal const costheta = std::cos(theta);
+                amrex::ParticleReal const sintheta = std::sin(theta);
+                amrex::ParticleReal const cosphi = std::cos(phi);
+                amrex::ParticleReal const sinphi = std::sin(phi);
+                amrex::ParticleReal const u0_old =
+                    ux_old * costheta * cosphi
+                    + uy_old * sintheta * cosphi + uz_old * sinphi;
+                amrex::ParticleReal const u1_old =
+                    -ux_old * sintheta + uy_old * costheta;
+                amrex::ParticleReal const u2_old =
+                    -ux_old * costheta * sinphi
+                    - uy_old * sintheta * sinphi + uz_old * cosphi;
+#else
+                amrex::ParticleReal const u0_old = ux_old;
+                amrex::ParticleReal const u1_old = uy_old;
+                amrex::ParticleReal const u2_old = uz_old;
+#endif
+                if (do_relax) {
+                    auto const u0_old_real =
+                        static_cast<amrex::Real>(u0_old);
+                    auto const u1_old_real =
+                        static_cast<amrex::Real>(u1_old);
+                    auto const u2_old_real =
+                        static_cast<amrex::Real>(u2_old);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 0), weight);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 1),
+                                            weight * u0_old_real);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 2),
+                                            weight * u1_old_real);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 3),
+                                            weight * u2_old_real);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 4),
+                                            weight * (u0_old_real * u0_old_real +
+                                                      u1_old_real * u1_old_real +
+                                                      u2_old_real * u2_old_real));
+                }
 
-                // Ornstein-Uhlenbeck drag and variance (Q_ei diffusion + redirect E_s).
+                // Ornstein-Uhlenbeck drag and variance (Q_ei diffusion +
+                // redirect E_s).
                 amrex::ParticleReal const nu_dt = nu * dt;
                 amrex::ParticleReal const drag = -std::expm1(-nu_dt);            // 1 - exp(-nu dt)
                 amrex::ParticleReal const sig2 =
                     (-kb * Te_K * std::expm1(-2._prt * nu_dt) + E_s) / m_i;
-                if (drag <= 0._prt && sig2 <= 0._prt) { return; }
-
-                amrex::ParticleReal const uex = coef_arr(ii,jj,kk,1);
-                amrex::ParticleReal const uey = coef_arr(ii,jj,kk,2);
-                amrex::ParticleReal const uez = coef_arr(ii,jj,kk,3);
-                amrex::ParticleReal const sig = std::sqrt(amrex::max(0._prt, sig2));
-                uxp[ip] += -drag*(uxp[ip]-uex) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
-                uyp[ip] += -drag*(uyp[ip]-uey) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
-                uzp[ip] += -drag*(uzp[ip]-uez) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                if (drag > 0._prt || sig2 > 0._prt) {
+                    amrex::ParticleReal const ue0 = coef_arr(ii, jj, kk, 1);
+                    amrex::ParticleReal const ue1 = coef_arr(ii, jj, kk, 2);
+                    amrex::ParticleReal const ue2 = coef_arr(ii, jj, kk, 3);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    amrex::ParticleReal const uex =
+                        ue0 * costheta - ue1 * sintheta;
+                    amrex::ParticleReal const uey =
+                        ue0 * sintheta + ue1 * costheta;
+                    amrex::ParticleReal const uez = ue2;
+#elif defined(WARPX_DIM_RSPHERE)
+                    amrex::ParticleReal const uex =
+                        ue0 * costheta * cosphi - ue1 * sintheta
+                        - ue2 * costheta * sinphi;
+                    amrex::ParticleReal const uey =
+                        ue0 * sintheta * cosphi + ue1 * costheta
+                        - ue2 * sintheta * sinphi;
+                    amrex::ParticleReal const uez =
+                        ue0 * sinphi + ue2 * cosphi;
+#else
+                    amrex::ParticleReal const uex = ue0;
+                    amrex::ParticleReal const uey = ue1;
+                    amrex::ParticleReal const uez = ue2;
+#endif
+                    amrex::ParticleReal const sig =
+                        std::sqrt(amrex::max(0._prt, sig2));
+                    uxp[ip] +=
+                        -drag * (uxp[ip] - uex) +
+                        sig * amrex::RandomNormal(0._prt, 1._prt, engine);
+                    uyp[ip] +=
+                        -drag * (uyp[ip] - uey) +
+                        sig * amrex::RandomNormal(0._prt, 1._prt, engine);
+                    uzp[ip] +=
+                        -drag * (uzp[ip] - uez) +
+                        sig * amrex::RandomNormal(0._prt, 1._prt, engine);
+                }
+                if (do_relax) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    amrex::ParticleReal const u0 =
+                        uxp[ip] * costheta + uyp[ip] * sintheta;
+                    amrex::ParticleReal const u1 =
+                        -uxp[ip] * sintheta + uyp[ip] * costheta;
+                    amrex::ParticleReal const u2 = uzp[ip];
+#elif defined(WARPX_DIM_RSPHERE)
+                    amrex::ParticleReal const u0 =
+                        uxp[ip] * costheta * cosphi
+                        + uyp[ip] * sintheta * cosphi + uzp[ip] * sinphi;
+                    amrex::ParticleReal const u1 =
+                        -uxp[ip] * sintheta + uyp[ip] * costheta;
+                    amrex::ParticleReal const u2 =
+                        -uxp[ip] * costheta * sinphi
+                        - uyp[ip] * sintheta * sinphi + uzp[ip] * cosphi;
+#else
+                    amrex::ParticleReal const u0 = uxp[ip];
+                    amrex::ParticleReal const u1 = uyp[ip];
+                    amrex::ParticleReal const u2 = uzp[ip];
+#endif
+                    auto const u0_real = static_cast<amrex::Real>(u0);
+                    auto const u1_real = static_cast<amrex::Real>(u1);
+                    auto const u2_real = static_cast<amrex::Real>(u2);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 5), weight);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 6),
+                                            weight * u0_real);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 7),
+                                            weight * u1_real);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 8),
+                                            weight * u2_real);
+                    amrex::Gpu::Atomic::Add(&moment_arr(ii, jj, kk, 9),
+                                            weight *
+                                                (u0_real * u0_real +
+                                                 u1_real * u1_real +
+                                                 u2_real * u2_real));
+                }
             });
+        }
+
+        if (do_relax) {
+            ion_moments->FillBoundary(warpx.Geom(lev).periodicity());
+            amrex::MultiFab const& electron_source = *warpx.m_fields.get(
+                "hybrid_qei_electron_energy_fp_" + spec_name, lev);
+            amrex::BoxArray const source_pba =
+                amrex::convert(pba, electron_source.ixType().toIntVect());
+            amrex::MultiFab source_on_particles(source_pba, pdm, 1, 0);
+            source_on_particles.setVal(0.0_rt);
+            source_on_particles.ParallelCopy(electron_source, 0, 0, 1,
+                                             amrex::IntVect::TheZeroVector(),
+                                             amrex::IntVect::TheZeroVector());
+
+            // Components: thermal scale; old mean u[3]; proposal mean u[3].
+            // Applying old_mean + scale*(proposal-proposal_mean) preserves
+            // the old cell momentum while setting the requested thermal
+            // energy independently of Monte-Carlo sampling noise.
+            amrex::MultiFab correction(pba, pdm, 7, 0);
+            correction.setVal(0.0_rt);
+            amrex::MultiFab ion_request_density(pba, pdm, 1, 0);
+            ion_request_density.setVal(0.0_rt);
+            amrex::Gpu::DeviceScalar<int> invalid_cells(0);
+            int* const invalid_cells_ptr = invalid_cells.dataPtr();
+            auto const problo = warpx.Geom(lev).ProbLoArray();
+            auto const dx = warpx.Geom(lev).CellSizeArray();
+            auto const domain_lo = amrex::lbound(warpx.Geom(lev).Domain());
+            auto const domain_hi = amrex::ubound(warpx.Geom(lev).Domain());
+            amrex::GpuArray<int, 3> periodic{0, 0, 0};
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                periodic[d] = warpx.Geom(lev).isPeriodic(d) ? 1 : 0;
+            }
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (MFIter mfi(correction, TilingIfNotGPU()); mfi.isValid();
+                 ++mfi) {
+                amrex::Array4<amrex::Real> const corr = correction.array(mfi);
+                amrex::Array4<amrex::Real> const request =
+                    ion_request_density.array(mfi);
+                amrex::Array4<amrex::Real const> const moments =
+                    ion_moments->const_array(mfi);
+                amrex::Array4<amrex::Real const> const source =
+                    source_on_particles.const_array(mfi);
+                amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE(
+                                                      int i, int j,
+                                                      int k) noexcept {
+                    // Partition each nodal dual-volume source only among
+                    // its adjacent particle cells.  The weight is local
+                    // ion number density times physical corner volume.
+                    // Thus a material/vacuum interface assigns the whole
+                    // interface-node request to its supported side, while
+                    // the sum over supported neighbors remains the exact
+                    // nodal energy.  No distant-cell redistribution is
+                    // permitted.
+                    amrex::Real electron_change = 0.0_rt;
+                    amrex::Real const cell_weight =
+                        amrex::max(moments(i, j, k, 0), 0.0_rt);
+                    amrex::Real const cell_volume =
+                        hybrid_cell_volume(i, j, k, problo, dx, domain_lo);
+                    amrex::Real const cell_density =
+                        cell_volume > 0.0_rt ? cell_weight / cell_volume
+                                             : 0.0_rt;
+                    for (int dk = 0; dk < (AMREX_SPACEDIM == 3 ? 2 : 1); ++dk) {
+                        for (int dj = 0; dj < (AMREX_SPACEDIM >= 2 ? 2 : 1);
+                             ++dj) {
+                            for (int di = 0; di < 2; ++di) {
+                                int const ni = i + di;
+                                int const nj = j + dj;
+                                int const nk = k + dk;
+                                amrex::Real support = 0.0_rt;
+                                amrex::Real physical_node_volume = 0.0_rt;
+                                for (int neighbor_dk = 0;
+                                     neighbor_dk <
+                                     (AMREX_SPACEDIM == 3 ? 2 : 1);
+                                     ++neighbor_dk) {
+                                    for (int neighbor_dj = 0;
+                                         neighbor_dj <
+                                         (AMREX_SPACEDIM >= 2 ? 2 : 1);
+                                         ++neighbor_dj) {
+                                        for (int neighbor_di = 0;
+                                             neighbor_di < 2; ++neighbor_di) {
+                                            int const ci = ni - neighbor_di;
+                                            int const cj = nj - neighbor_dj;
+                                            int const ck = nk - neighbor_dk;
+                                            if (!hybrid_source_cell_is_addressable(
+                                                    ci, cj, ck, domain_lo,
+                                                    domain_hi, periodic)) {
+                                                continue;
+                                            }
+                                            amrex::Real const corner_volume =
+                                                hybrid_cell_corner_volume(
+                                                    ci, cj, ck, neighbor_di,
+                                                    neighbor_dj, neighbor_dk,
+                                                    problo, dx, domain_lo);
+                                            amrex::Real const neighbor_volume =
+                                                hybrid_cell_volume(ci, cj, ck,
+                                                                   problo, dx,
+                                                                   domain_lo);
+                                            amrex::Real const neighbor_density =
+                                                neighbor_volume > 0.0_rt
+                                                    ? amrex::max(moments(ci, cj,
+                                                                         ck, 0),
+                                                                 0.0_rt) /
+                                                          neighbor_volume
+                                                    : 0.0_rt;
+                                            physical_node_volume +=
+                                                corner_volume;
+                                            support += neighbor_density *
+                                                       corner_volume;
+                                        }
+                                    }
+                                }
+                                amrex::Real const source_density =
+                                    source(ni, nj, nk);
+                                if (!(support > 0.0_rt)) {
+                                    if (source_density != 0.0_rt) {
+                                        amrex::Gpu::Atomic::Add(
+                                            invalid_cells_ptr, 1);
+                                    }
+                                    continue;
+                                }
+                                amrex::Real const own_corner_volume =
+                                    hybrid_cell_corner_volume(i, j, k, di, dj,
+                                                              dk, problo, dx,
+                                                              domain_lo);
+                                electron_change +=
+                                    source_density * physical_node_volume *
+                                    cell_density * own_corner_volume / support;
+                            }
+                        }
+                    }
+                    amrex::Real const requested_ion_change = -electron_change;
+                    request(i, j, k) = cell_volume > 0.0_rt
+                                           ? requested_ion_change / cell_volume
+                                           : 0.0_rt;
+                    amrex::Real const weight = moments(i, j, k, 0);
+                    amrex::Real const proposal_weight = moments(i, j, k, 5);
+                    amrex::Real const request_scale =
+                        amrex::max(std::abs(requested_ion_change),
+                                   std::numeric_limits<amrex::Real>::min());
+                    if (!(weight > 0.0_rt) || !(proposal_weight > 0.0_rt)) {
+                        if (std::abs(requested_ion_change) >
+                            128.0_rt *
+                                std::numeric_limits<amrex::Real>::epsilon() *
+                                request_scale) {
+                            amrex::Gpu::Atomic::Add(invalid_cells_ptr, 1);
+                        }
+                        corr(i, j, k, 0) = 1.0_rt;
+                        return;
+                    }
+
+                    amrex::Real const old_ux = moments(i, j, k, 1) / weight;
+                    amrex::Real const old_uy = moments(i, j, k, 2) / weight;
+                    amrex::Real const old_uz = moments(i, j, k, 3) / weight;
+                    amrex::Real const proposal_ux =
+                        moments(i, j, k, 6) / proposal_weight;
+                    amrex::Real const proposal_uy =
+                        moments(i, j, k, 7) / proposal_weight;
+                    amrex::Real const proposal_uz =
+                        moments(i, j, k, 8) / proposal_weight;
+                    corr(i, j, k, 1) = old_ux;
+                    corr(i, j, k, 2) = old_uy;
+                    corr(i, j, k, 3) = old_uz;
+                    corr(i, j, k, 4) = proposal_ux;
+                    corr(i, j, k, 5) = proposal_uy;
+                    corr(i, j, k, 6) = proposal_uz;
+
+                    amrex::Real const old_variance = amrex::max(
+                        moments(i, j, k, 4) -
+                            weight * (old_ux * old_ux + old_uy * old_uy +
+                                      old_uz * old_uz),
+                        0.0_rt);
+                    amrex::Real const proposal_variance = amrex::max(
+                        moments(i, j, k, 9) -
+                            proposal_weight * (proposal_ux * proposal_ux +
+                                               proposal_uy * proposal_uy +
+                                               proposal_uz * proposal_uz),
+                        0.0_rt);
+                    amrex::Real const old_thermal =
+                        0.5_rt * mass_real * old_variance;
+                    amrex::Real const proposal_thermal =
+                        0.5_rt * mass_real * proposal_variance;
+                    amrex::Real const target_thermal =
+                        old_thermal + requested_ion_change;
+                    amrex::Real const energy_scale =
+                        amrex::max(amrex::max(std::abs(old_thermal),
+                                              std::abs(requested_ion_change)),
+                                   std::numeric_limits<amrex::Real>::min());
+                    amrex::Real const tolerance =
+                        512.0_rt * std::numeric_limits<amrex::Real>::epsilon() *
+                        energy_scale;
+                    if (target_thermal < -tolerance ||
+                        (proposal_thermal <= tolerance &&
+                         target_thermal > tolerance)) {
+                        amrex::Gpu::Atomic::Add(invalid_cells_ptr, 1);
+                        corr(i, j, k, 0) = 1.0_rt;
+                        return;
+                    }
+                    corr(i, j, k, 0) =
+                        proposal_thermal > tolerance
+                            ? std::sqrt(amrex::max(target_thermal, 0.0_rt) /
+                                        proposal_thermal)
+                            : 0.0_rt;
+                });
+            }
+            amrex::Gpu::streamSynchronize();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                invalid_cells.dataValue() == 0,
+                "The conservative Qei ion update could not realize one or "
+                "more local energy requests while preserving cell momentum. "
+                "Every exchanging particle cell needs resolved thermal "
+                "variance (normally at least two non-identical ion "
+                "macroparticles), and an ion-cooling request cannot exceed "
+                "that cell's thermal energy. Increase particles per cell or "
+                "reduce the Qei source timestep/rate.");
+
+            auto& ion_request_field = *warpx.m_fields.get(
+                "hybrid_qei_ion_energy_cc_" + spec_name, lev);
+            ion_request_field.setVal(0.0_rt);
+            ion_request_field.ParallelCopy(ion_request_density, 0, 0, 1,
+                                           amrex::IntVect::TheZeroVector(),
+                                           amrex::IntVect::TheZeroVector());
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (WarpXParIter pti(pc, lev); pti.isValid(); ++pti) {
+                long const np = pti.numParticles();
+                auto const ptd = pti.GetParticleTile().getParticleTileData();
+                amrex::ParticleReal* AMREX_RESTRICT uxp =
+                    pti.GetAttribs(PIdx::ux).dataPtr();
+                amrex::ParticleReal* AMREX_RESTRICT uyp =
+                    pti.GetAttribs(PIdx::uy).dataPtr();
+                amrex::ParticleReal* AMREX_RESTRICT uzp =
+                    pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) ||                   \
+    defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const* AMREX_RESTRICT thetap =
+                    pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal const* AMREX_RESTRICT phip =
+                    pti.GetAttribs(PIdx::phi).dataPtr();
+#endif
+                amrex::Array4<amrex::Real const> const corr =
+                    correction.const_array(pti);
+                amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) noexcept {
+                    auto const p =
+                        WarpXParticleContainer::ParticleType(ptd, ip);
+                    const auto [ii, jj, kk] =
+                        amrex::getParticleCell(p, plo, dxi).dim3();
+                    amrex::ParticleReal const scale = corr(ii, jj, kk, 0);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    amrex::ParticleReal const theta = thetap[ip];
+                    amrex::ParticleReal const costheta = std::cos(theta);
+                    amrex::ParticleReal const sintheta = std::sin(theta);
+                    amrex::ParticleReal const proposal_u0 =
+                        uxp[ip] * costheta + uyp[ip] * sintheta;
+                    amrex::ParticleReal const proposal_u1 =
+                        -uxp[ip] * sintheta + uyp[ip] * costheta;
+                    amrex::ParticleReal const proposal_u2 = uzp[ip];
+#elif defined(WARPX_DIM_RSPHERE)
+                        amrex::ParticleReal const theta = thetap[ip];
+                        amrex::ParticleReal const phi = phip[ip];
+                        amrex::ParticleReal const costheta = std::cos(theta);
+                        amrex::ParticleReal const sintheta = std::sin(theta);
+                        amrex::ParticleReal const cosphi = std::cos(phi);
+                        amrex::ParticleReal const sinphi = std::sin(phi);
+                        amrex::ParticleReal const proposal_u0 =
+                            uxp[ip] * costheta * cosphi
+                            + uyp[ip] * sintheta * cosphi
+                            + uzp[ip] * sinphi;
+                        amrex::ParticleReal const proposal_u1 =
+                            -uxp[ip] * sintheta + uyp[ip] * costheta;
+                        amrex::ParticleReal const proposal_u2 =
+                            -uxp[ip] * costheta * sinphi
+                            - uyp[ip] * sintheta * sinphi
+                            + uzp[ip] * cosphi;
+#else
+                        amrex::ParticleReal const proposal_u0 = uxp[ip];
+                        amrex::ParticleReal const proposal_u1 = uyp[ip];
+                        amrex::ParticleReal const proposal_u2 = uzp[ip];
+#endif
+                    amrex::ParticleReal const corrected_u0 =
+                        corr(ii, jj, kk, 1) +
+                        scale * (proposal_u0 - corr(ii, jj, kk, 4));
+                    amrex::ParticleReal const corrected_u1 =
+                        corr(ii, jj, kk, 2) +
+                        scale * (proposal_u1 - corr(ii, jj, kk, 5));
+                    amrex::ParticleReal const corrected_u2 =
+                        corr(ii, jj, kk, 3) +
+                        scale * (proposal_u2 - corr(ii, jj, kk, 6));
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    uxp[ip] = corrected_u0 * costheta - corrected_u1 * sintheta;
+                    uyp[ip] = corrected_u0 * sintheta + corrected_u1 * costheta;
+                    uzp[ip] = corrected_u2;
+#elif defined(WARPX_DIM_RSPHERE)
+                        uxp[ip] = corrected_u0 * costheta * cosphi
+                            - corrected_u1 * sintheta
+                            - corrected_u2 * costheta * sinphi;
+                        uyp[ip] = corrected_u0 * sintheta * cosphi
+                            + corrected_u1 * costheta
+                            - corrected_u2 * sintheta * sinphi;
+                        uzp[ip] = corrected_u0 * sinphi
+                            + corrected_u2 * cosphi;
+#else
+                        uxp[ip] = corrected_u0;
+                        uyp[ip] = corrected_u1;
+                        uzp[ip] = corrected_u2;
+#endif
+                });
+            }
         }
     }
 }
@@ -1298,7 +4576,20 @@ void HybridPICModel::QDSMCFillElectronPressureFromTe (int const lev) const
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
 
     auto const rho_floor = PhysConst::q_e * m_n_floor;
-
+    auto const thermodynamics = m_electron_thermodynamics.executor();
+    int const num_materials = m_electron_thermodynamics.numMaterials();
+    bool const use_raw_material_support = m_fv_transport_internal_energy;
+    amrex::GpuArray<amrex::MultiFab const*,
+                    ElectronThermodynamicsExecutor::max_materials>
+        material_charge_density_fields{};
+    for (int material = 0; material < num_materials; ++material) {
+        auto& material_field = *warpx.m_fields.get(
+            "ni_charge_fp_"
+            + m_electron_thermodynamics.materialSpeciesName(material), lev);
+        material_field.FillBoundary(
+            material_field.nGrowVect(), warpx.Geom(lev).periodicity());
+        material_charge_density_fields[material] = &material_field;
+    }
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1307,15 +4598,649 @@ void HybridPICModel::QDSMCFillElectronPressureFromTe (int const lev) const
         amrex::Array4<amrex::Real>       const & Pe_arr  = Pe.array(mfi);
         amrex::Array4<amrex::Real const> const & Te_arr  = Te.const_array(mfi);
         amrex::Array4<amrex::Real const> const & rho_arr = rho.const_array(mfi);
+        ElectronThermodynamicsExecutor::MaterialChargeDensityArrays
+            material_charge_density{};
+        for (int material = 0; material < num_materials; ++material) {
+            material_charge_density[material] =
+                material_charge_density_fields[material]->const_array(mfi);
+        }
 
         amrex::Box const & tbox = mfi.tilebox();
         amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            amrex::Real const rho_val = std::max(rho_arr(i,j,k), rho_floor);
-            amrex::Real const ne      = rho_val / PhysConst::q_e;
-            Pe_arr(i,j,k) = ne * PhysConst::kb * Te_arr(i,j,k);
+            // The nonlinear FV path transports energy with the deposited
+            // material support and therefore needs the homogeneous vacuum
+            // limit P(rho=0)=0.  Keep rho_floor solely in the Ohm-law
+            // denominator; using it here would invent pressure in exact
+            // vacuum and make pressure work locally EOS-unrepresentable.
+            // The legacy entropy-marker path retains its historical floor.
+            amrex::Real const rho_val = use_raw_material_support
+                ? amrex::max(rho_arr(i,j,k), 0.0_rt)
+                : amrex::max(rho_arr(i,j,k), rho_floor);
+            auto const material_mass_density = thermodynamics
+                .materialMassDensitiesFromChargeDensityArrays(
+                    material_charge_density, i, j, k);
+            ElectronThermodynamicState const state = thermodynamics
+                .stateFromMaterialMassDensitiesTemperature(
+                    rho_val, material_mass_density, Te_arr(i,j,k));
+            if (state.pressure < 0.0_rt
+                || !amrex::Math::isfinite(state.pressure))
+            {
+                Pe_arr(i,j,k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+            Pe_arr(i,j,k) = state.pressure;
         });
     }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        Pe.is_finite(0, 1, 0),
+        "Hybrid electron-pressure reconstruction encountered an EOS state "
+        "outside its valid density or temperature range, or an unresolved "
+        "registered mixed-material node.");
+}
+
+
+amrex::Real HybridPICModel::ApplyElectronEnergySource (
+    int const lev,
+    amrex::MultiFab& cell_integrated_energy,
+    amrex::Real const minimum_electron_density,
+    amrex::MultiFab const* const nonlinear_lte_remap) const
+{
+    ABLASTR_PROFILE("HybridPICModel::ApplyElectronEnergySource()");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_solve_electron_energy_equation,
+        "Hybrid electron energy sources require "
+        "hybrid_pic_model.solve_electron_energy_equation=1.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        cell_integrated_energy.ixType().cellCentered(),
+        "Hybrid electron energy sources must be cell centered.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        cell_integrated_energy.nComp() >= 1,
+        "Hybrid electron energy sources require at least one component.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        cell_integrated_energy.nGrowVect().allGE(1),
+        "Hybrid electron energy sources require one cell ghost in every "
+        "active dimension for the cell-to-node remap.");
+    bool const use_nonlinear_lte_remap = nonlinear_lte_remap != nullptr;
+    if (use_nonlinear_lte_remap) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            nonlinear_lte_remap->ixType().cellCentered()
+                && nonlinear_lte_remap->nComp()
+                    == nonlinear_lte_remap_components
+                && nonlinear_lte_remap->nGrowVect().allGE(1)
+                && nonlinear_lte_remap->boxArray()
+                    == cell_integrated_energy.boxArray()
+                && nonlinear_lte_remap->DistributionMap()
+                    == cell_integrated_energy.DistributionMap(),
+            "Nonlinear hybrid LTE remap and material-energy source must "
+            "share one two-component cell-centered layout, distribution "
+            "map, and ghost extent.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            nonlinear_lte_remap->is_finite(
+                0, nonlinear_lte_remap_components,
+                nonlinear_lte_remap->nGrowVect()),
+            "Nonlinear hybrid LTE remap contains a non-finite temperature "
+            "or represented-energy increment.");
+    }
+
+    auto& warpx = WarpX::GetInstance();
+    amrex::MultiFab& Te =
+        *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    amrex::MultiFab& rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        amrex::convert(cell_integrated_energy.boxArray(), Te.ixType()) == Te.boxArray(),
+        "Hybrid electron energy source and electron-temperature layouts must match.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        cell_integrated_energy.DistributionMap() == Te.DistributionMap(),
+        "Hybrid electron energy source and electron-temperature distribution "
+        "maps must match.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        rho.boxArray() == Te.boxArray()
+            && rho.DistributionMap() == Te.DistributionMap()
+            && rho.ixType() == Te.ixType(),
+        "Hybrid charge density and electron temperature must share one nodal "
+        "layout and distribution map.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        rho.nGrowVect().allGE(1) && Te.nGrowVect().allGE(1),
+        "Hybrid charge density and electron temperature require one nodal "
+        "ghost in every active dimension for radiation energy remapping.");
+
+    auto const& geom = warpx.Geom(lev);
+    rho.FillBoundary(geom.periodicity());
+    Te.FillBoundary(Te.nGrowVect(), geom.periodicity());
+    int const num_materials = m_electron_thermodynamics.numMaterials();
+    amrex::GpuArray<amrex::MultiFab const*,
+                    ElectronThermodynamicsExecutor::max_materials>
+        material_charge_density_fields{};
+    for (int material = 0; material < num_materials; ++material) {
+        auto& material_field = *warpx.m_fields.get(
+            "ni_charge_fp_"
+            + m_electron_thermodynamics.materialSpeciesName(material), lev);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            material_field.boxArray() == Te.boxArray()
+                && material_field.DistributionMap() == Te.DistributionMap()
+                && material_field.ixType() == Te.ixType()
+                && material_field.nGrowVect().allGE(Te.nGrowVect()),
+            "Tabulated electron-EOS material densities must share the hybrid "
+            "temperature layout and ghost extent.");
+        material_field.FillBoundary(
+            material_field.nGrowVect(), geom.periodicity());
+        material_charge_density_fields[material] = &material_field;
+    }
+    auto const dx = geom.CellSizeArray();
+    auto const problo = geom.ProbLoArray();
+    auto const probhi = geom.ProbHiArray();
+    auto const domain_lo = amrex::lbound(geom.Domain());
+    auto const domain_hi = amrex::ubound(geom.Domain());
+    amrex::GpuArray<int, 3> periodic{0, 0, 0};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        periodic[d] = geom.isPeriodic(d) ? 1 : 0;
+    }
+
+    amrex::Real const material_rho_threshold =
+        PhysConst::q_e * minimum_electron_density;
+    amrex::Real const thermodynamic_rho_floor = m_fv_transport_internal_energy
+        ? 0.0_rt
+        : PhysConst::q_e * m_n_floor;
+    auto const thermodynamics = m_electron_thermodynamics.executor();
+    // Freeze the old nodal caloric state before updating any temperature.
+    // This avoids neighbor-read/write races and makes every source weight use
+    // one consistent old-state heat capacity. After that conservative spatial
+    // allocation, each node applies the exact configured U-to-T inverse.
+    amrex::MultiFab node_thermodynamic_state(
+        Te.boxArray(), Te.DistributionMap(), 3, Te.nGrowVect());
+    node_thermodynamic_state.setVal(0.0_rt);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(Te); mfi.isValid(); ++mfi)
+    {
+        amrex::Box const& box = mfi.growntilebox(Te.nGrowVect());
+        amrex::Array4<amrex::Real> const state_arr =
+            node_thermodynamic_state.array(mfi);
+        amrex::Array4<amrex::Real const> const Te_arr = Te.const_array(mfi);
+        amrex::Array4<amrex::Real const> const rho_arr = rho.const_array(mfi);
+        ElectronThermodynamicsExecutor::MaterialChargeDensityArrays
+            material_charge_density{};
+        for (int material = 0; material < num_materials; ++material) {
+            material_charge_density[material] =
+                material_charge_density_fields[material]->const_array(mfi);
+        }
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+            int i, int j, int k) noexcept
+        {
+            amrex::Real const rho_node = rho_arr(i, j, k);
+            if (rho_node <= material_rho_threshold) { return; }
+            auto const material_mass_density = thermodynamics
+                .materialMassDensitiesFromChargeDensityArrays(
+                    material_charge_density, i, j, k);
+            ElectronThermodynamicState const state = thermodynamics
+                .stateFromMaterialMassDensitiesTemperature(
+                    amrex::max(rho_node, thermodynamic_rho_floor),
+                    material_mass_density, Te_arr(i, j, k));
+            ElectronThermodynamicState const minimum_state = thermodynamics
+                .stateFromMaterialMassDensitiesTemperature(
+                    amrex::max(rho_node, thermodynamic_rho_floor),
+                    material_mass_density,
+                    thermodynamics.minimumTemperature());
+            amrex::Real const energy_tolerance = 256.0_rt
+                * std::numeric_limits<amrex::Real>::epsilon()
+                * amrex::max(
+                    amrex::max(
+                        std::abs(state.internal_energy_density),
+                        std::abs(minimum_state.internal_energy_density)),
+                    std::numeric_limits<amrex::Real>::min());
+            if (!amrex::Math::isfinite(state.internal_energy_density)
+                || !(state.heat_capacity_density > 0.0_rt)
+                || !amrex::Math::isfinite(state.heat_capacity_density)
+                || !amrex::Math::isfinite(
+                    minimum_state.internal_energy_density)
+                || state.internal_energy_density
+                    < minimum_state.internal_energy_density - energy_tolerance)
+            {
+                state_arr(i, j, k, 0) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+            state_arr(i, j, k, 0) = state.internal_energy_density;
+            state_arr(i, j, k, 1) = state.heat_capacity_density;
+            state_arr(i, j, k, 2) = minimum_state.internal_energy_density;
+        });
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        node_thermodynamic_state.is_finite(
+            0, 3, node_thermodynamic_state.nGrowVect()),
+        "Hybrid electron energy coupling encountered an invalid initial "
+        "thermodynamic state.");
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(Te, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+    {
+        amrex::Box const& box = mfi.tilebox();
+        amrex::Array4<amrex::Real> const Te_arr = Te.array(mfi);
+        amrex::Array4<amrex::Real const> const rho_arr = rho.const_array(mfi);
+        amrex::Array4<amrex::Real const> const source_arr =
+            cell_integrated_energy.const_array(mfi);
+        amrex::Array4<amrex::Real const> const state_arr =
+            node_thermodynamic_state.const_array(mfi);
+        amrex::Array4<amrex::Real const> nonlinear_remap_arr;
+        if (use_nonlinear_lte_remap) {
+            nonlinear_remap_arr = nonlinear_lte_remap->const_array(mfi);
+        }
+        ElectronThermodynamicsExecutor::MaterialChargeDensityArrays
+            material_charge_density{};
+        for (int material = 0; material < num_materials; ++material) {
+            material_charge_density[material] =
+                material_charge_density_fields[material]->const_array(mfi);
+        }
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+            amrex::Real const rho_node = rho_arr(i, j, k);
+            if (rho_node <= material_rho_threshold) { return; }
+
+            amrex::Real const node_volume = hybrid_node_volume(
+                i, j, k, problo, probhi, dx, domain_lo, domain_hi, periodic);
+            amrex::Real const thermodynamic_rho_node =
+                amrex::max(rho_node, thermodynamic_rho_floor);
+            amrex::Real const old_internal_energy_density =
+                state_arr(i, j, k, 0);
+            amrex::Real const minimum_internal_energy_density =
+                state_arr(i, j, k, 2);
+            amrex::Real const node_capacity =
+                state_arr(i, j, k, 1) * node_volume;
+            if (!amrex::Math::isfinite(old_internal_energy_density)
+                || !amrex::Math::isfinite(minimum_internal_energy_density)
+                || !(node_capacity > 0.0_rt)
+                || !amrex::Math::isfinite(node_capacity))
+            {
+                Te_arr(i, j, k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+
+            // Gather adjacent cell energies. Weight each cell's contribution
+            // by old-state C_V*V. This preserves each cell's energy while
+            // avoiding extreme heating of sparse interface nodes.
+            amrex::Real node_energy = 0.0_rt;
+            if (use_nonlinear_lte_remap) {
+                bool valid = true;
+                for (int ck = k - (AMREX_SPACEDIM == 3 ? 1 : 0);
+                     ck <= k; ++ck)
+                {
+                    for (int cj = j - (AMREX_SPACEDIM >= 2 ? 1 : 0);
+                         cj <= j; ++cj)
+                    {
+                        for (int ci = i - 1; ci <= i; ++ci) {
+                            node_energy += hybrid_nonlinear_lte_node_energy(
+                                i, j, k, ci, cj, ck, source_arr,
+                                nonlinear_remap_arr, state_arr, rho_arr,
+                                Te_arr, material_charge_density,
+                                thermodynamics, material_rho_threshold,
+                                thermodynamic_rho_floor, problo, dx,
+                                domain_lo, domain_hi, periodic, valid);
+                            if (!valid) {
+                                Te_arr(i, j, k) =
+                                    std::numeric_limits<amrex::Real>
+                                        ::quiet_NaN();
+                                return;
+                            }
+                        }
+                    }
+                }
+            } else {
+                bool valid = true;
+                for (int ck = k - (AMREX_SPACEDIM == 3 ? 1 : 0);
+                     ck <= k; ++ck)
+                {
+                    for (int cj = j - (AMREX_SPACEDIM >= 2 ? 1 : 0);
+                         cj <= j; ++cj)
+                    {
+                        for (int ci = i - 1; ci <= i; ++ci) {
+                            node_energy += hybrid_constant_lte_node_energy(
+                                i, j, k, ci, cj, ck, source_arr, state_arr,
+                                rho_arr, material_rho_threshold, problo, dx,
+                                domain_lo, domain_hi, periodic, valid);
+                            if (!valid) {
+                                Te_arr(i, j, k) =
+                                    std::numeric_limits<amrex::Real>
+                                        ::quiet_NaN();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            if (node_energy == 0.0_rt) { return; }
+            amrex::Real const energy_density_change = node_energy / node_volume;
+            amrex::Real new_internal_energy_density =
+                old_internal_energy_density + energy_density_change;
+            amrex::Real const negative_tolerance = 100.0_rt
+                * std::numeric_limits<amrex::Real>::epsilon()
+                * amrex::max(
+                    amrex::max(
+                        std::abs(old_internal_energy_density),
+                        std::abs(minimum_internal_energy_density)),
+                    amrex::max(
+                        std::abs(energy_density_change),
+                        std::numeric_limits<amrex::Real>::min()));
+            if (!amrex::Math::isfinite(new_internal_energy_density)
+                || new_internal_energy_density
+                    < minimum_internal_energy_density - negative_tolerance)
+            {
+                Te_arr(i, j, k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+            new_internal_energy_density = amrex::max(
+                minimum_internal_energy_density,
+                new_internal_energy_density);
+            // A sub-ULP source must preserve the bitwise thermodynamic state so
+            // the realized material ledger rebases to exact zero.
+            if (new_internal_energy_density == old_internal_energy_density) {
+                return;
+            }
+            auto const material_mass_density = thermodynamics
+                .materialMassDensitiesFromChargeDensityArrays(
+                    material_charge_density, i, j, k);
+            amrex::Real const new_temperature = thermodynamics
+                .temperatureFromMaterialMassDensitiesThermalEnergyDensity(
+                    thermodynamic_rho_node, material_mass_density,
+                    new_internal_energy_density);
+            if (new_temperature < thermodynamics.minimumTemperature()
+                || !amrex::Math::isfinite(new_temperature))
+            {
+                Te_arr(i, j, k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+            Te_arr(i, j, k) = new_temperature;
+        });
+    }
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        Te.is_finite(0, 1, 0),
+        "Hybrid electron energy coupling produced an invalid thermodynamic "
+        "state or attempted to remove more electron internal energy than "
+        "the participating material nodes contain.");
+
+    // The next QDSMC step reconstructs entropy on a ghost-grown nodal box,
+    // so radiation-updated temperatures must also be present in grid ghosts.
+    Te.FillBoundary(Te.nGrowVect(), geom.periodicity());
+
+    // The nonlinear remap above is only an input to the temperature solve. The
+    // authoritative material transfer is the old-to-final EOS energy change at
+    // each cell corner. Include every valid cell here: a zero-request cell may
+    // still share a node whose temperature changed because of a neighboring
+    // request.
+    amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpMax>
+        realization_reduce_ops;
+    amrex::ReduceData<amrex::Real, int> realization_reduce_data(
+        realization_reduce_ops);
+    using RealizationReduceTuple =
+        typename decltype(realization_reduce_data)::Type;
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(
+             cell_integrated_energy, amrex::TilingIfNotGPU());
+         mfi.isValid(); ++mfi)
+    {
+        amrex::Box const& box = mfi.tilebox();
+        amrex::Array4<amrex::Real const> const source_arr =
+            cell_integrated_energy.const_array(mfi);
+        amrex::Array4<amrex::Real> const material_arr =
+            cell_integrated_energy.array(mfi);
+        amrex::Array4<amrex::Real const> const rho_arr = rho.const_array(mfi);
+        amrex::Array4<amrex::Real const> const Te_arr = Te.const_array(mfi);
+        amrex::Array4<amrex::Real const> const old_state_arr =
+            node_thermodynamic_state.const_array(mfi);
+        ElectronThermodynamicsExecutor::MaterialChargeDensityArrays
+            material_charge_density{};
+        for (int material = 0; material < num_materials; ++material) {
+            material_charge_density[material] =
+                material_charge_density_fields[material]->const_array(mfi);
+        }
+
+        realization_reduce_ops.eval(box, realization_reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                -> RealizationReduceTuple
+        {
+            amrex::Real const requested_energy = source_arr(i, j, k);
+            if (!amrex::Math::isfinite(requested_energy)) {
+                return {0.0_rt, 1};
+            }
+
+            amrex::Real realized_energy = 0.0_rt;
+            for (int dk = 0;
+                 dk < (AMREX_SPACEDIM == 3 ? 2 : 1); ++dk)
+            {
+                for (int dj = 0;
+                     dj < (AMREX_SPACEDIM >= 2 ? 2 : 1); ++dj)
+                {
+                    for (int di = 0; di < 2; ++di) {
+                        int const ni = i + di;
+                        int const nj = j + dj;
+                        int const nk = k + dk;
+                        amrex::Real const rho_node = rho_arr(ni, nj, nk);
+                        if (!amrex::Math::isfinite(rho_node)) {
+                            return {0.0_rt, 1};
+                        }
+                        if (rho_node <= material_rho_threshold) {
+                            continue;
+                        }
+
+                        amrex::Real const old_internal_energy_density =
+                            old_state_arr(ni, nj, nk, 0);
+                        amrex::Real const final_temperature =
+                            Te_arr(ni, nj, nk);
+                        auto const material_mass_density = thermodynamics
+                            .materialMassDensitiesFromChargeDensityArrays(
+                                material_charge_density, ni, nj, nk);
+                        ElectronThermodynamicState const final_state =
+                            thermodynamics.stateFromMaterialMassDensitiesTemperature(
+                                amrex::max(
+                                    rho_node, thermodynamic_rho_floor),
+                                material_mass_density, final_temperature);
+                        amrex::Real const corner_volume =
+                            hybrid_cell_corner_volume(
+                                i, j, k, di, dj, dk, problo, dx, domain_lo);
+                        amrex::Real const corner_energy =
+                            (final_state.internal_energy_density
+                                - old_internal_energy_density)
+                            * corner_volume;
+                        if (!amrex::Math::isfinite(
+                                old_internal_energy_density)
+                            || !amrex::Math::isfinite(final_temperature)
+                            || final_temperature
+                                < thermodynamics.minimumTemperature()
+                            || final_temperature
+                                > thermodynamics.maximumTemperature()
+                            || !amrex::Math::isfinite(
+                                final_state.internal_energy_density)
+                            || !amrex::Math::isfinite(final_state.pressure)
+                            || final_state.pressure < 0.0_rt
+                            || !amrex::Math::isfinite(
+                                final_state.heat_capacity_density)
+                            || !(final_state.heat_capacity_density > 0.0_rt)
+                            || !amrex::Math::isfinite(corner_volume)
+                            || !(corner_volume > 0.0_rt)
+                            || !amrex::Math::isfinite(corner_energy))
+                        {
+                            return {0.0_rt, 1};
+                        }
+                        realized_energy += corner_energy;
+                    }
+                }
+            }
+
+            amrex::Real const residual = requested_energy - realized_energy;
+            if (!amrex::Math::isfinite(realized_energy)
+                || !amrex::Math::isfinite(residual))
+            {
+                return {0.0_rt, 1};
+            }
+            material_arr(i, j, k) = realized_energy;
+            return {residual, 0};
+        });
+    }
+
+    auto const realization_reduction = realization_reduce_data.value();
+    amrex::Real residual = amrex::get<0>(realization_reduction);
+    int invalid_realization = amrex::get<1>(realization_reduction);
+    amrex::ParallelDescriptor::ReduceRealSum(residual);
+    amrex::ParallelDescriptor::ReduceIntMax(&invalid_realization, 1);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        invalid_realization == 0,
+        "Hybrid electron radiation coupling produced a non-finite or "
+        "invalid thermodynamic EOS realization while rebasing the material "
+        "ledger.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        amrex::Math::isfinite(residual),
+        "Hybrid electron radiation coupling produced a non-finite material "
+        "realization residual.");
+
+    cell_integrated_energy.FillBoundary(geom.periodicity());
+
+    QDSMCFillElectronPressureFromTe(lev);
+    warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
+    ablastr::utils::communication::FillBoundary(
+        *warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+        WarpX::do_single_precision_comms,
+        geom.periodicity(),
+        true);
+    return residual;
+}
+
+void HybridPICModel::ApplyHybridIonizationEnergySource (
+    int const lev,
+    amrex::MultiFab const& old_charge_density,
+    amrex::MultiFab const& new_charge_density,
+    amrex::MultiFab const& binding_energy_density) const
+{
+    ABLASTR_PROFILE("HybridPICModel::ApplyHybridIonizationEnergySource()");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_solve_electron_energy_equation,
+        "Hybrid ionization requires the hybrid electron-energy equation.");
+    auto& warpx = WarpX::GetInstance();
+    amrex::MultiFab& Te = *warpx.m_fields.get(
+        FieldType::hybrid_electron_temperature_fp, lev);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        old_charge_density.boxArray() == Te.boxArray()
+            && new_charge_density.boxArray() == Te.boxArray()
+            && binding_energy_density.boxArray() == Te.boxArray()
+            && old_charge_density.DistributionMap() == Te.DistributionMap()
+            && new_charge_density.DistributionMap() == Te.DistributionMap()
+            && binding_energy_density.DistributionMap()
+                == Te.DistributionMap()
+            && old_charge_density.ixType() == Te.ixType()
+            && new_charge_density.ixType() == Te.ixType()
+            && binding_energy_density.ixType() == Te.ixType(),
+        "Hybrid ionization rho, Te, and binding-energy fields must share one "
+        "nodal layout and distribution map.");
+
+    auto const thermodynamics = m_electron_thermodynamics.executor();
+    amrex::Real const rho_floor = PhysConst::q_e * m_n_floor;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (amrex::MFIter mfi(Te, amrex::TilingIfNotGPU());
+         mfi.isValid(); ++mfi)
+    {
+        amrex::Box const& box = mfi.tilebox();
+        amrex::Array4<amrex::Real> const Te_arr = Te.array(mfi);
+        amrex::Array4<amrex::Real const> const old_rho_arr =
+            old_charge_density.const_array(mfi);
+        amrex::Array4<amrex::Real const> const new_rho_arr =
+            new_charge_density.const_array(mfi);
+        amrex::Array4<amrex::Real const> const binding_arr =
+            binding_energy_density.const_array(mfi);
+
+        amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (
+            int i, int j, int k) noexcept
+        {
+            amrex::Real const old_rho =
+                amrex::max(old_rho_arr(i, j, k), rho_floor);
+            amrex::Real const new_rho =
+                amrex::max(new_rho_arr(i, j, k), rho_floor);
+            amrex::Real const binding_energy = binding_arr(i, j, k);
+            if (!amrex::Math::isfinite(binding_energy)
+                || binding_energy < 0.0_rt)
+            {
+                Te_arr(i, j, k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+
+            ElectronThermodynamicState const old_state =
+                thermodynamics.stateFromChargeDensityTemperature(
+                    old_rho, Te_arr(i, j, k));
+            amrex::Real target_internal_energy =
+                old_state.internal_energy_density - binding_energy;
+            amrex::Real const tolerance = 100.0_rt
+                * std::numeric_limits<amrex::Real>::epsilon()
+                * amrex::max(
+                    std::abs(old_state.internal_energy_density),
+                    amrex::max(
+                        binding_energy,
+                        std::numeric_limits<amrex::Real>::min()));
+            if (!amrex::Math::isfinite(old_state.internal_energy_density)
+                || !amrex::Math::isfinite(target_internal_energy)
+                || target_internal_energy < -tolerance)
+            {
+                Te_arr(i, j, k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+            target_internal_energy =
+                amrex::max(0.0_rt, target_internal_energy);
+            amrex::Real const new_temperature = thermodynamics
+                .temperatureFromChargeDensityThermalEnergyDensity(
+                    new_rho, target_internal_energy);
+            ElectronThermodynamicState const new_state =
+                thermodynamics.stateFromChargeDensityTemperature(
+                    new_rho, new_temperature);
+            amrex::Real const residual =
+                new_state.internal_energy_density - target_internal_energy;
+            amrex::Real const residual_tolerance = 256.0_rt
+                * std::numeric_limits<amrex::Real>::epsilon()
+                * amrex::max(
+                    std::abs(target_internal_energy),
+                    std::numeric_limits<amrex::Real>::min());
+            if (!amrex::Math::isfinite(new_temperature)
+                || new_temperature < 0.0_rt
+                || !amrex::Math::isfinite(new_state.internal_energy_density)
+                || std::abs(residual) > residual_tolerance)
+            {
+                Te_arr(i, j, k) =
+                    std::numeric_limits<amrex::Real>::quiet_NaN();
+                return;
+            }
+            Te_arr(i, j, k) = new_temperature;
+        });
+    }
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        Te.is_finite(0, 1, 0),
+        "Hybrid ionization encountered an invalid thermodynamic state or "
+        "requested more binding energy than the hybrid electrons contain. "
+        "Reduce the timestep or ionization rate.");
+
+    auto const& geom = warpx.Geom(lev);
+    Te.FillBoundary(Te.nGrowVect(), geom.periodicity());
+    QDSMCFillElectronPressureFromTe(lev);
+    warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
+    ablastr::utils::communication::FillBoundary(
+        *warpx.m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+        WarpX::do_single_precision_comms,
+        geom.periodicity(), true);
 }
 
 
@@ -1330,6 +5255,32 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
         "QDSMC particle container was not constructed (InitData not run?)");
 
     auto & warpx = WarpX::GetInstance();
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_fv_transport_internal_energy || warpx.finestLevel() == 0,
+        "Nonlinear finite-volume electron-energy transport currently "
+        "requires a single AMR level; coarse/fine energy refluxing is not "
+        "implemented yet.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_fv_transport_internal_energy || !WarpX::use_filter,
+        "Nonlinear finite-volume electron-energy transport currently "
+        "requires warpx.use_filter=0 so rho and the electron charge flux "
+        "satisfy the same discrete continuity equation.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_fv_transport_internal_energy
+            || !WarpX::do_single_precision_comms,
+        "Nonlinear finite-volume electron-energy transport currently "
+        "requires warpx.do_single_precision_comms=0. Reduced-precision "
+        "guard-cell sums break the discrete rho/current continuity ledger.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_fv_transport_internal_energy || !warpx.DoFluidSpecies(),
+        "Nonlinear finite-volume electron-energy transport does not yet "
+        "support cold-fluid species because their auxiliary conservative "
+        "charge and velocity moments are not deposited.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_fv_transport_internal_energy || !EB::enabled(),
+        "Nonlinear finite-volume electron-energy transport does not yet "
+        "include embedded-boundary face metrics and masks.");
 
     // J_plasma (at B^n) is needed for V_e. On all but the first step it is
     // already valid: the previous step's final E-solve computed it from B^n
@@ -1348,36 +5299,42 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
     {
         // Step 1: grid-side initialization at t = n
         QDSMCInitializeUe(lev);
-        QDSMCInitializeKe(lev);
+        QDSMCInitializeThermodynamicQuantity(lev);
 
-        using ablastr::fields::Direction;
-        amrex::MultiFab const & Vex = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{0}, lev);
-        amrex::MultiFab const & Vey = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{1}, lev);
-        amrex::MultiFab const & Vez = *warpx.m_fields.get(FieldType::hybrid_electron_velocity_fp, Direction{2}, lev);
-        amrex::MultiFab const & Ke  = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,           lev);
-        amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::hybrid_rho_fp_temp,          lev);
-        amrex::MultiFab       & Karr_out    = *warpx.m_fields.get(FieldType::hybrid_entropy_fp,        lev);
-        amrex::MultiFab       & weights_out = *warpx.m_fields.get(FieldType::hybrid_qdsmc_weights_fp, lev);
+        if (m_fv_transport_internal_energy) {
+            // Nonlinear thermodynamics use a conservative first-order upwind
+            // finite-volume update of dU/dt + div(U V_e) = -P div(V_e).
+            // This is exactly stationary at V_e=0 and avoids applying a
+            // dissipative particle gather/scatter every PIC step.
+            QDSMCUpdateThermodynamics(lev, dt);
+        } else {
+            using ablastr::fields::Direction;
+            amrex::MultiFab const& Vex = *warpx.m_fields.get(
+                FieldType::hybrid_electron_velocity_fp, Direction{0}, lev);
+            amrex::MultiFab const& Vey = *warpx.m_fields.get(
+                FieldType::hybrid_electron_velocity_fp, Direction{1}, lev);
+            amrex::MultiFab const& Vez = *warpx.m_fields.get(
+                FieldType::hybrid_electron_velocity_fp, Direction{2}, lev);
+            amrex::MultiFab const& Ke = *warpx.m_fields.get(
+                FieldType::hybrid_qdsmc_thermodynamic_fp, lev);
+            amrex::MultiFab const& rho = *warpx.m_fields.get(
+                FieldType::hybrid_rho_fp_temp, lev);
+            amrex::MultiFab& Karr_out = *warpx.m_fields.get(
+                FieldType::hybrid_qdsmc_thermodynamic_fp, lev);
+            amrex::MultiFab& weights_out = *warpx.m_fields.get(
+                FieldType::hybrid_qdsmc_weights_fp, lev);
 
-        // Step 2: load each QDSMC particle with V_e and (K_e * N_e, N_e) from
-        // its home cell.
-        m_qdsmc_pc->SetV(lev, Vex, Vey, Vez);
-        m_qdsmc_pc->SetK(lev, Ke, rho);
+            // The reviewed ideal-gas algorithm transports K_e with one
+            // Lagrangian marker per cell.
+            m_qdsmc_pc->SetV(lev, Vex, Vey, Vez);
+            m_qdsmc_pc->SetK(lev, Ke, rho);
+            m_qdsmc_pc->PushX(lev, dt);
+            m_qdsmc_pc->DepositK(lev, Karr_out);
+            m_qdsmc_pc->DepositField(lev, weights_out);
+            QDSMCUpdateThermodynamics(lev, dt);
+        }
 
-        // Step 3: forward-Euler push by dt; redistribute so particles end up
-        // in their new tile.
-        m_qdsmc_pc->PushX(lev, dt);
-
-        // Step 4: scatter the carried entropy and weight onto the grid (each
-        // call zeroes its target field, then deposits, then SumBoundary).
-        m_qdsmc_pc->DepositK(lev, Karr_out);
-        m_qdsmc_pc->DepositField(lev, weights_out);
-
-        // Step 5: recover T_e^{n+1} from (deposited K*N) / (deposited N) and
-        // the updated n_e (from rho_fp = rho^{n+1}).
-        QDSMCUpdateTe(lev);
-
-        // Step 6: Joule-heating source on T_e (Phys. Plasmas 31, 012902 (2024), Eq. 12), per-cell from
+        // Step 6: Joule-heating source on U_e (Phys. Plasmas 31, 012902 (2024), Eq. 12), per-cell from
         // rho_fp(_s), the plasma current, and the Ohm's-law eta parser. With the
         // Te-threshold redirect on, the above-threshold heat is staged in
         // ion_redirect_E (per-charged-species energy, J) for the ion-heating step.
@@ -1498,12 +5455,16 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
             QDSMCAddTemperatureRelaxation(lev, dt, Ti_dep_by_species);
         }
 
-        // Step 6c: stochastic drag-diffusion ion-heating operator -- delivers the Q_ei
-        // conjugate (when relaxation is on) and/or the redirected Joule energy
-        // (when the redirect is on), so the ions are heated by one mechanism.
-        if (m_include_temperature_relaxation || redirect_active) {
-            QDSMCApplyIonHeating(lev, dt, redirect_active ? &ion_redirect_E : nullptr,
-                                 m_include_temperature_relaxation ? &Ti_dep_by_species : nullptr);
+        // Step 6c: the Qei OU proposal is projected cell-locally so its ion
+        // thermal-energy change is exactly the negative electron ledger while
+        // preserving each cell's pre-step ion momentum. Joule redirection is
+        // still a separate stochastic diffusion channel; separate calls keep
+        // its source from contaminating the conservative Qei projection.
+        if (m_include_temperature_relaxation) {
+            QDSMCApplyIonHeating(lev, dt, nullptr, &Ti_dep_by_species);
+        }
+        if (redirect_active) {
+            QDSMCApplyIonHeating(lev, dt, &ion_redirect_E, nullptr);
         }
 
         // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law
@@ -1517,9 +5478,11 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
             warpx.Geom(lev).periodicity(),
             true);
 
-        // Step 8: reset particles to home positions (and zero velocity /
-        // weight / entropy) so the next step starts with a clean grid.
-        m_qdsmc_pc->ResetParticles(lev);
+        // Reset only after the ideal-gas marker path. Nonlinear transport does
+        // not mutate the QDSMC particle container.
+        if (!m_fv_transport_internal_energy) {
+            m_qdsmc_pc->ResetParticles(lev);
+        }
     }
 }
 

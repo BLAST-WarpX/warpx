@@ -2160,6 +2160,32 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         fluid velocity, the source terms below are applied per cell, and
         ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve.
 
+    electron_thermodynamics: str, default="ideal_gas"
+        Electron thermodynamics backend used to reconstruct pressure and to
+        apply radiation/material energy exchange to the evolved hybrid
+        electron temperature. Available values are ``"ideal_gas"`` and
+        ``"fixed_charge_latent_energy"``. Their caloric energy, heat capacity,
+        and inverse are shared by hybrid radiation coupling. Raw density first
+        selects the radiation material; participating nodes then evaluate the
+        EOS at ``max(ne, n_floor)``. The fixed-charge model adds bounded
+        internal-energy shoulders but does not evolve charge state, electron
+        density, opacity, or atomic populations. It currently requires frozen-
+        temperature LTE and fixed-density source-validation configurations.
+        The backend is not used to compute the algebraic pressure closure,
+        although its input is still validated.
+
+    electron_latent_transition_temperature_eV: list of float, optional
+        Strictly increasing transition temperatures for
+        ``electron_thermodynamics="fixed_charge_latent_energy"``.
+
+    electron_latent_energy_eV: list of float, optional
+        Positive saturation energies in eV per effective electron, one for
+        each latent transition.
+
+    electron_latent_sharpness: list of float, optional
+        Transition exponents between two and 64. Defaults to four for each
+        configured transition.
+
     include_joule_heating: bool, default=False
         Add the resistive (Joule) heating source to the electron temperature.
         Reduces to ``eta * J**2`` for a single ion species. Only used when
@@ -2301,6 +2327,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Jz_external_function=None,
         A_external=None,
         do_external_diva_cleaning=None,
+        electron_thermodynamics=None,
+        electron_latent_transition_temperature_eV=None,
+        electron_latent_energy_eV=None,
+        electron_latent_sharpness=None,
         **kw,
     ):
         self.grid = grid
@@ -2314,6 +2344,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
+        self.electron_thermodynamics = electron_thermodynamics
+        self.electron_latent_transition_temperature_eV = (
+            electron_latent_transition_temperature_eV
+        )
+        self.electron_latent_energy_eV = electron_latent_energy_eV
+        self.electron_latent_sharpness = electron_latent_sharpness
         self.include_joule_heating = include_joule_heating
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
@@ -2376,6 +2412,22 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         if self.solve_electron_energy_equation is not None:
             pywarpx.hybridpicmodel.solve_electron_energy_equation = (
                 self.solve_electron_energy_equation
+            )
+        if self.electron_thermodynamics is not None:
+            pywarpx.hybridpicmodel.electron_thermodynamics = (
+                self.electron_thermodynamics
+            )
+        if self.electron_latent_transition_temperature_eV is not None:
+            pywarpx.hybridpicmodel.electron_latent_transition_temperature_eV = (
+                self.electron_latent_transition_temperature_eV
+            )
+        if self.electron_latent_energy_eV is not None:
+            pywarpx.hybridpicmodel.electron_latent_energy_eV = (
+                self.electron_latent_energy_eV
+            )
+        if self.electron_latent_sharpness is not None:
+            pywarpx.hybridpicmodel.electron_latent_sharpness = (
+                self.electron_latent_sharpness
             )
         if self.include_joule_heating is not None:
             pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
@@ -3141,6 +3193,55 @@ class FieldIonization(picmistandard.PICMI_FieldIonization):
             self.ionized_species.charge_state
         )
         self.ionized_species.species.charge = "q_e"
+
+
+class HybridIonization(picmistandard.base._ClassWithInit):
+    """Charge-changing ionization for Hybrid-PIC fluid electrons.
+
+    This operator evolves one adjacent integer ion charge state per PIC step,
+    creates the conjugate free-electron density in the hybrid fluid, and
+    removes the tabulated ionization potential from its internal energy. It
+    does not create a kinetic product-electron species.
+
+    Parameters
+    ----------
+    ionized_species: :class:`Species`
+        Ion species whose ``charge_state`` supplies the initial state and whose
+        ``particle_type`` identifies the chemical element.
+    rate_coefficient: float or str
+        Maxwellian ionization rate coefficient K(x,y,z,t,ne,Te,Z) in m^3/s.
+        Here ne is in m^-3, Te is in eV, and Z is the current integer charge
+        state. One transition has probability ``1-exp(-ne*K*dt)``.
+    **kw:
+        Constants referenced by the rate expression.
+    """
+
+    def __init__(self, ionized_species, rate_coefficient, **kw):
+        self.ionized_species = ionized_species
+        self.rate_coefficient = str(rate_coefficient)
+        self.user_defined_kw = dict(kw)
+        self.handle_init({})
+
+    def interaction_initialize_inputs(self):
+        if self.ionized_species.particle_type is None:
+            raise ValueError(
+                "HybridIonization requires ionized_species.particle_type "
+                "to name a chemical element."
+            )
+        if self.ionized_species.charge_state is None:
+            raise ValueError(
+                "HybridIonization requires an initial ionized_species.charge_state."
+            )
+        mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        species_bucket = self.ionized_species.species
+        species_bucket.do_hybrid_ionization = 1
+        species_bucket.physical_element = self.ionized_species.particle_type
+        species_bucket.ionization_initial_level = self.ionized_species.charge_state
+        species_bucket.charge = "q_e"
+        species_bucket.__setattr__(
+            "hybrid_ionization_rate_coefficient(x,y,z,t,ne,Te,Z)",
+            pywarpx.my_constants.mangle_expression(self.rate_coefficient, mangle_dict),
+        )
 
 
 class CoulombCollisions(picmistandard.base._ClassWithInit):
@@ -4163,7 +4264,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
 
         for interaction in self.interactions:
-            assert isinstance(interaction, FieldIonization)
+            assert isinstance(interaction, (FieldIonization, HybridIonization))
             interaction.interaction_initialize_inputs()
 
         if self.collisions is not None:

@@ -12,6 +12,7 @@
 #ifndef WARPX_HYBRIDPICMODEL_H_
 #define WARPX_HYBRIDPICMODEL_H_
 
+#include "ElectronThermodynamics.H"
 #include "HybridPICModel_fwd.H"
 
 #include "Fields.H"
@@ -22,6 +23,7 @@
 
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "Utils/MaterialRegistry_fwd.H"
 #include "Utils/WarpXConst.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -45,7 +47,8 @@
 class HybridPICModel
 {
 public:
-    HybridPICModel ();
+    explicit HybridPICModel (
+        warpx::materials::MaterialRegistry const* material_registry = nullptr);
     // Defined out-of-line in the .cpp so the unique_ptr<QdsmcParticleContainer>
     // member can destroy a forward-declared particle container.
     ~HybridPICModel ();
@@ -56,7 +59,8 @@ public:
     HybridPICModel& operator= ( HybridPICModel && )       = delete;
 
     /** Read user-defined model parameters. Called in constructor. */
-    void ReadParameters ();
+    void ReadParameters (
+        warpx::materials::MaterialRegistry const* material_registry);
 
     /** Allocate hybrid-PIC specific multifabs. Called in constructor. */
     void AllocateLevelMFs (
@@ -79,6 +83,12 @@ public:
         const amrex::IntVect& By_nodal_flag,
         const amrex::IntVect& Bz_nodal_flag
     ) const;
+
+    /** Allocate the particle-gather copy of the isolated pressure electric
+     * field after WarpX has established the auxiliary E-field layouts. */
+    void AllocateAuxiliaryLevelMFs (
+        ablastr::fields::MultiFabRegister& fields,
+        int lev) const;
 
     void InitData (const ablastr::fields::MultiFabRegister& fields);
 
@@ -238,41 +248,40 @@ public:
     void QDSMCInitializeUe (int lev) const;
 
     /**
-     * \brief Fill the nodal K_e = T_e * n_e^(1-gamma) * (k_B / q_e) MultiFab
-     *        from the current T_e and rho_fp_temp (= rho at n+1/2), using the
-     *        floored density max(n_e, n_floor) so below-floor (halo) cells
-     *        carry a valid K_e instead of acting as an absorbing K_e = 0
-     *        boundary.
+     * \brief Initialize the electron-energy transport scratch field.
      *
-     *        Reads hybrid_electron_temperature_fp (T_e in K) and
-     *        hybrid_rho_fp_temp; writes hybrid_entropy_fp.
+     * Ideal-gas mode writes the entropy invariant
+     * K_e = T_e n_e^(1-gamma) k_B/q_e. Nonlinear thermodynamics write the
+     * physical internal-energy density U_e(rho,T_e) consumed directly by the
+     * conservative finite-volume transport operator.
      */
-    void QDSMCInitializeKe (int lev) const;
+    void QDSMCInitializeThermodynamicQuantity (int lev) const;
 
     /**
-     * \brief After the QDSMC scatter, recover T_e^{n+1} from
-     *           T_e = (deposited K*N) / (deposited N) / n_e^(1-gamma)
-     *                 / (k_B / q_e)
-     *        using the floored density max(n_e, n_floor) from rho at n+1
-     *        (rho_fp), the deposited entropy field (hybrid_entropy_fp), and
-     *        the deposited weight field (hybrid_qdsmc_weights_fp). Cells that
-     *        received no deposited weight keep their previous T_e.
+     * \brief Advance the thermodynamic state and recover T_e.
      *
-     *        Writes hybrid_electron_temperature_fp.
+     * Ideal-gas mode reconstructs T_e from deposited K_e N_e / N_e and the
+     * new density. Supported nonlinear Cartesian modes source-load exact
+     * particle-paired pressure work into U_e, advance it with a conservative
+     * mass-consistent upwind finite-volume flux, apply the remaining fluid
+     * pressure source, and use the configured exact U_e-to-T_e inverse. Ideal
+     * cells receiving no marker weight retain their previous temperature.
      */
-    void QDSMCUpdateTe (int lev) const;
+    void QDSMCUpdateThermodynamics (int lev, amrex::Real dt) const;
 
     /**
      * \brief Resistive electron-heating source (see Phys. Plasmas 31, 012902 (2024), Eq. 12).
      *        Adds, per cell and per charged ion species,
-     *           T_e += dt * (gamma-1) * Z_s e^2 eta n_s |dV|^2 / k_B,
+     *           Delta U_e = dt Z_s e^2 eta n_e n_s |dV|^2,
      *        with the e-i relative drift dV = J_plasma/(e n_e) and eta from the
      *        Ohm's-law parser. Summed over species,
      *           S_e = e^2 eta n_e * Sigma_s Z_s n_s |dV|^2,
      *        which reduces to eta J^2 for a single species. n_s is recovered from
      *        the species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
      *        = Z_s n_s/n_e (2pi*r-cancelling) -> n_s = f_s n_e/Z_s, with n_e from
-     *        the total rho_fp. Deterministic, no per-particle scatter. Called
+     *        the total rho_fp. The configured caloric inverse recovers T_e,
+     *        and the realized energy change is recorded in step and cumulative
+     *        ledgers. Deterministic, no per-particle scatter. Called
      *        when m_include_joule_heating is true. When the Te-threshold redirect
      *        is on (\c redirect_E non-null), the contribution from cells with
      *        Te >= m_joule_redirect_Te_eV is written into \c redirect_E for
@@ -292,12 +301,13 @@ public:
     /**
      * \brief Add the electron-ion thermal-equilibration sink Q_ei to T_e.
      *
-     * Per ion species, cools T_e toward that species' (deposited) T_i:
-     *   dT_e = -dt (gamma-1) * 3 * (n_s/n_e) * nu_ei * (T_e - T_i_s),
-     * with nu_ei from the electron_ion_relaxation_rate parser. This is the
-     * ELECTRON-SIDE sink; QDSMCApplyIonHeating deposits the conjugate ion gain
-     * so the pair conserves energy. Called when m_include_temperature_relaxation
-     * is true.
+     * Per ion species, exchanges energy between the finite electron EOS heat
+     * capacity and C_i=3 n_i k_B/2 using the exact frozen-coefficient
+     * two-temperature solution. The realized electron EOS energy change is
+     * ledgered explicitly. QDSMCApplyIonHeating consumes each per-species
+     * ledger through a strict cell-local moment projection that preserves ion
+     * momentum and closes the nonrelativistic pair-energy budget. Called when
+     * m_include_temperature_relaxation is true.
      *
      * \param lev AMR refinement level.
      * \param dt  PIC timestep [s].
@@ -310,20 +320,26 @@ public:
         std::map<std::string, amrex::MultiFab*> const & Ti_dep_by_species) const;
 
     /**
-     * \brief Ion-heating operator: a stochastic drag-diffusion applied to
-     *        every ion. It delivers both electron-ion energy channels:
+     * \brief Ion-heating operator: an ion drag-diffusion proposal followed,
+     *        for Qei, by a conservative local moment projection.
      *
      *   dv_p = -nu_ei (v_p - u_e) dt + sqrt(2 D dt) R,   D = D_qei + D_redir,
      *
-     * with R a unit-variance Gaussian vector. The Q_ei conjugate (when
-     * m_include_temperature_relaxation) supplies the drag toward the electron
+     * with R a unit-variance Gaussian vector. The Q_ei proposal (when
+     * Ti_dep_by_species is non-null) supplies the drag toward the electron
      * fluid u_e and the thermal diffusion D_qei = nu_ei k_B T_e / m_i, relaxing
-     * the ions toward a Maxwellian at T_e (T_i -> T_e at rate 2 nu_ei). The
+     * ions toward a Maxwellian at T_e. Its realized velocities are recentered
+     * and rescaled in every NGP particle cell so that the cell's old ion
+     * momentum is preserved and its nonrelativistic thermal-energy change is
+     * exactly the negative, physical-corner-volume integral of the electron
+     * Qei ledger. Unsupported local requests abort; they are not moved to
+     * distant occupied cells. The
      * Te-threshold Joule redirection (when \c redirect_E is non-null) supplies
      * an additional pure-diffusion heating sig_redir^2 = E_s/m_i that injects,
-     * in expectation, the redirected electron energy per cell. Either or both
-     * channels may be active. Both are per-species correct (the redirect reads
-     * each species' own component of \c redirect_E).
+     * in expectation, the redirected electron energy per cell. Qei and Joule
+     * redirection are invoked separately so the conservative projection has a
+     * single unambiguous source. Both are per-species correct (the redirect
+     * reads each species' own component of \c redirect_E).
      *
      * \param lev AMR refinement level.
      * \param dt  PIC timestep [s].
@@ -345,23 +361,118 @@ public:
      */
     void QDSMCFillElectronPressureFromTe (int lev) const;
 
+    /** Whether the hybrid electron temperature is an evolved state. */
+    [[nodiscard]] bool
+    solvesElectronEnergyEquation () const noexcept {
+        return m_solve_electron_energy_equation;
+    }
+
+    /** Electron number-density floor used by the hybrid material model. */
+    [[nodiscard]] amrex::Real
+    electronDensityFloor () const noexcept {
+        return m_n_floor;
+    }
+
+    /**
+     * Whether finite-volume electron internal-energy transport uses the raw
+     * deposited charge density in its ElectronOnly EOS state.
+     *
+     * The radiation LTE producer and its material-energy source must use the
+     * same density convention. This is true for supported nonlinear
+     * finite-volume transport and false for the ideal/entropy path, which
+     * retains the configured electron-density floor.
+     */
+    [[nodiscard]] bool
+    transportsElectronInternalEnergyAtRawDensity () const noexcept {
+        return m_fv_transport_internal_energy;
+    }
+
+    /** Device-callable view of the configured electron thermodynamics. */
+    [[nodiscard]] ElectronThermodynamicsExecutor
+    electronThermodynamicsExecutor () const noexcept {
+        return m_electron_thermodynamics.executor();
+    }
+
+    /** Number of fixed-charge ion materials supplying a tabulated electron EOS. */
+    [[nodiscard]] int
+    electronThermodynamicsNumMaterials () const noexcept {
+        return m_electron_thermodynamics.numMaterials();
+    }
+
+    /** Particle species that supplies one tabulated material mass density. */
+    [[nodiscard]] std::string const&
+    electronThermodynamicsMaterialSpeciesName (int const material) const {
+        return m_electron_thermodynamics.materialSpeciesName(material);
+    }
+
+    /** Whether the configured caloric EOS can accept conservative sources. */
+    [[nodiscard]] bool
+    electronThermodynamicsSupportsEnergyCoupling () const noexcept {
+        return m_electron_thermodynamics.supportsEnergyCoupling();
+    }
+
+    /** Whether implicit LTE may use the constant-C_V material residual. */
+    [[nodiscard]] bool
+    electronThermodynamicsSupportsConstantHeatCapacityLte () const noexcept {
+        return m_electron_thermodynamics.supportsConstantHeatCapacityLte();
+    }
+
     /**
      * \brief Top-level orchestrator for the QDSMC electron-energy step.
      *
-     * Performs the full entropy transport over one PIC step (see Phys. Plasmas 31, 012902 (2024)):
+     * Performs thermodynamic transport over one PIC step. Ideal-gas mode uses
+     * the entropy algorithm of Phys. Plasmas 31, 012902 (2024); nonlinear
+     * thermodynamics use conservative finite-volume internal-energy transport:
      *   1. CalculatePlasmaCurrent so J_plasma is current
      *   2. QDSMCInitializeUe  (V_e from J_plasma and J_i)
-     *   3. QDSMCInitializeKe  (K_e from T_e^n and rho^n)
-     *   4. QDSMC particle SetV / SetK / PushX / DepositK / DepositField
-     *   5. QDSMCUpdateTe      (recover T_e^{n+1} from K_arr / N_arr / rho^{n+1})
+     *   3. Initialize K_e or U_e from T_e^n and rho^n
+     *   4. Transport ideal K_e with markers, or source-load paired pressure
+     *      work and transport nonlinear U_e with mass-consistent FV fluxes
+     *   5. Recover T_e^{n+1}; nonlinear mode includes the remaining
+     *      -P_e div(V_e) contribution
      *   6. QDSMCAddJouleHeating (if m_include_joule_heating is on):
-     *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2 -> T_e
+     *      Joule source (Phys. Plasmas 31, 012902 (2024), Eq. 12) Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2 -> U_e -> T_e
      *   7. QDSMCFillElectronPressureFromTe (Pe = n_e * k_B * T_e)
      *   8. Reset QDSMC particles to home positions for the next step
      *
      * Called from HybridPICEvolveFields when m_solve_electron_energy_equation is true.
      */
     void AdvanceElectronEnergyQDSMC (amrex::Real dt) const;
+
+    /**
+     * \brief Add a conservative cell-integrated energy source to the nodal
+     *        hybrid-electron internal energy.
+     *
+     * The source is distributed to material corner nodes in proportion to
+     * their old-state heat capacities. The configured thermodynamics maps
+     * T_e to U_e, receives the energy increment, and inverts U_e back to T_e;
+     * P_e is then rebuilt for Ohm's law. The supplied density threshold must
+     * match the source producer's material mask. When supplied, the nonlinear
+     * LTE remap stores a cell temperature increment and the exact EOS energy
+     * represented by it; only its conservative root residual uses the fallback
+     * heat-capacity map. This is deliberately separate from QDSMC entropy
+     * transport and is called before AdvanceElectronEnergyQDSMC. The mutable
+     * cell_integrated_energy enters as the requested radiation-to-material
+     * transfer q in J/cell and exits rebased to the EOS-realized material
+     * change d in J/cell. The [[nodiscard]] return is the MPI-global residual
+     * R = sum(q-d), in joules.
+     */
+    [[nodiscard]] amrex::Real ApplyElectronEnergySource (
+        int lev,
+        amrex::MultiFab& cell_integrated_energy,
+        amrex::Real minimum_electron_density,
+        amrex::MultiFab const* nonlinear_lte_remap = nullptr) const;
+
+    /** Conservatively apply hybrid ionization after the ion charge density
+     * changes. The old electron internal-energy density is evaluated at
+     * \p old_charge_density and \p electron_temperature, the deposited
+     * ionization-potential density is removed, and the EOS is inverted at
+     * \p new_charge_density. */
+    void ApplyHybridIonizationEnergySource (
+        int lev,
+        amrex::MultiFab const& old_charge_density,
+        amrex::MultiFab const& new_charge_density,
+        amrex::MultiFab const& binding_energy_density) const;
 
     /** Check if rkf45 should be used */
     [[nodiscard]] bool DoRKF45(int step) const { return m_rkf45_intervals.contains(step); }
@@ -395,17 +506,27 @@ public:
     /** Electron pressure scaling exponent */
     amrex::Real m_gamma = 5.0/3.0;
 
-    /** Master gate for the electron-energy equation. When true, K_e is
-     * transported each step by QDSMC fictitious particles advecting with
-     * V_e, then T_e is recovered from K_e and n_e via the polytropic
-     * relation, then the Joule-heating source (if enabled) is added,
-     * then Pe = n_e k_B T_e is emitted for the Ohm's-law E-solve. When
-     * false (default), Pe is computed from the algebraic polytropic closure
-     * (FillElectronPressureMF): T_e is not an evolved state variable, but
-     * the implied temperature Pe/(n_e k_B) still varies with density
-     * through the closure (with the chosen gamma, which need not be
-     * adiabatic). */
+    /** Electron pressure and caloric equation-of-state interface. */
+    ElectronThermodynamics m_electron_thermodynamics;
+
+    /** Master gate for the electron-energy equation. Ideal-gas QDSMC carries
+     * K_e; supported nonlinear Cartesian thermodynamics advance internal
+     * energy with a conservative finite-volume operator. Particle-paired
+     * pressure work is source-loaded before that transport; remaining source
+     * terms follow it, then P_e is emitted for Ohm's law. When false
+     * (default), the algebraic polytropic closure is used. */
     bool m_solve_electron_energy_equation = false;
+
+    /** Select conservative finite-volume U_e transport instead of ideal-gas
+     * entropy markers. Derived from the thermodynamics model and supported
+     * geometry/material constraints; not a user-facing approximation switch. */
+    bool m_fv_transport_internal_energy = false;
+
+    /** Instrument the full Boris ion push with the isolated pressure electric
+     * field so its work can be exchanged conservatively with the nonlinear
+     * electron internal-energy update. This experimental path is opt-in until
+     * its application-level analytic validation matrix is complete. */
+    bool m_conservative_pressure_work = false;
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as
@@ -433,8 +554,9 @@ public:
      *   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),   dU_e/dt += -Q_ei,
      * cooling T_e toward each ion species' T_i at the rate given by the
      * electron_ion_relaxation_rate(rho,Te,Ti,t) parser, with the matching ion
-     * heating deposited conservatively (QDSMCApplyIonHeating) so the exchange
-     * conserves energy. Enabled by specifying the
+     * electron energy change ledgered exactly. QDSMCApplyIonHeating projects
+     * the finite-macroparticle ion proposal onto that ledger while preserving
+     * cell ion momentum. Enabled by specifying the
      * electron_ion_relaxation_rate expression (the bool is derived in
      * ReadParameters, not a separate user input); only consulted when
      * m_solve_electron_energy_equation is on. */

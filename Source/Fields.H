@@ -46,13 +46,39 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
-        hybrid_electron_temperature_fp, /**< Used with Ohm's law solver. Stores the electron temperature T_e (K): implied by the electron-pressure closure by default, or the QDSMC electron-energy-equation state variable (updated each step from the entropy K_e) when that equation is solved. */
-        hybrid_entropy_fp,           /**< Used with the QDSMC electron-energy equation. Stores the electron entropy K_e = T_e * n_e^(1-gamma) on the grid; the QDSMC fictitious particles read this at the start of each step and rewrite it after Lagrangian advection. */
-        hybrid_qdsmc_weights_fp,     /**< Used with the QDSMC electron-energy equation. Scratch field for the per-cell weight (N_e) deposited by QDSMC particles after their push, used to recover K_e^{n+1} as (deposited K*N) / (deposited N). */
-        hybrid_electron_velocity_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron fluid velocity V_e = -(J_plasma - J_i) / (q_e * n_e) on a NODAL grid (3 components); read by QDSMC SetV at the start of each step to advect the entropy-carrying particles. */
+        hybrid_pressure_E_fp, /**< Electron-pressure contribution -grad(P_e)/rho to the native hybrid electric field. Checkpointed when exact ion/electron pressure-work exchange is enabled. */
+        hybrid_pressure_E_aux, /**< Particle-gather representation of hybrid_pressure_E_fp, kept separate from external particle fields for exact pressure-work attribution. */
+        hybrid_pressure_work_current_fp, /**< Exact Boris electric-work current mapped to the native pressure-E grid; consumed by the adjoint electron pressure-work update. */
+        hybrid_pressure_work_current_aux, /**< Particle scatter of q v_work on the pressure-E gather grid, prior to the transpose native-centering map. */
+        hybrid_pressure_work_state_fp, /**< Checkpointed two-component state used to form hybrid_pressure_E_fp: pressure and its Holmstrom-masked reciprocal charge density. */
+        hybrid_electron_temperature_fp, /**< Used with Ohm's law solver. Stores the electron temperature T_e (K): implied by the electron-pressure closure by default, or advanced by QDSMC thermodynamic transport when the electron-energy equation is solved. */
+        hybrid_qdsmc_thermodynamic_fp, /**< Electron-energy scratch field. Stores ideal-gas entropy K_e before/scattered after marker transport, or nonlinear-EOS internal-energy density U_e before finite-volume transport. */
+        hybrid_qdsmc_weights_fp,     /**< Ideal-gas QDSMC scratch field for the deposited marker electron count N_e, used as the entropy denominator. */
+        hybrid_electron_velocity_fp, /**< Electron fluid velocity V_e = -(J_plasma - J_i) / (q_e * n_e) on a NODAL grid (3 components), consumed by ideal QDSMC markers or nonlinear finite-volume energy transport. */
+        radiation_material_energy,   /**< Cell-integrated radiation energy transferred to matter
+                                      * during the current step [J/cell]. Material adapters remap
+                                      * this conservative ledger to their degrees of freedom. */
+        radiation_material_kinetic_energy, /**< Cell-integrated material kinetic-energy change
+                                             * caused by radiation momentum transfer during the
+                                             * current step [J/cell]. This is
+                                             * diagnostic bookkeeping;
+                                             * the particle impulse has already been applied. */
+        radiation_material_momentum, /**< Cell-integrated radiation momentum transferred to matter
+                                       * during the current step [kg*m/s/cell]. Components are
+                                       * Cartesian in Cartesian geometry and (r,theta,z) in radial
+                                       * geometry. */
+        radiation_hybrid_lte_remap, /**< Ephemeral two-component nonlinear hybrid-LTE remap:
+                                     * cell temperature increment [K] and represented material
+                                     * energy increment [J/cell]. */
+        radiation_diffusion_energy,  /**< Cell-integrated radiation energy represented by the
+                                      * optically thick transport field [J/cell]. Each component
+                                      * stores one configured photon-energy group. */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
+        hybrid_energy_charge_flux_fp, /**< Charge-conserving ion current on dual-volume faces. Used only to transport nonlinear hybrid-electron internal energy consistently with deposited charge. */
+        hybrid_energy_rho_mid_fp,    /**< Unfiltered ion charge density deposited at the particle midpoint for nonlinear electron pressure-work velocity reconstruction. */
+        hybrid_energy_velocity_current_fp, /**< Direct nodal ion current co-deposited with hybrid_energy_rho_mid_fp for a constant-preserving electron velocity. */
         hybrid_current_fp_external,  /**< Used with Ohm's law solver. Stores external current */
         hybrid_B_fp_external,       /**< Used with Ohm's law solver. Stores external B field */
         hybrid_E_fp_external,       /**< Used with Ohm's law solver. Stores external E field */
@@ -115,8 +141,14 @@ namespace warpx::fields
         FieldType::vector_potential_fp_nodal,
         FieldType::vector_potential_grad_buf_e_stag,
         FieldType::vector_potential_grad_buf_b_stag,
+        FieldType::hybrid_pressure_E_fp,
+        FieldType::hybrid_pressure_E_aux,
+        FieldType::hybrid_pressure_work_current_fp,
+        FieldType::hybrid_pressure_work_current_aux,
         FieldType::hybrid_current_fp_temp,
         FieldType::hybrid_current_fp_plasma,
+        FieldType::hybrid_energy_charge_flux_fp,
+        FieldType::hybrid_energy_velocity_current_fp,
         FieldType::hybrid_current_fp_external,
         FieldType::hybrid_B_fp_external,
         FieldType::hybrid_E_fp_external,

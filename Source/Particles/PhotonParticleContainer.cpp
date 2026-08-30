@@ -190,6 +190,7 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 
     // local copy for device lambda capture
     amrex::ParticleReal const mass = m_mass;
+    bool const radiation_transport_managed = m_radiation_transport_managed;
 
     amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
                                 CompileTimeOptions<no_qed  ,has_qed>>{},
@@ -238,7 +239,9 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             amrex::ignore_unused(qed_control);
 #endif
 
-            if (position_push_type == PositionPushType::Full) {
+            if (position_push_type == PositionPushType::Full
+                && !radiation_transport_managed)
+            {
                 UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
                 SetPosition(i, x, y, z);
             }

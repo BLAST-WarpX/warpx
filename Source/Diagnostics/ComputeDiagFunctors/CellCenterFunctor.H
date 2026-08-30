@@ -20,10 +20,12 @@ public:
      * \param[in] convertRZmodes2cartesian (in cylindrical) whether to
      *            sum all modes in mf_src before cell-centering into dst multifab.
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
+     * \param[in] scomp First component of mf_src to cell-center.
      */
     CellCenterFunctor(const amrex::MultiFab * mf_src, int lev,
                       amrex::IntVect crse_ratio,
-                      bool convertRZmodes2cartesian=true, int ncomp=1);
+                      bool convertRZmodes2cartesian=true, int ncomp=1,
+                      int scomp=0);
     /** \brief Cell-center m_mf_src and write the result in mf_dst.
      *
      * In cylindrical geometry, by default this functor average all components
@@ -40,6 +42,7 @@ private:
     int m_lev; /**< level on which mf_src is defined (used in cylindrical) */
     /**< (for cylindrical) whether to average all modes into 1 comp */
     bool m_convertRZmodes2cartesian;
+    int m_scomp = 0; /**< first source component to cell-center */
 };
 
 #endif // WARPX_CELLCENTERFUNCTOR_H_

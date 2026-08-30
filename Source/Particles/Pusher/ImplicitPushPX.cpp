@@ -513,7 +513,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
-    if (do_field_ionization) {
+    if (HasEvolvingChargeState()) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
 
@@ -865,7 +865,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
     int* AMREX_RESTRICT ion_lev = nullptr;
-    if (do_field_ionization) {
+    if (HasEvolvingChargeState()) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
     }
 
@@ -1042,9 +1042,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #endif
 
                     // Set the Mass Matrices kernels
-                    amrex::ParticleReal fpxx, fpxy, fpxz;
-                    amrex::ParticleReal fpyx, fpyy, fpyz;
-                    amrex::ParticleReal fpzx, fpzy, fpzz;
+                    amrex::Real fpxx, fpxy, fpxz;
+                    amrex::Real fpyx, fpyy, fpyz;
+                    amrex::Real fpzx, fpzy, fpzz;
                     setMassMatricesKernels(q, mass, dt_suborbit, rhop,
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                                            costh, sinth,

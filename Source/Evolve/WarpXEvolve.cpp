@@ -30,12 +30,14 @@
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Python/callbacks.H"
+#include "Radiation/RadiationTransport.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
+#include <ablastr/utils/Communication.H>
 #include <ablastr/utils/SignalHandling.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -410,6 +412,17 @@ void WarpX::OneStep (
 {
     ABLASTR_PROFILE("WarpX::OneStep()");
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !m_radiation_transport->isEnabled() || m_implicit_solver == nullptr,
+        "Radiation transport currently supports explicit time integration only.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC
+            || !m_hybrid_pic_model->m_conservative_pressure_work
+            || !m_collisions_split_momentum_push,
+        "hybrid_pic_model.conservative_pressure_work requires "
+        "collisions.split_momentum_push=0 so one instrumented full Boris "
+        "push supplies the exact pressure-work velocity.");
+
     // implicit solver
     if (m_implicit_solver) {
         // advance fields and particles by one time step
@@ -424,6 +437,27 @@ void WarpX::OneStep (
     }
     // explicit solver
     else {
+        m_radiation_transport->Advance(*mypc, m_fields, a_cur_time, a_dt);
+        if (m_radiation_transport->couplesToHybridElectrons()) {
+            // Apply the source to T_e^n immediately after transport. QDSMC
+            // then advects this already radiation-updated electron energy,
+            // keeping the LTE emission-capacity bound and its material state
+            // at the same operator-split time.
+            amrex::MultiFab const* nonlinear_lte_remap = nullptr;
+            if (m_radiation_transport->usesNonlinearHybridLteRemap()) {
+                nonlinear_lte_remap = m_fields.get(
+                    warpx::fields::FieldType::radiation_hybrid_lte_remap, 0);
+            }
+            amrex::Real const material_realization_residual =
+                m_hybrid_pic_model->ApplyElectronEnergySource(
+                    0, *m_fields.get(
+                        warpx::fields::FieldType::radiation_material_energy, 0),
+                    m_radiation_transport->minimumElectronDensity(),
+                    nonlinear_lte_remap);
+            m_radiation_transport->RecordMaterialEnergyRealizationResidual(
+                material_realization_residual);
+        }
+
         // electrostatic solver or hybrid solver
         if (electromagnetic_solver_id == ElectromagneticSolverAlgo::None ||
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
@@ -1437,6 +1471,22 @@ WarpX::PushParticlesandDeposit (
         current_fp_string = "current_fp";
     }
 
+    bool const collect_hybrid_pressure_work =
+        electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
+        && m_hybrid_pic_model->m_conservative_pressure_work
+        && lev == 0
+        && subcycling_half == SubcyclingHalf::None
+        && position_push_type == PositionPushType::Full
+        && momentum_push_type == MomentumPushType::Full
+        && implicit_options == nullptr;
+    if (collect_hybrid_pressure_work) {
+        auto const work_current_aux = m_fields.get_alldirs(
+            FieldType::hybrid_pressure_work_current_aux, lev);
+        for (auto* component : work_current_aux) {
+            component->setVal(0.0_rt);
+        }
+    }
+
     mypc->Evolve(
         m_fields,
         lev,
@@ -1449,6 +1499,45 @@ WarpX::PushParticlesandDeposit (
         momentum_push_type,
         implicit_options
     );
+
+    if (collect_hybrid_pressure_work) {
+        auto const work_current_aux = m_fields.get_alldirs(
+            FieldType::hybrid_pressure_work_current_aux, lev);
+        auto const work_current_fp = m_fields.get_alldirs(
+            FieldType::hybrid_pressure_work_current_fp, lev);
+        auto const& period = Geom(lev).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+            // Particle shapes can straddle FAB and periodic boundaries. Fold
+            // every scatter contribution into the valid owner in full
+            // precision before reconstructing periodic/nodal aliases.
+            ablastr::utils::communication::SumBoundary(
+                *work_current_aux[idim], 0,
+                work_current_aux[idim]->nComp(),
+                work_current_aux[idim]->nGrowVect(),
+                work_current_aux[idim]->nGrowVect(),
+                /*do_single_precision_comms=*/false, period);
+            ablastr::utils::communication::FillBoundary(
+                *work_current_aux[idim],
+                work_current_aux[idim]->nGrowVect(),
+                /*do_single_precision_comms=*/false, period,
+                /*nodal_sync=*/true);
+
+            // Phase one is explicitly collocated, so A*=I. Keeping separate
+            // aux/native fields makes the later staggered implementation add
+            // the true transpose-centering operation at this exact hook.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                work_current_aux[idim]->ixType()
+                        == work_current_fp[idim]->ixType()
+                    && work_current_aux[idim]->boxArray()
+                        == work_current_fp[idim]->boxArray(),
+                "Conservative pressure-work current requires the exact "
+                "transpose native-centering map; phase one supports A*=I only.");
+            amrex::MultiFab::Copy(
+                *work_current_fp[idim], *work_current_aux[idim], 0, 0,
+                work_current_fp[idim]->nComp(),
+                work_current_fp[idim]->nGrowVect());
+        }
+    }
 
     if (!skip_deposition) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)

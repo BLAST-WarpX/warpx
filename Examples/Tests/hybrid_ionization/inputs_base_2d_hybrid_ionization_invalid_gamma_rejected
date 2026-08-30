@@ -1,0 +1,12 @@
+# Copyright 2026 The WarpX Community
+#
+# License: BSD-3-Clause-LBNL
+
+# The hybrid charge-changing operator debits an ideal-gas electron internal
+# energy U_e = P_e/(gamma-1).  An isothermal gamma=1 closure therefore has no
+# finite caloric reservoir and must be rejected during initialization, before
+# an ionization event can mutate a particle charge state.
+
+FILE = inputs_test_2d_hybrid_ionization_he
+
+hybrid_pic_model.gamma = 1.0

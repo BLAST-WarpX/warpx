@@ -1173,8 +1173,9 @@ MultiParticleContainer::doFieldIonization (int lev,
         const SmartCopyFactory copy_factory(*pc_source, *pc_product);
         auto *phys_pc_ptr = static_cast<PhysicalParticleContainer*>(pc_source.get());
 
-        auto Copy      = copy_factory.getSmartCopy();
-        auto Transform = IonizationTransformFunc();
+        auto Copy = copy_factory.getSmartCopy();
+        auto Transform = IonizationTransformFunc(
+            phys_pc_ptr->GetIntCompIndex("ionizationLevel"));
 
         pc_source ->defineAllParticleTiles();
         pc_product->defineAllParticleTiles();
@@ -1215,6 +1216,52 @@ MultiParticleContainer::doFieldIonization (int lev,
     }
 }
 
+bool
+MultiParticleContainer::hasHybridIonization () const noexcept
+{
+    return std::any_of(
+        allcontainers.begin(), allcontainers.end(),
+        [] (auto const& pc) { return pc->DoHybridIonization(); });
+}
+
+void
+MultiParticleContainer::doHybridIonization (
+    int const lev,
+    amrex::MultiFab const& electron_charge_density,
+    amrex::MultiFab const& electron_temperature,
+    amrex::MultiFab& binding_energy_density,
+    amrex::Real const time,
+    amrex::Real const dt)
+{
+    ABLASTR_PROFILE("MultiParticleContainer::doHybridIonization()");
+    binding_energy_density.setVal(0.0_rt);
+
+    for (auto& pc : allcontainers) {
+        if (!pc->DoHybridIonization()) { continue; }
+        auto* const physical_pc =
+            dynamic_cast<PhysicalParticleContainer*>(pc.get());
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            physical_pc != nullptr,
+            "do_hybrid_ionization is only valid for physical ion species.");
+        physical_pc->DoHybridIonization(
+            lev, electron_charge_density, electron_temperature,
+            binding_energy_density, time, dt);
+    }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(
+        &binding_energy_density, lev);
+#endif
+    auto const& geom = WarpX::GetInstance().Geom(lev);
+    ablastr::utils::communication::SumBoundary(
+        binding_energy_density, 0, binding_energy_density.nComp(),
+        binding_energy_density.nGrowVect(),
+        binding_energy_density.nGrowVect(),
+        WarpX::do_single_precision_comms, geom.periodicity());
+    binding_energy_density.FillBoundary(
+        binding_energy_density.nGrowVect(), geom.periodicity());
+}
+
 void
 MultiParticleContainer::doCollisions ( int step, Real cur_time, amrex::Real dt )
 {
@@ -1238,9 +1285,31 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
 {
     for (int i=0; i < static_cast<int>(species_names.size()); i++){
         if (allcontainers[i]->do_field_ionization){
+            auto const& source = allcontainers[i];
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                i != allcontainers[i]->ionization_product,
-                "ERROR: ionization product cannot be the same species");
+                i != source->ionization_product,
+                "Field-ionization product for species '" + species_names[i] +
+                    "' cannot be the source species itself.");
+
+            auto const& product = allcontainers[source->ionization_product];
+            std::string const product_description =
+                "Field-ionization product species '" +
+                species_names[source->ionization_product] +
+                "' for source species '" + species_names[i] + "'";
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                product->AmIA<PhysicalSpecies::electron>(),
+                product_description + " must have particle_type = electron.");
+
+            constexpr amrex::ParticleReal relative_tolerance =
+                16.0_prt * std::numeric_limits<amrex::ParticleReal>::epsilon();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::abs(product->getCharge() / PhysConst::q_e + 1.0_prt) <=
+                    relative_tolerance,
+                product_description + " must have charge = -q_e.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::abs(product->getMass() / PhysConst::m_e - 1.0_prt) <=
+                    relative_tolerance,
+                product_description + " must have mass = m_e.");
         }
     }
 }
