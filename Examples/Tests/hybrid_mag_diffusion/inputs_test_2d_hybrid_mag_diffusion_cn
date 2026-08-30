@@ -53,10 +53,9 @@ hybrid_pic_model.implicit_mag_diffusion = 1
 hybrid_pic_model.mag_diff_theta = 0.5
 hybrid_pic_model.mag_diff_constant_eta = 1.0e-2
 hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
-# The current MLCurlCurl V-cycle stalls below this relative tolerance for
-# theta < 1; the analytic oracle below verifies the resulting field error.
-hybrid_pic_model.mag_diff_rtol = 1.0e-4
-hybrid_pic_model.mag_diff_atol = 1.0e-14
+# Matrix-free flat-eta (Phase A); same FLASH-like tols as other mag-diff CI.
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 200
 hybrid_pic_model.mag_diff_verbose = 0
 

@@ -1,0 +1,88 @@
+# RCYLINDER hybrid implicit magnetic-diffusion HARSH-VACUUM test (T1, AMReX GMRES).
+# 1D r-only (axisymmetric). Uniform harsh vacuum eta = 129 Ohm*m via the parser
+# (variable-eta / BuildMagDiffResistivity product path), theta = 1 (backward
+# Euler), mag_diff_eta_explicit_max = 0 (all resistive diffusion is implicit, so
+# explicit Faraday need not resolve the resistive CFL).
+#
+# r_hi = PEC (tangential-mirror, i.e. Neumann dBt/dr = 0). This is REQUIRED for a
+# well-posed Bt solve: with "none" at r_hi the cylindrical operator has a
+# Bt proportional-to-r steady-state NULL MODE (K(Bt=r) = 0: (1/r)d(r*kr)/dr = 2k
+# = const -> d/dr = 0), leaving the linear system singular so AMReX GMRES and
+# PETSc converge to different particular solutions. PEC (Neumann dBt/dr = 0)
+# EXCLUDES Bt=r (which has dBt/dr = k != 0) -> unique, well-posed solution
+# (verified: AMReX == PETSc to ~1e-10 with PEC r_hi). See
+# notes/2026-07-19_rcyl_mag_diff_port.md.
+#
+# Oracle (analysis_rcyl.py): finite Bt; final Bt amplitude < 1e-3 * initial
+# (>99.9% damped in 5 steps at eta=129, dt=1ns -- the slowest Bessel mode damps
+# by ~1/(1+870) per step -> annihilated); AND the analytic explicit-resistive
+# CFL violation ratio const_dt / dt_resistive_explicit (= 2*mu0*eta*dr^2 -> 1)
+# showing explicit Faraday at the same const_dt is wildly unstable -- the
+# operator-split implicit mag-diff is what makes this deck run.
+
+max_step = 5
+amr.n_cell = 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 2.0e-2
+
+# r=0 axis (none). r_hi = PEC (Neumann for Bt; excludes the Bt~r null mode).
+# No pec_insulator: the Rcyl affine-feed split is a documented follow-up.
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+# RCYLINDER component order is Br, Bt, Bz (same as RZ). Uniform Bt init.
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 1.0e-4 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 4
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "129.0"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+hybrid_pic_model.implicit_mag_diffusion = 1
+hybrid_pic_model.mag_diff_theta = 1.0
+hybrid_pic_model.mag_diff_use_variable_eta = 1
+hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
+# Matrix-free GMRES + scaled Jacobi PC. rtol=1e-6 is ample for the >99.9% damping
+# oracle (the stiff eta=129 modes annihilate regardless of tight tolerance).
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
+hybrid_pic_model.mag_diff_max_iter = 500
+hybrid_pic_model.mag_diff_verbose = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile

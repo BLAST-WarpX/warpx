@@ -29,8 +29,6 @@
 #include <AMReX_Geometry.H>
 #include <AMReX_GMRES.H>
 #include <AMReX_Loop.H>
-#include <AMReX_MLCurlCurl.H>
-#include <AMReX_MLMG.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
@@ -109,9 +107,9 @@ HybridMagDiffusion::GetLinOpBCs (
 {
     // Map WarpX field BCs to LinOp types (same idea as ProjectionDivCleaner).
     // Unmapped types default to Neumann. PEC_Insulator is treated as Dirichlet
-    // for tangential B. On the matrix-free RZ path the feed is enforced via
+    // for tangential B. On the matrix-free path the feed is enforced via
     // ApplyBfieldBoundary and an affine RHS term (VariableCoeffMagDiffusionOp);
-    // this map is used by the Cartesian MLCurlCurl path.
+    // this map is retained for callers that still fill LinOpBC arrays.
     const std::map<FieldBoundaryType, LinOpBCType> bcmap{
         {FieldBoundaryType::PEC, LinOpBCType::Dirichlet},
         {FieldBoundaryType::Neumann, LinOpBCType::Neumann},
@@ -130,37 +128,6 @@ HybridMagDiffusion::GetLinOpBCs (
 }
 
 namespace {
-
-// MLCurlCurl constant-eta path is Cartesian-only; RZ always uses AdvanceVariable.
-#if !defined(WARPX_DIM_RZ)
-/** Alias WarpX (Bx,By,Bz) MultiFabs into AMReX MLCurlCurl component order. */
-Array<MultiFab,3>
-MakeCurlCurlAliases (const Array<MultiFab,3>& mf)
-{
-#if defined(WARPX_DIM_1D_Z)
-    // Missing dimensions are x,y in WarpX and y,z in AMReX
-    return {
-        MultiFab(mf[2], make_alias, 0, 1),
-        MultiFab(mf[1], make_alias, 0, 1),
-        MultiFab(mf[0], make_alias, 0, 1)
-    };
-#elif defined(WARPX_DIM_XZ)
-    // Missing dimension is y in WarpX and z in AMReX
-    return {
-        MultiFab(mf[0], make_alias, 0, 1),
-        MultiFab(mf[2], make_alias, 0, 1),
-        MultiFab(mf[1], make_alias, 0, 1)
-    };
-#else
-    // 3D and RCYLINDER / RSPHERE
-    return {
-        MultiFab(mf[0], make_alias, 0, 1),
-        MultiFab(mf[1], make_alias, 0, 1),
-        MultiFab(mf[2], make_alias, 0, 1)
-    };
-#endif
-}
-#endif // !WARPX_DIM_RZ
 
 // File-scope device functors (not nested in VariableCoeffMagDiffusionOp).
 // nvc++ rejects extended __device__ lambdas whose enclosing parent is a local
@@ -204,8 +171,19 @@ struct MagDiffJacobiPrecond
     // so the PC is identity there too. Mirrors ComputeCurlA's mask pattern.
     Array4<int const> mask;
     Real theta_dt = 0.0_rt;
-    Real diag_factor = 0.0_rt;
+    Real diag_factor = 0.0_rt;   // Cartesian Laplacian diagonal (scalar; cyl unused)
     Real denom = 1.0_rt;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    // Cylindrical metric for the per-DOF Laplacian diagonal (matches the
+    // assembled frozen-Laplacian P). ishift_r = 1 if the component is NODE in
+    // r (Br), 0 if CELL in r (Bt/Bz); is_bt = (idim == 1) -> subtract 1/r^2.
+    Real rmin = 0.0_rt;
+    Real dr = 1.0_rt;
+    Real dr_inv2 = 0.0_rt;
+    Real dz_inv2 = 0.0_rt;
+    int ishift_r = 1;
+    int idim = 0;
+#endif
 
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void operator() (int i, int j, int k) const noexcept
@@ -221,7 +199,34 @@ struct MagDiffJacobiPrecond
         Real const tiny = Real(1.e-3) * std::numeric_limits<Real>::min();
         Real const eta_val = std::max(eta(i, j, k), Real(0.0));
         Real const chi_val = eta_val / PhysConst::mu0;
-        Real const diag = (1.0_rt + theta_dt * chi_val * diag_factor) / denom;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        // Exact geometric diagonal of the curl-curl operator at this DOF.
+        // Br (idim 0) has only axial self-derivatives: 2/dz^2
+        // Bz (idim 2) has only radial self-derivatives: 2/dr^2
+        // Bt (idim 1) has both, minus 1/r^2 (applied off-axis to avoid zero/neg diag).
+        Real const r = rmin + (i + (ishift_r ? 0.0_rt : 0.5_rt)) * dr;
+        Real lap_diag = 0.0_rt;
+
+        if (idim == 1) { // B_theta
+            if (r > 0.0_rt) { lap_diag += 2.0_rt * dr_inv2; }
+#if defined(WARPX_DIM_RZ)
+            lap_diag += 2.0_rt * dz_inv2;
+#endif
+            if (r > 0.0_rt) {
+                Real const inv_r2 = 1.0_rt / (r * r);
+                if (lap_diag - inv_r2 > 0.0_rt) { lap_diag -= inv_r2; }
+            }
+        } else if (idim == 0) { // B_r
+#if defined(WARPX_DIM_RZ)
+            lap_diag = 2.0_rt * dz_inv2;
+#endif
+        } else if (idim == 2) { // B_z
+            if (r > 0.0_rt) { lap_diag = 2.0_rt * dr_inv2; }
+        }
+#else
+        Real const lap_diag = diag_factor;
+#endif
+        Real const diag = (1.0_rt + theta_dt * chi_val * lap_diag) / denom;
         Real const inv = Real(1.0) / std::max(diag, tiny);
         Real const out = src(i, j, k) * inv;
         // Device-safe finite check (avoid std::isfinite on CUDA device).
@@ -424,10 +429,41 @@ public:
             "RZ matrix-free hybrid magnetic diffusion supports Periodic, PEC, "
             "or PEC_Insulator at each axial (z) boundary (None is not "
             "well-posed for the z edge ghosts)");
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RCYLINDER)
+        // RCYLINDER is 1D (r only), axisymmetric (single azimuthal mode). The
+        // cylindrical FDTD curl kernels (CalculateCurrentAmpereCylindrical /
+        // ComputeCurlACylindrical) and WarpX::ApplyBfieldBoundary (axis at r=0
+        // via ApplyFieldBoundaryOnAxis) already support RCYLINDER -- they are
+        // the same operators the RCYLINDER hybrid-PIC EM solve uses -- so the
+        // matrix-free path reuses them by mirroring the RZ staging branch
+        // (computeAFull / copy-back), not the Cartesian FillBoundaryAndSync.
+        // BC policy mirrors RZ minus the z dimension:
+        //   - r_lo (r=0): None (axis; ApplyFieldBoundaryOnAxis).
+        //   - r_hi: None (unforced) or PEC (tangential-mirror wall).
+        // pec_insulator (Dirichlet B_t feed) is NOT wired into the mag-diff
+        // affine-feed split for RCYLINDER yet (prepareFeed is RZ-only); assert
+        // here so a feed deck fails fast instead of silently treating an affine
+        // operator as linear. Extending the feed to Rcyl is a documented
+        // follow-up (notes/2026-07-19_rcyl_mag_diff_port.md Sec 2/7).
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::field_boundary_lo[0] == FieldBoundaryType::None,
+            "RCYLINDER matrix-free hybrid magnetic diffusion requires the "
+            "lower radial boundary to be None (r=0 axis; "
+            "ApplyFieldBoundaryOnAxis)");
+        auto const fb_is_outer_radial = [] (FieldBoundaryType fb) {
+            return fb == FieldBoundaryType::None ||
+                   fb == FieldBoundaryType::PEC;
+        };
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            fb_is_outer_radial(WarpX::field_boundary_hi[0]),
+            "RCYLINDER matrix-free hybrid magnetic diffusion supports None or "
+            "PEC at the outer radial boundary. pec_insulator (Dirichlet B_t "
+            "feed) is a follow-up, not yet wired into the affine-feed split "
+            "(prepareFeed); see notes/2026-07-19_rcyl_mag_diff_port.md");
+#elif defined(WARPX_DIM_RSPHERE)
         WARPX_ABORT_WITH_MESSAGE(
             "Matrix-free hybrid magnetic diffusion is not yet supported in "
-            "RCYLINDER or RSPHERE geometries");
+            "RSPHERE geometry");
 #else
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             m_geom.isAllPeriodic(),
@@ -583,8 +619,36 @@ public:
 #elif defined(WARPX_DIM_1D_Z)
         Real const dz_inv2 = 1.0_rt / (dx[0]*dx[0]);
         Real const diag_factor = 2.0_rt * dz_inv2;
+#elif defined(WARPX_DIM_RCYLINDER)
+        // 1D r-only (axisymmetric). diag_factor = 2/dr^2 is the off-axis
+        // Laplacian diagonal used as the denom reference scale (uniform eta ->
+        // identity after PC). The per-DOF metric-aware diagonal (radial 1/r and
+        // the Bt -1/r^2 term) is computed inside MagDiffJacobiPrecond from the
+        // geometry passed below -- mirroring assembleExactCurlCurl diagonals.
+        Real const dr_inv2 = 1.0_rt / (dx[0]*dx[0]);
+        Real const diag_factor = 2.0_rt * dr_inv2;
 #else
+        // RSPHERE (aborts in the ctor) or any other dim: leave the PC diagonal
+        // unscaled (diag_factor = 0) so the Jacobi PC reduces to identity rather
+        // than reading a bogus scale.
         Real const diag_factor = 0.0_rt;
+#endif
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        // Cylindrical metric for the per-DOF Jacobi diagonal: MagDiffJacobiPrecond
+        // computes the r-aware Laplacian diagonal from these; diag_factor above is
+        // the off-axis reference used only for the denom scale (uniform eta ->
+        // identity after PC, except a negligible scaling on the one near-axis Bt
+        // cell whose -1/r^2 is skipped).
+        Real const rmin = geom.ProbLo(0);
+        Real const dr = dx[0];
+#  if defined(WARPX_DIM_RZ)
+        Real const kern_dr_inv2 = dx_inv2;
+        Real const kern_dz_inv2 = dz_inv2;
+#  else // WARPX_DIM_RCYLINDER
+        Real const kern_dr_inv2 = dr_inv2;
+        Real const kern_dz_inv2 = 0.0_rt;  // no z dimension
+#  endif
 #endif
 
         auto& dest_fields = destination.fields();
@@ -605,6 +669,12 @@ public:
 
         bool const eb_on = EB::enabled();
         for (int idim = 0; idim < 3; ++idim) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            // r-staggering per component: 1 = NODE in r (Br), 0 = CELL in r
+            // (Bt/Bz); is_bt -> subtract 1/r^2 (Bt only). See ComputeCurlA.cpp.
+            int const ishift_r = dest_fields[idim].ixType().toIntVect()[0];
+
+#endif
             for (MFIter mfi(dest_fields[idim], TilingIfNotGPU()); mfi.isValid(); ++mfi) {
                 // Covered B faces are identity in the operator; the PC mirrors
                 // that (see MagDiffJacobiPrecond). Empty Array4 when EB is off.
@@ -617,7 +687,11 @@ public:
                     src_fields[idim].const_array(mfi),
                     m_eta_pc[idim].const_array(mfi),
                     mask_arr,
-                    m_theta_dt, diag_factor, denom};
+                    m_theta_dt, diag_factor, denom
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    , rmin, dr, kern_dr_inv2, kern_dz_inv2, ishift_r, idim
+#endif
+                };
                 ParallelFor(mfi.tilebox(), kernel);
             }
         }
@@ -652,7 +726,7 @@ public:
     void computeAFull (MagDiffVector& output, MagDiffVector const& input, Real alpha_dt)
     {
         auto const& input_fields = input.fields();
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         auto& warpx = WarpX::GetInstance();
         // Stage valid cells into the registered B field so WarpX applies RZ
         // axis and field boundaries, then pull the filled ghost region into
@@ -768,16 +842,18 @@ public:
     [[nodiscard]] MagDiffVector const& feedOffset () const { return m_feed_offset; }
 
     // Accessors used by the optional PETSc KSP path (MagDiffPetscKSP): the
-    // homogeneous apply()/precond() are reused directly, and the assembled
-    // frozen-eta Laplacian Pmat needs the B-centered eta (m_eta_pc), the
-    // theta*dt scale, and the geometry (cell sizes). apply()/precond() are
-    // non-const because they stage through internal work MultiFabs.
+    // homogeneous apply()/precond() are reused directly. The assembled
+    // exact_curl_curl Pmat uses E/J-face eta (m_eta) on RZ/Rcyl to match the
+    // matvec face selection; Cartesian still uses B-sampled m_eta_pc. Jacobi
+    // shell PC always uses m_eta_pc. apply()/precond() are non-const because
+    // they stage through internal work MultiFabs.
     void applyPetsc (MagDiffVector& output, MagDiffVector const& input) { apply(output, input); }
     void precondPetsc (MagDiffVector& destination, MagDiffVector const& source)
     { precond(destination, source); }
     [[nodiscard]] Real thetaDt () const { return m_theta_dt; }
     [[nodiscard]] Geometry const& geom () const { return m_geom; }
     [[nodiscard]] Array<MultiFab,3> const& etaPC () const { return m_eta_pc; }
+    [[nodiscard]] Array<MultiFab const*,3> const& etaEdge () const { return m_eta; }
 
 private:
     Real m_theta_dt;
@@ -984,25 +1060,17 @@ HybridMagDiffusion::Advance (
         lev == 0,
         "HybridMagDiffusion only supports single-level hybrid runs");
 
-    // Magnetic diffusivity chi = eta / mu0  [m^2/s]
+    // Constant-η convenience entry: flat η MultiFab → AdvanceVariable (the
+    // only mag-diff discrete path).
     const Real chi = eta_SI / PhysConst::mu0;
-    // MLCurlCurl: curl(alpha curl B) + beta B = rhs
-    // with alpha = theta * dt * chi, beta = 1  =>  (I + theta dt chi curlcurl) B
-    const Real alpha = m_theta * dt * chi;
-
     if (m_verbose > 0) {
         amrex::Print() << "HybridMagDiffusion::Advance: eta=" << eta_SI
                        << " chi=" << chi
                        << " dt=" << dt
-                       << " alpha=theta*dt*chi=" << alpha << "\n";
+                       << " (matrix-free flat-eta)\n";
     }
 
     auto& warpx = WarpX::GetInstance();
-
-#if defined(WARPX_DIM_RZ)
-    // AMReX MLCurlCurl supports only Cartesian operators in 2D. Build a
-    // constant eta field on the E/J staggering and use the matrix-free
-    // cylindrical FDTD curl chain instead.
     ablastr::fields::VectorField const current_layout =
         warpx.m_fields.get_alldirs(
             warpx::fields::FieldType::hybrid_current_fp_plasma, lev);
@@ -1014,9 +1082,8 @@ HybridMagDiffusion::Advance (
         eta_storage[idim].setVal(eta_SI);
     }
     // Zero η on covered E faces (eb_update_E == 0): no diffusion into the
-    // solid. Mirrors the Cartesian EB branch and BuildMagDiffResistivity; the
-    // matvec is already safe (computeAFull zeros Jwork), but this keeps the
-    // B-face PC and the frozen-η PETSc Pmat clean near the EB. No-op EB-off.
+    // solid. Mirrors BuildMagDiffResistivity; matvec already zeros Jwork.
+    // No-op when EB is off.
     if (EB::enabled()) {
         auto const& eb_update_E = warpx.GetEBUpdateEFlag()[lev];
         amrex::Periodicity const& eb_period = warpx.Geom(lev).periodicity();
@@ -1039,158 +1106,6 @@ HybridMagDiffusion::Advance (
     ablastr::fields::VectorField const eta_field = {
         eta_ptr, eta_ptr + 1, eta_ptr + 2};
     AdvanceVariable(Bfield, eta_field, dt, lev, lobc, hibc);
-#else
-    // EB: plain MLCurlCurl has no embedded-boundary API and would silently
-    // solve the wrong operator. Route to the matrix-free path (same as RZ),
-    // which is EB-aware as of Milestone 1 (stair-case masks: covered E faces
-    // carry η=0, covered B inert). See notes/2026-07-18_eb_parser_eta.md.
-    if (EB::enabled()) {
-        ablastr::fields::VectorField const current_layout =
-            warpx.m_fields.get_alldirs(
-                warpx::fields::FieldType::hybrid_current_fp_plasma, lev);
-        Array<MultiFab,3> eta_storage;
-        for (int idim = 0; idim < 3; ++idim) {
-            eta_storage[idim].define(
-                current_layout[idim]->boxArray(),
-                current_layout[idim]->DistributionMap(),
-                1, current_layout[idim]->nGrowVect());
-            eta_storage[idim].setVal(eta_SI);
-        }
-        // Zero η on covered E faces (eb_update_E == 0): no diffusion into the
-        // solid. The matvec is already safe (computeAFull zeros Jwork, so
-        // J = 0 on covered E faces), but this makes the B-face PC
-        // (SampleEtaOntoBFace) and the frozen-η PETSc Pmat (M2) see fluid η
-        // only near the EB. Mirrors BuildMagDiffResistivity's masking.
-        {
-            auto const& eb_update_E = warpx.GetEBUpdateEFlag()[lev];
-            amrex::Periodicity const& eb_period = warpx.Geom(lev).periodicity();
-            for (int idim = 0; idim < 3; ++idim) {
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-                for (MFIter mfi(eta_storage[idim], TilingIfNotGPU());
-                     mfi.isValid(); ++mfi) {
-                    auto arr = eta_storage[idim].array(mfi);
-                    auto const mask_arr = eb_update_E[idim]->const_array(mfi);
-                    ParallelFor(mfi.tilebox(),
-                        [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                            if (mask_arr(i, j, k) == 0) { arr(i, j, k) = 0.0_rt; }
-                        });
-                }
-                eta_storage[idim].FillBoundaryAndSync(eb_period);
-            }
-        }
-        MultiFab * const eta_ptr = eta_storage.data();
-        ablastr::fields::VectorField const eta_field = {
-            eta_ptr, eta_ptr + 1, eta_ptr + 2};
-        AdvanceVariable(Bfield, eta_field, dt, lev, lobc, hibc);
-        return;
-    }
-
-    // Cartesian constant-eta path via AMReX MLCurlCurl.
-    Geometry const& geom = warpx.Geom(lev);
-    // MLCurlCurl expects cell-centered BoxArray (enclosedCells of edge BA)
-    BoxArray ba = Bfield[0]->boxArray();
-    ba.enclosedCells();
-    DistributionMapping const& dm = Bfield[0]->DistributionMap();
-
-    LPInfo info;
-    info.setMaxCoarseningLevel(30);
-
-#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    constexpr int coord = 1;
-#else
-    constexpr int coord = 0;
-#endif
-
-    Vector<Geometry> const geom_v{geom};
-    Vector<BoxArray> const grids_v{ba};
-    Vector<DistributionMapping> const dmap_v{dm};
-
-    MLCurlCurl linop(geom_v, grids_v, dmap_v, info, coord);
-    linop.setDomainBC(lobc, hibc);
-    linop.setScalars(alpha, Real(1.0));
-
-    // Working storage in WarpX component order
-    Array<MultiFab, 3> sol;
-    Array<MultiFab, 3> rhs;
-    for (int idim = 0; idim < 3; ++idim) {
-        const IntVect ng = Bfield[idim]->nGrowVect();
-        sol[idim].define(Bfield[idim]->boxArray(), Bfield[idim]->DistributionMap(), 1, ng);
-        rhs[idim].define(Bfield[idim]->boxArray(), Bfield[idim]->DistributionMap(), 1, ng);
-        MultiFab::Copy(sol[idim], *Bfield[idim], 0, 0, 1, ng);
-        MultiFab::Copy(rhs[idim], *Bfield[idim], 0, 0, 1, ng);
-    }
-
-    // For 0 < theta < 1 (e.g. Crank–Nicolson):
-    //   rhs = B - (1-theta) dt chi curlcurl B
-    //       = 2 B - A_e(B)
-    // where A_e uses alpha_e = (1-theta) dt chi and beta = 1.
-    if (m_theta < 1.0_rt) {
-        for (int idim = 0; idim < 3; ++idim) {
-            ablastr::utils::communication::FillBoundary(
-                rhs[idim],
-                WarpX::do_single_precision_comms,
-                geom.periodicity(),
-                true);
-        }
-
-        const Real alpha_e = (1.0_rt - m_theta) * dt * chi;
-        MLCurlCurl linop_e(geom_v, grids_v, dmap_v, info, coord);
-        linop_e.setDomainBC(lobc, hibc);
-        linop_e.setScalars(alpha_e, Real(1.0));
-        linop_e.setLevelBC(0, nullptr);
-        linop_e.prepareForSolve();
-
-        Array<MultiFab, 3> Ae_out;
-        for (int idim = 0; idim < 3; ++idim) {
-            Ae_out[idim].define(
-                Bfield[idim]->boxArray(), Bfield[idim]->DistributionMap(), 1, 0);
-            Ae_out[idim].setVal(0.0_rt);
-        }
-
-        Array<MultiFab, 3> in_arr = MakeCurlCurlAliases(rhs);
-        Array<MultiFab, 3> out_arr = MakeCurlCurlAliases(Ae_out);
-
-        using Op = MLLinOpT<Array<MultiFab,3>>;
-        linop_e.apply(0, 0, out_arr, in_arr, Op::BCMode::Homogeneous, Op::StateMode::Solution);
-
-        for (int idim = 0; idim < 3; ++idim) {
-            // rhs := 2*B - A_e(B)
-            MultiFab::LinComb(
-                rhs[idim],
-                2.0_rt, sol[idim], 0,
-                -1.0_rt, Ae_out[idim], 0,
-                0, 1, 0);
-        }
-    }
-
-    Array<MultiFab, 3> solution = MakeCurlCurlAliases(sol);
-    Array<MultiFab, 3> rhs_arr = MakeCurlCurlAliases(rhs);
-
-    linop.setLevelBC(0, nullptr);
-    linop.prepareRHS({&rhs_arr});
-
-    using MFArr = Array<MultiFab, 3>;
-    MLMGT<MFArr> mlmg(linop);
-    mlmg.setMaxIter(m_max_iter);
-    mlmg.setVerbose(m_verbose);
-    mlmg.setBottomVerbose(0);
-    const Real residual = mlmg.solve({&solution}, {&rhs_arr}, m_rtol, m_atol);
-
-    if (m_verbose > 0) {
-        amrex::Print() << "HybridMagDiffusion MLMG residual=" << residual << "\n";
-    }
-
-    for (int idim = 0; idim < 3; ++idim) {
-        MultiFab::Copy(*Bfield[idim], sol[idim], 0, 0, 1, 0);
-        ablastr::utils::communication::FillBoundary(
-            *Bfield[idim],
-            WarpX::do_single_precision_comms,
-            geom.periodicity(),
-            true);
-    }
-#endif // WARPX_DIM_RZ
 }
 
 void
@@ -1247,7 +1162,7 @@ HybridMagDiffusion::AdvanceVariable (
 
     // Theta-method RHS for  (I + theta*dt*K) B^{n+1} = rhs, where
     //   rhs = B^n - (1-theta)*dt*K_hom B^n - feed_RHS
-    // built in the MLCurlCurl-mirroring form  rhs = 2*B^n - A_e(B^n) - c,
+    // built in the theta-method form  rhs = 2*B^n - A_e(B^n) - c,
     // with A_e(x) = computeAFull(x, alpha=(1-theta)*dt) = x + (1-theta)*dt*K_full(x)
     // using the same frozen eta and feed ghost g(t_new) as the implicit operator.
     // Expanding (K_full = K_hom + K_feed) gives rhs = B^n - (1-theta)*dt*K_hom B^n
@@ -1264,7 +1179,7 @@ HybridMagDiffusion::AdvanceVariable (
     //   existing backward-Euler path (skipped here to stay bit-/test-identical
     //   and avoid a wasted matrix-free apply).
     // - theta < 1: one extra matrix-free apply per step (same cost as the
-    //   Cartesian MLCurlCurl CN path). c = 0 with no feed -> rhs = 2*B^n - A_e.
+    //   constant-eta CN path). c = 0 with no feed -> rhs = 2*B^n - A_e.
     if (m_theta < 1.0_rt) {
         MagDiffVector Ae;
         Ae.Define(Bfield);
@@ -1295,9 +1210,10 @@ HybridMagDiffusion::AdvanceVariable (
 #endif
 
         auto& eta_pc = linop.etaPC();
+        auto const& eta_edge = linop.etaEdge();
         amrex::Array<MultiFab const*,3> const B_proto{
             &solution.fields()[0], &solution.fields()[1], &solution.fields()[2]};
-        amrex::Array<MultiFab const*,3> const eta_proto{
+        amrex::Array<MultiFab const*,3> const eta_pc_proto{
             &eta_pc[0], &eta_pc[1], &eta_pc[2]};
 
         // Pass the EB B-field mask (if any) so covered DOFs are skipped from
@@ -1308,8 +1224,8 @@ HybridMagDiffusion::AdvanceVariable (
         bool const petsc_eb_on = EB::enabled();
 
         MagDiffPetscSolver* petsc_solver = magdiff_petsc_make(
-            B_proto, eta_proto, linop.geom(), linop.thetaDt(), PhysConst::mu0,
-            m_petsc_pc, m_rtol, m_atol, m_max_iter, m_verbose,
+            B_proto, eta_edge, eta_pc_proto, linop.geom(), linop.thetaDt(),
+            PhysConst::mu0, m_petsc_pc, m_rtol, m_atol, m_max_iter, m_verbose,
             &petscMatvec, &petscPCApply, &opctx,
             petsc_eb_on ? &eb_update_B_ptrs : nullptr);
 
@@ -1383,12 +1299,12 @@ HybridMagDiffusion::AdvanceVariable (
     // never write a nonzero value into the solid.
     zeroCoveredB(solution, eb_update_B);
     auto& warpx = WarpX::GetInstance();
-#if !defined(WARPX_DIM_RZ)
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
     Geometry const& geom = warpx.Geom(lev);
 #endif
     for (int idim = 0; idim < 3; ++idim) {
         MultiFab::Copy(*Bfield[idim], solution_fields[idim], 0, 0, 1, 0);
-#if !defined(WARPX_DIM_RZ)
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
         ablastr::utils::communication::FillBoundary(
             *Bfield[idim],
             WarpX::do_single_precision_comms,
@@ -1396,7 +1312,11 @@ HybridMagDiffusion::AdvanceVariable (
             true);
 #endif
     }
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+    // Re-apply the axis (r=0 mirror) and any PEC wall via the same boundary
+    // path the RZ matvec uses, then refill ghosts. RCYLINDER mirrors RZ here
+    // (ApplyFieldBoundaryOnAxis supports both); the Cartesian FillBoundary
+    // tail above is for 3D/XZ/1D_Z only.
     warpx.ApplyBfieldBoundary(
         lev, PatchType::fine, SubcyclingHalf::None, warpx.gett_new(lev));
     warpx.FillBoundaryB(lev, Bfield[0]->nGrowVect(), true);

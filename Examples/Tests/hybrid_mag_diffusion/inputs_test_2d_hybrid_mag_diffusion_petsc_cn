@@ -3,7 +3,7 @@
 # matrix-free curl-curl operator and same theta-method RHS (built before the
 # GMRES/PETSc branch, so PETSc inherits the (1-theta) explicit term trivially)
 # as the default AMReX-GMRES CN test; only the solver driver differs. The
-# frozen-eta Laplacian Pmat (mag_diff_petsc_pc = frozen_laplacian) is assembled
+# frozen-η curl-curl Pmat (mag_diff_petsc_pc = exact_curl_curl) is assembled
 # so PETSc's default block-Jacobi ILU PC factors a real matrix. Mild eta
 # (1e-2) keeps the system well conditioned so PETSc converges tightly and the
 # discrete-Fourier CN amplification oracle in analysis.py applies (the matvec
@@ -67,9 +67,9 @@ hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
 # theta<1 RHS (2*B^n - A_e(B^n)) is assembled before the solver branch, so
 # PETSc uses it unchanged. rtol=1e-10 reproduces the CN amplification oracle.
 hybrid_pic_model.mag_diff_linear_solver = petsc
-hybrid_pic_model.mag_diff_petsc_pc = frozen_laplacian
-hybrid_pic_model.mag_diff_rtol = 1.0e-10
-hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_petsc_pc = exact_curl_curl
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 300
 hybrid_pic_model.mag_diff_verbose = 0
 

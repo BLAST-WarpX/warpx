@@ -66,8 +66,8 @@ hybrid_pic_model.mag_diff_constant_eta = 129.0
 hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
 # Matrix-free GMRES with the Dirichlet feed baked into operator + RHS.
 # rtol=1e-4 matches the RZ eta=129 stability smokes (no cylindrical MG PC).
-hybrid_pic_model.mag_diff_rtol = 1.0e-4
-hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 300
 hybrid_pic_model.mag_diff_verbose = 1
 

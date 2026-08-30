@@ -3,7 +3,8 @@
 # Physics: operator-split θ-method curl-curl diffusion of a Fourier mode
 #   By = B0 cos(kx x), kx = 2π/Lx
 # with plasma_resistivity = 0 in Ohm (Faraday free of η) and
-# mag_diff_constant_eta driving the implicit MLCurlCurl step.
+# mag_diff_constant_eta → flat-η MultiFab → matrix-free AdvanceVariable
+# (same discrete path as variable-η / production).
 # High n_floor / density keeps Hall negligible so the pure diffusion
 # solution By(t) = B0 cos(kx x) exp(-χ kx^2 t), χ = η/μ0, applies.
 #
@@ -62,8 +63,8 @@ hybrid_pic_model.implicit_mag_diffusion = 1
 hybrid_pic_model.mag_diff_theta = 1.0
 hybrid_pic_model.mag_diff_constant_eta = 1.0e-2
 hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
-hybrid_pic_model.mag_diff_rtol = 1.0e-10
-hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 200
 hybrid_pic_model.mag_diff_verbose = 0
 

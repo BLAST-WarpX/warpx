@@ -2,8 +2,8 @@
 #
 
 # Analytic constant-eta magnetic diffusion (Fourier By mode) with
-# hybrid_pic_model.implicit_mag_diffusion. Uses the C++ executable directly
-# (no PICMI) so pywarpx is not required.
+# hybrid_pic_model.implicit_mag_diffusion (matrix-free flat-eta Advance).
+# Uses the C++ executable directly (no PICMI) so pywarpx is not required.
 add_warpx_test(
     test_2d_hybrid_mag_diffusion  # name
     2  # dims
@@ -37,8 +37,8 @@ add_warpx_test(
 # Crank-Nicolson (theta=0.5) companion to the 2D variable-eta test. A uniform
 # parser eta drives the matrix-free GMRES path with the (1-theta) explicit RHS
 # term; the discrete-Fourier CN amplification oracle in analysis.py applies
-# unchanged (uniform parser eta matches the constant-eta symbol). This mirrors
-# the constant-eta MLCurlCurl CN test on the matrix-free path.
+# unchanged (uniform parser eta matches the constant-eta symbol). Mirrors the
+# constant-eta CN analytic test (also matrix-free flat-eta after Phase A).
 add_warpx_test(
     test_2d_hybrid_mag_diffusion_variable_eta_cn  # name
     2  # dims
@@ -207,5 +207,80 @@ if(WarpX_EB)
         "analysis_rz_eb.py"  # analysis
         OFF  # checksum (finite/covered-inert oracle in analysis_rz_eb.py)
         OFF  # dependency
+    )
+endif()
+
+# ---- RCYLINDER (1D r-only, axisymmetric) matrix-free mag-diff ----------------
+# RCYLINDER reuses the RZ cylindrical curl kernels + axis BC, so it routes
+# through the matrix-free AdvanceVariable path.
+# r_hi = PEC (Neumann dBt/dr=0) is REQUIRED for a well-posed Bt solve: with
+# "none" at r_hi the cylindrical operator has a Bt proportional-to-r steady-
+# state null mode (K(Bt=r)=0) leaving the system singular, so AMReX GMRES and
+# PETSc converge to different particular solutions. PEC excludes Bt=r
+# (dBt/dr=k!=0) -> unique solution (verified AMReX==PETSc to ~1e-10). See
+# notes/2026-07-19_rcyl_mag_diff_port.md. theta=1 only.
+
+# T1: harsh vacuum (eta=129, dt=1ns) AMReX GMRES. Oracle (analysis_rcyl.py):
+# finite Bt; >99.9% damped in 5 steps (slowest Bessel mode annihilated); AND a
+# paired analytic explicit-resistive CFL-violation analysis (const_dt /
+# dt_resistive_explicit ~ 2e6 -> explicit Faraday wildly unstable at this eta;
+# the operator-split implicit mag-diff is what makes the deck run).
+add_warpx_test(
+    test_rcylinder_hybrid_mag_diffusion_harsh  # name
+    RCYLINDER  # dims
+    1  # nprocs
+    "inputs_test_rcylinder_hybrid_mag_diffusion_harsh"  # inputs
+    "analysis_rcyl.py"  # analysis
+    OFF  # checksum (finite + >99.9% damped + explicit-CFL analysis in analysis_rcyl.py)
+    OFF  # dependency
+)
+
+# T2 reference: mild eta (1e-2) AMReX GMRES. Persists a nonzero Bt (slowest mode
+# damps only ~0.03%/step) so the field is meaningful for the PETSc parity L2.
+# analysis_rcyl_mild.py checks finite + damped; the plotfile + reduced
+# field_energy are the parity reference for test_rcylinder_hybrid_mag_diffusion_petsc.
+add_warpx_test(
+    test_rcylinder_hybrid_mag_diffusion_mild  # name
+    RCYLINDER  # dims
+    1  # nprocs
+    "inputs_test_rcylinder_hybrid_mag_diffusion_mild"  # inputs
+    "analysis_rcyl_mild.py"  # analysis
+    OFF  # checksum (finite + damped smoke in analysis_rcyl_mild.py)
+    OFF  # dependency
+)
+
+# T2 + T3: PETSc (exact_curl_curl) solver parity to the AMReX GMRES reference.
+# IDENTICAL physics to test_rcylinder_hybrid_mag_diffusion_mild, differing only in
+# mag_diff_linear_solver. analysis_rcyl_parity.py compares this run's reduced
+# B-energy + Bt Cell_H min/max to the sibling reference test's (a ctest
+# `dependency` keeps the reference dir alive through this test). Manual yt
+# full-field L2 ~1e-10; the ctest uses stdlib-readable reduced B-energy + Cell_H
+# (the test python has no yt/numpy). Only registered with PETSc (mirrors the RZ
+# PETSc test gating).
+if(AMReX_PETSC)
+    add_warpx_test(
+        test_rcylinder_hybrid_mag_diffusion_petsc  # name
+        RCYLINDER  # dims
+        1  # nprocs
+        "inputs_test_rcylinder_hybrid_mag_diffusion_petsc"  # inputs
+        "analysis_rcyl_parity.py"  # analysis
+        OFF  # checksum (solver-parity oracle in analysis_rcyl_parity.py)
+        test_rcylinder_hybrid_mag_diffusion_mild  # dependency (AMReX GMRES reference)
+    )
+
+    # T2: harsh vacuum (eta=129, dt=1ns, PEC r_hi, 5 steps) through the PETSc
+    # KSP + cylindrical exact_curl_curl Pmat. Same finite/>99.9%-damped oracle
+    # as the AMReX GMRES harsh test (analysis_rcyl.py, reused) -- a parity L2 of
+    # the annihilated ~1e-7 Bt fields would be too noisy, so the absolute damping
+    # oracle is the strong check. The metric-aware Pmat is what makes the frozen
+    # path usable at stiff eta=129 (the Cartesian Pmat was never exercised here).
+    add_warpx_test(
+        test_rcylinder_hybrid_mag_diffusion_harsh_petsc  # name
+        RCYLINDER  # dims
+        1  # nprocs
+        "inputs_test_rcylinder_hybrid_mag_diffusion_harsh_petsc"  # inputs
+        "analysis_rcyl.py"  # analysis (finite + >99.9% damped + explicit-CFL)
+        OFF  # checksum (absolute damping oracle in analysis_rcyl.py)
+        OFF  # dependency (absolute oracle; no reference dir needed)
     )
 endif()

@@ -41,12 +41,10 @@ AMREX_ENUM(MagDiffLinearSolver,
  * after each hybrid B half-step when enabled. Resistivity may be constant
  * or spatially varying (parser / MultiFab).
  *
- * Implementation paths:
- *  - Cartesian, constant eta: AMReX MLCurlCurl.
- *  - Cartesian variable eta and RZ: matrix-free FDTD curl(eta curl B)/mu0
- *    with AMReX GMRES and a scaled Laplacian-diagonal Jacobi preconditioner.
- *    (MLCurlCurl is Cartesian-only in 2D; uniform eta reduces the PC to a
- *    constant scale.)
+ * Implementation: single matrix-free path for all geometries (FDTD
+ * curl(eta curl B)/mu0 + AMReX GMRES or PETSc KSP). Constant eta builds a
+ * flat eta MultiFab and calls the same AdvanceVariable driver as parser /
+ * variable eta.
  *
  * Disabled by default. Enable with hybrid_pic_model.implicit_mag_diffusion = 1.
  */
@@ -101,8 +99,9 @@ public:
     /**
      * \brief Map WarpX field boundary types to AMReX LinOpBCType values.
      *
-     * Used by the Cartesian MLCurlCurl path. Unmapped types default to
-     * Neumann. PEC_Insulator maps to Dirichlet (tangential B prescribed).
+     * Unmapped types default to Neumann. PEC_Insulator maps to Dirichlet
+     * (tangential B prescribed). Callers may still fill these arrays even
+     * though the matrix-free op primarily uses WarpX field BCs.
      */
     static void GetLinOpBCs (
         amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM>& lobc,
@@ -111,8 +110,10 @@ public:
 private:
     bool m_enabled = false;
     amrex::Real m_theta = 1.0;
+    /** Relative KSP/GMRES tolerance (FLASH MagDiff-class; CI uses 1e-8). */
     amrex::Real m_rtol = 1.e-8;
-    amrex::Real m_atol = 1.e-12;
+    /** Absolute tolerance; 0 = relative-only (FLASH-like). */
+    amrex::Real m_atol = 0.0;
     int m_max_iter = 200;
     int m_verbose = 0;
     amrex::Real m_eta_explicit_max = 0.0;

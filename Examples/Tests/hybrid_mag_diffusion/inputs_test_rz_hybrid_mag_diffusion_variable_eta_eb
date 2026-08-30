@@ -69,8 +69,8 @@ hybrid_pic_model.implicit_mag_diffusion = 1
 hybrid_pic_model.mag_diff_theta = 1.0
 hybrid_pic_model.mag_diff_use_variable_eta = 1
 hybrid_pic_model.mag_diff_eta_explicit_max = 0.0
-hybrid_pic_model.mag_diff_rtol = 1.0e-4
-hybrid_pic_model.mag_diff_atol = 1.0e-14
+hybrid_pic_model.mag_diff_rtol = 1.0e-8
+hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 300
 hybrid_pic_model.mag_diff_verbose = 0
 

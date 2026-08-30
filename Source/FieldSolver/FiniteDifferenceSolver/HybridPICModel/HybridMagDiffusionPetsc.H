@@ -29,10 +29,16 @@
  * \brief Preconditioner choice for the optional PETSc mag-diffusion KSP path.
  * Declared outside any AMREX_USE_PETSC guard so non-PETSc builds still parse it
  * (same convention as PreconditionerLibrary.H).
+ *
+ * - shell_jacobi: scaled Jacobi shell PC (callback from HybridMagDiffusion).
+ * - exact_curl_curl: assembled frozen-η curl-curl Pmat (RZ/Rcyl exact stencil
+ *   with Br–Bz coupling; Cartesian remains the face-averaged Laplacian proxy).
+ * - frozen_laplacian: deprecated input alias for exact_curl_curl (same value).
  */
 AMREX_ENUM(MagDiffPetscPC,
     shell_jacobi,
-    frozen_laplacian
+    exact_curl_curl,
+    frozen_laplacian = 1
 );
 
 /**
@@ -57,18 +63,21 @@ using MagDiffPCFn = void (*)(
 
 /**
  * \brief Create the PETSc KSP. The 3 B-component MultiFabs (`B_proto`) define the
- * DOF layout (boxArray/DistributionMap/IndexType). `eta_pc` is the B-centered
- * resistivity (nghost=0); the implementation copies it to nghost=1 for the
- * assembled frozen-eta Laplacian Pmat. `mu0` is passed in to keep this header
- * free of WarpX constants.
+ * DOF layout (boxArray/DistributionMap/IndexType).
+ *
+ * `eta_edge` is the E/J-face resistivity (matvec staggering); on RZ/Rcyl the
+ * assembled exact_curl_curl Pmat is built from these faces. `eta_pc` is the
+ * B-sampled resistivity used for the Cartesian Laplacian proxy Pmat (and kept
+ * for API symmetry with the Jacobi shell path). Both are copied to nghost=1
+ * host buffers as needed. `mu0` keeps this header free of WarpX constants.
  *
  * Returns nullptr if built without PETSc (AMREX_USE_PETSC undefined).
  */
 MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Array<amrex::MultiFab const*,3> const& B_proto,
+    amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
     amrex::Array<amrex::MultiFab const*,3> const& eta_pc,
-    amrex::Geometry const& geom,
-    amrex::Real theta_dt, amrex::Real mu0,
+    amrex::Geometry const& geom, amrex::Real theta_dt, amrex::Real mu0,
     MagDiffPetscPC pc_choice,
     amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
     MagDiffMatvecFn matvec, MagDiffPCFn pcapply, void* opctx,
