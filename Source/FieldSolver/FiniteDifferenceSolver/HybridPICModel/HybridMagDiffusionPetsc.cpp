@@ -269,10 +269,6 @@ private:
         if (options.sub_pc_type == "ilu") {
             set_default("-magdiff_sub_pc_factor_levels",
                         std::to_string(options.ilu_factor_levels));
-            // Restore the operator's identity-scale pivot when ILU produces
-            // a near-zero pivot on an overlap submatrix.
-            set_default("-magdiff_sub_pc_factor_shift_type", "inblocks");
-            set_default("-magdiff_sub_pc_factor_shift_amount", "1.0");
         }
     }
 

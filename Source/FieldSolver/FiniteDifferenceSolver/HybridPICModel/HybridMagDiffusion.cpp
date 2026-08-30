@@ -887,14 +887,16 @@ petscScatter (MagDiffVector& dst, Real const* flat,
               )
 {
     auto& f = dst.fields();
+    // PETSc omits covered EB faces from the global vector.  Give those faces
+    // the homogeneous extension required by the matrix-free stencil instead
+    // of leaving allocation-dependent values in the MultiFabs.
+    dst.setVal(0.0_rt);
     for (int idim = 0; idim < 3; ++idim) {
 #ifdef AMREX_USE_GPU
         MultiFab& host = host_bufs[idim];
         for (MFIter mfi(host); mfi.isValid(); ++mfi) {
             auto arr = host.array(mfi);
 #else
-        // Only write active gix >= 0; covered DOFs are omitted from the PETSc
-        // system (gather skips them). Stale covered values never re-enter KSP.
         for (MFIter mfi(f[idim]); mfi.isValid(); ++mfi) {
             auto arr = f[idim].array(mfi);
 #endif
@@ -903,7 +905,10 @@ petscScatter (MagDiffVector& dst, Real const* flat,
             LoopOnCpu(lbound(tb), ubound(tb),
                 [&] (int i, int j, int k) {
                     auto const gixv = gix(i, j, k);
-                    if (gixv < 0) { return; }  // covered B DOF, skip
+                    if (gixv < 0) {
+                        arr(i, j, k) = 0.0_rt;
+                        return;
+                    }
                     auto const lid = static_cast<amrex::Long>(gixv) - rstart;
                     arr(i, j, k) = flat[lid];
                 });
