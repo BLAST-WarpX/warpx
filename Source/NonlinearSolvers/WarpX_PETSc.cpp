@@ -439,6 +439,8 @@ void KSP_impl::createObjects(const VecType& a_vec)
 
     // create KSP and PC object
     KSPCreate( PETSC_COMM_WORLD, &m_ksp->obj );
+    KSPSetType( m_ksp->obj, KSPGMRES );
+    KSPGMRESSetRestart( m_ksp->obj, m_restart_length );
     PC pc;
     KSPGetPC(m_ksp->obj, &pc);
     KSPSetPCSide(m_ksp->obj, PC_RIGHT);
@@ -523,6 +525,19 @@ void KSP_impl::setMaxIters(const int a_its )
                           PETSC_CURRENT,
                           PETSC_CURRENT,
                           a_its );
+    }
+}
+
+void KSP_impl::setRestartLength(const int a_restart_length)
+{
+    BL_PROFILE("KSP_impl::setRestartLength()");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        a_restart_length > 0,
+        "KSP_impl: gmres.restart_length must be greater than zero");
+
+    m_restart_length = a_restart_length;
+    if (isDefined()) {
+        KSPGMRESSetRestart(m_ksp->obj, m_restart_length);
     }
 }
 

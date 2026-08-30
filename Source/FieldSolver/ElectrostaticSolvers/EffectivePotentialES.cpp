@@ -175,8 +175,10 @@ void EffectivePotentialES::ComputeSigma (
         amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, add_ng);
 
         // get multiplication factor for this species
-        auto const q = std::abs(pc->getCharge());
-        auto const mult_factor_pc = mult_factor * q / pc->getMass();
+        auto const q = static_cast<amrex::Real>(
+            amrex::Math::abs(pc->getCharge()));
+        auto const mass = static_cast<amrex::Real>(pc->getMass());
+        amrex::Real const mult_factor_pc = mult_factor * q / mass;
 
         // update sigma
 #ifdef AMREX_USE_OMP
@@ -190,11 +192,12 @@ void EffectivePotentialES::ComputeSigma (
             amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE (int i, int j, int k){
                 // Interpolate rho to cell-centered value, applying a floor
                 // on the density
-                auto const rho_cc = std::max(
+                amrex::Real const rho_cc = amrex::max(
                     density_floor*q,
-                    std::abs(ablastr::coarsen::sample::Interp(
-                        rho_arr, nodal, cell_centered, coarsen, i, j, k, 0
-                    ))
+                    amrex::Math::abs(static_cast<amrex::Real>(
+                        ablastr::coarsen::sample::Interp(
+                            rho_arr, nodal, cell_centered, coarsen, i, j, k, 0
+                        )))
                 );
                 // add species term to sigma:
                 // C_SI * w_p^2 * dt^2 / 4 = C_SI / 4 * q*rho/(m*eps0) * dt^2

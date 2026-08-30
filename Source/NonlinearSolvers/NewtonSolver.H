@@ -18,9 +18,12 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Config.H>
 
-#include <vector>
-#include <istream>
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
+#include <istream>
+#include <limits>
+#include <vector>
 
 /**
  * \brief Newton method to solve nonlinear equation of form:
@@ -85,6 +88,7 @@ public:
         amrex::Print()     << "Newton max iterations:      " << m_maxits << "\n";
         amrex::Print()     << "Newton relative tolerance:  " << m_rtol << "\n";
         amrex::Print()     << "Newton absolute tolerance:  " << m_atol << "\n";
+        amrex::Print()     << "Newton JFNK epsilon:        " << m_jfnk_epsilon << "\n";
         amrex::Print()     << "Newton require convergence: " << (m_require_convergence?"true":"false") << "\n";
         auto linsol_name = amrex::getEnumNameString(m_linear_solver_type);
         amrex::Print()     << "Newton linear solver:       " << linsol_name << "\n";
@@ -99,6 +103,8 @@ public:
     }
 
 private:
+
+    using RT = typename Vec::value_type;
 
     /**
      * \brief Intermediate Vec containers used by the solver.
@@ -124,6 +130,12 @@ private:
      * \brief Absolute tolerance for the Newton solver.
      */
     amrex::Real m_atol = 0.;
+
+    /**
+     * \brief Relative perturbation scale for the finite-difference JVP
+     * (matrix-free Jacobian action) in the linear solve.
+     */
+    RT m_jfnk_epsilon = std::max(RT(1.0e-6), std::sqrt(std::numeric_limits<RT>::epsilon()));
 
     /**
      * \brief Maximum iterations for the Newton solver.
@@ -220,6 +232,7 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 
     m_linear_function = std::make_unique<JacobianFunctionMF<Vec,Ops>>();
     m_linear_function->define(m_F, m_ops, m_pc_type);
+    m_linear_function->setJFNKEps(m_jfnk_epsilon);
     this->m_usePC = m_linear_function->usePreconditioner();
 
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
@@ -286,8 +299,13 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_newton.query("relative_tolerance",  m_rtol);
     pp_newton.query("max_iterations",      m_maxits);
     pp_newton.query("require_convergence", m_require_convergence);
+    pp_newton.query("jfnk_epsilon",        m_jfnk_epsilon);
     pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
     pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        std::isfinite(m_jfnk_epsilon) && m_jfnk_epsilon > RT(0.),
+        "NewtonSolver: newton.jfnk_epsilon must be finite and greater than zero");
 
     const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
     pp_l.query("verbose_int",         m_linsol_verbose_int);
@@ -304,6 +322,10 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_gmres.query("relative_tolerance",  m_linsol_rtol);
     pp_gmres.query("max_iterations",      m_linsol_maxits);
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_linsol_restart_length > 0,
+        "NewtonSolver: gmres.restart_length must be greater than zero");
+
     const amrex::ParmParse pp_jac("jacobian");
     pp_jac.query("pc_type", m_pc_type);
 }
@@ -319,6 +341,9 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         this->m_is_defined,
         "NewtonSolver::Solve() called on undefined object");
+    // The exit status describes this solve; do not carry a previous failed
+    // timestep into the current one.
+    this->m_exit_status = 0;
     using namespace amrex::literals;
 
     //
@@ -395,6 +420,27 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         m_linear_solver->solve( m_dU, m_F, m_linsol_rtol, m_linsol_atol );
         linear_solver_iters += m_linear_solver->getNumIters();
 
+        const int linear_solver_status = m_linear_solver->getStatus();
+        // AMReX GMRES reports success as zero and failure as any nonzero
+        // status. PETSc KSP uses positive reasons for convergence and
+        // negative reasons for divergence, so preserve each native convention.
+        const bool linear_solver_failed =
+            (m_linear_solver_type == LinearSolverType::amrex_gmres)
+            ? (linear_solver_status != 0)
+            : (linear_solver_status < 0);
+        if (linear_solver_failed) {
+            this->m_exit_status = -1;
+            std::stringstream linear_solver_msg;
+            linear_solver_msg << "Newton solver linear solve failed at iteration " << iter
+                              << ". Linear solver status is " << linear_solver_status
+                              << ", residual norm is " << m_linear_solver->getResidualNorm()
+                              << ", and the solver used " << m_linear_solver->getNumIters()
+                              << " iterations.";
+            if (this->m_verbose) { amrex::Print() << linear_solver_msg.str() << "\n"; }
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver", linear_solver_msg.str());
+            break;
+        }
+
         // Update solution
         a_U -= m_dU;
 
@@ -413,7 +459,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     m_total_iters += iter;
     m_total_linsol_iters += linear_solver_iters;
 
-    if (m_rtol > 0. && iter == m_maxits) {
+    if (this->m_exit_status >= 0 && m_rtol > 0. && iter == m_maxits) {
         std::stringstream convergenceMsg;
         convergenceMsg << "Newton solver failed to converge after " << iter <<
                           " iterations. Relative norm is " << norm_rel <<

@@ -12,11 +12,16 @@
 # This simulates a planar pinch using the theta-implicit solver with
 # the curl curl PC including the diagonal response from mass matrices.
 
-import sys
+import argparse
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
+
+parser = argparse.ArgumentParser()
+parser.add_argument("pltdir")
+parser.add_argument("--precision", required=True, choices=("SINGLE", "DOUBLE"))
+args = parser.parse_args()
 
 newton_solver = np.loadtxt("diags/reduced_files/newton_solver.txt", skiprows=1)
 num_steps = newton_solver[-1, 0]
@@ -53,7 +58,11 @@ else:
 dE = Efields + Eplasma + dE_poynting
 rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
-rel_net_energy_tol = 1.0e-12
+# These precision-qualified physical/test contracts are not generic solver defaults.
+if args.precision == "SINGLE":
+    rel_net_energy_tol = np.finfo(np.float32).eps
+else:
+    rel_net_energy_tol = 1.0e-12
 print(f"max relative delta energy : {max_rel_net_energy}")
 print(f"relative delta energy tolerance : {rel_net_energy_tol}")
 assert max_rel_net_energy < rel_net_energy_tol
@@ -72,7 +81,7 @@ assert total_newton_iters / num_steps <= newton_iters_tol
 # check for machine precision conservation of charge density
 n0 = 1.0e23
 
-pltdir = sys.argv[1]
+pltdir = args.pltdir
 ds = yt.load(pltdir)
 data = ds.covering_grid(
     level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
@@ -90,7 +99,10 @@ drho_trimmed = drho[:-1, ...]
 Ng = drho_trimmed.size
 drho2_avg = (drho_trimmed**2).sum() / Ng
 drho_rms = np.sqrt(drho2_avg)
-tolerance_rel_charge = 1.0e-12
+if args.precision == "SINGLE":
+    tolerance_rel_charge = 4.0 * np.finfo(np.float32).eps
+else:
+    tolerance_rel_charge = 1.0e-12
 print(f"rms error in charge conservation: {drho_rms}")
 print(f"tolerance: {tolerance_rel_charge}")
 assert drho_rms < tolerance_rel_charge
