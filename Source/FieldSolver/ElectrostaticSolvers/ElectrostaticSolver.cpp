@@ -36,19 +36,20 @@ void ElectrostaticSolver::ReadParameters () {
     // Note that with the relativistic version, these parameters would be
     // input for each species.
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_required_precision", self_fields_required_precision);
+        pp_warpx, "self_fields_required_precision", m_mlmg_options.relative_tolerance);
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_absolute_tolerance", self_fields_absolute_tolerance);
+        pp_warpx, "self_fields_absolute_tolerance", m_mlmg_options.absolute_tolerance);
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_max_iters", self_fields_max_iters);
+        pp_warpx, "self_fields_max_iters", m_mlmg_options.max_iters);
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_verbosity", self_fields_verbosity);
+        pp_warpx, "self_fields_verbosity", m_mlmg_options.verbosity);
 
-    utils::parser::queryWithParser(pp_warpx, "self_fields_num_final_sweeps", self_fields_num_final_sweeps); {
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_num_final_sweeps", m_mlmg_options.num_final_sweeps);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            self_fields_num_final_sweeps > 0,
-            "warpx.self_fields_num_final_sweeps must be > 0");
-    }
+        m_mlmg_options.num_final_sweeps > 0,
+        "warpx.self_fields_num_final_sweeps must be > 0");
+
     // MLMG bottom solver options
     std::string bottom_solver_name = "default";
     pp_warpx.query("self_fields_bottom_solver", bottom_solver_name);
@@ -167,10 +168,7 @@ ElectrostaticSolver::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     std::array<Real, 3> const beta,
-    Real const required_precision,
-    Real absolute_tolerance,
-    int const max_iters,
-    int const verbosity,
+    ablastr::fields::MLMGOptions const & mlmg_options,
     bool const is_igf_2d,
     std::optional<ablastr::fields::MultiLevelVectorField> efield
 ) const
@@ -243,10 +241,7 @@ ElectrostaticSolver::computePhi (
         sorted_rho,
         sorted_phi,
         beta,
-        required_precision,
-        absolute_tolerance,
-        max_iters,
-        verbosity,
+        mlmg_options,
         warpx.Geom(),
         warpx.DistributionMap(),
         warpx.boxArray(),
@@ -256,8 +251,6 @@ ElectrostaticSolver::computePhi (
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
-        self_fields_num_final_sweeps,
-        m_mlmg_options,
         post_phi_calculation,
         *m_poisson_boundary_handler,
         warpx.gett_new(0),

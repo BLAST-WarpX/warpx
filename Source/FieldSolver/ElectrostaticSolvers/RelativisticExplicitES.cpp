@@ -126,11 +126,17 @@ void RelativisticExplicitES::AddSpaceChargeField (
         beta[i] = beta_pr[i]/PhysConst::c; // Normalize
     }
 
+    // The convergence and verbosity settings are given per species for the
+    // relativistic solver; the remaining MLMG options are shared.
+    auto species_mlmg_options = m_mlmg_options;
+    species_mlmg_options.relative_tolerance = pc.self_fields_required_precision;
+    species_mlmg_options.absolute_tolerance = pc.self_fields_absolute_tolerance;
+    species_mlmg_options.max_iters = pc.self_fields_max_iters;
+    species_mlmg_options.verbosity = pc.self_fields_verbosity;
+
     // Compute the potential phi, by solving the Poisson equation
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
-                beta, pc.self_fields_required_precision,
-                pc.self_fields_absolute_tolerance, pc.self_fields_max_iters,
-                pc.self_fields_verbosity, is_igf_2d_slices);
+                beta, species_mlmg_options, is_igf_2d_slices);
 
     // Compute the corresponding electric and magnetic field, from the potential phi
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );
@@ -166,9 +172,7 @@ void RelativisticExplicitES::AddBoundaryField (ablastr::fields::MultiLevelVector
 
     // Compute the potential phi, by solving the Poisson equation
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
-                beta, self_fields_required_precision,
-                self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity, is_igf_2d_slices);
+                beta, m_mlmg_options, is_igf_2d_slices);
 
     // Compute the corresponding electric field, from the potential phi.
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );

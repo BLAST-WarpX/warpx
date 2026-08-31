@@ -55,19 +55,13 @@ public:
      * \param[in] rho The total charge density
      * \param[out] phi The potential to be computed by this function
      * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
-     * \param[in] required_precision The relative convergence threshold for the MLMG solver
-     * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
-     * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
-     * \param[in] verbosity The verbosity setting for the MLMG solver
+     * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
         ablastr::fields::MultiLevelVectorField const& efield,
-        amrex::Real required_precision,
-        amrex::Real absolute_tolerance,
-        int max_iters,
-        int verbosity
+        ablastr::fields::MLMGOptions const & mlmg_options
     ) const;
 
     bool m_overwrite_sigma;

@@ -83,9 +83,7 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelVectorField const& efield )
 {
     // Use the AMREX MLMG solver
-    computePhi(rho, phi, efield, self_fields_required_precision,
-                self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity);
+    computePhi(rho, phi, efield, m_mlmg_options);
 }
 
 void EffectivePotentialES::ComputeSigma (
@@ -209,10 +207,7 @@ void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     ablastr::fields::MultiLevelVectorField const& efield,
-    amrex::Real required_precision,
-    amrex::Real absolute_tolerance,
-    int max_iters,
-    int verbosity
+    ablastr::fields::MLMGOptions const & mlmg_options
 ) const
 {
     // create a vector to our fields, sorted by level
@@ -282,10 +277,7 @@ void EffectivePotentialES::computePhi (
         sorted_rho,
         sorted_phi,
         *sigma,
-        required_precision,
-        absolute_tolerance,
-        max_iters,
-        verbosity,
+        mlmg_options,
         warpx.Geom(),
         warpx.DistributionMap(),
         warpx.boxArray(),
@@ -294,7 +286,6 @@ void EffectivePotentialES::computePhi (
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
-        m_mlmg_options,
         post_phi_calculation,
         *m_poisson_boundary_handler,
         warpx.gett_new(0),

@@ -80,10 +80,7 @@ public:
      *                               or total charge density (labframe solver)
      * \param[out] phi The potential to be computed by this function
      * \param[in] beta Represents the velocity of the source of `phi`
-     * \param[in] required_precision The relative convergence threshold for the MLMG solver
-     * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
-     * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
-     * \param[in] verbosity The verbosity setting for the MLMG solver
+     * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
      * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
      */
@@ -91,10 +88,7 @@ public:
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
         std::array<amrex::Real, 3> beta,
-        amrex::Real required_precision,
-        amrex::Real absolute_tolerance,
-        int max_iters,
-        int verbosity,
+        ablastr::fields::MLMGOptions const & mlmg_options,
         bool is_igf_2d_slices,
         std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
     ) const;
@@ -146,20 +140,9 @@ public:
     /** Boundary handler object to set potential for EB and on the domain boundary */
     std::unique_ptr<PoissonBoundaryHandler> m_poisson_boundary_handler;
 
-    /** Parameters for MLMG Poisson solve */
-    amrex::Real self_fields_required_precision = 1e-11;
-    amrex::Real self_fields_absolute_tolerance = 0.0;
-    /** Limit on number of MLMG iterations */
-    int self_fields_max_iters = 200;
-    /** Verbosity for the MLMG solver.
-     *  0 : no verbosity
-     *  1 : timing and convergence at the end of MLMG
-     *  2 : convergence progress at every MLMG iteration
+    /** Parameters of the MLMG Poisson solve, set from the `warpx.self_fields_*`
+     *  input parameters
      */
-    int self_fields_verbosity = 2;
-    /** MLGM number of smoothing sweeps */
-    int self_fields_num_final_sweeps = 8;
-    /** Bottom solver and coarsening options for the MLMG Poisson solve */
     ablastr::fields::MLMGOptions m_mlmg_options;
 
     /** Parameters for FFT Poisson solver aka IGF */

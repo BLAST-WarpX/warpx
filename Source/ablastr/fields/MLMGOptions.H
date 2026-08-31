@@ -21,14 +21,37 @@
 
 namespace ablastr::fields {
 
-/** Optional settings for the AMReX MLMG solvers
+/** Settings for the AMReX MLMG solvers
  *
- * These control the bottom solve (the solve on the coarsest multigrid level)
- * and the depth of the multigrid hierarchy. Members set to a negative value
- * are ignored, i.e. the corresponding AMReX default is used.
+ * The first group of members controls the outer MLMG solve and always takes
+ * effect. The remaining members control the bottom solve (the solve on the
+ * coarsest multigrid level) and the shape of the multigrid hierarchy; those
+ * set to a negative value are ignored, i.e. the corresponding AMReX default
+ * is used.
  */
 struct MLMGOptions
 {
+    /** Relative convergence threshold of the MLMG solve */
+    amrex::Real relative_tolerance = amrex::Real(1.e-11);
+
+    /** Absolute convergence threshold of the MLMG solve (0: unused) */
+    amrex::Real absolute_tolerance = amrex::Real(0.0);
+
+    /** Maximum number of MLMG iterations */
+    int max_iters = 200;
+
+    /** Verbosity of the MLMG solver.
+     *  0 : no verbosity
+     *  1 : timing and convergence at the end of MLMG
+     *  2 : convergence progress at every MLMG iteration
+     */
+    int verbosity = 2;
+
+    /** Number of smoothing sweeps applied on the coarsest multigrid level
+     *  after the bottom solve (AMReX default: 8)
+     */
+    int num_final_sweeps = 8;
+
     /** Bottom solver used on the coarsest multigrid level. `Default` lets the
      *  linear operator pick its own default (usually BiCGStab).
      */
@@ -151,7 +174,10 @@ applyMLMGOptions (amrex::LPInfo & info, MLMGOptions const & options)
     }
 }
 
-/** Apply the bottom solver related options to an `amrex::MLMG` object
+/** Apply the solver options to an `amrex::MLMG` object
+ *
+ * Note that the convergence thresholds are not applied here; they are
+ * arguments of `amrex::MLMG::solve` and must be passed at the call site.
  *
  * \param[inout] mlmg the MLMG solver object
  * \param[in] options the MLMG options to apply
@@ -159,6 +185,12 @@ applyMLMGOptions (amrex::LPInfo & info, MLMGOptions const & options)
 inline void
 applyMLMGOptions (amrex::MLMG & mlmg, MLMGOptions const & options)
 {
+    mlmg.setVerbose(options.verbosity);
+    mlmg.setMaxIter(options.max_iters);
+    if (options.num_final_sweeps > 0) {
+        mlmg.setFinalSmooth(options.num_final_sweeps);
+    }
+
     mlmg.setBottomSolver(options.bottom_solver);
     mlmg.setBottomVerbose(options.bottom_verbosity);
     if (options.bottom_max_iters > 0) {

@@ -66,10 +66,7 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
         const std::array<amrex::Real, 3> beta = {0.0};
         es_solver.computePhi(
             amrex::GetVecOfPtrs(rho_vec), amrex::GetVecOfPtrs(phi_vec),
-            beta, es_solver.self_fields_required_precision,
-            es_solver.self_fields_absolute_tolerance,
-            es_solver.self_fields_max_iters, es_solver.self_fields_verbosity,
-            /*is_igf_2d_slices*/ false
+            beta, es_solver.m_mlmg_options, /*is_igf_2d_slices*/ false
         );
 
         InterpolateMFForDiag(
