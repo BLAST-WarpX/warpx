@@ -259,6 +259,11 @@ computePhi (
     amrex::LPInfo info;
     applyMLMGOptions(info, mlmg_options);
 
+    // Local copy of the absolute tolerance: getMaxNormRho below raises it to a
+    // finite value if rho turns out to be zero everywhere, in which case a
+    // purely relative convergence criterion is meaningless.
+    amrex::Real absolute_tolerance = mlmg_options.absolute_tolerance;
+
     for (int lev=0; lev<=finest_level; lev++) {
         amrex::Array<amrex::Real,AMREX_SPACEDIM> const dx_scaled
                 {AMREX_D_DECL(geom[lev].CellSize(0)/std::sqrt(1._rt-beta_solver[0]*beta_solver[0]),
@@ -412,8 +417,7 @@ computePhi (
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
-                     mlmg_options.relative_tolerance,
-                     mlmg_options.absolute_tolerance );
+                     mlmg_options.relative_tolerance, absolute_tolerance );
 
         const amrex::IntVect& refratio = rel_ref_ratio.value()[lev];
         const int ncomp = linop->getNComp();
