@@ -66,12 +66,10 @@ namespace ablastr::fields {
  *
  * \param[in] rho The charge density a given species
  * \param[in] finest_level The most refined mesh refinement level
- * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
  */
 inline amrex::Real getMaxNormRho (
     ablastr::fields::ConstMultiLevelScalarField const& rho,
-    int finest_level,
-    amrex::Real & absolute_tolerance)
+    int finest_level)
 {
     amrex::Real max_norm_rho = 0.0;
     for (int lev=0; lev<=finest_level; lev++) {
@@ -80,7 +78,6 @@ inline amrex::Real getMaxNormRho (
     amrex::ParallelDescriptor::ReduceRealMax(max_norm_rho);
 
     if (max_norm_rho == 0) {
-        if (absolute_tolerance == 0.0) { absolute_tolerance = amrex::Real(1e-6); }
         ablastr::warn_manager::WMRecordWarning(
                 "ElectrostaticSolver",
                 "Max norm of rho is 0",
@@ -259,10 +256,20 @@ computePhi (
     amrex::LPInfo info;
     applyMLMGOptions(info, mlmg_options);
 
-    // Local copy of the absolute tolerance: getMaxNormRho below raises it to a
-    // finite value if rho turns out to be zero everywhere, in which case a
-    // purely relative convergence criterion is meaningless.
-    amrex::Real absolute_tolerance = mlmg_options.absolute_tolerance;
+#if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
+    // determine if rho is zero everywhere
+    amrex::Real const max_norm_b = getMaxNormRho(
+        amrex::GetVecOfConstPtrs(rho), finest_level);
+
+    // A charge density that is zero everywhere makes a purely relative
+    // convergence criterion meaningless, so require a finite absolute
+    // tolerance in that case.
+    amrex::Real const absolute_tolerance =
+        (max_norm_b == 0._rt && mlmg_options.absolute_tolerance == 0._rt) ?
+            amrex::Real(1.e-6) : mlmg_options.absolute_tolerance;
+#else
+    amrex::Real const absolute_tolerance = mlmg_options.absolute_tolerance;
+#endif
 
     for (int lev=0; lev<=finest_level; lev++) {
         amrex::Array<amrex::Real,AMREX_SPACEDIM> const dx_scaled
@@ -271,9 +278,6 @@ computePhi (
                               geom[lev].CellSize(2)/std::sqrt(1._rt-beta_solver[2]*beta_solver[2]))};
 
 #if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
-        // determine if rho is zero everywhere
-        const amrex::Real max_norm_b = getMaxNormRho(
-            amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
         // Use the Integrated Green Function solver (FFT) on the coarsest level if it was selected
         if(is_solver_igf_on_lev0 && lev==0){
             if ( max_norm_b == 0 ) {
