@@ -19,6 +19,13 @@
     - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
     - python3 -m venv venv
     - source venv/bin/activate
+    # Dependencies required for analysis and checksums.
+    # Remove system copy of Matplotlib to avoid conflict
+    # with the version set in the requirements file, see
+    # https://github.com/matplotlib/matplotlib/issues/28768.
+    - apt-get remove python3-matplotlib
+    - python3 -m pip install --upgrade -r Regression/requirements.txt
+    - python3 -m pip cache purge
 
 NVIDIA-H100:
   extends: .install-dependencies
@@ -46,10 +53,10 @@ NVIDIA-H100:
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
         # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+        ctest --test-dir build -R test_3d_laser_acceleration_btd \
           --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
       else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+        ctest --test-dir build -R test_3d_laser_acceleration_btd \
           --output-on-failure --no-tests=error
       fi
 
@@ -86,10 +93,10 @@ AMD-MI300:
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
         # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+        ctest --test-dir build -R test_3d_laser_acceleration_btd \
           --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
       else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+        ctest --test-dir build -R test_3d_laser_acceleration_btd \
           --output-on-failure --no-tests=error
       fi
 
@@ -127,9 +134,9 @@ Intel-PVC:
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
         # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+        ctest --test-dir build -R test_3d_laser_acceleration_btd \
           --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
       else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd.run \
+        ctest --test-dir build -R test_3d_laser_acceleration_btd \
           --output-on-failure --no-tests=error
       fi

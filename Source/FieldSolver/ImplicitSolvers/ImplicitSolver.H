@@ -15,8 +15,12 @@
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_INT.H>
 #include <AMReX_REAL.H>
 #include <AMReX_LO_BCTYPES.H>
+
+#include <map>
+#include <string>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -159,6 +163,11 @@ public:
      */
     void FinishMassMatrices ();
 
+    /**
+     * \brief Finish the implicit particle update after the converged time-centered solve
+     */
+    void FinishImplicitParticleUpdate (amrex::Real time, int step);
+
 protected:
 
     /**
@@ -206,6 +215,15 @@ protected:
      * m_max_particle_iterations iterations
      */
     bool m_particle_suborbits = false;
+
+    int m_suborbit_warning_threshold = 5;
+    int m_suborbit_statistics_interval = 100;
+    std::map<std::string, amrex::Long> m_accumulated_suborbit_counts;
+    int m_suborbit_statistics_start_step = -1;
+
+    void AccumulateSuborbitStatistics (
+        std::map<std::string, amrex::Long> const& local_suborbit_counts,
+        int step);
 
     /**
      * \brief whether the details of unconverged particles are printed out during

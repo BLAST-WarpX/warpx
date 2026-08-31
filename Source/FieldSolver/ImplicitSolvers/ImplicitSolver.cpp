@@ -4,8 +4,96 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_GpuAtomic.H>
+#include <AMReX_GpuContainers.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Print.H>
+
+#include <sstream>
+
 using namespace amrex;
 using namespace amrex::literals;
+
+void ImplicitSolver::FinishImplicitParticleUpdate (
+    amrex::Real const time,
+    int const step)
+{
+    m_WarpX->FinishImplicitParticleUpdate(time);
+
+    std::map<std::string, amrex::Long> local_suborbit_counts;
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+        if (!pc->HasiAttrib("nsuborbits")) { continue; }
+
+        amrex::Gpu::Buffer<amrex::Long> suborbit_count({0});
+        amrex::Long* const suborbit_count_ptr = suborbit_count.data();
+
+        for (int lev = 0; lev <= m_WarpX->finestLevel(); ++lev) {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            {
+                for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+                    int const* const nsuborbits =
+                        pti.GetiAttribs("nsuborbits").dataPtr();
+                    long const np = pti.numParticles();
+                    int const suborbit_warning_threshold = m_suborbit_warning_threshold;
+                    amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
+                    {
+                        if (nsuborbits[ip] >= suborbit_warning_threshold) {
+                            amrex::Gpu::Atomic::Add(
+                                suborbit_count_ptr, amrex::Long(1));
+                        }
+                    });
+                }
+            }
+        }
+
+        local_suborbit_counts[pc->getName()] =
+            *(suborbit_count.copyToHost());
+    }
+
+    AccumulateSuborbitStatistics(local_suborbit_counts, step);
+}
+
+void ImplicitSolver::AccumulateSuborbitStatistics (
+    std::map<std::string, amrex::Long> const& local_suborbit_counts,
+    int const step)
+{
+    if (m_suborbit_statistics_start_step < 0) {
+        m_suborbit_statistics_start_step = step+1;
+    }
+    for (auto const& [species, local_count] : local_suborbit_counts) {
+        m_accumulated_suborbit_counts[species] += local_count;
+    }
+
+    if ((step+1) % m_suborbit_statistics_interval != 0) { return; }
+
+    std::stringstream statistics_msg;
+    amrex::Long global_total = 0;
+    bool have_statistics = false;
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+        statistics_msg << "During steps "
+                       << m_suborbit_statistics_start_step << "-" << step+1
+                       << ", particles requiring " << m_suborbit_warning_threshold
+                       << " or more suborbits by species:\n";
+    }
+    for (auto& [species, local_count] : m_accumulated_suborbit_counts) {
+        amrex::Long global_count = local_count;
+        amrex::ParallelDescriptor::ReduceLongSum(global_count);
+        if (amrex::ParallelDescriptor::IOProcessor() && global_count > 0) {
+            statistics_msg << "  " << species << ": " << global_count << "\n";
+            global_total += global_count;
+            have_statistics = true;
+        }
+        local_count = 0;
+    }
+    if (amrex::ParallelDescriptor::IOProcessor() && have_statistics) {
+        statistics_msg << "  total: " << global_total;
+        amrex::Print() << "\nSuborbit particle statistics:\n"
+                       << statistics_msg.str() << "\n\n";
+    }
+    m_suborbit_statistics_start_step = step+2;
+}
 
 void ImplicitSolver::CreateParticleAttributes () const
 {
@@ -531,6 +619,8 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         pp.query("particle_tolerance", m_particle_tolerance);
         pp.query("particle_suborbits", m_particle_suborbits);
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
+        pp.query("suborbit_warning_threshold", m_suborbit_warning_threshold);
+        pp.query("suborbit_statistics_interval", m_suborbit_statistics_interval);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
@@ -1217,7 +1307,11 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
     amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
     amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
     amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
-    amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    if (m_particle_suborbits) {
+        amrex::Print() << "suborbit warning threshold:          " << m_suborbit_warning_threshold << "\n";
+        amrex::Print() << "suborbit statistics interval:        " << m_suborbit_statistics_interval << "\n";
+        amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    }
     amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
     if ( (m_nlsolver_type == NonlinearSolverType::newton)
       || (m_nlsolver_type == NonlinearSolverType::petsc_snes) ) {

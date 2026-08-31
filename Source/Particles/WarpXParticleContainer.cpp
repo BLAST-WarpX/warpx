@@ -252,7 +252,7 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
         r[i-ibegin] = std::sqrt(x[i]*x[i] + y[i]*y[i] + z[i]*z[i]);
         theta[i-ibegin] = std::atan2(y[i], x[i]);
         const amrex::ParticleReal rxy = std::sqrt(x[i]*x[i] + y[i]*y[i]);
-        phi[i-ibegin] = std::atan2(rxy, r[i-ibegin]);
+        phi[i-ibegin] = std::atan2(z[i], rxy);
 #endif
     }
 
@@ -274,7 +274,7 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
         amrex::ignore_unused(x,y);
         pinned_tile.push_back_real(PIdx::z, z.data() + ibegin, z.data() + iend);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        pinned_tile.push_back_real(PIdx::r, x.data() + ibegin, x.data() + iend);
+        pinned_tile.push_back_real(PIdx::r, r.data(), r.data() + np);
         amrex::ignore_unused(y,z);
 #endif
 

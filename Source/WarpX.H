@@ -433,7 +433,7 @@ public:
      */
     amrex::Real GlobalPlasmaFrequencyMax ();
     amrex::Real GlobalCyclotronFrequencyMax ();
-    void ApplyDtLimiters ();
+    void ApplyDtLimiters (int step);
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
@@ -1218,7 +1218,9 @@ private:
     amrex::Vector<amrex::Real> dt;
     // How often to update the timestep when using adaptive timestepping
     ablastr::utils::text::IntervalsParser m_dt_update_interval;
+    ablastr::utils::text::IntervalsParser m_dt_update_write_interval;
     std::string m_dt_update_diagnostic_file;
+    void WriteDtUpdateFileHeader ();
 
     bool m_safe_guard_cells = false;
 

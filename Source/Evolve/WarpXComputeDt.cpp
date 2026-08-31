@@ -219,7 +219,56 @@ WarpX::GlobalCyclotronFrequencyMax ()
 }
 
 void
-WarpX::ApplyDtLimiters ()
+WarpX::WriteDtUpdateFileHeader ()
+{
+    // Write diagnostics if requested
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !m_dt_update_diagnostic_file.empty()) {
+
+        std::filesystem::path const diagnostic_path(m_dt_update_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        const amrex::ParmParse pp_amr("amr");
+        pp_amr.query("restart", restart_chkfile);
+        const bool IsNotRestart = restart_chkfile.empty();
+
+        // If not a restart, discard the file if already exists.
+        auto file_mode = std::ofstream::out;
+        if (IsNotRestart) { file_mode |= std::ofstream::trunc; }
+
+        std::ofstream diagnostic_file{m_dt_update_diagnostic_file, file_mode};
+        if (!diagnostic_file.is_open()) {
+            amrex::Abort("Failed to open file: " + m_dt_update_diagnostic_file);
+        }
+
+        int c = 0;
+        diagnostic_file << "#";
+        diagnostic_file << "[" << c++ << "]step()";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]time(s)";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]new_dt";
+        diagnostic_file << " ";
+        diagnostic_file << "[" << c++ << "]vmax_dt";
+        if (m_max_omegap_dt.has_value()) {
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]omegap_dt";
+        }
+        if (m_max_omegac_dt.has_value()) {
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]omegac_dt";
+        }
+        diagnostic_file << "\n";
+        diagnostic_file.close();
+    }
+
+}
+
+void
+WarpX::ApplyDtLimiters (int const step)
 {
     using namespace amrex::literals;
 
@@ -262,42 +311,7 @@ WarpX::ApplyDtLimiters ()
     // Write diagnostics if requested
     if (amrex::ParallelDescriptor::IOProcessor()
         && !m_dt_update_diagnostic_file.empty()
-        && !amrex::FileExists(m_dt_update_diagnostic_file)) {
-
-        std::filesystem::path const diagnostic_path(m_dt_update_diagnostic_file);
-        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
-        if (!diagnostic_dir.empty()) {
-            std::filesystem::create_directories(diagnostic_dir);
-        }
-
-        std::ofstream diagnostic_file{m_dt_update_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
-        if (!diagnostic_file.is_open()) {
-            amrex::Abort("Failed to open file: " + m_dt_update_diagnostic_file);
-        }
-
-        int c = 0;
-        diagnostic_file << "#";
-        diagnostic_file << "[" << c++ << "]step()";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]time(s)";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]new_dt";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]vmax_dt";
-        if (m_max_omegap_dt.has_value()) {
-            diagnostic_file << " ";
-            diagnostic_file << "[" << c++ << "]omegap_dt";
-        }
-        if (m_max_omegac_dt.has_value()) {
-            diagnostic_file << " ";
-            diagnostic_file << "[" << c++ << "]omegac_dt";
-        }
-        diagnostic_file << "\n";
-        diagnostic_file.close();
-    }
-
-    if (amrex::ParallelDescriptor::IOProcessor()
-        && !m_dt_update_diagnostic_file.empty()) {
+        && m_dt_update_write_interval.contains(step + 1)) {
 
         std::ofstream diagnostic_file{m_dt_update_diagnostic_file, std::ofstream::out | std::ofstream::app};
         if (!diagnostic_file.is_open()) {

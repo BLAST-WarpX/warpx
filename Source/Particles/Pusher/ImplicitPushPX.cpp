@@ -666,14 +666,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     SetupSuborbitParticles(pti, offset, np_to_push, num_unconverged_particles,
                            unconverged_indices, saved_weights);
 
-    if (num_unconverged_particles > 0) {
-        ablastr::warn_manager::WMRecordWarning("ImplicitPushXP",
-            "Picard solver for " +
-            std::to_string(num_unconverged_particles) +
-            " particles failed to converge after " +
-            std::to_string(max_iterations) + " iterations."
-         );
-    }
 }
 
 /* \brief Perform the implicit particle push operation for unconverged particles

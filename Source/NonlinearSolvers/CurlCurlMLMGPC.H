@@ -23,7 +23,6 @@
 #include <AMReX_MLLinOp.H>
 #include <AMReX_MLCurlCurl.H>
 #include <AMReX_MLMG.H>
-#include <AMReX_GMRES_MLMG.H>
 
 /**
  * \brief Curl-curl Preconditioner
@@ -114,16 +113,16 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         bool m_bottom_verbose = false;
         bool m_agglomeration = true;
         bool m_consolidation = true;
-        bool m_use_gmres = false;
-        bool m_use_gmres_pc = true;
 
-        int m_max_iter = 10;
+        int m_max_iter = 1;
         int m_max_coarsening_level = 30;
 
         bool m_beta_scalar = true;
 
-        RT m_atol = 1.0e-16;
-        RT m_rtol = 1.0e-4;
+        // Zero by default, so that the solve performs a fixed number of iterations,
+        // and the preconditioner is thus a fixed linear operator, as required by GMRES.
+        RT m_atol = 0.0;
+        RT m_rtol = 0.0;
 
         Ops* m_ops = nullptr;
 
@@ -141,7 +140,6 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         std::unique_ptr<amrex::LPInfo> m_info;
         std::unique_ptr<amrex::MLCurlCurl> m_curl_curl;
         std::unique_ptr<amrex::MLMGT<MFArr>> m_solver;
-        std::unique_ptr<amrex::GMRESMLMGT<MFArr>> m_gmres_solver;
 
         /**
          * \brief Read parameters
@@ -166,12 +164,6 @@ void CurlCurlMLMGPC<T,Ops>::printParameters() const
     Print() << pc_name << " max_coarsening_level: " << m_max_coarsening_level << "\n";
     Print() << pc_name << " absolute tolerance:   " << m_atol << "\n";
     Print() << pc_name << " relative tolerance:   " << m_rtol << "\n";
-    Print() << pc_name << " use GMRES:            " << (m_use_gmres?"true":"false") << "\n";
-    if (m_use_gmres) {
-        Print() << pc_name
-                << " use PC for GMRES:     "
-                << (m_use_gmres_pc?"true":"false") << "\n";
-    }
 }
 
 template <class T, class Ops>
@@ -186,8 +178,6 @@ void CurlCurlMLMGPC<T,Ops>::readParameters()
     pp.query("max_coarsening_level", m_max_coarsening_level);
     pp.query("absolute_tolerance",  m_atol);
     pp.query("relative_tolerance",  m_rtol);
-    pp.query("use_gmres",  m_use_gmres);
-    pp.query("use_gmres_pc",  m_use_gmres_pc);
 }
 
 template <class T, class Ops>
@@ -246,18 +236,9 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 
     // Construct the MLMG solver
     m_solver = std::make_unique<MLMGT<MFArr>>(*m_curl_curl);
-    m_solver->setMaxIter(m_max_iter);
     m_solver->setFixedIter(m_max_iter);
     m_solver->setVerbose(static_cast<int>(m_verbose));
     m_solver->setBottomVerbose(static_cast<int>(m_bottom_verbose));
-
-    // If using GMRES solver, construct it
-    if (m_use_gmres) {
-        m_gmres_solver = std::make_unique<GMRESMLMGT<MFArr>>(*m_solver);
-        m_gmres_solver->usePrecond(m_use_gmres_pc);
-        m_gmres_solver->setPrecondNumIters(m_max_iter);
-        m_gmres_solver->setVerbose(static_cast<int>(m_verbose));
-    }
 
     m_bcoefs = m_ops->GetMassMatricesCoeff();
     if (m_bcoefs != nullptr) { m_beta_scalar = false; }
@@ -389,11 +370,10 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
 #endif
 
         m_curl_curl->prepareRHS({&rhs});
-        if (m_use_gmres) {
-            m_gmres_solver->solve(solution, rhs, m_rtol, m_atol);
-        } else {
-            m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
-        }
+        // m_rtol and m_atol are zero by default: this ensures that MLMG performs a fixed
+        // number of iterations (m_max_iter V-cycles), for any right-hand side, so that the
+        // preconditioner is a fixed linear operator, as required by GMRES.
+        m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
     }
 }
 

@@ -243,6 +243,7 @@ function(add_warpx_test
         # add paths for custom Python modules
         set(PYTHONPATH "${PYTHONPATH}:${WarpX_SOURCE_DIR}/Regression/Checksum")
         set_property(TEST ${name}.checksum APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+        set_property(TEST ${name}.checksum APPEND PROPERTY ENVIRONMENT "WARPX_COMPUTE=${WarpX_COMPUTE}")
     endif()
 
     # CI: remove test directory after run

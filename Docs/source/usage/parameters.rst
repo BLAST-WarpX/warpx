@@ -290,6 +290,8 @@ Overall simulation parameters
           - ``implicit_evolve.max_particle_iterations`` (``integer``, default: 21)
           - ``implicit_evolve.particle_tolerance`` (``float``, default: 1.e-10)
           - ``implicit_evolve.particle_suborbits`` (``bool``, default: false)
+          - ``implicit_evolve.suborbit_warning_threshold`` (``int``, default: 5)
+          - ``implicit_evolve.suborbit_statistics_interval`` (``int``, default: 100)
           - ``implicit_evolve.print_unconverged_particle_details`` (``bool``, default: false)
 
         - ``implicit_evolve.use_mass_matrices_jacobian`` (``bool``, default: false).
@@ -3064,6 +3066,23 @@ Details about the collision models can be found in the :ref:`theory section <mul
     With ``forward``, the scattering angle is set to zero, i.e. the products are emitted in the same direction as the reactant (in the center of mass frame).
     With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in the opposite direction of the reactant (in the center of mass frame).
 
+.. pp:param:: <collision_name>.create_products
+    :type: ``bool``
+    :default: ``1``
+    :optional:
+
+    Only for ``nuclearfusion``. When true, the product particles are created, otherwise not.
+
+.. pp:param:: <collision_name>.save_particle_production
+    :type: ``bool``
+    :default: ``0``
+    :optional:
+
+    Only for ``nuclearfusion``.
+    When true, the integrated product particle density is saved in a MultiFab with the name ``<collision_name>_particle_production``.
+    The data can be written out by adding that name to the ``<diag_name>.fields_to_plot`` input parameter.
+    The option can be used in conjunction with ``<collision_name>.create_products`` to save only the product density and not create particles.
+
 .. pp:param:: <collision_name>.background_density
     :type: ``float``
 
@@ -3366,6 +3385,13 @@ Time step
     :optional:
 
     When adaptive timestepping is activated, information about the new time step and the simulation conditions are output to the file specified by this parameter.
+
+.. pp:param:: warpx.dt_update_write_interval
+    :type: ``string``
+    :optional:
+
+    When adaptive timestepping is activated and :pp:param:`warpx.dt_update_diagnostic_file` is specified, this specifies the interval when data is written to the diagnostic file.
+    The default is to write every time the time step is updated.
 
 .. pp:param:: warpx.max_omegap_dt
     :type: ``float``

@@ -45,7 +45,7 @@ To contact the developers, feel free to open an issue on this repo, or visit our
 [![Ascent](https://img.shields.io/static/v1?label="runs%20on"&message="Ascent"&color="blueviolet")](http://www.ascent-dav.org)
 [![SENSEI](https://img.shields.io/static/v1?label="runs%20on"&message="SENSEI"&color="blueviolet")](https://sensei-insitu.org)
 
-Our workflow is described in [CONTRIBUTING.rst](CONTRIBUTING.rst).
+Our workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md).
 We invite you to contribute to WarpX in any form following our [Code of Conduct](https://warpx.readthedocs.io/en/latest/coc.html), e.g., contribute to [discussions](https://github.com/BLAST-WarpX/warpx/discussions), help each other in [issues](https://github.com/BLAST-WarpX/warpx/issues), fix bugs, or add [documentation](https://warpx.readthedocs.io/en/latest/developers/documentation.html) and new functionality!
 
 ## Governance
