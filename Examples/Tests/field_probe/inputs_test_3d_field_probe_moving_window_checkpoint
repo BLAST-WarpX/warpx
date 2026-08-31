@@ -1,0 +1,19 @@
+FILE=inputs_base_3d_field_probe
+
+max_step = 20
+
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0
+
+diagnostics.diags_names = chk
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 10
+
+FP.intervals = 10
+FP.probe_geometry = Point
+FP.x_probe = 0
+FP.y_probe = 0
+FP.z_probe = 0
+FP.do_moving_window_FP = 1
