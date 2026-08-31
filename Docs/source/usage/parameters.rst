@@ -522,15 +522,7 @@ Overall simulation parameters
     solve") of the electrostatic self-field solve. Options are ``default``
     (the linear operator's own default, usually BiCGStab), ``smoother``,
     ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre`` and ``petsc``.
-    The last two require an AMReX built with HYPRE respectively PETSc support.
-
-    On GPUs the bottom solve is often dominated by kernel-launch and reduction
-    latency rather than by arithmetic, since the coarsest level is small. A
-    cheaper bottom solver (``cg`` instead of the default BiCGStab, or
-    ``smoother``, which performs no reductions at all) can then cut the cost of
-    the bottom solve several-fold at the price of a small increase in the number
-    of MLMG iterations. Set ``warpx.self_fields_verbosity = 1`` or higher to
-    monitor that trade-off.
+    The last two require an AMReX built with HYPRE / PETSc support.
 
 .. pp:param:: warpx.self_fields_bottom_verbosity
     :type: ``integer``
@@ -583,11 +575,7 @@ Overall simulation parameters
     Agglomeration avoids very small boxes at coarse levels, but it also
     serializes those levels: one rank performs all the work from the
     agglomerated level down to and including the bottom solve, while the
-    remaining ranks wait. When that serial branch dominates -- visible as a
-    large ``FabArray::ParallelCopy_finish()`` entry and a large spread between
-    the minimum and maximum times of ``MLMG::mgVcycle_up::*`` in the
-    ``TinyProfiler`` output -- disabling agglomeration can be faster despite
-    the smaller boxes.
+    remaining ranks wait.
 
 .. pp:param:: warpx.self_fields_agglomeration_grid_size
     :type: ``integer``
