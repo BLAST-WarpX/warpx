@@ -62,12 +62,12 @@ void ElasticCollisionPerez (
     const T_index max_N = amrex::max(NI1,NI2);
     const T_index min_N = amrex::min(NI1,NI2);
 
-    T_PR * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+    const T_PR * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
     T_PR * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
     T_PR * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
     T_PR * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
 
-    T_PR * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+    const T_PR * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
     T_PR * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
     T_PR * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
     T_PR * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];

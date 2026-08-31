@@ -32,7 +32,7 @@ PhiFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer
     // check if phi_fp exists in the multifab registry
     if (warpx.m_fields.has(FieldType::phi_fp, m_lev)) {
         // grab the global phi multifab
-        amrex::MultiFab* global_phi = warpx.m_fields.get(FieldType::phi_fp, m_lev);
+        const amrex::MultiFab* global_phi = warpx.m_fields.get(FieldType::phi_fp, m_lev);
 
         InterpolateMFForDiag(
             mf_dst, *global_phi, dcomp, warpx.DistributionMap(m_lev),

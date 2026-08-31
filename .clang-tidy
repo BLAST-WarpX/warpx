@@ -22,6 +22,7 @@ Checks: '
         -cppcoreguidelines-avoid-non-const-global-variables,
         -cppcoreguidelines-init-variables,
         -cppcoreguidelines-macro-usage,
+        -cppcoreguidelines-use-default-member-init,
         -cppcoreguidelines-missing-std-forward,
         -cppcoreguidelines-narrowing-conversions,
         -cppcoreguidelines-non-private-member-variables-in-classes,
@@ -32,6 +33,7 @@ Checks: '
     google-explicit-constructor,
     google-global-names-in-headers,
     misc-*,
+        -misc-confusable-identifiers,
         -misc-no-recursion,
         -misc-non-private-member-variables-in-classes,
         -misc-include-cleaner,
@@ -42,6 +44,7 @@ Checks: '
         -modernize-return-braced-init-list,
         -modernize-use-trailing-return-type,
         -modernize-use-constraints,
+        -modernize-use-default-member-init,
         -modernize-use-designated-initializers,
         -modernize-use-std-numbers,
         -modernize-use-ranges,
@@ -68,7 +71,8 @@ Checks: '
         -readability-redundant-casting,
         -readability-redundant-inline-specifier,
         -readability-redundant-member-init,
-        -readability-reference-to-constructed-temporary
+        -readability-reference-to-constructed-temporary,
+        -readability-use-concise-preprocessor-directives
     '
 
 CheckOptions:
@@ -82,6 +86,8 @@ CheckOptions:
   value:        "H,"
 - key:          performance-move-const-arg.CheckTriviallyCopyableMove
   value:        "false"
+- key:          cppcoreguidelines-use-enum-class.IgnoreUnscopedEnumsInClasses
+  value:        "true"
 
 HeaderFilterRegex: 'Source[a-z_A-Z0-9\/]+\.H$'
 

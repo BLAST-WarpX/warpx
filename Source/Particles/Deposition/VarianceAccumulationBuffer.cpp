@@ -47,7 +47,7 @@ VarianceAccumulationBuffer::VarianceAccumulationBuffer (ablastr::fields::MultiLe
 }
 
 void
-VarianceAccumulationBuffer::reset ()
+VarianceAccumulationBuffer::Reset ()
 {
     using ablastr::fields::Direction;
     auto &warpx = WarpX::GetInstance();

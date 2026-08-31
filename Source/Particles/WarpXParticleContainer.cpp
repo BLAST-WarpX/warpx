@@ -1436,7 +1436,7 @@ WarpXParticleContainer::DepositCurrent (
             const auto & uyp = pti.GetAttribs(PIdx::uy);
             const auto & uzp = pti.GetAttribs(PIdx::uz);
 
-            int* AMREX_RESTRICT ion_lev = nullptr;
+            const int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization)
             {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
@@ -1857,7 +1857,7 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         const long np = pti.numParticles();
         auto const & wp = pti.GetAttribs(PIdx::w);
 
-        int* AMREX_RESTRICT ion_lev = nullptr;
+        const int* AMREX_RESTRICT ion_lev = nullptr;
         if (do_field_ionization)
         {
             ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
@@ -2874,9 +2874,9 @@ WarpXParticleContainer::PushX (int lev, amrex::Real dt)
 
             // - momenta are stored as a struct of array, in `attribs`
             auto& attribs = pti.GetAttribs();
-            ParticleReal* AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
-            ParticleReal* AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
-            ParticleReal* AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+            const ParticleReal* AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+            const ParticleReal* AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+            const ParticleReal* AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
             // Loop over the particles and update their position
             amrex::ParallelFor( pti.numParticles(),
@@ -3038,17 +3038,17 @@ WarpXParticleContainer::FinishImplicitParticleUpdate (
         amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
 #if !defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
+        const amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
+        const amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-        amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+        const amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
 #endif
-        amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
-        amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
-        amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+        const amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+        const amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+        const amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
         const long np = pti.numParticles();
 

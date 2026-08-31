@@ -422,7 +422,7 @@ public:
             const index_type n_total_pairs = (n_cells_products == 0) ? 0:
                                                 amrex::Scan::ExclusiveSum(n_cells_products,
                                                     p_n_pairs_in_each_cell, pair_offsets.data());
-            index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
+            const index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
 
             amrex::Gpu::DeviceVector<index_type> n_ind_pairs_in_each_cell(n_cells+1);
             index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = n_ind_pairs_in_each_cell.dataPtr();
@@ -441,7 +441,7 @@ public:
             // number of total independent collision pairs
             const auto n_independent_pairs =  (int) amrex::Scan::ExclusiveSum(n_cells+1,
                                                     p_n_ind_pairs_in_each_cell, coll_offsets.data(), amrex::Scan::RetSum{true});
-            index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
+            const index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
             // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
@@ -900,7 +900,7 @@ public:
             const index_type n_total_pairs = (n_cells_products == 0) ? 0:
                                                 amrex::Scan::ExclusiveSum(n_cells_products,
                                                     p_n_pairs_in_each_cell, pair_offsets.data());
-            index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
+            const index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
 
             amrex::Gpu::DeviceVector<index_type> n_ind_pairs_in_each_cell(n_cells+1);
             index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = n_ind_pairs_in_each_cell.dataPtr();
@@ -926,7 +926,7 @@ public:
             // number of total independent collision pairs
             const auto n_independent_pairs = (int) amrex::Scan::ExclusiveSum(n_cells+1,
                                                     p_n_ind_pairs_in_each_cell, coll_offsets.data(), amrex::Scan::RetSum{true});
-            index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
+            const index_type* AMREX_RESTRICT p_coll_offsets = coll_offsets.dataPtr();
             ABLASTR_PROFILE_VAR_STOP(prof_computeNumberOfPairs);
 
             // mask: for DSMC, the index+1 of the selected scattering process (0 = no collision);
@@ -952,12 +952,12 @@ public:
               End of calculations only required when creating product particles
             */
 
-            amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
+            const amrex::ParticleReal * const AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
 
-            amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
+            const amrex::ParticleReal * const AMREX_RESTRICT w2 = soa_2.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];

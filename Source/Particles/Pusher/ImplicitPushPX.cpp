@@ -52,9 +52,9 @@ using namespace amrex::literals;
 
 namespace {
 
-    enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
-    enum depos_order_flags : int { order_one = 1, order_two, order_three, order_four };
+    enum exteb_flags : int { no_exteb, has_exteb };                                        // NOLINT(cppcoreguidelines-use-enum-class)
+    enum qed_flags : int { no_qed, has_qed };                                              // NOLINT(cppcoreguidelines-use-enum-class)
+    enum depos_order_flags : int { order_one = 1, order_two, order_three, order_four };    // NOLINT(cppcoreguidelines-use-enum-class)
 
     template<int exteb_control, int qed_control>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
@@ -512,7 +512,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         });
     }
 
-    int* AMREX_RESTRICT ion_lev = nullptr;
+    const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
@@ -860,11 +860,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #if !defined(WARPX_DIM_RCYLINDER)
     amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
 #endif
-    amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
-    amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
-    amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+    const amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+    const amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+    const amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
-    int* AMREX_RESTRICT ion_lev = nullptr;
+    const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
     }

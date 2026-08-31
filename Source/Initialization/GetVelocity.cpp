@@ -15,12 +15,12 @@ GetVelocityVector::GetVelocityVector (VelocityProperties const& vel) noexcept
                   vel.m_u_mean_z_reader.get()}
 #endif
 {
-    if (m_type == VelConstantVector) {
+    if (m_type == VelocityInitType::VelConstantVector) {
         m_ux_mean = vel.m_ux_mean;
         m_uy_mean = vel.m_uy_mean;
         m_uz_mean = vel.m_uz_mean;
     }
-    else if (m_type == VelParserFunctionVector) {
+    else if (m_type == VelocityInitType::VelParserFunctionVector) {
         m_ux_mean_parser = vel.m_ptr_ux_mean_parser->compile<3>();
         m_uy_mean_parser = vel.m_ptr_uy_mean_parser->compile<3>();
         m_uz_mean_parser = vel.m_ptr_uz_mean_parser->compile<3>();

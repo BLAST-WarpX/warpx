@@ -109,18 +109,18 @@ struct LorentzTransformParticles
         // get current src position
         amrex::ParticleReal xpnew, ypnew, zpnew;
         m_get_position(i_src, xpnew, ypnew, zpnew);
-        const amrex::Real gamma_new_p = std::sqrt(1.0_rt + m_inv_c2*
+        const amrex::Real gamma_new_p = std::sqrt(1.0_rt + PhysConst::inv_c2*
                                         ( m_uxpnew[i_src] * m_uxpnew[i_src]
                                         + m_uypnew[i_src] * m_uypnew[i_src]
                                         + m_uzpnew[i_src] * m_uzpnew[i_src]));
-        const amrex::Real gamma_old_p = std::sqrt(1.0_rt + m_inv_c2*
+        const amrex::Real gamma_old_p = std::sqrt(1.0_rt + PhysConst::inv_c2*
                                         ( m_uxpold[i_src] * m_uxpold[i_src]
                                         + m_uypold[i_src] * m_uypold[i_src]
                                         + m_uzpold[i_src] * m_uzpold[i_src]));
-        const amrex::Real t_new_p = m_gammaboost * m_t_boost - m_uzfrm * zpnew * m_inv_c2;
+        const amrex::Real t_new_p = m_gammaboost * m_t_boost - m_uzfrm * zpnew * PhysConst::inv_c2;
         const amrex::Real uz_new_p = m_gammaboost * m_uzpnew[i_src] - gamma_new_p * m_uzfrm;
         const amrex::Real t_old_p = m_gammaboost * (m_t_boost - m_dt)
-                                    - m_uzfrm * m_zpold[i_src] * m_inv_c2;
+                                    - m_uzfrm * m_zpold[i_src] * PhysConst::inv_c2;
         const amrex::Real uz_old_p = m_gammaboost * m_uzpold[i_src] - gamma_old_p * m_uzfrm;
         // interpolate in time to t_lab
         const amrex::Real weight_old = (t_new_p - m_t_lab)
@@ -135,9 +135,9 @@ struct LorentzTransformParticles
         const amrex::ParticleReal yp = m_ypold[i_src] * weight_old + ypnew * weight_new;
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-        const amrex::Real z_new_p = m_gammaboost* ( zpnew + m_betaboost * m_Phys_c * m_t_boost);
+        const amrex::Real z_new_p = m_gammaboost* ( zpnew + m_betaboost * PhysConst::c * m_t_boost);
         const amrex::Real z_old_p = m_gammaboost * ( m_zpold[i_src] + m_betaboost
-                                                     * m_Phys_c * (m_t_boost - m_dt ) );
+                                                     * PhysConst::c * (m_t_boost - m_dt ) );
         const amrex::ParticleReal zp = z_old_p * weight_old + z_new_p * weight_new;
 #endif
         const amrex::ParticleReal uxp = m_uxpold[i_src] * weight_old
@@ -179,8 +179,6 @@ struct LorentzTransformParticles
     amrex::Real m_t_lab;
     amrex::Real m_gammaboost;
     amrex::Real m_betaboost;
-    amrex::Real m_Phys_c;
-    amrex::Real m_inv_c2;
     amrex::Real m_uzfrm;
 
     GetParticlePosition<PIdx> m_get_position;

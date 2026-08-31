@@ -101,12 +101,12 @@ public:
             amrex::ParticleReal* AMREX_RESTRICT p_product_data,
             amrex::RandomEngine const& engine) const
         {
-            amrex::ParticleReal * const AMREX_RESTRICT weight1 = soa_1.m_rdata[PIdx::w];
+            const amrex::ParticleReal * const AMREX_RESTRICT weight1 = soa_1.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u1x = soa_1.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u1y = soa_1.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u1z = soa_1.m_rdata[PIdx::uz];
 
-            amrex::ParticleReal * const AMREX_RESTRICT weight2 = soa_2.m_rdata[PIdx::w];
+            const amrex::ParticleReal * const AMREX_RESTRICT weight2 = soa_2.m_rdata[PIdx::w];
             amrex::ParticleReal * const AMREX_RESTRICT u2x = soa_2.m_rdata[PIdx::ux];
             amrex::ParticleReal * const AMREX_RESTRICT u2y = soa_2.m_rdata[PIdx::uy];
             amrex::ParticleReal * const AMREX_RESTRICT u2z = soa_2.m_rdata[PIdx::uz];

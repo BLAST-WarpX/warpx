@@ -1268,7 +1268,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
             ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-            int* AMREX_RESTRICT ion_lev = nullptr;
+            const int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization) {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
@@ -1282,7 +1282,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const auto t_do_not_gather = do_not_gather;
 
-            enum exteb_flags : int { no_exteb, has_exteb };
+            enum exteb_flags : int { no_exteb, has_exteb }; // NOLINT(cppcoreguidelines-use-enum-class)
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
@@ -1445,15 +1445,15 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
-    int* AMREX_RESTRICT ion_lev = nullptr;
+    const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
 
     const bool save_previous_position = m_save_previous_position;
-    ParticleReal* x_old = nullptr;
-    ParticleReal* y_old = nullptr;
-    ParticleReal* z_old = nullptr;
+    ParticleReal* x_old = nullptr; //NOLINT (misc-const-correctness)
+    ParticleReal* y_old = nullptr; //NOLINT (misc-const-correctness)
+    ParticleReal* z_old = nullptr; //NOLINT (misc-const-correctness)
     if (save_previous_position) {
 #if !defined(WARPX_DIM_1D_Z)
         x_old = pti.GetAttribs("prev_x").dataPtr() + offset;
@@ -1489,8 +1489,8 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     }
 #endif
 
-    enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
+    enum exteb_flags : int { no_exteb, has_exteb }; // NOLINT(cppcoreguidelines-use-enum-class)
+    enum qed_flags : int { no_qed, has_qed };       // NOLINT(cppcoreguidelines-use-enum-class)
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 #ifdef WARPX_QED
@@ -2036,7 +2036,7 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         auto const& periodicity = warpx.Geom(lev).periodicity();
 
         // Clear accumulation arrays
-        local_temperature_arrays->reset();
+        local_temperature_arrays->Reset();
 
         // Loop over particle tiles and deposit current on each level
 #ifdef AMREX_USE_OMP
@@ -2125,15 +2125,15 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         }
 
         // Get MF pointers for all deposition multifabs
-        amrex::iMultiFab* nx_mf    = local_temperature_arrays->get_n(Direction{0}, lev);
-        amrex::iMultiFab* ny_mf    = local_temperature_arrays->get_n(Direction{1}, lev);
-        amrex::iMultiFab* nz_mf    = local_temperature_arrays->get_n(Direction{2}, lev);
-        amrex::MultiFab*  wx_mf    = local_temperature_arrays->get("w", Direction{0}, lev);
-        amrex::MultiFab*  wy_mf    = local_temperature_arrays->get("w", Direction{1}, lev);
-        amrex::MultiFab*  wz_mf    = local_temperature_arrays->get("w", Direction{2}, lev);
-        amrex::MultiFab*  w2x_mf   = local_temperature_arrays->get("w2", Direction{0}, lev);
-        amrex::MultiFab*  w2y_mf   = local_temperature_arrays->get("w2", Direction{1}, lev);
-        amrex::MultiFab*  w2z_mf   = local_temperature_arrays->get("w2", Direction{2}, lev);
+        const amrex::iMultiFab* nx_mf    = local_temperature_arrays->get_n(Direction{0}, lev);
+        const amrex::iMultiFab* ny_mf    = local_temperature_arrays->get_n(Direction{1}, lev);
+        const amrex::iMultiFab* nz_mf    = local_temperature_arrays->get_n(Direction{2}, lev);
+        const amrex::MultiFab*  wx_mf    = local_temperature_arrays->get("w", Direction{0}, lev);
+        const amrex::MultiFab*  wy_mf    = local_temperature_arrays->get("w", Direction{1}, lev);
+        const amrex::MultiFab*  wz_mf    = local_temperature_arrays->get("w", Direction{2}, lev);
+        const amrex::MultiFab*  w2x_mf   = local_temperature_arrays->get("w2", Direction{0}, lev);
+        const amrex::MultiFab*  w2y_mf   = local_temperature_arrays->get("w2", Direction{1}, lev);
+        const amrex::MultiFab*  w2z_mf   = local_temperature_arrays->get("w2", Direction{2}, lev);
         amrex::MultiFab*  vbarx_mf = local_temperature_arrays->get("vbar", Direction{0}, lev);
         amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
         amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);

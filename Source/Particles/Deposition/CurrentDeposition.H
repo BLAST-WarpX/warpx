@@ -720,8 +720,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
 
     // (Compile 2 versions of the kernel: with and without reduced shape)
-    enum eb_flags : int { has_reduced_shape, no_reduced_shape };
-    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
+    enum eb_flags : int { has_reduced_shape, no_reduced_shape };                                                            //NOLINT (cppcoreguidelines-use-enum-class)
+    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;  //NOLINT (cppcoreguidelines-use-enum-class)
 
     // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
     amrex::For( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},

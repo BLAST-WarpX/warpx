@@ -131,7 +131,7 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         const std::vector<amrex::Parser*>& user_real_attrib_parser = pc.getUserRealAttribParser();
         const std::vector<amrex::Parser*>& user_int_attrib_parser  = pc.getUserIntAttribParser();
 #ifdef WARPX_QED
-        BreitWheelerEngine*       p_bw_engine = pc.get_breit_wheeler_engine_ptr();
+        const BreitWheelerEngine*       p_bw_engine = pc.get_breit_wheeler_engine_ptr();
         QuantumSynchrotronEngine* p_qs_engine = pc.get_quantum_sync_engine_ptr();
 #endif
         const int ionization_initial_level = pc.getIonizationInitialLevel();

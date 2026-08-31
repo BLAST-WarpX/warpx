@@ -195,9 +195,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
           auto SetPosition = SetParticlePosition<PIdx>(pti, offset);
 
-    amrex::ParticleReal* const AMREX_RESTRICT ux = uxp.dataPtr() + offset;
-    amrex::ParticleReal* const AMREX_RESTRICT uy = uyp.dataPtr() + offset;
-    amrex::ParticleReal* const AMREX_RESTRICT uz = uzp.dataPtr() + offset;
+    const amrex::ParticleReal* const AMREX_RESTRICT ux = uxp.dataPtr() + offset;
+    const amrex::ParticleReal* const AMREX_RESTRICT uy = uyp.dataPtr() + offset;
+    const amrex::ParticleReal* const AMREX_RESTRICT uz = uzp.dataPtr() + offset;
 
     if (!done_injecting_lev)
     {
@@ -232,9 +232,9 @@ RigidInjectedParticleContainer::PushPX (WarpXParIter& pti,
 
     if (!done_injecting_lev) {
 
-        amrex::ParticleReal* AMREX_RESTRICT x_save = xp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT y_save = yp_save.dataPtr();
-        amrex::ParticleReal* AMREX_RESTRICT z_save = zp_save.dataPtr();
+        const amrex::ParticleReal* AMREX_RESTRICT x_save = xp_save.dataPtr();
+        const amrex::ParticleReal* AMREX_RESTRICT y_save = yp_save.dataPtr();
+        const amrex::ParticleReal* AMREX_RESTRICT z_save = zp_save.dataPtr();
 
         // Undo the push for particles not injected yet.
         // The zp are advanced a fixed amount.
@@ -379,7 +379,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             amrex::ParticleReal* const AMREX_RESTRICT uypp = attribs[PIdx::uy].dataPtr();
             amrex::ParticleReal* const AMREX_RESTRICT uzpp = attribs[PIdx::uz].dataPtr();
 
-            int* AMREX_RESTRICT ion_lev = nullptr;
+            const int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization) {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
@@ -399,7 +399,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             const auto pusher_algo = WarpX::particle_pusher_algo;
             const auto do_crr = do_classical_radiation_reaction;
 
-            enum exteb_flags : int { no_exteb, has_exteb };
+            enum exteb_flags : int { no_exteb, has_exteb }; // NOLINT(cppcoreguidelines-use-enum-class)
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 

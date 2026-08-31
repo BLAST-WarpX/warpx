@@ -56,11 +56,11 @@ struct GetTemperature
     {
         switch (m_type)
         {
-            case (TempConstantValue):
+            case (TemperatureInitType::TempConstantValue):
             {
                 return m_temperature;
             }
-            case (TempParserFunction):
+            case (TemperatureInitType::TempParserFunction):
             {
                 return m_temperature_parser(x,y,z);
             }
@@ -107,17 +107,17 @@ struct GetTemperatureVector
     {
         switch (m_type)
         {
-            case (TempConstantVector):
+            case (TemperatureInitType::TempConstantVector):
             {
                 return amrex::XDim3{m_ux_std, m_uy_std, m_uz_std};
             }
-            case (TempParserFunctionVector):
+            case (TemperatureInitType::TempParserFunctionVector):
             {
                 return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
             }
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-            case (TempFromFileVector):
+            case (TemperatureInitType::TempFromFileVector):
             {
                 return m_from_file.getValue(x, y, z);
             }

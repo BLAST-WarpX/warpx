@@ -577,7 +577,7 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 AddRZModesToOutputNames(std::string("eb_covered"), 1);
             }
         } else if ( warpx.m_fields.has(m_varnames_fields[comp], lev) ) {
-            amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
+            const amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
             const int mf_ncomp = mf->nComp();
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
             if (mf_ncomp == ncomp) {
