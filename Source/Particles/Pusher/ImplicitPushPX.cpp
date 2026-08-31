@@ -860,9 +860,9 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 #if !defined(WARPX_DIM_RCYLINDER)
     amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
 #endif
-    amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
-    amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
-    amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+    const amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+    const amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+    const amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
     const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {

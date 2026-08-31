@@ -1451,9 +1451,9 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     }
 
     const bool save_previous_position = m_save_previous_position;
-    ParticleReal* x_old = nullptr;
-    ParticleReal* y_old = nullptr;
-    ParticleReal* z_old = nullptr;
+    ParticleReal* x_old = nullptr; //NOLINT (misc-const-correctness)
+    ParticleReal* y_old = nullptr; //NOLINT (misc-const-correctness)
+    ParticleReal* z_old = nullptr; //NOLINT (misc-const-correctness)
     if (save_previous_position) {
 #if !defined(WARPX_DIM_1D_Z)
         x_old = pti.GetAttribs("prev_x").dataPtr() + offset;
