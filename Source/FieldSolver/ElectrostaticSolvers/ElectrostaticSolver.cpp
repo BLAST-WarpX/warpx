@@ -15,6 +15,8 @@
 
 #include <ablastr/fields/PoissonSolver.H>
 
+#include <string>
+
 
 using namespace amrex;
 
@@ -47,6 +49,40 @@ void ElectrostaticSolver::ReadParameters () {
             self_fields_num_final_sweeps > 0,
             "warpx.self_fields_num_final_sweeps must be > 0");
     }
+    // MLMG bottom solver options
+    std::string bottom_solver_name = "default";
+    pp_warpx.query("self_fields_bottom_solver", bottom_solver_name);
+    m_mlmg_options.bottom_solver = ablastr::fields::parseBottomSolver(bottom_solver_name);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_verbosity", m_mlmg_options.bottom_verbosity);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_max_iters", m_mlmg_options.bottom_max_iters);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_relative_tolerance",
+        m_mlmg_options.bottom_relative_tolerance);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_absolute_tolerance",
+        m_mlmg_options.bottom_absolute_tolerance);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_max_coarsening_level", m_mlmg_options.max_coarsening_level);
+
+    // MLMG coarse level distribution options
+    {
+        bool flag = false;
+        if (pp_warpx.query("self_fields_agglomeration", flag)) {
+            m_mlmg_options.agglomeration = static_cast<int>(flag);
+        }
+        if (pp_warpx.query("self_fields_consolidation", flag)) {
+            m_mlmg_options.consolidation = static_cast<int>(flag);
+        }
+    }
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_agglomeration_grid_size",
+        m_mlmg_options.agglomeration_grid_size);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_consolidation_grid_size",
+        m_mlmg_options.consolidation_grid_size);
+
     // FFT solver flags
     utils::parser::queryWithParser(
         pp_warpx, "use_2d_slices_fft_solver", is_igf_2d_slices);
@@ -221,6 +257,7 @@ ElectrostaticSolver::computePhi (
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
         self_fields_num_final_sweeps,
+        m_mlmg_options,
         post_phi_calculation,
         *m_poisson_boundary_handler,
         warpx.gett_new(0),
