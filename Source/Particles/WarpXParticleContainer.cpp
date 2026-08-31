@@ -339,7 +339,7 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
 
     // Remove particles that are inside the embedded boundaries
 #ifdef AMREX_USE_EB
-    if (EB::enabled()) {
+    if (EB::enabled() && WarpX::eb_particle_boundary != ParticleBoundaryType::None) {
         auto & warpx = WarpX::GetInstance();
         scrapeParticlesAtEB(
             *this,
