@@ -171,10 +171,7 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] rho The charge density a given species
  * \param[out] phi The potential to be computed by this function
  * \param[in] beta Represents the velocity of the source of `phi`
- * \param[in] relative_tolerance The relative convergence threshold for the MLMG solver
- * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
- * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
- * \param[in] verbosity The verbosity setting for the MLMG solver
+ * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
  * \param[in] geom the geometry per level (e.g., from AmrMesh)
  * \param[in] dmap the distribution mapping per level (e.g., from AmrMesh)
  * \param[in] grids the grids per level (e.g., from AmrMesh)
@@ -184,9 +181,6 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
- * \param[in] num_final_sweeps Optional MLMG final smoothing count. If set, it is used for final smoothing.
- * Otherwise, the default AMReX MLMG value (8) is used.
- * \param[in] mlmg_options Optional settings for the MLMG bottom solve and coarsening (default: AMReX defaults)
  * \param[in] post_phi_calculation perform a calculation per level directly after phi was calculated; required for embedded boundaries (default: none)
  * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] current_time the current time; required for embedded boundaries (default: none)
@@ -202,10 +196,7 @@ computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     std::array<amrex::Real, 3> const beta,
-    amrex::Real relative_tolerance,
-    amrex::Real absolute_tolerance,
-    int max_iters,
-    int verbosity,
+    MLMGOptions const & mlmg_options,
     amrex::Vector<amrex::Geometry> const& geom,
     amrex::Vector<amrex::DistributionMapping> const& dmap,
     amrex::Vector<amrex::BoxArray> const& grids,
@@ -215,8 +206,6 @@ computePhi (
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
-    std::optional<int> num_final_sweeps = std::nullopt,
-    MLMGOptions const & mlmg_options = MLMGOptions{},
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
     [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
@@ -408,11 +397,6 @@ computePhi (
 
         // Solve the Poisson equation
         amrex::MLMG mlmg(*linop); // actual solver defined here
-        mlmg.setVerbose(verbosity);
-        mlmg.setMaxIter(max_iters);
-        if (num_final_sweeps) {
-            mlmg.setFinalSmooth(*num_final_sweeps);
-        }
         applyMLMGOptions(mlmg, mlmg_options);
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
         mlmg.setNoGpuSync(true);
@@ -428,7 +412,8 @@ computePhi (
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},
-                     relative_tolerance, absolute_tolerance );
+                     mlmg_options.relative_tolerance,
+                     mlmg_options.absolute_tolerance );
 
         const amrex::IntVect& refratio = rel_ref_ratio.value()[lev];
         const int ncomp = linop->getNComp();
