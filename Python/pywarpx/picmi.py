@@ -2482,6 +2482,50 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     warpx_self_fields_verbosity: integer, default=2
         Level of verbosity for the labframe electrostatic solver
 
+    warpx_self_fields_bottom_solver: string, default='default'
+        Bottom solver used by the MLMG labframe electrostatic solver. Options are
+        'default', 'smoother', 'bicgstab', 'cg', 'bicgcg', 'cgbicg', 'hypre' and
+        'petsc'. The last two require an AMReX built with HYPRE respectively
+        PETSc support. On GPUs the bottom solve is often latency- rather than
+        arithmetic-bound, so a cheaper bottom solver ('cg', or 'smoother', which
+        performs no reductions) can be considerably faster at the price of a
+        small increase in the number of MLMG iterations.
+
+    warpx_self_fields_bottom_verbosity: integer, default=0
+        Level of verbosity of the bottom solver of the labframe electrostatic
+        solver
+
+    warpx_self_fields_bottom_max_iters: integer, optional
+        Maximum number of bottom solver iterations (AMReX default: 200)
+
+    warpx_self_fields_bottom_relative_tolerance: float, optional
+        Relative tolerance of the bottom solve (AMReX default: 1e-4)
+
+    warpx_self_fields_bottom_absolute_tolerance: float, optional
+        Absolute tolerance of the bottom solve (AMReX default: unused)
+
+    warpx_self_fields_max_coarsening_level: integer, optional
+        Maximum number of MLMG coarsening levels (AMReX default: 30). Lowering
+        this leaves a larger problem to the bottom solver.
+
+    warpx_self_fields_agglomeration: bool, optional
+        Whether MLMG may gather the coarse multigrid levels onto a single box
+        owned by a single MPI rank (AMReX default: True). Agglomeration avoids
+        very small boxes at coarse levels, but it serializes those levels
+        including the bottom solve, leaving the other ranks idle.
+
+    warpx_self_fields_agglomeration_grid_size: integer, optional
+        Box size below which MLMG agglomerates the coarse multigrid levels
+        (AMReX defaults: 32 in 3D, 16 in 2D, 8 in 1D)
+
+    warpx_self_fields_consolidation: bool, optional
+        Whether MLMG may redistribute the coarse multigrid levels onto a subset
+        of the MPI ranks (AMReX default: True)
+
+    warpx_self_fields_consolidation_grid_size: integer, optional
+        Box size below which MLMG consolidates the coarse multigrid levels onto
+        fewer MPI ranks (AMReX defaults: 32 in 3D, 16 in 2D, 8 in 1D)
+
     warpx_magnetostatic: bool, default=False
         Whether to also solve for self-consistent magnetic fields from currents.
 
@@ -2532,6 +2576,32 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         self.relativistic = kw.pop("warpx_relativistic", False)
         self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
         self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
+        # MLMG bottom solver parameters
+        self.self_fields_bottom_solver = kw.pop("warpx_self_fields_bottom_solver", None)
+        self.self_fields_bottom_verbosity = kw.pop(
+            "warpx_self_fields_bottom_verbosity", None
+        )
+        self.self_fields_bottom_max_iters = kw.pop(
+            "warpx_self_fields_bottom_max_iters", None
+        )
+        self.self_fields_bottom_relative_tolerance = kw.pop(
+            "warpx_self_fields_bottom_relative_tolerance", None
+        )
+        self.self_fields_bottom_absolute_tolerance = kw.pop(
+            "warpx_self_fields_bottom_absolute_tolerance", None
+        )
+        self.self_fields_max_coarsening_level = kw.pop(
+            "warpx_self_fields_max_coarsening_level", None
+        )
+        # MLMG coarse level distribution parameters
+        self.self_fields_agglomeration = kw.pop("warpx_self_fields_agglomeration", None)
+        self.self_fields_agglomeration_grid_size = kw.pop(
+            "warpx_self_fields_agglomeration_grid_size", None
+        )
+        self.self_fields_consolidation = kw.pop("warpx_self_fields_consolidation", None)
+        self.self_fields_consolidation_grid_size = kw.pop(
+            "warpx_self_fields_consolidation_grid_size", None
+        )
         self.magnetostatic = kw.pop("warpx_magnetostatic", False)
         # Explicit magnetostatic solver parameters (override self_fields_* defaults)
         self.magnetostatic_required_precision = kw.pop(
@@ -2589,6 +2659,30 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
             pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance
             pywarpx.warpx.self_fields_max_iters = self.maximum_iterations
             pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
+            pywarpx.warpx.self_fields_bottom_solver = self.self_fields_bottom_solver
+            pywarpx.warpx.self_fields_bottom_verbosity = (
+                self.self_fields_bottom_verbosity
+            )
+            pywarpx.warpx.self_fields_bottom_max_iters = (
+                self.self_fields_bottom_max_iters
+            )
+            pywarpx.warpx.self_fields_bottom_relative_tolerance = (
+                self.self_fields_bottom_relative_tolerance
+            )
+            pywarpx.warpx.self_fields_bottom_absolute_tolerance = (
+                self.self_fields_bottom_absolute_tolerance
+            )
+            pywarpx.warpx.self_fields_max_coarsening_level = (
+                self.self_fields_max_coarsening_level
+            )
+            pywarpx.warpx.self_fields_agglomeration = self.self_fields_agglomeration
+            pywarpx.warpx.self_fields_agglomeration_grid_size = (
+                self.self_fields_agglomeration_grid_size
+            )
+            pywarpx.warpx.self_fields_consolidation = self.self_fields_consolidation
+            pywarpx.warpx.self_fields_consolidation_grid_size = (
+                self.self_fields_consolidation_grid_size
+            )
             # Explicit magnetostatic solver parameters (if provided)
             pywarpx.warpx.magnetostatic_solver_required_precision = (
                 self.magnetostatic_required_precision

@@ -294,6 +294,7 @@ void EffectivePotentialES::computePhi (
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
+        m_mlmg_options,
         post_phi_calculation,
         *m_poisson_boundary_handler,
         warpx.gett_new(0),
