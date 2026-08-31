@@ -102,7 +102,8 @@ private:
      * \brief The linear operator whose action on a vector the linear solver
      *  evaluates, i.e. the left-hand side of the magnetoinductive equation
      *
-     *      bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+     *      -laplacian(curl(curl(Z))) + curl(chi curl(Z))
+     *                                  = 2 * laplacian(B) + 2 * mu_0 curl(J)
      *
      *  where chi is the mass matrix scaled by 2 * mu_0 / dt. It owns the
      *  scratch space that evaluation needs.

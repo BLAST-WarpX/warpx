@@ -184,7 +184,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     CalculateSourceVector();
 
     // Solve the magnetoinductive equation:
-    // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+    // -laplacian(curl(curl(Z))) + curl(chi curl(Z))
+    //                             = 2 * laplacian(B) + 2 * mu_0 curl(J)
     // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
     // ApplyScaledMassMatrices), i.e. the linear response of the deposited
     // current to the inductive E-field that this solve produces.
@@ -348,7 +349,8 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 void SemiImplicitDarwin::CalculateSourceVector ()
 {
     // Compute the right-hand side of the magnetoinductive equation
-    // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+    // -laplacian(curl(curl(Z))) + curl(chi curl(Z))
+    //                             = 2 * laplacian(B) + 2 * mu_0 curl(J)
     // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
     // ApplyScaledMassMatrices).
     BL_PROFILE("SemiImplicitDarwin::CalculateSourceVector()");

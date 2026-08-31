@@ -255,23 +255,6 @@ class FiniteDifferenceSolver
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
             int lev );
 
-        /**
-          * \brief Calculation of the vector bi-Laplacian (nabla^4) of the given vector field,
-          * using a single-pass discretization of the biharmonic stencil (as opposed to
-          * composing two separate ComputeVectorLaplacian calls with an intermediate
-          * boundary fill).
-          *
-          * \param[out] out_field  vector of output MultiFabs at a given level
-          * \param[in] in_field   vector of input MultiFabs at a given level
-          * \param[in] eb_update  array indicating where the field should be updated with respect to the position of the embedded boundary
-          * \param[in] lev  level number for the calculation
-          */
-        void ComputeVectorBiLaplacian (
-            ablastr::fields::VectorField& out_field,
-            ablastr::fields::VectorField const& in_field,
-            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
-            int lev );
-
     private:
 
         ElectromagneticSolverAlgo m_fdtd_algo;
@@ -396,14 +379,6 @@ class FiniteDifferenceSolver
             int lev
         );
 
-        template<typename T_Algo>
-        void ComputeVectorBiLaplacianCylindrical (
-            ablastr::fields::VectorField& out_field,
-            ablastr::fields::VectorField const& in_field,
-            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
-            int lev
-        );
-
 #elif defined(WARPX_DIM_RSPHERE)
         template< typename T_Algo >
         void EvolveBSpherical (
@@ -487,14 +462,6 @@ class FiniteDifferenceSolver
 
         template<typename T_Algo>
         void ComputeVectorLaplacianSpherical (
-            ablastr::fields::VectorField& out_field,
-            ablastr::fields::VectorField const& in_field,
-            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
-            int lev
-        );
-
-        template<typename T_Algo>
-        void ComputeVectorBiLaplacianSpherical (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::VectorField const& in_field,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
@@ -639,14 +606,6 @@ class FiniteDifferenceSolver
 
         template<typename T_Algo>
         void ComputeVectorLaplacianCartesian (
-            ablastr::fields::VectorField& out_field,
-            ablastr::fields::VectorField const& in_field,
-            std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,
-            int lev
-        );
-
-        template<typename T_Algo>
-        void ComputeVectorBiLaplacianCartesian (
             ablastr::fields::VectorField& out_field,
             ablastr::fields::VectorField const& in_field,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update,

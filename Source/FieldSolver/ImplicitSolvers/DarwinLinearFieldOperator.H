@@ -24,11 +24,24 @@ class SemiImplicitDarwin;
  *  solver hands to GMRES, i.e. the left-hand side of the magnetoinductive
  *  field equation
  *
- *      bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
+ *      -laplacian(curl(curl(Z))) + curl(chi curl(Z))
+ *                                  = 2 * laplacian(B) + 2 * mu_0 curl(J)
  *
  *  where `chi` is the deposited mass matrix scaled by `2 mu_0 / dt`. The
  *  action of the operator on a vector is evaluated by apply(), which is
  *  called once per GMRES iteration.
+ *
+ *  The fourth-order term comes from the Darwin field equation
+ *  `-laplacian(curl(dA)) = 2 mu_0 curl(J) + 2 laplacian(B)`, in which the
+ *  vector-potential increment is written as `dA = curl(Z)` so that it is
+ *  divergence-free by construction (i.e. the Coulomb gauge is preserved).
+ *  This gives `-laplacian(curl(curl(Z)))`, which reduces to `bilaplacian(Z)`
+ *  only where `div(Z) = 0` - a condition the scheme never imposes on Z
+ *  itself (only `div(curl(Z)) = 0` is guaranteed) - so the curl-curl form is
+ *  the one evaluated here.
+ *
+ *  Both terms of the operator annihilate gradient fields, so Z is determined
+ *  only up to a gradient. That is harmless: only `curl(Z)` is ever used.
  *
  *  This class is deliberately specific to the Darwin solver rather than a
  *  generic matrix-free wrapper: it owns the scratch space the operator needs,
@@ -53,7 +66,7 @@ public:
 
     /**
      * \brief Evaluate the action of the Darwin field operator, i.e. compute
-     *  `a_Ax = bilaplacian(a_x) + curl(chi curl(a_x))`.
+     *  `a_Ax = -laplacian(curl(curl(a_x))) + curl(chi curl(a_x))`.
      *
      * \param[out] a_Ax result of applying the operator
      * \param[in] a_x vector the operator is applied to (a GMRES iterate of Z)
@@ -120,8 +133,9 @@ private:
      *  than on every GMRES iteration since every iterate of Z shares the same
      *  layout.
      */
-    amrex::MultiFab m_lapZ_x, m_lapZ_y, m_lapZ_z;
     amrex::MultiFab m_Zscratch_x, m_Zscratch_y, m_Zscratch_z;
+    amrex::MultiFab m_curlcurlZ_x, m_curlcurlZ_y, m_curlcurlZ_z;
+    amrex::MultiFab m_lap_curlcurlZ_x, m_lap_curlcurlZ_y, m_lap_curlcurlZ_z;
 };
 
 #endif // WARPX_DARWIN_LINEAR_FIELD_OPERATOR_H_
