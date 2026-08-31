@@ -497,7 +497,7 @@ WarpX::UpdateAuxiliaryData ()
 
     using ablastr::fields::Direction;
 
-    amrex::MultiFab *Bfield_aux_lvl0_0 = m_fields.get(FieldType::Bfield_aux, Direction{0}, 0);
+    const amrex::MultiFab *Bfield_aux_lvl0_0 = m_fields.get(FieldType::Bfield_aux, Direction{0}, 0);
 
     ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
 

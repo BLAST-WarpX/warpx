@@ -22,6 +22,7 @@ Checks: '
         -cppcoreguidelines-avoid-non-const-global-variables,
         -cppcoreguidelines-init-variables,
         -cppcoreguidelines-macro-usage,
+        -cppcoreguidelines-use-default-member-init,
         -cppcoreguidelines-missing-std-forward,
         -cppcoreguidelines-narrowing-conversions,
         -cppcoreguidelines-non-private-member-variables-in-classes,

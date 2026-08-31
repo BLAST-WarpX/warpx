@@ -251,11 +251,11 @@ QdsmcParticleContainer::SetV (int lev,
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
 
-        amrex::ParticleReal* const AMREX_RESTRICT x_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT y_node =
             attribs[QdsmcPIdx::y_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT z_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT z_node =
             attribs[QdsmcPIdx::z_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT vx =
             attribs[QdsmcPIdx::vx].dataPtr();
@@ -302,11 +302,11 @@ QdsmcParticleContainer::SetK (int lev,
         long const np = pti.numParticles();
         auto & attribs = pti.GetStructOfArrays().GetRealData();
 
-        amrex::ParticleReal* const AMREX_RESTRICT x_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT y_node =
             attribs[QdsmcPIdx::y_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT z_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT z_node =
             attribs[QdsmcPIdx::z_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT entropy =
             attribs[QdsmcPIdx::entropy].dataPtr();
@@ -372,22 +372,22 @@ QdsmcParticleContainer::PushX (int lev, amrex::Real dt)
         // Home and velocity components are only needed for the axes with an
         // AMReX-tracked position slot (x everywhere but 1D_Z, y only in 3D).
 #if !defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* const AMREX_RESTRICT x_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT vx =
+        const amrex::ParticleReal* const AMREX_RESTRICT vx =
             attribs[QdsmcPIdx::vx].dataPtr();
 #endif
 #if defined(WARPX_DIM_3D)
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT y_node =
             attribs[QdsmcPIdx::y_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT vy =
+        const amrex::ParticleReal* const AMREX_RESTRICT vy =
             attribs[QdsmcPIdx::vy].dataPtr();
 #endif
-        amrex::ParticleReal* const AMREX_RESTRICT z_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT z_node =
             attribs[QdsmcPIdx::z_node].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT vz =
+        const amrex::ParticleReal* const AMREX_RESTRICT vz =
             attribs[QdsmcPIdx::vz].dataPtr();
-        amrex::ParticleReal* const AMREX_RESTRICT np_real =
+        const amrex::ParticleReal* const AMREX_RESTRICT np_real =
             attribs[QdsmcPIdx::np_real].dataPtr();
 
         // Position attributes (only the AMReX-tracked subset). For
@@ -462,14 +462,14 @@ QdsmcParticleContainer::ResetParticles (int lev)
         // The home components are only needed where a matching AMReX-tracked
         // position slot exists (x everywhere but 1D_Z, y only in 3D).
 #if !defined(WARPX_DIM_1D_Z)
-        amrex::ParticleReal* const AMREX_RESTRICT x_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT x_node =
             attribs[QdsmcPIdx::x_node].dataPtr();
 #endif
 #if defined(WARPX_DIM_3D)
-        amrex::ParticleReal* const AMREX_RESTRICT y_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT y_node =
             attribs[QdsmcPIdx::y_node].dataPtr();
 #endif
-        amrex::ParticleReal* const AMREX_RESTRICT z_node =
+        const amrex::ParticleReal* const AMREX_RESTRICT z_node =
             attribs[QdsmcPIdx::z_node].dataPtr();
         amrex::ParticleReal* const AMREX_RESTRICT vx =
             attribs[QdsmcPIdx::vx].dataPtr();

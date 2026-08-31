@@ -177,9 +177,9 @@ struct LorentzTransformParticles
     amrex::Real m_t_boost;
     amrex::Real m_dt;
     amrex::Real m_t_lab;
-    amrex::Real m_gammaboost; //NOLINT (cppcoreguidelines-use-default-member-init)
-    amrex::Real m_betaboost;  //NOLINT (cppcoreguidelines-use-default-member-init)
-    amrex::Real m_uzfrm;      //NOLINT (cppcoreguidelines-use-default-member-init)
+    amrex::Real m_gammaboost;
+    amrex::Real m_betaboost;
+    amrex::Real m_uzfrm;
 
     GetParticlePosition<PIdx> m_get_position;
 

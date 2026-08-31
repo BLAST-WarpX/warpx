@@ -1268,7 +1268,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
             ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
-            int* AMREX_RESTRICT ion_lev = nullptr;
+            const int* AMREX_RESTRICT ion_lev = nullptr;
             if (do_field_ionization) {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
@@ -1445,7 +1445,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         copyAttribs = CopyParticleAttribs(*this, pti, offset);
     }
 
-    int* AMREX_RESTRICT ion_lev = nullptr;
+    const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }

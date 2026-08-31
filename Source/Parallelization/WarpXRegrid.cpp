@@ -368,7 +368,7 @@ WarpX::ComputeCostsHeuristic (amrex::Vector<std::unique_ptr<amrex::LayoutData<am
         }
 
         // Cell loop
-        MultiFab* Ex = m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
+        const MultiFab* Ex = m_fields.get(FieldType::Efield_fp, Direction{0}, lev);
         for (MFIter mfi(*Ex, false); mfi.isValid(); ++mfi)
         {
             const Box& gbx = mfi.growntilebox();

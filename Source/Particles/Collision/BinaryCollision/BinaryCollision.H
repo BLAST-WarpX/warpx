@@ -422,7 +422,7 @@ public:
             const index_type n_total_pairs = (n_cells_products == 0) ? 0:
                                                 amrex::Scan::ExclusiveSum(n_cells_products,
                                                     p_n_pairs_in_each_cell, pair_offsets.data());
-            index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
+            const index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
 
             amrex::Gpu::DeviceVector<index_type> n_ind_pairs_in_each_cell(n_cells+1);
             index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = n_ind_pairs_in_each_cell.dataPtr();
@@ -900,7 +900,7 @@ public:
             const index_type n_total_pairs = (n_cells_products == 0) ? 0:
                                                 amrex::Scan::ExclusiveSum(n_cells_products,
                                                     p_n_pairs_in_each_cell, pair_offsets.data());
-            index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
+            const index_type* AMREX_RESTRICT p_pair_offsets = pair_offsets.dataPtr();
 
             amrex::Gpu::DeviceVector<index_type> n_ind_pairs_in_each_cell(n_cells+1);
             index_type* AMREX_RESTRICT p_n_ind_pairs_in_each_cell = n_ind_pairs_in_each_cell.dataPtr();

@@ -254,7 +254,7 @@ namespace warpx::initialization
     amrex::AMReX*
     amrex_init (int& argc, char**& argv, bool build_parm_parse)
     {
-        amrex::AMReX* amrex =
+        amrex::AMReX* const amrex =
             amrex::Initialize(
                 argc,
                 argv,

@@ -512,7 +512,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         });
     }
 
-    int* AMREX_RESTRICT ion_lev = nullptr;
+    const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
@@ -864,7 +864,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
     amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
 
-    int* AMREX_RESTRICT ion_lev = nullptr;
+    const int* AMREX_RESTRICT ion_lev = nullptr;
     if (do_field_ionization) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
     }

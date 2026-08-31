@@ -632,7 +632,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             }
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {
-                int* AMREX_RESTRICT ion_lev = nullptr;
+                const int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
                               np_to_deposit, thread_num, lev, lev);
@@ -694,7 +694,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
 
             if (has_rho && ! skip_deposition && ! do_not_deposit) {
-                int* AMREX_RESTRICT ion_lev = nullptr;
+                const int* AMREX_RESTRICT ion_lev = nullptr;
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 1, 0,
                               np_to_deposit, thread_num, lev, lev);
@@ -878,18 +878,18 @@ LaserParticleContainer::update_laser_particle (WarpXParIter& pti,
     // (within the linear and nonlinear solver). Thus, the position of the particles needs to be reset
     // to the initial position (at the beginning of the timestep), before updating the particle position
 #if !defined(WARPX_DIM_1D_Z)
-    ParticleReal* x_n = nullptr;
+    const ParticleReal* x_n = nullptr;
     if (push_type == PushType::Implicit) {
         x_n = pti.GetAttribs("x_n").dataPtr();
     }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-    ParticleReal* y_n = nullptr;
+    const ParticleReal* y_n = nullptr;
     if (push_type == PushType::Implicit) {
         y_n = pti.GetAttribs("y_n").dataPtr();
     }
 #endif
-    ParticleReal* z_n = nullptr;
+    const ParticleReal* z_n = nullptr;
     if (push_type == PushType::Implicit) {
         z_n = pti.GetAttribs("z_n").dataPtr();
     }
