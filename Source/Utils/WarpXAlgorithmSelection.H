@@ -68,6 +68,7 @@ AMREX_ENUM(ElectrostaticSolverAlgo,
 
 AMREX_ENUM(PoissonSolverAlgo,
            Multigrid,
+           GMRES,
            IntegratedGreenFunction,
            fft = IntegratedGreenFunction,
            Default = Multigrid);
