@@ -89,6 +89,9 @@ struct ParticleBoundaries
         amrex::ParserExecutor<1> reflection_model_zhi;
 
         bool reflect_all_velocities;
+
+        amrex::Real SEE_probability = 0.;
+        amrex::Real v_SEE = 0.;
     };
     ParticleBoundariesData data;
 
