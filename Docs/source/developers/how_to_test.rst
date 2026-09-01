@@ -168,6 +168,14 @@ needs. Adding a dimensionality that does not have a subdirectory yet only requir
 that subdirectory (``2d``, ``rz``, ...) with a ``conftest.py`` in it; the CTest registration
 in ``tests/unit/CMakeLists.txt`` picks it up automatically.
 
+The shared ``tests/unit/conftest.py`` pins the process to the dimensionality of the
+subdirectory being collected, before any simulation is built. That is what makes
+``Config`` available early enough to import ``mpi4py`` only for builds that have MPI:
+``mpi4py`` has to own ``MPI_Init``, because AMReX would otherwise finalize MPI in the
+first ``amrex::Finalize`` and MPI cannot be initialized again. Collecting two
+dimensionalities in one process is rejected with a clear error, and a dimensionality
+that was not built is skipped.
+
 Two fixtures are provided:
 
 * ``warpx_lifecycle`` (in ``tests/unit/conftest.py``, applied automatically) runs
