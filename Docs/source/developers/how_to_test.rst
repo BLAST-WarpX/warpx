@@ -135,10 +135,10 @@ routines, such as the fact that charge and current deposition conserve the total
 and current of a species.
 They require a build with ``-DWarpX_PYTHON=ON`` and they need no checksum file.
 
-A compiled ``warpx_pybind_*`` module can only be imported once per Python process, so a
-process is pinned to a single dimensionality.
-The suite is therefore split into one subdirectory per dimensionality, and CTest registers
-one test — that is, one process — per dimensionality that was built:
+The tests are dimensionality-agnostic: the same files run in every dimensionality that
+was built.  What cannot be shared is the process, because a compiled ``warpx_pybind_*``
+module can only be imported once in it, so CTest registers one test, that is one process,
+per value of ``WarpX_DIMS``:
 
 .. code-block:: sh
 
@@ -157,35 +157,34 @@ test. This requires that the Python package has been installed first, with
 
 .. code-block:: sh
 
-     # all 3D unit tests
-     python3 -m pytest -s -vvvv tests/unit/3d
+     # all unit tests, in one of the built dimensionalities
+     python3 -m pytest -s -vvvv tests/unit
 
      # a single test (useful during debugging)
-     python3 -m pytest -s -vvvv tests/unit/3d/test_charge_deposition.py::test_charge_deposition_is_negative_for_electrons
+     python3 -m pytest -s -vvvv tests/unit/test_charge_deposition.py::test_charge_deposition_is_negative_for_electrons
 
-To add a unit test, put a ``test_*.py`` file in the subdirectory of the dimensionality it
-needs. Adding a dimensionality that does not have a subdirectory yet only requires creating
-that subdirectory (``2d``, ``rz``, ...) with a ``conftest.py`` in it; the CTest registration
-in ``tests/unit/CMakeLists.txt`` picks it up automatically.
+``tests/unit/conftest.py`` pins the process to one dimensionality when it is imported,
+taking it from ``WARPX_TEST_DIMS`` if CTest set it and otherwise from what is compiled in.
+That is also what makes ``Config`` available early enough to import ``mpi4py`` only for
+builds that have MPI: ``mpi4py`` has to own ``MPI_Init``, because AMReX would otherwise
+finalize MPI in the first ``amrex::Finalize`` and MPI cannot be initialized again.
+Collecting two dimensionalities in one process is rejected with a clear error.
 
-The shared ``tests/unit/conftest.py`` pins the process to the dimensionality of the
-subdirectory being collected, before any simulation is built. That is what makes
-``Config`` available early enough to import ``mpi4py`` only for builds that have MPI:
-``mpi4py`` has to own ``MPI_Init``, because AMReX would otherwise finalize MPI in the
-first ``amrex::Finalize`` and MPI cannot be initialized again. Collecting two
-dimensionalities in one process is rejected with a clear error, and a dimensionality
-that was not built is skipped.
+A test that does not apply to every geometry says so with a plain ``skipif``, as the
+deposition tests do for RZ, whose inverse volume scaling needs its own assertion.
 
-Two fixtures are provided:
+Two fixtures do the setup work:
 
-* ``warpx_lifecycle`` (in ``tests/unit/conftest.py``, applied automatically) runs
-  each test in its own temporary directory and calls ``pywarpx.WarpX.finalize`` afterwards,
-  which tears down WarpX and AMReX and clears all module-level input state. This is what
-  allows a single process to run several independent simulations, for instance to compare
-  deposition algorithms.
-* ``make_sim`` (in the per-dimensionality ``conftest.py``) is a factory that returns a
-  minimal, already initialized simulation, with the grid, particle shape and deposition
-  algorithm the test asks for.
+* ``warpx_lifecycle`` (applied automatically) runs each test in its own temporary
+  directory and calls ``pywarpx.WarpX.finalize`` afterwards, which tears down WarpX and
+  AMReX and clears all module-level input state. This is what allows a single process to
+  run several independent simulations, for instance to compare deposition algorithms.
+* ``make_sim`` is a factory that returns a minimal, already initialized simulation for the
+  dimensionality of the process, with the grid, particle shape and deposition algorithm the
+  test asks for. ``uniform_particles``, ``total``, ``cell_volume`` and ``rtol`` are the
+  helpers the deposition tests build on.
+
+To add a unit test, put a ``test_*.py`` file in ``tests/unit``.
 
 If you need a new Python package dependency for the unit tests, add it in
 `tests/unit/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/tests/unit/requirements.txt>`__.

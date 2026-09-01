@@ -24,7 +24,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.mark.parametrize("particle_shape", ["linear", "quadratic", "cubic"])
 def test_charge_deposition_conserves_total_charge(
-    make_sim, uniform_particles, cell_volume, rtol, particle_shape
+    make_sim, uniform_particles, total, rtol, particle_shape
 ):
     """Charge deposition must conserve the total charge of the species.
 
@@ -45,22 +45,23 @@ def test_charge_deposition_conserves_total_charge(
     # that a failure below can be attributed to the deposition and not to the
     # particles that were added
     expected_charge = -constants.q_e * n_part * weight
+    # atol=0.0, so that the relative tolerance is what actually decides. The
+    # numpy default of atol=1e-8 is far larger than the ~1e-11 C compared here
+    # and would make this assertion vacuous.
     assert np.isclose(
-        electrons.sum_particle_charge(local=False), expected_charge, rtol=rtol()
+        electrons.sum_particle_charge(local=False),
+        expected_charge,
+        rtol=rtol,
+        atol=0.0,
     )
 
     # allocates a nodal MultiFab, resets it, deposits, sums the guard cells and
     # applies the boundary/volume treatment
     rho = electrons.get_charge_density(lev=0, local=False)
 
-    # rho is nodal and the domain is periodic: without passing the periodicity,
-    # the nodes shared across the periodic boundary would be counted twice
-    geom = sim.extension.warpx.Geom(0)
-    deposited_charge = rho.sum_unique(
-        comp=0, local=False, period=geom.periodicity()
-    ) * cell_volume(sim)
+    deposited_charge = total(rho, sim)
 
-    assert np.isclose(deposited_charge, expected_charge, rtol=rtol())
+    assert np.isclose(deposited_charge, expected_charge, rtol=rtol, atol=0.0)
 
 
 def test_charge_deposition_is_negative_for_electrons(make_sim, uniform_particles):

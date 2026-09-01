@@ -28,13 +28,18 @@ DIMS_MODULE = {
 DIMS_PREFERENCE = ("3", "2", "1", "RZ")
 
 # PICMI grid per dimensionality, and how many grid axes it takes
+# PICMI grid per Cartesian dimensionality, and how many axes it takes. RZ is
+# deliberately absent: CylindricalGrid needs n_azimuthal_modes and a different
+# set of boundary conditions, so it wants its own fixture once a test needs it.
 GRID_CLASS = {
     "1": picmi.Cartesian1DGrid,
     "2": picmi.Cartesian2DGrid,
     "3": picmi.Cartesian3DGrid,
-    "RZ": picmi.CylindricalGrid,
 }
-N_AXES = {"1": 1, "2": 2, "3": 3, "RZ": 2}
+N_AXES = {"1": 1, "2": 2, "3": 3}
+
+# spreads particles over the domain without aligning them with the cells
+GOLDEN_RATIO = 0.6180339887498949
 
 # tolerances for the conservation identities asserted by the unit tests
 RTOL = {"SINGLE": 1.0e-5, "DOUBLE": 1.0e-12}
@@ -100,7 +105,7 @@ if Config.have_mpi:
 
 
 def pytest_report_header(config):
-    return f"warpx: {WARPX_DIMS}D geometry, built: {available_dims()}"
+    return f"warpx: {pywarpx.libwarpx.geometry_dim} geometry, built: {available_dims()}"
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -125,12 +130,6 @@ def warpx_lifecycle(tmp_path, monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def dims():
-    """The dimensionality of this process, as in ``geometry.dims``."""
-    return WARPX_DIMS
-
-
-@pytest.fixture(scope="function")
 def make_sim():
     """Factory for a minimal, initialized simulation of this dimensionality.
 
@@ -150,11 +149,19 @@ def make_sim():
         current_deposition_algo=None,
         dt=None,
     ):
-        if WARPX_DIMS not in ("1", "2", "3"):
+        if WARPX_DIMS not in GRID_CLASS:
             raise NotImplementedError(
                 f"make_sim does not build a {WARPX_DIMS} geometry yet. Tests "
                 "that rely on it should skip on a non-Cartesian geometry."
             )
+
+        # A second simulation in one test would reach amrex_init() with AMReX
+        # already initialized, which aborts the whole pytest process. Fail here
+        # instead, with a traceback that points at the test.
+        assert not pywarpx.libwarpx.initialized, (
+            "a simulation is already running; only one simulation can live at "
+            "a time, and warpx_lifecycle finalizes it after the test"
+        )
 
         n_axes = N_AXES[WARPX_DIMS]
         n_cell = [16] * n_axes if n_cell is None else list(n_cell)
@@ -186,12 +193,7 @@ def make_sim():
             warpx_current_deposition_algo=current_deposition_algo,
         )
         # no particles are injected: the tests add them explicitly
-        sim.add_species(
-            electrons,
-            layout=picmi.GriddedLayout(
-                n_macroparticle_per_cell=[0] * n_axes, grid=grid
-            ),
-        )
+        sim.add_species(electrons, layout=None)
 
         sim.initialize_inputs()
 
@@ -225,13 +227,13 @@ def _rtol():
 
 
 def _uniform_particles(sim, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0):
-    """Add a regular lattice of macro particles to the ``electrons`` species.
+    """Add a lattice of macro particles to the ``electrons`` species.
 
-    One lattice point per grid axis of the current geometry, so this yields
-    ``n_per_dim`` particles in 1D and ``n_per_dim**3`` in 3D. The particles sit
-    strictly inside the domain and are offset from both cell centers and nodes,
-    so that the shape factors of every deposition order spread charge over more
-    than one cell.
+    ``n_per_dim`` positions per grid axis of the current geometry, so this
+    yields ``n_per_dim`` particles in 1D and ``n_per_dim**3`` in 3D. The
+    particles sit strictly inside the domain, at differing offsets inside their
+    cells, so that the shape factors of every deposition order spread charge
+    over more than one cell.
 
     Returns the particle container together with the position and momentum
     arrays that were used, as they are needed to form the expected values.
@@ -240,8 +242,12 @@ def _uniform_particles(sim, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0):
     lo = np.array(geom.ProbLo())
     hi = np.array(geom.ProbHi())
 
-    # fractional positions in (0, 1), avoiding the domain boundaries
-    frac = (np.arange(n_per_dim) + 0.37) / n_per_dim
+    # Fractional positions in (0, 1). A regular lattice would be commensurate
+    # with the grid and put every particle at the same offset inside its cell,
+    # so use a golden ratio sequence instead: it spreads the particles evenly
+    # over the domain while giving each of them a different sub-cell offset,
+    # which keeps the shape factors away from their symmetric special case.
+    frac = ((np.arange(n_per_dim) + 1) * GOLDEN_RATIO) % 1.0
     axes = np.meshgrid(*(frac,) * len(lo), indexing="ij")
     coords = [(lo[i] + axis * (hi[i] - lo[i])).ravel() for i, axis in enumerate(axes)]
 
@@ -279,8 +285,27 @@ def _cell_volume(sim):
 
 @pytest.fixture(scope="function")
 def rtol():
-    """Callable returning the tolerance for the compiled precision."""
-    return _rtol
+    """Relative tolerance for the precision WarpX was compiled with."""
+    return _rtol()
+
+
+def _total(mf, sim):
+    """Integrate a field component over the domain.
+
+    Passing the periodicity matters: the fields are nodal in at least one
+    direction, and without it the nodes on the periodic boundary would be
+    counted twice.
+    """
+    geom = sim.extension.warpx.Geom(0)
+    return mf.sum_unique(comp=0, local=False, period=geom.periodicity()) * _cell_volume(
+        sim
+    )
+
+
+@pytest.fixture(scope="function")
+def total():
+    """Callable integrating a field component over the domain."""
+    return _total
 
 
 @pytest.fixture(scope="function")

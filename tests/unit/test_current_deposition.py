@@ -22,14 +22,9 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _total(mf, geom, dV):
-    """Integrate a field component over the (periodic) domain."""
-    return mf.sum_unique(comp=0, local=False, period=geom.periodicity()) * dV
-
-
 @pytest.mark.parametrize("current_deposition_algo", ["direct", "esirkepov"])
 def test_current_deposition_conserves_total_current(
-    make_sim, uniform_particles, cell_volume, rtol, current_deposition_algo
+    make_sim, uniform_particles, total, rtol, current_deposition_algo
 ):
     """Current deposition must conserve the total current of the species.
 
@@ -54,32 +49,37 @@ def test_current_deposition_conserves_total_current(
     dt = sim.extension.warpx.getdt(0)
     electrons.deposit_current("current_fp", 0, dt, 0.0)
 
-    geom = sim.extension.warpx.Geom(0)
-    dV = cell_volume(sim)
-
     gamma = np.sqrt(1.0 + (p["ux"] ** 2 + p["uy"] ** 2 + p["uz"] ** 2) / constants.c**2)
     expected_jz = -constants.q_e * np.sum(p["w"] * p["uz"] / gamma)
 
-    total_jz = _total(fields.get("current_fp", "z", 0), geom, dV)
-    assert np.isclose(total_jz, expected_jz, rtol=rtol())
+    # atol=0.0, so that the relative tolerance is what actually decides. The
+    # numpy default of atol=1e-8 would be larger than the quantities compared
+    # here and would make the assertion vacuous.
+    total_jz = total(fields.get("current_fp", "z", 0), sim)
+    assert np.isclose(total_jz, expected_jz, rtol=rtol, atol=0.0)
 
     # the particles have no transverse momentum, so Jx and Jy must integrate
-    # to zero
+    # to zero. This one compares against zero, so it needs an absolute
+    # tolerance, scaled to the current that is actually flowing.
     for direction in ("x", "y"):
-        total = _total(fields.get("current_fp", direction, 0), geom, dV)
-        assert np.isclose(total, 0.0, atol=abs(expected_jz) * rtol())
+        transverse = total(fields.get("current_fp", direction, 0), sim)
+        assert np.isclose(transverse, 0.0, atol=abs(expected_jz) * rtol)
 
 
-def test_current_deposition_scales_with_weight(
-    make_sim, uniform_particles, cell_volume, rtol
+def test_current_deposition_sums_mixed_weights(
+    make_sim, uniform_particles, total, rtol
 ):
-    """The deposited current must be linear in the macro particle weight."""
+    """Particles of differing weight must all contribute to the current.
+
+    The parametrized test above only ever deposits a single weight, so this
+    covers the weighting itself: two sets of particles at the same positions,
+    carrying ``w`` and ``2 w``, have to sum to the current of ``3 w``.
+    """
     sim = make_sim(current_deposition_algo="direct")
 
     uz = 1.0e8
     weight = 1.0e6
     electrons, p = uniform_particles(sim, weight=weight, uz=uz)
-    # a second set at the same positions, carrying twice the weight
     uniform_particles(sim, weight=2.0 * weight, uz=uz)
 
     fields = sim.fields
@@ -89,11 +89,9 @@ def test_current_deposition_scales_with_weight(
     dt = sim.extension.warpx.getdt(0)
     electrons.deposit_current("current_fp", 0, dt, 0.0)
 
-    geom = sim.extension.warpx.Geom(0)
-    total = _total(fields.get("current_fp", "z", 0), geom, cell_volume(sim))
-
     gamma = np.sqrt(1.0 + uz**2 / constants.c**2)
     n_part = p["w"].size
     expected = -constants.q_e * n_part * (weight + 2.0 * weight) * uz / gamma
 
-    assert np.isclose(total, expected, rtol=rtol())
+    total_jz = total(fields.get("current_fp", "z", 0), sim)
+    assert np.isclose(total_jz, expected, rtol=rtol, atol=0.0)

@@ -270,8 +270,15 @@ function(warpx_test_set_pythonpath test_name)
             APPEND PROPERTY ENVIRONMENT "PATH=${WIN_DLL_DIRS}\;${WIN_PATH}"
         )
     else()
+        #   note: a trailing separator would put the current working directory
+        #         on sys.path, so only append an existing PYTHONPATH
+        if(DEFINED ENV{PYTHONPATH})
+            set(WARPX_TEST_PYTHONPATH "${CMAKE_PYTHON_OUTPUT_DIRECTORY}:$ENV{PYTHONPATH}")
+        else()
+            set(WARPX_TEST_PYTHONPATH "${CMAKE_PYTHON_OUTPUT_DIRECTORY}")
+        endif()
         set_property(TEST ${test_name}
-            APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_PYTHON_OUTPUT_DIRECTORY}:$ENV{PYTHONPATH}"
+            APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${WARPX_TEST_PYTHONPATH}"
         )
     endif()
 endfunction()
@@ -330,12 +337,17 @@ function(add_warpx_pytest dims)
         NAME ${name}
         COMMAND
             ${Python_EXECUTABLE} -m pytest -s -vvvv
+            -p no:cacheprovider
             ${THIS_TEST_DIR}
         WORKING_DIRECTORY ${THIS_WORKING_DIR}
     )
 
     # run all tests with 1 OpenMP thread by default
     set_property(TEST ${name} APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    # the tests are run from the source directory: keep __pycache__ out of it,
+    # which also avoids concurrent writes when several dimensionalities run
+    set_property(TEST ${name} APPEND PROPERTY ENVIRONMENT "PYTHONDONTWRITEBYTECODE=1")
 
     # the dimensionality this process runs; a bare pytest run without it picks
     # one of the built dimensionalities itself

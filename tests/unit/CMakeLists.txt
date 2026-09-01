@@ -1,6 +1,6 @@
-# Add pytest-based unit tests, one ctest test (= one process) per built
-# dimensionality. Dimensionalities without a source subdirectory here are
-# skipped automatically.
+# Add the pytest-based unit tests: one ctest test, that is one process, per
+# built dimensionality. The tests themselves are dimensionality-agnostic and
+# skip what does not apply to the geometry they run in.
 #
 foreach(_dim IN LISTS WarpX_DIMS)
     add_warpx_pytest(${_dim})
