@@ -4596,7 +4596,8 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     Reduce size of the selected diagnostic fields output by this ratio in each dimension.
-    (For a ratio of N, this is done by averaging the fields over N or (N+1) points depending on the staggering).
+    Coarsening uses ``ablastr::coarsen::sample``, which samples one or two nearby source points per dimension, depending on the field staggering.
+    See :ref:`developers-fields-coarsening-interpolation-helpers`.
     If ``blocking_factor`` and ``max_grid_size`` are used for the domain decomposition, as detailed in
     the :ref:`domain decomposition <usage_domain_decomposition>` section, ``coarsening_ratio`` should be an integer
     divisor of ``blocking_factor``. If :pp:param:`warpx.numprocs` is used instead, the total number of cells in a given
