@@ -277,18 +277,22 @@ function(warpx_test_set_pythonpath test_name)
 endfunction()
 
 
-# Add a pytest-based unit test suite for one dimensionality.
+set(_warpx_pytest_dims "1;2;3;RZ")
+
+# Add the pytest-based unit test suite for one dimensionality.
 #
-# Every pytest process is pinned to a single dimensionality: the compiled
-# warpx_pybind_* module can only be imported once per process (see
-# Python/pywarpx/_libwarpx.py). We therefore register one ctest test per built
-# dimensionality, each running the tests in the matching source subdirectory.
+# The tests themselves are dimensionality-agnostic: every dimensionality runs
+# the same directory and the suite adapts, skipping what does not apply. What
+# cannot be shared is the process, because a compiled warpx_pybind_* module can
+# only be imported once per process (see Python/pywarpx/_libwarpx.py). We
+# therefore register one ctest test per built dimensionality and tell each of
+# them which one to use through WARPX_TEST_DIMS.
 #
 # Test names are pytest.WarpX.<suffix>, so that
 #   ctest -R pytest             runs all of them and
 #   ctest -R pytest.WarpX.3d    runs a single dimensionality.
 #
-# dims: 1, 2, 3, RZ, RCYLINDER, RSPHERE
+# dims: 1, 2, 3, RZ
 #
 function(add_warpx_pytest dims)
     # pytest tests drive WarpX through its Python bindings
@@ -301,14 +305,16 @@ function(add_warpx_pytest dims)
         return()
     endif()
 
+    # pywarpx cannot select RCYLINDER or RSPHERE yet, even though they are
+    # valid WarpX_DIMS values, see LibWarpX.load_library
+    if(NOT dims IN_LIST _warpx_pytest_dims)
+        return()
+    endif()
+
     # set dimension suffix
     warpx_set_suffix_dims(SD ${dims})
 
-    # nothing to run if no tests were written for this dimensionality yet
-    set(THIS_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/${SD})
-    if(NOT IS_DIRECTORY ${THIS_TEST_DIR})
-        return()
-    endif()
+    set(THIS_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
     set(name pytest.WarpX.${SD})
 
@@ -330,6 +336,10 @@ function(add_warpx_pytest dims)
 
     # run all tests with 1 OpenMP thread by default
     set_property(TEST ${name} APPEND PROPERTY ENVIRONMENT "OMP_NUM_THREADS=1")
+
+    # the dimensionality this process runs; a bare pytest run without it picks
+    # one of the built dimensionalities itself
+    set_property(TEST ${name} APPEND PROPERTY ENVIRONMENT "WARPX_TEST_DIMS=${dims}")
 
     set_property(TEST ${name} APPEND PROPERTY LABELS "pytest")
 

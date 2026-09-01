@@ -8,9 +8,18 @@
 import numpy as np
 import pytest
 
+import pywarpx
 from pywarpx import picmi
 
 constants = picmi.constants
+
+# The conservation identities below integrate a density over the grid with a
+# Cartesian volume element. RZ deposits with an inverse volume scaling instead,
+# so it needs its own test rather than this assertion.
+pytestmark = pytest.mark.skipif(
+    pywarpx.libwarpx.geometry_dim not in ("1d", "2d", "3d"),
+    reason="conservation identity assumes a Cartesian volume element",
+)
 
 
 def _total(mf, geom, dV):
@@ -73,10 +82,9 @@ def test_current_deposition_scales_with_weight(
 
     uz = 1.0e8
     weight = 1.0e6
-    n_per_dim = 4
-    electrons, _ = uniform_particles(sim, n_per_dim=n_per_dim, weight=weight, uz=uz)
+    electrons, p = uniform_particles(sim, weight=weight, uz=uz)
     # a second set at the same positions, carrying twice the weight
-    uniform_particles(sim, n_per_dim=n_per_dim, weight=2.0 * weight, uz=uz)
+    uniform_particles(sim, weight=2.0 * weight, uz=uz)
 
     fields = sim.fields
     for direction in ("x", "y", "z"):
@@ -89,6 +97,7 @@ def test_current_deposition_scales_with_weight(
     total = _total(fields.get("current_fp", "z", 0), geom, cell_volume(sim))
 
     gamma = np.sqrt(1.0 + uz**2 / constants.c**2)
-    expected = -constants.q_e * n_per_dim**3 * (weight + 2.0 * weight) * uz / gamma
+    n_part = p["w"].size
+    expected = -constants.q_e * n_part * (weight + 2.0 * weight) * uz / gamma
 
     assert np.isclose(total, expected, rtol=rtol())

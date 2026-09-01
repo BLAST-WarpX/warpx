@@ -8,9 +8,18 @@
 import numpy as np
 import pytest
 
+import pywarpx
 from pywarpx import picmi
 
 constants = picmi.constants
+
+# The conservation identities below integrate a density over the grid with a
+# Cartesian volume element. RZ deposits with an inverse volume scaling instead,
+# so it needs its own test rather than this assertion.
+pytestmark = pytest.mark.skipif(
+    pywarpx.libwarpx.geometry_dim not in ("1d", "2d", "3d"),
+    reason="conservation identity assumes a Cartesian volume element",
+)
 
 
 @pytest.mark.parametrize("particle_shape", ["linear", "quadratic", "cubic"])
@@ -26,10 +35,9 @@ def test_charge_deposition_conserves_total_charge(
     """
     sim = make_sim(particle_shape=particle_shape)
 
-    n_per_dim = 4
     weight = 1.0e6
-    n_part = n_per_dim**3
-    electrons, _ = uniform_particles(sim, n_per_dim=n_per_dim, weight=weight)
+    electrons, p = uniform_particles(sim, weight=weight)
+    n_part = p["w"].size
 
     assert electrons.size == n_part
 
