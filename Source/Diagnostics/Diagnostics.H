@@ -17,11 +17,37 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 /** All types of diagnostics. */
-enum struct DiagTypes {Full, BackTransformed, BoundaryScraping, TimeAveraged};
+enum struct DiagTypes
+{
+    Full,
+    BackTransformed,
+    BoundaryScraping,
+    TimeAveraged
+};
+
+/** A struct containing the moving window parameters required to initialize a diagnostic */
+struct InitDiagnosticsMovingWindowParameters
+{
+    std::optional<int> dir;                    /** The moving window direction */
+    std::optional<amrex::Real> x;              /** The moving window position */
+    std::optional<amrex::Real> cell_size_lev0; /** The cell size in the moving window direction (at level 0)*/
+    std::optional<amrex::Real> prob_lo_lev0;   /** The lo end of the problem domain in the moving window direction (at level 0)*/
+};
+
+/** A struct containing the parameters required to initialize a diagnostic */
+struct InitDiagnosticsParameters
+{
+    std::optional<int> finest_level;     /** The finest level */
+    std::optional<int> max_level;        /** The max level */
+
+    std::optional<InitDiagnosticsMovingWindowParameters> moving_window; /** Moving window parameters */
+};
+
 /**
  * \brief base class for diagnostics.
  * Contains main routines to filter, compute and flush diagnostics.
@@ -72,9 +98,17 @@ public:
      */
     virtual void Flush (int i_buffer, bool force_flush) = 0;
 
-    /** Initialize pointers to main fields and allocate output multifab m_mf_output. */
-    void InitData (const MultiParticleContainer& mpc);
-    void InitDataBeforeRestart ();
+    /** \brief * Initialize pointers to main fields and allocate output multifab m_mf_output.
+     *
+     * @param[in] params struct containing the essential parameters required to initialize a diagnostic
+     * @param[in] mpc a constant reference to the MultiParticleContainer
+     * @param[in] p_warpx_mesh a pointer to the base class of the WarpX object
+     */
+    void InitData (
+        const InitDiagnosticsParameters& params,
+        const MultiParticleContainer& mpc,
+        amrex::AmrMesh* p_warpx_mesh);
+    void InitDataBeforeRestart (const InitDiagnosticsParameters& params, amrex::AmrMesh* p_warpx_mesh);
     void InitDataAfterRestart (const MultiParticleContainer& mpc);
 
     /** Initialize functors that store pointers to the fields requested by the user.
@@ -195,7 +229,7 @@ protected:
     /** Whether to output a message when diagnostics are output */
     int m_verbose = 2;
     /** Initialize member variables of the base Diagnostics class. */
-    void InitBaseData ();
+    void InitBaseData (const InitDiagnosticsParameters& params, [[maybe_unused]] amrex::AmrMesh* p_warpx_mesh);
     /** Initialize m_mf_output vectors and data required to construct the buffers
      * \param[in] i_buffer index of buffer for which the output MultiFab is defined.
      * \param[in] lev level on which the output MultiFab is defined
