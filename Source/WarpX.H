@@ -1429,6 +1429,8 @@ private:
     int field_io_nfiles = 1024;
     int particle_io_nfiles = 1024;
 
+    ablastr::utils::text::IntervalsParser m_tiny_profiler_flush_interval;
+
     amrex::RealVect fine_tag_lo;
     amrex::RealVect fine_tag_hi;
     //! User-defined parser to define refinement patches
