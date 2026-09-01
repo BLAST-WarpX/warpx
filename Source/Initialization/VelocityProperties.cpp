@@ -57,8 +57,8 @@ namespace {
                     utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
             vel.m_type = VelParserFunctionVector;
         } else if (u_mean_dist_s == "read_from_file") {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
             if (WarpX::gamma_boost > 1.0) {
                 WARPX_ABORT_WITH_MESSAGE(
                     dist_type_param + " = read_from_file is not "
@@ -71,10 +71,18 @@ namespace {
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dx =
                 geom.CellSizeArray();
             amrex::Box const dombox = amrex::convert(geom.Domain(), amrex::IntVect(1));
+            // In RZ, the record holds the cylindrical components of the vector
+#if defined(WARPX_DIM_RZ)
+            std::string const comp_x = "r";
+            std::string const comp_y = "t";
+#else
+            std::string const comp_x = "x";
+            std::string const comp_y = "y";
+#endif
             vel.m_u_mean_x_reader = std::make_unique<ExternalFieldReader>(
-                vel.m_read_u_mean_path, "u_mean", "x", problo, dx, dombox, false);
+                vel.m_read_u_mean_path, "u_mean", comp_x, problo, dx, dombox, false);
             vel.m_u_mean_y_reader = std::make_unique<ExternalFieldReader>(
-                vel.m_read_u_mean_path, "u_mean", "y", problo, dx, dombox, false);
+                vel.m_read_u_mean_path, "u_mean", comp_y, problo, dx, dombox, false);
             vel.m_u_mean_z_reader = std::make_unique<ExternalFieldReader>(
                 vel.m_read_u_mean_path, "u_mean", "z", problo, dx, dombox, false);
             amrex::BoxArray const grids;
@@ -86,7 +94,7 @@ namespace {
 #else
             WARPX_ABORT_WITH_MESSAGE(
                 dist_type_param + " = read_from_file requires WarpX built with "
-                "openPMD support and is not supported in RZ/RCYLINDER/RSPHERE geometries.");
+                "openPMD support and is not supported in RCYLINDER/RSPHERE geometries.");
 #endif
         }
         else {

@@ -23,6 +23,7 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_TableData.H>
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -263,14 +264,48 @@ private:
     amrex::FabArray<amrex::BaseFab<double>> m_mf; //! non-owning container for communication purpose
 };
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ)
+/**
+ * \brief Rotate a vector from the local cylindrical basis to the Cartesian basis.
+ *
+ * \param[in] u_cyl components (r, theta, z) of the vector, in the local
+ *                  cylindrical basis at the azimuthal angle of the point (x, y)
+ * \param[in] x     Cartesian x coordinate of that point
+ * \param[in] y     Cartesian y coordinate of that point
+ *
+ * \return the components (x, y, z) of the same vector, in the Cartesian basis
+ */
+[[nodiscard]]
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::XDim3
+CylindricalToCartesian (amrex::XDim3 const& u_cyl, amrex::Real x, amrex::Real y) noexcept
+{
+    using namespace amrex::literals;
+    amrex::Real const r = std::sqrt(x*x + y*y);
+    // On the axis, the azimuthal angle is arbitrary: use theta = 0.
+    amrex::Real const cos_theta = (r > 0._rt) ? x/r : 1._rt;
+    amrex::Real const sin_theta = (r > 0._rt) ? y/r : 0._rt;
+    return amrex::XDim3{cos_theta*u_cyl.x - sin_theta*u_cyl.y,
+                        sin_theta*u_cyl.x + cos_theta*u_cyl.y,
+                        u_cyl.z};
+}
+#endif
+
 /**
  * \brief Companion class for a triplet of ExternalFieldReader.
  *
  * This groups the views of the three components of a vector record into a
  * single lightweight functor that can be used in kernels. It is the
  * vector-valued analogue of ExternalFieldView.
+ *
+ * In RZ geometry, the three readers hold the cylindrical components
+ * (r, theta, z) of the record, on the (r, z) grid. In that case, `getValue`
+ * evaluates them at the radius of the requested point and returns the
+ * components in the local cylindrical basis at that point: it is up to the
+ * caller to rotate them with `CylindricalToCartesian` when Cartesian
+ * components are needed.
  */
 struct ExternalFieldVectorView
 {
@@ -288,6 +323,9 @@ struct ExternalFieldVectorView
     amrex::XDim3
     getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
     {
+#if defined(WARPX_DIM_RZ)
+        amrex::RealVect const pos{std::sqrt(x*x + y*y), z};
+#else
 #if (AMREX_SPACEDIM < 3)
         amrex::ignore_unused(x,y,z);
 #endif
@@ -297,6 +335,7 @@ struct ExternalFieldVectorView
         amrex::RealVect const pos{x,z};
 #else
         amrex::RealVect const pos{x,y,z};
+#endif
 #endif
 #if defined(AMREX_USE_GPU)
         // The views can only be evaluated on device: ExternalFieldView calls

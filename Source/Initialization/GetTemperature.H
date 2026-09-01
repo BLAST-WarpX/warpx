@@ -79,8 +79,8 @@ struct GetTemperatureVector
 
     amrex::Real m_ux_std{0}, m_uy_std{0}, m_uz_std{0};
     amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     ExternalFieldVectorView m_from_file;
 #endif
     /**
@@ -101,6 +101,12 @@ struct GetTemperatureVector
      *\return value of temperature at (x,y,z).
      *        m_ux_std, m_uy_std, m_uz_std if m_type is TempConstantVector
      *        m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z) if m_type is TempParserFunctionVector
+     *
+     * In RZ geometry with m_type == TempFromFileVector, the returned thermal
+     * spreads are the components in the local cylindrical basis (r, theta, z) at
+     * (x,y,z), so that an anisotropic spread stays correctly oriented. The
+     * momentum offset drawn from them is rotated into the Cartesian basis by
+     * InjectorMomentumMaxwellian.
      */
     AMREX_GPU_HOST_DEVICE
     amrex::XDim3 operator() (amrex::Real const x, amrex::Real const y, amrex::Real const z) const noexcept
@@ -115,8 +121,8 @@ struct GetTemperatureVector
             {
                 return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
             }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
             case (TempFromFileVector):
             {
                 return m_from_file.getValue(x, y, z);

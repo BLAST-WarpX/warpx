@@ -1801,11 +1801,16 @@ Particle initialization
           ``<species_name>.uz_mean_function(x,y,z)``.
         * If ``read_from_file``, ``u_mean`` is read as a function of position from an openPMD
           file and interpolated to the particle positions (requires a WarpX build with openPMD;
-          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          not supported yet in ``RCYLINDER`` / ``RSPHERE``). The following is required:
           ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
-          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z`` in Cartesian
+          geometry, or with the cylindrical components ``r``, ``t`` and ``z`` in ``RZ``
+          geometry (in that case, the record is read on the ``(r,z)`` grid, with a single
+          azimuthal mode, and the components are rotated to Cartesian components using the
+          azimuthal angle of each particle). See
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
+          In ``RZ``, this option is not supported with ``injection_style = NFluxPerCell``.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1824,11 +1829,17 @@ Particle initialization
           ``<species_name>.uz_std_function(x,y,z)``.
         * If ``read_from_file``, ``u_std`` is read as a function of position from an openPMD
           file and interpolated to the particle positions (requires a WarpX build with openPMD;
-          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          not supported yet in ``RCYLINDER`` / ``RSPHERE``). The following is required:
           ``<species_name>.read_u_std_from_path`` (openPMD file path). The file must contain
-          an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z``. See
+          an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z`` in Cartesian
+          geometry, or with the cylindrical components ``r``, ``t`` and ``z`` in ``RZ``
+          geometry (in that case, the record is read on the ``(r,z)`` grid, with a single
+          azimuthal mode; the momentum offset is sampled in the local cylindrical basis, so
+          that an anisotropic spread stays correctly oriented, and is then rotated to
+          Cartesian components using the azimuthal angle of each particle). See
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
+          In ``RZ``, this option is not supported with ``injection_style = NFluxPerCell``.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
@@ -1866,11 +1877,16 @@ Particle initialization
           ``<species_name>.uz_mean_function(x,y,z)``.
         * If ``read_from_file``, ``u_mean`` is read as a function of position from an openPMD
           file and interpolated to the particle positions (requires a WarpX build with openPMD;
-          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          not supported yet in ``RCYLINDER`` / ``RSPHERE``). The following is required:
           ``<species_name>.read_u_mean_from_path`` (openPMD file path). The file must contain
-          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
+          an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z`` in Cartesian
+          geometry, or with the cylindrical components ``r``, ``t`` and ``z`` in ``RZ``
+          geometry (in that case, the record is read on the ``(r,z)`` grid, with a single
+          azimuthal mode, and the components are rotated to Cartesian components using the
+          azimuthal angle of each particle). See
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
+          In ``RZ``, this option is not supported with ``injection_style = NFluxPerCell``.
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.
