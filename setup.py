@@ -136,8 +136,9 @@ class CMakeBuild(build_ext):
             # Windows: has no RPath concept, all `.dll`s must be in %PATH%
             #          or same dir as calling executable
         ]
-        # Free-threaded (PEP 703) gil_disabled is OFF by default
-        #   https://cmake.org/cmake/help/latest/module/FindPython.html#variable:Python_FIND_ABI
+        # CMake's Python_FIND_ABI defaults the gil_disabled flag to OFF,
+        # so free-threaded interpreters are not matched. Requires CMake 3.30+"
+        # See https://cmake.org/cmake/help/latest/module/FindPython.html#variable:Python_FIND_ABI
         if sysconfig.get_config_var("Py_GIL_DISABLED"):
             cmake_args.append("-DPython_FIND_ABI=OFF;OFF;OFF;ON")
         if emscripten:
