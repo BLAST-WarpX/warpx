@@ -7,7 +7,6 @@
 
 import numpy as np
 import pytest
-from conftest import cell_volume, rtol, uniform_particles
 
 from pywarpx import picmi
 
@@ -20,7 +19,9 @@ def _total(mf, geom, dV):
 
 
 @pytest.mark.parametrize("current_deposition_algo", ["direct", "esirkepov"])
-def test_current_deposition_conserves_total_current(make_sim, current_deposition_algo):
+def test_current_deposition_conserves_total_current(
+    make_sim, uniform_particles, cell_volume, rtol, current_deposition_algo
+):
     """Current deposition must conserve the total current of the species.
 
     Integrating the deposited current density over the grid must return
@@ -64,7 +65,9 @@ def test_current_deposition_conserves_total_current(make_sim, current_deposition
         assert np.isclose(total, 0.0, atol=abs(expected_jz) * rtol())
 
 
-def test_current_deposition_scales_with_weight(make_sim):
+def test_current_deposition_scales_with_weight(
+    make_sim, uniform_particles, cell_volume, rtol
+):
     """The deposited current must be linear in the macro particle weight."""
     sim = make_sim(current_deposition_algo="direct")
 

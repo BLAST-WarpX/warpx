@@ -7,7 +7,6 @@
 
 import numpy as np
 import pytest
-from conftest import cell_volume, rtol, uniform_particles
 
 from pywarpx import picmi
 
@@ -15,7 +14,9 @@ constants = picmi.constants
 
 
 @pytest.mark.parametrize("particle_shape", ["linear", "quadratic", "cubic"])
-def test_charge_deposition_conserves_total_charge(make_sim, particle_shape):
+def test_charge_deposition_conserves_total_charge(
+    make_sim, uniform_particles, cell_volume, rtol, particle_shape
+):
     """Charge deposition must conserve the total charge of the species.
 
     Whatever the B-spline order, the shape factors of a macro particle sum to
@@ -54,7 +55,7 @@ def test_charge_deposition_conserves_total_charge(make_sim, particle_shape):
     assert np.isclose(deposited_charge, expected_charge, rtol=rtol())
 
 
-def test_charge_deposition_is_negative_for_electrons(make_sim):
+def test_charge_deposition_is_negative_for_electrons(make_sim, uniform_particles):
     """Electrons must deposit a negative charge density everywhere."""
     sim = make_sim()
     electrons, _ = uniform_particles(sim)

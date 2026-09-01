@@ -22,9 +22,13 @@ import pywarpx
 # time, so this cannot be conditioned on the build having MPI. Importing mpi4py
 # is harmless for a serial build.
 try:
-    from mpi4py import MPI  # noqa
+    from mpi4py import MPI
+
+    mpi_owned_by_mpi4py = MPI.Is_initialized()
 except ImportError:
-    pass
+    # mpi4py is optional. Without it, AMReX initializes and finalizes MPI
+    # itself, which limits a process to a single simulation.
+    mpi_owned_by_mpi4py = False
 
 
 def pytest_configure(config):

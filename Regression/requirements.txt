@@ -8,6 +8,5 @@ openpmd-api
 openpmd-viewer
 pandas
 periodictable
-pytest
 scipy
 yt

@@ -15,9 +15,25 @@ from pywarpx import picmi
 RTOL = {"SINGLE": 1.0e-5, "DOUBLE": 1.0e-12}
 
 
+def _rtol():
+    """Relative tolerance matching the precision WarpX was compiled with.
+
+    Deposition combines particle attributes (``ParticleReal``) with field data
+    (``Real``), so a mixed-precision build is held to the looser of the two.
+    """
+    config = pywarpx.libwarpx.Config
+    return max(RTOL[config.precision], RTOL[config.precision_particles])
+
+
+@pytest.fixture(scope="function")
 def rtol():
-    """Relative tolerance matching the precision WarpX was compiled with."""
-    return RTOL[pywarpx.libwarpx.Config.precision]
+    """Callable returning the tolerance for the compiled precision.
+
+    This hands out a callable rather than a value because ``Config`` only
+    exists once the dimensionality-specific module has been loaded, which
+    happens when the first simulation of a test is built.
+    """
+    return _rtol
 
 
 @pytest.fixture(scope="function")
@@ -92,7 +108,7 @@ def make_sim():
     return _make
 
 
-def uniform_particles(sim, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0):
+def _uniform_particles(sim, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0):
     """Add a regular lattice of macro particles to the ``electrons`` species.
 
     The particles are placed strictly inside the domain, offset from both cell
@@ -128,6 +144,18 @@ def uniform_particles(sim, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0):
     return electrons, dict(x=x, y=y, z=z, ux=uxp, uy=uyp, uz=uzp, w=w)
 
 
-def cell_volume(sim):
+def _cell_volume(sim):
     """Volume of one cell of the level-0 grid."""
     return float(np.prod(sim.extension.warpx.Geom(0).data().CellSize()))
+
+
+@pytest.fixture(scope="function")
+def uniform_particles():
+    """Callable adding a regular lattice of macro particles, see below."""
+    return _uniform_particles
+
+
+@pytest.fixture(scope="function")
+def cell_volume():
+    """Callable returning the level-0 cell volume of a simulation."""
+    return _cell_volume
