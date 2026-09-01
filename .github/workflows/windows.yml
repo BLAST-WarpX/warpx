@@ -20,10 +20,8 @@ jobs:
   build_win_msvc:
     name: MSVC C++20 w/o MPI
     runs-on: windows-latest
-    # disabled due to issues in #5230
-    if: 0
-    #needs: check_changes
-    #if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
@@ -42,6 +40,10 @@ jobs:
           ccache-windows-winmsvc-${{ hashFiles('.github/workflows/windows.yml') }}-
           ccache-windows-winmsvc-
     - name: Build & Install
+      env:
+        # Work-around for windows-latest GH runner issue, see
+        # https://github.com/actions/runner-images/issues/10004
+        CXXFLAGS: "/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR"
       run: |
         cmake -S . -B build               `
               -DCMAKE_BUILD_TYPE=Debug    `
