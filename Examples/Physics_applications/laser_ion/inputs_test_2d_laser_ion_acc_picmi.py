@@ -265,6 +265,19 @@ load_balance_costs_rdiag = picmi.ReducedDiagnostic(
     name="LBC",
 )
 
+# Per-rank memory diagnostic: one text file per MPI rank, containing AMReX
+# arena usage, host-process memory (VmRSS etc. on Linux), hostname and
+# GPU device id. Use sparingly on large production runs; see
+# <rd_name>.rank_stride to thin out the number of files.
+# NOTE: use sparingly for large-scale runs as it produces a text file per rank
+memory_per_rank_rdiag = picmi.ReducedDiagnostic(
+    diag_type="MemoryPerRank",
+    name="MPR",
+    period=100,
+    path="diags/reducedfiles/MemoryPerRank/",
+    file_prefix="MPR",
+)
+
 # Set up simulation
 sim = picmi.Simulation(
     solver=solver,
@@ -311,6 +324,7 @@ sim.add_diagnostic(field_probe_z_rdiag)
 sim.add_diagnostic(field_probe_scat_point_rdiag)
 sim.add_diagnostic(field_probe_scat_line_rdiag)
 sim.add_diagnostic(load_balance_costs_rdiag)
+sim.add_diagnostic(memory_per_rank_rdiag)
 # TODO: make ParticleHistogram2D available
 
 # Write input file that can be used to run with the compiled version
