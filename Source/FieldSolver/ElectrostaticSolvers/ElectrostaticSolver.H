@@ -144,6 +144,7 @@ public:
 
     /** Boundary handler object to set potential for EB and on the domain boundary */
     std::unique_ptr<PoissonBoundaryHandler> m_poisson_boundary_handler;
+    bool m_skip_domain_bc_value_update = false;
 
     /** Parameters for MLMG Poisson solve */
     amrex::Real self_fields_required_precision = 1e-11;
