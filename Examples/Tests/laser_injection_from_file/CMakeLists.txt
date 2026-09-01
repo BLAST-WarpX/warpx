@@ -122,6 +122,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_laser_injection_from_RZ_lasy_file_prepare  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_laser_injection_from_RZ_lasy_file_prepare.py  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_laser_injection_from_RZ_lasy_file  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_laser_injection_from_RZ_lasy_file  # inputs
+    "analysis_3d_from_RZ_file.py diags/diag1000251"  # analysis
+    "analysis_default_regression.py --path diags/diag1000251"  # checksum
+    test_3d_laser_injection_from_RZ_lasy_file_prepare  # dependency
+)
+
+add_warpx_test(
     test_rz_laser_injection_from_RZ_lasy_file_prepare  # name
     RZ  # dims
     1  # nprocs
