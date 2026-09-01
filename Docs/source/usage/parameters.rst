@@ -3216,6 +3216,14 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc`` with impact ionization. This specifies which one of the
     colliding particles is ionized.
 
+    If the target species also undergoes field ionization (i.e. it has
+    :pp:param:`<species_name>.do_field_ionization` ``= 1``), then DSMC impact ionization is
+    automatically skipped for target macroparticles that are already fully ionized (i.e. whose
+    ionization level has reached the atomic number of the element). This avoids unphysically
+    ionizing a fully-stripped ion that has no bound electron left to remove. Note, however, that
+    the impact-ionization cross section is still assumed to correspond to the transition specified
+    by the provided cross-section file, regardless of the target's current ionization level.
+
 .. pp:param:: <collision_name>.decay_rate(x,y,z,t)
     :type: `string`
 
