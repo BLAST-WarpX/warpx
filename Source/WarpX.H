@@ -311,6 +311,16 @@ public:
 
     //! If true, a bilinear filter is used to smooth charge and currents
     static bool use_filter;
+    /** Cartesian only: bilinear-filter E/B_aux when \c use_filter is on
+     *  and mesh refinement is off. */
+    [[nodiscard]] bool UseFilterEBAux () const
+    {
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+        return use_filter && maxLevel() == 0;
+#else
+        return false;
+#endif
+    }
     //! If true, the bilinear filtering of charge and currents is done in Fourier space
     static bool use_kspace_filter;
     //! If true, a compensation step is added to the bilinear filtering of charge and currents
