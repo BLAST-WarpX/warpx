@@ -9,6 +9,7 @@
 #define WARPX_PARTICLES_PUSHER_UPDATEPOSITION_H_
 
 #include "Utils/WarpXConst.H"
+#include "Utils/WarpXDim.H"
 
 #include <AMReX.H>
 #include <AMReX_FArrayBox.H>
@@ -19,7 +20,10 @@
 /** \brief Push the particle position over one time step,
  *         given the value of its momenta `ux`, `uy`, `uz`,
  *         using the standard leapfrog algorithm x(t+dt) = x(t) + v(t+dt/2)*dt.
+ *
+ * \tparam D dimensionality of the simulation
  */
+template <warpx::Dim D = warpx::CompileDim>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
                      [[maybe_unused]] amrex::ParticleReal& y,
@@ -30,6 +34,8 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
 {
     using namespace amrex::literals;
 
+    static_assert(D != warpx::Dim::Runtime, "UpdatePosition requires an explicit dimensionality");
+
     amrex::ParticleReal const u2 = ux*ux + uy*uy + uz*uz;
 
     // massive particles
@@ -38,16 +44,16 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
         const amrex::ParticleReal inv_gamma = 1._prt/std::sqrt(1._prt + u2*inv_c2);
 
         // Update positions over one time step
-#if !defined(WARPX_DIM_1D_Z)
-        x += ux * inv_gamma * dt;
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
-        y += uy * inv_gamma * dt;
-#endif
-#if !defined(WARPX_DIM_RCYLINDER)
-        z += uz * inv_gamma * dt;
-#endif
+        if constexpr (warpx::pushes_x_3d<D>) {
+            x += ux * inv_gamma * dt;
+        }
+        if constexpr (warpx::pushes_y_3d<D>) {
+            // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
+            y += uy * inv_gamma * dt;
+        }
+        if constexpr (warpx::pushes_z_3d<D>) {
+            z += uz * inv_gamma * dt;
+        }
     }
     // massless particles (photons)
     else {
@@ -55,16 +61,16 @@ void UpdatePosition ([[maybe_unused]] amrex::ParticleReal& x,
             amrex::ParticleReal const c_over_unorm = PhysConst::c/std::sqrt(u2);
 
             // Update positions over one time step
-#if !defined(WARPX_DIM_1D_Z)
-            x += ux * c_over_unorm * dt;
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
-            y += uy * c_over_unorm * dt;
-#endif
-#if !defined(WARPX_DIM_RCYLINDER)
-            z += uz * c_over_unorm * dt;
-#endif
+            if constexpr (warpx::pushes_x_3d<D>) {
+                x += ux * c_over_unorm * dt;
+            }
+            if constexpr (warpx::pushes_y_3d<D>) {
+                // Particles pushed in 3D even in 1D cylindrical, 1D spherical, and 2D cylindrical geometry
+                y += uy * c_over_unorm * dt;
+            }
+            if constexpr (warpx::pushes_z_3d<D>) {
+                z += uz * c_over_unorm * dt;
+            }
         }
     }
 }
@@ -100,7 +106,10 @@ amrex::ParticleReal GetImplicitGammaInverse (const amrex::ParticleReal uxp_n,
  *    The implicit version is the Crank-Nicolson scheme,
  *    x^{n+1} - x^{n} = dt*(u^{n+1} + u^{n})/(gamma^{n+1} + gamma^{n})
  *    See Eqs. 15 and 17 in Chen, JCP 407 (2020) 109228.
+ *
+ * \tparam D dimensionality of the simulation
  */
+template <warpx::Dim D = warpx::CompileDim>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void UpdatePositionImplicit ([[maybe_unused]] amrex::ParticleReal& x,
                              [[maybe_unused]] amrex::ParticleReal& y,
@@ -109,27 +118,31 @@ void UpdatePositionImplicit ([[maybe_unused]] amrex::ParticleReal& x,
                              const amrex::ParticleReal ux, const amrex::ParticleReal uy, const amrex::ParticleReal uz,
                              const amrex::Real dt )
 {
+    static_assert(D != warpx::Dim::Runtime, "UpdatePositionImplicit requires an explicit dimensionality");
 
     // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
     const amrex::ParticleReal inv_gamma = GetImplicitGammaInverse(ux_n, uy_n, uz_n, ux, uy, uz);
 
     // Update positions over one time step
-#if !defined(WARPX_DIM_1D_Z)
-    x += ux * inv_gamma * dt;
-#endif
-#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Radial pushes particles in 3D
-    y += uy * inv_gamma * dt;
-#endif
-#if !defined(WARPX_DIM_RCYLINDER)
-    z += uz * inv_gamma * dt;
-#endif
+    if constexpr (warpx::pushes_x_3d<D>) {
+        x += ux * inv_gamma * dt;
+    }
+    if constexpr (warpx::pushes_y_3d<D>) {
+        // Radial pushes particles in 3D
+        y += uy * inv_gamma * dt;
+    }
+    if constexpr (warpx::pushes_z_3d<D>) {
+        z += uz * inv_gamma * dt;
+    }
 }
 
 /** \brief Check particle position for convergence. This is used by the Picard method
  *         used to achieve a self-consistent time-centered update of the particles
  *         for given electric and magnetic fields on the grid.
+ *
+ * \tparam D dimensionality of the simulation
  */
+template <warpx::Dim D = warpx::CompileDim>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void PositionNorm ([[maybe_unused]] const amrex::ParticleReal dxp,
                    [[maybe_unused]] const amrex::ParticleReal dyp,
@@ -144,19 +157,21 @@ void PositionNorm ([[maybe_unused]] const amrex::ParticleReal dxp,
 {
     using namespace amrex::literals;
 
-#if !defined(WARPX_DIM_RCYLINDER)
-    step_norm = (dzp - dzp_save)*(dzp - dzp_save)*idzg2;
-#else
-    step_norm = 0._prt;
-#endif
-#if !defined(WARPX_DIM_1D_Z)
-    step_norm += (dxp - dxp_save)*(dxp - dxp_save)*idxg2;
-#endif
-#if defined(WARPX_DIM_3D)
-    step_norm += (dyp - dyp_save)*(dyp - dyp_save)*idyg2;
-#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    step_norm += (dyp - dyp_save)*(dyp - dyp_save)*idxg2;
-#endif
+    static_assert(D != warpx::Dim::Runtime, "PositionNorm requires an explicit dimensionality");
+
+    if constexpr (warpx::pushes_z_3d<D>) {
+        step_norm = (dzp - dzp_save)*(dzp - dzp_save)*idzg2;
+    } else {
+        step_norm = 0._prt;
+    }
+    if constexpr (warpx::pushes_x_3d<D>) {
+        step_norm += (dxp - dxp_save)*(dxp - dxp_save)*idxg2;
+    }
+    if constexpr (D == warpx::Dim::XYZ) {
+        step_norm += (dyp - dyp_save)*(dyp - dyp_save)*idyg2;
+    } else if constexpr (warpx::is_radial<D>) {
+        step_norm += (dyp - dyp_save)*(dyp - dyp_save)*idxg2;
+    }
     step_norm = std::sqrt(step_norm);
 
 }
