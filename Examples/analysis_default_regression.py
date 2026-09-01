@@ -44,8 +44,8 @@ if __name__ == "__main__":
     test_name = os.path.split(os.getcwd())[1]
     compute_backend = os.getenv("WARPX_COMPUTE", "").upper()
     if compute_backend in {"CUDA", "HIP", "SYCL"}:
-        # GPU checksums
-        default_tolerance = 1e-1
+        # FIXME GPU checksums
+        default_tolerance = 1e-12
     else:
         # CPU checksums (default for restart tests is stricter)
         default_tolerance = 1e-12 if "_restart" in test_name else 1e-9

@@ -14,11 +14,30 @@
 # Available runners: https://gitlab.spack.io/groups/hpsf/-/wikis/supported-tags
 #
 .install-dependencies:
+  timeout: 90 minutes
   before_script:
     - hostname
     - apt-get update && apt-get install -y cmake git libhdf5-openmpi-dev libopenmpi-dev openmpi-bin python3-dev python3-venv
     - python3 -m venv venv
     - source venv/bin/activate
+    - |
+      apt-get install -y ccache curl libblas-dev liblapack-dev
+      curl -L -o /usr/local/bin/cmake-easyinstall https://raw.githubusercontent.com/ax3l/cmake-easyinstall/main/cmake-easyinstall
+      chmod a+x /usr/local/bin/cmake-easyinstall
+      # BLAS++
+      cmake-easyinstall --prefix=/usr/local           \
+        git+https://github.com/icl-utk-edu/blaspp.git \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache) \
+        -DCMAKE_CXX_STANDARD=20                       \
+        -Dgpu_backend=${BLASPP_GPU_BACKEND:-auto}     \
+        -Duse_openmp=OFF -Dbuild_tests=OFF
+      # LAPACK++
+      cmake-easyinstall --prefix=/usr/local             \
+        git+https://github.com/icl-utk-edu/lapackpp.git \
+        -DCMAKE_CXX_COMPILER_LAUNCHER=$(which ccache)   \
+        -DCMAKE_CXX_STANDARD=20                         \
+        -Dgpu_backend=${BLASPP_GPU_BACKEND:-auto}       \
+        -Duse_cmake_find_lapack=ON -Dbuild_tests=OFF
     # Dependencies required for analysis and checksums.
     # Remove system copy of Matplotlib to avoid conflict
     # with the version set in the requirements file, see
@@ -34,15 +53,16 @@ NVIDIA-H100:
   script:
     - |
       cmake -S . -B build                                  \
-          -DCMAKE_VERBOSE_MAKEFILE=ON                      \
-          -DBUILDNAME=GPU-H100-CUDA-SP                     \
+          -DBUILDNAME=GPU-H100-CUDA-DP                     \
           -DSITE=Frank_UO                                  \
           -DWarpX_COMPUTE=CUDA                             \
+          -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"        \
           -DWarpX_EB=ON                                    \
           -DWarpX_PYTHON=OFF                               \
           -DCMAKE_CUDA_ARCHITECTURES=90                    \
           -DWarpX_OPENPMD=ON                               \
-          -DWarpX_PRECISION=SINGLE                         \
+          -DWarpX_PRECISION=DOUBLE                         \
+          -DWarpX_PARTICLE_PRECISION=DOUBLE                \
           -DWarpX_FFT=ON                                   \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
@@ -51,53 +71,86 @@ NVIDIA-H100:
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
+      GPU_TESTS=(
+        test_1d_langmuir_multi
+        test_2d_refined_injection
+        test_3d_laser_acceleration_btd
+        test_rcylinder_langmuir_multi
+        test_rsphere_langmuir_multi
+        test_rz_embedded_boundary_diffraction
+      )
+      # Join the test names with "|" to form regex alternatives.
+      GPU_TESTS_REGEX=""
+      for test_name in "${GPU_TESTS[@]}"; do
+        GPU_TESTS_REGEX+="${GPU_TESTS_REGEX:+|}${test_name}"
+      done
+      # Match all generated stages (e.g., <test_name>.run, <test_name>.analysis, etc.).
+      GPU_TESTS_REGEX="^(${GPU_TESTS_REGEX})\."
+      echo "Resolved GPU test regex: ${GPU_TESTS_REGEX}"
+      ctest --test-dir build -N -R "${GPU_TESTS_REGEX}"
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
         # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
+        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure -D ExperimentalTest -D ExperimentalSubmit
       else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error
+        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure
       fi
 
 AMD-MI300:
   extends: .install-dependencies
+  variables:
+    BLASPP_GPU_BACKEND: hip
+    ROCM_PATH: /opt/rocm-6.4.3
+    HIP_PATH: ${ROCM_PATH}
+    HIP_CLANG_PATH: ${ROCM_PATH}/llvm/bin
+    CMAKE_PREFIX_PATH: "${ROCM_PATH}:${CMAKE_PREFIX_PATH}"
   tags: [amd-mi300]
   image: rocm/dev-ubuntu-24.04:6.4.3-complete
   script:
-    - export ROCM_PATH=/opt/rocm-6.4.3
     - export PATH=$ROCM_PATH/bin:$ROCM_PATH/llvm/bin:$PATH
     - export LD_LIBRARY_PATH=$ROCM_PATH/lib:$ROCM_PATH/lib64:$LD_LIBRARY_PATH
-    - export HIP_PATH=$ROCM_PATH
-    - export HIP_CLANG_PATH=$ROCM_PATH/llvm/bin
-    - export CMAKE_PREFIX_PATH=$ROCM_PATH:$CMAKE_PREFIX_PATH
     - |
       cmake -S . -B build                              \
           -DCMAKE_C_COMPILER=$(which clang)            \
           -DCMAKE_CXX_COMPILER=$(which clang++)        \
-          -DCMAKE_VERBOSE_MAKEFILE=ON                  \
-          -DBUILDNAME=GPU-MI300-HIP-SP                 \
+          -DBUILDNAME=GPU-MI300-HIP-DP                 \
           -DSITE=Frank_UO                              \
           -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
+          -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE"    \
           -DWarpX_EB=ON                                \
           -DWarpX_PYTHON=OFF                           \
           -DWarpX_MPI=ON                               \
           -DWarpX_OPENPMD=ON                           \
-          -DWarpX_PRECISION=SINGLE                     \
+          -DWarpX_PRECISION=DOUBLE                     \
+          -DWarpX_PARTICLE_PRECISION=DOUBLE            \
           -DWarpX_FFT=ON
     - cmake --build build -j 16
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
+      GPU_TESTS=(
+        test_1d_langmuir_multi
+        test_2d_refined_injection
+        test_3d_laser_acceleration_btd
+        test_rcylinder_langmuir_multi
+        test_rsphere_langmuir_multi
+        test_rz_embedded_boundary_diffraction
+      )
+      # Join the test names with "|" to form regex alternatives.
+      GPU_TESTS_REGEX=""
+      for test_name in "${GPU_TESTS[@]}"; do
+        GPU_TESTS_REGEX+="${GPU_TESTS_REGEX:+|}${test_name}"
+      done
+      # Match all generated stages (e.g., <test_name>.run, <test_name>.analysis, etc.).
+      GPU_TESTS_REGEX="^(${GPU_TESTS_REGEX})\."
+      echo "Resolved GPU test regex: ${GPU_TESTS_REGEX}"
+      ctest --test-dir build -N -R "${GPU_TESTS_REGEX}"
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
         # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
+        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure -D ExperimentalTest -D ExperimentalSubmit
       else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error
+        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure
       fi
 
 Intel-PVC:
@@ -113,9 +166,8 @@ Intel-PVC:
     - |
       cmake -S . -B build                       \
           -DBUILD_SHARED_LIBS=ON                \
-          -DBUILDNAME=GPU-PVC-SYCL-MP           \
+          -DBUILDNAME=GPU-PVC-SYCL-DP           \
           -DSITE=Frank_UO                       \
-          -DCMAKE_VERBOSE_MAKEFILE=ON           \
           -DCMAKE_C_COMPILER=$(which icx)       \
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
           -DCMAKE_CXX_FLAGS="-fp-model=precise" \
@@ -128,7 +180,7 @@ Intel-PVC:
           -DWarpX_MPI=ON                        \
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
-          -DWarpX_PARTICLE_PRECISION=SINGLE
+          -DWarpX_PARTICLE_PRECISION=DOUBLE
     - cmake --build build -j 16
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
