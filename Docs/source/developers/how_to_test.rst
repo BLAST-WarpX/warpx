@@ -136,9 +136,8 @@ and current of a species.
 They require a build with ``-DWarpX_PYTHON=ON`` and they need no checksum file.
 
 The tests are dimensionality-agnostic: the same files run in every dimensionality that
-was built.  What cannot be shared is the process, because a compiled ``warpx_pybind_*``
-module can only be imported once in it, so CTest registers one test, that is one process,
-per value of ``WarpX_DIMS``:
+was built.  CTest registers one test per ``WarpX_DIMS``, because a compiled ``warpx_pybind_*``
+module can only be imported once:
 
 .. code-block:: sh
 
