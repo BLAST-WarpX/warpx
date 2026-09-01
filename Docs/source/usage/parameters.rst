@@ -5706,6 +5706,7 @@ Schwinger process
     :optional:
 
     If this is 1, Schwinger electron-positron pairs can be generated in vacuum in the cells where the EM field is high enough.
+    Activating the Schwinger process does not require the code to be compiled with ``QED=TRUE``.
     If :pp:param:`warpx.do_qed_schwinger = 1`, Schwinger product species must be specified with
     :pp:param:`qed_schwinger.ele_product_species` and :pp:param:`qed_schwinger.pos_product_species`.
     Schwinger process requires either :pp:param:`warpx.grid_type = collocated` or
