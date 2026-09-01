@@ -17,6 +17,7 @@
 #include <AMReX_ParmParse.H>
 
 #include <algorithm>
+#include <format>
 #include <sstream>
 #include <vector>
 
@@ -70,12 +71,8 @@ void WarnManager::RecordWarning(
 
         amrex::Warning(
             ablastr::utils::TextMsg::Warn(
-                "["
-                + std::string(abl_msg_logger::PriorityToString(msg_priority))
-                + "]["
-                + topic
-                + "] "
-                + text));
+                std::format("[{}][{}] {}",
+                    abl_msg_logger::PriorityToString(msg_priority), topic, text)));
     }
 
 #ifdef AMREX_USE_OMP
