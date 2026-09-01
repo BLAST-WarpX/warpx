@@ -316,7 +316,7 @@ BTDiagnostics::DoDump (int step, int i_buffer, bool force_flush)
         // was already fully written and buffer was reset to zero size or that
         // lab snapshot was not even started to be backtransformed yet
         const auto do_forced_flush = (force_flush && !buffer_empty(i_buffer));
-
+        if (do_forced_flush) amrex::Print() << "forcing flush \n";
         return is_buffer_full || last_z_slice_filled || do_forced_flush;
     }
 
@@ -1049,6 +1049,77 @@ BTDiagnostics::Flush (int i_buffer, bool force_flush)
     bool const isBTD = true;
     double const labtime = m_t_lab[i_buffer];
 
+    amrex::Vector< amrex::MultiFab > out;
+    out.resize(nlev_output);
+    amrex::Vector<amrex::Geometry> new_geom(nlev_output);
+    for(int lev = 0; lev < nlev_output; ++lev) {
+        if (!force_flush) {
+            out[lev] = amrex::MultiFab(m_mf_output[i_buffer][lev].boxArray(),
+                     m_mf_output[i_buffer][lev].DistributionMap(),
+                     m_mf_output[i_buffer][lev].nComp(), 0);
+            out[lev].ParallelCopy( m_mf_output[i_buffer][lev], 0, 0, m_mf_output[i_buffer][lev].nComp() );
+            new_geom[lev] = m_geom_snapshot[i_buffer][lev];
+        } else {
+            auto const& ba = m_mf_output[i_buffer][lev].boxArray();
+            auto const& dm = m_mf_output[i_buffer][lev].DistributionMap();
+            amrex::BoxList bl(ba.ixType());
+            amrex::Vector<int> proc;
+            amrex::Vector<int> imap;
+            for (int i = 0; i < int(ba.size()); ++i) {
+                auto b = ba[i];
+                int new_small = b.bigEnd(m_moving_window_dir)
+                                - (m_buffer_counter[i_buffer]-1);
+                b.setSmall(m_moving_window_dir,
+                         std::max(b.smallEnd(m_moving_window_dir),new_small));
+                if (b.ok()) {
+                    bl.push_back(b);
+                    proc.push_back(dm[i]);
+                    if (dm[i] == amrex::ParallelDescriptor::MyProc()) {
+                        imap.push_back(i);
+                    }
+                }
+            }
+            out[lev] = amrex::MultiFab(amrex::BoxArray(std::move(bl)),
+                       amrex::DistributionMapping(std::move(proc)),
+                       m_mf_output[i_buffer][lev].nComp(),0);
+            for (amrex::MFIter mfi(out[lev], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                auto const& bx = mfi.tilebox();
+                (out[lev])[mfi].template copy<amrex::RunOn::Device>
+                    ( (m_mf_output[i_buffer][lev])[imap[mfi.LocalIndex()]],
+                       bx, 0, bx, 0, m_mf_output[i_buffer][lev].nComp() );
+            }
+            amrex::BoxArray newba = out[lev].boxArray();
+            amrex::Box newbbox = newba.minimalBox();
+            //int new_small = std::max(m_snapshot_box[i_buffer].smallEnd(m_moving_window_dir),
+            //                newbbox.smallEnd(m_moving_window_dir));
+            int ncellsflushed = m_buffer_flush_counter[i_buffer]*m_buffer_size;
+            int currentncells = newbbox.bigEnd(m_moving_window_dir) - newbbox.smallEnd(m_moving_window_dir);
+            int new_small = newbbox.smallEnd(m_moving_window_dir);
+            amrex::Box new_snapshot_box = m_snapshot_box[i_buffer];
+            new_snapshot_box.setSmall(m_moving_window_dir, new_small);
+            auto ref_ratio = amrex::IntVect(1);
+            if (lev > 0 ) { ref_ratio = WarpX::RefRatio(lev-1); }
+            const amrex::Real new_zlo = m_snapshot_domain_lab[i_buffer].hi(m_moving_window_dir) -
+                                 (currentncells + ncellsflushed) *
+                                 dz_lab(warpx.getdt(lev), ref_ratio[m_moving_window_dir]);
+            amrex::Print() << " old z lo : " << m_snapshot_domain_lab[i_buffer].lo(m_moving_window_dir) << " \n";
+//            m_snapshot_domain_lab[i_buffer].setLo(m_moving_window_dir, new_zlo);
+            amrex::RealBox new_snapshot_lab = m_snapshot_domain_lab[i_buffer];
+            new_snapshot_lab.setLo(m_moving_window_dir, new_zlo);
+            amrex::Print() << " new z lo : " << m_snapshot_domain_lab[i_buffer].lo(m_moving_window_dir) << " \n";
+            amrex::Vector<int> BTdiag_periodicity(AMREX_SPACEDIM, 0);
+//            m_geom_snapshot[i_buffer][lev].define( new_snapshot_box,
+//                                               &m_snapshot_domain_lab[i_buffer],
+//                                               amrex::CoordSys::cartesian,
+//                                               BTdiag_periodicity.data() );
+            new_geom[lev].define( new_snapshot_box,
+                                  &m_snapshot_domain_lab[i_buffer],
+                                  amrex::CoordSys::cartesian,
+                                  BTdiag_periodicity.data() );
+         }
+    }
+
     amrex::Vector<amrex::BoxArray> vba;
     amrex::Vector<amrex::DistributionMapping> vdmap;
     amrex::Vector<amrex::Geometry> vgeom;
@@ -1097,13 +1168,14 @@ BTDiagnostics::Flush (int i_buffer, bool force_flush)
             }
         }
     }
+    amrex::Print() << " m_buffer_flush_counter : " << m_buffer_flush_counter[i_buffer] << "\n";
     m_flush_format->WriteToFile(
-        m_varnames, m_mf_output.at(i_buffer), m_geom_output.at(i_buffer), warpx.getistep(),
+        m_varnames, out, m_geom_output.at(i_buffer), warpx.getistep(),
         labtime,
         m_output_species.at(i_buffer), nlev_output, file_name, m_file_min_digits,
         m_plot_raw_fields, m_plot_raw_fields_guards, m_verbose,
         use_pinned_pc, isBTD, i_buffer, m_buffer_flush_counter.at(i_buffer),
-        m_max_buffer_multifabs.at(i_buffer), m_geom_snapshot.at(i_buffer).at(0), isLastBTDFlush);
+        m_max_buffer_multifabs.at(i_buffer), new_geom.at(0), isLastBTDFlush);
 
     // Rescaling the box for plotfile after WriteToFile. This is because, for plotfiles, when writing particles, amrex checks if the particles are within the bounds defined by the box. However, in BTD, particles can be (at max) 1 cell outside the bounds of the geometry. So we keep a one-cell bigger box for plotfile when writing out the particle data and rescale after.
     if (m_format == "plotfile") {
