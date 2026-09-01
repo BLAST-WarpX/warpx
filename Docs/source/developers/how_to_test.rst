@@ -182,8 +182,7 @@ Two fixtures are provided:
   each test in its own temporary directory and calls ``pywarpx.WarpX.finalize`` afterwards,
   which tears down WarpX and AMReX and clears all module-level input state. This is what
   allows a single process to run several independent simulations, for instance to compare
-  deposition algorithms. A test that wants to drive initialization and finalization itself
-  can opt out with the ``@pytest.mark.manages_warpx`` marker.
+  deposition algorithms.
 * ``make_sim`` (in the per-dimensionality ``conftest.py``) is a factory that returns a
   minimal, already initialized simulation, with the grid, particle shape and deposition
   algorithm the test asks for.

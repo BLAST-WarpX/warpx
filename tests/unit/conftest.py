@@ -99,19 +99,12 @@ if Config.have_mpi:
     assert MPI.Is_initialized()
 
 
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "manages_warpx: test drives the WarpX/AMReX init and finalize itself",
-    )
-
-
 def pytest_report_header(config):
     return f"warpx: {WARPX_DIMS}D geometry, built: {available_dims()}"
 
 
 @pytest.fixture(autouse=True, scope="function")
-def warpx_lifecycle(request, tmp_path, monkeypatch):
+def warpx_lifecycle(tmp_path, monkeypatch):
     """Isolate each test and guarantee a clean WarpX/AMReX teardown.
 
     Each test runs in its own temporary directory, so that diagnostics and
@@ -128,8 +121,7 @@ def warpx_lifecycle(request, tmp_path, monkeypatch):
 
     yield
 
-    if not request.node.get_closest_marker("manages_warpx"):
-        pywarpx.warpx.finalize()
+    pywarpx.warpx.finalize()
 
 
 @pytest.fixture(scope="function")
