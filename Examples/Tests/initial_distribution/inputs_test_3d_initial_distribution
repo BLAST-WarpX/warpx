@@ -478,4 +478,5 @@ bmmntr.species                           = beam
 diagnostics.diags_names = diag1
 diag1.intervals = 1000
 diag1.diag_type = Full
+diag1.additional_fields_to_plot = T_maxwell_juttner
 diag1.format = openpmd

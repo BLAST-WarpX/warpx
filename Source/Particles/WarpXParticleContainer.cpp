@@ -1958,7 +1958,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                                   remake, redistribute_on_remake);
     }
     if (!warpx.m_fields.has(N_field_name, lev)) {
-        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps, ng, 0.,
+        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps + 1, ng, 0.,
                                   remake, redistribute_on_remake);
     }
     if (!warpx.m_fields.has(u_field_name, Direction{0}, lev)) {
@@ -2041,7 +2041,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal uy = uy_cartesian;
                 const amrex::ParticleReal uz = uz_cartesian;
 #endif
-                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), (amrex::Real)(w));
+                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk, 0), (amrex::Real)(w));
+                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk, 1), (amrex::Real)(w*w));
                 amrex::Gpu::Atomic::AddNoRet(&ux_array(ii, jj, kk), (amrex::Real)(w*ux));
                 amrex::Gpu::Atomic::AddNoRet(&uy_array(ii, jj, kk), (amrex::Real)(w*uy));
                 amrex::Gpu::Atomic::AddNoRet(&uz_array(ii, jj, kk), (amrex::Real)(w*uz));
@@ -2062,8 +2063,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(mfi);
         amrex::ParallelFor(box,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (N_array(i,j,k) == 0._rt) { return; }
-                    const amrex::Real invsum = 1._rt/N_array(i,j,k);
+                    if (N_array(i,j,k,0) == 0._rt) { return; }
+                    const amrex::Real invsum = 1._rt/N_array(i,j,k,0);
+                    N_array(i,j,k,1) *= invsum;
                     ux_array(i,j,k) *= invsum;
                     uy_array(i,j,k) *= invsum;
                     uz_array(i,j,k) *= invsum;
@@ -2110,9 +2112,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal theta = thetap[ip];
                 const amrex::ParticleReal costheta = std::cos(theta);
                 const amrex::ParticleReal sintheta = std::sin(theta);
-                const amrex::ParticleReal ux = ux_cartesian*costheta + uy_cartesian*sintheta;
-                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
-                const amrex::ParticleReal uz = uz_cartesian;
+                amrex::ParticleReal ux = ux_cartesian*costheta + uy_cartesian*sintheta;
+                amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+                amrex::ParticleReal uz = uz_cartesian;
 #elif defined(WARPX_DIM_RSPHERE)
                 const amrex::ParticleReal theta = thetap[ip];
                 const amrex::ParticleReal phi = phip[ip];
@@ -2120,21 +2122,24 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal sintheta = std::sin(theta);
                 const amrex::ParticleReal cosphi = std::cos(phi);
                 const amrex::ParticleReal sinphi = std::sin(phi);
-                const amrex::ParticleReal ux = ux_cartesian*costheta*cosphi
-                                             + uy_cartesian*sintheta*cosphi + uz_cartesian*sinphi;
-                const amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
-                const amrex::ParticleReal uz = -ux_cartesian*costheta*sinphi
-                                             - uy_cartesian*sintheta*sinphi + uz_cartesian*cosphi;
+                amrex::ParticleReal ux = ux_cartesian*costheta*cosphi
+                                       + uy_cartesian*sintheta*cosphi + uz_cartesian*sinphi;
+                amrex::ParticleReal uy = -ux_cartesian*sintheta + uy_cartesian*costheta;
+                amrex::ParticleReal uz = -ux_cartesian*costheta*sinphi
+                                        - uy_cartesian*sintheta*sinphi + uz_cartesian*cosphi;
 #else
-                const amrex::ParticleReal ux = ux_cartesian;
-                const amrex::ParticleReal uy = uy_cartesian;
-                const amrex::ParticleReal uz = uz_cartesian;
+                amrex::ParticleReal ux = ux_cartesian;
+                amrex::ParticleReal uy = uy_cartesian;
+                amrex::ParticleReal uz = uz_cartesian;
 #endif
-                const amrex::ParticleReal uxr = ux - ux_array(ii, jj, kk);
-                const amrex::ParticleReal uyr = uy - uy_array(ii, jj, kk);
-                const amrex::ParticleReal uzr = uz - uz_array(ii, jj, kk);
-                const auto vsq = (amrex::Real)(w*(uxr*uxr + uyr*uyr + uzr*uzr));
-                amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), vsq);
+                const amrex::ParticleReal mean_ux = ux_array(ii, jj, kk);
+                const amrex::ParticleReal mean_uy = uy_array(ii, jj, kk);
+                const amrex::ParticleReal mean_uz = uz_array(ii, jj, kk);
+                ParticleUtils::doLorentzTransformWithU(ux, uy, uz, mean_ux, mean_uy, mean_uz);
+                amrex::ParticleReal const usq = ux*ux + uy*uy + uz*uz;
+                amrex::ParticleReal const gaminv = 1._rt/std::sqrt(1._rt + usq/(PhysConst::c*PhysConst::c));
+                const auto gammausq = (amrex::Real)(w*gaminv*usq);
+                amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), gammausq);
             });
     }
 
@@ -2150,8 +2155,11 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (N_array(i,j,k) == 0._rt) { return; }
-                const amrex::Real invsum = 1._rt/N_array(i,j,k);
+                if (N_array(i,j,k,0) == 0._rt) { return; }
+                // Use the unbiased weighted sample variance,
+                // dividing by sum(w) - ave(w)
+                const amrex::Real denom = N_array(i,j,k,0) - N_array(i,j,k,1);
+                const amrex::Real invsum = denom > 0._rt ? 1._rt/denom : 0._rt;
                 temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
             });
     }
