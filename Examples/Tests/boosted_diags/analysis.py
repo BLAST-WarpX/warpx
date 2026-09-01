@@ -41,11 +41,15 @@ Ez_plotfile = data[("mesh", "Ez")].to_ndarray()
 # Read data from new back-transformed diagnostics (openPMD)
 series = io.Series("./diags/diag2/openpmd_%T.h5", io.Access.read_only)
 ds_openpmd = series.iterations[3]
-Ez_openpmd = ds_openpmd.meshes["E"]["z"].load_chunk()
-Ez_openpmd = Ez_openpmd.transpose()
-series.flush()
-# Compare arrays to check consistency between new BTD formats (plotfile and openPMD)
-assert np.allclose(Ez_plotfile, Ez_openpmd, rtol=rtol, atol=atol)
+# Compare field data if diag2 contains meshes (not the case for particle-only BTD)
+if len(ds_openpmd.meshes) > 0:
+    Ez_openpmd = ds_openpmd.meshes["E"]["z"].load_chunk()
+    Ez_openpmd = Ez_openpmd.transpose()
+    series.flush()
+    # Compare arrays to check consistency between new BTD formats (plotfile and openPMD)
+    assert np.allclose(Ez_plotfile, Ez_openpmd, rtol=rtol, atol=atol)
+else:
+    series.flush()
 
 # Check that particle random sub-selection has been applied
 ts = OpenPMDTimeSeries("./diags/diag2/")
