@@ -38,10 +38,6 @@ def test_current_deposition_conserves_total_current(
     particle deposits ``q w v`` weighted by shape factors that sum to one, and
     for Esirkepov, which builds J from the displacement ``v dt`` so that its
     grid sum is the same.
-
-    The two algorithms cannot coexist in one initialized simulation, so this
-    parametrization also exercises that a second WarpX instance can be created
-    in the same Python process (see :meth:`pywarpx.WarpX.finalize`).
     """
     sim = make_sim(current_deposition_algo=current_deposition_algo)
 
