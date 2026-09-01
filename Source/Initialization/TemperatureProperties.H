@@ -44,9 +44,11 @@ struct TemperatureProperties
      * \param[in] pp: Reference to the parameter parser object for the species being initialized
      * \param[in] source_name: Optional group name of the input parameters
      * \param[in] geom: Domain geometry (for openPMD external fields when used)
+     * \param[in] allow_distributed: Whether the injection style supports reading the openPMD
+     * data distributedly. This is the default value of `read_u_std_distributed`.
      */
     TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
-                           amrex::Geometry const& geom);
+                           amrex::Geometry const& geom, bool allow_distributed);
 
     /* Type of temperature initialization */
     TemperatureInitType m_type;

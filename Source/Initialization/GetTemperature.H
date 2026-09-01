@@ -13,6 +13,10 @@
 #include "TemperatureProperties.H"
 
 #include <AMReX.H>
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
+
+#include <functional>
 
 /**
  * \brief Get temperature at a point on the grid
@@ -81,7 +85,13 @@ struct GetTemperatureVector
     amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    /** View on the openPMD data, if m_type == TempFromFileVector */
     ExternalFieldVectorView m_from_file;
+    /** Readers of the three components of `u_std`. These are owned by the
+     * TemperatureProperties object that was passed to the constructor. */
+    ExternalFieldReader* m_u_std_x_reader = nullptr;
+    ExternalFieldReader* m_u_std_y_reader = nullptr;
+    ExternalFieldReader* m_u_std_z_reader = nullptr;
 #endif
     /**
      * \brief Construct the functor with information provided by temp
@@ -90,6 +100,29 @@ struct GetTemperatureVector
      * populate the functor
      */
     explicit GetTemperatureVector (TemperatureProperties const& temp) noexcept;
+
+    // This function needs to be called before initializing the momentum of the
+    // particles, when `u_std` is read from a file. When the readers are created
+    // in the constructor of TemperatureProperties, we do not know the particle
+    // containers' BoxArray and DistributionMapping yet.
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    // This function needs to be called before we do continuous injection of
+    // particles to inform the readers to load the data we need.
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    // For distributed data, this function prepares the functor for reading
+    // data in this Box. Here `li` is the local index for the Box in a
+    // particle container.
+    void prepare (int li);
+
+    [[nodiscard]] bool needPreparation () const;
+
+    [[nodiscard]] bool distributed () const;
 
     /**
      * \brief Functor call. Returns the value of temperature at the location (x,y,z)

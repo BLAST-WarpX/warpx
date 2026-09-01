@@ -1806,6 +1806,15 @@ Particle initialization
           an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
+          There is another optional parameter,
+          ``<species_name>.read_u_mean_distributed``, which controls how the openPMD
+          data are distributed among processes. If it is set to false, the openPMD data
+          are loaded and duplicated on every process. If it is set to true, the openPMD
+          data required for initializing ``u_mean`` are distributed among MPI processes.
+          It defaults to true for the injection styles that inject particles cell by cell
+          (``NRandomPerCell`` and ``NUniformPerCell``) when the moving window is off, and
+          to false otherwise: these are the only cases in which distributed reading is
+          supported.
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
@@ -1829,6 +1838,15 @@ Particle initialization
           an openPMD vector record ``u_std`` with components ``x``, ``y`` and ``z``. See
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
+          There is another optional parameter,
+          ``<species_name>.read_u_std_distributed``, which controls how the openPMD
+          data are distributed among processes. If it is set to false, the openPMD data
+          are loaded and duplicated on every process. If it is set to true, the openPMD
+          data required for initializing ``u_std`` are distributed among MPI processes.
+          It defaults to true for the injection styles that inject particles cell by cell
+          (``NRandomPerCell`` and ``NUniformPerCell``) when the moving window is off, and
+          to false otherwise: these are the only cases in which distributed reading is
+          supported.
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
@@ -1871,6 +1889,15 @@ Particle initialization
           an openPMD vector record ``u_mean`` with components ``x``, ``y`` and ``z``. See
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
+          There is another optional parameter,
+          ``<species_name>.read_u_mean_distributed``, which controls how the openPMD
+          data are distributed among processes. If it is set to false, the openPMD data
+          are loaded and duplicated on every process. If it is set to true, the openPMD
+          data required for initializing ``u_mean`` are distributed among MPI processes.
+          It defaults to true for the injection styles that inject particles cell by cell
+          (``NRandomPerCell`` and ``NUniformPerCell``) when the moving window is off, and
+          to false otherwise: these are the only cases in which distributed reading is
+          supported.
 
       * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the temperature :math:`\theta`.

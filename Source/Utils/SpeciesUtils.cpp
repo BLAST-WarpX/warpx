@@ -8,6 +8,11 @@
 #include <ablastr/warn_manager/WarnManager.H>
 #include "Utils/TextMsg.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "WarpX.H"
+
+#include <AMReX_BoxArray.H>
+#include <AMReX_DistributionMapping.H>
+#include <AMReX_IntVect.H>
 
 namespace SpeciesUtils {
 
@@ -130,6 +135,19 @@ namespace SpeciesUtils {
 
         const amrex::ParmParse pp_species(species_name);
 
+        // Reading the openPMD data distributedly requires the BoxArray and the
+        // DistributionMapping of the destination container, which are only
+        // available for the injection styles that inject cell by cell (and for
+        // the fluid container, whose style is "none"). It is also incompatible
+        // with the moving window, because the bulk momentum is then evaluated
+        // on the host, outside of the injection loop (see
+        // UpdateInjectionPosition in WarpXMovingWindow.cpp). In the other
+        // cases, the openPMD data are read in full on every MPI process.
+        const bool allow_distributed = ((style == "nrandompercell") ||
+                                        (style == "nuniformpercell") ||
+                                        (style == "none")) &&
+                                       !WarpX::do_moving_window;
+
         // parse momentum information
         std::string mom_dist_s;
         utils::parser::get(pp_species, source_name, "momentum_distribution_type", mom_dist_s);
@@ -204,15 +222,19 @@ namespace SpeciesUtils {
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumUniform*)nullptr,
                                                 ux_min, uy_min, uz_min, ux_max, uy_max, uz_max));
         } else if (mom_dist_s == "maxwellian") {
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom,
+                                                                allow_distributed);
             const GetTemperatureVector getTempVec(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom,
+                                                            allow_distributed);
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
-            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
+            h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom,
+                                                                allow_distributed);
             const GetTemperature getTemp(*h_mom_temp);
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom,
+                                                            allow_distributed);
             const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVelVec));
@@ -220,12 +242,24 @@ namespace SpeciesUtils {
             // The momentum is defined by the parser functions ux_mean_function,
             // uy_mean_function, uz_mean_function, stored in VelocityProperties and
             // evaluated through GetVelocityVector (the parsers are owned by h_mom_vel).
-            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+            h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom,
+                                                            allow_distributed);
             const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumParser.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumParser*)nullptr, getVelVec));
         } else {
             StringParseAbortMessage("Momentum distribution type", mom_dist_s);
+        }
+
+        // openPMD data that are not distributed among MPI processes are read in
+        // full right away, because this does not require the BoxArray and the
+        // DistributionMapping of the destination container. (Distributed data
+        // are read later, in PlasmaInjector::prepare and
+        // WarpXFluidContainer::InitData.) This is a no-op if the momentum is
+        // not read from a file.
+        if (h_inj_mom && ! h_inj_mom->distributed()) {
+            h_inj_mom->prepare(amrex::BoxArray{}, amrex::DistributionMapping{},
+                               amrex::IntVect(0), nullptr);
         }
     }
 

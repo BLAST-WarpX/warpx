@@ -706,11 +706,30 @@ PlasmaInjector::getInjectorMomentumHost () const
     return h_inj_mom.get();
 }
 
+InjectorMomentum*
+PlasmaInjector::getInjectorMomentum (int li) const
+{
+    auto* inj_mom = d_inj_mom;
+    if (inj_mom_distributed) {
+        h_inj_mom->prepare(li, &inj_mom);
+    }
+    return inj_mom;
+}
+
 void PlasmaInjector::prepare (amrex::BoxArray const& grids,
                               amrex::DistributionMapping const& dmap,
                               amrex::IntVect const& ngrow,
                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
+    // Only distributed data need to be prepared here: data that are not
+    // distributed have already been read in full, in SpeciesUtils::parseMomentum.
+    // The momentum injector is prepared before the density injector, because
+    // `get_zlab` uses the bulk momentum.
+    if (h_inj_mom && h_inj_mom->distributed()) {
+        h_inj_mom->prepare(grids, dmap, ngrow, get_zlab);
+        inj_mom_distributed = true;
+    }
+
     if (h_inj_rho) {
         h_inj_rho->prepare(grids, dmap, ngrow, get_zlab);
         inj_rho_distributed = h_inj_rho->distributed();
@@ -727,6 +746,11 @@ void PlasmaInjector::prepare (amrex::BoxArray const& grids,
 void PlasmaInjector::prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
                               std::function<amrex::Real(amrex::Real)> const& get_zlab)
 {
+    // Continuous injection only happens with a moving window, in which case the
+    // momentum data are never distributed (see SpeciesUtils::parseMomentum), so
+    // there is nothing to prepare for the momentum injector here.
+    inj_mom_distributed = false;
+
     if (h_inj_rho) {
         h_inj_rho->prepare(pbox, moving_dir, moving_sign, get_zlab);
 #ifdef AMREX_USE_GPU

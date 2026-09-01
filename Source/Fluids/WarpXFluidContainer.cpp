@@ -183,19 +183,24 @@ void WarpXFluidContainer::InitData(
     const auto problo = geom_lev.ProbLoArray();
     const amrex::Real clight = PhysConst::c;
 
-    // Create local copies of pointers for GPU kernels
-    InjectorMomentum* inj_mom = d_inj_mom;
+    auto get_zlab = [=] (amrex::Real z) -> amrex::Real
+    {
+        return gamma_boost*(z + beta_boost*clight*cur_time);
+    };
 
     if (h_inj_rho && h_inj_rho->needPreparation()) {
-        auto get_zlab = [=] (amrex::Real z) -> amrex::Real
-        {
-            return gamma_boost*(z + beta_boost*clight*cur_time);
-        };
         auto const& mf = *fields.get(name_mf_N, lev);
         h_inj_rho->prepare(mf.boxArray(), mf.DistributionMap(), IntVect(0), get_zlab);
 #ifdef AMREX_USE_GPU
         amrex::Gpu::htod_memcpy_async(d_inj_rho, h_inj_rho.get(), sizeof(InjectorDensity));
 #endif
+    }
+
+    // Only distributed data need to be prepared here: data that are not
+    // distributed have already been read in full, in SpeciesUtils::parseMomentum.
+    if (h_inj_mom && h_inj_mom->distributed()) {
+        auto const& mf = *fields.get(name_mf_N, lev);
+        h_inj_mom->prepare(mf.boxArray(), mf.DistributionMap(), IntVect(0), get_zlab);
     }
 
     // Loop through cells and initialize their value
@@ -207,6 +212,11 @@ void WarpXFluidContainer::InitData(
         InjectorDensity* inj_rho = d_inj_rho;
         if (h_inj_rho->distributed()) {
             h_inj_rho->prepare(mfi.LocalIndex(), &inj_rho);
+        }
+
+        InjectorMomentum* inj_mom = d_inj_mom;
+        if (h_inj_mom->distributed()) {
+            h_inj_mom->prepare(mfi.LocalIndex(), &inj_mom);
         }
 
         amrex::Box const tile_box  = mfi.tilebox(fields.get(name_mf_N, lev)->ixType().toIntVect());
@@ -273,9 +283,9 @@ void WarpXFluidContainer::InitData(
             }
         );
 
-        if (h_inj_rho->distributed()) {
-            // h_inj_rho is shared by multiple GPU streams. We need to sync
-            // to avoid race conditions in h_inj_rho->prepare(int).
+        if (h_inj_rho->distributed() || h_inj_mom->distributed()) {
+            // h_inj_rho and h_inj_mom are shared by multiple GPU streams. We
+            // need to sync to avoid race conditions in their prepare(int).
             Gpu::streamSynchronize();
         }
     }
