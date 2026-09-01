@@ -17,6 +17,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -56,8 +57,8 @@ PhotonParticleContainer::PhotonParticleContainer (AmrCore* amr_core, int ispecie
         //If Breit Wheeler process is enabled, look for the target electron and positron
         //species
         if(m_do_qed_breit_wheeler){
-            pp_species_name.get("qed_breit_wheeler_ele_product_species", m_qed_breit_wheeler_ele_product_name);
-            pp_species_name.get("qed_breit_wheeler_pos_product_species", m_qed_breit_wheeler_pos_product_name);
+            utils::parser::getWithParser(pp_species_name, "qed_breit_wheeler_ele_product_species", m_qed_breit_wheeler_ele_product_name);
+            utils::parser::getWithParser(pp_species_name, "qed_breit_wheeler_pos_product_species", m_qed_breit_wheeler_pos_product_name);
         }
 
         //Check for processes which do not make sense for photons

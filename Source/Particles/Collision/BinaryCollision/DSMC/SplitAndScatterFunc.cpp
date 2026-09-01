@@ -8,6 +8,7 @@
  */
 
 #include "SplitAndScatterFunc.H"
+#include "Utils/Parser/ParserUtils.H"
 
 SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                                           MultiParticleContainer const * const mypc):
@@ -40,7 +41,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
         // Check if the scattering processes include reactions that produce macroparticles in new species
         // (i.e. not in the incident species list), i.e. if it contains ionization, charge exchange or two-product reaction
         amrex::Vector<std::string> scattering_processes;
-        pp_collision_name.queryarr("scattering_processes", scattering_processes);
+        utils::parser::queryArrWithParser(pp_collision_name, "scattering_processes", scattering_processes);
         const bool reaction_produces_new_species = std::any_of(scattering_processes.begin(), scattering_processes.end(), [](const std::string& process) {
             return process == "ionization" || process == "charge_exchange" || process == "two_product_reaction";
         });
@@ -49,7 +50,7 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
 
             // Check that product species have been specified
             amrex::Vector<std::string> product_species;
-            pp_collision_name.getarr("product_species", product_species);
+            utils::parser::getArrWithParser(pp_collision_name, "product_species", product_species);
             // TODO: check number of product species
 
             // For ionization:

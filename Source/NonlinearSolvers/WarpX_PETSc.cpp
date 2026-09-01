@@ -246,12 +246,12 @@ void PETScSolver_impl::setOptions()
     if ((!pc_specified) && (m_pc_type == PreconditionerType::pc_petsc)) {
 
         auto parsestr = amrex::getEnumNameString(PreconditionerType::pc_petsc);
-        const amrex::ParmParse pp_pc(parsestr.c_str());
+        const amrex::ParmParse pp_pc(parsestr);
 
         std::string pctype = "asm"; // default
         {
             std::string val = pctype;
-            pp_pc.query("type", val);
+            utils::parser::queryWithParser(pp_pc, "type", val);
             PetscOptionsSetValue( NULL, "-pc_type", val.c_str());
             pctype = val;
         }
@@ -268,7 +268,7 @@ void PETScSolver_impl::setOptions()
             std::string subpctype = "ilu"; // default
             {
                 std::string val = subpctype;
-                pp_pc.query("sub_type", val);
+                utils::parser::queryWithParser(pp_pc, "sub_type", val);
                 PetscOptionsSetValue( NULL, "-sub_pc_type", val.c_str());
                 subpctype = val;
             }
@@ -285,7 +285,7 @@ void PETScSolver_impl::setOptions()
             std::string hyprepctype = "euclid"; // default
             {
                 std::string val = hyprepctype;
-                pp_pc.query("hypre_type", val);
+                utils::parser::queryWithParser(pp_pc, "hypre_type", val);
                 PetscOptionsSetValue( NULL, "-pc_hypre_type", val.c_str());
                 hyprepctype = val;
             }

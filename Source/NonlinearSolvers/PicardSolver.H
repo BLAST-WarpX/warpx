@@ -11,6 +11,7 @@
 
 #include <AMReX_ParmParse.H>
 #include "Utils/TextMsg.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include <vector>
 #include <istream>
@@ -162,7 +163,7 @@ void PicardSolver<Vec,Ops>::ParseParameters ()
     pp_picard.query("relative_tolerance",  m_rtol);
     pp_picard.query("max_iterations",      m_maxits);
     pp_picard.query("require_convergence", m_require_convergence);
-    pp_picard.query("diagnostic_file",     this->m_diagnostic_file);
+    utils::parser::queryWithParser(pp_picard, "diagnostic_file", this->m_diagnostic_file);
     pp_picard.query("diagnostic_interval", this->m_diagnostic_interval);
 }
 

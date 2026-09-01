@@ -62,8 +62,8 @@ WarpXLaserProfiles::FromFileLaserProfile::init (
         ablastr::warn_manager::WarnPriority::high);
     }
     // Parse the lasy or binary file
-    ppl.query("lasy_file_name", m_params.lasy_file_name);
-    ppl.query("binary_file_name", m_params.binary_file_name);
+    utils::parser::queryWithParser(ppl, "lasy_file_name", m_params.lasy_file_name);
+    utils::parser::queryWithParser(ppl, "binary_file_name", m_params.binary_file_name);
     const std::string lasy_file_name = m_params.lasy_file_name;
     const std::string binary_file_name = m_params.binary_file_name;
     m_params.file_in_lasy_format = false;

@@ -136,12 +136,12 @@ MultiParticleContainer::ReadParameters ()
         // default values of E_external_particle and B_external_particle
         // are used to set the E and B field when "constant" or "parser"
         // is not explicitly used in the input
-        pp_particles.query("B_ext_particle_init_style", m_B_ext_particle_s);
+        utils::parser::queryWithParser(pp_particles, "B_ext_particle_init_style", m_B_ext_particle_s);
         std::transform(m_B_ext_particle_s.begin(),
                        m_B_ext_particle_s.end(),
                        m_B_ext_particle_s.begin(),
                        ::tolower);
-        pp_particles.query("E_ext_particle_init_style", m_E_ext_particle_s);
+        utils::parser::queryWithParser(pp_particles, "E_ext_particle_init_style", m_E_ext_particle_s);
         std::transform(m_E_ext_particle_s.begin(),
                        m_E_ext_particle_s.end(),
                        m_E_ext_particle_s.begin(),
@@ -262,14 +262,14 @@ MultiParticleContainer::ReadParameters ()
 
 
         // particle species
-        pp_particles.queryarr("species_names", species_names);
+        utils::parser::queryArrWithParser(pp_particles, "species_names", species_names);
         auto const nspecies = species_names.size();
 
         if (nspecies > 0) {
             // Get species to deposit on main grid
             m_deposit_on_main_grid.resize(nspecies, false);
             std::vector<std::string> tmp;
-            pp_particles.queryarr("deposit_on_main_grid", tmp);
+            utils::parser::queryArrWithParser(pp_particles, "deposit_on_main_grid", tmp);
             for (auto const& name : tmp) {
                 auto it = std::find(species_names.begin(), species_names.end(), name);
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -282,7 +282,7 @@ MultiParticleContainer::ReadParameters ()
 
             m_gather_from_main_grid.resize(nspecies, false);
             std::vector<std::string> tmp_gather;
-            pp_particles.queryarr("gather_from_main_grid", tmp_gather);
+            utils::parser::queryArrWithParser(pp_particles, "gather_from_main_grid", tmp_gather);
             for (auto const& name : tmp_gather) {
                 auto it = std::find(species_names.begin(), species_names.end(), name);
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -297,7 +297,7 @@ MultiParticleContainer::ReadParameters ()
 
             // Get rigid-injected species
             std::vector<std::string> rigid_injected_species;
-            pp_particles.queryarr("rigid_injected_species", rigid_injected_species);
+            utils::parser::queryArrWithParser(pp_particles, "rigid_injected_species", rigid_injected_species);
             if (!rigid_injected_species.empty()) {
                 for (auto const& name : rigid_injected_species) {
                     auto it = std::find(species_names.begin(), species_names.end(), name);
@@ -312,7 +312,7 @@ MultiParticleContainer::ReadParameters ()
 
             // Get photon species
             std::vector<std::string> photon_species;
-            pp_particles.queryarr("photon_species", photon_species);
+            utils::parser::queryArrWithParser(pp_particles, "photon_species", photon_species);
             const auto spec_size = static_cast<int>(species_names.size());
             for (int spec_index = 0; spec_index < spec_size; ++spec_index){
 
@@ -320,7 +320,7 @@ MultiParticleContainer::ReadParameters ()
 
                 bool species_type_is_photon = false;
                 const ParmParse pp_species(name);
-                if (auto type_string = std::string {}; pp_species.query("species_type", type_string)){
+                if (auto type_string = std::string {}; utils::parser::queryWithParser(pp_species, "species_type", type_string)){
                     const auto physical_species = species::from_string(type_string);
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                         physical_species.has_value(),
@@ -349,12 +349,12 @@ MultiParticleContainer::ReadParameters ()
 #endif
 
         const ParmParse pp_lasers("lasers");
-        pp_lasers.queryarr("names", lasers_names);
+        utils::parser::queryArrWithParser(pp_lasers, "names", lasers_names);
         auto const nlasers = lasers_names.size();
         // Get lasers to deposit on main grid
         m_laser_deposit_on_main_grid.resize(nlasers, false);
         std::vector<std::string> tmp;
-        pp_lasers.queryarr("deposit_on_main_grid", tmp);
+        utils::parser::queryArrWithParser(pp_lasers, "deposit_on_main_grid", tmp);
         for (auto const& name : tmp) {
             auto it = std::find(lasers_names.begin(), lasers_names.end(), name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -372,8 +372,8 @@ MultiParticleContainer::ReadParameters ()
 
         if (m_do_qed_schwinger) {
             const ParmParse pp_qed_schwinger("qed_schwinger");
-            pp_qed_schwinger.get("ele_product_species", m_qed_schwinger_ele_product_name);
-            pp_qed_schwinger.get("pos_product_species", m_qed_schwinger_pos_product_name);
+            utils::parser::getWithParser(pp_qed_schwinger, "ele_product_species", m_qed_schwinger_ele_product_name);
+            utils::parser::getWithParser(pp_qed_schwinger, "pos_product_species", m_qed_schwinger_pos_product_name);
 #if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             utils::parser::getWithParser(
                 pp_qed_schwinger, "y_size",m_qed_schwinger_y_size);
@@ -1326,7 +1326,7 @@ void MultiParticleContainer::InitQuantumSync ()
     utils::parser::getWithParser(pp_qed_qs, "chi_min", qs_minimum_chi_part);
 
 
-    pp_qed_qs.query("lookup_table_mode", lookup_table_mode);
+    utils::parser::queryWithParser(pp_qed_qs, "lookup_table_mode", lookup_table_mode);
     if(lookup_table_mode.empty()){
         WARPX_ABORT_WITH_MESSAGE("Quantum Synchrotron table mode should be provided");
     }
@@ -1343,7 +1343,7 @@ void MultiParticleContainer::InitQuantumSync ()
     }
     else if(lookup_table_mode == "load"){
         std::string load_table_name;
-        pp_qed_qs.query("load_table_from", load_table_name);
+        utils::parser::queryWithParser(pp_qed_qs, "load_table_from", load_table_name);
         ablastr::warn_manager::WMRecordWarning("QED",
             "The Quantum Synchrotron table will be read from the file: " + load_table_name,
             ablastr::warn_manager::WarnPriority::low);
@@ -1385,7 +1385,7 @@ void MultiParticleContainer::InitBreitWheeler ()
         WARPX_ABORT_WITH_MESSAGE("qed_bw.chi_min should be provided!");
     }
 
-    pp_qed_bw.query("lookup_table_mode", lookup_table_mode);
+    utils::parser::queryWithParser(pp_qed_bw, "lookup_table_mode", lookup_table_mode);
     if(lookup_table_mode.empty()){
         WARPX_ABORT_WITH_MESSAGE("Breit Wheeler table mode should be provided");
     }
@@ -1402,7 +1402,7 @@ void MultiParticleContainer::InitBreitWheeler ()
     }
     else if(lookup_table_mode == "load"){
         std::string load_table_name;
-        pp_qed_bw.query("load_table_from", load_table_name);
+        utils::parser::queryWithParser(pp_qed_bw, "load_table_from", load_table_name);
         ablastr::warn_manager::WMRecordWarning("QED",
             "The Breit Wheeler table will be read from the file:" + load_table_name,
             ablastr::warn_manager::WarnPriority::low);
@@ -1436,7 +1436,7 @@ MultiParticleContainer::QuantumSyncGenerateTable ()
 {
     const ParmParse pp_qed_qs("qed_qs");
     std::string table_name;
-    pp_qed_qs.query("save_table_in", table_name);
+    utils::parser::queryWithParser(pp_qed_qs, "save_table_in", table_name);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !table_name.empty(),
         "qed_qs.save_table_in should be provided!");
@@ -1525,7 +1525,7 @@ MultiParticleContainer::BreitWheelerGenerateTable ()
 {
     const ParmParse pp_qed_bw("qed_bw");
     std::string table_name;
-    pp_qed_bw.query("save_table_in", table_name);
+    utils::parser::queryWithParser(pp_qed_bw, "save_table_in", table_name);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !table_name.empty(),
         "qed_bw.save_table_in should be provided!");

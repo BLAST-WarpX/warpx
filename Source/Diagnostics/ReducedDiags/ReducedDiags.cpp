@@ -33,17 +33,17 @@ m_rd_name{rd_name}
     const ParmParse pp_rd_name(m_rd_name);
 
     // read path
-    pp_rd.query("path", m_path);
-    pp_rd_name.query("path", m_path);
+    utils::parser::queryWithParser(pp_rd, "path", m_path);
+    utils::parser::queryWithParser(pp_rd_name, "path", m_path);
 
     // read extension
-    pp_rd.query("extension", m_extension);
-    pp_rd_name.query("extension", m_extension);
+    utils::parser::queryWithParser(pp_rd, "extension", m_extension);
+    utils::parser::queryWithParser(pp_rd_name, "extension", m_extension);
 
     // check if it is a restart run
     std::string restart_chkfile;
     const ParmParse pp_amr("amr");
-    pp_amr.query("restart", restart_chkfile);
+    utils::parser::queryWithParser(pp_amr, "restart", restart_chkfile);
     const bool IsNotRestart = restart_chkfile.empty();
 
     if (ParallelDescriptor::IOProcessor())
@@ -65,13 +65,13 @@ m_rd_name{rd_name}
 
     // read reduced diags intervals
     std::vector<std::string> intervals_string_vec = {"1"};
-    pp_rd.queryarr("intervals", intervals_string_vec);
-    pp_rd_name.queryarr("intervals", intervals_string_vec);
+    utils::parser::queryArrWithParser(pp_rd, "intervals", intervals_string_vec);
+    utils::parser::queryArrWithParser(pp_rd_name, "intervals", intervals_string_vec);
     m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
 
     // read separator
-    pp_rd.query("separator", m_sep);
-    pp_rd_name.query("separator", m_sep);
+    utils::parser::queryWithParser(pp_rd, "separator", m_sep);
+    utils::parser::queryWithParser(pp_rd_name, "separator", m_sep);
 
     // precision of data in the output file
     utils::parser::queryWithParser(pp_rd, "precision", m_precision);

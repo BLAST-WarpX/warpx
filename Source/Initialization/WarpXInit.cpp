@@ -102,7 +102,7 @@ void warpx::initialization::check_dims()
     std::string dims_error = "The selected WarpX executable was built as '";
     dims_error.append(dims_compiled).append("'-dimensional, but the ");
     if (pp_geometry.contains("dims")) {
-        pp_geometry.get("dims", dims);
+        utils::parser::getWithParser(pp_geometry, "dims", dims);
         dims_error.append("inputs file declares 'geometry.dims = ").append(dims).append("'.\n");
         dims_error.append("Please re-compile with a different WarpX_DIMS option or select the right executable name.");
     } else {
@@ -125,7 +125,7 @@ void warpx::initialization::read_moving_window_parameters(
         utils::parser::queryWithParser(
             pp_warpx, "end_moving_window_step", end_moving_window_step);
         std::string s;
-        pp_warpx.get("moving_window_dir", s);
+        utils::parser::getWithParser(pp_warpx, "moving_window_dir", s);
 
         if (s == "z" || s == "Z") {
 #ifdef WARPX_ZINDEX

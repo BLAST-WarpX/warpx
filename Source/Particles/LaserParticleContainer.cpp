@@ -90,7 +90,7 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
 
     // Parse the type of laser profile and set the corresponding flag `profile`
     std::string laser_type_s;
-    pp_laser_name.get("profile", laser_type_s);
+    utils::parser::getWithParser(pp_laser_name, "profile", laser_type_s);
     std::transform(laser_type_s.begin(), laser_type_s.end(), laser_type_s.begin(), ::tolower);
 
     // Parse the properties of the antenna
@@ -139,19 +139,19 @@ LaserParticleContainer::LaserParticleContainer (AmrCore* amr_core, int ispecies,
     //Check if someone uses the obsolete syntax
     std::vector<std::string> backward_laser_names;
     const ParmParse pp_lasers("lasers");
-    pp_lasers.queryarr("names", backward_laser_names);
+    utils::parser::queryArrWithParser(pp_lasers, "names", backward_laser_names);
     for(const std::string& lasersiter : backward_laser_names){
         const ParmParse pp_name(lasersiter);
         std::string backward_profile;
-        std::stringstream lasers;
-        pp_name.query("profile", backward_profile);
+        bool const backward_profile_provided = utils::parser::queryWithParser(pp_name, "profile", backward_profile);
         if (backward_profile == "from_txye_file") {
+            std::stringstream lasers;
             lasers << "'" << lasersiter << ".profile = " + backward_profile + "'";
             lasers << " is not supported anymore. ";
             lasers << "Please use instead: ";
             lasers << "'" << lasersiter << ".profile = from_file'";
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !pp_name.query("profile", backward_profile),
+                !backward_profile_provided,
                 lasers.str());
         }
     }

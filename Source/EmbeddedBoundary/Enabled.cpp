@@ -5,6 +5,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "Enabled.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #ifdef AMREX_USE_EB
 #include <AMReX_ParmParse.H>
@@ -30,7 +31,7 @@ namespace EB
 
         // https://amrex-codes.github.io/amrex/docs_html/EB.html
         std::string eb_stl;
-        eb_enabled |= pp_eb2.query("geom_type", eb_stl);
+        eb_enabled |= utils::parser::queryWithParser(pp_eb2, "geom_type", eb_stl);
 
         return eb_enabled;
 #endif

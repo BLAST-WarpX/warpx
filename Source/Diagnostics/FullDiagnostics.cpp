@@ -120,7 +120,7 @@ FullDiagnostics::ReadParameters ()
         m_format == "sensei" || m_format == "catalyst",
         "<diag>.format must be plotfile or openpmd or checkpoint or ascent or catalyst or sensei");
     std::vector<std::string> intervals_string_vec = {"0"};
-    pp_diag_name.getarr("intervals", intervals_string_vec);
+    utils::parser::getArrWithParser(pp_diag_name, "intervals", intervals_string_vec);
     m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
     const bool plot_raw_fields_specified = pp_diag_name.query("plot_raw_fields", m_plot_raw_fields);
     const bool plot_raw_fields_guards_specified = pp_diag_name.query("plot_raw_fields_guards", m_plot_raw_fields_guards);
@@ -131,11 +131,11 @@ FullDiagnostics::ReadParameters ()
         /** Whether the diagnostics are averaging data over time or not
          * Valid options are "fixed_start" and "dynamic_start".
          */
-        pp_diag_name.get("time_average_mode", m_time_average_mode_str);
+        utils::parser::getWithParser(pp_diag_name, "time_average_mode", m_time_average_mode_str);
 
         const amrex::ParmParse pp_warpx("warpx");
         std::vector<std::string> dt_interval_vec = {"-1"};
-        const bool timestep_may_vary = pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
+        const bool timestep_may_vary = utils::parser::queryArrWithParser(pp_warpx, "dt_update_interval", dt_interval_vec);
         if (timestep_may_vary) {
             WARPX_ABORT_WITH_MESSAGE(
                     "Time-averaged diagnostics (encountered in: "
@@ -163,7 +163,7 @@ FullDiagnostics::ReadParameters ()
 
         if (m_time_average_mode == TimeAverageType::Static) {
             // This fails if users do not specify a start.
-            pp_diag_name.get("average_start_step", m_average_start_step);
+            utils::parser::getWithParser(pp_diag_name, "average_start_step", m_average_start_step);
             if (m_average_start_step == 0) {
                 WARPX_ABORT_WITH_MESSAGE(
                     "Static-start time-averaged diagnostic " + m_diag_name + " requires a positive (non-zero) value "

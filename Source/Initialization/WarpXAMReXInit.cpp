@@ -220,14 +220,13 @@ namespace {
         auto preparse_amrex_input_int_array =
             [&pp_amr](const std::string& input_str, const bool replace = false)
             {
-                const auto *const c_input_str = input_str.c_str();
-                if (pp_amr.contains(c_input_str)) {
+                if (pp_amr.contains(input_str)) {
                     amrex::Vector<int> input_array;
-                    utils::parser::getArrWithParser(pp_amr,c_input_str, input_array);
+                    utils::parser::getArrWithParser(pp_amr, input_str, input_array);
                     if (replace) {
-                        pp_amr.remove(c_input_str);
+                        pp_amr.remove(input_str);
                     }
-                    pp_amr.addarr(c_input_str, input_array);
+                    pp_amr.addarr(input_str, input_array);
                 }
             };
 

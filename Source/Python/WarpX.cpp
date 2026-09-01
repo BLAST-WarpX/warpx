@@ -77,12 +77,12 @@ namespace detail
 
         bool has_name = false;
         // TODO: if array do queryarr
-        // has_name = amrex::ParmParse(prefix).queryarr(name.c_str(), value);
+        // has_name = amrex::ParmParse(prefix).queryarr(name, value);
         if constexpr (std::is_same_v<V, bool> || std::is_same_v<V, std::string>) {
-            has_name = amrex::ParmParse(prefix).query(name.c_str(), value);
+            has_name = amrex::ParmParse(prefix).query(name, value);
         }
         else {
-            has_name = amrex::ParmParse(prefix).queryWithParser(name.c_str(), value);
+            has_name = amrex::ParmParse(prefix).queryWithParser(name, value);
         }
 
         if (!has_name) {

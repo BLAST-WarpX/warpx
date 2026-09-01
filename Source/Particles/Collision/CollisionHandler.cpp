@@ -35,7 +35,7 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
 
     // Read in collision input
     const amrex::ParmParse pp_collisions("collisions");
-    pp_collisions.queryarr("collision_names", collision_names);
+    utils::parser::queryArrWithParser(pp_collisions, "collision_names", collision_names);
 
     // Create instances based on the collision type
     auto const ncollisions = collision_names.size();
@@ -50,7 +50,7 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         // For legacy, pairwisecoulomb is the default
         std::string type = "pairwisecoulomb";
 
-        pp_collision_name.query("type", type);
+        utils::parser::queryWithParser(pp_collision_name, "type", type);
         collision_types[i] = type;
 
         if (type == "pairwisecoulomb") {

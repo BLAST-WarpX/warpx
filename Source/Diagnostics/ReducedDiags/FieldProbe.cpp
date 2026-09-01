@@ -78,7 +78,7 @@ FieldProbe::FieldProbe (const std::string& rd_name)
      */
     const amrex::ParmParse pp_rd_name(rd_name);
     std::string m_probe_geometry_str = "Point";
-    pp_rd_name.query("probe_geometry", m_probe_geometry_str);
+    utils::parser::queryWithParser(pp_rd_name, "probe_geometry", m_probe_geometry_str);
 
     if (m_probe_geometry_str == "Point")
     {

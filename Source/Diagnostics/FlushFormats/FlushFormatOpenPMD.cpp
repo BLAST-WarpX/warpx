@@ -1,6 +1,7 @@
 #include "FlushFormatOpenPMD.H"
 
 #include "Utils/TextMsg.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Diagnostics/OpenPMDHelpFunction.H"
 #include "WarpX.H"
 
@@ -25,7 +26,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     ParmParse pp_diag_name(diag_name);
     // Which backend to use (ADIOS, ADIOS2 or HDF5). Default depends on what is available
     std::string openpmd_backend {"default"};
-    pp_diag_name.query("openpmd_backend", openpmd_backend);
+    utils::parser::queryWithParser(pp_diag_name, "openpmd_backend", openpmd_backend);
     // pick first available backend if default is chosen
     if( openpmd_backend == "default" ) {
         openpmd_backend = WarpXOpenPMDFileType();
@@ -35,7 +36,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
 
     // one file per timestep (or one file for all steps)
     std::string  openpmd_encoding {"f"};
-    const bool encodingDefined = pp_diag_name.query("openpmd_encoding", openpmd_encoding);
+    const bool encodingDefined = utils::parser::queryWithParser(pp_diag_name, "openpmd_encoding", openpmd_encoding);
 
     openPMD::IterationEncoding encoding = openPMD::IterationEncoding::groupBased;
     if ( openpmd_encoding == "v" ) {
@@ -54,7 +55,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     }
 
     std::string diag_type_str;
-    pp_diag_name.get("diag_type", diag_type_str);
+    utils::parser::getWithParser(pp_diag_name, "diag_type", diag_type_str);
     if (diag_type_str == "BackTransformed")
     {
         if ( ( openPMD::IterationEncoding::fileBased != encoding ) &&
@@ -83,7 +84,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
 
     // ADIOS2 operator type & parameters
     std::string operator_type;
-    pp_diag_name.query("adios2_operator.type", operator_type);
+    utils::parser::queryWithParser(pp_diag_name, "adios2_operator.type", operator_type);
     std::string const prefix = diag_name + ".adios2_operator.parameters";
     const ParmParse pp;
     auto entr = amrex::ParmParse::getEntries(prefix);
@@ -92,14 +93,14 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     auto const prefix_len = prefix.size() + 1;
     for (std::string k : entr) {
         std::string v;
-        pp.get(k, v);
+        utils::parser::getWithParser(pp, k, v);
         k.erase(0, prefix_len);
         operator_parameters.insert({k, v});
     }
 
     // ADIOS2 engine type & parameters
     std::string engine_type;
-    pp_diag_name.query("adios2_engine.type", engine_type);
+    utils::parser::queryWithParser(pp_diag_name, "adios2_engine.type", engine_type);
     std::string const engine_prefix = diag_name + ".adios2_engine.parameters";
     const ParmParse ppe;
     auto eng_entr = amrex::ParmParse::getEntries(engine_prefix);
@@ -108,7 +109,7 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
     auto const prefixlen = engine_prefix.size() + 1;
     for (std::string k : eng_entr) {
         std::string v;
-        ppe.get(k, v);
+        utils::parser::getWithParser(ppe, k, v);
         k.erase(0, prefixlen);
         engine_parameters.insert({k, v});
     }

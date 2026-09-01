@@ -124,7 +124,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     const ParmParse pp_species_name(species_name);
 
     std::string injection_style = "none";
-    pp_species_name.query("injection_style", injection_style);
+    utils::parser::queryWithParser(pp_species_name, "injection_style", injection_style);
     if (injection_style != "none") {
         // The base plasma injector, whose input parameters have no source prefix.
         // Only created if needed
@@ -132,7 +132,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     std::vector<std::string> injection_sources;
-    pp_species_name.queryarr("injection_sources", injection_sources);
+    utils::parser::queryArrWithParser(pp_species_name, "injection_sources", injection_sources);
     for (auto &source_name : injection_sources) {
         plasma_injectors.push_back(std::make_unique<PlasmaInjector>(species_id, species_name, amr_core->Geom(0),
                                                                     source_name));
@@ -153,7 +153,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     std::string physical_species_s;
-    const bool species_is_specified = pp_species_name.query("species_type", physical_species_s);
+    const bool species_is_specified = utils::parser::queryWithParser(pp_species_name, "species_type", physical_species_s);
     if (species_is_specified) {
         const auto physical_species_from_string = species::from_string( physical_species_s );
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(physical_species_from_string,
@@ -284,7 +284,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     if(m_do_qed_quantum_sync){
-        pp_species_name.get("qed_quantum_sync_phot_product_species",
+        utils::parser::getWithParser(pp_species_name, "qed_quantum_sync_phot_product_species",
             m_qed_quantum_sync_phot_product_name);
     }
 
@@ -304,7 +304,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 #endif
 
     // User-defined integer attributes
-    pp_species_name.queryarr("addIntegerAttributes", m_user_int_attribs);
+    utils::parser::queryArrWithParser(pp_species_name, "addIntegerAttributes", m_user_int_attribs);
     const auto n_user_int_attribs = static_cast<int>(m_user_int_attribs.size());
     std::vector< std::string > str_int_attrib_function;
     str_int_attrib_function.resize(n_user_int_attribs);
@@ -319,7 +319,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     }
 
     // User-defined real attributes
-    pp_species_name.queryarr("addRealAttributes", m_user_real_attribs);
+    utils::parser::queryArrWithParser(pp_species_name, "addRealAttributes", m_user_real_attribs);
     const auto n_user_real_attribs = static_cast<int>(m_user_real_attribs.size());
     std::vector< std::string > str_real_attrib_function;
     str_real_attrib_function.resize(n_user_real_attribs);
@@ -1617,8 +1617,8 @@ PhysicalParticleContainer::InitIonizationModule ()
 
     utils::parser::queryWithParser(
         pp_species_name, "ionization_initial_level", ionization_initial_level);
-    pp_species_name.get("ionization_product_species", ionization_product_name);
-    pp_species_name.get("physical_element", physical_element);
+    utils::parser::getWithParser(pp_species_name, "ionization_product_species", ionization_product_name);
+    utils::parser::getWithParser(pp_species_name, "physical_element", physical_element);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         physical_element == "H" || !do_adk_correction,
         "Correction to ADK by Zhang et al., PRA 90, 043410 (2014) only works with Hydrogen");

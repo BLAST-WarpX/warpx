@@ -51,7 +51,7 @@ DSMCFunc::DSMCFunc (
             // Ensure that the first product species is always an electron (which is assumed
             // during the scattering operation).
             amrex::Vector<std::string> product_species_names;
-            pp_collision_name.getarr("product_species", product_species_names);
+            utils::parser::getArrWithParser(pp_collision_name, "product_species", product_species_names);
             // Check that the charge is consistent with an electron species
             auto& species1 = mypc->GetParticleContainerFromName(product_species_names[0]);
             if( species1.getCharge() >= 0._prt ) {
@@ -66,11 +66,11 @@ DSMCFunc::DSMCFunc (
             // and the other must have lost an electron (charge difference ≈ +q_e).
             // This check verifies that the user did not swap the product_species in the input file.
             amrex::Vector<std::string> species_names;
-            pp_collision_name.getarr("species", species_names);
+            utils::parser::getArrWithParser(pp_collision_name, "species", species_names);
             auto& species1 = mypc->GetParticleContainerFromName(species_names[0]);
             auto& species2 = mypc->GetParticleContainerFromName(species_names[1]);
             amrex::Vector<std::string> product_species_name;
-            pp_collision_name.getarr("product_species", product_species_name);
+            utils::parser::getArrWithParser(pp_collision_name, "product_species", product_species_name);
             auto& product_species1 = mypc->GetParticleContainerFromName(product_species_name[0]);
             auto& product_species2 = mypc->GetParticleContainerFromName(product_species_name[1]);
             amrex::ParticleReal constexpr q_e = PhysConst::q_e;

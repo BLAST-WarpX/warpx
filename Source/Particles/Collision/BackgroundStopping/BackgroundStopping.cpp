@@ -27,7 +27,7 @@ BackgroundStopping::BackgroundStopping (std::string const& collision_name)
     const amrex::ParmParse pp_collision_name(collision_name);
 
     std::string background_type_str;
-    pp_collision_name.get("background_type", background_type_str);
+    utils::parser::getWithParser(pp_collision_name, "background_type", background_type_str);
     if (background_type_str == "electrons") {
         m_background_type = BackgroundStoppingType::ELECTRONS;
     } else if (background_type_str == "ions") {

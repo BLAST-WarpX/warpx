@@ -11,6 +11,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Fields.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -30,7 +31,7 @@ ExternalVectorPotential::ReadParameters ()
 
     pp_ext_A.query("do_diva_cleaning", m_do_clean_divA);
 
-    pp_ext_A.queryarr("fields", m_field_names);
+    utils::parser::queryArrWithParser(pp_ext_A, "fields", m_field_names);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_field_names.empty(),
         "No external field names defined in external_vector_potential.fields");
@@ -60,12 +61,11 @@ ExternalVectorPotential::ReadParameters ()
 
     for (int i = 0; i < m_nFields; ++i) {
         bool read_from_file = false;
-        utils::parser::queryWithParser(pp_ext_A,
-            (m_field_names[i]+".read_from_file").c_str(), read_from_file);
+        utils::parser::queryWithParser(pp_ext_A, m_field_names[i]+".read_from_file", read_from_file);
         m_read_A_from_file[i] = read_from_file;
 
         if (m_read_A_from_file[i]) {
-            pp_ext_A.query(m_field_names[i]+".path", m_external_file_path[i]);
+            utils::parser::queryWithParser(pp_ext_A, m_field_names[i]+".path", m_external_file_path[i]);
         } else {
             pp_ext_A.query(m_field_names[i]+".Ax_external_grid_function(x,y,z)",
                 m_Ax_ext_grid_function[i]);

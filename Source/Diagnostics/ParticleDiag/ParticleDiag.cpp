@@ -27,7 +27,7 @@ ParticleDiag::ParticleDiag (
 
     const ParmParse pp_diag_name_species_name(diag_name + "." + name);
     amrex::Vector<std::string> variables;
-    const int variables_specified = pp_diag_name_species_name.queryarr("variables", variables);
+    const int variables_specified = utils::parser::queryArrWithParser(pp_diag_name_species_name, "variables", variables);
 
     if (variables_specified) {
         // If only specific variables have been specified, fill m_plot_flags with zero and only set
@@ -80,7 +80,7 @@ ParticleDiag::ParticleDiag (
     }
 
     amrex::Vector<std::string> additional_variables;
-    pp_diag_name_species_name.queryarr("additional_variables", additional_variables);
+    utils::parser::queryArrWithParser(pp_diag_name_species_name, "additional_variables", additional_variables);
     for (auto& var : additional_variables) {
         if (var == "phi") { m_plot_phi = true; }
         else if (var == "Ex") { m_plot_Ex = true; }
