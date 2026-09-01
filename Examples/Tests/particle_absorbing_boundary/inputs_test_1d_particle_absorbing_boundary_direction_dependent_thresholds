@@ -13,7 +13,7 @@ hydrogen.uy                         = -beta/sqrt(1-beta*beta)
 
 electrons.maxwellian_u_mean_distribution_type = "constant"
 electrons.ux_mean = 0
-electrons.uy_mean = -1.33
+electrons.uy_mean = -beta/sqrt(1-beta*beta)
 electrons.uz_mean = 0
 
 # the following line replaces `particle_thermalizer.momentum_threshold = 0.1`
