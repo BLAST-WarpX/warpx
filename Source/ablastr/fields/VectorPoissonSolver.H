@@ -9,6 +9,7 @@
 
 #include <ablastr/constant.H>
 #include <ablastr/fields/Interpolate.H>
+#include <ablastr/fields/PoissonSolver.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/utils/TextMsg.H>
 #include <ablastr/warn_manager/WarnManager.H>
@@ -149,22 +150,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
 
         if (!eb_enabled && !is_rz) {
-            // Determine whether to use semi-coarsening
-            int max_semicoarsening_level = 0;
-            int semicoarsening_direction = -1;
-            const auto min_dir = static_cast<int>(std::distance(dx.begin(),
-                                                                std::min_element(dx.begin(), dx.end())));
-            const auto max_dir = static_cast<int>(std::distance(dx.begin(),
-                                                                std::max_element(dx.begin(), dx.end())));
-            if (dx[max_dir] > dx[min_dir]) {
-                semicoarsening_direction = max_dir;
-                max_semicoarsening_level = static_cast<int>(std::log2(dx[max_dir] / dx[min_dir]));
-            }
-            if (max_semicoarsening_level > 0) {
-                info.setSemicoarsening(true);
-                info.setMaxSemicoarseningLevel(max_semicoarsening_level);
-                info.setSemicoarseningDirection(semicoarsening_direction);
-            }
+            configureSemicoarsening(dx, info);
         }
 
         amrex::MLEBNodeFDLaplacian linopx, linopy, linopz;
