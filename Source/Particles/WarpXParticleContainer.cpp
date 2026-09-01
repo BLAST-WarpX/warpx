@@ -337,18 +337,43 @@ WarpXParticleContainer::AddNParticles (int /*lev*/, long n,
     // Move particles to their appropriate tiles
     Redistribute();
 
-    // Remove particles that are inside the embedded boundaries
+    // Remove particles that are inside the embedded boundaries and particle sinks
 #ifdef AMREX_USE_EB
-    if (EB::enabled()) {
+    if (EB::enabled() || ParticleSink::enabled()) {
         auto & warpx = WarpX::GetInstance();
+        std::vector<ablastr::fields::MultiLevelScalarField> distance_fields;
+        if (EB::enabled() && WarpX::eb_particle_boundary != ParticleBoundaryType::None) {
+            distance_fields.push_back(
+            warpx.m_fields.get_mr_levels("distance_to_eb", warpx.finestLevel())
+        );
+        }
+        if (ParticleSink::enabled()) {
+            // Add distance fields for each particle sink instance
+            for (const auto& sink_name : warpx.m_particle_sinks->get_names()) {
+                distance_fields.push_back(
+                    warpx.m_fields.get_mr_levels("distance_to_" + sink_name, warpx.finestLevel())
+                    );
+            }
+
+        }
+
+        amrex::Vector<ablastr::fields::MultiLevelScalarField const*> distance_ptrs;
+        for (const auto& field : distance_fields) {
+            distance_ptrs.push_back(&field);
+        }
+        if (!distance_ptrs.empty()) {
         scrapeParticlesAtEB(
             *this,
-            warpx.m_fields.get_mr_levels(FieldType::distance_to_eb, warpx.finestLevel()),
+            distance_ptrs,
+            0,
+            finestLevel(),
             ParticleBoundaryProcess::Absorb());
-        deleteInvalidParticles();
+            deleteInvalidParticles();
+        }
     }
 #endif
 }
+
 
 void
 WarpXParticleContainer::deleteInvalidParticles () {

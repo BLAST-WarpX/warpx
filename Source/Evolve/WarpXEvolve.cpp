@@ -805,6 +805,26 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
         mypc->Redistribute();
     }
 
+
+    // interact the particles with particle sinks (if present)
+    if (ParticleSink::enabled()) {
+
+        mypc->ScrapeParticlesAtEB(*m_particle_sinks);
+
+        const auto sink_ptrs = m_particle_sinks->get_active_distance_fields();
+        if (!sink_ptrs.empty()) {
+            m_particle_boundary_buffer->gatherParticlesFromDistanceFields(*mypc, sink_ptrs, cur_time);
+        }
+
+        if (m_particle_sinks->has_absorbing_sinks()) {
+            mypc->deleteInvalidParticles();
+        }
+        if (m_particle_sinks->has_reflecting_or_thermal_sinks())
+        {
+            mypc->Redistribute();
+        }
+    }
+
     // interact the particles with EB walls (if present)
     if (EB::enabled()) {
         using warpx::fields::FieldType;
