@@ -129,7 +129,7 @@ Python unit tests
 -----------------
 
 Besides the simulation-level tests described above, WarpX has a `pytest <https://docs.pytest.org>`__-based
-unit test suite in `Examples/Tests/python <https://github.com/BLAST-WarpX/warpx/tree/development/Examples/Tests/python>`__.
+unit test suite in `tests/unit <https://github.com/BLAST-WarpX/warpx/tree/development/tests/unit>`__.
 These tests drive WarpX through its Python bindings and assert properties of individual
 routines, such as the fact that charge and current deposition conserve the total charge
 and current of a species.
@@ -158,19 +158,19 @@ test. This requires that the Python package has been installed first, with
 .. code-block:: sh
 
      # all 3D unit tests
-     python3 -m pytest -s -vvvv Examples/Tests/python/3d
+     python3 -m pytest -s -vvvv tests/unit/3d
 
      # a single test (useful during debugging)
-     python3 -m pytest -s -vvvv Examples/Tests/python/3d/test_charge_deposition.py::test_charge_deposition_is_negative_for_electrons
+     python3 -m pytest -s -vvvv tests/unit/3d/test_charge_deposition.py::test_charge_deposition_is_negative_for_electrons
 
 To add a unit test, put a ``test_*.py`` file in the subdirectory of the dimensionality it
 needs. Adding a dimensionality that does not have a subdirectory yet only requires creating
 that subdirectory (``2d``, ``rz``, ...) with a ``conftest.py`` in it; the CTest registration
-in ``Examples/Tests/python/CMakeLists.txt`` picks it up automatically.
+in ``tests/unit/CMakeLists.txt`` picks it up automatically.
 
 Two fixtures are provided:
 
-* ``warpx_lifecycle`` (in ``Examples/Tests/python/conftest.py``, applied automatically) runs
+* ``warpx_lifecycle`` (in ``tests/unit/conftest.py``, applied automatically) runs
   each test in its own temporary directory and calls ``pywarpx.WarpX.finalize`` afterwards,
   which tears down WarpX and AMReX and clears all module-level input state. This is what
   allows a single process to run several independent simulations, for instance to compare
@@ -181,7 +181,7 @@ Two fixtures are provided:
   algorithm the test asks for.
 
 If you need a new Python package dependency for the unit tests, add it in
-`Examples/Tests/python/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/python/requirements.txt>`__.
+`tests/unit/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/tests/unit/requirements.txt>`__.
 
 How to add automated tests
 --------------------------

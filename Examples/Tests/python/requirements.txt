@@ -1,2 +1,0 @@
--r ../../../Regression/requirements.txt
-pytest

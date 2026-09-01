@@ -868,6 +868,9 @@ if(BUILD_TESTING)
     if(WarpX_APP OR WarpX_PYTHON)
         add_subdirectory(Examples)
     endif()
+    if(WarpX_PYTHON)
+        add_subdirectory(tests/unit)
+    endif()
 endif()
 
 
