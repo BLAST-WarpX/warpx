@@ -567,6 +567,14 @@ Overall simulation parameters
     For all regular WarpX operations, we therefore do explicit memory transfers without the need for managed memory and thus changed the AMReX default to false.
     `Please also see the documentation in AMReX <https://amrex-codes.github.io/amrex/docs_html/GPU.html#inputs-parameters>`__.
 
+.. pp:param:: amrex.throw_exception
+    :type: ``0`` or ``1``
+    :default: ``1`` for true
+
+    When set to ``1``, AMReX will throw a C++ exception on errors such as out-of-memory conditions instead of calling ``amrex::Abort()``.
+    This allows WarpX to handle errors more gracefully and provide clearer diagnostic messages.
+    `Please also see the documentation in AMReX <https://amrex-codes.github.io/amrex/docs_html/RuntimeParameters.html#amrex.throw_exception>`__.
+
 .. pp:param:: amrex.omp_threads
     :type: ``system``, ``nosmt`` or positive integer
     :default: ``nosmt``
