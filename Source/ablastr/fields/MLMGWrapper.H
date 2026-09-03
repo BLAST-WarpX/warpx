@@ -10,6 +10,7 @@
 #endif
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <map>
 #include <utility>
@@ -156,7 +157,7 @@ public:
                 l_mlmg->setFinalSmooth(*num_final_sweeps);
             }
             l_mlmg->setConvergenceNormType(MLMGNormType::greater);
-            l_mlmg->setNoGpuSync(true);
+            l_mlmg->setNoGpuSync(Parms{}.no_gpu_sync); // baseline; tuned below
 
             if (ng) {
                 // In this case, computeE needs to use ghost nodes data. So we
@@ -206,6 +207,17 @@ public:
 
             // If the baseline converged in zero iterations, there is nothing to tune.
             if (!baseline_ok || (niter0 > 0)) {
+                // On GPUs, MLMG can run in a single-stream no-sync region, thus
+                // avoiding stream synchronizations at the cost of losing the
+                // concurrency of multiple streams. Which one is faster depends
+                // on the problem, so we try both. On CPUs, this makes no
+                // difference, and we therefore test one option only.
+#ifdef AMREX_USE_GPU
+                constexpr std::array<bool,2> no_gpu_sync_options{true, false};
+#else
+                constexpr std::array<bool,1> no_gpu_sync_options{true};
+#endif
+
                 // let's test single Box first
                 if ((lev == 0) && (rho.size() > 1)
                     && (geom.Domain().numPts() <= (Long(256)*Long(256)*Long(256))))
@@ -231,26 +243,32 @@ public:
                         info.setMaxCoarseningLevel(mcl);
                         auto tmp = make_mlmg_linop(info, ba, dm, fac);
                         tmp.first->setMaxIter(std::min(max_iters, 2*niter0));
-                        double tsolve_tmp = std::numeric_limits<double>::max();
-                        Parms parms_tmp{};
-                        parms_tmp.single_box = true;
-                        parms_tmp.mcl = mcl;
-                        for (int itry = 0; itry < 3; ++itry) {
-                            try {
-                                phi.setVal(0);
-                                auto t0 = amrex::second();
-                                solve_doit(parms_tmp, ba, dm, geom, *tmp.first, ng, phi, rho,
-                                           relative_tolerance, absolute_tolerance);
-                                auto t1 = amrex::second();
-                                tsolve_tmp = std::min(tsolve_tmp, t1-t0);
-                            } catch (...) {
-                                tsolve_tmp = std::numeric_limits<double>::max();
-                                break;
+                        for (bool nosync : no_gpu_sync_options) {
+                            tmp.first->setNoGpuSync(nosync);
+                            double tsolve_tmp = std::numeric_limits<double>::max();
+                            Parms parms_tmp{};
+                            parms_tmp.single_box = true;
+                            parms_tmp.mcl = mcl;
+                            parms_tmp.no_gpu_sync = nosync;
+                            for (int itry = 0; itry < 3; ++itry) {
+                                try {
+                                    phi.setVal(0);
+                                    Gpu::synchronize();
+                                    auto t0 = amrex::second();
+                                    solve_doit(parms_tmp, ba, dm, geom, *tmp.first, ng, phi, rho,
+                                               relative_tolerance, absolute_tolerance);
+                                    Gpu::synchronize();
+                                    auto t1 = amrex::second();
+                                    tsolve_tmp = std::min(tsolve_tmp, t1-t0);
+                                } catch (...) {
+                                    tsolve_tmp = std::numeric_limits<double>::max();
+                                    break;
+                                }
                             }
-                        }
-                        if (tsolve_tmp < tsolve) {
-                            tsolve = tsolve_tmp;
-                            m_parms = parms_tmp;
+                            if (tsolve_tmp < tsolve) {
+                                tsolve = tsolve_tmp;
+                                m_parms = parms_tmp;
+                            }
                         }
                     }
                 }
@@ -270,27 +288,33 @@ public:
                         info.setMaxCoarseningLevel(mcl).setAgglomerationGridSize(ags);
                         auto tmp = make_mlmg_linop(info, ba, dm, factory);
                         tmp.first->setMaxIter(std::min(max_iters, 2*niter0));
-                        double tsolve_tmp = std::numeric_limits<double>::max();
-                        Parms parms_tmp{};
-                        parms_tmp.single_box = false;
-                        parms_tmp.mcl = mcl;
-                        parms_tmp.ags = ags;
-                        for (int itry = 0; itry < 3; ++itry) {
-                            try {
-                                phi.setVal(0);
-                                auto t0 = amrex::second();
-                                solve_doit(parms_tmp, ba, dm, geom, *tmp.first, ng, phi, rho,
-                                           relative_tolerance, absolute_tolerance);
-                                auto t1 = amrex::second();
-                                tsolve_tmp = std::min(tsolve_tmp, t1-t0);
-                            } catch (...) {
-                                tsolve_tmp = std::numeric_limits<double>::max();
-                                break;
+                        for (bool nosync : no_gpu_sync_options) {
+                            tmp.first->setNoGpuSync(nosync);
+                            double tsolve_tmp = std::numeric_limits<double>::max();
+                            Parms parms_tmp{};
+                            parms_tmp.single_box = false;
+                            parms_tmp.mcl = mcl;
+                            parms_tmp.ags = ags;
+                            parms_tmp.no_gpu_sync = nosync;
+                            for (int itry = 0; itry < 3; ++itry) {
+                                try {
+                                    phi.setVal(0);
+                                    Gpu::synchronize();
+                                    auto t0 = amrex::second();
+                                    solve_doit(parms_tmp, ba, dm, geom, *tmp.first, ng, phi, rho,
+                                               relative_tolerance, absolute_tolerance);
+                                    Gpu::synchronize();
+                                    auto t1 = amrex::second();
+                                    tsolve_tmp = std::min(tsolve_tmp, t1-t0);
+                                } catch (...) {
+                                    tsolve_tmp = std::numeric_limits<double>::max();
+                                    break;
+                                }
                             }
-                        }
-                        if (tsolve_tmp < tsolve) {
-                            tsolve = tsolve_tmp;
-                            m_parms = parms_tmp;
+                            if (tsolve_tmp < tsolve) {
+                                tsolve = tsolve_tmp;
+                                m_parms = parms_tmp;
+                            }
                         }
                     }
                 }
@@ -308,6 +332,9 @@ public:
                         if (m_parms.ags != -1) {
                             msg.append(" agglomeration_grid_size=").append(std::to_string(m_parms.ags));
                         }
+#ifdef AMREX_USE_GPU
+                        msg.append(" no_gpu_sync=").append(m_parms.no_gpu_sync ? "true" : "false");
+#endif
                         amrex::Print() << msg << '\n';
                     }
                 }
@@ -353,6 +380,7 @@ public:
         auto tmp = make_mlmg_linop(info, m_ba, m_dm, fac);
         m_mlmg = std::move(tmp.first);
         m_linop = std::move(tmp.second);
+        m_mlmg->setNoGpuSync(m_parms.no_gpu_sync);
     }
 
     amrex::MLMG& getMLMG () { return *m_mlmg; }
@@ -372,6 +400,7 @@ private:
         bool single_box = false;
         int mcl = 30; // default in amrex
         int ags = -1; // default in amrex
+        bool no_gpu_sync = true; // GPU only: single stream and no stream sync
     };
 
     inline static std::map<std::pair<int,amrex::FabArrayBase::BDKey>, Parms> m_parms_map;
