@@ -147,3 +147,6 @@ particle_buffer.clear_buffer()
 n = particle_buffer.get_particle_boundary_buffer_size("electrons", "eb")
 print(f"Number of electrons in buffer (proc #{my_id}): {n}")
 assert n == 0
+
+# clean up
+del particle_buffer

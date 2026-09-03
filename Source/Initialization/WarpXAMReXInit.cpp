@@ -164,6 +164,8 @@ namespace {
         pp_constants.queryAdd("m_u", tmp);
         tmp =       PhysConst::kb;
         pp_constants.queryAdd("kb", tmp);
+        tmp =       PhysConst::hbar;
+        pp_constants.queryAdd("hbar", tmp);
         tmp =       MathConst::pi;
         pp_constants.queryAdd("pi", tmp);
     }

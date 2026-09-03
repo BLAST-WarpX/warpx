@@ -26,7 +26,9 @@ def check_final_macroparticles():
     macro_electron2_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 11]
     macro_photon2_number = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 5]
     macro_photon2_weight = np.loadtxt("diags/reducedfiles/ParticleNumber.txt")[-1, 10]
-    assert macro_electron2_number == macro_photon2_number == 2.0
+    # Linear Compton creates one macroparticle per product species (photon at first reactant
+    # position, electron at second reactant position)
+    assert macro_electron2_number == macro_photon2_number == 1.0
     assert macro_electron2_weight == macro_photon2_weight == 1e14
 
 

@@ -8,6 +8,7 @@
 -e ../Python
 breathe
 docutils>=0.17.1
+myst-parser
 
 # PICMI API docs
 # note: keep in sync with version in ../requirements.txt
@@ -17,7 +18,6 @@ picmistandard==0.34.0
 
 pybtex
 pygments
-recommonmark
 # Sphinx<7.2 because we are waiting for
 #   https://github.com/breathe-doc/breathe/issues/943
 sphinx>=5.3,<7.2

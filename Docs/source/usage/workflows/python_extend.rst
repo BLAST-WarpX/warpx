@@ -18,6 +18,8 @@ If your custom Python code uses high-performance, GPU-accelerated libraries -- s
 or `numba <https://numba.pydata.org/>`__ -- the extra computations are unlikely to significantly impact simulation speed.
 Note that WarpX's Python bindings provide direct access to particle and field data without creating copies, resulting in very low overhead.
 
+.. _usage-python-extend-run-simulation:
+
 How to run a simulation with Python extensions
 ----------------------------------------------
 
@@ -77,312 +79,26 @@ Callback Functions
 ------------------
 
 Installing `callback functions <https://en.wikipedia.org/wiki/Callback_(computer_programming)>`__ will execute a given Python function at a
-specific location in the WarpX simulation loop.
+specific location in the WarpX simulation loop. The syntax to use in order to define callback functions is described in the links below.
 
-.. automodule:: pywarpx.callbacks
-   :members: installcallback, uninstallcallback, isinstalled
+.. toctree::
+   :maxdepth: 1
 
-
-pyAMReX
--------
-
-The Python interface to WarpX is provided through `pyAMReX <https://github.com/AMReX-Codes/pyamrex>`__.
-After the simulation is initialized, the pyAMReX module can be accessed (if needed) via
-
-.. code-block:: python
-
-   from pywarpx import picmi, libwarpx
-
-   # ... simulation definition ...
-
-   # equivalent to
-   #   import amrex.space3d as amr
-   # for a 3D simulation
-   amr = libwarpx.amr  # picks the right 1d, 2d or 3d variant
-
-
-Full details for pyAMReX APIs are `documented here <https://pyamrex.readthedocs.io/en/latest/usage/api.html>`__.
-The major objects used in the WarpX interface will be of types defined by pyAMReX.
-Important APIs include:
-
-* `amr.ParallelDescriptor <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParallelDescriptor.IOProcessor>`__: MPI-parallel rank information
-* `amr.MultiFab <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.MultiFab>`__: MPI-parallel field data
-* `amr.ParticleContainer_* <https://pyamrex.readthedocs.io/en/latest/usage/api.html#amrex.space3d.ParticleContainer_1_1_2_1_default>`__: MPI-parallel particle data for a particle species
-
+   python_callbacks
 
 .. _usage-python-extend-data-access:
 
-Data Access
------------
-
-While the simulation is running, the user will have read and write access the WarpX simulation data *in situ*, for example to be used in callbacks.
-
-An important object in the ``pywarpx.picmi`` module for data access is ``Simulation.extension.warpx``, which is available only during the simulation run.
-This object is the Python equivalent to the C++ ``WarpX`` simulation class.
-
-.. py:class:: WarpX
-
-   .. py:method:: getistep(lev: int)
-
-      Get the current step on mesh-refinement level ``lev``.
-
-   .. py:method:: gett_new(lev: int)
-
-      Get the current physical time on mesh-refinement level ``lev``.
-
-   .. py:method:: getdt(lev: int)
-
-      Get the current physical time step size on mesh-refinement level ``lev``.
-
-   .. py:method:: multi_particle_container
-
-   .. py:method:: get_particle_boundary_buffer
-
-   .. py:method:: set_potential_on_domain_boundary(potential_[lo/hi]_[x/y/z]: str)
-
-      The potential on the domain boundaries can be modified when using the electrostatic solver.
-      This function updates the strings and function parsers which set the domain
-      boundary potentials during the Poisson solve.
-
-   .. py:method:: set_potential_on_eb(potential: str)
-
-      The embedded boundary (EB) conditions can be modified when using the electrostatic solver.
-      This set the EB potential string and updates the function parser.
-
-   .. py:method:: evolve(numsteps=-1)
-
-      Evolve the simulation the specified number of steps.
-
-   .. py:method:: step(numsteps=-1)
-
-      An alias to the evolve method.
-
-   .. autofunction:: pywarpx.picmi.Simulation.extension.finalize
-
-.. py::def:: pywarpx.picmi.Simulation.extension.get_instance
-
-   Return a reference to the WarpX object.
-
-
-The :py:class:`WarpX` also provides read and write access to field ``MultiFab`` and ``ParticleContainer`` data, shown in the following examples.
-
-Fields
-^^^^^^
-
-All of the data on the grids can be accessed, with each field returned as a MultiFab instance.
-This callback example accesses the :math:`Ex(x,y,z)` field at level 0 after every time step and sets all of the values to ``42``.
-This shows how to loop over levels and grid blocks.
-
-.. code-block:: python3
-
-   from pywarpx import picmi
-   from pywarpx.callbacks import callfromafterstep
-
-   # Preparation: set up the simulation
-   #   sim = picmi.Simulation(...)
-   #   ...
-
-
-   @callfromafterstep
-   def set_Ex():
-       warpx = sim.extension.warpx
-
-       # data access
-       #   vector field E, component x, on the fine patch of MR level 0
-       Ex_mf = sim.fields.get("Efield_fp", dir=0, level=0)
-       #   scalar field rho, on the fine patch of MR level 0
-       rho_mf = sim.fields.get("rho_fp", level=0)
-
-       # compute on Ex_mf
-       # iterate over mesh-refinement levels
-       for lev in range(warpx.finest_level + 1):
-           # grow (aka guard/ghost/halo) regions
-           ngv = Ex_mf.n_grow_vect
-
-           # get every local block of the field
-           for mfi in Ex_mf:
-               # global index space box, including guards
-               bx = mfi.tilebox().grow(ngv)
-               print(bx)  # note: global index space of this block
-
-               # numpy/cupy representation: non-copying view, including
-               # the guard/ghost region
-               Ex = Ex_mf.array(mfi).to_xp()
-
-               # notes on indexing in Ex:
-               # - numpy/cupy use locally zero-based indexing
-               # - layout is F_CONTIGUOUS by default, just like AMReX
-
-               # notes:
-               # Only the next lines are the "HOT LOOP" of the computation.
-               # For efficiency, we use array operation for speed.
-               Ex[()] = 42.0
-
-
-   sim.step(nsteps=100)
-
-The physical fields in WarpX have the following :ref:`naming convention <developers-fields>`:
-
-- ``_fp`` are the "fine" patches, the regular resolution of a current mesh-refinement level
-- ``_aux`` are temporary (auxiliary) patches at the same resolution as ``_fp``.
-  Depending on the algorithms being used, they can be averaged spatially or include contributions from other levels. This will be the fields that will be interpolated to the particles.
-- ``_cp`` are "coarse" patches, at the same resolution (but not necessary values) as the ``_fp`` of ``level - 1``
-  (only for level 1 and higher).
-
-For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``Ex``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#fields>`__.
-
-Various operations can be done using the MultiFab objects. For example, to find the maximum value, use ``Ex.max()``, and to multiply the data by a factor, ``Ex.mult(2.)``.
-
-The field ``MultiFab`` object provides access to the data via global indexing.
-Using standard array indexing with square brackets, the data can be accessed using indices that are relative to the full domain (across the MultiFab and across processors).
-When the data is fetched the result is a numpy array that contains a copy of the data, and when using multiple processors is broadcast to all processors (and is a global operation).
-For indices within the domain, values from valid cells are always returned.
-The ghost cells at the exterior of the domain are accessed using imaginary numbers, with negative values accessing the lower ghost cells, and positive the upper ghost cells.
-This example will return the ``Bz`` field at all valid interior points along ``x`` at the specified ``y`` and ``z`` indices.
-
-.. code-block:: python
-
-   Bz = sim.fields.get("Bfield_fp", dir=2, level=0)
-   Bz_along_x = Bz[:,5,6]
-
-The same global indexing can be done to set values. This example will set the values over a range in ``y`` and ``z`` at the
-specified ``x``. The data will be scattered appropriately to the underlying FABs. The set is a local operation.
-
-.. code-block:: python
-
-   Jy = sim.fields.get("current_fp", dir=1, level=0)
-   Jy[5,6:20,8:30] = 7.
-
-In this example, seven is added to all of the values along ``x``, including both valid and ghost cells (specified by using the empty tuple, ``()``), the first ghost cell at the lower boundary in ``y``, and the last valid cell and first upper ghost cell in ``z``.
-Note that the ``+=`` will be a global operation.
-
-.. code-block:: python
-
-   Jx = sim.fields.get("current_fp", dir=0, level=0)
-   Jx[(),-1j,-1:2j] += 7.
-
-To fetch the data from all of the valid cells of all dimensions, the ellipsis can be used, ``Jx[...]``.
-Similarly, to fetch all of the data including valid cells and ghost cells, use an empty tuple, ``Jx[()]``.
-The code does error checking to ensure that the specified indices are within the bounds of the global domain.
-
-New MultiFabs can be created at the Python level and added to the registry. Using this method, the new MultiFabs will be handled in the same way as internal MultiFabs, for example that data can be redistributed during load balancing (when the flags are set as shpwn in the example).
-In this example, a new MultiFab is added with the same properties as `Ex`.
-
-.. code-block:: python
-
-   Ex = sim.fields.get("Efield_fp", dir=0, level=0)
-   normalized_Ex = sim.fields.alloc_init(name="normalized_Ex",
-                                         dir=0,
-                                         level=0,
-                                         ba=Ex.box_array(),
-                                         dm=Ex.dm(),
-                                         ncomp=Ex.n_comp,
-                                         ngrow=Ex.n_grow_vect,
-                                         initial_value=0.,
-                                         redistribute=True,
-                                         redistribute_on_remake=True)
-
-Particles
-^^^^^^^^^
-
-.. code-block:: python3
-
-   from pywarpx import picmi
-   from pywarpx.callbacks import callfromafterstep
-
-   # Preparation: set up the simulation
-   #   sim = picmi.Simulation(...)
-   #   ...
-
-   @callfromafterstep
-   def my_after_step_callback():
-       warpx = sim.extension.warpx
-       Config = sim.extension.Config
-
-       # data access
-       multi_pc = warpx.multi_particle_container()
-       pc = multi_pc.get_particle_container_from_name("electrons")
-
-       # compute
-       # iterate over mesh-refinement levels
-       for lvl in range(pc.finest_level + 1):
-           # get every local chunk of particles
-           for pti in pc.iterator(pc, level=lvl):
-               # compile-time and runtime attributes in SoA format
-               soa = pti.soa().to_cupy() if Config.have_gpu else \
-                     pti.soa().to_numpy()
-
-               # notes:
-               # Only the next lines are the "HOT LOOP" of the computation.
-               # For speed, use array operation.
-
-               # write to all particles in the chunk
-               # note: careful, if you change particle positions, you might need to
-               #       redistribute particles before continuing the simulation step
-               soa.real[0][()] = 0.30  # x
-               soa.real[1][()] = 0.35  # y
-               soa.real[2][()] = 0.40  # z
-
-               # all other attributes: weight, momentum x, y, z, ...
-               for soa_real in soa.real[3:]:
-                   soa_real[()] = 42.0
-
-               # by default empty unless ionization or QED physics is used
-               # or other runtime attributes were added manually
-               for soa_int in soa.int:
-                   soa_int[()] = 12
-
-
-   sim.step(nsteps=100)
-
-For further details on how to `access GPU data <https://pyamrex.readthedocs.io/en/latest/usage/zerocopy.html>`__ or compute on ``electrons``, please see the `pyAMReX documentation <https://pyamrex.readthedocs.io/en/latest/usage/compute.html#particles>`__.
-
-
-High-Level Particle Wrapper
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. note::
-
-   TODO: What are the benefits of using the high-level wrapper?
-   TODO: What are the limitations (e.g., in memory usage or compute scalability) of using the high-level wrapper?
-
-Particles can be added to the simulation at specific positions and with specific attribute values:
-
-.. code-block:: python
-
-   from pywarpx import particle_containers, picmi
-
-   # ...
-
-   electron_wrapper = particle_containers.ParticleContainerWrapper("electrons")
-
-
-.. autoclass:: pywarpx.particle_containers.ParticleContainerWrapper
-   :members:
-
-The ``get_particle_real_arrays()``, ``get_particle_int_arrays()`` and
-``get_particle_idcpu_arrays()`` functions are called
-by several utility functions of the form ``get_particle_{comp_name}`` where
-``comp_name`` is one of ``x``, ``y``, ``z``, ``r``, ``theta``, ``id``, ``cpu``,
-``weight``, ``ux``, ``uy`` or ``uz``.
-
-
-Diagnostics
------------
-
-Various diagnostics are also accessible from Python.
-This includes getting the deposited or total charge density from a given species as well as accessing the scraped particle buffer.
-See the example in ``Examples/Tests/ParticleBoundaryScrape`` for a reference on how to interact with scraped particle data.
-
-
-.. autoclass:: pywarpx.particle_containers.ParticleBoundaryBufferWrapper
-   :members:
-
-
-Modify Solvers
---------------
-
-From Python, one can also replace numerical solvers in the PIC loop or add new physical processes into the time step loop.
-Examples:
-
-* :ref:`Capacitive Discharge <examples-capacitive-discharge>`: replaces the Poisson solver of an electrostatic simulation (default: MLMG) with a python function that uses `superLU <https://portal.nersc.gov/project/sparse/superlu/>`__ to directly solve the Poisson equation.
+Accessing simulation data through Python
+----------------------------------------
+
+While the simulation is running, the Python code (e.g. the code in the callback functions) will have read and write access the WarpX simulation data.
+The specific Python syntax to access this data is described in the following sections.
+
+.. toctree::
+   :maxdepth: 1
+
+   python_field_data
+   python_particle_data
+   python_particle_boundary_data
+   python_warpx
+   python_portable

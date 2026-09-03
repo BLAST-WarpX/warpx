@@ -17,6 +17,26 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
     {
         const amrex::ParmParse pp_collision_name(collision_name);
 
+        // Build the ScatteringProcess objects using the same shared helper as DSMCFunc, so
+        // that the process ordering matches the indices encoded in the per-pair mask. The
+        // scatter kernel uses these to look up, for each colliding pair, the process type,
+        // scattering angle model and energy penalty.
+        m_scattering_processes = BinaryCollisionUtils::parse_scattering_processes(collision_name);
+#ifdef AMREX_USE_GPU
+        amrex::Gpu::HostVector<ScatteringProcess::Executor> h_scattering_processes_exe;
+        for (auto const& p : m_scattering_processes) {
+            h_scattering_processes_exe.push_back(p.executor());
+        }
+        m_scattering_processes_exe.resize(h_scattering_processes_exe.size());
+        amrex::Gpu::copyAsync(amrex::Gpu::hostToDevice, h_scattering_processes_exe.begin(),
+                              h_scattering_processes_exe.end(), m_scattering_processes_exe.begin());
+        amrex::Gpu::streamSynchronize();
+#else
+        for (auto const& p : m_scattering_processes) {
+            m_scattering_processes_exe.push_back(p.executor());
+        }
+#endif
+
         // Check if the scattering processes include reactions that produce macroparticles in new species
         // (i.e. not in the incident species list), i.e. if it contains ionization, charge exchange or two-product reaction
         amrex::Vector<std::string> scattering_processes;
@@ -35,26 +55,20 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             // For ionization:
             if (std::find(scattering_processes.begin(), scattering_processes.end(), "ionization") != scattering_processes.end()) {
                 m_num_product_species = 4;
-                m_num_products_host.push_back(1); // the non-target species
-                m_num_products_host.push_back(0); // the target species
-                m_num_products_host.push_back(1); // first product species
-                m_num_products_host.push_back(1); // second product species
-
-                // get the reaction energy
-                pp_collision_name.get("ionization_energy", m_reaction_energy);
+                m_num_products_host.push_back(1); // slot 0: first reactant (incident/non-target) species; 1 scattered particle per ionization event
+                m_num_products_host.push_back(0); // slot 1: other reactant (target) species; consumed by reaction, no new reaction-produced particle
+                m_num_products_host.push_back(1); // slot 2: first true product species (e.g. ejected electron)
+                m_num_products_host.push_back(1); // slot 3: second true product species (e.g. resulting ion)
             }
 
             // For charge exchange or two-product reaction:
             if (std::find(scattering_processes.begin(), scattering_processes.end(), "charge_exchange") != scattering_processes.end() ||
                 std::find(scattering_processes.begin(), scattering_processes.end(), "two_product_reaction") != scattering_processes.end()) {
                 m_num_product_species = 4;
-                m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
-                m_num_products_host.push_back(0); // the colliding species are consumed in the reaction
-                m_num_products_host.push_back(1); // first product species
-                m_num_products_host.push_back(1); // second product species
-
-                // get the reaction energy, assuming zero energy for charge exchange
-                pp_collision_name.query("two_product_reaction_energy", m_reaction_energy);
+                m_num_products_host.push_back(0); // slot 0: first reactant species; consumed by reaction, no new reaction-produced particles
+                m_num_products_host.push_back(0); // slot 1: other reactant species; consumed by reaction, no new reaction-produced particles
+                m_num_products_host.push_back(1); // slot 2: first true product species
+                m_num_products_host.push_back(1); // slot 3: second true product species
             }
 
         } else {

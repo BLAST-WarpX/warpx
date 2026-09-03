@@ -52,6 +52,27 @@ for all scattering processes are evaluated at the energy as calculated above.
 
 Once a particle is selected for a specific collision process, that process determines how the particle is scattered as outlined below.
 
+.. _multiphysics-collisions-pulseddecay:
+
+Pulsed Decay
+------------
+
+This collision module can be used to have a parent species decay into two product
+species with a user-defined decay rate. Mathematically, it solves the following
+rate equations on a cell-by-cell basis:
+
+    .. math::
+
+       \begin{aligned}
+        \frac{dn_1}{dt} &= -\nu(t)n_1, \\
+        \frac{dn_A}{dt} &= +\nu(t)n_1 = \frac{dn_B}{dt}, \\
+       \end{aligned}
+
+where :math:`n_1` is the parent species density, :math:`n_A` and :math:`n_B` are the product species densities,
+and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
+
+This can be used, for example, to represent ionization of a parent species by an externally applied laser pulse.
+
 .. _multiphysics-collisions-dsmc:
 
 Direct Simulation Monte Carlo (DSMC)
@@ -87,7 +108,7 @@ The ``elastic`` option uses isotropic scattering, i.e., with a differential
 cross section that is independent of angle.
 This scattering process as well as the ones below that relate to it, are all
 performed in the center-of-momentum (COM) frame. Designating the COM velocity of
-the particle as :math:`\vec{u}_c` and its labframe velocity as :math:`\vec{u}_l`,
+the particle as :math:`\boldsymbol{u}_c` and its labframe velocity as :math:`\boldsymbol{u}_l`,
 the transformation from lab frame to COM frame is done with a general Lorentz
 boost (see function ``ParticleUtils::doLorentzTransform()``):
 
@@ -114,14 +135,14 @@ where :math:`\gamma` is the Lorentz factor of the relative speed between the lab
 
     .. math::
 
-        \vec{v}^{COM} = \frac{m \vec{u_c}}{\gamma_u m + M}
+        \boldsymbol{v}^{COM} = \frac{m \boldsymbol{u}_c}{\gamma_u m + M}
 
 The particle velocity in the COM frame is then isotropically scattered using the function ``ParticleUtils::RandomizeVelocity()``. After the direction of the velocity vector has been appropriately changed, it is transformed back to the lab frame with the reversed Lorentz transform as was done above followed by the reverse Galilean transformation using the starting neutral velocity.
 
 Back scattering
 ^^^^^^^^^^^^^^^
 
-The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
+The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\boldsymbol{u}_c`.
 
 Excitation
 ^^^^^^^^^^

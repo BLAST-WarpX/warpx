@@ -17,9 +17,9 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -82,11 +82,15 @@ Diagnostics::BaseReadParameters ()
         }
     }
 
+    amrex::Vector< std::string > additional_varnames_fields;
+    pp_diag_name.queryarr("additional_fields_to_plot", additional_varnames_fields);
+    m_varnames_fields.insert(m_varnames_fields.end(), additional_varnames_fields.begin(), additional_varnames_fields.end());
+
     // Sanity check if user requests to plot phi
-    if (utils::algorithms::is_in(m_varnames_fields, "phi") && !(
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrame ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic ||
-            warpx.electrostatic_solver_id==ElectrostaticSolverAlgo::LabFrameEffectivePotential
+    if (utils::algorithms::is_in(m_varnames_fields, "phi") && (
+            WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrame &&
+            WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic &&
+            WarpX::electrostatic_solver_id != ElectrostaticSolverAlgo::LabFrameEffectivePotential
         )
     ){
         ablastr::warn_manager::WMRecordWarning(
@@ -149,7 +153,7 @@ Diagnostics::BaseReadParameters ()
     for (const auto& var : m_pfield_varnames) {
 
         bool do_average = true;
-        pp_diag_pfield.query((var + ".do_average").c_str(), do_average);
+        pp_diag_pfield.query(var + ".do_average", do_average);
         m_pfield_do_average.push_back(do_average);
         utils::parser::Store_parserString(
             pp_diag_pfield, (var + "(x,y,z,ux,uy,uz)"), parser_str);
@@ -163,7 +167,7 @@ Diagnostics::BaseReadParameters ()
 
         // Look for and record filter functions. If one is not found, the empty string will be
         // stored as the filter string, and will be ignored.
-        const bool do_parser_filter = pp_diag_pfield.query((var + ".filter(x,y,z,ux,uy,uz)").c_str(), filter_parser_str);
+        const bool do_parser_filter = pp_diag_pfield.query(var + ".filter(x,y,z,ux,uy,uz)", filter_parser_str);
         m_pfield_dofilter.push_back(do_parser_filter);
         m_pfield_filter_strings.push_back(filter_parser_str);
     }
@@ -272,7 +276,7 @@ Diagnostics::BaseReadParameters ()
     // Loop over all fields stored in m_varnames
     for (const auto& var : m_varnames) {
         // Check if m_varnames contains a string of the form rho_<species_name>
-        if (var.rfind("rho_", 0) == 0) {
+        if (var.starts_with("rho_")) {
             // Extract species name from the string rho_<species_name>
             const std::string species = var.substr(var.find("rho_") + 4);
             // Boolean used to check if species name was misspelled
@@ -296,7 +300,7 @@ Diagnostics::BaseReadParameters ()
             );
         }
         // Check if m_varnames contains a string of the form T_<species_name>
-        if (var.rfind("T_", 0) == 0) {
+        if (var.starts_with("T_")) {
             // Extract species name from the string T_<species_name>
             const std::string species = var.substr(var.find("T_") + 2);
             // Boolean used to check if species name was misspelled
@@ -321,25 +325,14 @@ Diagnostics::BaseReadParameters ()
         }
 
         // Check if m_varnames contains a string of the form T_<species_name>
-        if (var.rfind("Tx_", 0) == 0 || var.rfind("Ty_", 0) == 0 || var.rfind("Tz_", 0) == 0) {
+        if (var.starts_with("Tx_") || var.starts_with("Ty_") || var.starts_with("Tz_")) {
             // Extract species name from the string T_<species_name>
             const std::string species = var.substr(var.find("T") + 3);
-            // Boolean used to check if species name was misspelled
-            bool species_name_is_wrong = true;
-            // Loop over all species
-            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
-                // Check if species name extracted from the string T_<species_name>
-                // matches any of the species in the simulation
-                if (species == m_all_species_names[i]) {
-                    species_name_is_wrong = false;
-                }
-            }
-            // If species name was misspelled, abort with error message
+
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !species_name_is_wrong,
+                utils::algorithms::is_in(m_all_species_names, species),
                 "Input error: string " + var + " in " + m_diag_name
-                + ".fields_to_plot does not match any species"
-            );
+                + ".fields_to_plot does not match any species");
         }
     }
 
@@ -535,23 +528,16 @@ Diagnostics::InitBaseData ()
         const int moving_dir = WarpX::moving_window_dir;
         const int current_step = warpx.getistep(0);
 
-        // Calculate how many steps the moving window has been active up to current_step
-        // This accounts for start_moving_window_step and end_moving_window_step
-        int active_steps = 0;
-        const int start_step = WarpX::start_moving_window_step;
-        const int end_step = (WarpX::end_moving_window_step < 0) ?
-            current_step : std::min(WarpX::end_moving_window_step, current_step);
-
-        if (end_step >= start_step && current_step >= start_step) {
-            // Count steps from start_step to min(end_step, current_step - 1)
-            // Note: current_step is the checkpoint step, but the replay loop goes from 0 to current_step - 1
-            // So we need to count steps up to current_step - 1, not current_step
-            const int last_replayed_step = current_step - 1;
-            const int effective_end_step = std::min(end_step, last_replayed_step);
-            if (effective_end_step >= start_step) {
-                active_steps = effective_end_step - start_step + 1;
-            }
-        }
+        // Calculate how many steps the moving window has been active up to current_step.
+        // This must mirror WarpX::moving_window_active(n), which is always evaluated at
+        // n = 1, ..., current_step (i.e., the 1-indexed count of completed steps, see the
+        // call sites using getistep(0)+1) and treats end_moving_window_step as an
+        // exclusive upper bound (n < end_moving_window_step).
+        const int first_active_step = std::max(WarpX::start_moving_window_step, 1);
+        const int last_active_step = (WarpX::end_moving_window_step < 0) ?
+            current_step : std::min(WarpX::end_moving_window_step - 1, current_step);
+        const int active_steps = (last_active_step >= first_active_step) ?
+            last_active_step - first_active_step + 1 : 0;
 
         if (active_steps > 0) {
             // Calculate the shift based on the number of active steps
@@ -677,7 +663,7 @@ Diagnostics::ComputeAndPack ()
 void
 Diagnostics::FilterComputePackFlush (int step, bool force_flush)
 {
-    WARPX_PROFILE("Diagnostics::FilterComputePackFlush()");
+    ABLASTR_PROFILE("Diagnostics::FilterComputePackFlush()");
     MovingWindowAndGalileanDomainShift (step);
 
     if ( DoComputeAndPack (step, force_flush) ) {

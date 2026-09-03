@@ -106,7 +106,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
     if (!context->m_fd_jac_comput) {
-        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat(context->m_U);
+        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
     }
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -250,9 +250,8 @@ void PETScSolver_impl::setOptions()
 
         std::string pctype = "asm"; // default
         {
-            std::string key = "type";
             std::string val = pctype;
-            pp_pc.query(key.c_str(), val);
+            pp_pc.query("type", val);
             PetscOptionsSetValue( NULL, "-pc_type", val.c_str());
             pctype = val;
         }
@@ -260,47 +259,42 @@ void PETScSolver_impl::setOptions()
         if (pctype == "asm") {
 
             {
-                std::string key = "asm_overlap";
                 int val = 0;
-                pp_pc.query(key.c_str(), val);
-                char valstr[10]; sprintf(valstr, "%d", val);
-                PetscOptionsSetValue( NULL, "-pc_asm_overlap", valstr);
+                pp_pc.query("asm_overlap", val);
+                std::string valstr = std::to_string(val);
+                PetscOptionsSetValue( NULL, "-pc_asm_overlap", valstr.c_str());
             }
 
             std::string subpctype = "ilu"; // default
             {
-                std::string key = "sub_type";
                 std::string val = subpctype;
-                pp_pc.query(key.c_str(), val);
+                pp_pc.query("sub_type", val);
                 PetscOptionsSetValue( NULL, "-sub_pc_type", val.c_str());
                 subpctype = val;
             }
 
             if (subpctype == "ilu") {
-                std::string key = "ilu_factor_levels";
                 int val = 2;
-                pp_pc.query(key.c_str(), val);
-                char valstr[10]; sprintf(valstr, "%d", val);
-                PetscOptionsSetValue( NULL, "-sub_pc_factor_levels", valstr);
+                pp_pc.query("ilu_factor_levels", val);
+                std::string valstr = std::to_string(val);
+                PetscOptionsSetValue( NULL, "-sub_pc_factor_levels", valstr.c_str());
             }
 
         } else if (pctype == "hypre") {
 
             std::string hyprepctype = "euclid"; // default
             {
-                std::string key = "hypre_type";
                 std::string val = hyprepctype;
-                pp_pc.query(key.c_str(), val);
+                pp_pc.query("hypre_type", val);
                 PetscOptionsSetValue( NULL, "-pc_hypre_type", val.c_str());
                 hyprepctype = val;
             }
 
             if (hyprepctype == "euclid") {
-                std::string key = "euclid_factor_levels";
                 int val = 2;
-                pp_pc.query(key.c_str(), val);
-                char valstr[10]; sprintf(valstr, "%d", val);
-                PetscOptionsSetValue( NULL, "-pc_hypre_euclid_level", valstr);
+                pp_pc.query("euclid_factor_levels", val);
+                std::string valstr = std::to_string(val);
+                PetscOptionsSetValue( NULL, "-pc_hypre_euclid_level", valstr.c_str());
             }
 
         } else {
@@ -341,6 +335,7 @@ void PETScSolver_impl::applyPC( VecType& a_F,
 //! Assemble preconditioner matrix
 int PETScSolver_impl::assemblePCMatrix(LinOpType* const a_linop)
 {
+    PetscFunctionBeginUser;
     BL_PROFILE("PETScSolver_impl::assemblePCMatrix()");
 
     AMREX_ALWAYS_ASSERT(m_is_defined);
@@ -780,11 +775,11 @@ bool SNES_impl::usePC() const
     return dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->usePreconditioner();
 }
 
-void SNES_impl::solve(  VecType& a_U,
-                        const VecType& a_B,
-                        amrex::Real a_time,
-                        amrex::Real a_dt,
-                        int a_step ) const
+void SNES_impl::solve (VecType& a_U,
+                       const VecType& a_B,
+                       amrex::Real a_time,
+                       amrex::Real a_dt,
+                       int a_step) const
 {
     BL_PROFILE("SNES_impl::solve()");
     AMREX_ALWAYS_ASSERT(isDefined());
@@ -807,11 +802,12 @@ void SNES_impl::solve(  VecType& a_U,
 
     SNESConvergedReason reason;
     SNESGetConvergedReason( m_snes->obj, &reason );
-    m_status = (int) reason;
+    m_status = (int)reason;
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
 
     const char* conv_reason;
     SNESGetConvergedReasonString(m_snes->obj, &conv_reason);
+    // see https://petsc.org/release/docs/manualpages/SNES/SNESConvergedReason/
     if (m_verbose) {
         amrex::Print() << "Newton (PETSc SNES): exited due to \""
                        << conv_reason << "\" "

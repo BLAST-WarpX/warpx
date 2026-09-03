@@ -22,7 +22,8 @@ void UpdateMomentumBorisWithRadiationReaction(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
-    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt )
+    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type)
+
 {
     using namespace amrex::literals;
 
@@ -32,14 +33,14 @@ void UpdateMomentumBorisWithRadiationReaction(
     const amrex::ParticleReal uz_old = uz;
 
     //Useful constant
-    constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     //Call to regular Boris pusher
     UpdateMomentumBoris(
         ux, uy, uz,
         Ex, Ey, Ez,
         Bx, By, Bz,
-        q, m, dt );
+        q, m, dt, momentum_push_type );
 
     //Estimation of the normalized momentum at intermediate (integer) time
     const amrex::ParticleReal ux_n = (ux+ux_old)*0.5_prt;
@@ -83,9 +84,10 @@ void UpdateMomentumBorisWithRadiationReaction(
         RRcoeff*(PhysConst::c*(flx_q*By - fly_q*Bx) + bdotE*Ez - coeff*bz_n);
 
     //Update momentum using the RR force
-    ux += frx*dt;
-    uy += fry*dt;
-    uz += frz*dt;
+    const amrex::ParticleReal dt_multiplier = ((momentum_push_type == MomentumPushType::Full) ? 1.0_prt : 0.5_prt);
+    ux += frx*dt_multiplier*dt;
+    uy += fry*dt_multiplier*dt;
+    uz += frz*dt_multiplier*dt;
 }
 
 #endif // WARPX_PARTICLES_PUSHER_UPDATEMOMENTUM_BORIS_WITHRR_H_

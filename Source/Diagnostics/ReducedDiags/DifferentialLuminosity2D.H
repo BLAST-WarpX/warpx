@@ -28,7 +28,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    DifferentialLuminosity2D(const std::string& rd_name);
+    explicit DifferentialLuminosity2D(const std::string& rd_name);
 
     /// File type
     std::string m_openpmd_backend {"default"};

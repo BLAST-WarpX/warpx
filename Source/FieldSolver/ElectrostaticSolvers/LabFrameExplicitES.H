@@ -15,7 +15,7 @@ class LabFrameExplicitES final : public ElectrostaticSolver
 {
 public:
 
-    LabFrameExplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
+    explicit LabFrameExplicitES (int nlevs_max) : ElectrostaticSolver (nlevs_max) {
         ReadParameters();
     }
 
@@ -28,6 +28,11 @@ public:
         int max_level) override;
 
     void computePhiTriDiagonal (
+        const ablastr::fields::MultiLevelScalarField& rho,
+        const ablastr::fields::MultiLevelScalarField& phi
+    );
+
+    void computePhiTriDiagonal_periodic (
         const ablastr::fields::MultiLevelScalarField& rho,
         const ablastr::fields::MultiLevelScalarField& phi
     );

@@ -24,7 +24,7 @@ public:
      *
      * \param[in] rd_name reduced diags names
      */
-    FieldMomentum(const std::string& rd_name);
+    explicit FieldMomentum(const std::string& rd_name);
 
     /**
      * \brief This function computes the electromagnetic momentum,

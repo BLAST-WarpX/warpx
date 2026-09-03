@@ -157,11 +157,11 @@ inline void interpolatePhiBetweenLevels (
 /** Compute the potential `phi` by solving the Poisson equation
  *
  * Uses `rho` as a source, assuming that the source moves at a
- * constant speed \f$\vec{\beta}\f$. This uses the AMReX solver.
+ * constant speed \f$\boldsymbol{\beta}\f$. This uses the AMReX solver.
  *
  * More specifically, this solves the equation
  * \f[
- *   \vec{\nabla}^2 r \phi - (\vec{\beta}\cdot\vec{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
+ *   \nabla^2 r \phi - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
  * \f]
  *
  * \tparam T_PostPhiCalculationFunctor a calculation per level directly after phi was calculated
@@ -183,6 +183,8 @@ inline void interpolatePhiBetweenLevels (
  * \param[in] eb_enabled solve with embedded boundaries
  * \param[in] do_single_precision_comms perform communications in single precision
  * \param[in] rel_ref_ratio mesh refinement ratio between levels (default: 1)
+ * \param[in] num_final_sweeps Optional MLMG final smoothing count. If set, it is used for final smoothing.
+ * Otherwise, the default AMReX MLMG value (8) is used.
  * \param[in] post_phi_calculation perform a calculation per level directly after phi was calculated; required for embedded boundaries (default: none)
  * \param[in] boundary_handler a handler for boundary conditions, for example @see ElectrostaticSolver::PoissonBoundaryHandler
  * \param[in] current_time the current time; required for embedded boundaries (default: none)
@@ -211,10 +213,11 @@ computePhi (
     bool eb_enabled = false,
     bool do_single_precision_comms = false,
     std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
+    std::optional<int> num_final_sweeps = std::nullopt,
     [[maybe_unused]] T_PostPhiCalculationFunctor post_phi_calculation = std::nullopt,
-    [[maybe_unused]] T_BoundaryHandler const boundary_handler = std::nullopt,
+    [[maybe_unused]] T_BoundaryHandler const& boundary_handler = std::nullopt,
     [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-    [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
+    [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
 )
 {
     using namespace amrex::literals;
@@ -261,10 +264,6 @@ computePhi (
             [](const auto b){return (b<1.0_rt);}),
         "Components of beta_solver must be < 1.");
 
-    // determine if rho is zero everywhere
-    const amrex::Real max_norm_b = getMaxNormRho(
-        amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
-
     amrex::LPInfo info;
 
     for (int lev=0; lev<=finest_level; lev++) {
@@ -274,6 +273,9 @@ computePhi (
                               geom[lev].CellSize(2)/std::sqrt(1._rt-beta_solver[2]*beta_solver[2]))};
 
 #if (defined(ABLASTR_USE_FFT) && defined(WARPX_DIM_3D))
+        // determine if rho is zero everywhere
+        const amrex::Real max_norm_b = getMaxNormRho(
+            amrex::GetVecOfConstPtrs(rho), finest_level, absolute_tolerance);
         // Use the Integrated Green Function solver (FFT) on the coarsest level if it was selected
         if(is_solver_igf_on_lev0 && lev==0){
             if ( max_norm_b == 0 ) {
@@ -404,7 +406,11 @@ computePhi (
         amrex::MLMG mlmg(*linop); // actual solver defined here
         mlmg.setVerbose(verbosity);
         mlmg.setMaxIter(max_iters);
-        mlmg.setConvergenceNormType((max_norm_b > 0) ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+        if (num_final_sweeps) {
+            mlmg.setFinalSmooth(*num_final_sweeps);
+        }
+        mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
+        mlmg.setNoGpuSync(true);
 
         const int ng = int(grid_type == utils::enums::GridType::Collocated); // ghost cells
         if (ng) {
@@ -412,6 +418,8 @@ computePhi (
             // ask MLMG to fill BC for us after it solves the problem.
             mlmg.setFinalFillBC(true);
         }
+
+        rho[lev]->OverrideSync(geom[lev].periodicity());
 
         // Solve Poisson equation at lev
         mlmg.solve( {phi[lev]}, {rho[lev]},

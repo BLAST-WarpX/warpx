@@ -75,6 +75,13 @@ macro(find_amrex)
             set(AMReX_EB OFF CACHE INTERNAL "")
         endif()
 
+        # PETSc support in AMReX
+        if(WarpX_PETSC)
+            set(AMReX_PETSC ON CACHE INTERNAL "")
+        else()
+            set(AMReX_PETSC OFF CACHE INTERNAL "")
+        endif()
+
         if(WarpX_MPI)
             set(AMReX_MPI ON CACHE INTERNAL "")
             if(WarpX_MPI_THREAD_MULTIPLE)
@@ -113,12 +120,16 @@ macro(find_amrex)
         set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
         set(AMReX_LINEAR_SOLVERS_INCFLO ON CACHE INTERNAL "")
 
-        if(WarpX_ASCENT OR WarpX_SENSEI)
-            set(AMReX_GPU_RDC ON CACHE BOOL "")
+        # CUDA device LTO (AMReX_CUDA_LTO, set for WarpX_IPO below) only works
+        # with relocatable device code: without RDC every translation unit is
+        # already device linked on its own and AMReX errors out.
+        if(WarpX_ASCENT OR WarpX_SENSEI OR
+           (WarpX_IPO AND WarpX_COMPUTE STREQUAL CUDA))
+            set(AMReX_GPU_RDC ON CACHE BOOL "" FORCE)
         else()
             # we don't need RDC and disabling it simplifies the build
             # complexity and potentially improves code optimization
-            set(AMReX_GPU_RDC OFF CACHE BOOL "")
+            set(AMReX_GPU_RDC OFF CACHE BOOL "" FORCE)
         endif()
 
         # shared libs, i.e. for Python bindings, need relocatable code
@@ -138,10 +149,12 @@ macro(find_amrex)
         endif()
 
         # IPO/LTO
-        if(WarpX_IPO)
-            set(AMReX_IPO ON CACHE INTERNAL "")
-            if(WarpX_COMPUTE STREQUAL CUDA)
-                set(AMReX_CUDA_LTO ON CACHE BOOL "")
+        set(AMReX_IPO "${WarpX_IPO}" CACHE INTERNAL "")
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            if(WarpX_IPO)
+                set(AMReX_CUDA_LTO ON CACHE BOOL "" FORCE)
+            else()
+                set(AMReX_CUDA_LTO OFF CACHE BOOL "" FORCE)
             endif()
         endif()
 
@@ -163,13 +176,11 @@ macro(find_amrex)
             list(APPEND CMAKE_MODULE_PATH "${WarpX_amrex_src}/Tools/CMake")
             if(WarpX_COMPUTE STREQUAL CUDA)
                 enable_language(CUDA)
-                # AMReX 21.06+ supports CUDA_ARCHITECTURES
             endif()
             add_subdirectory(${WarpX_amrex_src} _deps/localamrex-build/)
         else()
             if(WarpX_COMPUTE STREQUAL CUDA)
                 enable_language(CUDA)
-                # AMReX 21.06+ supports CUDA_ARCHITECTURES
             endif()
             FetchContent_Declare(fetchedamrex
                 GIT_REPOSITORY ${WarpX_amrex_repo}
@@ -282,6 +293,11 @@ macro(find_amrex)
         else()
             set(COMPONENT_EB)
         endif()
+        if(WarpX_PETSC)
+            set(COMPONENT_PETSC PETSC)
+        else()
+            set(COMPONENT_PETSC)
+        endif()
         if(WarpX_LIB)
             set(COMPONENT_PIC PIC)
         else()
@@ -294,7 +310,7 @@ macro(find_amrex)
         endif()
         set(COMPONENT_PRECISION ${WarpX_PRECISION} P${WarpX_PARTICLE_PRECISION})
 
-        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
+        find_package(AMReX ${amrex_version} CONFIG REQUIRED COMPONENTS ${COMPONENT_ASCENT} ${COMPONENT_CATALYST} ${COMPONENT_DIMS} ${COMPONENT_EB} ${COMPONENT_FFT} PARTICLES ${COMPONENT_PETSC} ${COMPONENT_PIC} ${COMPONENT_PRECISION} ${COMPONENT_SENSEI} ${COMPONENT_SIMD} LSOLVERS)
         # note: TINYP skipped because user-configured and optional
 
         # AMReX CMake helper scripts

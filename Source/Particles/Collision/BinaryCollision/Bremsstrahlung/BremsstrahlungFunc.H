@@ -8,6 +8,7 @@
 #ifndef WARPX_BREMSSTRAHLUNG_FUNC_H_
 #define WARPX_BREMSSTRAHLUNG_FUNC_H_
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -31,6 +32,7 @@
  *  effectively created in the particle creation functor.
  */
 class BremsstrahlungFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -92,7 +94,8 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const m1, amrex::ParticleReal const m2,
             amrex::Real const dt, amrex::Real const /*dV*/, index_type coll_idx,
-            index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
+            index_type const cell_start_pair, amrex::IntVect const /*global_index*/,
+            index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* AMREX_RESTRICT p_product_data,
@@ -118,11 +121,6 @@ public:
 
             index_type pair_index = cell_start_pair + coll_idx;
 
-#if (defined WARPX_DIM_RZ)
-            amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-            amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
-#endif
-
             index_type i1 = I1s + coll_idx;
             index_type const i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
@@ -132,21 +130,6 @@ public:
             for (index_type k = coll_idx; k < max_N; k += min_N)
             {
 
-#if (defined WARPX_DIM_RZ)
-                /* In RZ geometry, macroparticles can collide with other macroparticles
-                 * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                 * are actually not local in space. In this case, the underlying assumption is that
-                 * particles within the same cylindrical cell represent a cylindrically-symmetry
-                 * momentum distribution function. Therefore, here, we temporarily rotate the
-                 * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                 * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                 * there is a corresponding assert statement at initialization.) */
-                amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
-                amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
-                u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-                u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
-#endif
-
                 BremsstrahlungEvent(
                     u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                     u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
@@ -154,12 +137,6 @@ public:
                     n1, n2, dt, static_cast<int>(pair_index), p_mask,
                     p_pair_reaction_weight, p_product_data,
                     engine);
-
-#if (defined WARPX_DIM_RZ)
-                amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
-                u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-                u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
-#endif
 
                 p_pair_indices_1[pair_index] = I1[i1];
                 p_pair_indices_2[pair_index] = I2[i2];
@@ -336,7 +313,7 @@ public:
         {
             using namespace amrex::literals;
 
-            constexpr auto c2 = PhysConst::c * PhysConst::c;
+            constexpr auto c2 = PhysConst::c2;
 
             // compute gamma for particles 1 (electron) and 2 (ion)
             amrex::ParticleReal const u1sq = (u1x*u1x + u1y*u1y + u1z*u1z);
@@ -378,8 +355,7 @@ public:
                 amrex::Print() << "        sigma_total = " << sigma_total << "\n";
 #endif
                 arg = 1.0_prt;
-                fmulti = fmulti/arg;
-                if (fmulti < 1.0_prt) { fmulti = 1.0_prt; }
+                fmulti = std::max(fmulti/arg, 1.0_prt);
             }
             //q12 = 1.0 - exp(-arg)
             amrex::ParticleReal const q12 = arg;
@@ -433,9 +409,9 @@ public:
 
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    bool use_global_debye_length() { return m_use_global_debye_length; }
+    [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 
 private:
 

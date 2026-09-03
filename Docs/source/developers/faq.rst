@@ -29,8 +29,8 @@ Do you worry about using ``size_t`` vs. ``uint`` vs. ``int`` for indexing things
 Close to but not necessarily ``uint``, `depends on the platform <https://en.cppreference.com/w/cpp/language/types>`__.
 For "hot" inner loops, you want to use ``int`` instead of an unsigned integer type. Why? Because ``int`` has no handling for overflows (it is intentional, undefined behavior in C++), which allows compilers to vectorize easier, because they don't need to check for an overflow every time one reaches the control/condition section of the loop.
 
-C++20 will also add support for `ssize <https://en.cppreference.com/w/cpp/iterator/size>`__ (signed size), but we currently require C++17 for builds.
-Thus, sometimes you need to ``static_cast<int>(...)``.
+C++20 also adds support for `ssize <https://en.cppreference.com/w/cpp/iterator/size>`__ (signed size).
+Alternatively, sometimes you need to ``static_cast<int>(...)``.
 
 
 What does ``std::make_unique`` do?

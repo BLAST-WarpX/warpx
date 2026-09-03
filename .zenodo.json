@@ -89,7 +89,7 @@
         "orcid": "0000-0003-3244-5525"
       },
       {
-        "affiliation": "TAE Technologies Inc.",
+        "affiliation": "Realta Fusion",
         "name": "Groenewald, Roelof E.",
         "orcid": "0000-0002-5282-7152"
       },
@@ -270,57 +270,13 @@
     "related_identifiers": [
     {
       "identifier": "https://warpx.readthedocs.io",
-      "relation_type": {
-        "id": "isdocumentedby",
-        "title": {
-          "en": "Is documented by"
-        }
-      },
-      "resource_type": {
-        "id": "publication-softwaredocumentation",
-        "title": {
-          "en": "Software documentation"
-        }
-      },
+      "relation": "isDocumentedBy",
       "scheme": "url"
     },
     {
       "identifier": "https://blast-warpx.github.io",
-      "relation_type": {
-        "id": "isdescribedby",
-        "title": {
-          "en": "Is described by"
-        }
-      },
-      "resource_type": {
-        "id": "other",
-        "title": {
-          "en": "Other"
-        }
-      },
+      "relation": "isDescribedBy",
       "scheme": "url"
     }
-  ],
-  "custom_fields": {
-    "code:developmentStatus": {
-      "id": "active",
-      "title": {
-        "en": "Active"
-      }
-    },
-    "code:programmingLanguage": [
-      {
-        "id": "c++",
-        "title": {
-          "en": "C++"
-        }
-      },
-      {
-        "id": "python",
-        "title": {
-          "en": "Python"
-        }
-      }
-    ]
-  }
+  ]
 }

@@ -24,9 +24,7 @@ class WarpX;
 struct WarpXSolverDOF
 {
     amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>,3>> m_array;
-    amrex::Vector<std::array<std::unique_ptr<amrex::iMultiFab>,3>> m_array_lhs;
     amrex::Vector<std::unique_ptr<amrex::iMultiFab>> m_scalar;
-    amrex::Vector<std::unique_ptr<amrex::iMultiFab>> m_scalar_lhs;
 
     warpx::fields::FieldType m_array_type = warpx::fields::FieldType::None;
     warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;
@@ -34,7 +32,10 @@ struct WarpXSolverDOF
     amrex::Long m_nDoFs_l = 0; /*!< Local nDOF */
     amrex::Long m_nDoFs_g = 0; /*!< Global nDOF */
 
-    void Define ( WarpX* const, int, const std::string&, const std::string&);
+    void Define ( WarpX* , int, const std::string&, const std::string&);
+
+    void fill_local_dof (amrex::iMultiFab& dof, amrex::iMultiFab const& mask);
+    void fill_global_dof ();
 };
 
 #endif

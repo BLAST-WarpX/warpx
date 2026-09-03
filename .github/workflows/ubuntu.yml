@@ -25,12 +25,12 @@ jobs:
     env:
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc.sh
+        .github/workflows/dependencies/gcc_minimal.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -63,15 +63,15 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       CXXFLAGS: "-Werror"
-      CXX: "g++-12"
-      CC: "gcc-12"
+      CXX: "g++-13"
+      CC: "gcc-13"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc12.sh
+        .github/workflows/dependencies/gcc.sh 13
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -106,19 +106,19 @@ jobs:
 
   build_3D_sp:
     name: GCC 3D & RZ w/ MPI, single precision
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
-      CXX: "g++-12"
-      CC: "gcc-12"
+      CXX: "g++-13"
+      CC: "gcc-13"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc12_blaspp_lapackpp.sh
+        .github/workflows/dependencies/gcc_blaspp_lapackpp.sh 13
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -161,13 +161,13 @@ jobs:
       CMAKE_GENERATOR: Ninja
       CXXFLAGS: "-Werror"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc.sh
+        .github/workflows/dependencies/gcc_minimal.sh
         sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -200,12 +200,12 @@ jobs:
       # On CI for this test, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       run: |
         .github/workflows/dependencies/pyfull.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

@@ -53,7 +53,7 @@ for s in range(N_species):
             plot=False,
         )
 
-        indeces = np.where(np.in1d(ids0, ids))[0]
+        indeces = np.where(np.isin(ids0, ids))[0]
 
         E = np.append(E, 0.5 * m[indeces] * (uz0[indeces] * c) ** 2 / MeV)
         X = np.append(X, x)

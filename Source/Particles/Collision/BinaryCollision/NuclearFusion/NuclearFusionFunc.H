@@ -10,6 +10,7 @@
 
 #include "SingleNuclearFusionEvent.H"
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -33,6 +34,7 @@
  *  This functor also reads and contains the fusion multiplier.
  */
 class NuclearFusionFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -77,11 +79,41 @@ public:
             pp_collision_name, "probability_target_value",
             m_probability_target_value);
 
+        bool create_products = true;
+        utils::parser::queryWithParser(
+            pp_collision_name, "create_products", create_products);
+        utils::parser::queryWithParser(
+            pp_collision_name, "save_particle_production", m_save_particle_production);
+
         m_exe.m_fusion_multiplier = m_fusion_multiplier;
         m_exe.m_probability_threshold = m_probability_threshold;
         m_exe.m_probability_target_value = m_probability_target_value;
         m_exe.m_fusion_type = m_fusion_type;
         m_exe.m_isSameSpecies = m_isSameSpecies;
+        m_exe.m_create_products = create_products;
+
+        if (m_save_particle_production) {
+            m_particle_production_mf_name = collision_name + "_particle_production";
+        }
+    }
+
+    void AllocData () override {
+        if (m_save_particle_production) {
+            WarpX & warpx = WarpX::GetInstance();
+            for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+
+                amrex::BoxArray const & ba = warpx.boxArray(lev);
+                amrex::DistributionMapping const & dmap = warpx.DistributionMap(lev);
+                int const ncomps = 1;
+                amrex::IntVect const ng = amrex::IntVect::TheZeroVector();
+                amrex::Real const initial_value = 0.;
+                bool const remake = true;
+                bool const redistribute_on_remake = true;
+                bool const checkpoint_restart = true;
+                warpx.m_fields.alloc_init(m_particle_production_mf_name, lev, ba, dmap, ncomps, ng,
+                                          initial_value, remake, redistribute_on_remake, checkpoint_restart);
+            }
+        }
     }
 
     struct Executor {
@@ -111,6 +143,7 @@ public:
          * @param[in] dV is the volume of the corresponding cell.
          * @param[in] coll_idx is the collision index offset.
          * @param[in] cell_start_pair is the start index of the pairs in that cell.
+         * @param[in] global_index grid cell where collision is taking place
          * @param[out] p_mask is a mask that will be set to true if a fusion event occurs for a given
          * pair. It is only needed here to store information that will be used later on when actually
          * creating the product particles.
@@ -136,7 +169,8 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
+            index_type const cell_start_pair, amrex::IntVect const global_index,
+            index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* /*p_product_data*/,
@@ -166,10 +200,6 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
-#if (defined WARPX_DIM_RZ)
-            amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-            amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
-#endif
             index_type i1 = I1s + coll_idx;
             index_type i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
@@ -185,21 +215,6 @@ public:
                 }
                 else {
 
-#if (defined WARPX_DIM_RZ)
-                    /* In RZ geometry, macroparticles can collide with other macroparticles
-                     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                     * are actually not local in space. In this case, the underlying assumption is that
-                     * particles within the same cylindrical cell represent a cylindrically-symmetry
-                     * momentum distribution function. Therefore, here, we temporarily rotate the
-                     * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                     * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                     * there is a corresponding assert statement at initialization.) */
-                    amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
-                    amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-                    u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
-#endif
-
                     SingleNuclearFusionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
@@ -208,13 +223,10 @@ public:
                         m_fusion_multiplier, multiplier_ratio,
                         m_probability_threshold,
                         m_probability_target_value,
-                        m_fusion_type, engine);
-
-#if (defined WARPX_DIM_RZ)
-                    amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-                    u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
-#endif
+                        m_fusion_type, engine,
+                        m_create_products,
+                        global_index,
+                        m_particle_production);
 
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {
@@ -242,9 +254,22 @@ public:
         bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
         bool m_isSameSpecies;
+
+        bool m_create_products = true;
+        amrex::Array4<amrex::Real> m_particle_production;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor executor (int const lev, amrex::MFIter const& mfi) const {
+        // Note that a copy is needed since with m_save_particle_production, it will be modified
+        // in a way that is thread dependent.
+        Executor exe = m_exe;
+        if (m_save_particle_production) {
+            WarpX & warpx = WarpX::GetInstance();
+            amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, lev);
+            exe.m_particle_production = particle_production_mf->array(mfi);
+        }
+        return exe;
+    }
 
     bool use_global_debye_length() { return false; }
 
@@ -262,6 +287,9 @@ private:
     amrex::ParticleReal m_probability_target_value;
     NuclearFusionType m_fusion_type;
     bool m_isSameSpecies;
+
+    bool m_save_particle_production = false;
+    std::string m_particle_production_mf_name;
 
     Executor m_exe;
 };

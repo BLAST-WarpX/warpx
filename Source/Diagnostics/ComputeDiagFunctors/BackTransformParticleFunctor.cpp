@@ -80,7 +80,7 @@ BackTransformParticleFunctor::BackTransformParticleFunctor (
 
 
 void
-BackTransformParticleFunctor::operator () (PinnedMemoryParticleContainer& pc_dst, int &totalParticleCounter, int i_buffer) const
+BackTransformParticleFunctor::operator () (WarpXParticleContainer::Base& pc_dst, int &totalParticleCounter, int i_buffer) const
 {
     if (m_perform_backtransform[i_buffer] == 0) { return; }
     auto &warpx = WarpX::GetInstance();

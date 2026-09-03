@@ -31,6 +31,13 @@ namespace ablastr::constant
         //! https://tauday.com/tau-manifesto
         constexpr auto tau = tau_v<amrex::Real>;
 
+        //! convert degree to radian (variable template)
+        template<typename T>
+        constexpr auto degree2rad_v = pi_v<T> / static_cast<T>(180);
+
+        //! convert degree to radian
+        constexpr auto degree2rad = degree2rad_v<amrex::Real>;
+
     } // namespace math
 
     /** Physical constants
@@ -145,6 +152,10 @@ namespace ablastr::constant
         template<typename T>
         constexpr auto inv_c2_v = static_cast<T>(1.0/c2_v<double>);
 
+        //! reduced Compton wavelength [m] (variable template)
+        template<typename T>
+        constexpr auto reduced_compton_wavelength_v = static_cast<T>(hbar_v<double> / (m_e_v<double> * c_v<double>));
+
         //! vacuum speed of light [m/s]
         constexpr auto c = c_v<amrex::Real>;
 
@@ -214,6 +225,9 @@ namespace ablastr::constant
 
         //! inverse of the square of the vacuum speed of light [s^2/m^2]
         constexpr auto inv_c2 = inv_c2_v<amrex::Real>;
+
+        //! reduced Compton wavelength [m]
+        constexpr auto reduced_compton_wavelength = reduced_compton_wavelength_v<amrex::Real>;
 
     } // namespace SI
 
