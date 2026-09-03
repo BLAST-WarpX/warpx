@@ -1,0 +1,11 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+diag2.electron.variables = x y z ux uy uz w phi
+warpx.do_electrostatic = labframe
+
+# use HYPRE (BoomerAMG) for the MLMG bottom solve; the coarsening depth is
+# limited so that the bottom solve is a non-trivial problem
+warpx.self_fields_bottom_solver = hypre
+warpx.self_fields_max_coarsening_level = 2
