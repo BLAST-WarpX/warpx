@@ -528,23 +528,16 @@ Diagnostics::InitBaseData ()
         const int moving_dir = WarpX::moving_window_dir;
         const int current_step = warpx.getistep(0);
 
-        // Calculate how many steps the moving window has been active up to current_step
-        // This accounts for start_moving_window_step and end_moving_window_step
-        int active_steps = 0;
-        const int start_step = WarpX::start_moving_window_step;
-        const int end_step = (WarpX::end_moving_window_step < 0) ?
-            current_step : std::min(WarpX::end_moving_window_step, current_step);
-
-        if (end_step >= start_step && current_step >= start_step) {
-            // Count steps from start_step to min(end_step, current_step - 1)
-            // Note: current_step is the checkpoint step, but the replay loop goes from 0 to current_step - 1
-            // So we need to count steps up to current_step - 1, not current_step
-            const int last_replayed_step = current_step - 1;
-            const int effective_end_step = std::min(end_step, last_replayed_step);
-            if (effective_end_step >= start_step) {
-                active_steps = effective_end_step - start_step + 1;
-            }
-        }
+        // Calculate how many steps the moving window has been active up to current_step.
+        // This must mirror WarpX::moving_window_active(n), which is always evaluated at
+        // n = 1, ..., current_step (i.e., the 1-indexed count of completed steps, see the
+        // call sites using getistep(0)+1) and treats end_moving_window_step as an
+        // exclusive upper bound (n < end_moving_window_step).
+        const int first_active_step = std::max(WarpX::start_moving_window_step, 1);
+        const int last_active_step = (WarpX::end_moving_window_step < 0) ?
+            current_step : std::min(WarpX::end_moving_window_step - 1, current_step);
+        const int active_steps = (last_active_step >= first_active_step) ?
+            last_active_step - first_active_step + 1 : 0;
 
         if (active_steps > 0) {
             // Calculate the shift based on the number of active steps

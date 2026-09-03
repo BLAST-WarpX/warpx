@@ -51,6 +51,26 @@ add_warpx_test(
     test_3d_acceleration  # dependency
 )
 
+add_warpx_test(
+    test_3d_acceleration_mw_start_stop  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_start_stop  # inputs
+    OFF  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_start_stop_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_start_stop_restart  # inputs
+    "analysis_restart_mw_start_stop.py --path diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
+    test_3d_acceleration_mw_start_stop  # dependency
+)
+
 if(WarpX_FFT)
     add_warpx_test(
         test_3d_acceleration_psatd  # name
