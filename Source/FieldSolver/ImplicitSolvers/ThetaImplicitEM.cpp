@@ -52,8 +52,7 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
         m_theta>=0.5 && m_theta<=1.0,
         "theta parameter for theta implicit time solver must be between 0.5 and 1.0");
 
-    // Parse nonlinear solver parameters
-    parseNonlinearSolverParams( pp );
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -106,6 +105,13 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
     SaveEoldMultifab();
     m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
+    // This function is needed when using the curl curl pc with nonzero dirichlet BCs
+    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
+    if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+        ZeroSolverVecOnNonzeroDirichletBC(m_Eold);
+        ZeroSolverVecOnNonzeroDirichletBC(m_E);
+    }
+
     // Save Bg at start of time step
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
@@ -157,7 +163,67 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
 
+    // Apply blanking to electric field RHS vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) {
+                a_RHS.getArrayVec()[lev][dir]->setVal(0._rt);
+            }
+        }
+    }
+
+#if defined(WARPX_DIM_1D_Z)
+    // RHS += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+    Enforce1DESPeriodic(a_RHS, m_theta*m_dt);
+#endif
+
 }
+
+#if defined(WARPX_DIM_1D_Z)
+void ThetaImplicitEM::Enforce1DESPeriodic ( WarpXSolverVec&  a_RHS,
+                                      const amrex::Real      a_theta_dt )
+{
+    BL_PROFILE("ImplicitSolver::Enforce1DESPeriodic()");
+
+    // Subtract the average Jz from the RHS to enforce zero potential
+    // drop in 1D electrostatic with periodic BCs.
+
+    // Check if doing electrostatic
+    if (!m_blank_electric_field[0] || !m_blank_electric_field[1]) { return; }
+
+    // Check if using periodic BCs
+    auto const& fbc_lo = m_WarpX->GetFieldBoundaryLo();
+    auto const& fbc_hi = m_WarpX->GetFieldBoundaryHi();
+    if (fbc_lo[0] != FieldBoundaryType::Periodic ||
+        fbc_hi[0] != FieldBoundaryType::Periodic)
+    {
+        return;
+    }
+
+    const amrex::Real norm_factor = PhysConst::c * PhysConst::c * PhysConst::mu0 * a_theta_dt;
+
+    using warpx::fields::FieldType;
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const amrex::Geometry& geom = m_WarpX->Geom(lev);
+        amrex::Real const *dx = geom.CellSize();
+        const amrex::RealBox& prob_domain = geom.ProbDomain();
+        const amrex::Real Lz = prob_domain.hi(0) - prob_domain.lo(0);
+
+        // Compute the spatial average of Jz
+        const amrex::MultiFab& Jz = *m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
+        const bool local_sum = false;
+        const amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
+        const amrex::Real meanJz = sumJz_global*dx[0]/Lz;
+
+        // RHSz += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+        amrex::MultiFab& RHSz = *a_RHS.getArrayVec()[lev][2];
+        RHSz.plus(norm_factor*meanJz,0,RHSz.nComp());
+    }
+
+}
+#endif
 
 void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
                                           amrex::Real start_time )
@@ -171,6 +237,14 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
     // Update Bfield_fp owned by WarpX
     ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt, start_time );
+
+    // Apply blanking to the electric field vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) { Efp[dir]->setVal(0._rt); }
+        }
+    }
 
 }
 
@@ -188,6 +262,85 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
     ablastr::fields::MultiLevelVectorField const & B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, end_time );
 
+}
+
+void ThetaImplicitEM::ZeroSolverVecOnNonzeroDirichletBC (WarpXSolverVec& a_E) const
+{
+
+    // Set nodal components of a solver vector to zero on nonzero Dirichlet boundaries.
+    // This is a work-around that is needed when using the curl curl PC with such boundaries.
+    // Without calling this function, that PC solver doesn't work properly and results in
+    // the GMRES solver diverging.
+
+    const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_lo = GetFieldBoundaryLo();
+    const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_hi = GetFieldBoundaryHi();
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const amrex::Geometry& geom = GetGeometry(lev);
+        amrex::Box domain_box = geom.Domain();
+        domain_box.convert(amrex::IntVect::TheNodeVector());
+        const amrex::IntVect domain_lo = domain_box.smallEnd();
+        const amrex::IntVect domain_hi = domain_box.bigEnd();
+
+        ablastr::fields::VectorField& Evec = a_E.getArrayVec()[lev];
+
+        for (int field_dir = 0; field_dir < 3; ++field_dir) {
+            amrex::MultiFab& Edir = *Evec[field_dir];
+
+            for (amrex::MFIter mfi(Edir, false); mfi.isValid(); ++mfi) {
+                const amrex::Box& valid_box = mfi.validbox();
+
+                for (int bdry_dir = 0; bdry_dir < AMREX_SPACEDIM; ++bdry_dir) {
+
+                    // Skip if Edir is not nodal in the bdry direction
+                    if (!Edir.ixType().nodeCentered(bdry_dir)) {
+                        continue;
+                    }
+
+                    for (int bdry_side = 0; bdry_side < 2; ++bdry_side) {
+
+                        // Check if BC is nonzero Dirichlet for E
+                        const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
+                        if (bc_type == FieldBoundaryType::PEC_Insulator) {
+                            const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
+                            if (!voltage_driven) {
+                                continue;
+                            }
+                        }
+                        else {
+                            continue;
+                        }
+
+                        const int boundary_index = (bdry_side == 0 ? domain_lo[bdry_dir]
+                                                                   : domain_hi[bdry_dir]);
+
+                        // Check if the box touches the boundary
+                        if (valid_box.smallEnd(bdry_dir) > boundary_index ||
+                            valid_box.bigEnd(bdry_dir) < boundary_index) {
+                            continue;
+                        }
+
+                        // Create a node box that only contains locations on the boundary
+                        amrex::Box bdry_box = valid_box;
+                        bdry_box.setSmall(bdry_dir, boundary_index);
+                        bdry_box.setBig(bdry_dir, boundary_index);
+
+                        // Set Efield values to zero on the boundary
+                        const auto Edir_arr = Edir.array(mfi);
+                        amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                            Edir_arr(i,j,k,0) = 0.0_rt;
+                        });
+
+                    } // end loop over boundary sides
+
+                } // end loop over boundary dirs
+
+            } // end loop over boxes
+
+        } // end loop over field dirs
+
+    } // end loop over levels
 }
 
 const amrex::MultiFab* ThetaImplicitEM::GetCurl2BCmask (const int lev, const int field_dir) const

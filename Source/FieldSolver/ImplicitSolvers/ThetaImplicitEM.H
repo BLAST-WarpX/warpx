@@ -84,6 +84,11 @@ public:
                       int              a_nl_iter,
                       bool             a_from_jacobian ) override;
 
+#if defined(WARPX_DIM_1D_Z)
+    void Enforce1DESPeriodic (WarpXSolverVec&  a_RHS,
+                              amrex::Real      a_theta_dt);
+#endif
+
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
@@ -93,6 +98,11 @@ public:
      * \brief Return reference to the multifabs for curl curl mask in virtual dirs
      */
     [[nodiscard]] const amrex::MultiFab* GetCurl2BCmask (int lev, int field_dir) const override;
+
+    /**
+     * \brief Enforce zero value for WarpXSolverVec on non-zero dirichlet boundaries
+     */
+    void ZeroSolverVecOnNonzeroDirichletBC (WarpXSolverVec& a_E) const;
 
     /**
      * \brief Inititialize the BC masks for the curl curl operator

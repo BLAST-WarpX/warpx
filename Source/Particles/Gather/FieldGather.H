@@ -351,13 +351,13 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                      [[maybe_unused]] const amrex::ParticleReal yp,
                      [[maybe_unused]] const amrex::ParticleReal zp,
                      amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
+                     [[maybe_unused]] amrex::ParticleReal& Eyp,
                      amrex::ParticleReal& Ezp,
                      amrex::ParticleReal& Bxp,
                      amrex::ParticleReal& Byp,
                      amrex::ParticleReal& Bzp,
                      amrex::Array4<amrex::Real const> const& ex_arr,
-                     amrex::Array4<amrex::Real const> const& ey_arr,
+                     [[maybe_unused]] amrex::Array4<amrex::Real const> const& ey_arr,
                      amrex::Array4<amrex::Real const> const& ez_arr,
                      amrex::Array4<amrex::Real const> const& bx_arr,
                      amrex::Array4<amrex::Real const> const& by_arr,
@@ -426,13 +426,17 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         j_cell_v = compute_shape_factor_galerkin(sx_cell_galerkin, x - 0.5_rt);
     }
     const amrex::Real (&sx_ex)[depos_order + 1 - galerkin_interpolation] = ((ex_type[0] == NODE) ? sx_node_galerkin : sx_cell_galerkin);
+#if !defined(WARPX_EM_TEY)
     const amrex::Real (&sx_ey)[depos_order + 1             ] = ((ey_type[0] == NODE) ? sx_node   : sx_cell  );
+#endif
     const amrex::Real (&sx_ez)[depos_order + 1             ] = ((ez_type[0] == NODE) ? sx_node   : sx_cell  );
     const amrex::Real (&sx_bx)[depos_order + 1             ] = ((bx_type[0] == NODE) ? sx_node   : sx_cell  );
     const amrex::Real (&sx_by)[depos_order + 1 - galerkin_interpolation] = ((by_type[0] == NODE) ? sx_node_galerkin : sx_cell_galerkin);
     const amrex::Real (&sx_bz)[depos_order + 1 - galerkin_interpolation] = ((bz_type[0] == NODE) ? sx_node_galerkin : sx_cell_galerkin);
     int const j_ex = ((ex_type[0] == NODE) ? j_node_v : j_cell_v);
+#if !defined(WARPX_EM_TEY)
     int const j_ey = ((ey_type[0] == NODE) ? j_node   : j_cell  );
+#endif
     int const j_ez = ((ez_type[0] == NODE) ? j_node   : j_cell  );
     int const j_bx = ((bx_type[0] == NODE) ? j_node   : j_cell  );
     int const j_by = ((by_type[0] == NODE) ? j_node_v : j_cell_v);
@@ -463,13 +467,17 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         k_cell_v = compute_shape_factor_galerkin(sy_cell_v, y - 0.5_rt);
     }
     const amrex::Real (&sy_ex)[depos_order + 1             ] = ((ex_type[1] == NODE) ? sy_node   : sy_cell  );
+#if !defined(WARPX_EM_TEY)
     const amrex::Real (&sy_ey)[depos_order + 1 - galerkin_interpolation] = ((ey_type[1] == NODE) ? sy_node_v : sy_cell_v);
+#endif
     const amrex::Real (&sy_ez)[depos_order + 1             ] = ((ez_type[1] == NODE) ? sy_node   : sy_cell  );
     const amrex::Real (&sy_bx)[depos_order + 1 - galerkin_interpolation] = ((bx_type[1] == NODE) ? sy_node_v : sy_cell_v);
     const amrex::Real (&sy_by)[depos_order + 1             ] = ((by_type[1] == NODE) ? sy_node   : sy_cell  );
     const amrex::Real (&sy_bz)[depos_order + 1 - galerkin_interpolation] = ((bz_type[1] == NODE) ? sy_node_v : sy_cell_v);
     int const k_ex = ((ex_type[1] == NODE) ? k_node   : k_cell  );
+#if !defined(WARPX_EM_TEY)
     int const k_ey = ((ey_type[1] == NODE) ? k_node_v : k_cell_v);
+#endif
     int const k_ez = ((ez_type[1] == NODE) ? k_node   : k_cell  );
     int const k_bx = ((bx_type[1] == NODE) ? k_node_v : k_cell_v);
     int const k_by = ((by_type[1] == NODE) ? k_node   : k_cell  );
@@ -501,13 +509,17 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
         l_cell_v = compute_shape_factor_galerkin(sz_cell_v, z - 0.5_rt);
     }
     const amrex::Real (&sz_ex)[depos_order + 1             ] = ((ex_type[zdir] == NODE) ? sz_node   : sz_cell  );
+#if !defined(WARPX_EM_TEY)
     const amrex::Real (&sz_ey)[depos_order + 1             ] = ((ey_type[zdir] == NODE) ? sz_node   : sz_cell  );
+#endif
     const amrex::Real (&sz_ez)[depos_order + 1 - galerkin_interpolation] = ((ez_type[zdir] == NODE) ? sz_node_v : sz_cell_v);
     const amrex::Real (&sz_bx)[depos_order + 1 - galerkin_interpolation] = ((bx_type[zdir] == NODE) ? sz_node_v : sz_cell_v);
     const amrex::Real (&sz_by)[depos_order + 1 - galerkin_interpolation] = ((by_type[zdir] == NODE) ? sz_node_v : sz_cell_v);
     const amrex::Real (&sz_bz)[depos_order + 1             ] = ((bz_type[zdir] == NODE) ? sz_node   : sz_cell  );
     int const l_ex = ((ex_type[zdir] == NODE) ? l_node   : l_cell  );
+#if !defined(WARPX_EM_TEY)
     int const l_ey = ((ey_type[zdir] == NODE) ? l_node   : l_cell  );
+#endif
     int const l_ez = ((ez_type[zdir] == NODE) ? l_node_v : l_cell_v);
     int const l_bx = ((bx_type[zdir] == NODE) ? l_node_v : l_cell_v);
     int const l_by = ((by_type[zdir] == NODE) ? l_node_v : l_cell_v);
@@ -524,8 +536,10 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     // Gather field on particle Exp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
     for (int iz=0; iz<=depos_order; iz++){
+#if !defined(WARPX_EM_TEY)
         Eyp += sz_ey[iz]*
             ey_arr(lo.x+l_ey+iz, 0, 0, 0);
+#endif
         Exp += sz_ex[iz]*
             ex_arr(lo.x+l_ex+iz, 0, 0, 0);
         Bzp += sz_bz[iz]*
@@ -545,6 +559,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     }
 
 #elif defined(WARPX_DIM_XZ)
+#if !defined(WARPX_EM_TEY)
     // Gather field on particle Eyp from field on grid ey_arr
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
@@ -552,6 +567,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                 ey_arr(lo.x+j_ey+ix, lo.y+l_ey+iz, 0, 0);
         }
     }
+#endif
     // Gather field on particle Exp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
     for (int iz=0; iz<=depos_order; iz++){
@@ -587,6 +603,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::ParticleReal Brp = 0.;
     amrex::ParticleReal Bthetap = 0.;
 
+#if !defined(WARPX_EM_TEY)
     // Gather field on particle Ethetap from field on grid ey_arr
     for (int iz=0; iz<=depos_order; iz++){
         for (int ix=0; ix<=depos_order; ix++){
@@ -594,6 +611,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                 ey_arr(lo.x+j_ey+ix, lo.y+l_ey+iz, 0, 0);
         }
     }
+#endif
     // Gather field on particle Erp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
     for (int iz=0; iz<=depos_order; iz++){
@@ -636,6 +654,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
 
     for (int imode=1 ; imode < n_rz_azimuthal_modes ; imode++) {
 
+#if !defined(WARPX_EM_TEY)
         // Gather field on particle Ethetap from field on grid ey_arr
         for (int iz=0; iz<=depos_order; iz++){
             for (int ix=0; ix<=depos_order; ix++){
@@ -644,6 +663,7 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
                 Ethetap += sx_ey[ix]*sz_ey[iz]*dEy;
             }
         }
+#endif
         // Gather field on particle Erp from field on grid ex_arr
         // Gather field on particle Bzp from field on grid bz_arr
         for (int iz=0; iz<=depos_order; iz++){
@@ -692,10 +712,12 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::ParticleReal Brp = 0.;
     amrex::ParticleReal Bthetap = 0.;
 
+#if !defined(WARPX_EM_TEY)
     // Gather field on particle Ethetap from field on grid ey_arr
     for (int ix=0; ix<=depos_order; ix++){
         Ethetap += sx_ey[ix]*ey_arr(lo.x+j_ey+ix, 0, 0, 0);
     }
+#endif
     // Gather field on particle Erp from field on grid ex_arr
     // Gather field on particle Bzp from field on grid bz_arr
     for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
@@ -731,10 +753,12 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
     amrex::ParticleReal Bthetap = 0.;
     amrex::ParticleReal Bphip = 0.;
 
+#if !defined(WARPX_EM_TEY)
     // Gather field on particle Ethetap from field on grid ey_arr
     for (int ix=0; ix<=depos_order; ix++){
         Ethetap += sx_ey[ix]*ey_arr(lo.x+j_ey+ix, 0, 0, 0);
     }
+#endif
     // Gather field on particle Erp from field on grid ex_arr
     // Gather field on particle Bphip from field on grid bz_arr
     for (int ix=0; ix<=depos_order-galerkin_interpolation; ix++){
@@ -852,13 +876,13 @@ void doGatherShapeNEsirkepovStencilImplicit (
                      [[maybe_unused]] const amrex::ParticleReal yp_nph,
                      [[maybe_unused]] const amrex::ParticleReal zp_nph,
                      amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
+                     [[maybe_unused]] amrex::ParticleReal& Eyp,
                      amrex::ParticleReal& Ezp,
                      amrex::ParticleReal& Bxp,
                      amrex::ParticleReal& Byp,
                      amrex::ParticleReal& Bzp,
                      amrex::Array4<amrex::Real const> const& Ex_arr,
-                     amrex::Array4<amrex::Real const> const& Ey_arr,
+                     [[maybe_unused]] amrex::Array4<amrex::Real const> const& Ey_arr,
                      amrex::Array4<amrex::Real const> const& Ez_arr,
                      amrex::Array4<amrex::Real const> const& Bx_arr,
                      amrex::Array4<amrex::Real const> const& By_arr,
@@ -876,8 +900,8 @@ void doGatherShapeNEsirkepovStencilImplicit (
 #endif
 
 #if (AMREX_SPACEDIM > 1)
-    Real constexpr one_third = 1.0_rt / 3.0_rt;
-    Real constexpr one_sixth = 1.0_rt / 6.0_rt;
+    [[maybe_unused]] Real constexpr one_third = 1.0_rt / 3.0_rt;
+    [[maybe_unused]] Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
 
 #if !defined(WARPX_DIM_1D_Z)
@@ -1155,6 +1179,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             Bzp += Bz_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdxiov*sdzk;
         }
     }
+#if !defined(WARPX_EM_TEY)
     for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
         for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
             Real const sdyj = (
@@ -1163,6 +1188,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
             E2p += Ey_arr(lo.x+i_E_new-1+i, lo.y+k_E_new-1+k, 0, 0)*sdyj;
         }
     }
+#endif
     for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
         const amrex::Real sdxi = 0.5_rt*(sx_E_new[i] + sx_E_old[i]);
         amrex::Real sdzk = 0._rt;
@@ -1209,6 +1235,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
                 Bzp += dBz*sdxiov*sdzk;
             }
         }
+#if !defined(WARPX_EM_TEY)
         // Gather field on particle E2p from field on grid ey_arr
         for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
             for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
@@ -1220,6 +1247,7 @@ void doGatherShapeNEsirkepovStencilImplicit (
                 E2p += dEy*sdyj;
             }
         }
+#endif
         // Gather field on particle Ezp from field on grid ez_arr
         // Gather field on particle B1p from field on grid bx_arr
         for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
@@ -1270,7 +1298,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
     for (int k=dkl_E; k<=depos_order+2-dku_E; k++) {
         amrex::Real const sdzk = 0.5_rt*(sz_E_old[k] + sz_E_new[k]);
         Exp += Ex_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzk;
+#if !defined(WARPX_EM_TEY)
         Eyp += Ey_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzk;
+#endif
         Bzp += Bz_arr(lo.x+k_E_new-1+k, 0, 0, 0)*sdzk;
     }
     amrex::Real sdzk = 0._rt;
@@ -1298,7 +1328,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
     for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
         amrex::Real const sdxi = 0.5_rt*(sx_E_old[i] + sx_E_new[i]);
         Brp += Bx_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
+#if !defined(WARPX_EM_TEY)
         Ethetap += Ey_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
+#endif
         Ezp += Ez_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
     }
     amrex::Real sdxi = 0._rt;
@@ -1338,7 +1370,9 @@ void doGatherShapeNEsirkepovStencilImplicit (
     for (int i=dil_E; i<=depos_order+2-diu_E; i++) {
         amrex::Real const sdxi = 0.5_rt*(sx_E_old[i] + sx_E_new[i]);
         Brp += Bx_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
+#if !defined(WARPX_EM_TEY)
         Ethetap += Ey_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
+#endif
         Ephip += Ez_arr(lo.x+i_E_new-1+i, 0, 0, 0)*sdxi;
     }
     amrex::Real sdxi = 0._rt;
@@ -1391,13 +1425,13 @@ void doGatherPicnicShapeN (
                      [[maybe_unused]] const amrex::ParticleReal yp_nph,
                      [[maybe_unused]] const amrex::ParticleReal zp_nph,
                      amrex::ParticleReal& Exp,
-                     amrex::ParticleReal& Eyp,
+                     [[maybe_unused]] amrex::ParticleReal& Eyp,
                      amrex::ParticleReal& Ezp,
                      amrex::ParticleReal& Bxp,
                      amrex::ParticleReal& Byp,
                      amrex::ParticleReal& Bzp,
                      amrex::Array4<amrex::Real const> const& Ex_arr,
-                     amrex::Array4<amrex::Real const> const& Ey_arr,
+                     [[maybe_unused]] amrex::Array4<amrex::Real const> const& Ey_arr,
                      amrex::Array4<amrex::Real const> const& Ez_arr,
                      amrex::Array4<amrex::Real const> const& Bx_arr,
                      amrex::Array4<amrex::Real const> const& By_arr,
@@ -1427,7 +1461,7 @@ void doGatherPicnicShapeN (
     const ParticleReal zp_np1 = 2._prt*zp_nph - zp_n;
 #endif
 
-#if (AMREX_SPACEDIM > 1)
+#if (AMREX_SPACEDIM > 1) && !defined(WARPX_EM_TEY)
     Real constexpr one_third = 1.0_rt / 3.0_rt;
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
@@ -1830,6 +1864,7 @@ void doGatherPicnicShapeN (
             }
         }
 
+#if !defined(WARPX_EM_TEY)
         // gather out-of-plane Ey for this segment
         const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
         for (int i=0; i<=depos_order; i++) {
@@ -1850,6 +1885,7 @@ void doGatherPicnicShapeN (
 #endif
             }
         }
+#endif
 
         // gather Ez for this segment
         for (int i=0; i<=depos_order; i++) {
@@ -1944,7 +1980,9 @@ void doGatherPicnicShapeN (
         for (int k=0; k<=depos_order; k++) {
             auto weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
             Exp += Ex_arr(lo.x+k0_node+k, 0, 0)*weight;
+#if !defined(WARPX_EM_TEY)
             Eyp += Ey_arr(lo.x+k0_node+k, 0, 0)*weight;
+#endif
         }
 
         // gather Ez for this segment
@@ -2024,7 +2062,9 @@ void doGatherPicnicShapeN (
         // gather out-of-plane Ey and Ez for this segment
         for (int i=0; i<=depos_order; i++) {
             auto weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
+#if !defined(WARPX_EM_TEY)
             E2p += Ey_arr(lo.x+i0_node+i, 0, 0)*weight;
+#endif
             E3p += Ez_arr(lo.x+i0_node+i, 0, 0)*weight;
         }
 
