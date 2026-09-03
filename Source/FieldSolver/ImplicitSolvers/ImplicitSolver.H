@@ -156,6 +156,15 @@ public:
         amrex::Real a_scale = 1.0,
         bool a_zero_out_first = false );
 
+    /**
+     * \brief Half-width, in cells and per direction, of the stencil that
+     *  ApplyMassMatrices() gathers over: evaluating the mass matrices at a cell
+     *  reads the input field no further than this many cells away.
+     *
+     *  Only valid after InitializeMassMatrices() has run.
+     */
+    [[nodiscard]] amrex::IntVect MassMatricesStencilHalfWidth () const;
+
     void ComputeJfromMassMatrices (bool a_J_from_MM_only);
 
     /**
