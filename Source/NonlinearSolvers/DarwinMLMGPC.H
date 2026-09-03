@@ -39,13 +39,6 @@
  *  elliptic solves: a Poisson solve followed by a Helmholtz solve with the
  *  spatially varying chi(x) as the MLABecLaplacian acoef.
  *
- *  On curl-free content the true operator reduces to nabla^4 alone while this
- *  preconditioner still applies the full factorization, so those modes are
- *  over-damped by a factor (1 + chi/k^2) rather than inverted exactly. That
- *  costs preconditioner quality, not correctness (see below), and it is the
- *  part a grad-div (Coulomb-gauge penalty) term in the operator would make
- *  exact as well.
- *
  *  Z is B-staggered while MLABecLaplacian is cell-centered, so each vector
  *  component is collocated onto the cell-centered grid by index
  *  identification (node i -> cell i, a half-cell shift in the component's
