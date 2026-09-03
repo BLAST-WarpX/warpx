@@ -3853,9 +3853,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         Whether to use GPU-aware MPI communications
 
     warpx_do_device_synchronize: bool, optional
-        Whether to synchronize GPU threads at ends of profiling regions.
-        Note that if this is set to False, the TinyProfiler table can be
-        misleading.
+        Whether to synchronize GPU threads at ends of profiling regions
+        (default: False).
+        Note that as long as this is False, the TinyProfiler table would be
+        misleading and is therefore not printed at the end of GPU runs.
 
     warpx_zmax_plasma_to_compute_max_step: float, optional
         Sets the simulation run time based on the maximum z value
