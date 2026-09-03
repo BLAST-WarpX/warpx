@@ -43,18 +43,15 @@
  *  MLABecLaplacian acoef. This is a heuristic beyond the constant-isotropic
  *  derivation above (chi_ii(x) varying in space means the curl no longer
  *  decouples exactly this way), but it is only ever used as a preconditioner
- *  (see below), and tracking the three diagonal entries separately rather
- *  than averaging them into one isotropic scalar better approximates the
- *  true tensor response when it is anisotropic. The off-diagonal terms
- *  (e.g. Hall-like coupling from a background field) are dropped either way.
+ *  (see below). The off-diagonal terms (e.g. Hall-like coupling from a
+ *  background field) are completely dropped.
  *
  *  Z is B-staggered while MLABecLaplacian is cell-centered, so each vector
  *  component is collocated onto the cell-centered grid by index
  *  identification (node i -> cell i, a half-cell shift in the component's
  *  nodal dimension), solved, and mapped back the same way. Deliberately NOT
  *  averaged: pair-averaging multiplies the nodal-dimension Nyquist modes by
- *  cos(k dx/2) = 0, making the preconditioner exactly singular on those
- *  planes.
+ *  cos(k dx/2) = 0, making the preconditioner exactly singular on those planes.
  *
  *  The MLMG solves run a fixed number of V-cycles (max_iter) so the
  *  preconditioner is a fixed linear operator across a GMRES solve.
@@ -99,8 +96,7 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
          * \brief Apply (approximately solve) the preconditioner given a RHS:
          *  per Z component, collocate onto cell centers, solve
          *  (-nabla^2) y = b then (-nabla^2 + chi_ii) x = y with fixed-cycle
-         *  MLMG using that component's diagonal chi, and map back to the
-         *  B-staggering.
+         *  MLMG, and map back to the B-staggering.
          */
         void Apply (T&, const T&) override;
 
@@ -139,10 +135,7 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
 
         /**
          * \brief Cell-centered diagonal susceptibility components chi_xx,
-         *  chi_yy, chi_zz, refreshed in Update(). Component comp of the
-         *  preconditioner's Apply() uses m_chi_cc[comp] for its Helmholtz
-         *  solve, so the anisotropy of the plasma response (e.g. from a
-         *  background magnetic field) is preserved rather than averaged away.
+         *  chi_yy, chi_zz, refreshed in Update().
          */
         amrex::MultiFab m_chi_cc[3];
 
@@ -256,9 +249,7 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
     m_poisson->setACoeffs(0, RT(0.0));
     m_poisson->setBCoeffs(0, RT(1.0));
 
-    // One Helmholtz operator per diagonal chi component (xx, yy, zz), so
-    // each B-staggered component's solve sees its own diagonal susceptibility
-    // rather than an isotropic average of the three.
+    // One Helmholtz operator per diagonal chi component.
     for (int comp = 0; comp < 3; ++comp) {
         m_helmholtz[comp] = std::make_unique<MLABecLaplacian>(
             Vector<Geometry>{m_geom}, Vector<BoxArray>{m_grids},
@@ -280,8 +271,8 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
         mg->setBottomVerbose(static_cast<int>(m_bottom_verbose));
     }
 
-    for (int comp = 0; comp < 3; ++comp) {
-        m_chi_cc[comp].define(m_grids, m_dmap, 1, 0);
+    for (auto& chi_cc : m_chi_cc) {
+        chi_cc.define(m_grids, m_dmap, 1, 0);
     }
     m_rhs_cc.define(m_grids, m_dmap, 1, 0);
     m_mid_cc.define(m_grids, m_dmap, 1, 0);
