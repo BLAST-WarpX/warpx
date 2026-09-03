@@ -31,13 +31,22 @@
  *
  *  The Darwin field operator applied to the auxiliary variable Z is
  *      A(Z) = nabla^4(Z) + curl(chi curl(Z)),
- *  with chi = (2 mu0/dt) x the mass-matrix response. On the solenoidal
- *  subspace (div Z = 0) the plasma-response term is -chi nabla^2(Z), so in
- *  the constant-chi limit the operator factors exactly as
- *      A = (-nabla^2)(-nabla^2 + chi),
- *  and a spectrally equivalent preconditioner is two successive scalar
- *  elliptic solves: a Poisson solve followed by a Helmholtz solve with the
- *  spatially varying chi(x) as the MLABecLaplacian acoef.
+ *  with chi = (2 mu0/dt) x the mass-matrix response, a 3x3 tensor at every
+ *  point (e.g. anisotropic in a magnetized plasma). On the solenoidal
+ *  subspace (div Z = 0) the plasma-response term for a constant, isotropic
+ *  chi = chi*I would reduce to -chi nabla^2(Z), giving the exact factorization
+ *      A = (-nabla^2)(-nabla^2 + chi).
+ *  This preconditioner instead keeps only the tensor's diagonal (chi_xx,
+ *  chi_yy, chi_zz), which need not be equal, and applies that factorization
+ *  component-wise: a shared Poisson solve for all three components, followed
+ *  by a per-component Helmholtz solve with chi_ii(x) as that component's
+ *  MLABecLaplacian acoef. This is a heuristic beyond the constant-isotropic
+ *  derivation above (chi_ii(x) varying in space means the curl no longer
+ *  decouples exactly this way), but it is only ever used as a preconditioner
+ *  (see below), and tracking the three diagonal entries separately rather
+ *  than averaging them into one isotropic scalar better approximates the
+ *  true tensor response when it is anisotropic. The off-diagonal terms
+ *  (e.g. Hall-like coupling from a background field) are dropped either way.
  *
  *  Z is B-staggered while MLABecLaplacian is cell-centered, so each vector
  *  component is collocated onto the cell-centered grid by index
@@ -80,16 +89,18 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
         void Define (const T&, Ops*) override;
 
         /**
-         * \brief Update the preconditioner: refresh chi(x) from the freshly
-         *  deposited mass matrices (via Ops::ComputeScaledMassMatrixCC).
+         * \brief Update the preconditioner: refresh chi_xx(x), chi_yy(x),
+         *  chi_zz(x) from the freshly deposited mass matrices (via
+         *  Ops::ComputeScaledMassMatrixCC).
          */
         void Update () override;
 
         /**
          * \brief Apply (approximately solve) the preconditioner given a RHS:
          *  per Z component, collocate onto cell centers, solve
-         *  (-nabla^2) y = b then (-nabla^2 + chi) x = y with fixed-cycle
-         *  MLMG, and map back to the B-staggering.
+         *  (-nabla^2) y = b then (-nabla^2 + chi_ii) x = y with fixed-cycle
+         *  MLMG using that component's diagonal chi, and map back to the
+         *  B-staggering.
          */
         void Apply (T&, const T&) override;
 
@@ -127,9 +138,13 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
         amrex::DistributionMapping m_dmap;
 
         /**
-         * \brief Cell-centered susceptibility chi(x), refreshed in Update().
+         * \brief Cell-centered diagonal susceptibility components chi_xx,
+         *  chi_yy, chi_zz, refreshed in Update(). Component comp of the
+         *  preconditioner's Apply() uses m_chi_cc[comp] for its Helmholtz
+         *  solve, so the anisotropy of the plasma response (e.g. from a
+         *  background magnetic field) is preserved rather than averaged away.
          */
-        amrex::MultiFab m_chi_cc;
+        amrex::MultiFab m_chi_cc[3];
 
         /**
          * \brief Cell-centered scratch shared by the per-component solves:
@@ -142,9 +157,9 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
 
         std::unique_ptr<amrex::LPInfo> m_info;
         std::unique_ptr<amrex::MLABecLaplacian> m_poisson;
-        std::unique_ptr<amrex::MLABecLaplacian> m_helmholtz;
+        std::unique_ptr<amrex::MLABecLaplacian> m_helmholtz[3];
         std::unique_ptr<amrex::MLMG> m_poisson_mg;
-        std::unique_ptr<amrex::MLMG> m_helmholtz_mg;
+        std::unique_ptr<amrex::MLMG> m_helmholtz_mg[3];
 
         /**
          * \brief Read parameters
@@ -241,24 +256,33 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
     m_poisson->setACoeffs(0, RT(0.0));
     m_poisson->setBCoeffs(0, RT(1.0));
 
-    m_helmholtz = std::make_unique<MLABecLaplacian>(
-        Vector<Geometry>{m_geom}, Vector<BoxArray>{m_grids},
-        Vector<DistributionMapping>{m_dmap}, *m_info);
-    m_helmholtz->setDomainBC(bc_lo, bc_hi);
-    m_helmholtz->setLevelBC(0, nullptr);
-    m_helmholtz->setScalars(RT(1.0), RT(1.0));
-    m_helmholtz->setACoeffs(0, RT(0.0)); // chi(x) set in Update()
-    m_helmholtz->setBCoeffs(0, RT(1.0));
+    // One Helmholtz operator per diagonal chi component (xx, yy, zz), so
+    // each B-staggered component's solve sees its own diagonal susceptibility
+    // rather than an isotropic average of the three.
+    for (int comp = 0; comp < 3; ++comp) {
+        m_helmholtz[comp] = std::make_unique<MLABecLaplacian>(
+            Vector<Geometry>{m_geom}, Vector<BoxArray>{m_grids},
+            Vector<DistributionMapping>{m_dmap}, *m_info);
+        m_helmholtz[comp]->setDomainBC(bc_lo, bc_hi);
+        m_helmholtz[comp]->setLevelBC(0, nullptr);
+        m_helmholtz[comp]->setScalars(RT(1.0), RT(1.0));
+        m_helmholtz[comp]->setACoeffs(0, RT(0.0)); // chi(x) set in Update()
+        m_helmholtz[comp]->setBCoeffs(0, RT(1.0));
+
+        m_helmholtz_mg[comp] = std::make_unique<MLMG>(*m_helmholtz[comp]);
+    }
 
     m_poisson_mg = std::make_unique<MLMG>(*m_poisson);
-    m_helmholtz_mg = std::make_unique<MLMG>(*m_helmholtz);
-    for (auto* mg : {m_poisson_mg.get(), m_helmholtz_mg.get()}) {
+    for (auto* mg : {m_poisson_mg.get(),
+                      m_helmholtz_mg[0].get(), m_helmholtz_mg[1].get(), m_helmholtz_mg[2].get()}) {
         mg->setFixedIter(m_max_iter);
         mg->setVerbose(static_cast<int>(m_verbose));
         mg->setBottomVerbose(static_cast<int>(m_bottom_verbose));
     }
 
-    m_chi_cc.define(m_grids, m_dmap, 1, 0);
+    for (int comp = 0; comp < 3; ++comp) {
+        m_chi_cc[comp].define(m_grids, m_dmap, 1, 0);
+    }
     m_rhs_cc.define(m_grids, m_dmap, 1, 0);
     m_mid_cc.define(m_grids, m_dmap, 1, 0);
     m_sol_cc.define(m_grids, m_dmap, 1, 1);
@@ -275,15 +299,21 @@ void DarwinMLMGPC<T,Ops>::Update ()
         IsDefined(),
         "DarwinMLMGPC::Update() called on undefined object" );
 
-    m_ops->ComputeScaledMassMatrixCC(m_chi_cc);
-    m_helmholtz->setACoeffs(0, m_chi_cc);
+    m_ops->ComputeScaledMassMatrixCC(m_chi_cc[0], m_chi_cc[1], m_chi_cc[2]);
+    for (int comp = 0; comp < 3; ++comp) {
+        m_helmholtz[comp]->setACoeffs(0, m_chi_cc[comp]);
+    }
 
     if (m_verbose) {
-        const amrex::Real chi_mean =
-            m_chi_cc.sum(0, false) / static_cast<amrex::Real>(m_chi_cc.boxArray().numPts());
+        const auto* names = "xyz";
         amrex::Print() << "Updating "
-                       << amrex::getEnumNameString(PreconditionerType::pc_darwin_mlmg)
-                       << ": mean chi = " << chi_mean << "\n";
+                       << amrex::getEnumNameString(PreconditionerType::pc_darwin_mlmg) << ":\n";
+        for (int comp = 0; comp < 3; ++comp) {
+            const amrex::Real chi_mean = m_chi_cc[comp].sum(0, false)
+                / static_cast<amrex::Real>(m_chi_cc[comp].boxArray().numPts());
+            amrex::Print() << "    mean chi_" << names[comp] << names[comp]
+                           << " = " << chi_mean << "\n";
+        }
     }
 }
 
@@ -333,7 +363,7 @@ void DarwinMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
         m_mid_cc.setVal(0.0);
         m_poisson_mg->solve({&m_mid_cc}, {&m_rhs_cc}, m_rtol, m_atol);
         m_sol_cc.setVal(0.0);
-        m_helmholtz_mg->solve({&m_sol_cc}, {&m_mid_cc}, m_rtol, m_atol);
+        m_helmholtz_mg[comp]->solve({&m_sol_cc}, {&m_mid_cc}, m_rtol, m_atol);
 
         // Map back to the B-staggering (cell i -> node i). Only the top node
         // plane in the nodal dimension reads a guard cell: the periodic

@@ -80,26 +80,31 @@ public:
                                    const ablastr::fields::MultiLevelVectorField& dA);
 
     /**
-     * \brief Fill a cell-centered MultiFab with the scalar susceptibility
-     *  chi(x): the (2 mu0/dt)-scaled row-sum of the diagonal mass-matrix
-     *  bands, averaged over the three diagonal blocks and interpolated from
-     *  their native (E-type) staggering to cell centers. This is the local
-     *  chi scale the curl(chi curl Z) operator term applies to a uniform dA,
-     *  used by the pc_darwin_mlmg preconditioner's Helmholtz factor. Must be
-     *  called after the mass matrices have been deposited and synced for the
-     *  current step.
+     * \brief Fill three cell-centered MultiFabs with the diagonal
+     *  susceptibility components chi_xx(x), chi_yy(x), chi_zz(x): the
+     *  (2 mu0/dt)-scaled row-sum of each diagonal mass-matrix block,
+     *  interpolated from its native (E-type) staggering to cell centers.
+     *  These are the local chi scales the curl(chi curl Z) operator term
+     *  applies to a uniform dA, used by the pc_darwin_mlmg preconditioner's
+     *  per-component Helmholtz factors. Must be called after the mass
+     *  matrices have been deposited and synced for the current step.
      *
      *  The full mass matrix is a 3x3 block tensor (one block per Jx/Jy/Jz
      *  row/column pair) at every point of each block's native E-type
      *  staggering, and each block is itself stored sparsely as several
      *  components representing the deposition-stencil bands rather than as
-     *  a dense matrix. a_chi_cc collapses all of that to a single scalar per
-     *  cell: it keeps only the 3 diagonal blocks (xx, yy, zz), sums each
-     *  block's stencil-band components into a per-point row-sum, averages
-     *  that row-sum over the 3 diagonal blocks, and interpolates the result
-     *  from the staggered points onto the cell center.
+     *  a dense matrix. a_chi_xx_cc, a_chi_yy_cc, a_chi_zz_cc each collapse
+     *  one diagonal block to a single scalar per cell: sum that block's
+     *  stencil-band components into a per-point row-sum, then interpolate
+     *  the result from the staggered points onto the cell center. Unlike an
+     *  isotropic average of the three diagonal blocks, keeping them separate
+     *  preserves anisotropy in the plasma response (e.g. from a background
+     *  magnetic field), at the cost of the preconditioner's per-component
+     *  Helmholtz solves no longer sharing a single operator.
      */
-    void ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const;
+    void ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
+                                     amrex::MultiFab& a_chi_yy_cc,
+                                     amrex::MultiFab& a_chi_zz_cc ) const;
 
     void PrepareVelocitiesForCurrentDeposition ();
     void AccumulateCurrentAndMassMatrices ();
