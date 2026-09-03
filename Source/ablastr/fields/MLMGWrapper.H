@@ -6,6 +6,7 @@
 #include <AMReX_MLMG.H>
 #include <AMReX_MLEBNodeFDLaplacian.H>
 #include <AMReX_MLNodeTensorLaplacian.H>
+#include <AMReX_OpenMP.H>
 #include <AMReX_ParallelContext.H>
 #include <AMReX_ParallelReduce.H>
 #include <AMReX_ParmParse.H>
@@ -447,17 +448,45 @@ private:
      * On the host, a NaN or an overflow produced by a diverging solve raises
      * SIGFPE if trapping is enabled. That kills the run before the failure can
      * be caught as an exception.
+     *
+     * The trap mask is part of the state of a thread, and it is inherited from
+     * the thread that creates it. Because AMReX enables trapping before the
+     * OpenMP threads are created, the threads have their own copy of the mask
+     * with trapping enabled. Thus it is not enough to change the mask of the
+     * master thread only. We must do it on all threads, and we must remember
+     * the previous mask of each thread, because they are not necessarily the
+     * same.
      */
     struct FPExceptGuard
     {
-        FPExceptGuard () : m_prev(amrex::disableFPExcept(amrex::FPExcept::all)) {}
-        ~FPExceptGuard () { amrex::setFPExcept(m_prev); }
+        FPExceptGuard ()
+            : m_prev(amrex::OpenMP::get_max_threads(), amrex::FPExcept::none)
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            {
+                m_prev[amrex::OpenMP::get_thread_num()]
+                    = amrex::disableFPExcept(amrex::FPExcept::all);
+            }
+        }
+
+        ~FPExceptGuard ()
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            {
+                amrex::setFPExcept(m_prev[amrex::OpenMP::get_thread_num()]);
+            }
+        }
+
         FPExceptGuard (FPExceptGuard const&) = delete;
         FPExceptGuard (FPExceptGuard &&) = delete;
         FPExceptGuard& operator= (FPExceptGuard const&) = delete;
         FPExceptGuard& operator= (FPExceptGuard &&) = delete;
     private:
-        amrex::FPExcept m_prev;
+        amrex::Vector<amrex::FPExcept> m_prev;
     };
 
     /** Reduce the measured solve time over all processes.
