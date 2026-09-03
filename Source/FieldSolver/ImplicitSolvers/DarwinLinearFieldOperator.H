@@ -69,10 +69,7 @@ public:
     }
 
     inline
-    void updatePreCondMat ( const WarpXSolverVec& a_X ) override
-    {
-        amrex::ignore_unused(a_X);
-    }
+    void updatePreCondMat () override { }
 
     inline
     void getPCMatrix ( amrex::Gpu::DeviceVector<int>& a_ridx_g,

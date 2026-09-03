@@ -52,9 +52,9 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     }
 
     inline
-    void updatePreCondMat ( const T&  a_X ) override
+    void updatePreCondMat () override
     {
-        if (m_usePreCond) { m_preCond->Update(a_X); }
+        if (m_usePreCond) { m_preCond->Update(); }
     }
 
     inline

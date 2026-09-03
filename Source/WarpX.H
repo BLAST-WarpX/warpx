@@ -280,6 +280,10 @@ public:
     //! Maximum number of allowed grid crossings for particles
     static int particle_max_grid_crossings;
 
+    //! Maximum number of allowed grid crossings for particles when using mass matrices for Jacobian
+    //! The Villasenor deposition requires this value at compile time for arrays used in the routine
+    static constexpr int villasenor_mass_matrices_max_grid_crossings = 3;
+
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
     //! Order of finite centering of fields (from staggered grid to nodal grid), along y
