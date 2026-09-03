@@ -44,8 +44,12 @@ def check_restart_domain(filename, tolerance=1e-12):
     right_benchmark = ds_benchmark.domain_right_edge.v
 
     print(f"\ntolerance = {tolerance}")
-    print(f"restart:   domain_left_edge = {left_restart}, domain_right_edge = {right_restart}")
-    print(f"benchmark: domain_left_edge = {left_benchmark}, domain_right_edge = {right_benchmark}")
+    print(
+        f"restart:   domain_left_edge = {left_restart}, domain_right_edge = {right_restart}"
+    )
+    print(
+        f"benchmark: domain_left_edge = {left_benchmark}, domain_right_edge = {right_benchmark}"
+    )
 
     scale = np.amax(np.abs(right_benchmark - left_benchmark))
     error_lo = np.amax(np.abs(left_restart - left_benchmark)) / scale
