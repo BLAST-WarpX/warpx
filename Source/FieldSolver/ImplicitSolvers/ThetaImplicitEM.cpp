@@ -105,6 +105,13 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
     SaveEoldMultifab();
     m_Eold.Copy(FieldType::E_old, FieldType::None, true);
 
+    // This function is needed when using the curl curl pc with nonzero dirichlet BCs
+    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
+    if (pc_type == PreconditionerType::pc_curl_curl_mlmg) {
+        ZeroSolverVecOnNonzeroDirichletBC(m_Eold);
+        ZeroSolverVecOnNonzeroDirichletBC(m_E);
+    }
+
     // Save Bg at start of time step
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         const ablastr::fields::VectorField Bfp = m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
@@ -255,6 +262,85 @@ void ThetaImplicitEM::FinishFieldUpdate ( amrex::Real end_time )
     ablastr::fields::MultiLevelVectorField const & B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
     m_WarpX->FinishMagneticFieldAndApplyBCs( B_old, m_theta, end_time );
 
+}
+
+void ThetaImplicitEM::ZeroSolverVecOnNonzeroDirichletBC (WarpXSolverVec& a_E) const
+{
+
+    // Set nodal components of a solver vector to zero on nonzero Dirichlet boundaries.
+    // This is a work-around that is needed when using the curl curl PC with such boundaries.
+    // Without calling this function, that PC solver doesn't work properly and results in
+    // the GMRES solver diverging.
+
+    const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_lo = GetFieldBoundaryLo();
+    const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& bc_type_hi = GetFieldBoundaryHi();
+
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const amrex::Geometry& geom = GetGeometry(lev);
+        amrex::Box domain_box = geom.Domain();
+        domain_box.convert(amrex::IntVect::TheNodeVector());
+        const amrex::IntVect domain_lo = domain_box.smallEnd();
+        const amrex::IntVect domain_hi = domain_box.bigEnd();
+
+        ablastr::fields::VectorField& Evec = a_E.getArrayVec()[lev];
+
+        for (int field_dir = 0; field_dir < 3; ++field_dir) {
+            amrex::MultiFab& Edir = *Evec[field_dir];
+
+            for (amrex::MFIter mfi(Edir, false); mfi.isValid(); ++mfi) {
+                const amrex::Box& valid_box = mfi.validbox();
+
+                for (int bdry_dir = 0; bdry_dir < AMREX_SPACEDIM; ++bdry_dir) {
+
+                    // Skip if Edir is not nodal in the bdry direction
+                    if (!Edir.ixType().nodeCentered(bdry_dir)) {
+                        continue;
+                    }
+
+                    for (int bdry_side = 0; bdry_side < 2; ++bdry_side) {
+
+                        // Check if BC is nonzero Dirichlet for E
+                        const FieldBoundaryType bc_type = (bdry_side == 0) ? bc_type_lo[bdry_dir]:bc_type_hi[bdry_dir];
+                        if (bc_type == FieldBoundaryType::PEC_Insulator) {
+                            const int voltage_driven = m_WarpX->GetPECInsulator_IsESet(bdry_dir,bdry_side);
+                            if (!voltage_driven) {
+                                continue;
+                            }
+                        }
+                        else {
+                            continue;
+                        }
+
+                        const int boundary_index = (bdry_side == 0 ? domain_lo[bdry_dir]
+                                                                   : domain_hi[bdry_dir]);
+
+                        // Check if the box touches the boundary
+                        if (valid_box.smallEnd(bdry_dir) > boundary_index ||
+                            valid_box.bigEnd(bdry_dir) < boundary_index) {
+                            continue;
+                        }
+
+                        // Create a node box that only contains locations on the boundary
+                        amrex::Box bdry_box = valid_box;
+                        bdry_box.setSmall(bdry_dir, boundary_index);
+                        bdry_box.setBig(bdry_dir, boundary_index);
+
+                        // Set Efield values to zero on the boundary
+                        const auto Edir_arr = Edir.array(mfi);
+                        amrex::ParallelFor(bdry_box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                            Edir_arr(i,j,k,0) = 0.0_rt;
+                        });
+
+                    } // end loop over boundary sides
+
+                } // end loop over boundary dirs
+
+            } // end loop over boxes
+
+        } // end loop over field dirs
+
+    } // end loop over levels
 }
 
 const amrex::MultiFab* ThetaImplicitEM::GetCurl2BCmask (const int lev, const int field_dir) const

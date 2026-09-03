@@ -100,6 +100,11 @@ public:
     [[nodiscard]] const amrex::MultiFab* GetCurl2BCmask (int lev, int field_dir) const override;
 
     /**
+     * \brief Enforce zero value for WarpXSolverVec on non-zero dirichlet boundaries
+     */
+    void ZeroSolverVecOnNonzeroDirichletBC (WarpXSolverVec& a_E) const;
+
+    /**
      * \brief Inititialize the BC masks for the curl curl operator
      */
     void InitializeCurlCurlBCMasks ();
