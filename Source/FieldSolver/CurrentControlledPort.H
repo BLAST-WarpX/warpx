@@ -84,7 +84,13 @@ class CurrentControlledPort {
     // this basis on each axial plane changes the Ampere circulation without
     // changing the discrete divergence of B.
     std::array<std::unique_ptr<amrex::MultiFab>, 3> m_curl_basis;
+#endif
 
+  public:
+    // The implementation helpers below contain extended __device__ lambdas.
+    // NVCC requires their enclosing member functions and any nested types used
+    // by the generated host stubs to be public.
+#ifdef WARPX_DIM_3D
     struct Edge {
         int component = 0;
         int tangent_direction = 0;
@@ -97,10 +103,6 @@ class CurrentControlledPort {
 
     [[nodiscard]] std::array<Edge, 4> Edges () const;
 #endif
-
-  public:
-    // The implementation helpers below contain extended __device__ lambdas.
-    // NVCC requires their enclosing member functions to be public.
 #ifdef WARPX_DIM_3D
     void BuildCurlBasis (
         ablastr::fields::VectorField const& Bfield,
