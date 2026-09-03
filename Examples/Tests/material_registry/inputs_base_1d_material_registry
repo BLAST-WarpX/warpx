@@ -1,0 +1,43 @@
+# Structural application-initialization base for the named material registry.
+
+my_constants.n0 = 1.0e20
+
+max_step = 0
+amr.n_cell = 8
+amr.max_level = 0
+amr.max_grid_size = 8
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.verbose = 0
+warpx.serialize_initial_conditions = 1
+amrex.abort_on_unused_inputs = 1
+algo.particle_shape = 1
+
+particles.species_names = foam tungsten
+
+foam.charge = q_e
+foam.mass = m_p
+foam.injection_style = NUniformPerCell
+foam.num_particles_per_cell_each_dim = 1
+foam.profile = parse_density_function
+foam.density_function(x,y,z) = "n0*(z < 0.5)"
+foam.momentum_distribution_type = at_rest
+
+tungsten.charge = q_e
+tungsten.mass = 3.05279e-25
+tungsten.injection_style = NUniformPerCell
+tungsten.num_particles_per_cell_each_dim = 1
+tungsten.profile = parse_density_function
+tungsten.density_function(x,y,z) = "n0*(z >= 0.5)"
+tungsten.momentum_distribution_type = at_rest
+
+materials.names = tungsten foam
+materials.foam.species = foam
+materials.tungsten.species = tungsten

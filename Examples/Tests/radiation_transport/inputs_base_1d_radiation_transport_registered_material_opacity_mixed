@@ -1,0 +1,5 @@
+FILE = inputs_base_1d_radiation_transport_registered_material_opacity
+
+# Deliberately place material B carriers on material A cell centers.
+material_b.multiple_particles_pos_z = \
+    0.3125 0.3375 0.3625 0.3875 0.7125 0.7375 0.7625 0.7875

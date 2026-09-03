@@ -154,24 +154,83 @@ density, :math:`\vec{V}_e = \vec{J}_e/(-e n_e)` is the electron fluid velocity
 and :math:`S_e` collects the source and sink terms. The local electron
 pressure :math:`P_e = n_e k_B T_e` then feeds back into Ohm's law.
 
-The homogeneous part of the equation (the left-hand side) is solved with the
-QDSMC kinetic-enslavement scheme of :cite:t:`kfhm-Belyaev2024`: the electron
-entropy function :math:`K_e = T_e\, n_e^{1-\gamma}`, which the transport terms
-conserve along electron-fluid characteristics, is advected by fictitious
-Lagrangian markers. Each PIC step one marker is initialized at every cell
-center carrying the local :math:`K_e N_e` and :math:`N_e` (with :math:`N_e`
-the electron count of the cell), is pushed by one timestep with
-:math:`\vec{V}_e` interpolated at its position, and both quantities are
-deposited back to the grid with the standard (linear) particle shape factors.
-The updated temperature is recovered from the deposited quantities and the
-ion-derived density as
+For the ideal-gas backend, the homogeneous part of the equation (the
+left-hand side) is solved with the QDSMC kinetic-enslavement scheme of
+:cite:t:`kfhm-Belyaev2024`: the electron entropy function
+:math:`K_e = T_e\, n_e^{1-\gamma}`, which the transport terms conserve along
+electron-fluid characteristics, is advected by fictitious Lagrangian markers.
+Each PIC step one marker is initialized at every cell center carrying the local
+:math:`K_e N_e` and :math:`N_e` (with :math:`N_e` the electron count of the
+cell), is pushed by one timestep with :math:`\vec{V}_e` interpolated at its
+position, and both quantities are deposited back to the grid with the standard
+(linear) particle shape factors. The updated temperature is recovered from the
+deposited quantities and the ion-derived density as
 
     .. math::
 
         T_e = \frac{\sum K_e N_e}{\sum N_e}\, n_e^{\gamma - 1}.
 
-Since the scheme only advects the electron entropy, thermal conduction is
-neglected (:math:`\nabla\cdot\vec{q}_e = 0`).
+Nonlinear electron-thermodynamics backends instead advect :math:`U_e` with a
+conservative Cartesian finite-volume operator and recover :math:`T_e` by
+inverting :math:`U_e(n_e,T_e)`. The ion charge flux used by that operator is
+deposited with the same particle trajectories as the endpoint charge, so the
+two satisfy one discrete continuity equation.
+
+The optional conservative pressure-work path
+(``hybrid_pic_model.conservative_pressure_work``) also pairs the pressure
+force on kinetic ions with an equal and opposite electron-energy update. For
+each full Boris push it constructs a velocity :math:`\vec{v}_{w,p}` satisfying
+
+    .. math::
+
+        \Delta K_p = q_p w_p\,\Delta t\,
+        \vec{E}_p\cdot\vec{v}_{w,p}
+
+to floating-point roundoff, including relativistic and magnetic effects. The
+transpose of the particle field-gather shape scatters
+:math:`q_p w_p\vec{v}_{w,p}` to :math:`\vec{J}_w`. For the isolated pressure
+field :math:`\vec{E}_P=-\nabla_hP_e/R`, with :math:`R` the charge-density
+denominator used by Ohm's law, the periodic discrete adjoint identity gives
+
+    .. math::
+
+        \Delta K_{i,P}
+        = \Delta t\sum_g V_g P_{e,g}\,
+          D_h\!\left(\frac{\vec{J}_{w,g}}{R_g}\right).
+
+WarpX source-loads the negative of this quantity into the old-state
+:math:`U_e` before applying the existing mass-consistent finite-volume remap.
+The remap is conservative on a periodic mesh, so this ordering preserves the
+global particle/electron work identity. It also transports the local work
+increment with its material carrier: under the upwind CFL condition and in
+exact arithmetic, a node that becomes exact vacuum cannot retain a nonzero,
+EOS-unrepresentable electron energy density. Two independently evaluated
+floating-point flux subtractions can nevertheless leave a cancellation-sized
+residual. WarpX accepts only a residual bounded by machine precision times the
+absolute mass and energy fluxes, sets the evacuated node to the exactly
+representable zero state, and transfers the integrated residual along its
+positive-support material-outflow faces. The face-charge-flux weights and
+nodal control volumes make that deterministic cleanup conservative. A larger
+residual, a missing material recipient, or outflow into endpoint vacuum aborts;
+this is not a general energy clip or an EOS repair.
+
+For nonlinear finite-volume thermodynamics, pressure is reconstructed from the
+nonnegative deposited density and therefore tends homogeneously to zero at
+vacuum; the separately floored charge denominator is used only in Ohm's law.
+The pressure and masked reciprocal denominator that generated
+:math:`\vec{E}_P` are checkpointed, so a rank-changing restart uses the same
+work pair as a continuous run. This first implementation is deliberately
+restricted to a single-level, periodic, collocated Cartesian mesh, direct
+field gather, double-precision fields, full-order particle shapes and one full
+Boris momentum push.
+The temporary velocity-synchronization half-push used by some diagnostics is
+disabled, so the paired kinetic energy is the native leapfrog value.
+Unsupported boundary, staggering, geometry, diagnostic-synchronization and
+split-push combinations abort rather than silently using a non-adjoint
+approximation.
+
+Neither transport discretization includes a heat-flux term, so thermal
+conduction is neglected (:math:`\nabla\cdot\vec{q}_e = 0`).
 
 Two source terms can be enabled on the right-hand side. The first is the Joule
 (Ohmic) heating consistent with the resistive friction in Ohm's law
@@ -199,9 +258,13 @@ specifying the rate ``hybrid_pic_model.electron_ion_relaxation_rate``,
         Q_{ei} = \sum_s 3\, n_s k_B\, \nu_{ei}\, (T_e - T_{i,s}),
 
 with the rate :math:`\nu_{ei}(\rho, T_e, T_i, t)` given by a user expression.
-The sink on the electron fluid is paired with a matching thermal-velocity
-kick on the ion macro-particles of each species so that the exchange
-conserves energy exactly.
+The electron source is integrated with both finite heat capacities. Its exact
+EOS energy change is paired with an ion drag/diffusion proposal followed by a
+cell-local moment projection. The projection leaves the cell ion momentum
+unchanged and makes the nonrelativistic ion thermal-energy change exactly the
+negative electron change. Cells without resolved thermal variance and
+over-cooling requests are rejected rather than repaired by nonlocal energy
+redistribution.
 
 Verification tests of the transport terms (adiabatic compression, and slab
 transport through a below-floor halo), the Joule source (force-free field

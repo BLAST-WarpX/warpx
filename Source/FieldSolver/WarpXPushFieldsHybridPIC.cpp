@@ -11,6 +11,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "WarpX.H"
@@ -18,6 +19,8 @@
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
+
+#include <limits>
 
 
 using namespace amrex;
@@ -58,7 +61,7 @@ void WarpX::HybridPICEvolveFields ()
 
     // The particles have now been pushed to their t_{n+1} positions.
     // Perform charge deposition at t_{n+1} and current deposition at t_{n+1/2}.
-    HybridPICDepositRhoAndJ();
+    HybridPICDepositRhoAndJ(/*deposit_energy_auxiliary=*/true);
 
     // Electron pressure/temperature update at t=n+1, right after the
     // deposition. With solve_electron_energy_equation on, the QDSMC
@@ -71,6 +74,48 @@ void WarpX::HybridPICEvolveFields ()
         m_hybrid_pic_model->AdvanceElectronEnergyQDSMC(dt[0]);
     } else {
         m_hybrid_pic_model->CalculateElectronPressure();
+    }
+
+    if (mypc->hasHybridIonization()) {
+        // Freeze the old-Z electron density and temperature state. The
+        // particle operator then increments accepted ion charge states and
+        // deposits the corresponding ionization-potential energy density.
+        auto& rho_old =
+            *m_fields.get("hybrid_ionization_rho_old_fp", 0);
+        auto& electron_source =
+            *m_fields.get("hybrid_ionization_electron_source_fp", 0);
+        auto& binding_energy =
+            *m_fields.get("hybrid_ionization_binding_energy_fp", 0);
+        auto& rho = *m_fields.get(FieldType::rho_fp, 0);
+        auto& Te = *m_fields.get(
+            FieldType::hybrid_electron_temperature_fp, 0);
+        MultiFab::Copy(
+            rho_old, rho, 0, 0, 1, rho_old.nGrowVect());
+
+        // Ion positions, gett_new, and the QDSMC thermodynamic state are all
+        // at the endpoint, so time-dependent coefficients use t^(n+1).
+        mypc->doHybridIonization(
+            0, rho_old, Te, binding_energy,
+            gett_new(0), dt[0]);
+
+        // Recompute ion rho/J with the new Z before Ohm's law. This also
+        // refreshes every per-species charge field consumed by the hybrid
+        // model. Particle number, mass, position and momentum are unchanged.
+        HybridPICDepositRhoAndJ(/*deposit_energy_auxiliary=*/true);
+
+        // The charge increase is exactly the new hybrid-fluid electron
+        // density required by quasi-neutrality. Store it independently of the
+        // binding-energy ledger for diagnostics and conservation tests.
+        MultiFab::LinComb(
+            electron_source,
+            1.0_rt / PhysConst::q_e, rho, 0,
+            -1.0_rt / PhysConst::q_e, rho_old, 0,
+            0, 1, electron_source.nGrowVect());
+        electron_source.FillBoundary(
+            electron_source.nGrowVect(), Geom(0).periodicity());
+
+        m_hybrid_pic_model->ApplyHybridIonizationEnergySource(
+            0, rho_old, rho, binding_energy);
     }
 
     // Get the external current
@@ -221,13 +266,58 @@ void WarpX::HybridPICEvolveFields ()
     }
 }
 
-void WarpX::HybridPICDepositRhoAndJ ()
+void WarpX::HybridPICDepositRhoAndJ (bool const deposit_energy_auxiliary)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     auto current_fp = m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level);
     auto rho_fp = m_fields.get_mr_levels(FieldType::rho_fp, finest_level);
+    bool const deposit_energy_charge_flux =
+        m_hybrid_pic_model->m_fv_transport_internal_energy
+        && deposit_energy_auxiliary;
+    if (deposit_energy_charge_flux) {
+        // Esirkepov reconstructs the old particle position from the current
+        // position and velocity.  Reject trajectories longer than one cell
+        // before entering the deposition kernel, whose stencil assumes that
+        // bound.  Check material carriers only; photons and non-depositing
+        // species do not contribute to this auxiliary continuity ledger.
+        amrex::ParticleReal max_material_dt_inv = 0.0_prt;
+        for (auto const& species_name : mypc->GetSpeciesNames()) {
+            auto& species =
+                mypc->GetParticleContainerFromName(species_name);
+            if (species.getCharge() == 0.0_prt || species.do_not_deposit) {
+                continue;
+            }
+            max_material_dt_inv = amrex::max(
+                max_material_dt_inv, species.maxParticleDtInv());
+        }
+        amrex::Real const max_cell_displacement =
+            dt[0] * static_cast<amrex::Real>(max_material_dt_inv);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            max_cell_displacement <= 1.0_rt + 64.0_rt
+                * std::numeric_limits<amrex::Real>::epsilon(),
+            "Nonlinear finite-volume electron-energy transport requires "
+            "dt*max_i(|v_i|/dx_i) <= 1 before its charge-conserving "
+            "auxiliary current deposition. Reduce the timestep.");
+    }
+    ablastr::fields::MultiLevelVectorField energy_charge_flux;
+    ablastr::fields::MultiLevelScalarField energy_rho_mid;
+    ablastr::fields::MultiLevelVectorField energy_velocity_current;
+    if (deposit_energy_charge_flux) {
+        energy_charge_flux = m_fields.get_mr_levels_alldirs(
+            FieldType::hybrid_energy_charge_flux_fp, finest_level);
+        energy_rho_mid = m_fields.get_mr_levels(
+            FieldType::hybrid_energy_rho_mid_fp, finest_level);
+        energy_velocity_current = m_fields.get_mr_levels_alldirs(
+            FieldType::hybrid_energy_velocity_current_fp, finest_level);
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            for (int idim = 0; idim < 3; ++idim) {
+                energy_charge_flux[lev][idim]->setVal(0.0_rt);
+                energy_velocity_current[lev][idim]->setVal(0.0_rt);
+            }
+        }
+    }
     if (m_hybrid_pic_model->m_need_per_species_fields) {
         // Per-species deposition at t_{n+1} (rho) and t_{n-1/2} (J): each
         // charged species deposits its charge once into its own MultiFab and
@@ -247,7 +337,33 @@ void WarpX::HybridPICDepositRhoAndJ ()
             auto & pc = mypc->GetParticleContainerFromName(spec);
             if (pc.getCharge() == 0._prt || pc.do_not_deposit) { continue; }
             auto rho_spec = m_fields.get_mr_levels("rho_fp_" + spec, finest_level);
+            bool is_eos_material = false;
+            for (int material = 0;
+                 material < m_hybrid_pic_model
+                     ->electronThermodynamicsNumMaterials(); ++material)
+            {
+                is_eos_material = is_eos_material
+                    || spec == m_hybrid_pic_model
+                        ->electronThermodynamicsMaterialSpeciesName(material);
+            }
+            ablastr::fields::MultiLevelScalarField ion_count_charge;
+            if (is_eos_material) {
+                ion_count_charge = m_fields.get_mr_levels(
+                    "ni_charge_fp_" + spec, finest_level);
+                pc.DepositUnitChargeDensity(
+                    ion_count_charge, /*local=*/true, /*reset=*/true,
+                    /*apply_boundary_and_scale_volume=*/false,
+                    /*interpolate_across_levels=*/false);
+            }
             pc.DepositCurrent(current_fp, dt[0], -0.5_rt * dt[0]);
+            if (deposit_energy_charge_flux) {
+                pc.DepositCurrent(
+                    energy_charge_flux, dt[0], -0.5_rt * dt[0],
+                    PushType::Explicit, CurrentDepositionAlgo::Esirkepov);
+                pc.DepositCurrent(
+                    energy_velocity_current, dt[0], -0.5_rt * dt[0],
+                    PushType::Explicit, CurrentDepositionAlgo::Direct);
+            }
             pc.DepositCharge(rho_spec, /*local*/true, /*reset*/true,
                              /*apply_boundary_and_scale_volume*/false,
                              /*interpolate_across_levels*/false);
@@ -270,6 +386,10 @@ void WarpX::HybridPICDepositRhoAndJ ()
             // densities near the axis and corrupt the species fractions.
             for (int lev = 0; lev <= finest_level; ++lev) {
                 ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
+                if (is_eos_material) {
+                    ApplyInverseVolumeScalingToChargeDensity(
+                        ion_count_charge[lev], lev);
+                }
             }
 #endif
             // The per-species charge densities themselves are consumed
@@ -280,6 +400,24 @@ void WarpX::HybridPICDepositRhoAndJ ()
                     *rho_spec[lev], 0, rho_spec[lev]->nComp(),
                     rho_spec[lev]->nGrowVect(), rho_spec[lev]->nGrowVect(),
                     WarpX::do_single_precision_comms, Geom(lev).periodicity());
+                // The total rho receives this physical boundary operator in
+                // SyncCurrentAndRho below. Apply the same linear operator to
+                // every material component before summing them, so table-EOS
+                // mass densities remain consistent at PEC/PMC and reflecting
+                // or thermal particle boundaries as well as in the interior.
+                ApplyRhofieldBoundary(
+                    lev, rho_spec[lev], PatchType::fine);
+                if (is_eos_material) {
+                    ablastr::utils::communication::SumBoundary(
+                        *ion_count_charge[lev], 0,
+                        ion_count_charge[lev]->nComp(),
+                        ion_count_charge[lev]->nGrowVect(),
+                        ion_count_charge[lev]->nGrowVect(),
+                        WarpX::do_single_precision_comms,
+                        Geom(lev).periodicity());
+                    ApplyRhofieldBoundary(
+                        lev, ion_count_charge[lev], PatchType::fine);
+                }
             }
             // Species-summed physical charge density (same form as the
             // rho_fp_s numerators), shared by the electron-energy-equation
@@ -306,6 +444,28 @@ void WarpX::HybridPICDepositRhoAndJ ()
         mypc->DepositCurrent(current_fp, dt[0], -0.5_rt * dt[0]);
     }
 
+    if (deposit_energy_charge_flux) {
+        // Co-deposit rho and the direct velocity moment at exactly the same
+        // particle midpoint.  Their ratio is therefore exactly constant for
+        // a rigidly translating material, including CIC interface tails.
+        mypc->DepositCharge(energy_rho_mid, -0.5_rt * dt[0]);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) \
+    || defined(WARPX_DIM_RSPHERE)
+        // The nonlinear transport operator consumes physical charge and
+        // current densities. Apply the same radial deposition-volume scaling
+        // used by the primary rho/J fields before guard-cell summation.
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            ApplyInverseVolumeScalingToCurrentDensity(
+                energy_charge_flux[lev][0], energy_charge_flux[lev][1],
+                energy_charge_flux[lev][2], lev);
+            ApplyInverseVolumeScalingToCurrentDensity(
+                energy_velocity_current[lev][0],
+                energy_velocity_current[lev][1],
+                energy_velocity_current[lev][2], lev);
+        }
+#endif
+    }
+
     // TODO: Perhaps add flag here for when using temperature accumulation in Hybrid
     // Perform Temperature Deposition at time t_{n}
     mypc->DepositTemperatures(m_fields, 0.0_rt);
@@ -325,6 +485,53 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // filter (if used), exchange guard cells, interpolate across MR levels
     // and apply boundary conditions
     SyncCurrentAndRho();
+
+    if (deposit_energy_charge_flux) {
+        // Sum the dedicated Esirkepov deposits without applying the primary
+        // current filter: rho and this auxiliary face flux must retain their
+        // exact discrete continuity relation.  Hybrid-PIC is single-level.
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            auto const& period = Geom(lev).periodicity();
+            for (int idim = 0; idim < 3; ++idim) {
+                for (auto* auxiliary_current : {
+                         energy_charge_flux[lev][idim],
+                         energy_velocity_current[lev][idim]})
+                {
+                    ablastr::utils::communication::SumBoundary(
+                        *auxiliary_current, 0, auxiliary_current->nComp(),
+                        auxiliary_current->nGrowVect(),
+                        auxiliary_current->nGrowVect(), false, period);
+                }
+            }
+            ApplyJfieldBoundary(
+                lev, energy_charge_flux[lev][0],
+                energy_charge_flux[lev][1], energy_charge_flux[lev][2],
+                PatchType::fine);
+            ApplyJfieldBoundary(
+                lev, energy_velocity_current[lev][0],
+                energy_velocity_current[lev][1],
+                energy_velocity_current[lev][2], PatchType::fine);
+            ablastr::utils::communication::SumBoundary(
+                *energy_rho_mid[lev], 0, energy_rho_mid[lev]->nComp(),
+                energy_rho_mid[lev]->nGrowVect(),
+                energy_rho_mid[lev]->nGrowVect(), false, period);
+            ApplyRhofieldBoundary(
+                lev, energy_rho_mid[lev], PatchType::fine);
+            ablastr::utils::communication::FillBoundary(
+                *energy_rho_mid[lev], energy_rho_mid[lev]->nGrowVect(),
+                false, period, true);
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *energy_charge_flux[lev][idim],
+                    energy_charge_flux[lev][idim]->nGrowVect(), false,
+                    period, true);
+                ablastr::utils::communication::FillBoundary(
+                    *energy_velocity_current[lev][idim],
+                    energy_velocity_current[lev][idim]->nGrowVect(), false,
+                    period, true);
+            }
+        }
+    }
 
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to
@@ -368,21 +575,50 @@ void WarpX::HybridPICInitializeRhoJandB ()
     // the below-n_floor branch of the Ohm's-law E-solve on top of the full
     // mid-run curl(B), which is catastrophically stiff (or, with the vacuum
     // treatment, silently wrong physics for one step).
-    HybridPICDepositRhoAndJ();
+    // This initialization deposit reconstructs rho^n and J_i^(n-1/2), but
+    // there is no n -> n+1 material trajectory yet.  The first evolved
+    // deposit will initialize the auxiliary continuity flux consistently.
+    HybridPICDepositRhoAndJ(/*deposit_energy_auxiliary=*/false);
 
     // Fill the electron pressure using the freshly deposited rho. On a fresh
-    // start this seeds Pe^0 for the first step's B-substep E-solves (the
-    // iteration-0 diagnostics were already written at the end of InitData,
-    // before this runs); on restart it restores Pe(rho^n), which is not
-    // checkpointed and would otherwise be zero for the whole first restarted
-    // step. From the first step onward, HybridPICEvolveFields refreshes Pe
-    // right after each deposition (via the closure, or via the QDSMC entropy
-    // transport when solve_electron_energy_equation is on).
-    // With the energy equation on the closure is evaluated on floored density.
-    // T_e is not checkpointed either, so on restart the seed re-derives it from
-    // the restored rho: evolved T_e structure is not preserved across a restart.
-    m_hybrid_pic_model->CalculateElectronPressure(
-        m_hybrid_pic_model->m_solve_electron_energy_equation);
+    // ideal/polytropic start this seeds Pe^0 and the corresponding T_e for the
+    // first step's B-substep E-solves (the iteration-0 diagnostics were already
+    // written at the end of InitData, before this runs). Any nonlinear caloric
+    // EOS must instead preserve the input T_e seeded by InitData and evaluate
+    // its own P(rho,T); running the legacy closure here would silently replace
+    // both quantities with ideal-polytropic values. On restart every evolved
+    // temperature is restored from its checkpoint and likewise must not be
+    // replaced by the algebraic closure. Pe is derived, so rebuild it from the
+    // preserved T_e and reconstructed rho. This also preserves radiation,
+    // Joule and collisional changes to the hybrid electron internal energy
+    // across a restart.
+    bool const preserve_evolved_temperature =
+        m_hybrid_pic_model->m_solve_electron_energy_equation
+        && (!restart_chkfile.empty()
+            || !m_hybrid_pic_model->electronThermodynamicsExecutor()
+                .isIdealGas());
+    if (preserve_evolved_temperature)
+    {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            auto& Te = *m_fields.get(
+                FieldType::hybrid_electron_temperature_fp, lev);
+            ablastr::utils::communication::FillBoundary(
+                Te, Te.nGrowVect(), false, Geom(lev).periodicity(), true);
+
+            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev);
+            ApplyElectronPressureBoundary(lev, PatchType::fine);
+            ablastr::utils::communication::FillBoundary(
+                *m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+                WarpX::do_single_precision_comms,
+                Geom(lev).periodicity(),
+                true);
+        }
+    } else {
+        // The closure is evaluated on floored density when it initializes the
+        // QDSMC state, and on raw density for the algebraic closure path.
+        m_hybrid_pic_model->CalculateElectronPressure(
+            m_hybrid_pic_model->m_solve_electron_energy_equation);
+    }
 
     if (restart_chkfile.empty()) {
         // Handle field splitting for Hybrid field push
@@ -429,6 +665,33 @@ void WarpX::HybridPICInitializeRhoJandB ()
             MultiFab::Copy(*current_fp_temp[lev][idim], *m_fields.get(FieldType::current_fp, Direction{idim}, lev),
                         0, 0, 1, current_fp_temp[lev][idim]->nGrowVect());
         }
+    }
+
+    if (m_hybrid_pic_model->m_conservative_pressure_work
+        && restart_chkfile.empty())
+    {
+        // The ordinary hybrid startup historically leaves E at its input
+        // value until the end of step one.  The exact pressure-work ledger
+        // cannot debit -P div(V_work) unless the matching -grad(P)/rho force
+        // was actually present in that first particle push.  Build the
+        // complete Ohm-law E^0 now from the deposited initial moments and
+        // seed both the checkpointed pressure component and its auxiliary
+        // gather representation before any particle moves.
+        m_hybrid_pic_model->CalculatePlasmaCurrent(
+            m_fields.get_mr_levels_alldirs(
+                FieldType::Bfield_fp, finest_level),
+            m_eb_update_E);
+        m_hybrid_pic_model->HybridPICSolveE(
+            m_fields.get_mr_levels_alldirs(
+                FieldType::Efield_fp, finest_level),
+            current_fp_temp,
+            m_fields.get_mr_levels_alldirs(
+                FieldType::Bfield_fp, finest_level),
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
+            m_eb_update_E, false);
+        FillBoundaryE(
+            guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+        UpdateAuxiliaryData();
     }
 }
 

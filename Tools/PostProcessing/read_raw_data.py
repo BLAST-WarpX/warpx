@@ -5,12 +5,26 @@
 #
 # License: BSD-3-Clause-LBNL
 
+import re
 from collections import namedtuple
 from glob import glob
 
 import numpy as np
 
 HeaderInfo = namedtuple("HeaderInfo", ["version", "how", "ncomp", "nghost"])
+
+
+def _fab_real_dtype(header_line):
+    """Return the floating-point dtype encoded in an AMReX FAB header."""
+    match = re.match(rb"^FAB \(\(\d+,\s*\((\d+)", header_line)
+    if match is None:
+        raise ValueError("Could not determine the precision of an AMReX FAB")
+    precision_bits = int(match.group(1))
+    if precision_bits == 32:
+        return np.float32
+    if precision_bits == 64:
+        return np.float64
+    raise ValueError(f"Unsupported AMReX FAB precision: {precision_bits} bits")
 
 
 def read_data(plt_file):
@@ -190,7 +204,12 @@ def _read_field(raw_file, field_name):
     data_shape = dom_hi - dom_lo + 1
     if header.ncomp > 1:
         data_shape = np.append(data_shape, header.ncomp)
-    data = np.zeros(data_shape)
+    dtype = np.float64
+    if header.version == 1 and file_names:
+        with open(raw_file + file_names[0], "rb") as f:
+            f.seek(offsets[0])
+            dtype = _fab_real_dtype(f.readline())
+    data = np.zeros(data_shape, dtype=dtype)
 
     for box, fn, offset in zip(boxes, file_names, offsets):
         lo = box[0] - dom_lo
@@ -201,8 +220,8 @@ def _read_field(raw_file, field_name):
         with open(raw_file + fn, "rb") as f:
             f.seek(offset)
             if header.version == 1:
-                f.readline()  # skip the first line
-            arr = np.fromfile(f, "float64", np.prod(shape))
+                f.readline()
+            arr = np.fromfile(f, dtype, np.prod(shape))
             arr = arr.reshape(shape, order="F")
             box_shape = [slice(low, hig + 1) for low, hig in zip(lo, hi)]
             if header.ncomp > 1:
@@ -217,9 +236,14 @@ def _read_buffer(snapshot, header_fn, _component_names):
 
     dom_lo, dom_hi = _combine_boxes(boxes)
 
+    dtype = np.float64
+    if header.version == 1 and file_names:
+        with open(snapshot + "/Level_0/" + file_names[0], "rb") as f:
+            f.seek(offsets[0])
+            dtype = _fab_real_dtype(f.readline())
     all_data = {}
     for i in range(header.ncomp):
-        all_data[_component_names[i]] = np.zeros(dom_hi - dom_lo + 1)
+        all_data[_component_names[i]] = np.zeros(dom_hi - dom_lo + 1, dtype=dtype)
 
     for box, fn, offset in zip(boxes, file_names, offsets):
         lo = box[0] - dom_lo
@@ -229,8 +253,8 @@ def _read_buffer(snapshot, header_fn, _component_names):
         with open(snapshot + "/Level_0/" + fn, "rb") as f:
             f.seek(offset)
             if header.version == 1:
-                f.readline()  # skip the first line
-            arr = np.fromfile(f, "float64", header.ncomp * size)
+                f.readline()
+            arr = np.fromfile(f, dtype, header.ncomp * size)
             for i in range(header.ncomp):
                 comp_data = arr[i * size : (i + 1) * size].reshape(shape, order="F")
                 data = all_data[_component_names[i]]

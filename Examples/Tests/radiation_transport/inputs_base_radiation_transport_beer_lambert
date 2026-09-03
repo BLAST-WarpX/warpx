@@ -1,0 +1,56 @@
+# Searchlight transport through a homogeneous absorbing medium.
+
+my_constants.alpha = 3.0
+my_constants.path_length = 0.7
+my_constants.photon_weight = 1.0e16
+
+max_step = 1
+amr.max_level = 0
+amr.max_grid_size = 32
+
+warpx.const_dt = path_length/clight
+warpx.verbose = 0
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = alpha
+radiation_transport.path_cell_fraction = 0.5
+radiation_transport.material_coupling = none
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.write_species = 0
+diag.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = particle_energy radiation_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1

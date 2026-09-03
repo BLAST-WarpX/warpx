@@ -1,0 +1,7 @@
+FILE = inputs_test_rz_radiation_transport_conversion
+
+radiation_transport.energy_group_boundaries = 2.0e-19
+radiation_transport.group_photon_energies = 1.0e-19 4.0e-19
+
+diag1.fields_to_plot = radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1

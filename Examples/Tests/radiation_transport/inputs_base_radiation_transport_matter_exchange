@@ -1,0 +1,75 @@
+# Turner-Stone-style uniform grey radiation-matter equilibration.
+
+my_constants.n0 = 1.0e24
+my_constants.Te0_eV = 10.0
+my_constants.alpha_planck = 1.0e3
+my_constants.dt = 4.0e-13
+
+max_step = 50
+amr.max_level = 0
+amr.max_grid_size = 32
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 0.01*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+particles.species_names = ions photons
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+ions.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_weight = 1.0
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = implicit_temperature
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 50
+diag.file_prefix = diags/diag
+diag.write_species = 0
+diag.fields_to_plot = rho Te Pe radiation_material_energy radiation_diffusion_energy
+
+warpx.reduced_diags_names = radiation_energy
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1

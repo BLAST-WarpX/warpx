@@ -1,0 +1,60 @@
+# RAD-P0-003b: cylindrical metric companion for constant-CV implicit LTE.
+#
+# A zero-opacity warm-up is followed by one uniformly active LTE exchange
+# step.  The radial domain includes the axis and the physical outer boundary;
+# four-cell FABs exercise both radial endpoint corner volumes and the MPI
+# interface without requiring a large production run.
+
+FILE = inputs_base_radiation_transport_matter_exchange
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 1.0
+my_constants.alpha_planck = 1.0e5
+my_constants.dt = 1.0e-10
+my_constants.dr = 1.0e-3
+
+max_step = 2
+amr.n_cell = 8
+amr.blocking_factor = 1
+amr.max_grid_size = 4
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 8.0*dr
+
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = reflecting
+
+warpx.const_dt = dt
+warpx.serialize_initial_conditions = 1
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = n0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+ions.density = 0.25*n0
+ions.num_particles_per_cell_each_dim = 128 1
+ions.radial_numpercell_power = 1.0
+ions.do_not_push = 1
+
+photons.single_particle_pos = 0.5*dr 0.0 0.0
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 0.0
+
+radiation_transport.minimum_electron_density = 0.05*n0
+radiation_transport.lte_exchange_tolerance = 1.0e-11
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, alpha_planck, 0.0)
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diag.intervals = 1
+diag.fields_to_plot = rho Te Pe radiation_material_energy \
+    radiation_diffusion_energy

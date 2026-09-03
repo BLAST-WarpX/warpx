@@ -9,9 +9,10 @@
 
 CellCenterFunctor::CellCenterFunctor(amrex::MultiFab const * mf_src, int lev,
                                      amrex::IntVect crse_ratio,
-                                     bool convertRZmodes2cartesian, int ncomp)
+                                     bool convertRZmodes2cartesian, int ncomp,
+                                     int scomp)
     : ComputeDiagFunctor(ncomp, crse_ratio), m_mf_src(mf_src), m_lev(lev),
-      m_convertRZmodes2cartesian(convertRZmodes2cartesian)
+      m_convertRZmodes2cartesian(convertRZmodes2cartesian), m_scomp(scomp)
 {}
 
 void
@@ -24,5 +25,5 @@ CellCenterFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_
 
     InterpolateMFForDiag(
         mf_dst, *m_mf_src, dcomp,
-        warpx.DistributionMap(m_lev),m_convertRZmodes2cartesian);
+        warpx.DistributionMap(m_lev),m_convertRZmodes2cartesian, m_scomp);
 }

@@ -33,8 +33,7 @@ ions.ionization_initial_level = 2
 ions.ionization_product_species = electrons
 ions.physical_element = N
 
-electrons.mass = m_e
-electrons.charge = -q_e
+electrons.species_type = electron
 electrons.injection_style = none
 electrons.addRealAttributes = orig_z
 electrons.attribute.orig_z(x,y,z,ux,uy,uz,t) = z

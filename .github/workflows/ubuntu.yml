@@ -90,12 +90,14 @@ jobs:
           -DWarpX_DIMS="1;2"           \
           -DWarpX_EB=OFF               \
           -DWarpX_FFT=ON               \
+          -DWarpX_MATERIAL_OPACITY_HDF5=ON \
           -DWarpX_QED_TABLE_GEN=ON     \
           -DWarpX_QED_TOOLS=ON
 
         cmake --build build -j 4
         ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
+        ctest --test-dir build -R '^material_opacity_table$' --output-on-failure
 
         ccache -s
         du -hs ~/.cache/ccache

@@ -1,0 +1,48 @@
+# Hohlraum-like grey radiation transport with fully kinetic electrons.
+
+FILE = inputs_base_rz
+
+my_constants.Te_wall_K = Te_wall_eV*q_e/kb
+
+algo.maxwell_solver = yee
+
+particles.species_names = electrons wall_ions photons
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 1 2
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = if( \
+    (sqrt(x*x+y*y) > r_wall) \
+    + ((abs(z) > z_wall)*(sqrt(x*x+y*y) > r_leh)), \
+    n_wall, n_fill)
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = sqrt(kb*Te_wall_K/m_e)/clight
+electrons.uy_th = sqrt(kb*Te_wall_K/m_e)/clight
+electrons.uz_th = sqrt(kb*Te_wall_K/m_e)/clight
+
+wall_ions.species_type = proton
+wall_ions.injection_style = NUniformPerCell
+wall_ions.num_particles_per_cell_each_dim = 2 1 2
+wall_ions.profile = parse_density_function
+wall_ions.density_function(x,y,z) = if( \
+    (sqrt(x*x+y*y) > r_wall) \
+    + ((abs(z) > z_wall)*(sqrt(x*x+y*y) > r_leh)), \
+    n_wall, n_fill)
+wall_ions.momentum_distribution_type = constant
+wall_ions.ux = 0.0
+wall_ions.uy = 0.0
+wall_ions.uz = 0.0
+
+# These flags isolate radiation/material exchange for this short demonstrator.
+# Remove them only when the electromagnetic resolution and timestep also resolve
+# the dense plasma and the particle statistics are increased appropriately.
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+wall_ions.do_not_deposit = 1
+wall_ions.do_not_gather = 1
+wall_ions.do_not_push = 1
+
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons

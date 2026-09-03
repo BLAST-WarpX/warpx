@@ -1,6 +1,36 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+if(WarpX_LIB)
+    add_executable(
+        test_field_ionization_transform
+        test_field_ionization_transform.cpp)
+    target_link_libraries(
+        test_field_ionization_transform
+        PRIVATE lib_${WarpX_DIMS_LAST})
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        setup_target_for_cuda_compilation(test_field_ionization_transform)
+        target_compile_features(
+            test_field_ionization_transform PRIVATE cuda_std_20)
+        set_target_properties(
+            test_field_ionization_transform PROPERTIES
+            CUDA_EXTENSIONS OFF
+            CUDA_STANDARD_REQUIRED ON)
+    else()
+        target_compile_features(
+            test_field_ionization_transform PRIVATE cxx_std_20)
+        set_target_properties(
+            test_field_ionization_transform PROPERTIES
+            CXX_EXTENSIONS OFF
+            CXX_STANDARD_REQUIRED ON)
+    endif()
+    warpx_set_compile_warnings(test_field_ionization_transform)
+
+    add_test(
+        NAME test_field_ionization_transform_component
+        COMMAND test_field_ionization_transform)
+endif()
+
 add_warpx_test(
     test_2d_ionization_boost  # name
     2  # dims

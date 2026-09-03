@@ -8,6 +8,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "Fields.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Radiation/RadiationTransport.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -294,6 +295,7 @@ FlushFormatCheckpoint::WriteReducedDiagsData (std::string const & dir) const
 {
     if (ParallelDescriptor::IOProcessor()) {
         auto & warpx = WarpX::GetInstance();
+        warpx.GetRadiationTransport().WriteCheckpointData(dir);
         warpx.reduced_diags->WriteCheckpointData(dir);
     }
 }
