@@ -100,10 +100,12 @@ namespace ApplyParticleBoundaries {
      *        is changed appropriately.
      *        Note that periodic boundaries are handled in AMReX code.
      *
-     * \param x, xmin, xmax: particle x position, location of x boundary
-     * \param y, ymin, ymax: particle y position, location of y boundary (3D only)
-     * \param z, zmin, zmax: particle z position, location of z boundary
-     * \param ux, uy, uz: particle momenta
+     * \param x, y, z: particle position. For RZ and RCYLINDER, these are the mapped
+     *                  coordinates (r, theta, z); for RSPHERE, they are (r, theta, phi).
+     * \param gridmin, gridmax: locations of the lower and upper boundaries in mapped space
+     * \param ux, uy, uz: particle momentum. For RZ and RCYLINDER, these are the mapped
+     *                    components (u_r, u_theta, u_z); for RSPHERE, they are
+     *                    (u_r, u_theta, u_phi).
      * \param particle_lost: output, flags whether the particle was lost
      * \param boundaries: object with boundary condition settings
     */
@@ -159,43 +161,9 @@ namespace ApplyParticleBoundaries {
             change_sign_uz = true;
         }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-        // Note that the reflection of the position does "r = 2*rmax - r", but this is only approximate.
-        // The exact calculation requires the position at the start of the step.
-        if (change_sign_ux && change_sign_uy) {
-            ux = -ux;
-            uy = -uy;
-        } else if (change_sign_ux) {
-            // Reflect only ur
-            // Note that y is theta
-            amrex::Real ur = ux*std::cos(y) + uy*std::sin(y);
-            const amrex::Real ut = -ux*std::sin(y) + uy*std::cos(y);
-            ur = -ur;
-            ux = ur*std::cos(y) - ut*std::sin(y);
-            uy = ur*std::sin(y) + ut*std::cos(y);
-        }
-        if (change_sign_uz) { uz = -uz; }
-#elif defined(WARPX_DIM_RSPHERE)
-        // "y" is theta
-        // "z" is phi
-        const amrex::Real costheta = std::cos(y);
-        const amrex::Real sintheta = std::sin(y);
-        const amrex::Real cosphi = std::cos(z);
-        const amrex::Real sinphi = std::sin(z);
-        amrex::Real ur = +ux*costheta*sinphi + uy*sintheta*sinphi + uz*cosphi;
-        amrex::Real ut = -ux*sintheta + uy*costheta;
-        amrex::Real up = -ux*costheta*cosphi - uy*sintheta*cosphi + uz*sinphi;
-        if (change_sign_ux) { ur = -ur; }
-        if (change_sign_uy) { ut = -ut; }
-        if (change_sign_uz) { up = -up; }
-        ux = sinphi*costheta*ur - sintheta*ut - cosphi*costheta*up;
-        uy = sinphi*sintheta*ur + costheta*ut - cosphi*sintheta*up;
-        uz = cosphi*ur + sinphi*up;
-#else
         if (change_sign_ux) { ux = -ux; }
         if (change_sign_uy) { uy = -uy; }
         if (change_sign_uz) { uz = -uz; }
-#endif
     }
 
 }

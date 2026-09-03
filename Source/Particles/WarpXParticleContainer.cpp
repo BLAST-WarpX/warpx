@@ -82,6 +82,51 @@
 
 using namespace amrex;
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+namespace
+{
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void transform_momentum_to_curvilinear (
+        amrex::ParticleReal& ux, amrex::ParticleReal& uy,
+        [[maybe_unused]] amrex::ParticleReal& uz,
+        amrex::ParticleReal const theta,
+        [[maybe_unused]] amrex::ParticleReal const phi)
+    {
+        amrex::ParticleReal const ux_save = ux;
+        amrex::ParticleReal const uy_save = uy;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        ux = ux_save*std::cos(theta) + uy_save*std::sin(theta);
+        uy = -ux_save*std::sin(theta) + uy_save*std::cos(theta);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const uz_save = uz;
+        ux = +ux_save*std::cos(theta)*std::cos(phi) + uy_save*std::sin(theta)*std::cos(phi) + uz_save*std::sin(phi);
+        uy = -ux_save*std::sin(theta) + uy_save*std::cos(theta);
+        uz = -ux_save*std::cos(theta)*std::sin(phi) - uy_save*std::sin(theta)*std::sin(phi) + uz_save*std::cos(phi);
+#endif
+    }
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void transform_momentum_to_cartesian (
+        amrex::ParticleReal& ux, amrex::ParticleReal& uy,
+        [[maybe_unused]] amrex::ParticleReal& uz,
+        amrex::ParticleReal const theta,
+        [[maybe_unused]] amrex::ParticleReal const phi)
+    {
+        amrex::ParticleReal const ux_save = ux;
+        amrex::ParticleReal const uy_save = uy;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        ux = ux_save*std::cos(theta) - uy_save*std::sin(theta);
+        uy = ux_save*std::sin(theta) + uy_save*std::cos(theta);
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal const uz_save = uz;
+        ux = +ux_save*std::cos(theta)*std::cos(phi) - uy_save*std::sin(theta) - uz_save*std::cos(theta)*std::sin(phi);
+        uy = +ux_save*std::sin(theta)*std::cos(phi) + uy_save*std::cos(theta) - uz_save*std::sin(theta)*std::sin(phi);
+        uz = +ux_save*std::sin(phi) + uz_save*std::cos(phi);
+#endif
+    }
+}
+#endif
+
 WarpXParIter::WarpXParIter (ContainerType& pc, int level)
     : amrex::ParIterSoA<PIdx::nattribs, 0, amrex::PolymorphicArenaAllocator>(pc, level,
              MFItInfo().SetDynamic(WarpX::do_dynamic_scheduling))
@@ -2757,61 +2802,43 @@ WarpXParticleContainer::TransformMomentumToCurvilinear ([[maybe_unused]]bool for
             auto& attribs = pti.GetAttribs();
             amrex::ParticleReal * AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
             amrex::ParticleReal * AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
-            amrex::ParticleReal * AMREX_RESTRICT theta_data = attribs[PIdx::theta].dataPtr();
-
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-
-            // Loop over the particles, rotating their velocities by theta
-            amrex::ParallelFor(pti.numParticles(),
-                [=] AMREX_GPU_DEVICE (long i) {
-                    const amrex::ParticleReal theta_sign = forward ? -1._prt : +1._prt;
-                    const amrex::ParticleReal theta = theta_sign*theta_data[i];
-                    const amrex::ParticleReal uxsave = ux[i];
-                    const amrex::ParticleReal uysave = uy[i];
-                    ux[i] = uxsave*std::cos(theta) - uysave*std::sin(theta);
-                    uy[i] = uxsave*std::sin(theta) + uysave*std::cos(theta);
-                }
-            );
-
-#elif defined(WARPX_DIM_RSPHERE)
-
             amrex::ParticleReal * AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+            amrex::ParticleReal * AMREX_RESTRICT theta_data = attribs[PIdx::theta].dataPtr();
+#if defined(WARPX_DIM_RSPHERE)
             amrex::ParticleReal * AMREX_RESTRICT phi_data = attribs[PIdx::phi].dataPtr();
+#endif
 
             if (forward) {
 
-                // Loop over the particles, rotating to theta = phi = 0
+                // Loop over the particles, rotating to the curvilinear frame
                 amrex::ParallelFor(pti.numParticles(),
                     [=] AMREX_GPU_DEVICE (long i) {
                         const amrex::ParticleReal theta = theta_data[i];
+#if defined(WARPX_DIM_RSPHERE)
                         const amrex::ParticleReal phi = phi_data[i];
-                        const amrex::ParticleReal uxsave = ux[i];
-                        const amrex::ParticleReal uysave = uy[i];
-                        const amrex::ParticleReal uzsave = uz[i];
-                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) + uysave*std::sin(theta)*std::cos(phi) + uzsave*std::sin(phi);
-                        uy[i] = -uxsave*std::sin(theta) + uysave*std::cos(theta);
-                        uz[i] = -uxsave*std::cos(theta)*std::sin(phi) - uysave*std::sin(theta)*std::sin(phi) + uzsave*std::cos(phi);
+#else
+                        const amrex::ParticleReal phi = 0._prt;
+#endif
+                        transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], theta, phi);
                     }
                 );
 
             } else {
 
-                // Loop over the particles, rotating from zero to theta and phi
+                // Loop over the particles, rotating to the Cartesian frame
                 amrex::ParallelFor(pti.numParticles(),
                     [=] AMREX_GPU_DEVICE (long i) {
                         const amrex::ParticleReal theta = theta_data[i];
+#if defined(WARPX_DIM_RSPHERE)
                         const amrex::ParticleReal phi = phi_data[i];
-                        const amrex::ParticleReal uxsave = ux[i];
-                        const amrex::ParticleReal uysave = uy[i];
-                        const amrex::ParticleReal uzsave = uz[i];
-                        ux[i] = +uxsave*std::cos(theta)*std::cos(phi) - uysave*std::sin(theta) - uzsave*std::cos(theta)*std::sin(phi);
-                        uy[i] = +uxsave*std::sin(theta)*std::cos(phi) + uysave*std::cos(theta) - uzsave*std::sin(theta)*std::sin(phi);
-                        uz[i] = +uxsave*std::sin(phi) + uzsave*std::cos(phi);
+#else
+                        const amrex::ParticleReal phi = 0._prt;
+#endif
+                        transform_momentum_to_cartesian(ux[i], uy[i], uz[i], theta, phi);
                     }
                 );
 
             }
-#endif
         }
     }
     }
@@ -2926,7 +2953,8 @@ WarpXParticleContainer::particlePostLocate(ParticleType& p,
 }
 
 void
-WarpXParticleContainer::ApplyBoundaryConditions (){
+WarpXParticleContainer::ApplyBoundaryConditions ()
+{
     ABLASTR_PROFILE("WarpXParticleContainer::ApplyBoundaryConditions()");
 
     // Periodic boundaries are handled in AMReX code
@@ -2980,9 +3008,29 @@ WarpXParticleContainer::ApplyBoundaryConditions (){
                     // and for RSPHERE (r, theta, phi).
 
                     bool particle_lost = false;
-                    ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
-                                                              ux[i], uy[i], uz[i], particle_lost,
-                                                              boundary_conditions, engine);
+
+                    bool outside_domain = false;
+#ifndef WARPX_DIM_1D_Z
+                    outside_domain = (x < gridmin.x || x > gridmax.x);
+#endif
+#ifdef WARPX_DIM_3D
+                    outside_domain |= (y < gridmin.y || y > gridmax.y);
+#endif
+#ifdef WARPX_ZINDEX
+                    outside_domain |= (z < gridmin.z || z > gridmax.z);
+#endif
+
+                    if (outside_domain) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                        transform_momentum_to_curvilinear(ux[i], uy[i], uz[i], y, z);
+#endif
+                        ApplyParticleBoundaries::apply_boundaries(x, y, z, gridmin, gridmax,
+                                                                  ux[i], uy[i], uz[i], particle_lost,
+                                                                  boundary_conditions, engine);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                        transform_momentum_to_cartesian(ux[i], uy[i], uz[i], y, z);
+#endif
+                    }
 
                     if (particle_lost) {
                         pidw.make_invalid();
