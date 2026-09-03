@@ -1,0 +1,71 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 10
+amr.n_cell = 8 8 64
+amr.max_grid_size = 32
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims = 3
+geometry.prob_lo     = -8.e-6 -8.e-6 -10.e-6
+geometry.prob_hi     =  8.e-6  8.e-6  10.e-6
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = periodic periodic pml
+boundary.field_hi = periodic periodic pml
+
+#################################
+############ NUMERICS ###########
+#################################
+algo.maxwell_solver = ckc
+algo.particle_shape = 1
+warpx.cfl = .99
+
+#################################
+######### MOVING WINDOW #########
+#################################
+# The window does not start until step 8, i.e. it has not yet become active
+# by the time the checkpoint at step 5 is written (start_moving_window_step
+# > current_step at restart). This covers the complementary edge case to
+# inputs_base_3d_mw_start_stop: InitBaseData() must correctly compute zero
+# active steps (no shift) at restart, and the window must still start on
+# schedule once the run resumes past step 8.
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1. # in units of the speed of light
+warpx.start_moving_window_step = 8
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = beam
+
+beam.charge = -q_e
+beam.mass = m_e
+beam.injection_style = "gaussian_beam"
+beam.x_rms = .5e-6
+beam.y_rms = .5e-6
+beam.z_rms = 1.e-6
+beam.x_m = 0.
+beam.y_m = 0.
+beam.z_m = -5.e-6
+beam.npart = 1000
+beam.q_tot = -5.e-14
+beam.momentum_distribution_type = "gaussian"
+beam.ux_m = 0.0
+beam.uy_m = 0.0
+beam.uz_m = 200.
+beam.ux_th = 2.
+beam.uy_th = 2.
+beam.uz_th = 20.
+
+# Diagnostics
+diagnostics.diags_names = diag1 chk
+diag1.intervals = 5
+diag1.diag_type = Full
+diag1.fields_to_plot = Ex Ey Ez jx jy jz rho
+chk.intervals = 5
+chk.diag_type = Full
+chk.format = checkpoint
