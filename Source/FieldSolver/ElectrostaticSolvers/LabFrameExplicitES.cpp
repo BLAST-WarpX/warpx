@@ -38,11 +38,13 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
     const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
 
+    ExecutePythonCallback("beforedeposition");
     mpc.DepositCharge(rho_fp, 0.0_rt);
     if (mfl) {
         const int lev = 0;
         mfl->DepositCharge(fields, *rho_fp[lev], lev);
     }
+    ExecutePythonCallback("afterdeposition");
 
     // Apply filter, perform MPI exchange, interpolate across levels
     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);

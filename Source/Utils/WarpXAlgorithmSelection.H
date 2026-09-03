@@ -34,6 +34,7 @@ AMREX_ENUM(EvolveScheme,
            Theta_Implicit_EM,
            Semi_Implicit_EM,
            Strang_Implicit_Spectral_EM,
+           Semi_Implicit_Darwin,
            Default = Explicit);
 
 /**
@@ -182,6 +183,16 @@ AMREX_ENUM(MomentumPushType,
            FirstHalf,
            SecondHalf,
            Default = Full);
+
+/** \brief Particle shuffling method for binary collisions */
+AMREX_ENUM(
+    ParticleShufflingMethod,
+    None,
+    FisherYates,
+    Modulus,
+    Standard,
+    Default = FisherYates
+);
 
 /** \brief For binary collision algorithms, the strategy to determine
  *  the scattering angle in the center of mass frame */

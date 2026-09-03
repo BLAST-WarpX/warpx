@@ -2099,6 +2099,31 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
+class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the semi-implicit Darwin evolve scheme.
+
+    linear_solver:
+        GMRESLinearSolver instance.
+    """
+
+    def __init__(
+        self,
+        linear_solver,
+    ):
+        if not isinstance(linear_solver, GMRESLinearSolver):
+            raise TypeError(
+                "SemiImplicitDarwinEvolveScheme only supports GMRESLinearSolver "
+                "as its linear_solver (there is no nonlinear solver for the "
+                "linear solver to attach to, which PETScKSPLinearSolver requires)"
+            )
+        self.linear_solver = linear_solver
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        self.linear_solver.linear_solver_initialize_inputs()
+
+
 class HybridPICSolver(picmistandard.base._ClassWithInit):
     """
     Hybrid-PIC solver based on Ohm's law.
@@ -2157,11 +2182,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti``
         (temperatures in eV) and ``t`` (time). Only used when
         ``solve_electron_energy_equation`` is True.
-
-    qdsmc_n_floor: float, optional
-        Minimum electron number density (in m^-3) used when recovering the
-        electron temperature from the QDSMC entropy deposit. Defaults to
-        ``n_floor``.
 
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full
@@ -2268,7 +2288,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         include_joule_heating=None,
         joule_redirect_Te_threshold=None,
         electron_ion_relaxation_rate=None,
-        qdsmc_n_floor=None,
         substeps=None,
         use_rkf45=None,
         substep_rtol=None,
@@ -2298,7 +2317,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.include_joule_heating = include_joule_heating
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
-        self.qdsmc_n_floor = qdsmc_n_floor
 
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
@@ -2372,8 +2390,6 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                     self.electron_ion_relaxation_rate, self.mangle_dict
                 ),
             )
-        if self.qdsmc_n_floor is not None:
-            pywarpx.hybridpicmodel.qdsmc_n_floor = self.qdsmc_n_floor
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
@@ -3676,6 +3692,139 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
             pywarpx.warpx.__setattr__("eb_potential(x,y,z,t)", expression)
 
 
+class MacroscopicProperty(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle set up of material property specific to WarpX.
+    If macroscopic properties initialization is added to picmistandard this can be
+    changed to inherit that functionality. The geometry can be specified either as
+    an implicit function.  STL file (ASCII or binary) will be added in future. In
+    the latter case the geometry specified in the STL file can be scaled,
+    translated and inverted.
+
+    This can be used for both Electromagnetic and electrostatic solvers.
+
+    Parameters
+    ----------
+    name: string
+        the macroscopic property name to set. One of "sigma", "epsilon", or "mu"
+
+    implicit_function: string
+        Analytic expression f(x,y,z) describing the sigma, epsilon, or mu
+
+    value: float
+        Value of sigma, epsilon, or mu if it is a constant
+
+    method: string
+        The algorithm for updating electric field when algo.em_solver_medium is macroscopic.
+        Available options for name = sigma are: backwardeuler and laxwendroff
+
+    Parameters used in the analytic expressions should be given as additional keyword arguments.
+
+    Unimplemented Parameters
+    ------------------------
+    stl_file: string
+        STL file path (string),  file contains the embedded boundary geometry
+
+    stl_scale: float
+        Factor by which the STL geometry is scaled
+
+    stl_center: vector of floats
+        Vector by which the STL geometry is translated (in meters)
+
+    stl_reverse_normal: bool
+        If True inverts the orientation of the STL geometry
+
+    """
+
+    def __init__(
+        self,
+        name="epsilon",
+        implicit_function=None,
+        value=None,
+        method=None,
+        stl_file=None,
+        stl_scale=None,
+        stl_center=None,
+        stl_reverse_normal=False,
+        **kw,
+    ):
+        assert (
+            sum(
+                [stl_file is not None, implicit_function is not None, value is not None]
+            )
+            == 1
+        ), Exception(
+            "Exactly one one of implicit_function, stl_file, and value must be specified"
+        )
+        self.name = name
+        self.implicit_function = implicit_function
+        self.stl_file = stl_file
+        self.value = value
+        if stl_file is None:
+            assert stl_scale is None, Exception(
+                "Material property can only be scaled only when using an stl file"
+            )
+            assert stl_center is None, Exception(
+                "Material property  can only be translated only when using an stl file"
+            )
+            assert stl_reverse_normal is False, Exception(
+                "Material property  can only be reversed only when using an stl file"
+            )
+
+        self.stl_scale = stl_scale
+        self.stl_center = stl_center
+        self.stl_reverse_normal = stl_reverse_normal
+
+        # Validate method for conductivity (sigma)
+        if method is not None:
+            if self.name != "sigma":
+                raise ValueError("Input 'method' can only be used with 'sigma'")
+            if method not in ["backwardeuler", "laxwendroff"]:
+                raise ValueError(
+                    "Input 'method' must be one of 'backwardeuler' or 'laxwendroff'"
+                )
+
+        self.method = method
+
+        # Handle keyword arguments used in expressions
+        self.user_defined_kw = {}
+        for k in list(kw.keys()):
+            if implicit_function is not None and re.search(
+                r"\b%s\b" % k, implicit_function
+            ):
+                self.user_defined_kw[k] = kw[k]
+                del kw[k]
+
+        self.handle_init(kw)
+
+    def material_property_initialize_inputs(self, solver):
+        # Add the user defined keywords to my_constants
+        # The keywords are mangled if there is a conflicting variable already
+        # defined in my_constants with the same name but different value.
+        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        macroscopic = pywarpx.warpx.get_bucket("macroscopic")
+        if self.implicit_function is not None:
+            expression = pywarpx.my_constants.mangle_expression(
+                self.implicit_function, self.mangle_dict
+            )
+            setattr(macroscopic, self.name + "_function(x,y,z)", expression)
+
+        if self.value is not None:
+            setattr(macroscopic, self.name, self.value)
+
+        if self.stl_file is not None:
+            raise NotImplementedError(
+                "material property definition with stl file is not implemented yet"
+            )
+
+        if self.method is not None:
+            setattr(
+                pywarpx.algo,
+                "macroscopic_" + self.name + "_method",
+                self.method,
+            )
+
+
 class PlasmaLens(picmistandard.base._ClassWithInit):
     """
     Custom class to setup a plasma lens lattice.
@@ -4017,6 +4166,15 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.inputs_initialized = False
         self.warpx_initialized = False
+        self.finalized = False
+        self.macroscopic_properties = []
+
+    def _check_not_finalized(self):
+        if self.finalized:
+            raise RuntimeError(
+                "This Simulation was finalized. Create new PICMI objects to "
+                "set up another simulation."
+            )
 
     def add_prescribed_current_injection(self, injection):
         """
@@ -4040,6 +4198,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.prescribed_current_injections.append(injection)
 
     def initialize_inputs(self):
+        self._check_not_finalized()
         if self.inputs_initialized:
             return
 
@@ -4212,7 +4371,13 @@ class Simulation(picmistandard.PICMI_Simulation):
         if self.do_device_synchronize is not None:
             pywarpx.warpx.do_device_synchronize = self.do_device_synchronize
 
+        if len(self.macroscopic_properties) > 0:
+            pywarpx.algo.em_solver_medium = "macroscopic"
+            for prop in self.macroscopic_properties:
+                prop.material_property_initialize_inputs(self.solver)
+
     def initialize_warpx(self, mpi_comm=None):
+        self._check_not_finalized()
         if self.warpx_initialized:
             return
 
@@ -4236,9 +4401,19 @@ class Simulation(picmistandard.PICMI_Simulation):
         pywarpx.warpx.step(nsteps)
 
     def finalize(self):
-        if self.warpx_initialized:
-            self.warpx_initialized = False
-            pywarpx.warpx.finalize()
+        # unconditional: tearing down WarpX is a no-op if it was never
+        # initialized, but the input state still needs to be cleared
+        self.warpx_initialized = False
+        self.finalized = True
+        pywarpx.warpx.finalize()
+
+    def add_macroscopic_property(self, macroscopic_property):
+        if isinstance(macroscopic_property, MacroscopicProperty):
+            self.macroscopic_properties.append(macroscopic_property)
+        else:
+            raise TypeError(
+                "Expected a MacroscopicProperty instance, got f {type(macroscopic_property)}"
+            )
 
     @property
     def fields(self):
@@ -4423,7 +4598,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 "Jz_displacement",
             ]
             A_fields_list = ["Ar", "At", "Az"]
-            T_fields_list = ["Tr_", "Tt_", "Tz_"]
         else:
             E_fields_list = ["Ex", "Ey", "Ez"]
             B_fields_list = ["Bx", "By", "Bz"]
@@ -4434,7 +4608,6 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 "Jz_displacement",
             ]
             A_fields_list = ["Ax", "Ay", "Az"]
-            T_fields_list = ["Tx_", "Ty_", "Tz_"]
         if self.data_list is not None:
             for dataname in self.data_list:
                 if dataname == "E":
@@ -4452,44 +4625,16 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                 elif dataname == "A":
                     for field_name in A_fields_list:
                         fields_to_plot.add(field_name)
-                elif dataname in E_fields_list:
-                    fields_to_plot.add(dataname)
-                elif dataname in B_fields_list:
-                    fields_to_plot.add(dataname)
-                elif dataname in A_fields_list:
-                    fields_to_plot.add(dataname)
-                elif dataname in [
-                    "rho",
-                    "phi",
-                    "F",
-                    "G",
-                    "divE",
-                    "divB",
-                    "proc_number",
-                    "part_per_cell",
-                    "eb_covered",
-                    # Electron temperature/pressure of the hybrid-PIC
-                    # (Ohm's law) solver; only valid with that solver.
-                    "Te",
-                    "Pe",
-                ]:
-                    fields_to_plot.add(dataname)
                 elif dataname in J_fields_list:
                     fields_to_plot.add(dataname.lower())
                 elif dataname in J_displacement_fields_list:
                     fields_to_plot.add(dataname.lower())
-                elif dataname.startswith("rho_"):
-                    # Adds rho_species diagnostic
-                    fields_to_plot.add(dataname)
-                elif dataname.startswith("T_"):
-                    # Adds T_species diagnostic
-                    fields_to_plot.add(dataname)
-                elif any([dataname.startswith(tstr) for tstr in T_fields_list]):
-                    fields_to_plot.add(dataname)
                 elif dataname == "dive":
                     fields_to_plot.add("divE")
                 elif dataname == "divb":
                     fields_to_plot.add("divB")
+                elif dataname == "proc_number":
+                    fields_to_plot.add("proc_num")
                 elif dataname == "raw_fields":
                     self.plot_raw_fields = 1
                 elif dataname == "raw_fields_guards":
@@ -4498,8 +4643,12 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
                     self.plot_finepatch = 1
                 elif dataname == "crsepatch":
                     self.plot_crsepatch = 1
-                elif dataname == "none":
-                    fields_to_plot = set(("none",))
+                else:
+                    # Pass field names through to C++ for resolution and validation.
+                    # This includes known diagnostic quantities as well as fields
+                    # registered in the MultiFabRegister. C++ raises a descriptive
+                    # error if the name is not valid.
+                    fields_to_plot.add(dataname)
 
             # --- Convert the set to a sorted list so that the order
             # --- is the same on all processors.

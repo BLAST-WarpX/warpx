@@ -17,7 +17,6 @@ def main(args):
     if "_restart" in test_name:
         # use original test's checksums
         test_name = test_name.replace("_restart", "")
-    # TODO check environment and reset tolerance (portable, machine precision)
     # compare checksums
     evaluate_checksum(
         test_name=test_name,
@@ -36,15 +35,20 @@ if __name__ == "__main__":
     # add arguments: output path
     parser.add_argument(
         "--path",
-        help="path to output file(s)",
+        help="path to output file",
         type=str,
+        required=True,
     )
 
     # add arguments: relative tolerance
-    # Identify whether the test is a restart test,
-    # if it is, use a 1e-12 tolerance for the restart checksum analysis
     test_name = os.path.split(os.getcwd())[1]
-    default_tolerance = 1e-12 if "_restart" in test_name else 1e-9
+    compute_backend = os.getenv("WARPX_COMPUTE", "").upper()
+    if compute_backend in {"CUDA", "HIP", "SYCL"}:
+        # GPU checksums
+        default_tolerance = 1e-1
+    else:
+        # CPU checksums (default for restart tests is stricter)
+        default_tolerance = 1e-12 if "_restart" in test_name else 1e-9
     parser.add_argument(
         "--rtol",
         help="relative tolerance to compare checksums",

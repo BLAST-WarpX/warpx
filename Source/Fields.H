@@ -80,7 +80,6 @@ namespace warpx::fields
         pml_j_cp,
         pml_F_cp,
         pml_G_cp,
-        pml_edge_lengths,
         Efield_avg_fp,
         Bfield_avg_fp,
         Efield_avg_cp,
@@ -97,6 +96,7 @@ namespace warpx::fields
         ECTRhofield,
         Venl,
         global_debye_length,
+        dA_fp,   /**< Used by the Darwin solver; the change in vector potential over one step */
         effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
     );
 
@@ -147,7 +147,8 @@ namespace warpx::fields
         FieldType::MassMatrices_PC,
         FieldType::curl2_BC_mask,
         FieldType::ECTRhofield,
-        FieldType::Venl
+        FieldType::Venl,
+        FieldType::dA_fp,
     };
 
     /** Returns true if a FieldType represents a vector field */

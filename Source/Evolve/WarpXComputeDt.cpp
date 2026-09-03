@@ -113,21 +113,6 @@ WarpX::ComputeDt ()
     }
 }
 
-/**
- * Used to determine the simulation timestep from the maximum speed of all particles
- * Timestep will be set so that a particle can cross at most cfl*dx cells per timestep.
- */
-amrex::Real
-WarpX::ParticleGridSpeedMax ()
-{
-    const amrex::Real* dx = geom[max_level].CellSize();
-    const amrex::Real dx_min = minDim(dx);
-
-    const amrex::ParticleReal max_v = mypc->maxParticleVelocity();
-
-    return max_v/dx_min;
-}
-
 amrex::Real
 WarpX::GlobalPlasmaFrequencyMax ()
 {
@@ -234,17 +219,66 @@ WarpX::GlobalCyclotronFrequencyMax ()
 }
 
 void
-WarpX::ApplyDtLimiters ()
+WarpX::WriteDtUpdateFileHeader ()
+{
+    // Write diagnostics if requested
+    if (amrex::ParallelDescriptor::IOProcessor()
+        && !m_dt_update_diagnostic_file.empty()) {
+
+        std::filesystem::path const diagnostic_path(m_dt_update_diagnostic_file);
+        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
+        if (!diagnostic_dir.empty()) {
+            std::filesystem::create_directories(diagnostic_dir);
+        }
+
+        const amrex::ParmParse pp_amr("amr");
+        pp_amr.query("restart", restart_chkfile);
+        const bool IsNotRestart = restart_chkfile.empty();
+
+        // If not a restart, discard the file if already exists.
+        if (IsNotRestart) {
+            auto file_mode = std::ofstream::out | std::ofstream::trunc;
+            std::ofstream diagnostic_file{m_dt_update_diagnostic_file, file_mode};
+            if (!diagnostic_file.is_open()) {
+                amrex::Abort("Failed to open file: " + m_dt_update_diagnostic_file);
+            }
+
+            int c = 0;
+            diagnostic_file << "#";
+            diagnostic_file << "[" << c++ << "]step()";
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]time(s)";
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]new_dt";
+            diagnostic_file << " ";
+            diagnostic_file << "[" << c++ << "]vmax_dt";
+            if (m_max_omegap_dt.has_value()) {
+                diagnostic_file << " ";
+                diagnostic_file << "[" << c++ << "]omegap_dt";
+            }
+            if (m_max_omegac_dt.has_value()) {
+                diagnostic_file << " ";
+                diagnostic_file << "[" << c++ << "]omegac_dt";
+            }
+            diagnostic_file << "\n";
+            diagnostic_file.close();
+        }
+    }
+
+}
+
+void
+WarpX::ApplyDtLimiters (int const step)
 {
     using namespace amrex::literals;
 
     // Calculate limiting values from the simulation conditions
-    const amrex::Real vmax_o_dx = ParticleGridSpeedMax();
+    const amrex::Real max_dt_inv = mypc->maxParticleDtInv();  // max value of abs(vp_i/dx[i])
     const amrex::Real omegap_max = m_max_omegap_dt.has_value() ? GlobalPlasmaFrequencyMax() : 0._rt;
     const amrex::Real omegac_max = m_max_omegac_dt.has_value() ? GlobalCyclotronFrequencyMax() : 0._rt;
 
     // Ensure that a valid time step value exists, either from the simulation conditions or from max_dt
-    if (vmax_o_dx == 0._rt &&
+    if (max_dt_inv == 0._rt &&
         (!m_max_omegap_dt.has_value() || omegap_max == 0._rt) &&
         (!m_max_omegac_dt.has_value() || omegac_max == 0._rt)) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_max_dt.has_value(),
@@ -253,8 +287,8 @@ WarpX::ApplyDtLimiters ()
 
     amrex::Real dt_new = std::numeric_limits<amrex::Real>::max();
 
-    if (vmax_o_dx > 0._rt) {
-        dt_new = std::min(dt_new, cfl/vmax_o_dx);
+    if (max_dt_inv > 0._rt) {
+        dt_new = std::min(dt_new, cfl/max_dt_inv);
     }
     if (m_max_omegap_dt.has_value() && omegap_max > 0._rt) {
         dt_new = std::min(dt_new, m_max_omegap_dt.value()/omegap_max);
@@ -277,42 +311,7 @@ WarpX::ApplyDtLimiters ()
     // Write diagnostics if requested
     if (amrex::ParallelDescriptor::IOProcessor()
         && !m_dt_update_diagnostic_file.empty()
-        && !amrex::FileExists(m_dt_update_diagnostic_file)) {
-
-        std::filesystem::path const diagnostic_path(m_dt_update_diagnostic_file);
-        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
-        if (!diagnostic_dir.empty()) {
-            std::filesystem::create_directories(diagnostic_dir);
-        }
-
-        std::ofstream diagnostic_file{m_dt_update_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
-        if (!diagnostic_file.is_open()) {
-            amrex::Abort("Failed to open file: " + m_dt_update_diagnostic_file);
-        }
-
-        int c = 0;
-        diagnostic_file << "#";
-        diagnostic_file << "[" << c++ << "]step()";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]time(s)";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]new_dt";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]vmax_dt";
-        if (m_max_omegap_dt.has_value()) {
-            diagnostic_file << " ";
-            diagnostic_file << "[" << c++ << "]omegap_dt";
-        }
-        if (m_max_omegac_dt.has_value()) {
-            diagnostic_file << " ";
-            diagnostic_file << "[" << c++ << "]omegac_dt";
-        }
-        diagnostic_file << "\n";
-        diagnostic_file.close();
-    }
-
-    if (amrex::ParallelDescriptor::IOProcessor()
-        && !m_dt_update_diagnostic_file.empty()) {
+        && m_dt_update_write_interval.contains(step + 1)) {
 
         std::ofstream diagnostic_file{m_dt_update_diagnostic_file, std::ofstream::out | std::ofstream::app};
         if (!diagnostic_file.is_open()) {
@@ -326,7 +325,7 @@ WarpX::ApplyDtLimiters ()
         diagnostic_file << " ";
         diagnostic_file << dt_new;
         diagnostic_file << " ";
-        diagnostic_file << vmax_o_dx*dt_new;
+        diagnostic_file << max_dt_inv*dt_new;
 
         if (m_max_omegap_dt.has_value()) {
             diagnostic_file << " ";

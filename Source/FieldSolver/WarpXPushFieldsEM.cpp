@@ -1046,6 +1046,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                 m_fields,
                 patch_type,
                 lev,
+                pml[lev]->GetEBUpdateEFlag(),
                 pml[lev]->GetMultiSigmaBox_fp(),
                 a_dt, pml_has_particles );
         } else {
@@ -1053,6 +1054,7 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                 m_fields,
                 patch_type,
                 lev,
+                pml[lev]->GetEBUpdateEFlag(),
                 pml[lev]->GetMultiSigmaBox_cp(),
                 a_dt, pml_has_particles );
         }
@@ -1232,6 +1234,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
                 m_fields,
                 patch_type,
                 lev,
+                pml[lev]->GetEBUpdateEFlag(),
                 pml[lev]->GetMultiSigmaBox_fp(),
                 a_dt, pml_has_particles );
         } else {
@@ -1239,6 +1242,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
                 m_fields,
                 patch_type,
                 lev,
+                pml[lev]->GetEBUpdateEFlag(),
                 pml[lev]->GetMultiSigmaBox_cp(),
                 a_dt, pml_has_particles );
         }

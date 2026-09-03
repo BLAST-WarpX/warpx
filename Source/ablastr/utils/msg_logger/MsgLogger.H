@@ -224,6 +224,11 @@ namespace ablastr::utils::msg_logger
         [[nodiscard]] std::vector<MsgWithCounterAndRanks>
         collective_gather_msgs_with_counter_and_ranks() const;
 
+        /**
+         * \brief Clear all messages
+         */
+        void clear() { m_messages.clear(); }
+
         private:
 
         /**

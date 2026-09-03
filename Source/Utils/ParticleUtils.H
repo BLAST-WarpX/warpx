@@ -237,12 +237,27 @@ namespace ParticleUtils {
      * \result true if the point with within the boundary, otherwise false
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool containsInclusive (amrex::RealBox const& tilebox, amrex::XDim3 const point) {
+    bool containsInclusive (amrex::RealBox const& tilebox,
+                            [[maybe_unused]]amrex::Real x,
+                            [[maybe_unused]]amrex::Real y,
+                            [[maybe_unused]]amrex::Real z) {
         const auto *const xlo = tilebox.lo();
         const auto *const xhi = tilebox.hi();
-        return  AMREX_D_TERM((xlo[0] <= point.x) && (point.x <= xhi[0]),
-                          && (xlo[1] <= point.y) && (point.y <= xhi[1]),
-                          && (xlo[2] <= point.z) && (point.z <= xhi[2]));
+#if defined(WARPX_DIM_3D)
+        const amrex::Real px = x;
+        const amrex::Real py = y;
+        const amrex::Real pz = z;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const amrex::Real px = x;
+        const amrex::Real py = z;
+#elif defined(WARPX_DIM_1D_Z)
+        const amrex::Real px = z;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::Real px = x;
+#endif
+        return  AMREX_D_TERM((xlo[0] <= px) && (px <= xhi[0]),
+                          && (xlo[1] <= py) && (py <= xhi[1]),
+                          && (xlo[2] <= pz) && (pz <= xhi[2]));
     }
 
     /* \brief Crops the position at the specified boundary if do_cropping is true, 1D version
@@ -580,6 +595,113 @@ namespace ParticleUtils {
             }
         }
     };
+
+    /**
+     * \brief Check if particle position (for gather/deposit) is within the local nodal field domain
+     *
+     * \param xp_n    Particle x position at time n
+     * \param yp_n    Particle y position at time n
+     * \param zp_n    Particle z position at time n
+     * \param xp_nph  Particle x position at time n+1/2
+     * \param yp_nph  Particle y position at time n+1/2
+     * \param zp_nph  Particle z position at time n+1/2
+     * \param dinv    3D cell size inverse
+     * \param xyzmin  Physical lower bounds of domain
+     * \param lo      Index lower bounds of domain
+     * \param nodal_lo  Lower nodal field domain bounds
+     * \param nodal_hi  Upper nodal field domain bounds
+     * \return true if particle position is within bounds, false otherwise
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool isImplicitParticlePositionInBounds (
+        amrex::ParticleReal const xp_n,
+        amrex::ParticleReal const yp_n,
+        amrex::ParticleReal const zp_n,
+        amrex::ParticleReal const xp_nph,
+        amrex::ParticleReal const yp_nph,
+        amrex::ParticleReal const zp_nph,
+        amrex::XDim3 const & dinv,
+        amrex::XDim3 const & xyzmin,
+        amrex::Dim3 const & lo,
+        amrex::Dim3 const & nodal_lo,
+        amrex::Dim3 const & nodal_hi)
+    {
+        using namespace amrex::literals;
+        [[maybe_unused]] amrex::ParticleReal const xp_np1 = 2.0_prt*xp_nph - xp_n;
+        [[maybe_unused]] amrex::ParticleReal const yp_np1 = 2.0_prt*yp_nph - yp_n;
+        [[maybe_unused]] amrex::ParticleReal const zp_np1 = 2.0_prt*zp_nph - zp_n;
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        double const x_new = lo.x + (std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1) - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+        double const x_new = lo.x +
+            (std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1) - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+        double const x_new = lo.x + (xp_np1 - xyzmin.x)*dinv.x;
+#endif
+#if !defined(WARPX_DIM_1D_Z)
+        bool const x_in_bounds = x_new >= nodal_lo.x && x_new <= nodal_hi.x;
+#else
+        bool const x_in_bounds = true;
+#endif
+
+#if defined(WARPX_DIM_3D)
+        double const y_new = lo.y + (yp_np1 - xyzmin.y)*dinv.y;
+        bool const y_in_bounds = y_new >= nodal_lo.y && y_new <= nodal_hi.y;
+#else
+        bool const y_in_bounds = true;
+#endif
+
+#if defined(WARPX_DIM_3D)
+        double const z_new = lo.z + (zp_np1 - xyzmin.z)*dinv.z;
+        bool const z_in_bounds = z_new >= nodal_lo.z && z_new <= nodal_hi.z;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        double const z_new = lo.y + (zp_np1 - xyzmin.z)*dinv.z;
+        bool const z_in_bounds = z_new >= nodal_lo.y && z_new <= nodal_hi.y;
+#elif defined(WARPX_DIM_1D_Z)
+        double const z_new = lo.x + (zp_np1 - xyzmin.z)*dinv.z;
+        bool const z_in_bounds = z_new >= nodal_lo.x && z_new <= nodal_hi.x;
+#else
+        bool const z_in_bounds = true;
+#endif
+
+        return x_in_bounds && y_in_bounds && z_in_bounds;
+    }
+
+    /**
+     * \brief Check for grid crossing errors after Villasenor deposition and abort if any found
+     *
+     * \param d_error_x  Device vector containing x-direction error count
+     * \param d_error_y  Device vector containing y-direction error count
+     * \param d_error_z  Device vector containing z-direction error count
+     * \param max_grid_crossings  Maximum allowed crossings per direction
+     */
+    AMREX_INLINE
+    void CheckGridCrossingErrors (const amrex::Gpu::DeviceVector<int>& d_error_x,
+                                  const amrex::Gpu::DeviceVector<int>& d_error_y,
+                                  const amrex::Gpu::DeviceVector<int>& d_error_z,
+                                  const int max_grid_crossings)
+    {
+        const int h_error_x = d_error_x[0];
+        const int h_error_y = d_error_y[0];
+        const int h_error_z = d_error_z[0];
+
+        if (h_error_x > 0 || h_error_y > 0 || h_error_z > 0) {
+            std::string error_msg = "Villasenor deposition error: particles exceeded max_grid_crossings.\n";
+            if (h_error_x > 0) {
+                error_msg += "  X-direction: " + std::to_string(h_error_x) + " particles\n";
+            }
+            if (h_error_y > 0) {
+                error_msg += "  Y-direction: " + std::to_string(h_error_y) + " particles\n";
+            }
+            if (h_error_z > 0) {
+                error_msg += "  Z-direction: " + std::to_string(h_error_z) + " particles\n";
+            }
+            error_msg += "Consider decreasing time step or increasing particles.max_grid_crossings (current: " +
+                         std::to_string(max_grid_crossings) + ")";
+            WARPX_ABORT_WITH_MESSAGE(error_msg);
+        }
+    }
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_

@@ -58,7 +58,7 @@ class Preconditioner
         /**
          * \brief Update the preconditioner
          */
-        virtual void Update ( const T& a_U ) = 0;
+        virtual void Update () = 0;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS

@@ -111,6 +111,14 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
 
 }
 
+/* \brief Allocate any data needed for the collision */
+void CollisionHandler::AllocData ()
+{
+    for (auto& collision : allcollisions) {
+        collision->AllocData();
+    }
+}
+
 /** Perform all collisions
  *
  * @param step Current iteration

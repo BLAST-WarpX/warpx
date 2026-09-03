@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # --- Test suite for the hybrid-PIC (Ohm's law) electron energy equation.
-# --- One script, three cases (selected with --case), each isolating one
+# --- One script, four cases (selected with --case), each isolating one
 # --- term of the equation in a 2D Cartesian (x,z) periodic box:
 # ---
 # ---   adiabat : transport terms only (B=0, eta=0, all sources off),
@@ -35,6 +35,16 @@
 # ---                 rate = [3(gamma_e-1) + 2] nu_ei,
 # ---             and C_e T_e + C_i T_i is conserved.  Analyse with
 # ---             analysis_qei.py (difference rate + budget).
+# ---
+# ---   vacuum  : transport through a below-floor halo (B=0, eta=0, all
+# ---             sources off).  A slab (n = n0) drifts at c_s through a
+# ---             halo with n = 0.02 n0, below the solver's n_floor,
+# ---             starting from uniform entropy K_e, so entropy-conserving
+# ---             transport must keep
+# ---                 T_e(x,t) = T_e0 (n(x,t)/n0)^(gamma_e-1)
+# ---             pointwise at all times: the below-floor halo must act as
+# ---             an insulating boundary, not a heat sink.  Analyse with
+# ---             analysis_vacuum.py.
 
 import argparse
 import shutil
@@ -84,6 +94,9 @@ class ElectronEnergyCase(object):
 
     def momentum_expressions(self):
         return ["0", "0", "0"]
+
+    def density_expression(self):
+        return "n0"
 
     def setup_run(self):
         global simulation
@@ -146,7 +159,7 @@ class ElectronEnergyCase(object):
             charge="q_e",
             mass=constants.m_p,
             initial_distribution=picmi.AnalyticDistribution(
-                density_expression="n0",
+                density_expression=self.density_expression(),
                 momentum_expressions=self.momentum_expressions(),
                 warpx_momentum_spread_expressions=[str(self.vi_th)] * 3,
                 n0=self.n0,
@@ -275,6 +288,96 @@ class AdiabaticCompression(ElectronEnergyCase):
             f"  steps     = {self.total_steps},  diag every {self.diag_steps}\n"
             f"  B = 0,  eta = 0  ->  Joule OFF, pure advection+compression\n"
             f"  CHECK:  T_e(x,t) = Te0 (n/n0)^(gamma_e-1)  pointwise\n"
+        )
+
+
+class VacuumSlabTransport(ElectronEnergyCase):
+    """Insulating-halo transport test: a plasma slab drifting through a
+    below-floor halo must keep its electron entropy.
+
+    A slab (n = n0) drifts at v0 = c_s through a tenuous halo whose density
+    sits BELOW the solver's n_floor. The initial T_e is the floored adiabat
+    (uniform entropy K_e), and there are no sources (B = 0, eta = 0), so
+    entropy-conserving transport requires T_e = Te0 (n/n0)^(gamma-1)
+    pointwise at all times -- exactly, even through the CIC-mixed slab edge,
+    because a uniform K_e is invariant under any mass-weighted mixing.
+
+    This guards the insulating treatment of below-floor cells: if the QDSMC
+    transport left K_e = 0 there (instead of flooring the density in the
+    K_e <-> T_e conversion), the halo would dilute and erase the slab's
+    entropy at the drifting edge and T_e would fall off the adiabat within
+    tens of steps.
+    """
+
+    te_eV = 100.0  # slab electron temperature (eV) at n0
+    ti_eV = 10.0  # ion temperature (eV); cold, so the slab holds together
+
+    # ---- Slab / halo geometry -----------------------------------------------
+    halo_frac = 0.02  # halo density fraction of n0; BELOW the 0.05 n_floor
+    slab_frac = 0.5  # slab width as a fraction of Lx
+    cfl_marker = 0.2  # QDSMC marker displacement per step, v0 dt / dx
+
+    # ---- Geometry / numerics ------------------------------------------------
+    NX = 128
+    NZ = 16
+    NPPC = 800
+    substeps = 10
+
+    diag_data_list = ["rho", "Te"]
+
+    def configure(self):
+        if self.test:
+            self.NX = 64
+            self.NZ = 8
+            self.NPPC = 200
+            self._steps_override = 80
+            self.ndiag = 8
+        else:
+            self._steps_override = None
+            self.ndiag = 20
+
+    def get_plasma_quantities(self):
+        mi = constants.m_p
+        self.dx = self.Lx / self.NX
+        self.Lz = self.dx * self.NZ
+
+        # Drift at the electron-pressure sound speed: markers stream through
+        # the slab edge at cfl_marker cells per step.
+        self.c_s = np.sqrt(self.gamma_e * constants.q_e * self.te_eV / mi)
+        self.v0 = self.c_s
+
+        self.dt = self.cfl_marker * self.dx / self.v0
+        if self._steps_override is not None:
+            self.total_steps = self._steps_override
+        else:
+            self.total_steps = 400
+        self.diag_steps = max(1, self.total_steps // self.ndiag)
+
+        self.vi_th = np.sqrt(constants.q_e * self.ti_eV / mi)
+        # No applied B (B=0). No resistivity (eta=0 -> no Joule, pure LHS).
+        self.eta = 0.0
+
+    def density_expression(self):
+        x0 = 0.5 * self.Lx
+        hw = 0.5 * self.slab_frac * self.Lx
+        return f"n0*({self.halo_frac} + (1 - {self.halo_frac})*(abs(x - {x0}) < {hw}))"
+
+    def momentum_expressions(self):
+        # Uniform drift: the slab translates without compression.
+        return [f"{self.v0}", "0", "0"]
+
+    def _print_params(self):
+        print(
+            f"\n[setup] Vacuum-slab (insulating-halo) transport test\n"
+            f"  Te0 = {self.te_eV:.1f} eV (at n0),  Ti = {self.ti_eV:.1f} eV,  gamma_e = {self.gamma_e:.4f}\n"
+            f"  n0        = {self.n0:.3e} m^-3,  halo = {self.halo_frac:.3f} n0 (below the 0.05 n0 floor)\n"
+            f"  slab      = {self.slab_frac:.2f} Lx wide, drifting at v0 = c_s = {self.v0:.3e} m/s\n"
+            f"  Grid      = {self.NX} x {self.NZ},  Lx x Lz = {self.Lx:.3f} x {self.Lz:.4f} m\n"
+            f"  dt        = {self.dt:.3e} s   (marker CFL {self.cfl_marker:.2f} cells/step)\n"
+            f"  steps     = {self.total_steps} (slab travels "
+            f"{self.cfl_marker * self.total_steps / self.NX:.2f} Lx),  diag every {self.diag_steps}\n"
+            f"  B = 0,  eta = 0  ->  no sources, pure transport through the halo\n"
+            f"  CHECK:  T_e(x,t) = Te0 (n/n0)^(gamma_e-1)  pointwise (uniform K_e)\n"
         )
 
 
@@ -466,6 +569,7 @@ CASES = {
     "adiabat": AdiabaticCompression,
     "joule": ForceFreeJoule,
     "qei": QeiRelaxation,
+    "vacuum": VacuumSlabTransport,
 }
 
 parser = argparse.ArgumentParser()

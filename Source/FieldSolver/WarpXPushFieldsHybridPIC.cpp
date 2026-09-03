@@ -370,15 +370,19 @@ void WarpX::HybridPICInitializeRhoJandB ()
     // treatment, silently wrong physics for one step).
     HybridPICDepositRhoAndJ();
 
-    // Fill the electron pressure from the algebraic closure using the freshly
-    // deposited rho. On a fresh start this seeds Pe^0 for the iteration-0
-    // diagnostics and the first step's B-substep E-solves; on restart it
-    // restores Pe(rho^n), which is not checkpointed and would otherwise be
-    // zero for the whole first restarted step. From the first step onward,
-    // HybridPICEvolveFields refreshes Pe right after each deposition (via the
-    // closure, or via the QDSMC entropy transport when
-    // solve_electron_energy_equation is on).
-    m_hybrid_pic_model->CalculateElectronPressure();
+    // Fill the electron pressure using the freshly deposited rho. On a fresh
+    // start this seeds Pe^0 for the first step's B-substep E-solves (the
+    // iteration-0 diagnostics were already written at the end of InitData,
+    // before this runs); on restart it restores Pe(rho^n), which is not
+    // checkpointed and would otherwise be zero for the whole first restarted
+    // step. From the first step onward, HybridPICEvolveFields refreshes Pe
+    // right after each deposition (via the closure, or via the QDSMC entropy
+    // transport when solve_electron_energy_equation is on).
+    // With the energy equation on the closure is evaluated on floored density.
+    // T_e is not checkpointed either, so on restart the seed re-derives it from
+    // the restored rho: evolved T_e structure is not preserved across a restart.
+    m_hybrid_pic_model->CalculateElectronPressure(
+        m_hybrid_pic_model->m_solve_electron_energy_equation);
 
     if (restart_chkfile.empty()) {
         // Handle field splitting for Hybrid field push

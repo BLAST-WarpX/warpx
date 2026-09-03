@@ -106,7 +106,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
     if (!context->m_fd_jac_comput) {
-        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat(context->m_U);
+        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
     }
     PetscFunctionReturn(PETSC_SUCCESS);
 }
