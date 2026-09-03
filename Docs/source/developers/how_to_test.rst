@@ -114,10 +114,79 @@ For easier debugging, it can be convenient to run the tests on your local comput
 
        ctest --test-dir build -LE slow
 
+* Run only the Python unit tests (see the section below):
+
+  .. code-block:: sh
+
+       ctest --test-dir build -L pytest
+
 Once the execution of CTest is completed, you can find all files associated with each test in its corresponding directory under ``build/bin/``.
 For example, if you run the single test ``test_3d_laser_acceleration``, you can find all files associated with this test in the directory ``build/bin/test_3d_laser_acceleration/``.
 
 If you modify the code base locally and want to assess the effects of your code changes on the automated tests, you need to first rebuild WarpX including your code changes and then rerun CTest.
+
+Python unit tests
+-----------------
+
+Besides the simulation-level tests described above, WarpX has a `pytest <https://docs.pytest.org>`__-based
+unit test suite in `tests/unit <https://github.com/BLAST-WarpX/warpx/tree/development/tests/unit>`__.
+These tests drive WarpX through its Python bindings and assert properties of individual
+routines, such as the fact that charge and current deposition conserve the total charge
+and current of a species.
+They require a build with ``-DWarpX_PYTHON=ON`` and they need no checksum file.
+
+The tests are dimensionality-agnostic: the same files run in every dimensionality that
+was built.  CTest registers one test per ``WarpX_DIMS``, because a compiled ``warpx_pybind_*``
+module can only be imported once:
+
+.. code-block:: sh
+
+     # run the unit tests for all built dimensionalities
+     ctest --test-dir build -R pytest
+
+     # run the unit tests for a single dimensionality
+     ctest --test-dir build -R pytest.WarpX.3d
+
+     # equivalent, via the ctest label
+     ctest --test-dir build -L pytest
+
+You can also invoke ``pytest`` directly, which is usually more convenient while writing a
+test. This requires that the Python package has been installed first, with
+``cmake --build build --target pip_install``:
+
+.. code-block:: sh
+
+     # all unit tests, in one of the built dimensionalities
+     python3 -m pytest -s -vvvv tests/unit
+
+     # a single test (useful during debugging)
+     python3 -m pytest -s -vvvv tests/unit/test_charge_deposition.py::test_charge_deposition_is_negative_for_electrons
+
+``tests/unit/conftest.py`` pins the process to one dimensionality when it is imported,
+taking it from ``WARPX_TEST_DIMS`` if CTest set it and otherwise from what is compiled in.
+That is also what makes ``Config`` available early enough to import ``mpi4py`` only for
+builds that have MPI: ``mpi4py`` has to own ``MPI_Init``, because AMReX would otherwise
+finalize MPI in the first ``amrex::Finalize`` and MPI cannot be initialized again.
+Collecting two dimensionalities in one process is rejected with a clear error.
+
+A test that does not apply to every geometry says so with a plain ``skipif``, as the
+deposition tests do for RZ, whose inverse volume scaling needs its own assertion.
+
+Two fixtures do the setup work:
+
+* ``warpx_lifecycle`` (applied automatically) runs each test in its own temporary
+  directory and calls ``pywarpx.WarpX.finalize`` afterwards, which tears down WarpX and
+  AMReX and clears all module-level input state. This is what allows a single process to
+  run several independent simulations, for instance to compare deposition algorithms.
+* ``make_sim`` is a factory that returns a minimal, already initialized simulation for the
+  dimensionality of the process, with the grid, particle shape and deposition algorithm the
+  test asks for. ``uniform_particles``, ``total``, ``cell_volume`` and ``rtol`` are the
+  helpers the deposition tests build on.
+
+To add a unit test, put a ``test_*.py`` file in ``tests/unit``.
+
+If you need a new Python package dependency for the unit tests, add it in
+`tests/unit/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/tests/unit/requirements.txt>`__.
 
 How to add automated tests
 --------------------------
