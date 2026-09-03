@@ -87,7 +87,53 @@ The skill will:
 #. Format the entry in the RST style used in the file.
 #. Create a branch, commit the change, and optionally open a pull request.
 
+``/warpx-self-review-pr``
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Reviews the changes on your current branch relative to ``development``, as a WarpX maintainer would review a pull request (see the :ref:`Self-Reviewing a Pull Request <developers-llm-self-review>` section below).
+
+Usage (in Claude Code):
+
+.. code-block:: text
+
+   /warpx-self-review-pr
+
+The skill will:
+
+#. Read ``AGENTS.md`` for the project conventions.
+#. Fetch the latest upstream ``development`` and diff your branch against it.
+#. Review the diff against a checklist (correctness, algorithmic scaling, dimensionality, GPU/CPU portability, AMReX usage, backward compatibility, testing, style, auto-generated files, documentation, scope).
+#. Report concrete findings with file and line references, each with a severity and a suggested fix.
+
 To add new skills, create a directory under ``.claude/skills/<skill-name>/`` containing a ``SKILL.md`` file that describes the step-by-step procedure.
+
+
+.. _developers-llm-self-review:
+
+Self-Reviewing a Pull Request
+-----------------------------
+
+As emphasized above, you should carefully review all LLM-generated code *yourself* before requesting a review from other WarpX developers.
+A coding assistant can help with this first pass: it can re-read your own diff with fresh context and flag issues you may have missed.
+This does not replace your own critical review, but it makes that review more effective.
+
+Before using the prompt below, commit your work and make sure your branch is up to date with ``development``, so that the diff the assistant reviews matches what reviewers will see.
+Run it in a *fresh* session (not the one that wrote the code). If this session also wrote the code under review, say so up front and weigh your own prior choices skeptically.
+
+The review is a static reading of the diff: the assistant is asked not to compile the code or run the test suite, since the CI checks do that once the pull request is open.
+This keeps the pass fast and avoids spending a long local build on something CI reports anyway.
+The prompt says so explicitly because ``AGENTS.md`` documents how to build and test WarpX for development work, and an assistant reading it for the project conventions would otherwise be inclined to do both.
+
+The prompt also asks the assistant to check AMReX behavior against real source, at the ``commit_amrex`` pinned in ``dependencies.json``, rather than recalling APIs from memory, which is a common source of confident but wrong review findings.
+Reading the pin costs nothing: a clone next to your WarpX checkout can show any file at that commit without touching your working tree or branches, and ``raw.githubusercontent.com`` serves it without a clone at all.
+Local copies are not a substitute, since they drift: a sibling clone tracks AMReX ``development``, and the copy CMake fetched into ``build/_deps/fetchedamrex-src`` is frozen at whatever ``WarpX_amrex_branch`` was cached as, so neither follows a pin update.
+
+What the prompt does *not* ask for is a verdict on whether the code compiles against the pin: CI checks out that commit and builds it with ``-Werror``, which settles signature mismatches and deprecated APIs far more reliably than reading headers.
+The AMReX item on the checklist is therefore limited to what a compiler cannot judge, namely whether the code uses the right AMReX abstraction.
+
+In Claude Code, the ``/warpx-self-review-pr`` skill runs this review for you.
+For other assistants, adapt the prompt in the
+`Claude Code skill <https://github.com/BLAST-WarpX/warpx/blob/development/.claude/skills/warpx-self-review-pr/SKILL.md>`__.
 
 
 Documentation Context via MCP Servers
