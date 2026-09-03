@@ -1,6 +1,7 @@
 #ifndef ABLASTR_MLMG_WRAPPER_H_
 #define ABLASTR_MLMG_WRAPPER_H_
 
+#include <AMReX_Exception.H>
 #include <AMReX_MLMG.H>
 #include <AMReX_MLEBNodeFDLaplacian.H>
 #include <AMReX_MLNodeTensorLaplacian.H>
@@ -199,6 +200,7 @@ public:
                     tmp.first->solve({&phi}, {&rho}, relative_tolerance, absolute_tolerance);
                     Gpu::synchronize();
                     auto t1 = amrex::second();
+                    assert_no_nan(phi);
                     tsolve = t1-t0;
                     niter0 = tmp.first->getNumIters();
                     baseline_ok = true;
@@ -259,6 +261,7 @@ public:
                                                relative_tolerance, absolute_tolerance);
                                     Gpu::synchronize();
                                     auto t1 = amrex::second();
+                                    assert_no_nan(phi);
                                     tsolve_tmp = std::min(tsolve_tmp, t1-t0);
                                 } catch (...) {
                                     tsolve_tmp = std::numeric_limits<double>::max();
@@ -305,6 +308,7 @@ public:
                                                relative_tolerance, absolute_tolerance);
                                     Gpu::synchronize();
                                     auto t1 = amrex::second();
+                                    assert_no_nan(phi);
                                     tsolve_tmp = std::min(tsolve_tmp, t1-t0);
                                 } catch (...) {
                                     tsolve_tmp = std::numeric_limits<double>::max();
@@ -413,6 +417,19 @@ private:
     std::unique_ptr<amrex::MLNodeLinOp> m_linop;
     int m_ng;
     int m_verbose = 1;
+
+    /** Throw an exception if the solution contains NaNs.
+     *
+     * MLMG's convergence test is based on the max norm, which ignores NaNs.
+     * Therefore MLMG may report success even though the solution is polluted
+     * by NaNs. So we must check the solution explicitly.
+     */
+    static void assert_no_nan (amrex::MultiFab const& phi)
+    {
+        if (phi.contains_nan(0, 1, 0)) {
+            throw amrex::RuntimeError("ablastr::fields::MLMGWrapper: solution contains NaNs");
+        }
+    }
 
     static void solve_doit (Parms const& parms, amrex::BoxArray const& ba,
                             amrex::DistributionMapping const& dm,
