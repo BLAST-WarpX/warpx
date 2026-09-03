@@ -49,4 +49,59 @@ amrex::ParticleReal LinearBreitWheelerCrossSection (const amrex::ParticleReal& E
     return cross_section;
 }
 
+/**
+ * \brief Indefinite integral of the unnormalized BW differential cross section,
+ * evaluated in the transformed coordinate y = atanh(beta*cos(theta)).
+ *
+ * This form avoids loss of precision near cos(theta) = +/-1 for highly relativistic
+ * products. It corresponds to the untransformed indefinite integral
+ * x / (1 - beta^2 x^2) * (-1 + 2 beta^2 - beta^4) - x
+ * + atanh(beta * x) / beta * (3 - beta^4), evaluated with x = tanh(y)/beta.
+ *
+ * @param[in] beta velocity of the produced leptons in the CM frame (dimensionless)
+ * @param[in] one_minus_beta2 1 - beta^2, evaluated without subtractive cancellation
+ * @param[in] y transformed angular coordinate atanh(beta*cos(theta))
+ * @return the indefinite integral evaluated at y
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+amrex::ParticleReal LBWIntegralOfDifferentialCrossSectionTransformed (
+    const amrex::ParticleReal& beta,
+    const amrex::ParticleReal& one_minus_beta2,
+    const amrex::ParticleReal& y)
+{
+    using namespace amrex::literals;
+
+    const amrex::ParticleReal tanh_y = std::tanh(y);
+    const amrex::ParticleReal cosh_y = std::cosh(y);
+    const amrex::ParticleReal x = tanh_y / beta;
+    const amrex::ParticleReal one_minus_beta2_cosh_y = one_minus_beta2 * cosh_y;
+    const amrex::ParticleReal coefficient =
+        2._prt + 2._prt * one_minus_beta2 - one_minus_beta2 * one_minus_beta2;
+    return -x * one_minus_beta2_cosh_y * one_minus_beta2_cosh_y
+        - x + coefficient * y / beta;
+}
+
+/**
+ * \brief Derivative with respect to y of
+ * LBWIntegralOfDifferentialCrossSectionTransformed.
+ *
+ * @param[in] beta velocity of the produced leptons in the CM frame (dimensionless)
+ * @param[in] one_minus_beta2 1 - beta^2, evaluated without subtractive cancellation
+ * @param[in] y transformed angular coordinate atanh(beta*cos(theta))
+ * @return the unnormalized differential cross section with respect to y
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+amrex::ParticleReal LBWDifferentialCrossSectionTransformed (
+    const amrex::ParticleReal& beta,
+    const amrex::ParticleReal& one_minus_beta2,
+    const amrex::ParticleReal& y)
+{
+    using namespace amrex::literals;
+
+    const amrex::ParticleReal tanh_y = std::tanh(y);
+    const amrex::ParticleReal cosh_y = std::cosh(y);
+    const amrex::ParticleReal sech2_y = 1._prt / (cosh_y * cosh_y);
+    return (1._prt + tanh_y * tanh_y
+        + 2._prt * one_minus_beta2 * (1._prt - one_minus_beta2 / sech2_y)) / beta;
+}
 #endif // LINEAR_BREIT_WHEELER_CROSS_SECTION_H

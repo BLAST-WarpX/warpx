@@ -81,7 +81,7 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         /**
          * \brief Update the preconditioner
          */
-        void Update (const T& a_U) override;
+        void Update () override;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS
@@ -247,7 +247,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 }
 
 template <class T, class Ops>
-void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
+void CurlCurlMLMGPC<T,Ops>::Update ()
 {
     BL_PROFILE("CurlCurlMLMGPC::Update()");
     using namespace amrex;
@@ -255,9 +255,6 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "CurlCurlMLMGPC::Update() called on undefined object" );
-
-    // a_U is not needed for a linear operator
-    amrex::ignore_unused(a_U);
 
     // set the alpha coefficient for the curl-curl op
     const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;

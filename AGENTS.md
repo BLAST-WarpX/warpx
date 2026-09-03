@@ -72,6 +72,17 @@ Test output goes to `build/bin/<test_name>/`.
 - When running tests: ignore checksum failures, since they can be platform-dependent.
 - When debugging/fixing tests: do not modify the tolerance of assert statements in the Python analysis files just to make the tests pass (unless explicitly asked to do so).
 
+### Where CI is Configured
+
+- **Compile-time tests: `.github/workflows/`** — build-only jobs across compilers and backends
+  (AppleClang, Clang, GCC, HIP, NVCC, Intel, ...). The exception is `clang_sanitizers.yml`,
+  which also runs `ctest` under the UB/address sanitizers.
+- **Runtime tests: `.azure-pipelines.yml`** — builds the `matrix:` of dimensionality/feature
+  combinations and runs the full `ctest` suite for each.
+- **GPU tests: `.gitlab/ci.yaml`** — builds and runs one smoke test on NVIDIA H100 and AMD MI300
+  runners, through a GitHub-to-GitLab mirror. Only triggered on merges to `development` and on
+  PRs labeled `bot: run GPU`, so it is absent from a default PR's checks.
+
 ### Adding a Test
 
 Use `add_warpx_test()` in the test directory's `CMakeLists.txt`. Generate checksums with `CHECKSUM_RESET=ON ctest --test-dir build -R your_test_name`.

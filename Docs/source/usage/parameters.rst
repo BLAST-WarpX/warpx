@@ -2927,8 +2927,9 @@ Details about the collision models can be found in the :ref:`theory section <mul
     - ``linear_breit_wheeler`` for electron-positron pair creation from the annihilation of two photons, according to the linear Breit-Wheeler mechanism
       (see for example `Gould et al. (Phys. Rev. 155, 1404, 1967) <https://doi.org/10.1103/PhysRev.155.1404>`__).
       This implements the generation of electron-positron pairs based on the analytical cross-section, e.g.
-      equation (1) in Gould. The angular distribution of the emitted pairs is isotropic for now
-      (instead of following the correct distribution, see e.g. `Ribeyre et al. (Plasma Phys. Control. Fusion 60 104001, 2018) <https://doi.org/10.1088/1361-6587/aad6da>`__).
+      equation (1) in Gould. In the center-of-momentum frame, the polar angle of the emitted pairs
+      is sampled from the differential cross section, while the azimuthal angle is sampled uniformly
+      (see e.g. `Ribeyre et al. (Plasma Phys. Control. Fusion 60 104001, 2018) <https://doi.org/10.1088/1361-6587/aad6da>`__).
       The implementation follows the same numerical algorithm as that of fusion reactions (see. :cite:t:`param-HigginsonJCP2019`).
     - ``linear_compton`` for linear Compton scattering between a lepton (electron or positron, for now) and a photon, based on the Klein-Nishina cross-section
       (see for example :cite:t:`param-LandauVol4`: equations 86.10 and 86.16 for the differential and total cross sections, respectively).

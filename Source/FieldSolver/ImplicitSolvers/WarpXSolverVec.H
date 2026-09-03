@@ -314,7 +314,7 @@ public:
     [[nodiscard]] auto numAMRLevels () const { return m_num_amr_levels; }
 
     // return DOFs object pointer
-    [[nodiscard]] inline const auto& getDOFsObject () const { return m_dofs; }
+    [[nodiscard]] inline static const auto& getDOFsObject () { return m_dofs; }
 
 private:
 

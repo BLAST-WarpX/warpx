@@ -835,8 +835,6 @@ void doGatherShapeN ([[maybe_unused]] const amrex::ParticleReal xp,
  * \param Bxp,Byp,Bzp                     Magnetic field on particles.
  * \param Ex_arr,Ey_arr,Ez_arr            Array4 of the electric field, either full array or tile.
  * \param Bx_arr,By_arr,Bz_arr            Array4 of the magnetic field, either full array or tile.
- * \param Ex_type,Ey_type,Ez_type         IndexType of the electric field
- * \param Bx_type,By_type,Bz_type         IndexType of the magnetic field
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
  * \param domain_double             The domain boundary indicies cast to double values
@@ -865,12 +863,6 @@ void doGatherShapeNEsirkepovStencilImplicit (
                      amrex::Array4<amrex::Real const> const& Bx_arr,
                      amrex::Array4<amrex::Real const> const& By_arr,
                      amrex::Array4<amrex::Real const> const& Bz_arr,
-                     [[maybe_unused]] const amrex::IndexType Ex_type,
-                     [[maybe_unused]] const amrex::IndexType Ey_type,
-                     [[maybe_unused]] const amrex::IndexType Ez_type,
-                     [[maybe_unused]] const amrex::IndexType Bx_type,
-                     [[maybe_unused]] const amrex::IndexType By_type,
-                     [[maybe_unused]] const amrex::IndexType Bz_type,
                      const amrex::XDim3 & dinv,
                      const amrex::XDim3 & xyzmin,
                      const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
@@ -1381,7 +1373,6 @@ void doGatherShapeNEsirkepovStencilImplicit (
  * \param Bxp,Byp,Bzp               Magnetic field on particles.
  * \param Ex_arr,Ey_arr,Ez_arr      Array4 of the electric field, either full array or tile.
  * \param Bx_arr,By_arr,Bz_arr      Array4 of the magnetic field, either full array or tile.
- * \param Ex_type,Ey_type,Ez_type   IndexType of the electric field
  * \param Bx_type,By_type,Bz_type   IndexType of the magnetic field
  * \param dinv                      3D cell size inverse
  * \param xyzmin                    The lower bounds of the domain
@@ -1411,9 +1402,6 @@ void doGatherPicnicShapeN (
                      amrex::Array4<amrex::Real const> const& Bx_arr,
                      amrex::Array4<amrex::Real const> const& By_arr,
                      amrex::Array4<amrex::Real const> const& Bz_arr,
-                     [[maybe_unused]] const amrex::IndexType Ex_type,
-                     [[maybe_unused]] const amrex::IndexType Ey_type,
-                     [[maybe_unused]] const amrex::IndexType Ez_type,
                      const amrex::IndexType Bx_type,
                      const amrex::IndexType By_type,
                      const amrex::IndexType Bz_type,
@@ -2263,25 +2251,21 @@ void doGatherShapeNImplicit (
             doGatherShapeNEsirkepovStencilImplicit<1>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                                      ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                                       dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherShapeNEsirkepovStencilImplicit<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                                      ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                                       dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherShapeNEsirkepovStencilImplicit<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                                      ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                                       dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherShapeNEsirkepovStencilImplicit<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                                      ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
                                                       dinv, xyzmin, domain_double, do_cropping, lo, n_rz_azimuthal_modes);
         }
     }
@@ -2290,28 +2274,28 @@ void doGatherShapeNImplicit (
             doGatherPicnicShapeN<1>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                    ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                    bx_type, by_type, bz_type,
                                     dinv, xyzmin, domain_double, do_cropping, lo,
                                     n_rz_azimuthal_modes);
         } else if (nox == 2) {
             doGatherPicnicShapeN<2>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                    ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                    bx_type, by_type, bz_type,
                                     dinv, xyzmin, domain_double, do_cropping, lo,
                                     n_rz_azimuthal_modes);
         } else if (nox == 3) {
             doGatherPicnicShapeN<3>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                    ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                    bx_type, by_type, bz_type,
                                     dinv, xyzmin, domain_double, do_cropping, lo,
                                     n_rz_azimuthal_modes);
         } else if (nox == 4) {
             doGatherPicnicShapeN<4>(xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
                                     Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                     ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                    ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                    bx_type, by_type, bz_type,
                                     dinv, xyzmin, domain_double, do_cropping, lo,
                                     n_rz_azimuthal_modes);
         }
