@@ -52,13 +52,7 @@
  *  nodal dimension), solved, and mapped back the same way. Deliberately NOT
  *  averaged: pair-averaging multiplies the nodal-dimension Nyquist modes by
  *  cos(k dx/2) = 0, making the preconditioner exactly singular on those
- *  planes - right-preconditioned GMRES can then never reduce the residual
- *  content there (measured: a hard stall at the few-percent Nyquist noise
- *  floor of the deposited-current source). The index shift is spectrally
- *  exact in periodic dimensions, since the cell-centered Laplacian stencil is
- *  shift-invariant. Any such approximation only affects preconditioner
- *  quality, not correctness: amrex::GMRES applies the preconditioner on the
- *  right, so the reported residual is always that of the true operator.
+ *  planes.
  *
  *  The MLMG solves run a fixed number of V-cycles (max_iter) so the
  *  preconditioner is a fixed linear operator across a GMRES solve.

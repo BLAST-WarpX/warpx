@@ -632,7 +632,10 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc )
             amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 amrex::Real s = 0.0;
+                // Perform row-sum of mass matrix elements
                 for (int c = 0; c < nc; ++c) {
+                    // Perform interpolation from `S`'s
+                    // original staggering to the desired staggering
                     for (int kk = 0; kk <= e2; ++kk) {
                         for (int jj = 0; jj <= e1; ++jj) {
                             for (int ii = 0; ii <= e0; ++ii) {

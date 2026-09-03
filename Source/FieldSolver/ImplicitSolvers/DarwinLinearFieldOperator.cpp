@@ -29,7 +29,7 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
         a_pc_type == PreconditionerType::none ||
         a_pc_type == PreconditionerType::pc_darwin_mlmg,
         "DarwinLinearFieldOperator::define(): the only preconditioner supported "
-        "by the Darwin solver is pc_darwin_mlmg");
+        "by the Darwin solver is pc_darwin_mlmg (or none for no preconditioning)");
 
     m_R.Define(a_U);
     m_ops = a_ops;
