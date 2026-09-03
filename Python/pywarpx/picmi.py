@@ -2078,6 +2078,34 @@ class ThetaImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
+class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
+    """
+    Sets up the "theta implicit" hybrid-PIC evolve scheme. This requires the
+    hybrid-PIC (Ohm's law) field solver.
+
+    Parameters
+    ----------
+    nonlinear_solver: nonlinear solver instance
+        The nonlinear solver to use for the iterations
+
+    theta: float, optional
+        The "theta" parameter, determining the level of implicitness
+    """
+
+    def __init__(self, nonlinear_solver, theta=None):
+        self.nonlinear_solver = nonlinear_solver
+        self.theta = theta
+
+        assert isinstance(nonlinear_solver, NonlinearSolverBase)
+
+    def solver_scheme_initialize_inputs(self):
+        pywarpx.algo.evolve_scheme = "theta_implicit_hybrid"
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.theta = self.theta
+
+        self.nonlinear_solver.nonlinear_solver_initialize_inputs()
+
+
 class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
     """
     Sets up the "semi-implicit" electromagnetic evolve scheme

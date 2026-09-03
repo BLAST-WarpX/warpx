@@ -1303,6 +1303,9 @@ WarpX::ReadParameters ()
         else if (evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
             m_implicit_solver = std::make_unique<ThetaImplicitEM>();
         }
+        else if (evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid) {
+            m_implicit_solver = std::make_unique<ThetaImplicitHybrid>();
+        }
         else if (evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
             m_implicit_solver = std::make_unique<StrangImplicitSpectralEM>();
         }
@@ -1313,6 +1316,7 @@ WarpX::ReadParameters ()
         // implicit evolve schemes not setup to use mirrors
         if (evolve_scheme == EvolveScheme::Semi_Implicit_EM ||
             evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+            evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid ||
             evolve_scheme == EvolveScheme::Semi_Implicit_Darwin ) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_num_mirrors == 0,
                 "Mirrors cannot be used with Implicit evolve schemes.");
@@ -1444,6 +1448,18 @@ WarpX::ReadParameters ()
                 "With the strang_implicit_spectral_em evolve scheme, the algo.maxwell_solver must be psatd");
         }
 
+        if (evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC,
+                "With the theta_implicit_hybrid evolve scheme, the algo.maxwell_solver must be hybrid");
+
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                current_deposition_algo == CurrentDepositionAlgo::Esirkepov ||
+                current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
+                current_deposition_algo == CurrentDepositionAlgo::Direct,
+                "Only Esirkepov, Villasenor, or Direct current deposition is supported with the theta_implicit_hybrid scheme");
+        }
+
         // Load balancing parameters
         std::vector<std::string> load_balance_intervals_string_vec = {"0"};
         pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
@@ -1516,6 +1532,7 @@ WarpX::ReadParameters ()
 
             // These evolve schemes permit time steps that violate the CFL condition
             if (evolve_scheme == EvolveScheme::Theta_Implicit_EM ||
+                evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid ||
                 evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
                 pp_particles.query("max_grid_crossings", particle_max_grid_crossings);
             }
@@ -2760,6 +2777,12 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         rho_ncomps = ncomps;
     }
     if (do_dive_cleaning) {
+        rho_ncomps = 2*ncomps;
+    }
+    if (evolve_scheme == EvolveScheme::Theta_Implicit_Hybrid) {
+        // Two components: rho deposited at the entry particle positions and
+        // rho deposited from the time-centered positions of the particle
+        // advance within each nonlinear residual evaluation.
         rho_ncomps = 2*ncomps;
     }
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {

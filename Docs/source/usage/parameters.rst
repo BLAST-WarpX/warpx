@@ -354,6 +354,29 @@ Overall simulation parameters
         - `Angus et al., An implicit particle code with exact energy and charge conservation for electromagnetic studies of dense plasmas <https://doi.org/10.1016/j.jcp.2023.112383>`__.
         - `Angus et al., An implicit particle code with exact energy and charge conservation for studies of dense plasmas in axisymmetric geometries <https://doi.org/10.1016/j.jcp.2024.113427>`__.
 
+    * ``theta_implicit_hybrid``: Use a :math:`\theta`-implicit solver for the hybrid-PIC (Ohm's law) model.
+
+      The fields and particles are advanced as a single coupled nonlinear system: at each nonlinear
+      iteration the particles are re-advanced with the iterate electric field, the ion current and
+      charge density are re-deposited, the magnetic field is updated through Faraday's law, and the
+      electric field is re-evaluated from the generalized Ohm's law. Since the whistler-wave CFL
+      condition of the explicit hybrid advance does not apply, no field sub-stepping is needed
+      (:pp:param:`hybrid_pic_model.substeps` is ignored).
+
+      - Requires :pp:param:`algo.maxwell_solver` = ``hybrid`` and one of the ``direct``, ``villasenor``
+        or ``esirkepov`` current depositions.
+      - The time-biasing parameter ``implicit_evolve.theta`` and the nonlinear solver parameters
+        (``implicit_evolve.nonlinear_solver``, ``picard.*``, ``newton.*``, ``gmres.*``,
+        ``implicit_evolve.max_particle_iterations``, ``implicit_evolve.particle_tolerance``,
+        ``implicit_evolve.particle_suborbits``) are shared with ``theta_implicit_em``; see above.
+      - The electron pressure is evaluated from the algebraic equation-of-state closure
+        (see :ref:`the hybrid-PIC theory section <theory-kinetic-fluid-hybrid-model>`).
+        ``hybrid_pic_model.solve_electron_energy_equation``, mass matrices
+        (``implicit_evolve.use_mass_matrices_jacobian``) and external fields from vector potentials
+        are not yet supported with this scheme.
+      - The method is described in `Kumar et al., A theta-implicit hybrid particle-in-cell algorithm
+        for kinetic simulations of magnetized plasmas <https://dx.doi.org/10.2139/ssrn.7346445>`__.
+
     * ``semi_implicit_em``: Use an approximately energy conserving semi-implicit electromagnetic solver.
 
       - Difference with ``theta_implicit_em`` is that light waves are treated explicit just as in the standard FDTD method. Consequently, this method has the CFL limitation :math:`c\Delta t < 1/\sqrt( \sum_i 1/\Delta x_i^2 )`.

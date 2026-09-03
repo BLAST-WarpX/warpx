@@ -16,6 +16,7 @@ import numpy as np
 from mpi4py import MPI as mpi
 
 from pywarpx import callbacks, libwarpx, picmi
+from pywarpx import particles as pywarpx_particles
 
 constants = picmi.constants
 
@@ -95,6 +96,7 @@ class EMModes(object):
         verbose,
         include_es_solver=False,
         use_rkf45=False,
+        use_implicit=False,
     ):
         """Get input parameters for the specific case desired."""
         self.solver = solver
@@ -104,6 +106,7 @@ class EMModes(object):
         self.verbose = verbose or self.test
         self.include_es_solver = include_es_solver
         self.use_rkf45 = use_rkf45
+        self.use_implicit = use_implicit
 
         # sanity check
         assert dim > 0 and dim < 4, f"{dim}-dimensions not a valid input"
@@ -116,6 +119,18 @@ class EMModes(object):
         # get simulation parameters from the defaults given the direction of
         # the initial B-field and the dimensionality
         self.get_simulation_parameters()
+
+        if self.test and self.use_implicit:
+            # Every GMRES iteration of the (unpreconditioned) implicit solver
+            # evaluates the full nonlinear residual, so the CI case is kept
+            # small: fewer/coarser cells and particles than the explicit CI
+            # case, and a time step ~3x beyond the whistler CFL limit
+            # dt < dz^2/(pi*l_i*v_A) of the explicit advance, taken in a
+            # single implicit step with no field subcycling.
+            self.Nz = 64
+            self.NPPC = 64
+            self.DZ = 0.25
+            self.DT = 0.01
 
         # calculate various plasma parameters based on the simulation input
         self.get_plasma_quantities()
@@ -139,7 +154,12 @@ class EMModes(object):
                 self.total_steps = int(self.LT / self.DT)
         else:
             # if this is a test case run for only a small number of steps
-            self.total_steps = 50 if self.solver == "darwin" else 250
+            if self.solver == "darwin":
+                self.total_steps = 50
+            elif self.use_implicit:
+                self.total_steps = 50
+            else:
+                self.total_steps = 250
 
         if self.solver == "darwin":
             self.diag_steps = 3
@@ -331,6 +351,27 @@ class EMModes(object):
             )
             simulation.solver = self.solver_obj
 
+            if self.use_implicit:
+                simulation.evolve_scheme = picmi.ThetaImplicitHybridEvolveScheme(
+                    nonlinear_solver=picmi.NewtonNonlinearSolver(
+                        verbose=self.verbose,
+                        relative_tolerance=1e-6,
+                        max_iterations=20,
+                        require_convergence=True,
+                        linear_solver=picmi.GMRESLinearSolver(
+                            verbose_int=0,
+                            relative_tolerance=1e-6,
+                            max_iterations=1000,
+                            restart_length=100,
+                        ),
+                    ),
+                    theta=0.5,
+                )
+                # Particles may straddle a grid-box face at the time-centered
+                # deposition inside the nonlinear solve; allow for one grid
+                # crossing so the rho/J guard cells cover their deposition.
+                pywarpx_particles.max_grid_crossings = 2
+
         B_ext = picmi.AnalyticInitialField(
             Bx_expression=self.Bx, By_expression=self.By, Bz_expression=self.Bz
         )
@@ -429,7 +470,7 @@ class EMModes(object):
                     "[3]Ez_lev0-(V/m) [4]Bx_lev0-(T) [5]By_lev0-(T)\n"
                 )
 
-        if self.solver == "darwin":
+        if self.solver == "darwin" or self.use_implicit:
             write_dir = "diags/"
             field_energy = picmi.ReducedDiagnostic(
                 diag_type="FieldEnergy",
@@ -542,6 +583,11 @@ parser.add_argument(
     action="store_true",
 )
 parser.add_argument(
+    "--implicit",
+    help="Ohm only: use the theta-implicit hybrid evolve scheme",
+    action="store_true",
+)
+parser.add_argument(
     "-v",
     "--verbose",
     help="Verbose output",
@@ -558,5 +604,6 @@ run = EMModes(
     verbose=args.verbose,
     include_es_solver=args.include_es_solver,
     use_rkf45=args.use_rkf45,
+    use_implicit=args.implicit,
 )
 simulation.step()
