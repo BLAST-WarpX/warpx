@@ -43,7 +43,4 @@ export FI_CXI_RX_MATCH_MODE=software
 export ROCFFT_RTC_CACHE_PATH=/dev/null
 
 export OMP_NUM_THREADS=1
-export WARPX_NMPI_PER_NODE=8
-export TOTAL_NMPI=$(( ${SLURM_JOB_NUM_NODES} * ${WARPX_NMPI_PER_NODE} ))
-srun -N${SLURM_JOB_NUM_NODES} -n${TOTAL_NMPI} --ntasks-per-node=${WARPX_NMPI_PER_NODE} \
-    ./warpx inputs > output.txt
+srun ./warpx inputs > output.txt
