@@ -1,10 +1,13 @@
 #ifndef ABLASTR_MLMG_WRAPPER_H_
 #define ABLASTR_MLMG_WRAPPER_H_
 
+#include <AMReX.H>
 #include <AMReX_Exception.H>
 #include <AMReX_MLMG.H>
 #include <AMReX_MLEBNodeFDLaplacian.H>
 #include <AMReX_MLNodeTensorLaplacian.H>
+#include <AMReX_ParallelContext.H>
+#include <AMReX_ParallelReduce.H>
 #include <AMReX_ParmParse.H>
 #ifdef AMREX_USE_EB
 #   include <AMReX_EBFabFactory.H>
@@ -182,7 +185,14 @@ public:
         {
             MultiFab phi(rho.boxArray(), rho.DistributionMap(), 1, 1, MFInfo{}, rho.Factory());
 
-            auto tsolve = std::numeric_limits<double>::max();
+            // Some of the setups tried below might blow up. We want to discard
+            // them, not to crash the run. So floating point exception trapping
+            // (e.g., amrex.fpe_trap_invalid) must be disabled while we tune.
+            // Otherwise the run would be killed by a signal before we had a
+            // chance to catch the failure.
+            FPExceptGuard const fpe_guard{};
+
+            auto tsolve = t_failed;
             int mcl0, niter0;
             bool baseline_ok = false;
             { // base line
@@ -202,9 +212,12 @@ public:
                     auto t1 = amrex::second();
                     assert_no_nan(phi);
                     tsolve = t1-t0;
-                    niter0 = tmp.first->getNumIters();
-                    baseline_ok = true;
                 } catch (...) {}
+                tsolve = reduce_time(tsolve);
+                baseline_ok = (tsolve < t_failed);
+                if (baseline_ok) {
+                    niter0 = tmp.first->getNumIters();
+                }
             }
 
             // If the baseline converged in zero iterations, there is nothing to tune.
@@ -247,12 +260,13 @@ public:
                         tmp.first->setMaxIter(std::min(max_iters, 2*niter0));
                         for (bool nosync : no_gpu_sync_options) {
                             tmp.first->setNoGpuSync(nosync);
-                            double tsolve_tmp = std::numeric_limits<double>::max();
+                            double tsolve_tmp = t_failed;
                             Parms parms_tmp{};
                             parms_tmp.single_box = true;
                             parms_tmp.mcl = mcl;
                             parms_tmp.no_gpu_sync = nosync;
                             for (int itry = 0; itry < 3; ++itry) {
+                                auto t_try = t_failed;
                                 try {
                                     phi.setVal(0);
                                     Gpu::synchronize();
@@ -262,11 +276,14 @@ public:
                                     Gpu::synchronize();
                                     auto t1 = amrex::second();
                                     assert_no_nan(phi);
-                                    tsolve_tmp = std::min(tsolve_tmp, t1-t0);
-                                } catch (...) {
-                                    tsolve_tmp = std::numeric_limits<double>::max();
+                                    t_try = t1-t0;
+                                } catch (...) {}
+                                t_try = reduce_time(t_try);
+                                if (t_try == t_failed) {
+                                    tsolve_tmp = t_failed;
                                     break;
                                 }
+                                tsolve_tmp = std::min(tsolve_tmp, t_try);
                             }
                             if (tsolve_tmp < tsolve) {
                                 tsolve = tsolve_tmp;
@@ -293,13 +310,14 @@ public:
                         tmp.first->setMaxIter(std::min(max_iters, 2*niter0));
                         for (bool nosync : no_gpu_sync_options) {
                             tmp.first->setNoGpuSync(nosync);
-                            double tsolve_tmp = std::numeric_limits<double>::max();
+                            double tsolve_tmp = t_failed;
                             Parms parms_tmp{};
                             parms_tmp.single_box = false;
                             parms_tmp.mcl = mcl;
                             parms_tmp.ags = ags;
                             parms_tmp.no_gpu_sync = nosync;
                             for (int itry = 0; itry < 3; ++itry) {
+                                auto t_try = t_failed;
                                 try {
                                     phi.setVal(0);
                                     Gpu::synchronize();
@@ -309,11 +327,14 @@ public:
                                     Gpu::synchronize();
                                     auto t1 = amrex::second();
                                     assert_no_nan(phi);
-                                    tsolve_tmp = std::min(tsolve_tmp, t1-t0);
-                                } catch (...) {
-                                    tsolve_tmp = std::numeric_limits<double>::max();
+                                    t_try = t1-t0;
+                                } catch (...) {}
+                                t_try = reduce_time(t_try);
+                                if (t_try == t_failed) {
+                                    tsolve_tmp = t_failed;
                                     break;
                                 }
+                                tsolve_tmp = std::min(tsolve_tmp, t_try);
                             }
                             if (tsolve_tmp < tsolve) {
                                 tsolve = tsolve_tmp;
@@ -323,7 +344,7 @@ public:
                     }
                 }
 
-                if (baseline_ok || (tsolve < std::numeric_limits<double>::max()))
+                if (baseline_ok || (tsolve < t_failed))
                 {
                     if (m_parms_map.size() > 1000) { m_parms_map.clear(); } // just in case
 
@@ -417,6 +438,41 @@ private:
     std::unique_ptr<amrex::MLNodeLinOp> m_linop;
     int m_ng;
     int m_verbose = 1;
+
+    //! Elapsed time marking a setup that failed and must not be selected
+    static constexpr double t_failed = std::numeric_limits<double>::max();
+
+    /** RAII guard disabling floating point exception trapping.
+     *
+     * On the host, a NaN or an overflow produced by a diverging solve raises
+     * SIGFPE if trapping is enabled. That kills the run before the failure can
+     * be caught as an exception.
+     */
+    struct FPExceptGuard
+    {
+        FPExceptGuard () : m_prev(amrex::disableFPExcept(amrex::FPExcept::all)) {}
+        ~FPExceptGuard () { amrex::setFPExcept(m_prev); }
+        FPExceptGuard (FPExceptGuard const&) = delete;
+        FPExceptGuard (FPExceptGuard &&) = delete;
+        FPExceptGuard& operator= (FPExceptGuard const&) = delete;
+        FPExceptGuard& operator= (FPExceptGuard &&) = delete;
+    private:
+        amrex::FPExcept m_prev;
+    };
+
+    /** Reduce the measured solve time over all processes.
+     *
+     * The time measured by each process is different. Because all processes
+     * must choose the same parameters, the decision has to be based on a
+     * globally reduced time. We use the maximum, because that is when all
+     * processes have finished. Note that this communicates failures as well,
+     * because the time of a failed solve is `t_failed`.
+     */
+    static double reduce_time (double t)
+    {
+        amrex::ParallelAllReduce::Max(t, amrex::ParallelContext::CommunicatorSub());
+        return t;
+    }
 
     /** Throw an exception if the solution contains NaNs.
      *
