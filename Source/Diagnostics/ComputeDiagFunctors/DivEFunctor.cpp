@@ -58,11 +58,14 @@ DivEFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const int /*i_
             nComp()==1,
             "The RZ averaging over modes must write into 1 single component");
         amrex::MultiFab mf_dst_stag(divE.boxArray(), warpx.DistributionMap(m_lev), 1, divE.nGrowVect());
+        // ComputeDivE initializes valid cells only; exclude poisoned ghosts
+        // from the mode sum.
+        auto const ng_sum = amrex::IntVect::TheZeroVector();
         // Mode 0
-        amrex::MultiFab::Copy(mf_dst_stag, divE, 0, 0, 1, divE.nGrowVect());
+        amrex::MultiFab::Copy(mf_dst_stag, divE, 0, 0, 1, ng_sum);
         for (int ic=1 ; ic < divE.nComp() ; ic += 2) {
             // Real part of all modes > 0
-            amrex::MultiFab::Add(mf_dst_stag, divE, ic, 0, 1, divE.nGrowVect());
+            amrex::MultiFab::Add(mf_dst_stag, divE, ic, 0, 1, ng_sum);
         }
         ablastr::coarsen::sample::Coarsen( mf_dst, mf_dst_stag, dcomp, 0, nComp(), 0,  m_crse_ratio);
     } else {
