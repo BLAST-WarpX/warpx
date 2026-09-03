@@ -18,6 +18,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox.H"
+#include "FieldSolver/CurrentControlledPort.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/ElectrostaticSolvers/LabFrameExplicitES.H"
 #include "FieldSolver/ElectrostaticSolvers/RelativisticExplicitES.H"
@@ -435,6 +436,10 @@ WarpX::WarpX ()
         m_hybrid_pic_model = std::make_unique<HybridPICModel>();
     }
 
+    if (CurrentControlledPort::is_enabled()) {
+        m_current_controlled_port = std::make_unique<CurrentControlledPort>();
+    }
+
     current_buffer_masks.resize(nlevs_max);
     gather_buffer_masks.resize(nlevs_max);
 
@@ -456,11 +461,9 @@ WarpX::WarpX ()
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
 
-    // Prescribed current injection (warpx.current_injection.*) is realized by
-    // PrescribedCurrentParticleContainer, created by MultiParticleContainer and
-    // parsed there. It deposits through the standard particle current path, so
-    // no field-level injection or input parsing is needed here.
-    // ------------------------------------------------------------------------
+    // The box-based impressed-current antenna is created by
+    // MultiParticleContainer. The paired current-controlled port above is a
+    // separate field-level Ampere constraint; both source types may coexist.
 
 
     // Default values listed here for the case AMREX_USE_GPU are determined
@@ -566,6 +569,15 @@ WarpX::~WarpX ()
     for (int lev = 0; lev < nlevs_max; ++lev) {
         ClearLevel(lev);
     }
+}
+
+std::array<amrex::Real, 3>
+WarpX::GetCurrentControlledPortStatus () const
+{
+    if (!m_current_controlled_port) {
+        return {0.0_rt, 0.0_rt, 0.0_rt};
+    }
+    return m_current_controlled_port->status();
 }
 
 void

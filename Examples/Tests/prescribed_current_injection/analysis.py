@@ -7,6 +7,7 @@ import math
 
 import numpy as np
 import yt
+from scipy.constants import epsilon_0
 
 yt.funcs.mylog.setLevel(50)
 
@@ -52,6 +53,63 @@ def check_zero(ad, name, atol=1.0e-20):
     assert maximum < atol
 
 
+def check_gauss_law(ad, rtol=5.0e-2):
+    rho = get_field(ad, "rho")
+    div_e = get_field(ad, "divE")
+    charge_scale = np.max(np.abs(rho / epsilon_0))
+    assert charge_scale > 0.0, "Finite antenna must deposit polarization charge"
+    error = np.max(np.abs(div_e - rho / epsilon_0)) / charge_scale
+    print(f"Gauss-law relative L-infinity error={error:.6e}")
+    assert error < rtol
+
+
+def check_continuity(plotfiles, rtol=2.0e-6):
+    """Check d(rho)/dt + div(J) on cell-centered plotfile fields.
+
+    For a periodic Yee mesh, averaging the native staggered rho and J fields
+    to cell centers commutes with the centered divergence used below.  This is
+    therefore an independent regression of the source's old/new charge and
+    charge-conserving current deposition, rather than another Gauss-law test.
+    """
+    assert len(plotfiles) >= 2, "Continuity check needs consecutive plotfiles"
+    for old_path, new_path in zip(plotfiles[:-1], plotfiles[1:]):
+        ds_old = yt.load(old_path)
+        ds_new = yt.load(new_path)
+        old = ds_old.covering_grid(
+            level=0,
+            left_edge=ds_old.domain_left_edge,
+            dims=ds_old.domain_dimensions,
+        )
+        new = ds_new.covering_grid(
+            level=0,
+            left_edge=ds_new.domain_left_edge,
+            dims=ds_new.domain_dimensions,
+        )
+
+        dt = float(ds_new.current_time - ds_old.current_time)
+        assert dt > 0.0
+        rho_rate = (get_field(new, "rho") - get_field(old, "rho")) / dt
+        spacing = np.asarray(
+            (ds_new.domain_right_edge - ds_new.domain_left_edge)
+            / ds_new.domain_dimensions
+        )
+        div_j = np.zeros_like(rho_rate)
+        for axis, name in enumerate(("jx", "jy", "jz")):
+            current = get_field(new, name)
+            div_j += (
+                np.roll(current, -1, axis=axis) - np.roll(current, 1, axis=axis)
+            ) / (2.0 * spacing[axis])
+
+        scale = max(np.max(np.abs(rho_rate)), np.max(np.abs(div_j)))
+        assert scale > 0.0, "Finite antenna must have a nonzero continuity scale"
+        error = np.max(np.abs(rho_rate + div_j)) / scale
+        print(
+            f"continuity {old_path} -> {new_path}: "
+            f"relative L-infinity error={error:.6e}"
+        )
+        assert error < rtol
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jx-integral", type=float, default=0.0)
@@ -59,6 +117,7 @@ def main():
     parser.add_argument("--jz-integral", type=float, default=0.0)
     parser.add_argument("--jz", type=float)
     parser.add_argument("--rz-current", type=float)
+    parser.add_argument("--check-continuity", action="store_true")
     args = parser.parse_args()
 
     plotfiles = sorted(
@@ -68,7 +127,9 @@ def main():
     ds = yt.load(plotfiles[-1])
     ad = ds.all_data()
 
-    check_zero(ad, "rho")
+    if args.check_continuity:
+        check_continuity(plotfiles)
+    check_gauss_law(ad)
     if args.rz_current is None:
         for name, expected in (
             ("jx", args.jx_integral),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compact PICMI regression for prescribed current injection."""
+"""Compact PICMI regression for the impressed-current antenna."""
 
 from pathlib import Path
 
@@ -39,7 +39,7 @@ simulation = picmi.Simulation(
     max_steps=1,
     verbose=1,
     particle_shape="linear",
-    warpx_current_deposition_algo="direct",
+    warpx_current_deposition_algo="esirkepov",
 )
 simulation.add_prescribed_current_injection(current)
 try:
@@ -54,7 +54,7 @@ simulation.add_diagnostic(
         name="diag1",
         grid=grid,
         period=-1,
-        data_list=["Jx", "Jy", "Jz", "rho"],
+        data_list=["Jx", "Jy", "Jz", "rho", "divE"],
         write_dir="diags",
         warpx_file_prefix="diag1",
     )

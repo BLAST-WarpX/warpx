@@ -85,6 +85,7 @@ WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
 
     FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
     ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
+    ApplyCurrentControlledPort(0, PatchType::fine, a_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 

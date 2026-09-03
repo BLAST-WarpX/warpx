@@ -10,6 +10,7 @@
 #include "WarpXParticleContainer.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+#include "Utils/CurrentWaveform.H"
 
 #include <AMReX_AmrCoreFwd.H>
 #include <AMReX_BaseFwd.H>
@@ -19,41 +20,39 @@
 #include <vector>
 
 /**
- * PrescribedCurrentParticleContainer imposes a user-prescribed, time-varying
- * current density J = I(t)/A over one or more axis-aligned rectangular boxes,
- * using artificial macro-particles deposited through the standard WarpX
- * current-deposition path (like LaserParticleContainer).
+ * PrescribedCurrentParticleContainer is an impressed-current antenna that
+ * imposes a user-prescribed, time-varying current density J = I(t)/A over one
+ * or more axis-aligned rectangular boxes, using artificial macro-particles
+ * deposited through the standard WarpX current-deposition path (like
+ * LaserParticleContainer).
  *
  * Compared with writing J directly into `current_fp`, depositing through the
  * particle path means the imposed current (a) shows up in the Jx/Jy/Jz
  * diagnostics and (b) is handled identically by the explicit and implicit
  * field solvers.
  *
- * Each filled cell carries a single charge=1 particle of signed weight. Charge
- * deposition is explicitly disabled for this current-only source. Particle
- * positions are reset every step, so the antenna does not drift for a
- * sustained waveform.
+ * Each filled cell carries a coincident pair of opposite signed weights.  The
+ * pair members move in opposite directions, so their currents add while their
+ * charge separation supplies the rho required by the discrete continuity
+ * equation.  Their maximum excursion is kept below a fraction of one cell by
+ * choosing the particle weight from the time-integrated waveform.
  *
- * NOTE: this does NOT remove the need for a closed current path. The injected
- * J is localized, so div(J) != 0 at the box faces and charge conservation
- * still forces a return (locally, via displacement current / the nearest
- * conductor). Prescribed current injection only sustains a current along a
- * conductor when the circuit is closed -- a ring/coil (div J = 0 around the
- * loop) or an explicit drive + return face pair.
+ * This is not a terminal or circuit boundary.  A finite box generally has
+ * div(J) != 0, so it polarizes its two ends and behaves as an antenna.  It
+ * cannot enforce the same current through a separate conductor or plasma.
  *
  * Configured via the public `warpx.current_injection.*` input block:
- * n_pairs drive faces, each with a box, area A, sign (+/-1), and an optional
- * per-pair waveform file (pair_N.file) that overrides the global
- * current_injection.file. A "return" is just a drive face with sign = -1, so
- * no dedicated return block exists. Each face has its own current direction
- * `dir`. Requires algo.particle_shape >= 1. Works with algo.current_deposition =
- * direct or a charge-conserving scheme (esirkepov/villasenor): positions are
- * pushed by v*dt before deposition (then reset), so the displacement yields
- * J = q w v either way.
+ * n_pairs antenna regions, each with a box, area A, sign (+/-1), and an
+ * optional per-pair waveform file (pair_N.file) that overrides the global
+ * current_injection.file. The sign reverses the current vector; it does not
+ * identify a circuit return terminal. Each region has its own current direction
+ * `dir`. Requires algo.particle_shape >= 1 and a charge-conserving current
+ * deposition scheme (Esirkepov or Villasenor).
  *
  * Dimensionality:
  *  - 3D and 2D (XZ): J = sign * I(t) / A is uniform over the drive box; the
- *    per-cell weight w = sign * dV / (vel_coeff * A) is constant.
+ *    two pair members have weights +/-dV/(2*vel_coeff*A), and the requested
+ *    sign is applied to their opposite velocities.
  *  - RZ: dir = 0/1/2 -> Jr/Jtheta/Jz. Antenna particles are seeded at theta = 0
  *    so the Cartesian push is a radial/azimuthal/axial step. The RZ current
  *    path deposits a raw J that ApplyInverseVolumeScalingToCurrentDensity later
@@ -65,84 +64,75 @@
  *    -> uniform J = sign * I(t) / A over the r-z box (A is the physical
  *    cross-section, e.g. pi*(r_o^2-r_i^2) for Jz, (r_o-r_i)*dz for Jtheta).
  */
-class PrescribedCurrentParticleContainer
-    : public WarpXParticleContainer
-{
-public:
+class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
+  public:
     PrescribedCurrentParticleContainer (amrex::AmrCore* amr_core, int ispecies);
     ~PrescribedCurrentParticleContainer () override = default;
 
-    PrescribedCurrentParticleContainer ( PrescribedCurrentParticleContainer const &)             = delete;
-    PrescribedCurrentParticleContainer& operator= ( PrescribedCurrentParticleContainer const & ) = delete;
-    PrescribedCurrentParticleContainer ( PrescribedCurrentParticleContainer&& )                  = default;
-    PrescribedCurrentParticleContainer& operator= ( PrescribedCurrentParticleContainer&& )       = default;
+    PrescribedCurrentParticleContainer (
+        PrescribedCurrentParticleContainer const&) = delete;
+    PrescribedCurrentParticleContainer&
+    operator=(PrescribedCurrentParticleContainer const&) = delete;
+    PrescribedCurrentParticleContainer (PrescribedCurrentParticleContainer&&) =
+        default;
+    PrescribedCurrentParticleContainer&
+    operator=(PrescribedCurrentParticleContainer&&) = default;
 
     void InitData () final;
 
-    void DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType& /*pinned_tile*/,
-        int /*n_external_attr_real*/,
-        int /*n_external_attr_int*/) final {}
+    void
+    DefaultInitializeRuntimeAttributes (
+        typename ContainerLike<amrex::PolymorphicArenaAllocator>::
+            ParticleTileType& /*pinned_tile*/,
+        int /*n_external_attr_real*/, int /*n_external_attr_int*/) final {}
 
-    void ReadHeader (std::istream& /*is*/) final {}
-    void WriteHeader (std::ostream& /*os*/) const final {}
+    void
+    ReadHeader (std::istream& /*is*/) final {}
+    void
+    WriteHeader (std::ostream& /*os*/) const final {}
 
-    void Evolve (ablastr::fields::MultiFabRegister& fields,
-                 int lev,
-                 const std::string& current_fp_string,
-                 amrex::Real t, amrex::Real dt, SubcyclingHalf subcycling_half=SubcyclingHalf::None,
-                 bool skip_deposition=false,
-                 PositionPushType position_push_type=PositionPushType::Full,
-                 MomentumPushType momentum_push_type=MomentumPushType::Full,
-                 ImplicitOptions const * implicit_options = nullptr) final;
+    void Evolve (ablastr::fields::MultiFabRegister& fields, int lev,
+                 const std::string& current_fp_string, amrex::Real t,
+                 amrex::Real dt,
+                 SubcyclingHalf subcycling_half = SubcyclingHalf::None,
+                 bool skip_deposition = false,
+                 PositionPushType position_push_type = PositionPushType::Full,
+                 MomentumPushType momentum_push_type = MomentumPushType::Full,
+                 ImplicitOptions const* implicit_options = nullptr) final;
 
-    void PushP (int /*lev*/, amrex::Real /*dt*/,
-                const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                const amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&,
-                MomentumPushType /*momentum_push_type*/ = MomentumPushType::Full) final {}
+    void
+    PushP (int /*lev*/, amrex::Real /*dt*/, const amrex::MultiFab&,
+           const amrex::MultiFab&, const amrex::MultiFab&,
+           const amrex::MultiFab&, const amrex::MultiFab&,
+           const amrex::MultiFab&,
+           MomentumPushType /*momentum_push_type*/ =
+               MomentumPushType::Full) final {}
 
     void PostRestart () final;
 
-    void DepositCharge (
-        WarpXParIter& /*pti*/,
-        RealVector const& /*wp*/,
-        int const* /*ion_lev*/,
-        amrex::MultiFab* /*rho*/,
-        int /*icomp*/,
-        long /*offset*/,
-        long /*np_to_deposit*/,
-        int /*thread_num*/,
-        int /*lev*/,
-        int /*depos_lev*/) final
-    {}
-
-    /** Whether `warpx.current_injection = 1` is set in the inputs. */
+    /** Whether the impressed-current antenna is enabled in the inputs. */
     static bool is_enabled ();
 
-private:
+  private:
     //! One axis-aligned drive box with its own waveform.
     struct Face {
-        amrex::Real lo[3] = {0.,0.,0.};
-        amrex::Real hi[3] = {0.,0.,0.};
-        amrex::Real A     = 1.;   //!< Face area perpendicular to dir [m^2]
-        int dir           = 0;    //!< Current component: 0=Jx, 1=Jy, 2=Jz
-        int sign          = 1;    //!< Current sign: +1 or -1 (J = sign*I(t)/A)
-        //! Per-face waveform (from pair_N.file if given, else the global file).
-        std::vector<amrex::Real> t;   //!< sample times [s]
-        std::vector<amrex::Real> I;   //!< currents [A]
+        amrex::Real lo[3] = {0., 0., 0.};
+        amrex::Real hi[3] = {0., 0., 0.};
+        amrex::Real A = 1.; //!< Face area perpendicular to dir [m^2]
+        int dir = 0;        //!< Current component: 0=Jx, 1=Jy, 2=Jz
+        int sign = 1;       //!< Current sign: +1 or -1 (J = sign*I(t)/A)
+        //! Per-region waveform (from pair_N.file if given, else the global
+        //! file).
+        warpx::utils::CurrentWaveform waveform;
     };
 
     std::vector<Face> m_faces;
 
-    amrex::Real m_vel_coeff = 0.;  //!< C such that speed = C * I(t) [m/s/A]
-    bool       m_enabled    = true;
+    amrex::Real m_vel_coeff = 0.; //!< C such that speed = C * I(t) [m/s/A]
+    bool m_enabled = true;
 
     //! Set the velocity scale from the largest waveform sample.
     void compute_velocity_scale ();
-
-    //! Linear interpolation of a (t,I) table; returns 0 outside the table.
-    [[nodiscard]] static amrex::Real interpolate (
-        const std::vector<amrex::Real>& t, const std::vector<amrex::Real>& I, amrex::Real tt);
 };
 
 #endif // WARPX_PrescribedCurrentParticleContainer_H_

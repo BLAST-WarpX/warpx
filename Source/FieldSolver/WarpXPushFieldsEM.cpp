@@ -993,6 +993,7 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
 
     amrex::Real const new_time = start_time + a_dt;
     ApplyBfieldBoundary(lev, patch_type, subcycling_half, new_time);
+    ApplyCurrentControlledPort(lev, patch_type, new_time);
 }
 
 

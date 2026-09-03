@@ -17,6 +17,7 @@
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/CurrentControlledPort.H"
 #ifdef AMREX_USE_EB
 #   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
@@ -831,12 +832,24 @@ WarpX::InitData ()
         ComputeDt();
         ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
+        if (m_current_controlled_port) {
+            m_current_controlled_port->InitData(
+                m_fields.get_alldirs(FieldType::Bfield_fp, 0),
+                m_eb_update_B[0], gett_new(0));
+            FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+        }
         InitDiagnostics();
     }
     else
     {
         InitFromCheckpoint();
         ::PrintDtDxDyDz(max_level, geom, dt);
+        if (m_current_controlled_port) {
+            m_current_controlled_port->InitData(
+                m_fields.get_alldirs(FieldType::Bfield_fp, 0),
+                m_eb_update_B[0], gett_new(0));
+            FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+        }
         PostRestart();
         reduced_diags->InitData();
     }

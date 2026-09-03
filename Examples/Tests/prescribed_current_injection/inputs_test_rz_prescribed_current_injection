@@ -16,9 +16,10 @@ warpx.n_rz_azimuthal_modes = 2
 warpx.const_dt = 1.0e-12
 algo.maxwell_solver = yee
 algo.particle_shape = 1
-algo.current_deposition = direct
+algo.current_deposition = esirkepov
 
 warpx.current_injection = 1
+warpx.current_injection.type = antenna
 warpx.current_injection.file = current_profile.txt
 warpx.current_injection.n_pairs = 2
 
@@ -45,6 +46,6 @@ warpx.current_injection.pair_1.drive.sign = -1
 diagnostics.diags_names = diag1
 diag1.diag_type = Full
 diag1.intervals = -1
-diag1.fields_to_plot = jr jt jz rho
+diag1.fields_to_plot = jr jt jz rho divE
 diag1.format = plotfile
 diag1.file_prefix = diags/diag1
