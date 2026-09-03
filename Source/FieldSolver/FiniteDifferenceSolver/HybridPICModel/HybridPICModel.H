@@ -462,6 +462,15 @@ public:
      *  because it is a lazily-set cache flag inside a const call chain. */
     mutable bool m_qdsmc_J_plasma_valid = false;
 
+    /** True when the evolved electron temperature was restored from a
+     *  checkpoint (set by WarpX::InitFromCheckpoint). With the electron
+     *  energy equation on, T_e is evolved state and is written to the
+     *  checkpoint; the two seeds that would otherwise overwrite it -- the
+     *  uniform elec_temp fill in InitData and the adiabat seed in
+     *  WarpX::HybridPICInitializeRhoJandB -- are skipped when this is set,
+     *  so a restart continues from the restored thermal structure. */
+    bool m_te_restored_from_checkpoint = false;
+
     /** True when the per-species deposited charge densities rho_fp_{spec}
      *  are needed, i.e. when the electron-energy equation is solved (its
      *  Joule and Q_ei sources read the per-species charge densities).

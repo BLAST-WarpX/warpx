@@ -21,6 +21,7 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "FieldIO.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -30,6 +31,7 @@
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/text/StreamUtils.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
@@ -292,6 +294,11 @@ WarpX::InitFromCheckpoint ()
 
     const int nlevs = finestLevel()+1;
 
+    // Count the levels on which the electron temperature was restored from
+    // the checkpoint, to decide below whether the T_e seeds must be
+    // suppressed (see m_te_restored_from_checkpoint).
+    int n_levels_with_te_restored = 0;
+
     // Initialize the field data
     for (int lev = 0; lev < nlevs; ++lev)
     {
@@ -404,8 +411,38 @@ WarpX::InitFromCheckpoint ()
             }
         }
 
-        m_fields.read_restarts(lev, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, ""));
+        // Read any fields flagged checkpoint_restart in the field register
+        // (mirrors FlushFormatCheckpoint's write_checkpoints call). Flagged
+        // fields absent from an older checkpoint are skipped, not errors.
+        auto const restored_names = m_fields.read_restarts(
+            lev, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, ""));
 
+        std::string const te_name = m_fields.mf_name(
+            amrex::getEnumNameString(FieldType::hybrid_electron_temperature_fp), lev);
+        for (auto const& name : restored_names) {
+            if (name == te_name) { ++n_levels_with_te_restored; }
+        }
+    }
+
+    // With the electron energy equation on, T_e is evolved state that was
+    // just restored: latch the seeds off so neither HybridPICModel::InitData
+    // (uniform elec_temp fill) nor WarpX::HybridPICInitializeRhoJandB
+    // (adiabat seed) -- both of which run after this -- overwrites it.
+    if (m_hybrid_pic_model && m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        if (n_levels_with_te_restored == nlevs) {
+            m_hybrid_pic_model->m_te_restored_from_checkpoint = true;
+            amrex::Print() << Utils::TextMsg::Info(
+                "restart: electron temperature restored from checkpoint "
+                "(adiabat seed suppressed)");
+        } else {
+            ablastr::warn_manager::WMRecordWarning(
+                "HybridPIC",
+                "Restarting with the electron energy equation from a checkpoint "
+                "that does not contain the electron temperature: T_e will be "
+                "re-seeded from the density adiabat, so evolved electron thermal "
+                "structure from before the checkpoint is not preserved.",
+                ablastr::warn_manager::WarnPriority::high);
+        }
     }
 
     InitPML();

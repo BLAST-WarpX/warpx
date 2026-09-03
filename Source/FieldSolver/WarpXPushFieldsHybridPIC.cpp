@@ -379,10 +379,25 @@ void WarpX::HybridPICInitializeRhoJandB ()
     // right after each deposition (via the closure, or via the QDSMC entropy
     // transport when solve_electron_energy_equation is on).
     // With the energy equation on the closure is evaluated on floored density.
-    // T_e is not checkpointed either, so on restart the seed re-derives it from
-    // the restored rho: evolved T_e structure is not preserved across a restart.
-    m_hybrid_pic_model->CalculateElectronPressure(
-        m_hybrid_pic_model->m_solve_electron_energy_equation);
+    if (m_hybrid_pic_model->m_te_restored_from_checkpoint) {
+        // Restart with the electron energy equation: T_e is evolved state and
+        // was restored by InitFromCheckpoint. Emit Pe from the RESTORED T_e
+        // (with the boundary treatment grad Pe needs) rather than re-running
+        // the adiabat seed, which would overwrite it and discard the evolved
+        // thermal structure. Only reachable with the energy equation on.
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev);
+            ApplyElectronPressureBoundary(lev, PatchType::fine);
+            ablastr::utils::communication::FillBoundary(
+                *m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
+                do_single_precision_comms,
+                Geom(lev).periodicity(),
+                true);
+        }
+    } else {
+        m_hybrid_pic_model->CalculateElectronPressure(
+            m_hybrid_pic_model->m_solve_electron_energy_equation);
+    }
 
     if (restart_chkfile.empty()) {
         // Handle field splitting for Hybrid field push

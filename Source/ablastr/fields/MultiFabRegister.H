@@ -777,10 +777,18 @@ namespace ablastr::fields
 
         /** Read in any (i)MultiFabs that are flagged checkpoint_restart from the checkpoint files
          *
+         * A flagged field whose file is absent from the checkpoint (e.g. a
+         * checkpoint written before the field was flagged, or by a run with
+         * a different set of flagged fields) is skipped rather than fatal,
+         * so that older checkpoints remain restartable. Callers that need
+         * the field can detect the skip from the returned names and decide
+         * whether it is an error.
+         *
          * @param level the MR level of the MF
          * @param dir the pathname to the checkpoint files
+         * @return register names (see mf_name) of the fields actually read
          */
-        void
+        std::vector<std::string>
         read_restarts (
             int level,
             std::string const & dir
