@@ -592,9 +592,9 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
     }
 }
 
-void SemiImplicitDarwin::ScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const
+void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const
 {
-    BL_PROFILE("SemiImplicitDarwin::ScaledMassMatrixCC()");
+    BL_PROFILE("SemiImplicitDarwin::ComputeScaledMassMatrixCC()");
 
     using ablastr::fields::Direction;
 

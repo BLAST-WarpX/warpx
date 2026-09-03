@@ -99,7 +99,7 @@ public:
      *  that row-sum over the 3 diagonal blocks, and interpolates the result
      *  from the staggered points onto the cell center.
      */
-    void ScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const;
+    void ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const;
 
     void PrepareVelocitiesForCurrentDeposition ();
     void AccumulateCurrentAndMassMatrices ();

@@ -60,13 +60,6 @@
  *  quality, not correctness: amrex::GMRES applies the preconditioner on the
  *  right, so the reported residual is always that of the true operator.
  *
- *  This relies on each B-staggered component being nodal in at most one
- *  dimension, which holds in 1D, 2D, and 3D Cartesian geometry. The
- *  cell-centered operators are fully periodic, matching the periodic-only
- *  restriction that SemiImplicitDarwin::Define() already enforces, and are
- *  therefore singular - the constant null space is handled by MLMG's
- *  automatic RHS mean offset.
- *
  *  The MLMG solves run a fixed number of V-cycles (max_iter) so the
  *  preconditioner is a fixed linear operator across a GMRES solve.
  */
@@ -101,7 +94,7 @@ class DarwinMLMGPC : public Preconditioner<T,Ops>
 
         /**
          * \brief Update the preconditioner: refresh chi(x) from the freshly
-         *  deposited mass matrices (via Ops::ScaledMassMatrixCC).
+         *  deposited mass matrices (via Ops::ComputeScaledMassMatrixCC).
          */
         void Update () override;
 
@@ -295,7 +288,7 @@ void DarwinMLMGPC<T,Ops>::Update ()
         IsDefined(),
         "DarwinMLMGPC::Update() called on undefined object" );
 
-    m_ops->ScaledMassMatrixCC(m_chi_cc);
+    m_ops->ComputeScaledMassMatrixCC(m_chi_cc);
     m_helmholtz->setACoeffs(0, m_chi_cc);
 
     if (m_verbose) {
