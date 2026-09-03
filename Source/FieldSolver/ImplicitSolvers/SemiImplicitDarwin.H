@@ -96,11 +96,7 @@ public:
      *  a dense matrix. a_chi_xx_cc, a_chi_yy_cc, a_chi_zz_cc each collapse
      *  one diagonal block to a single scalar per cell: sum that block's
      *  stencil-band components into a per-point row-sum, then interpolate
-     *  the result from the staggered points onto the cell center. Unlike an
-     *  isotropic average of the three diagonal blocks, keeping them separate
-     *  preserves anisotropy in the plasma response (e.g. from a background
-     *  magnetic field), at the cost of the preconditioner's per-component
-     *  Helmholtz solves no longer sharing a single operator.
+     *  the result from the staggered points onto the cell center.
      */
     void ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
                                      amrex::MultiFab& a_chi_yy_cc,

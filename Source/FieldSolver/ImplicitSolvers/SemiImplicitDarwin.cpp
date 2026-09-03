@@ -608,9 +608,8 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_c
     amrex::MultiFab* chi_cc[3] = {&a_chi_xx_cc, &a_chi_yy_cc, &a_chi_zz_cc};
 
     // Scale by the same 2 mu0/dt prefactor the operator applies to the
-    // mass-matrix product. Each diagonal block is kept separate (not
-    // averaged) so the preconditioner can see the plasma response's
-    // anisotropy, e.g. from a background magnetic field.
+    // mass-matrix product. Each diagonal block is kept separate so the
+    // preconditioner can see the plasma response's anisotropy.
     const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
 
     for (int d = 0; d < 3; ++d) {
