@@ -36,6 +36,7 @@
 using namespace amrex;
 
 namespace {
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 [[nodiscard]] int
 nearest_index (amrex::MultiFab const& field, int const direction,
                amrex::Real const coordinate) {
@@ -54,6 +55,7 @@ nearest_index (amrex::MultiFab const& field, int const direction,
         "Current-controlled port coordinate lies outside the field domain.");
     return index;
 }
+#endif
 
 #ifdef WARPX_DIM_3D
 [[nodiscard]] std::array<int, 2>
@@ -139,7 +141,7 @@ CurrentControlledPort::CurrentControlledPort () {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_waveform.max_abs_current() > 0.0_rt,
         "The current-controlled-port waveform is identically zero.");
-#if defined(WARPX_DIM_3D)
+#ifdef WARPX_DIM_3D
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_direction >= 0 && m_direction < 3,
         "warpx.current_controlled_port.direction must be 0, 1, or 2 in 3D.");
@@ -236,6 +238,7 @@ CurrentControlledPort::ValidateGeometry (
             "per mode.");
     }
 
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     amrex::Geometry const& geometry = warpx.Geom(0);
     std::array<amrex::Real, 3> domain_lo{{0.0_rt, 0.0_rt, 0.0_rt}};
     std::array<amrex::Real, 3> domain_hi{{0.0_rt, 0.0_rt, 0.0_rt}};
@@ -277,6 +280,7 @@ CurrentControlledPort::ValidateGeometry (
                 "simulation domain.");
         }
     }
+#endif
 }
 
 void
@@ -359,9 +363,9 @@ CurrentControlledPort::BuildCurlBasis (
     auto const prob_lo = geometry.ProbLoArray();
     auto const cell_size = geometry.CellSizeArray();
     amrex::IntVect const domain_lo = geometry.Domain().smallEnd();
-    amrex::GpuArray<amrex::Real, 3> transverse_lo{
+    amrex::GpuArray<amrex::Real, 3> const transverse_lo{
         m_terminal_0.lo[0], m_terminal_0.lo[1], m_terminal_0.lo[2]};
-    amrex::GpuArray<amrex::Real, 3> transverse_hi{
+    amrex::GpuArray<amrex::Real, 3> const transverse_hi{
         m_terminal_0.hi[0], m_terminal_0.hi[1], m_terminal_0.hi[2]};
     amrex::IntVect const index_type = axial_potential.ixType().toIntVect();
     int const axis = m_direction;
@@ -394,7 +398,7 @@ CurrentControlledPort::BuildCurlBasis (
         component->FillBoundary(geometry.periodicity());
     }
 
-    ablastr::fields::VectorField potential_field{
+    ablastr::fields::VectorField const potential_field{
         potential[0].get(), potential[1].get(), potential[2].get()};
     ablastr::fields::VectorField basis_field{
         m_curl_basis[0].get(), m_curl_basis[1].get(), m_curl_basis[2].get()};
@@ -440,7 +444,7 @@ CurrentControlledPort::MeasureEdgeLocal (amrex::MultiFab const& field,
         amrex::Real const orientation = edge.orientation;
         amrex::ReduceOps<amrex::ReduceOpSum> reduce_ops;
         amrex::ReduceData<amrex::Real> reduce_data(reduce_ops);
-        using ReduceTuple = typename decltype(reduce_data)::Type;
+        using ReduceTuple = decltype(reduce_data)::Type;
         reduce_ops.eval(
             section, reduce_data,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
@@ -540,7 +544,7 @@ CurrentControlledPort::MeasureXZContourLocal (
                 reduce_ops;
             amrex::ReduceData<amrex::Real, amrex::Real, amrex::Real>
                 reduce_data(reduce_ops);
-            using ReduceTuple = typename decltype(reduce_data)::Type;
+            using ReduceTuple = decltype(reduce_data)::Type;
             reduce_ops.eval(
                 point_box, reduce_data,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k) -> ReduceTuple {
@@ -650,7 +654,7 @@ CurrentControlledPort::MeasureRZContourLocal (
                 reduce_ops;
             amrex::ReduceData<amrex::Real, amrex::Real, amrex::Real>
                 reduce_data(reduce_ops);
-            using ReduceTuple = typename decltype(reduce_data)::Type;
+            using ReduceTuple = decltype(reduce_data)::Type;
             amrex::Box const point_box(point, point, btheta.ixType());
             reduce_ops.eval(
                 point_box, reduce_data,
@@ -746,7 +750,7 @@ CurrentControlledPort::ApplyBfield (
     int const first_plane = std::min(plane_0, plane_1);
     int const last_plane = std::max(plane_0, plane_1);
     int const number_of_planes = last_plane - first_plane + 1;
-    ablastr::fields::VectorField basis_field{
+    ablastr::fields::VectorField const basis_field{
         m_curl_basis[0].get(), m_curl_basis[1].get(), m_curl_basis[2].get()};
     std::vector<amrex::Real> contour_data(2 * number_of_planes, 0.0_rt);
     for (int offset = 0; offset < number_of_planes; ++offset) {
@@ -865,7 +869,7 @@ CurrentControlledPort::ApplyBfield (
             m_axis_sign * terminal_circulation[terminal] / PhysConst::mu0;
     }
 #else
-    amrex::ignore_unused(Bfield, eb_update_B, time);
+    amrex::ignore_unused(Bfield, eb_update_B, target_axis_current);
 #endif
 }
 

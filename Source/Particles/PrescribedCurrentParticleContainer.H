@@ -82,8 +82,8 @@ class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
 
     void
     DefaultInitializeRuntimeAttributes (
-        typename ContainerLike<amrex::PolymorphicArenaAllocator>::
-            ParticleTileType& /*pinned_tile*/,
+        ContainerLike<amrex::PolymorphicArenaAllocator>::ParticleTileType&
+        /*pinned_tile*/,
         int /*n_external_attr_real*/, int /*n_external_attr_int*/) final {}
 
     void

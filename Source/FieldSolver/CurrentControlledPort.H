@@ -39,6 +39,7 @@
 class CurrentControlledPort {
   public:
     CurrentControlledPort ();
+    ~CurrentControlledPort () = default;
 
     CurrentControlledPort (CurrentControlledPort const&) = delete;
     CurrentControlledPort& operator=(CurrentControlledPort const&) = delete;
@@ -69,12 +70,11 @@ class CurrentControlledPort {
     int m_direction = 2;
     Terminal m_terminal_0;
     Terminal m_terminal_1;
-    amrex::Real m_axis_sign = amrex::Real(1.0);
+    amrex::Real m_axis_sign{1};
     warpx::utils::CurrentWaveform m_waveform;
     bool m_initialized = false;
-    amrex::Real m_last_target = amrex::Real(0.0);
-    std::array<amrex::Real, 2> m_last_terminal_current{
-        {amrex::Real(0.0), amrex::Real(0.0)}};
+    amrex::Real m_last_target{};
+    std::array<amrex::Real, 2> m_last_terminal_current{};
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> m_owner_mask;
 
     void ValidateGeometry (ablastr::fields::VectorField const& Bfield) const;
@@ -89,13 +89,19 @@ class CurrentControlledPort {
         int component = 0;
         int tangent_direction = 0;
         int fixed_direction = 1;
-        amrex::Real fixed_coordinate = amrex::Real(0.0);
-        amrex::Real tangent_lo = amrex::Real(0.0);
-        amrex::Real tangent_hi = amrex::Real(0.0);
-        amrex::Real orientation = amrex::Real(1.0);
+        amrex::Real fixed_coordinate{};
+        amrex::Real tangent_lo{};
+        amrex::Real tangent_hi{};
+        amrex::Real orientation{1};
     };
 
     [[nodiscard]] std::array<Edge, 4> Edges () const;
+#endif
+
+  public:
+    // The implementation helpers below contain extended __device__ lambdas.
+    // NVCC requires their enclosing member functions to be public.
+#ifdef WARPX_DIM_3D
     void BuildCurlBasis (
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B);

@@ -134,7 +134,7 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
         // In RZ with dir = 0 (Jr) the imposed profile is the conserved-total-I
         // 1/r coaxial profile Jr = I/(2*pi*r*dz), which has no single A, so A
         // is unused and may be omitted. In every other case A is required.
-#if defined(WARPX_DIM_RZ)
+#ifdef WARPX_DIM_RZ
         const bool a_required = (f.dir != 0);
 #else
         const bool a_required = true;
@@ -166,7 +166,7 @@ PrescribedCurrentParticleContainer::PrescribedCurrentParticleContainer (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             f.sign == -1 || f.sign == 1,
             "current_injection drive.sign must be -1 or 1");
-#if defined(WARPX_DIM_RZ)
+#ifdef WARPX_DIM_RZ
         if (f.dir == 0) {
             // Jr coaxial drive: box must lie off-axis (r > 0); Jr ~ 1/r
             // diverges at r = 0 and the inverse-volume scaling forces Jr = 0 on
@@ -219,7 +219,7 @@ PrescribedCurrentParticleContainer::InitData () {
         return;
     }
 
-#if defined(WARPX_DIM_1D_Z)
+#ifdef WARPX_DIM_1D_Z
     WARPX_ABORT_WITH_MESSAGE(
         "Prescribed current injection is not implemented in 1D_Z geometry.");
 #else
@@ -233,7 +233,7 @@ PrescribedCurrentParticleContainer::InitData () {
     const auto dx = geom.CellSizeArray();
     const Box& domain = geom.Domain();
 
-#if defined(WARPX_DIM_3D)
+#ifdef WARPX_DIM_3D
     const Real dV = dx[0] * dx[1] * dx[2];
 #elif defined(WARPX_DIM_XZ)
     // 2D XZ: per-unit-length in the invariant y-direction. AMReX index 0 -> x,
@@ -274,7 +274,7 @@ PrescribedCurrentParticleContainer::InitData () {
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
             const Real W = 0.5_rt * dV / (m_vel_coeff * f.A);
 #endif
-#if defined(WARPX_DIM_3D)
+#ifdef WARPX_DIM_3D
             for (int k = lo[2]; k <= hi[2]; ++k) {
                 for (int j = lo[1]; j <= hi[1]; ++j) {
                     for (int i = lo[0]; i <= hi[0]; ++i) {
@@ -501,24 +501,24 @@ PrescribedCurrentParticleContainer::Evolve (
             pti.GetStructOfArrays().GetIntData("face_id").dataPtr();
 
         if (!skip_deposition && fields.has(FieldType::rho_fp, lev)) {
-            int* ion_lev = nullptr;
+            int const* const ion_lev = nullptr;
             DepositCharge(pti, wp, ion_lev, fields.get(FieldType::rho_fp, lev),
                           0, 0, np, thread_num, lev, lev);
         }
 
-#if !defined(WARPX_DIM_1D_Z)
-        ParticleReal* x_n = nullptr;
+#ifndef WARPX_DIM_1D_Z
+        ParticleReal const* x_n = nullptr;
         if (push_type == PushType::Implicit) {
             x_n = pti.GetAttribs("x_n").dataPtr();
         }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
-        ParticleReal* y_n = nullptr;
+        ParticleReal const* y_n = nullptr;
         if (push_type == PushType::Implicit) {
             y_n = pti.GetAttribs("y_n").dataPtr();
         }
 #endif
-        ParticleReal* z_n = nullptr;
+        ParticleReal const* z_n = nullptr;
         if (push_type == PushType::Implicit) {
             z_n = pti.GetAttribs("z_n").dataPtr();
         }
@@ -529,15 +529,15 @@ PrescribedCurrentParticleContainer::Evolve (
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(long ip) noexcept {
             ParticleReal x, y, z;
             if (push_type == PushType::Implicit) {
-#if !defined(WARPX_DIM_1D_Z)
+#ifndef WARPX_DIM_1D_Z
                 x = x_n[ip];
 #else
-                x = ParticleReal(0.0);
+                x = ParticleReal{};
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
                 y = y_n[ip];
 #else
-                y = ParticleReal(0.0);
+                y = ParticleReal{};
 #endif
                 z = z_n[ip];
             } else {
@@ -548,7 +548,7 @@ PrescribedCurrentParticleContainer::Evolve (
             const Real polarity = weight_ptr[ip] >= 0.0_prt ? 1.0_rt : -1.0_rt;
             const Real v = polarity * velocity_f[fc];
             const Real u = v / std::sqrt(1._rt - v * v / c2);
-#if defined(WARPX_DIM_RZ)
+#ifdef WARPX_DIM_RZ
             if (fdir == 0) {
                 const Real r = std::sqrt(x * x + y * y);
                 const Real cos_theta = (r > 0._rt) ? x / r : 1._rt;
@@ -588,7 +588,7 @@ PrescribedCurrentParticleContainer::Evolve (
 
         if (!skip_deposition) {
             const Real relative_time = -0.5_rt * dt;
-            int* ion_lev = nullptr;
+            int const* const ion_lev = nullptr;
             amrex::MultiFab* jx =
                 fields.get(current_fp_string, Direction{0}, lev);
             amrex::MultiFab* jy =
@@ -600,7 +600,7 @@ PrescribedCurrentParticleContainer::Evolve (
         }
 
         if (!skip_deposition && fields.has(FieldType::rho_fp, lev)) {
-            int* ion_lev = nullptr;
+            int const* const ion_lev = nullptr;
             DepositCharge(pti, wp, ion_lev, fields.get(FieldType::rho_fp, lev),
                           1, 0, np, thread_num, lev, lev);
         }
