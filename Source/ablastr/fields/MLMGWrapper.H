@@ -10,6 +10,7 @@
 #endif
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <utility>
 
@@ -179,22 +180,32 @@ public:
         {
             MultiFab phi(rho.boxArray(), rho.DistributionMap(), 1, 1, MFInfo{}, rho.Factory());
 
-            Real tsolve;
+            auto tsolve = std::numeric_limits<double>::max();
             int mcl0, niter0;
+            bool baseline_ok = false;
             { // base line
                 auto tmp = make_mlmg_linop(info0, rho.boxArray(), rho.DistributionMap(), factory);
-                phi.setVal(0);
-                Gpu::synchronize();
-                auto t0 = amrex::second();
-                tmp.first->solve({&phi}, {&rho}, relative_tolerance, absolute_tolerance);
-                Gpu::synchronize();
-                auto t1 = amrex::second();
-                tsolve = t1-t0;
                 mcl0 = tmp.second->NMGLevels(0) - 1;
-                niter0 = tmp.first->getNumIters();
+                // The baseline solve itself might fail (e.g., it might not
+                // converge for this rho). In that case, we keep tsolve at its
+                // maximal value so that any setup that does work below will be
+                // chosen, and we use max_iters for the other setups.
+                niter0 = max_iters;
+                try {
+                    phi.setVal(0);
+                    Gpu::synchronize();
+                    auto t0 = amrex::second();
+                    tmp.first->solve({&phi}, {&rho}, relative_tolerance, absolute_tolerance);
+                    Gpu::synchronize();
+                    auto t1 = amrex::second();
+                    tsolve = t1-t0;
+                    niter0 = tmp.first->getNumIters();
+                    baseline_ok = true;
+                } catch (...) {}
             }
 
-            if (niter0 > 0) {
+            // If the baseline converged in zero iterations, there is nothing to tune.
+            if (!baseline_ok || (niter0 > 0)) {
                 // let's test single Box first
                 if ((lev == 0) && (rho.size() > 1)
                     && (geom.Domain().numPts() <= (Long(256)*Long(256)*Long(256))))
@@ -284,20 +295,35 @@ public:
                     }
                 }
 
-                if (m_parms_map.size() > 1000) { m_parms_map.clear(); } // just in case
+                if (baseline_ok || (tsolve < std::numeric_limits<double>::max()))
+                {
+                    if (m_parms_map.size() > 1000) { m_parms_map.clear(); } // just in case
 
-                m_parms_map[key] = m_parms;
+                    m_parms_map[key] = m_parms;
 
-                if (m_verbose) {
-                    std::string msg("MLMG parameters chosen:");
-                    if (m_parms.single_box) { msg += " original boxes agglomerated,"; }
-                    msg.append(" max_coarsening_level=").append(std::to_string(m_parms.mcl));
-                    if (m_parms.ags != -1) {
-                        msg.append(" agglomeration_grid_size=").append(std::to_string(m_parms.ags));
+                    if (m_verbose) {
+                        std::string msg("MLMG parameters chosen:");
+                        if (m_parms.single_box) { msg += " original boxes agglomerated,"; }
+                        msg.append(" max_coarsening_level=").append(std::to_string(m_parms.mcl));
+                        if (m_parms.ags != -1) {
+                            msg.append(" agglomeration_grid_size=").append(std::to_string(m_parms.ags));
+                        }
+                        amrex::Print() << msg << '\n';
                     }
-                    amrex::Print() << msg << '\n';
                 }
-            } // end of if (niter0 > 0)
+                else
+                {
+                    // None of the setups worked for this rho. We fall back to the
+                    // baseline setup (i.e., the default Parms) and hope that the
+                    // solver will work later with the real inputs. If it does not,
+                    // it will fail then anyway. The result is not cached, so that
+                    // the tuning can be attempted again later.
+                    m_parms = Parms{};
+                    if (m_verbose) {
+                        amrex::Print() << "MLMG tuning failed. Using the default parameters.\n";
+                    }
+                }
+            } // end of if (!baseline_ok || (niter0 > 0))
         }
 
         auto const* fac = factory;
