@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Verify that the 3D port projection preserves the magnetic constraint."""
 
-import glob
+from pathlib import Path
 
 import numpy as np
 import yt
 
 yt.funcs.mylog.setLevel(50)
 
-plotfiles = sorted(glob.glob("diags/diag1*"))
+plotfiles = sorted(
+    path
+    for path in Path("diags").glob("diag1*")
+    if path.name.removeprefix("diag1").isdigit()
+)
 assert plotfiles
-ds = yt.load(plotfiles[-1])
+ds = yt.load(str(plotfiles[-1]))
 data = ds.all_data()
 
 
@@ -27,3 +31,14 @@ dx_min = np.min(
 relative_divergence = np.max(np.abs(field("divB"))) / (b_scale / dx_min)
 print(f"relative magnetic-divergence error: {relative_divergence:.6e}")
 assert relative_divergence < 2.0e-12
+
+material_values = {
+    "sigma": 1.0,
+    "epsilon": 8.8541878188e-12,
+    "mu": 1.2566370612685e-6,
+}
+for name, expected in material_values.items():
+    if any(item[1] == name for item in ds.field_list):
+        relative_error = np.max(np.abs(field(name) - expected)) / expected
+        print(f"relative {name} diagnostic error: {relative_error:.6e}")
+        assert relative_error < 5.0e-6

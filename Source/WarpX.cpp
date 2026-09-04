@@ -445,14 +445,14 @@ WarpX::WarpX ()
                 "combined with analytic external current or split external "
                 "fields.");
         }
-        std::array<amrex::Real, 3> minimum_port_gap{};
 #ifdef WARPX_DIM_3D
-        for (int direction = 0; direction < 3; ++direction) {
-            minimum_port_gap[direction] = geom[0].CellSize(direction);
-        }
+        std::array<amrex::Real, 3> const minimum_port_gap{
+            geom[0].CellSize(0), geom[0].CellSize(1), geom[0].CellSize(2)};
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-        minimum_port_gap[0] = geom[0].CellSize(0);
-        minimum_port_gap[2] = geom[0].CellSize(1);
+        std::array<amrex::Real, 3> const minimum_port_gap{
+            geom[0].CellSize(0), 0.0_rt, geom[0].CellSize(1)};
+#else
+        std::array<amrex::Real, 3> const minimum_port_gap{};
 #endif
         int number_of_ports = 1;
         bool const indexed_ports =

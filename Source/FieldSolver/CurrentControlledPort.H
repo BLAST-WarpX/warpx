@@ -21,6 +21,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <vector>
 
 /** Enforce one current waveform between two internal terminal surfaces.
  *
@@ -127,9 +128,12 @@ class CurrentControlledPort {
         amrex::Real tangent_lo{};
         amrex::Real tangent_hi{};
         amrex::Real orientation{1};
+        bool upper_boundary = false;
     };
 
     [[nodiscard]] std::array<Edge, 4> Edges () const;
+    [[nodiscard]] int EdgeFixedIndex (amrex::MultiFab const& field,
+                                      Edge const& edge) const;
     void BuildCurlBasis (
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B);
@@ -142,27 +146,40 @@ class CurrentControlledPort {
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
         int plane_index) const;
-    void AddScaledCurlBasis (ablastr::fields::VectorField const& Bfield,
-                             int plane_index, amrex::Real scale) const;
+    [[nodiscard]] std::vector<amrex::Real> MeasureContoursLocalBatched (
+        ablastr::fields::VectorField const& Bfield,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+        int first_plane, int last_plane) const;
+    void
+    AddScaledCurlBasisBatched (ablastr::fields::VectorField const& Bfield,
+                               int first_plane,
+                               std::vector<amrex::Real> const& scales) const;
 #endif
 
 #ifdef WARPX_DIM_XZ
     [[nodiscard]] std::array<amrex::Real, 3> MeasureXZContourLocal (
         amrex::MultiFab const& by, amrex::iMultiFab const& owner_mask,
         amrex::iMultiFab const* eb_flag, int plane_index) const;
-    void CorrectXZContour (amrex::MultiFab& by, amrex::iMultiFab const* eb_flag,
-                           int plane_index, amrex::Real current_error,
-                           std::array<amrex::Real, 3> const& contour) const;
+    [[nodiscard]] std::vector<amrex::Real> MeasureXZContoursLocalBatched (
+        amrex::MultiFab const& by, amrex::iMultiFab const& owner_mask,
+        amrex::iMultiFab const* eb_flag, int first_plane, int last_plane) const;
+    void
+    CorrectXZContoursBatched (amrex::MultiFab& by,
+                              amrex::iMultiFab const* eb_flag, int first_plane,
+                              std::vector<amrex::Real> const& scales) const;
 #endif
 
 #ifdef WARPX_DIM_RZ
     [[nodiscard]] std::array<amrex::Real, 3> MeasureRZContourLocal (
         amrex::MultiFab const& btheta, amrex::iMultiFab const& owner_mask,
         amrex::iMultiFab const* eb_flag, int plane_index) const;
-    void CorrectRZContour (amrex::MultiFab& btheta,
-                           amrex::iMultiFab const* eb_flag, int plane_index,
-                           amrex::Real current_error,
-                           std::array<amrex::Real, 3> const& contour) const;
+    [[nodiscard]] std::vector<amrex::Real> MeasureRZContoursLocalBatched (
+        amrex::MultiFab const& btheta, amrex::iMultiFab const& owner_mask,
+        amrex::iMultiFab const* eb_flag, int first_plane, int last_plane) const;
+    void
+    CorrectRZContoursBatched (amrex::MultiFab& btheta,
+                              amrex::iMultiFab const* eb_flag, int first_plane,
+                              std::vector<amrex::Real> const& scales) const;
 #endif
 };
 

@@ -34,6 +34,16 @@ if(WarpX_EB)
 endif()
 
 add_warpx_test(
+    test_3d_current_controlled_port_off_grid_picmi  # name
+    3  # dims
+    1  # nprocs
+    "inputs_test_current_controlled_port_picmi.py --mode 3d-off-grid"  # inputs
+    analysis.py  # analysis (snapped contour, div(B), and material fields)
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_current_controlled_port_hybrid_picmi  # name
     3  # dims
     1  # nprocs

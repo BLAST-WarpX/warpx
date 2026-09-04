@@ -12,10 +12,11 @@
 #include "ComputeDiagFunctors/ParticleReductionFunctor.H"
 #include "ComputeDiagFunctors/PhiFunctor.H"
 #include "ComputeDiagFunctors/ProcessNumberFunctor.H"
-#include "ComputeDiagFunctors/TemperatureFunctor.H"
 #include "ComputeDiagFunctors/RhoFunctor.H"
+#include "ComputeDiagFunctors/TemperatureFunctor.H"
 #include "Diagnostics/Diagnostics.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "Fields.H"
 #include "FlushFormats/FlushFormat.H"
 #include "Particles/MultiParticleContainer.H"
@@ -1006,7 +1007,26 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
             m_all_field_functors[lev][comp] = std::make_unique<DivEFunctor>(warpx.m_fields.get_alldirs(FieldType::Efield_aux, lev), lev, m_crse_ratio);
         } else if ( m_varnames[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
-        } else if ( warpx.m_fields.has(m_varnames[comp], lev) ) {
+        } else if (m_varnames[comp] == "sigma" ||
+                   m_varnames[comp] == "epsilon" || m_varnames[comp] == "mu") {
+            auto* const properties = warpx.get_pointer_MacroscopicProperties();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                properties != nullptr,
+                "The '" + m_varnames[comp] +
+                    "' diagnostic requires algo.em_solver_medium = "
+                    "macroscopic.");
+            amrex::MultiFab const* material_field = nullptr;
+            if (m_varnames[comp] == "sigma") {
+                material_field = &properties->getsigma_mf();
+            } else if (m_varnames[comp] == "epsilon") {
+                material_field = &properties->getepsilon_mf();
+            } else {
+                material_field = &properties->getmu_mf();
+            }
+            m_all_field_functors[lev][comp] =
+                std::make_unique<CellCenterFunctor>(material_field, lev,
+                                                    m_crse_ratio);
+        } else if (warpx.m_fields.has(m_varnames[comp], lev)) {
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], lev), lev, m_crse_ratio);
         } else {
             WARPX_ABORT_WITH_MESSAGE(

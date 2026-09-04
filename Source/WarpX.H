@@ -1003,6 +1003,11 @@ public:
     //! This function is called in amrex::AmrCore::InitFromScratch.
     void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
+    [[nodiscard]] MacroscopicProperties*
+    get_pointer_MacroscopicProperties () const {
+        return m_macroscopic_properties.get();
+    }
+
 #ifdef AMREX_USE_EB
     amrex::EB2::IndexSpace const* GetEBIndexSpace (int lev) const {
         // If EB data was built separately for each mesh-refinement level, return the one for

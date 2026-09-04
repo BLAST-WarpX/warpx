@@ -15,6 +15,7 @@
 #include <AMReX_Array4.H>
 #include <AMReX_Box.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_GpuAtomic.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_MFIter.H>
@@ -400,16 +401,44 @@ CurrentControlledPort::Edges () const {
                                      : 0.0_rt;
     return {{{tangent_a, tangent_a, tangent_b,
               m_terminal_0.lo[tangent_b] - offset_b, m_terminal_0.lo[tangent_a],
-              m_terminal_0.hi[tangent_a], 1.0_rt},
+              m_terminal_0.hi[tangent_a], 1.0_rt, false},
              {tangent_b, tangent_b, tangent_a,
               m_terminal_0.hi[tangent_a] + offset_a, m_terminal_0.lo[tangent_b],
-              m_terminal_0.hi[tangent_b], 1.0_rt},
+              m_terminal_0.hi[tangent_b], 1.0_rt, true},
              {tangent_a, tangent_a, tangent_b,
               m_terminal_0.hi[tangent_b] + offset_b, m_terminal_0.lo[tangent_a],
-              m_terminal_0.hi[tangent_a], -1.0_rt},
+              m_terminal_0.hi[tangent_a], -1.0_rt, true},
              {tangent_b, tangent_b, tangent_a,
               m_terminal_0.lo[tangent_a] - offset_a, m_terminal_0.lo[tangent_b],
-              m_terminal_0.hi[tangent_b], -1.0_rt}}};
+              m_terminal_0.hi[tangent_b], -1.0_rt, false}}};
+}
+
+int
+CurrentControlledPort::EdgeFixedIndex (amrex::MultiFab const& field,
+                                       Edge const& edge) const {
+    if (WarpX::grid_type != GridType::Staggered) {
+        return nearest_index(field, edge.fixed_direction,
+                             edge.fixed_coordinate);
+    }
+    amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
+    amrex::Box const field_domain =
+        amrex::convert(geometry.Domain(), field.ixType());
+    amrex::Real const bound = edge.upper_boundary
+                                  ? m_terminal_0.hi[edge.fixed_direction]
+                                  : m_terminal_0.lo[edge.fixed_direction];
+    amrex::Real const raw = (bound - geometry.ProbLo(edge.fixed_direction)) /
+                                geometry.CellSize(edge.fixed_direction) +
+                            geometry.Domain().smallEnd(edge.fixed_direction);
+    amrex::Real constexpr tolerance =
+        64.0_rt * std::numeric_limits<amrex::Real>::epsilon();
+    int const index = edge.upper_boundary
+                          ? static_cast<int>(std::floor(raw + tolerance))
+                          : static_cast<int>(std::ceil(raw - tolerance)) - 1;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        index >= field_domain.smallEnd(edge.fixed_direction) &&
+            index <= field_domain.bigEnd(edge.fixed_direction),
+        "Current-controlled port contour lies outside the field domain.");
+    return index;
 }
 
 void
@@ -496,8 +525,7 @@ CurrentControlledPort::MeasureEdgeLocal (amrex::MultiFab const& field,
                                          int const plane_index) const {
     amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
     amrex::Box line = amrex::convert(geometry.Domain(), field.ixType());
-    int const fixed_index =
-        nearest_index(field, edge.fixed_direction, edge.fixed_coordinate);
+    int const fixed_index = EdgeFixedIndex(field, edge);
     auto const tangent_range = index_range(field, edge.tangent_direction,
                                            edge.tangent_lo, edge.tangent_hi);
     line.setSmall(m_direction, plane_index);
@@ -538,37 +566,6 @@ CurrentControlledPort::MeasureEdgeLocal (amrex::MultiFab const& field,
     return circulation;
 }
 
-void
-CurrentControlledPort::AddScaledCurlBasis (
-    ablastr::fields::VectorField const& Bfield, int const plane_index,
-    amrex::Real const scale) const {
-    for (int component = 0; component < 3; ++component) {
-        if (component == m_direction) {
-            continue;
-        }
-        amrex::MultiFab& field = *Bfield[component];
-        amrex::MultiFab const& basis = *m_curl_basis[component];
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(field); mfi.isValid(); ++mfi) {
-            amrex::Box section = mfi.validbox();
-            section.setSmall(m_direction, plane_index);
-            section.setBig(m_direction, plane_index);
-            section &= mfi.validbox();
-            if (!section.ok()) {
-                continue;
-            }
-            auto const values = field.array(mfi);
-            auto const basis_values = basis.const_array(mfi);
-            amrex::ParallelFor(
-                section, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-                    values(i, j, k) += scale * basis_values(i, j, k);
-                });
-        }
-    }
-}
-
 amrex::Real
 CurrentControlledPort::MeasureContourLocal (
     ablastr::fields::VectorField const& Bfield,
@@ -581,6 +578,106 @@ CurrentControlledPort::MeasureContourLocal (
             eb_update_B[edge.component].get(), edge, plane_index);
     }
     return result;
+}
+
+std::vector<amrex::Real>
+CurrentControlledPort::MeasureContoursLocalBatched (
+    ablastr::fields::VectorField const& Bfield,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+    int const first_plane, int const last_plane) const {
+    int const number_of_planes = last_plane - first_plane + 1;
+    amrex::Gpu::DeviceVector<amrex::Real> device_circulation(number_of_planes,
+                                                             0.0_rt);
+    amrex::Real* const circulation = device_circulation.data();
+    amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
+
+    for (Edge const& edge : Edges()) {
+        amrex::MultiFab const& field = *Bfield[edge.component];
+        amrex::iMultiFab const& owner_mask = *m_owner_mask[edge.component];
+        amrex::iMultiFab const* const eb_flag =
+            eb_update_B[edge.component].get();
+        amrex::Box slab = amrex::convert(geometry.Domain(), field.ixType());
+        int const fixed_index = EdgeFixedIndex(field, edge);
+        auto const tangent_range = index_range(
+            field, edge.tangent_direction, edge.tangent_lo, edge.tangent_hi);
+        slab.setSmall(m_direction, first_plane);
+        slab.setBig(m_direction, last_plane);
+        slab.setSmall(edge.fixed_direction, fixed_index);
+        slab.setBig(edge.fixed_direction, fixed_index);
+        slab.setSmall(edge.tangent_direction, tangent_range[0]);
+        slab.setBig(edge.tangent_direction, tangent_range[1]);
+        amrex::Real const weight =
+            edge.orientation * geometry.CellSize(edge.tangent_direction);
+        int const axis = m_direction;
+
+        for (amrex::MFIter mfi(field); mfi.isValid(); ++mfi) {
+            amrex::Box const section = slab & mfi.validbox();
+            if (!section.ok()) {
+                continue;
+            }
+            auto const values = field.const_array(mfi);
+            auto const owners = owner_mask.const_array(mfi);
+            amrex::Array4<int const> flags;
+            if (eb_flag != nullptr) {
+                flags = eb_flag->const_array(mfi);
+            }
+            amrex::For(section, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                if (owners(i, j, k) == 0 || (flags && flags(i, j, k) == 0)) {
+                    return;
+                }
+                int const index[3] = {i, j, k};
+                amrex::Gpu::Atomic::AddNoRet(
+                    &circulation[index[axis] - first_plane],
+                    weight * values(i, j, k));
+            });
+        }
+    }
+
+    std::vector<amrex::Real> host_circulation(number_of_planes);
+    amrex::Gpu::copy(amrex::Gpu::deviceToHost, device_circulation.begin(),
+                     device_circulation.end(), host_circulation.begin());
+    return host_circulation;
+}
+
+void
+CurrentControlledPort::AddScaledCurlBasisBatched (
+    ablastr::fields::VectorField const& Bfield, int const first_plane,
+    std::vector<amrex::Real> const& scales) const {
+    amrex::Gpu::DeviceVector<amrex::Real> device_scales(scales.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, scales.begin(), scales.end(),
+                     device_scales.begin());
+    amrex::Real const* const scale = device_scales.data();
+    int const last_plane = first_plane + static_cast<int>(scales.size()) - 1;
+    int const axis = m_direction;
+
+    for (int component = 0; component < 3; ++component) {
+        if (component == m_direction) {
+            continue;
+        }
+        amrex::MultiFab& field = *Bfield[component];
+        amrex::MultiFab const& basis = *m_curl_basis[component];
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(field); mfi.isValid(); ++mfi) {
+            amrex::Box section = mfi.validbox();
+            section.setSmall(axis, first_plane);
+            section.setBig(axis, last_plane);
+            section &= mfi.validbox();
+            if (!section.ok()) {
+                continue;
+            }
+            auto const values = field.array(mfi);
+            auto const basis_values = basis.const_array(mfi);
+            amrex::ParallelFor(section, [=] AMREX_GPU_DEVICE(int i, int j,
+                                                             int k) {
+                int const index[3] = {i, j, k};
+                values(i, j, k) +=
+                    scale[index[axis] - first_plane] * basis_values(i, j, k);
+            });
+        }
+    }
+    amrex::Gpu::streamSynchronize();
 }
 #endif
 
@@ -644,11 +741,11 @@ CurrentControlledPort::MeasureXZContourLocal (
     return result;
 }
 
-void
-CurrentControlledPort::CorrectXZContour (
-    amrex::MultiFab& by, amrex::iMultiFab const* const eb_flag,
-    int const plane_index, amrex::Real const current_error,
-    std::array<amrex::Real, 3> const& contour) const {
+std::vector<amrex::Real>
+CurrentControlledPort::MeasureXZContoursLocalBatched (
+    amrex::MultiFab const& by, amrex::iMultiFab const& owner_mask,
+    amrex::iMultiFab const* const eb_flag, int const first_plane,
+    int const last_plane) const {
     int const transverse_direction = m_direction == 0 ? 2 : 0;
     int const axial_mesh_direction = m_direction == 0 ? 0 : 1;
     int const transverse_mesh_direction = m_direction == 0 ? 1 : 0;
@@ -657,36 +754,106 @@ CurrentControlledPort::CorrectXZContour (
     int const upper_index = nearest_index(
         by, transverse_mesh_direction, m_terminal_0.hi[transverse_direction]);
     amrex::Real const upper_weight = m_direction == 2 ? 1.0_rt : -1.0_rt;
-    amrex::Real const scale = PhysConst::mu0 * current_error / contour[1];
+    int const number_of_planes = last_plane - first_plane + 1;
+    amrex::Gpu::DeviceVector<amrex::Real> device_contours(3 * number_of_planes,
+                                                          0.0_rt);
+    amrex::Real* const contours = device_contours.data();
+    amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
+
+    for (int side = 0; side < 2; ++side) {
+        int const transverse_index = side == 0 ? lower_index : upper_index;
+        amrex::Real const weight = side == 0 ? -upper_weight : upper_weight;
+        amrex::Box line = amrex::convert(geometry.Domain(), by.ixType());
+        line.setSmall(axial_mesh_direction, first_plane);
+        line.setBig(axial_mesh_direction, last_plane);
+        line.setSmall(transverse_mesh_direction, transverse_index);
+        line.setBig(transverse_mesh_direction, transverse_index);
+
+        for (amrex::MFIter mfi(by); mfi.isValid(); ++mfi) {
+            amrex::Box const section = line & mfi.validbox();
+            if (!section.ok()) {
+                continue;
+            }
+            auto const values = by.const_array(mfi);
+            auto const owners = owner_mask.const_array(mfi);
+            amrex::Array4<int const> flags;
+            if (eb_flag != nullptr) {
+                flags = eb_flag->const_array(mfi);
+            }
+            amrex::For(section, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                if (owners(i, j, k) == 0 || (flags && flags(i, j, k) == 0)) {
+                    return;
+                }
+                int const index[3] = {i, j, k};
+                int const offset = index[axial_mesh_direction] - first_plane;
+                amrex::Gpu::Atomic::AddNoRet(&contours[3 * offset],
+                                             weight * values(i, j, k));
+                amrex::Gpu::Atomic::AddNoRet(&contours[3 * offset + 1],
+                                             weight * weight);
+                amrex::Gpu::Atomic::AddNoRet(&contours[3 * offset + 2], 1.0_rt);
+            });
+        }
+    }
+
+    std::vector<amrex::Real> host_contours(3 * number_of_planes);
+    amrex::Gpu::copy(amrex::Gpu::deviceToHost, device_contours.begin(),
+                     device_contours.end(), host_contours.begin());
+    return host_contours;
+}
+
+void
+CurrentControlledPort::CorrectXZContoursBatched (
+    amrex::MultiFab& by, amrex::iMultiFab const* const eb_flag,
+    int const first_plane, std::vector<amrex::Real> const& scales) const {
+    int const transverse_direction = m_direction == 0 ? 2 : 0;
+    int const axial_mesh_direction = m_direction == 0 ? 0 : 1;
+    int const transverse_mesh_direction = m_direction == 0 ? 1 : 0;
+    int const lower_index = nearest_index(
+        by, transverse_mesh_direction, m_terminal_0.lo[transverse_direction]);
+    int const upper_index = nearest_index(
+        by, transverse_mesh_direction, m_terminal_0.hi[transverse_direction]);
+    amrex::Real const upper_weight = m_direction == 2 ? 1.0_rt : -1.0_rt;
+    int const last_plane = first_plane + static_cast<int>(scales.size()) - 1;
+    amrex::Gpu::DeviceVector<amrex::Real> device_scales(scales.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, scales.begin(), scales.end(),
+                     device_scales.begin());
+    amrex::Real const* const scale = device_scales.data();
+    amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
+
+    for (int side = 0; side < 2; ++side) {
+        int const transverse_index = side == 0 ? lower_index : upper_index;
+        amrex::Real const weight = side == 0 ? -upper_weight : upper_weight;
+        amrex::Box line = amrex::convert(geometry.Domain(), by.ixType());
+        line.setSmall(axial_mesh_direction, first_plane);
+        line.setBig(axial_mesh_direction, last_plane);
+        line.setSmall(transverse_mesh_direction, transverse_index);
+        line.setBig(transverse_mesh_direction, transverse_index);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (amrex::MFIter mfi(by); mfi.isValid(); ++mfi) {
-        auto const values = by.array(mfi);
-        amrex::Array4<int const> flags;
-        if (eb_flag != nullptr) {
-            flags = eb_flag->const_array(mfi);
-        }
-        for (int side = 0; side < 2; ++side) {
-            int const transverse_index = side == 0 ? lower_index : upper_index;
-            amrex::IntVect point;
-            point[axial_mesh_direction] = plane_index;
-            point[transverse_mesh_direction] = transverse_index;
-            if (!mfi.validbox().contains(point)) {
+        for (amrex::MFIter mfi(by); mfi.isValid(); ++mfi) {
+            amrex::Box const section = line & mfi.validbox();
+            if (!section.ok()) {
                 continue;
             }
-            amrex::Real const weight = side == 0 ? -upper_weight : upper_weight;
-            amrex::Box const point_box(point, point, by.ixType());
-            amrex::ParallelFor(point_box,
-                               [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-                                   if (flags && flags(i, j, k) == 0) {
-                                       return;
-                                   }
-                                   values(i, j, k) += scale * weight;
-                               });
+            auto const values = by.array(mfi);
+            amrex::Array4<int const> flags;
+            if (eb_flag != nullptr) {
+                flags = eb_flag->const_array(mfi);
+            }
+            amrex::ParallelFor(section, [=] AMREX_GPU_DEVICE(int i, int j,
+                                                             int k) {
+                if (flags && flags(i, j, k) == 0) {
+                    return;
+                }
+                int const index[3] = {i, j, k};
+                int const offset = index[axial_mesh_direction] - first_plane;
+                values(i, j, k) += scale[offset] * weight;
+            });
         }
     }
+    amrex::Gpu::streamSynchronize();
 }
 #endif
 
@@ -776,12 +943,13 @@ CurrentControlledPort::MeasureRZContourLocal (
     return result;
 }
 
-void
-CurrentControlledPort::CorrectRZContour (
-    amrex::MultiFab& btheta, amrex::iMultiFab const* const eb_flag,
-    int const plane_index, amrex::Real const current_error,
-    std::array<amrex::Real, 3> const& contour) const {
+std::vector<amrex::Real>
+CurrentControlledPort::MeasureRZContoursLocalBatched (
+    amrex::MultiFab const& btheta, amrex::iMultiFab const& owner_mask,
+    amrex::iMultiFab const* const eb_flag, int const first_plane,
+    int const last_plane) const {
     bool const axial = m_direction == 2;
+    int const plane_mesh_direction = axial ? 1 : 0;
     int const transverse_mesh_direction = axial ? 0 : 1;
     int const transverse_physical_direction = axial ? 0 : 2;
     amrex::Real const lower_coordinate =
@@ -801,50 +969,158 @@ CurrentControlledPort::CorrectRZContour (
                              : 0.0_rt;
     amrex::Real const upper_radius =
         axial ? index_coordinate(btheta, 0, upper_index) : 0.0_rt;
-    amrex::Real const plane_radius =
-        axial ? 0.0_rt : index_coordinate(btheta, 0, plane_index);
-    amrex::Real const scale = PhysConst::mu0 * current_error / contour[1];
+    int const number_of_planes = last_plane - first_plane + 1;
+    std::vector<amrex::Real> weights(2 * number_of_planes);
+    for (int offset = 0; offset < number_of_planes; ++offset) {
+        amrex::Real const plane_radius =
+            axial ? 0.0_rt : index_coordinate(btheta, 0, first_plane + offset);
+        weights[2 * offset] = omit_lower
+                                  ? 0.0_rt
+                                  : -2.0_rt * MathConst::pi *
+                                        (axial ? lower_radius : -plane_radius);
+        weights[2 * offset + 1] =
+            2.0_rt * MathConst::pi * (axial ? upper_radius : -plane_radius);
+    }
+
+    amrex::Gpu::DeviceVector<amrex::Real> device_weights(weights.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, weights.begin(), weights.end(),
+                     device_weights.begin());
+    amrex::Real const* const weight_values = device_weights.data();
+    amrex::Gpu::DeviceVector<amrex::Real> device_contours(3 * number_of_planes,
+                                                          0.0_rt);
+    amrex::Real* const contours = device_contours.data();
+    amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
+
+    for (int side = 0; side < 2; ++side) {
+        if (side == 0 && omit_lower) {
+            continue;
+        }
+        int const transverse_index = side == 0 ? lower_index : upper_index;
+        amrex::Box line = amrex::convert(geometry.Domain(), btheta.ixType());
+        line.setSmall(plane_mesh_direction, first_plane);
+        line.setBig(plane_mesh_direction, last_plane);
+        line.setSmall(transverse_mesh_direction, transverse_index);
+        line.setBig(transverse_mesh_direction, transverse_index);
+
+        for (amrex::MFIter mfi(btheta); mfi.isValid(); ++mfi) {
+            amrex::Box const section = line & mfi.validbox();
+            if (!section.ok()) {
+                continue;
+            }
+            auto const values = btheta.const_array(mfi);
+            auto const owners = owner_mask.const_array(mfi);
+            amrex::Array4<int const> flags;
+            if (eb_flag != nullptr) {
+                flags = eb_flag->const_array(mfi);
+            }
+            amrex::For(section, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                if (owners(i, j, k) == 0 || (flags && flags(i, j, k) == 0)) {
+                    return;
+                }
+                int const index[3] = {i, j, k};
+                int const offset = index[plane_mesh_direction] - first_plane;
+                amrex::Real const weight = weight_values[2 * offset + side];
+                amrex::Gpu::Atomic::AddNoRet(&contours[3 * offset],
+                                             weight * values(i, j, k));
+                amrex::Gpu::Atomic::AddNoRet(&contours[3 * offset + 1],
+                                             weight * weight);
+                amrex::Gpu::Atomic::AddNoRet(&contours[3 * offset + 2], 1.0_rt);
+            });
+        }
+    }
+
+    std::vector<amrex::Real> host_contours(3 * number_of_planes);
+    amrex::Gpu::copy(amrex::Gpu::deviceToHost, device_contours.begin(),
+                     device_contours.end(), host_contours.begin());
+    return host_contours;
+}
+
+void
+CurrentControlledPort::CorrectRZContoursBatched (
+    amrex::MultiFab& btheta, amrex::iMultiFab const* const eb_flag,
+    int const first_plane, std::vector<amrex::Real> const& scales) const {
+    bool const axial = m_direction == 2;
+    int const plane_mesh_direction = axial ? 1 : 0;
+    int const transverse_mesh_direction = axial ? 0 : 1;
+    int const transverse_physical_direction = axial ? 0 : 2;
+    amrex::Real const lower_coordinate =
+        m_terminal_0.lo[transverse_physical_direction];
+    amrex::Real const upper_coordinate =
+        m_terminal_0.hi[transverse_physical_direction];
+    bool const omit_lower =
+        axial && lower_coordinate <= WarpX::GetInstance().Geom(0).ProbLo(0);
+    int const lower_index =
+        omit_lower ? 0
+                   : nearest_index(btheta, transverse_mesh_direction,
+                                   lower_coordinate);
+    int const upper_index =
+        nearest_index(btheta, transverse_mesh_direction, upper_coordinate);
+    amrex::Real const lower_radius =
+        axial && !omit_lower ? index_coordinate(btheta, 0, lower_index)
+                             : 0.0_rt;
+    amrex::Real const upper_radius =
+        axial ? index_coordinate(btheta, 0, upper_index) : 0.0_rt;
+    int const number_of_planes = static_cast<int>(scales.size());
+    int const last_plane = first_plane + number_of_planes - 1;
+    std::vector<amrex::Real> weights(2 * number_of_planes);
+    for (int offset = 0; offset < number_of_planes; ++offset) {
+        amrex::Real const plane_radius =
+            axial ? 0.0_rt : index_coordinate(btheta, 0, first_plane + offset);
+        weights[2 * offset] = omit_lower
+                                  ? 0.0_rt
+                                  : -2.0_rt * MathConst::pi *
+                                        (axial ? lower_radius : -plane_radius);
+        weights[2 * offset + 1] =
+            2.0_rt * MathConst::pi * (axial ? upper_radius : -plane_radius);
+    }
+
+    amrex::Gpu::DeviceVector<amrex::Real> device_weights(weights.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, weights.begin(), weights.end(),
+                     device_weights.begin());
+    amrex::Real const* const weight_values = device_weights.data();
+    amrex::Gpu::DeviceVector<amrex::Real> device_scales(scales.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, scales.begin(), scales.end(),
+                     device_scales.begin());
+    amrex::Real const* const scale_values = device_scales.data();
+    amrex::Geometry const& geometry = WarpX::GetInstance().Geom(0);
+
+    for (int side = 0; side < 2; ++side) {
+        if (side == 0 && omit_lower) {
+            continue;
+        }
+        int const transverse_index = side == 0 ? lower_index : upper_index;
+        amrex::Box line = amrex::convert(geometry.Domain(), btheta.ixType());
+        line.setSmall(plane_mesh_direction, first_plane);
+        line.setBig(plane_mesh_direction, last_plane);
+        line.setSmall(transverse_mesh_direction, transverse_index);
+        line.setBig(transverse_mesh_direction, transverse_index);
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-    for (amrex::MFIter mfi(btheta); mfi.isValid(); ++mfi) {
-        auto const values = btheta.array(mfi);
-        amrex::Array4<int const> flags;
-        if (eb_flag != nullptr) {
-            flags = eb_flag->const_array(mfi);
-        }
-        for (int side = 0; side < 2; ++side) {
-            if (side == 0 && omit_lower) {
+        for (amrex::MFIter mfi(btheta); mfi.isValid(); ++mfi) {
+            amrex::Box const section = line & mfi.validbox();
+            if (!section.ok()) {
                 continue;
             }
-            int const transverse_index = side == 0 ? lower_index : upper_index;
-            amrex::IntVect const point =
-                axial ? amrex::IntVect(
-                            AMREX_D_DECL(transverse_index, plane_index, 0))
-                      : amrex::IntVect(
-                            AMREX_D_DECL(plane_index, transverse_index, 0));
-            if (!mfi.validbox().contains(point)) {
-                continue;
+            auto const values = btheta.array(mfi);
+            amrex::Array4<int const> flags;
+            if (eb_flag != nullptr) {
+                flags = eb_flag->const_array(mfi);
             }
-            amrex::Real const radius =
-                axial ? (side == 0 ? lower_radius : upper_radius)
-                      : plane_radius;
-            amrex::Real const orientation =
-                axial ? (side == 0 ? -1.0_rt : 1.0_rt)
-                      : (side == 0 ? 1.0_rt : -1.0_rt);
-            amrex::Real const weight =
-                orientation * 2.0_rt * MathConst::pi * radius;
-            amrex::Box const point_box(point, point, btheta.ixType());
-            amrex::ParallelFor(point_box,
-                               [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-                                   if (flags && flags(i, j, k) == 0) {
-                                       return;
-                                   }
-                                   values(i, j, k) += scale * weight;
-                               });
+            amrex::ParallelFor(section, [=] AMREX_GPU_DEVICE(int i, int j,
+                                                             int k) {
+                if (flags && flags(i, j, k) == 0) {
+                    return;
+                }
+                int const index[3] = {i, j, k};
+                int const offset = index[plane_mesh_direction] - first_plane;
+                values(i, j, k) +=
+                    scale_values[offset] * weight_values[2 * offset + side];
+            });
         }
     }
+    amrex::Gpu::streamSynchronize();
 }
 #endif
 
@@ -865,19 +1141,21 @@ CurrentControlledPort::Apply3D (
     int const number_of_planes = last_plane - first_plane + 1;
     ablastr::fields::VectorField const basis_field{
         m_curl_basis[0].get(), m_curl_basis[1].get(), m_curl_basis[2].get()};
-    std::vector<amrex::Real> contour_data(2 * number_of_planes, 0.0_rt);
+    auto const field_circulation = MeasureContoursLocalBatched(
+        Bfield, eb_update_B, first_plane, last_plane);
+    auto const basis_circulation = MeasureContoursLocalBatched(
+        basis_field, eb_update_B, first_plane, last_plane);
+    std::vector<amrex::Real> contour_data(2 * number_of_planes);
     for (int offset = 0; offset < number_of_planes; ++offset) {
-        int const plane = first_plane + offset;
-        contour_data[2 * offset] =
-            MeasureContourLocal(Bfield, eb_update_B, plane);
-        contour_data[2 * offset + 1] =
-            MeasureContourLocal(basis_field, eb_update_B, plane);
+        contour_data[2 * offset] = field_circulation[offset];
+        contour_data[2 * offset + 1] = basis_circulation[offset];
     }
     amrex::ParallelDescriptor::ReduceRealSum(
         contour_data.data(), static_cast<int>(contour_data.size()));
 
     amrex::Real const desired_circulation =
         PhysConst::mu0 * target_axis_current;
+    std::vector<amrex::Real> scales(number_of_planes);
     for (int offset = 0; offset < number_of_planes; ++offset) {
         amrex::Real const circulation = contour_data[2 * offset];
         amrex::Real const basis_response = contour_data[2 * offset + 1];
@@ -886,10 +1164,9 @@ CurrentControlledPort::Apply3D (
             "The current-controlled port contour has no solver-active curl "
             "basis; place its contour outside covered EB cells and away from "
             "the domain edge.");
-        AddScaledCurlBasis(Bfield, first_plane + offset,
-                           (desired_circulation - circulation) /
-                               basis_response);
+        scales[offset] = (desired_circulation - circulation) / basis_response;
     }
+    AddScaledCurlBasisBatched(Bfield, first_plane, scales);
     std::array<amrex::Real, 2> terminal_circulation{
         MeasureContourLocal(Bfield, eb_update_B, plane_0),
         MeasureContourLocal(Bfield, eb_update_B, plane_1)};
@@ -916,16 +1193,11 @@ CurrentControlledPort::ApplyXZ (
     int const first_plane = std::min(plane_0, plane_1);
     int const last_plane = std::max(plane_0, plane_1);
     int const number_of_planes = last_plane - first_plane + 1;
-    std::vector<amrex::Real> contour_data(3 * number_of_planes, 0.0_rt);
-    for (int offset = 0; offset < number_of_planes; ++offset) {
-        auto const contour = MeasureXZContourLocal(
-            by, *m_owner_mask[1], eb_update_B[1].get(), first_plane + offset);
-        for (int component = 0; component < 3; ++component) {
-            contour_data[3 * offset + component] = contour[component];
-        }
-    }
+    std::vector<amrex::Real> contour_data = MeasureXZContoursLocalBatched(
+        by, *m_owner_mask[1], eb_update_B[1].get(), first_plane, last_plane);
     amrex::ParallelDescriptor::ReduceRealSum(
         contour_data.data(), static_cast<int>(contour_data.size()));
+    std::vector<amrex::Real> scales(number_of_planes);
     for (int offset = 0; offset < number_of_planes; ++offset) {
         std::array<amrex::Real, 3> contour{contour_data[3 * offset],
                                            contour_data[3 * offset + 1],
@@ -935,9 +1207,10 @@ CurrentControlledPort::ApplyXZ (
             "The 2D XZ current-controlled contour has no active field points; "
             "place its endpoints outside covered EB cells.");
         amrex::Real const measured_current = contour[0] / PhysConst::mu0;
-        CorrectXZContour(by, eb_update_B[1].get(), first_plane + offset,
-                         target_axis_current - measured_current, contour);
+        scales[offset] = PhysConst::mu0 *
+                         (target_axis_current - measured_current) / contour[1];
     }
+    CorrectXZContoursBatched(by, eb_update_B[1].get(), first_plane, scales);
     std::array<amrex::Real, 2> terminal_circulation{
         MeasureXZContourLocal(by, *m_owner_mask[1], eb_update_B[1].get(),
                               plane_0)[0],
@@ -966,17 +1239,12 @@ CurrentControlledPort::ApplyRZ (
     int const first_plane = std::min(plane_0, plane_1);
     int const last_plane = std::max(plane_0, plane_1);
     int const number_of_planes = last_plane - first_plane + 1;
-    std::vector<amrex::Real> contour_data(3 * number_of_planes, 0.0_rt);
-    for (int offset = 0; offset < number_of_planes; ++offset) {
-        auto const contour =
-            MeasureRZContourLocal(btheta, *m_owner_mask[1],
-                                  eb_update_B[1].get(), first_plane + offset);
-        for (int component = 0; component < 3; ++component) {
-            contour_data[3 * offset + component] = contour[component];
-        }
-    }
+    std::vector<amrex::Real> contour_data = MeasureRZContoursLocalBatched(
+        btheta, *m_owner_mask[1], eb_update_B[1].get(), first_plane,
+        last_plane);
     amrex::ParallelDescriptor::ReduceRealSum(
         contour_data.data(), static_cast<int>(contour_data.size()));
+    std::vector<amrex::Real> scales(number_of_planes);
     for (int offset = 0; offset < number_of_planes; ++offset) {
         std::array<amrex::Real, 3> contour{contour_data[3 * offset],
                                            contour_data[3 * offset + 1],
@@ -986,9 +1254,10 @@ CurrentControlledPort::ApplyRZ (
             "The RZ current-controlled contour has no active field points; "
             "place its contour outside covered EB cells.");
         amrex::Real const measured_current = contour[0] / PhysConst::mu0;
-        CorrectRZContour(btheta, eb_update_B[1].get(), first_plane + offset,
-                         target_axis_current - measured_current, contour);
+        scales[offset] = PhysConst::mu0 *
+                         (target_axis_current - measured_current) / contour[1];
     }
+    CorrectRZContoursBatched(btheta, eb_update_B[1].get(), first_plane, scales);
     std::array<amrex::Real, 2> terminal_circulation{
         MeasureRZContourLocal(btheta, *m_owner_mask[1], eb_update_B[1].get(),
                               plane_0)[0],

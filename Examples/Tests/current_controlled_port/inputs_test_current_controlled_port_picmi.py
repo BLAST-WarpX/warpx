@@ -17,6 +17,7 @@ parser.add_argument(
         "3d",
         "3d-hybrid",
         "3d-multi",
+        "3d-off-grid",
         "3d-overlap",
         "3d-z",
         "rz-hybrid",
@@ -59,7 +60,7 @@ def add_neutral_kinetic_plasma(
     simulation.add_species(protons, layout=layout)
 
 
-if args.mode in ("3d", "3d-multi", "3d-overlap", "3d-z"):
+if args.mode in ("3d", "3d-multi", "3d-off-grid", "3d-overlap", "3d-z"):
     grid = picmi.Cartesian3DGrid(
         number_of_cells=[8, 8, 8],
         lower_bound=[-0.5, -0.5, -0.5],
@@ -101,18 +102,36 @@ if args.mode in ("3d", "3d-multi", "3d-overlap", "3d-z"):
     simulation.add_macroscopic_property(
         picmi.MacroscopicProperty(name="sigma", value=1.0, method="backwardeuler")
     )
-    if args.mode == "3d":
+    if args.mode in ("3d", "3d-off-grid"):
+        transverse_lower = -0.25 if args.mode == "3d" else -0.23
+        transverse_upper = 0.25 if args.mode == "3d" else 0.19
         ports = [
             picmi.CurrentControlledPort(
                 direction=0,
-                terminal_0_lower_bound=[-0.1875, -0.25, -0.25],
-                terminal_0_upper_bound=[-0.1875, 0.25, 0.25],
-                terminal_1_lower_bound=[0.1875, -0.25, -0.25],
-                terminal_1_upper_bound=[0.1875, 0.25, 0.25],
+                terminal_0_lower_bound=[
+                    -0.1875,
+                    transverse_lower,
+                    transverse_lower,
+                ],
+                terminal_0_upper_bound=[
+                    -0.1875,
+                    transverse_upper,
+                    transverse_upper,
+                ],
+                terminal_1_lower_bound=[
+                    0.1875,
+                    transverse_lower,
+                    transverse_lower,
+                ],
+                terminal_1_upper_bound=[
+                    0.1875,
+                    transverse_upper,
+                    transverse_upper,
+                ],
                 file=waveform,
             )
         ]
-        if not args.with_eb:
+        if args.mode == "3d" and not args.with_eb:
             antenna = picmi.PrescribedCurrentInjection(
                 drives=[
                     picmi.PrescribedCurrentDrive(
@@ -166,12 +185,15 @@ if args.mode in ("3d", "3d-multi", "3d-overlap", "3d-z"):
                 file=waveform,
             )
         ]
+    diagnostic_fields = ["Bx", "By", "Bz", "divB"]
+    if args.mode == "3d-off-grid":
+        diagnostic_fields += ["sigma", "epsilon", "mu"]
     simulation.add_diagnostic(
         picmi.FieldDiagnostic(
             name="diag1",
             grid=grid,
             period=2,
-            data_list=["Bx", "By", "Bz", "divB"],
+            data_list=diagnostic_fields,
             write_dir="diags",
             warpx_file_prefix="diag1",
         )
