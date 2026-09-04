@@ -1091,6 +1091,111 @@ additionally define the electric potential at the embedded boundary with an anal
       the same input used by the domain ``thermal`` particle boundary condition. The same standard
       deviation is used to sample all components.
 
+.. _running-cpp-parameters-dielectrics:
+
+Dielectric Materials
+--------------------
+
+Dielectric materials define a spatially varying relative permittivity for the
+lab-frame multigrid electrostatic solve. This feature requires an AMReX EB build,
+is currently supported in 2D XZ, RZ, and 3D, and requires
+:pp:param:`warpx.do_electrostatic` to be ``labframe`` or
+``labframe-electromagnetostatic``. Dielectric materials are not currently
+supported with the FFT Poisson solver, nonzero lab-frame Poisson ``beta``, or
+moving-window simulations.
+
+If dielectric materials overlap, the material listed latest in
+:pp:param:`dielectrics.names` takes precedence for the permittivity field and the
+diagnostic material-id mask. WarpX also builds a signed-distance field for the
+union of all dielectric materials. The diagnostic fields ``dielectric_epsilon``,
+``dielectric_signed_distance``, and ``dielectric_mask`` can be added explicitly
+to :pp:param:`<diag_name>.fields_to_plot`.
+
+.. pp:param:: dielectrics.names
+    :type: list of ``string``
+    :optional:
+
+    Names of dielectric materials. Each name is used as an input namespace for
+    the per-material parameters below. If this parameter is omitted, no
+    dielectric materials are initialized.
+
+.. pp:param:: dielectrics.stl_use_bvh
+    :type: ``0`` or ``1``
+    :default: ``1``
+    :optional:
+
+    Default value of :pp:param:`<dielectric_name>.stl_use_bvh` for all STL
+    dielectric materials.
+
+Each dielectric material must define exactly one geometry source, either an
+analytical implicit function or an STL file.
+
+.. pp:param:: <dielectric_name>.implicit_function
+    :type: ``string``
+
+    A function of ``x``, ``y``, and ``z`` that defines the dielectric surface.
+    The surface lies where the function value is zero; the material interior is
+    where the function value is positive. In 2D XZ and RZ simulations, ``y`` is
+    set to zero.
+
+.. pp:param:: <dielectric_name>.stl_file
+    :type: ``string``
+
+    Path to an `STL file <https://en.wikipedia.org/wiki/STL_(file_format)>`__
+    that defines the dielectric geometry. STL dielectric materials are currently
+    supported only in 3D.
+
+.. pp:param:: <dielectric_name>.stl_scale
+    :type: ``float``
+    :default: ``1.0``
+    :optional:
+
+    Scaling factor applied to the STL geometry.
+
+.. pp:param:: <dielectric_name>.stl_center
+    :type: list of ``3 floats``
+    :default: ``0.0 0.0 0.0``
+    :optional:
+
+    Center offset applied to the STL geometry.
+
+.. pp:param:: <dielectric_name>.stl_reverse_normal
+    :type: ``0`` or ``1``
+    :default: ``0``
+    :optional:
+
+    Whether to reverse the STL surface normals when building the signed-distance
+    field.
+
+.. pp:param:: <dielectric_name>.stl_use_bvh
+    :type: ``0`` or ``1``
+    :default: value of :pp:param:`dielectrics.stl_use_bvh`
+    :optional:
+
+    Whether to use the AMReX bounding-volume hierarchy optimization for this STL
+    dielectric material.
+
+Each dielectric material must also define exactly one permittivity source.
+
+.. pp:param:: <dielectric_name>.permittivity
+    :type: ``float``
+
+    Constant relative permittivity inside the material. The value must be finite
+    and greater than or equal to ``1.0``.
+
+.. pp:param:: <dielectric_name>.permittivity_function(x,y,z,t)
+    :type: ``string``
+
+    Relative permittivity inside the material as a function of ``x``, ``y``,
+    ``z``, and ``t``. In 2D XZ and RZ simulations, ``y`` is set to zero. All
+    evaluated values must be finite and greater than or equal to ``1.0``.
+
+.. pp:param:: <dielectric_name>.permittivity_from_file
+    :type: ``string``
+
+    Reserved for a future file-based relative-permittivity format. WarpX
+    currently aborts if this parameter is specified.
+
 .. _param-particle-thermalizer:
 
 Particle thermalizer
@@ -4514,7 +4619,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     Fields written to output.
-    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
+    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``dielectric_epsilon`` ``dielectric_signed_distance`` ``dielectric_mask`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.

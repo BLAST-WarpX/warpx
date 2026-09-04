@@ -85,6 +85,7 @@ public:
      * \param[in] verbosity The verbosity setting for the MLMG solver
      * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
+     * \param[in] dielectric_epsilon optional spatially-varying relative permittivity field. If not provided, vacuum permittivity is assumed.
      */
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
@@ -95,7 +96,8 @@ public:
         int max_iters,
         int verbosity,
         bool is_igf_2d_slices,
-        std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
+        std::optional<ablastr::fields::MultiLevelVectorField> const& efield = std::nullopt, // only used for EB
+        std::optional<ablastr::fields::ConstMultiLevelScalarField> const& dielectric_epsilon = std::nullopt
     ) const;
 
     /**
@@ -162,6 +164,7 @@ public:
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)
     bool is_igf_2d_slices = false;
+
 };
 
 #endif // WARPX_ELECTROSTATICSOLVER_H_
