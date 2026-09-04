@@ -235,6 +235,7 @@ A dashboard build collects three kinds of results, each produced by a separate C
 
 CDash only receives the configure and build results if those steps run *through* CTest.
 Calling ``cmake`` and ``cmake --build`` directly and then submitting only produces a ``Test.xml``.
+The command line route (``ctest -D ExperimentalConfigure``) is not an option here: it drives an already-generated build tree and needs a ``DartConfiguration.tcl``, which ``include(CTest)`` only writes during a configure, so it could only ever time a *re*-configure.
 Our CI therefore configures and builds via the helper script
 `Tools/CI/ctest_dashboard.sh <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/CI/ctest_dashboard.sh>`__,
 which drives ``ctest_configure()`` and ``ctest_build()`` from a CTest script:
@@ -245,7 +246,8 @@ which drives ``ctest_configure()`` and ``ctest_build()`` from a CTest script:
        Tools/CI/ctest_dashboard.sh build -DWarpX_DIMS=3 -DWarpX_FFT=ON
 
 The CMake options are passed through unchanged.
-The build parallelism comes from ``CMAKE_BUILD_PARALLEL_LEVEL``, which the script passes on to ``ctest_build(PARALLEL_LEVEL ...)``.
+The build parallelism comes from ``CMAKE_BUILD_PARALLEL_LEVEL``, which the script passes on to ``ctest_build(PARALLEL_LEVEL ...)``, and the generator from ``CMAKE_GENERATOR``.
+Do not pass ``-G``: ``ctest_configure()`` appends its own generator argument after the options, which would silently override it, so the script rejects it instead.
 
 The script always builds the default target.
 Keep packaging steps such as ``--target pip_install`` outside of it: CTest scrapes the build log for compiler errors, and ``pip``'s setuptools warnings (``dist.py:318: UserWarning: ...``) match its error pattern, which would fail the job on a build that actually succeeded.

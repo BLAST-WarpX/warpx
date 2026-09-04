@@ -91,7 +91,7 @@ only reach it when those steps run *through* CTest, so CI configures and builds 
 calling `cmake` and `cmake --build` directly. The test step stays a plain `ctest` call with
 `-D ExperimentalTest` appended, and one `-D ExperimentalSubmit` uploads all parts as one build.
 Set `CDASH_BUILD_NAME` and `CDASH_SITE` per job; build parallelism comes from
-`CMAKE_BUILD_PARALLEL_LEVEL`. The script builds the default target only — keep
+`CMAKE_BUILD_PARALLEL_LEVEL` and the generator from `CMAKE_GENERATOR` (not `-G`). The script builds the default target only — keep
 `--target pip_install` outside it, since CTest reads pip's setuptools warnings as
 build errors. See `Docs/source/developers/how_to_test.rst` for details.
 

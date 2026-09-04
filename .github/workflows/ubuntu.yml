@@ -75,6 +75,7 @@ jobs:
       CC: "gcc-13"
       CDASH_BUILD_NAME: Linux-GCC13-1D2D
       CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CMAKE_GENERATOR: Ninja
     steps:
     - uses: actions/checkout@v7
     - name: install dependencies
@@ -95,7 +96,6 @@ jobs:
         ccache -z
 
         Tools/CI/ctest_dashboard.sh build \
-          -GNinja                      \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_DIMS="1;2"           \
           -DWarpX_EB=OFF               \
@@ -122,6 +122,7 @@ jobs:
       CC: "gcc-13"
       CDASH_BUILD_NAME: Linux-GCC13-RZ3D-SP
       CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CMAKE_GENERATOR: Ninja
     steps:
     - uses: actions/checkout@v7
     - name: install dependencies
@@ -146,7 +147,6 @@ jobs:
         export CXXFLAGS="-Werror"
 
         Tools/CI/ctest_dashboard.sh build     \
-          -GNinja                           \
           -DCMAKE_VERBOSE_MAKEFILE=ON       \
           -DWarpX_DIMS="RZ;3"               \
           -DWarpX_EB=OFF                    \
