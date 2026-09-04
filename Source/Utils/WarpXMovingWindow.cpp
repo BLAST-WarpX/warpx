@@ -50,6 +50,7 @@
 
 #include <AMReX_BaseFwd.H>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <memory>
@@ -357,6 +358,36 @@ namespace
 
 }
 
+amrex::Real
+WarpX::MovingWindowShiftPerStep (const amrex::Real dt)
+{
+    return (moving_window_v - WarpX::beta_boost * PhysConst::c)
+        / (1._rt - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt;
+}
+
+amrex::Real
+WarpX::MovingWindowShiftAtStep (const int current_step, const amrex::Real dt)
+{
+    if (!do_moving_window) { return 0._rt; }
+
+    // Mirror moving_window_active(n), which is evaluated at n = 1, ..., current_step
+    // (the 1-indexed step numbers passed in from the evolve loop) and treats
+    // end_moving_window_step as an exclusive upper bound (n < end_moving_window_step).
+    const int first_active_step = std::max(start_moving_window_step, 1);
+    const int last_active_step = (end_moving_window_step < 0) ?
+        current_step : std::min(end_moving_window_step - 1, current_step);
+    const int active_steps = (last_active_step >= first_active_step) ?
+        last_active_step - first_active_step + 1 : 0;
+
+    return active_steps * MovingWindowShiftPerStep(dt);
+}
+
+int
+WarpX::NumCellsShifted (const amrex::Real displacement, const amrex::Real cell_size)
+{
+    return static_cast<int>(displacement / cell_size);
+}
+
 int
 WarpX::MoveWindow (const int step, bool move_j)
 {
@@ -377,7 +408,7 @@ WarpX::MoveWindow (const int step, bool move_j)
 
     // Update the continuous position of the moving window,
     // and of the plasma injection
-    moving_window_x += (moving_window_v - WarpX::beta_boost * PhysConst::c)/(1 - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt[0];
+    moving_window_x += MovingWindowShiftPerStep(dt[0]);
     const int dir = moving_window_dir;
 
     // Update current injection position for all containers
@@ -393,7 +424,7 @@ WarpX::MoveWindow (const int step, bool move_j)
     const amrex::Real* current_lo = geom[0].ProbLo();
     const amrex::Real* current_hi = geom[0].ProbHi();
     const amrex::Real* cdx = geom[0].CellSize();
-    const int num_shift_base = static_cast<int>((moving_window_x - current_lo[dir]) / cdx[dir]);
+    const int num_shift_base = NumCellsShifted(moving_window_x - current_lo[dir], cdx[dir]);
 
     if (num_shift_base == 0) { return 0; }
 
@@ -420,8 +451,8 @@ WarpX::MoveWindow (const int step, bool move_j)
             new_slice_lo[i] = current_slice_lo[i];
             new_slice_hi[i] = current_slice_hi[i];
         }
-        const int num_shift_base_slice = static_cast<int> ((moving_window_x -
-                                   current_slice_lo[dir]) / cdx[dir]);
+        const int num_shift_base_slice =
+            NumCellsShifted(moving_window_x - current_slice_lo[dir], cdx[dir]);
         new_slice_lo[dir] = current_slice_lo[dir] + num_shift_base_slice*cdx[dir];
         new_slice_hi[dir] = current_slice_hi[dir] + num_shift_base_slice*cdx[dir];
         slice_realbox.setLo(new_slice_lo);

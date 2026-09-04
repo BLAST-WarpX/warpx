@@ -526,30 +526,12 @@ Diagnostics::InitBaseData ()
     // end_moving_window_step to only shift based on steps where the window was active.
     if (WarpX::do_moving_window && warpx.getistep(0) > 0) {
         const int moving_dir = WarpX::moving_window_dir;
-        const int current_step = warpx.getistep(0);
-
-        // Calculate how many steps the moving window has been active up to current_step.
-        // This must mirror WarpX::moving_window_active(n), which is always evaluated at
-        // n = 1, ..., current_step (i.e., the 1-indexed count of completed steps, see the
-        // call sites using getistep(0)+1) and treats end_moving_window_step as an
-        // exclusive upper bound (n < end_moving_window_step).
-        const int first_active_step = std::max(WarpX::start_moving_window_step, 1);
-        const int last_active_step = (WarpX::end_moving_window_step < 0) ?
-            current_step : std::min(WarpX::end_moving_window_step - 1, current_step);
-        const int active_steps = (last_active_step >= first_active_step) ?
-            last_active_step - first_active_step + 1 : 0;
-
-        if (active_steps > 0) {
-            // Calculate the shift based on the number of active steps
-            const amrex::Real shift_per_step = (WarpX::moving_window_v - WarpX::beta_boost * PhysConst::c)
-                                             / (1._rt - WarpX::moving_window_v * WarpX::beta_boost / PhysConst::c)
-                                             * warpx.getdt(0);
-            const amrex::Real total_shift = active_steps * shift_per_step;
-            const int shift_num_base = static_cast<int>
-                (total_shift / warpx.Geom(0).CellSize(moving_dir));
-            m_lo[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-            m_hi[moving_dir] += shift_num_base * warpx.Geom(0).CellSize(moving_dir);
-        }
+        const amrex::Real cell_size = warpx.Geom(0).CellSize(moving_dir);
+        const amrex::Real total_shift =
+            WarpX::MovingWindowShiftAtStep(warpx.getistep(0), warpx.getdt(0));
+        const int shift_num_base = WarpX::NumCellsShifted(total_shift, cell_size);
+        m_lo[moving_dir] += shift_num_base * cell_size;
+        m_hi[moving_dir] += shift_num_base * cell_size;
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){

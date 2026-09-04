@@ -1106,8 +1106,8 @@ FullDiagnostics::MovingWindowAndGalileanDomainShift (int step)
         const amrex::Real* cur_lo = m_geom_output[0][0].ProbLo();
         const amrex::Real* cur_hi = m_geom_output[0][0].ProbHi();
         const amrex::Real* geom_dx = m_geom_output[0][0].CellSize();
-        const auto num_shift_base = static_cast<int>((moving_window_x - cur_lo[moving_dir])
-                                              / geom_dx[moving_dir]);
+        const int num_shift_base = WarpX::NumCellsShifted(moving_window_x - cur_lo[moving_dir],
+                                                           geom_dx[moving_dir]);
         // Update the diagnostic geom domain. Note that this is done only for the
         // base level 0 because m_geom_output[0][lev] share the same static RealBox
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
