@@ -2240,6 +2240,7 @@ void HybridPICModel::FieldPush (
     }
 
     // Push forward the B-field using Faraday's law
-    warpx.EvolveB(dt, subcycling_half, t_old);
+    warpx.EvolveB(dt, subcycling_half, t_old,
+                  /*apply_current_controlled_port=*/false);
     warpx.FillBoundaryB(ng, nodal_sync);
 }

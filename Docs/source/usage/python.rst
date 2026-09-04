@@ -125,8 +125,8 @@ Instances of the classes below need to be passed to the method `add_applied_fiel
 Externally driven currents
 --------------------------
 
-WarpX-specific PICMI classes for the box impressed-current antenna and global paired
-current-controlled port.  They are passed to
+WarpX-specific PICMI classes for the box impressed-current antenna and paired
+current-controlled ports.  They are passed to
 ``Simulation.add_prescribed_current_injection`` and
 ``Simulation.add_current_controlled_port``, respectively.
 

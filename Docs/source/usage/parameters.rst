@@ -3888,18 +3888,19 @@ injection uses the particle deposition path.
 Add at most one ``PrescribedCurrentInjection`` object to a simulation and put all antenna
 regions in its ``drives`` list.
 
-Paired current-controlled port
-""""""""""""""""""""""""""""""
+Paired current-controlled ports
+"""""""""""""""""""""""""""""""
 
-The paired port defines two congruent, axis-aligned terminal cross-sections and a single
-waveform.  Positive current flows from terminal 0 to terminal 1.  Neither terminal has to
-coincide with a simulation-domain boundary: both can be internal, and a terminal called
-``ground`` may be placed in surrounding vacuum outside the modeled device.  A terminal
-surface can cut through plasma, a macroscopic material, or an embedded-boundary object.
+Each paired port defines two coordinate-aligned terminal surfaces with matching transverse
+bounds and a current waveform.  Positive current flows from terminal 0 to terminal 1.
+Neither terminal has to coincide with a simulation-domain boundary: both can be
+internal, and a terminal called ``ground`` may be placed in surrounding vacuum outside
+the modeled device.  A terminal surface can cut through plasma, a macroscopic material,
+or an embedded-boundary object.
 The perimeter used for the Ampere circulation must remain in field-carrying cells, so an EB
 conductor should be enclosed by, rather than cover, that perimeter.
 
-On every mesh cross-section between the two terminals, WarpX projects the magnetic
+On every mesh cross-section between a port's two terminals, WarpX projects the magnetic
 circulation to
 
 .. math::
@@ -3912,42 +3913,64 @@ does not require the carrier current alone to jump instantaneously to the reques
 In Hybrid-PIC, which omits displacement current, the same constraint controls the combined
 ion and electron-fluid current.  The 3D correction is constructed as a discrete curl, so it
 does not introduce magnetic divergence.  The source is an ideal current constraint; an
-external circuit/power model is not yet coupled to it.
+external circuit/power model is not yet coupled to it.  Hybrid-PIC ports cannot currently
+be combined with analytic external current or split external fields because those would
+make the plasma-current target ambiguous.
 
-The current-controlled port supports a single mesh level with the Yee and Hybrid-PIC field
-solvers.  It supports 3D, in-plane x or z current in 2D XZ, and axial z current in
-axisymmetric RZ with one azimuthal mode.  Terminal cross-sections must currently be
-congruent rectangles (an annulus or disk in RZ), aligned with coordinate axes.  Coordinates
-are represented on the nearest compatible field plane.  General curved terminal masks and
-AMR, moving windows, dynamic load balancing, and hybrid-staggered grids are future
-extensions.
+Current-controlled ports support a single mesh level with the Yee and Hybrid-PIC field
+solvers.  They support 3D, in-plane x or z current in 2D XZ, and radial or axial current in
+axisymmetric RZ with one azimuthal mode.  Terminal surfaces must currently be
+matching rectangles, disks or annuli for axial RZ current, or cylindrical surfaces for
+radial RZ current.  Coordinates are represented on the nearest compatible field plane.
+Multiple ports are supported when their correction regions are separated by more than one
+grid cell, as in separate coil gaps.  General curved terminal masks and AMR, moving
+windows, dynamic load balancing, and hybrid-staggered grids are future extensions.
 
 * ``warpx.current_controlled_port`` (`bool`, optional, default: ``0``)
-    Enable one global paired current-controlled port.
+    Enable paired current-controlled ports.
+
+* ``warpx.current_controlled_port.n_ports`` (`integer`, optional)
+    Number of ports.  When this is present, define port ``N`` under
+    ``warpx.current_controlled_port.port_N`` for indices starting at zero.  When it is
+    omitted, the single-port parameters below retain their original unindexed names.
 
 * ``warpx.current_controlled_port.file`` (`string`)
     Path to the two-column waveform file.  This one waveform controls both terminals and
     all intervening cross-sections.
 
+* ``warpx.current_controlled_port.current_scale`` (`float`, optional, default: ``1``)
+    Positive multiplier applied to the waveform.  This lets several ports reuse one file
+    with different current fractions.
+
 * ``warpx.current_controlled_port.direction`` (`integer`: ``0``, ``1``, or ``2``)
     Axis from terminal 0 to terminal 1.  In 3D, ``0``, ``1``, and ``2`` mean x, y, and z.
-    In 2D XZ, only ``0`` (x) and ``2`` (z) are representable.  RZ currently requires ``2``
-    (z).
+    In 2D XZ, only ``0`` (x) and ``2`` (z) are representable.  In RZ, ``0`` selects radial
+    current through cylindrical terminal surfaces and ``2`` selects axial current through
+    disk or annular terminal surfaces.  Azimuthal current is not a two-terminal surface in
+    an axisymmetric model.
 
 * ``warpx.current_controlled_port.terminal_N.lower_bound`` (`3 floats`)
 * ``warpx.current_controlled_port.terminal_N.upper_bound`` (`3 floats`)
     Lower and upper physical-coordinate bounds [m] of terminal ``N``, for ``N = 0, 1``.
     The lower and upper coordinate in ``direction`` must be equal, making a zero-thickness
     surface; the two terminal positions must differ.  Their transverse bounds must match.
-    The y entries are ignored in 2D XZ and RZ.  For RZ a radial lower bound of zero defines
-    a disk; a positive lower bound defines an annulus.
+    The y entries are ignored in 2D XZ and RZ.  For axial RZ current, a radial lower bound
+    of zero defines a disk and a positive lower bound defines an annulus.  For radial RZ
+    current, each terminal radius must be positive and the z bounds define its axial span.
+
+For indexed input, replace the prefix in the four per-port parameters above with
+``warpx.current_controlled_port.port_N``.  Each indexed port may use its own waveform,
+direction, scale, and terminal pair.
 
 **PICMI interface (WarpX extension).** Construct ``pywarpx.picmi.CurrentControlledPort``
-and add it with ``Simulation.add_current_controlled_port``.  At most one global port is
-currently supported.  See
+and add each instance with ``Simulation.add_current_controlled_port``.  See
 ``Examples/Tests/current_controlled_port/inputs_test_current_controlled_port_picmi.py``.
+After initialization, ``libwarpx.warpx.get_current_controlled_port_statuses()`` returns
+one ``[target, terminal_0, terminal_1]`` current row per port.  The singular status method
+is retained for one-port scripts and returns the first row.
 The antenna and paired port may be enabled together when their combined effect is intended;
-their imposed fields then superpose.
+an antenna current that crosses a port contour is part of the total current controlled by
+that port.  Place them in disjoint regions when their effects should be independent.
 
 .. _running-cpp-parameters-hybrid-model:
 

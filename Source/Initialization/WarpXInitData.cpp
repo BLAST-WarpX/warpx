@@ -832,10 +832,12 @@ WarpX::InitData ()
         ComputeDt();
         ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
-        if (m_current_controlled_port) {
-            m_current_controlled_port->InitData(
+        for (auto& current_port : m_current_controlled_ports) {
+            current_port->InitData(
                 m_fields.get_alldirs(FieldType::Bfield_fp, 0),
                 m_eb_update_B[0], gett_new(0));
+        }
+        if (!m_current_controlled_ports.empty()) {
             FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
         }
         InitDiagnostics();
@@ -844,10 +846,12 @@ WarpX::InitData ()
     {
         InitFromCheckpoint();
         ::PrintDtDxDyDz(max_level, geom, dt);
-        if (m_current_controlled_port) {
-            m_current_controlled_port->InitData(
+        for (auto& current_port : m_current_controlled_ports) {
+            current_port->InitData(
                 m_fields.get_alldirs(FieldType::Bfield_fp, 0),
                 m_eb_update_B[0], gett_new(0));
+        }
+        if (!m_current_controlled_ports.empty()) {
             FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
         }
         PostRestart();

@@ -164,6 +164,8 @@ public:
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     [[nodiscard]] std::array<amrex::Real, 3> GetCurrentControlledPortStatus () const;
+    [[nodiscard]] std::vector<std::array<amrex::Real, 3>>
+    GetCurrentControlledPortStatuses () const;
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
@@ -469,13 +471,19 @@ public:
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
-    void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
-    void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (amrex::Real dt, SubcyclingHalf subcycling_half,
+                  amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
+    void EvolveB (int lev, amrex::Real dt,
+                  SubcyclingHalf subcycling_half, amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
     void EvolveF (         amrex::Real dt, int rho_comp);
     void EvolveF (int lev, amrex::Real dt, int rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt,
+                  SubcyclingHalf subcycling_half, amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
     void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
@@ -1367,8 +1375,9 @@ private:
     // Hybrid PIC algorithm parameters
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
 
-    // Global, waveform-driven paired terminal constraint
-    std::unique_ptr<CurrentControlledPort> m_current_controlled_port;
+    // Independent waveform-driven paired terminal constraints
+    std::vector<std::unique_ptr<CurrentControlledPort>>
+        m_current_controlled_ports;
 
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file

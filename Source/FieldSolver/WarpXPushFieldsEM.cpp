@@ -943,10 +943,13 @@ WarpX::PushPSATD (amrex::Real start_time)
 }
 
 void
-WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half,
+                amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     for (int lev = 0; lev <= finest_level; ++lev) {
-        EvolveB(lev, a_dt, subcycling_half, start_time);
+        EvolveB(lev, a_dt, subcycling_half, start_time,
+                apply_current_controlled_port);
     }
 
     // Allow execution of Python callback after B-field push
@@ -954,18 +957,24 @@ WarpX::EvolveB (amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real st
 }
 
 void
-WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (int lev, amrex::Real a_dt, SubcyclingHalf subcycling_half,
+                amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     ABLASTR_PROFILE("WarpX::EvolveB()");
-    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time);
+    EvolveB(lev, PatchType::fine, a_dt, subcycling_half, start_time,
+            apply_current_controlled_port);
     if (lev > 0)
     {
-        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time);
+        EvolveB(lev, PatchType::coarse, a_dt, subcycling_half, start_time,
+                apply_current_controlled_port);
     }
 }
 
 void
-WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf subcycling_half, amrex::Real start_time)
+WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt,
+                SubcyclingHalf subcycling_half, amrex::Real start_time,
+                bool const apply_current_controlled_port)
 {
     // Evolve B field in regular cells
     if (patch_type == PatchType::fine) {
@@ -993,7 +1002,9 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
 
     amrex::Real const new_time = start_time + a_dt;
     ApplyBfieldBoundary(lev, patch_type, subcycling_half, new_time);
-    ApplyCurrentControlledPort(lev, patch_type, new_time);
+    if (apply_current_controlled_port) {
+        ApplyCurrentControlledPort(lev, patch_type, new_time);
+    }
 }
 
 

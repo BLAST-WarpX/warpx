@@ -2849,7 +2849,8 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
     """A waveform-driven pair of internal current-terminal surfaces.
 
     This WarpX extension constrains the magnetic circulation on every
-    cross-section between two congruent, axis-aligned terminal surfaces. In a
+    cross-section between two coordinate-aligned terminal surfaces with
+    matching transverse bounds. In a
     fully kinetic Maxwell solve this controls total Ampere current, including
     particle, macroscopic, and displacement current. In Hybrid-PIC it controls
     ion plus electron-fluid current. Both terminals may be internal and their
@@ -2860,7 +2861,7 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
     ----------
     direction: {0, 1, 2}
         Current-axis direction. 2D XZ supports 0 (x) and 2 (z), and interprets
-        the waveform as A/m. RZ currently requires 2 (the z direction).
+        the waveform as A/m. RZ supports 0 (radial) and 2 (axial).
     terminal_0_lower_bound, terminal_0_upper_bound: sequence of 3 floats
         Bounds of the first terminal. The two coordinates in ``direction``
         must be equal, making this a zero-thickness surface.
@@ -2869,6 +2870,9 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
         terminal 0. Positive current flows from terminal 0 to terminal 1.
     file: str
         Two-column waveform file (time [s], current [A]).
+    current_scale: float, default=1.0
+        Positive factor applied to every current sample. This is useful when
+        several ports share one waveform but carry different current fractions.
     """
 
     def __init__(
@@ -2879,6 +2883,7 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
         terminal_1_lower_bound,
         terminal_1_upper_bound,
         file,
+        current_scale=1.0,
         **kw,
     ):
         self.direction = int(direction)
@@ -2887,6 +2892,7 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
         self.terminal_1_lower_bound = list(terminal_1_lower_bound)
         self.terminal_1_upper_bound = list(terminal_1_upper_bound)
         self.file = file
+        self.current_scale = float(current_scale)
         super().__init__(**kw)
 
         bounds = (
@@ -2901,6 +2907,8 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
             raise ValueError("Every CurrentControlledPort bound must have 3 entries.")
         if not self.file:
             raise ValueError("CurrentControlledPort file is required.")
+        if not np.isfinite(self.current_scale) or self.current_scale <= 0.0:
+            raise ValueError("CurrentControlledPort current_scale must be positive.")
         if (
             self.terminal_0_lower_bound[self.direction]
             != self.terminal_0_upper_bound[self.direction]
@@ -2927,19 +2935,16 @@ class CurrentControlledPort(picmistandard.base._ClassWithInit):
                     "CurrentControlledPort terminal transverse bounds must match."
                 )
 
-    def initialize_inputs(self):
+    def initialize_inputs(self, prefix="current_controlled_port"):
         pywarpx.warpx.current_controlled_port = 1
-        pywarpx.warpx.__setattr__("current_controlled_port.file", self.file)
-        pywarpx.warpx.__setattr__("current_controlled_port.direction", self.direction)
+        pywarpx.warpx.__setattr__(f"{prefix}.file", self.file)
+        pywarpx.warpx.__setattr__(f"{prefix}.direction", self.direction)
+        pywarpx.warpx.__setattr__(f"{prefix}.current_scale", self.current_scale)
         for index in (0, 1):
             lower = getattr(self, f"terminal_{index}_lower_bound")
             upper = getattr(self, f"terminal_{index}_upper_bound")
-            pywarpx.warpx.__setattr__(
-                f"current_controlled_port.terminal_{index}.lower_bound", lower
-            )
-            pywarpx.warpx.__setattr__(
-                f"current_controlled_port.terminal_{index}.upper_bound", upper
-            )
+            pywarpx.warpx.__setattr__(f"{prefix}.terminal_{index}.lower_bound", lower)
+            pywarpx.warpx.__setattr__(f"{prefix}.terminal_{index}.upper_bound", upper)
 
 
 class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
@@ -4303,13 +4308,15 @@ class Simulation(picmistandard.PICMI_Simulation):
         self.prescribed_current_injections.append(injection)
 
     def add_current_controlled_port(self, port):
-        """Add one global WarpX paired current-controlled port."""
+        """Add a WarpX paired current-controlled port.
+
+        Multiple ports must have correction regions separated by more than one
+        grid cell.
+        """
         if not isinstance(port, CurrentControlledPort):
             raise TypeError(
                 "add_current_controlled_port expects a CurrentControlledPort instance."
             )
-        if self.current_controlled_ports:
-            raise ValueError("Only one CurrentControlledPort is currently supported.")
         self.current_controlled_ports.append(port)
 
     def initialize_inputs(self):
@@ -4465,8 +4472,17 @@ class Simulation(picmistandard.PICMI_Simulation):
         for prescribed_current in self.prescribed_current_injections:
             prescribed_current.initialize_inputs()
 
-        for current_port in self.current_controlled_ports:
-            current_port.initialize_inputs()
+        if len(self.current_controlled_ports) == 1:
+            self.current_controlled_ports[0].initialize_inputs()
+        elif self.current_controlled_ports:
+            pywarpx.warpx.current_controlled_port = 1
+            pywarpx.warpx.__setattr__(
+                "current_controlled_port.n_ports", len(self.current_controlled_ports)
+            )
+            for index, current_port in enumerate(self.current_controlled_ports):
+                current_port.initialize_inputs(
+                    prefix=f"current_controlled_port.port_{index}"
+                )
 
         for applied_field in self.applied_fields:
             applied_field.applied_field_initialize_inputs()

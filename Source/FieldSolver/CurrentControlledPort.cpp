@@ -28,6 +28,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace amrex;
@@ -128,23 +129,28 @@ CurrentControlledPort::is_enabled () {
     return enabled;
 }
 
-CurrentControlledPort::CurrentControlledPort () {
+CurrentControlledPort::CurrentControlledPort (std::string parameter_prefix) {
     amrex::ParmParse const parser("warpx");
+    auto const key = [&parameter_prefix] (std::string const& suffix) {
+        return parameter_prefix + "." + suffix;
+    };
     std::string waveform_file;
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        parser.query("current_controlled_port.file", waveform_file),
-        "warpx.current_controlled_port.file is required.");
+        parser.query(key("file"), waveform_file),
+        "Each current-controlled port requires a waveform file.");
     m_waveform.load(waveform_file);
-    utils::parser::getWithParser(parser, "current_controlled_port.direction",
-                                 m_direction);
-    read_terminal(parser, "current_controlled_port.terminal_0", m_terminal_0.lo,
-                  m_terminal_0.hi);
-    read_terminal(parser, "current_controlled_port.terminal_1", m_terminal_1.lo,
-                  m_terminal_1.hi);
+    utils::parser::getWithParser(parser, key("direction").c_str(), m_direction);
+    utils::parser::queryWithParser(parser, key("current_scale").c_str(),
+                                   m_current_scale);
+    read_terminal(parser, key("terminal_0"), m_terminal_0.lo, m_terminal_0.hi);
+    read_terminal(parser, key("terminal_1"), m_terminal_1.lo, m_terminal_1.hi);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_waveform.max_abs_current() > 0.0_rt,
         "The current-controlled-port waveform is identically zero.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        std::isfinite(m_current_scale) && m_current_scale > 0.0_rt,
+        "Current-controlled-port current_scale must be finite and positive.");
 #ifdef WARPX_DIM_3D
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_direction >= 0 && m_direction < 3,
@@ -157,8 +163,9 @@ CurrentControlledPort::CurrentControlledPort () {
         "direction.");
 #elif defined(WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_direction == 2,
-        "RZ current-controlled ports currently require direction = 2 (Jz).");
+        m_direction == 0 || m_direction == 2,
+        "RZ current-controlled ports require direction = 0 (Jr) or 2 (Jz); "
+        "azimuthal terminals cannot be represented in axisymmetry.");
 #else
     WARPX_ABORT_WITH_MESSAGE("Current-controlled paired terminals are "
                              "implemented in 2D XZ, 3D, and RZ.");
@@ -206,7 +213,8 @@ CurrentControlledPort::CurrentControlledPort () {
                          m_terminal_1.lo[direction]) &&
                 nearly_equal(m_terminal_0.hi[direction],
                              m_terminal_1.hi[direction]),
-            "Current-controlled ports require congruent terminal contours.");
+            "Current-controlled ports require matching terminal transverse "
+            "bounds.");
     }
 }
 
@@ -285,6 +293,16 @@ CurrentControlledPort::ValidateGeometry (
         }
     }
 
+#ifdef WARPX_DIM_RZ
+    if (m_direction == 0) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_terminal_0.lo[0] > domain_lo[0] &&
+                m_terminal_1.lo[0] > domain_lo[0],
+            "Radial RZ current-controlled terminals must have positive "
+            "radius.");
+    }
+#endif
+
 #ifdef WARPX_DIM_3D
     amrex::MultiFab const& terminal_field = *Bfield[(m_direction + 1) % 3];
     int const terminal_mesh_direction = m_direction;
@@ -293,7 +311,7 @@ CurrentControlledPort::ValidateGeometry (
     int const terminal_mesh_direction = m_direction == 0 ? 0 : 1;
 #elif defined(WARPX_DIM_RZ)
     amrex::MultiFab const& terminal_field = *Bfield[1];
-    int const terminal_mesh_direction = 1;
+    int const terminal_mesh_direction = m_direction == 0 ? 0 : 1;
 #endif
     int const terminal_plane_0 = nearest_index(
         terminal_field, terminal_mesh_direction, m_terminal_0.lo[m_direction]);
@@ -328,6 +346,44 @@ std::array<amrex::Real, 3>
 CurrentControlledPort::status () const {
     return {m_last_target, m_last_terminal_current[0],
             m_last_terminal_current[1]};
+}
+
+bool
+CurrentControlledPort::correction_region_overlaps (
+    CurrentControlledPort const& other,
+    std::array<amrex::Real, 3> const& minimum_gap) const {
+    auto const bounds = [] (CurrentControlledPort const& port) {
+        std::array<amrex::Real, 3> lo = port.m_terminal_0.lo;
+        std::array<amrex::Real, 3> hi = port.m_terminal_0.hi;
+        lo[port.m_direction] = std::min(port.m_terminal_0.lo[port.m_direction],
+                                        port.m_terminal_1.lo[port.m_direction]);
+        hi[port.m_direction] = std::max(port.m_terminal_0.lo[port.m_direction],
+                                        port.m_terminal_1.lo[port.m_direction]);
+        return std::pair{lo, hi};
+    };
+
+    auto const [this_lo, this_hi] = bounds(*this);
+    auto const [other_lo, other_hi] = bounds(other);
+    for (int direction = 0; direction < 3; ++direction) {
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        if (direction == 1) {
+            continue;
+        }
+#endif
+        bool const separated =
+            (this_hi[direction] + minimum_gap[direction] <
+                 other_lo[direction] &&
+             !nearly_equal(this_hi[direction] + minimum_gap[direction],
+                           other_lo[direction])) ||
+            (other_hi[direction] + minimum_gap[direction] <
+                 this_lo[direction] &&
+             !nearly_equal(other_hi[direction] + minimum_gap[direction],
+                           this_lo[direction]));
+        if (separated) {
+            return false;
+        }
+    }
+    return true;
 }
 
 #ifdef WARPX_DIM_3D
@@ -639,15 +695,28 @@ std::array<amrex::Real, 3>
 CurrentControlledPort::MeasureRZContourLocal (
     amrex::MultiFab const& btheta, amrex::iMultiFab const& owner_mask,
     amrex::iMultiFab const* const eb_flag, int const plane_index) const {
-    amrex::Real const requested_inner = m_terminal_0.lo[0];
-    bool const has_inner =
-        requested_inner > WarpX::GetInstance().Geom(0).ProbLo(0);
-    int const inner_index =
-        has_inner ? nearest_index(btheta, 0, requested_inner) : 0;
-    int const outer_index = nearest_index(btheta, 0, m_terminal_0.hi[0]);
-    amrex::Real const inner_radius =
-        has_inner ? index_coordinate(btheta, 0, inner_index) : 0.0_rt;
-    amrex::Real const outer_radius = index_coordinate(btheta, 0, outer_index);
+    bool const axial = m_direction == 2;
+    int const transverse_mesh_direction = axial ? 0 : 1;
+    int const transverse_physical_direction = axial ? 0 : 2;
+    amrex::Real const lower_coordinate =
+        m_terminal_0.lo[transverse_physical_direction];
+    amrex::Real const upper_coordinate =
+        m_terminal_0.hi[transverse_physical_direction];
+    bool const omit_lower =
+        axial && lower_coordinate <= WarpX::GetInstance().Geom(0).ProbLo(0);
+    int const lower_index =
+        omit_lower ? 0
+                   : nearest_index(btheta, transverse_mesh_direction,
+                                   lower_coordinate);
+    int const upper_index =
+        nearest_index(btheta, transverse_mesh_direction, upper_coordinate);
+    amrex::Real const lower_radius =
+        axial && !omit_lower ? index_coordinate(btheta, 0, lower_index)
+                             : 0.0_rt;
+    amrex::Real const upper_radius =
+        axial ? index_coordinate(btheta, 0, upper_index) : 0.0_rt;
+    amrex::Real const plane_radius =
+        axial ? 0.0_rt : index_coordinate(btheta, 0, plane_index);
 
     amrex::Real circulation = 0.0_rt;
     amrex::Real response_norm = 0.0_rt;
@@ -660,18 +729,26 @@ CurrentControlledPort::MeasureRZContourLocal (
             flags = eb_flag->const_array(mfi);
         }
         for (int side = 0; side < 2; ++side) {
-            if (side == 0 && !has_inner) {
+            if (side == 0 && omit_lower) {
                 continue;
             }
-            int const radial_index = side == 0 ? inner_index : outer_index;
-            amrex::IntVect const point(
-                AMREX_D_DECL(radial_index, plane_index, 0));
+            int const transverse_index = side == 0 ? lower_index : upper_index;
+            amrex::IntVect const point =
+                axial ? amrex::IntVect(
+                            AMREX_D_DECL(transverse_index, plane_index, 0))
+                      : amrex::IntVect(
+                            AMREX_D_DECL(plane_index, transverse_index, 0));
             if (!mfi.validbox().contains(point)) {
                 continue;
             }
-            amrex::Real const radius = side == 0 ? inner_radius : outer_radius;
-            amrex::Real const weight = (side == 0 ? -1.0_rt : 1.0_rt) * 2.0_rt *
-                                       MathConst::pi * radius;
+            amrex::Real const radius =
+                axial ? (side == 0 ? lower_radius : upper_radius)
+                      : plane_radius;
+            amrex::Real const orientation =
+                axial ? (side == 0 ? -1.0_rt : 1.0_rt)
+                      : (side == 0 ? 1.0_rt : -1.0_rt);
+            amrex::Real const weight =
+                orientation * 2.0_rt * MathConst::pi * radius;
             amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum,
                              amrex::ReduceOpSum>
                 reduce_ops;
@@ -704,15 +781,28 @@ CurrentControlledPort::CorrectRZContour (
     amrex::MultiFab& btheta, amrex::iMultiFab const* const eb_flag,
     int const plane_index, amrex::Real const current_error,
     std::array<amrex::Real, 3> const& contour) const {
-    amrex::Real const requested_inner = m_terminal_0.lo[0];
-    bool const has_inner =
-        requested_inner > WarpX::GetInstance().Geom(0).ProbLo(0);
-    int const inner_index =
-        has_inner ? nearest_index(btheta, 0, requested_inner) : 0;
-    int const outer_index = nearest_index(btheta, 0, m_terminal_0.hi[0]);
-    amrex::Real const inner_radius =
-        has_inner ? index_coordinate(btheta, 0, inner_index) : 0.0_rt;
-    amrex::Real const outer_radius = index_coordinate(btheta, 0, outer_index);
+    bool const axial = m_direction == 2;
+    int const transverse_mesh_direction = axial ? 0 : 1;
+    int const transverse_physical_direction = axial ? 0 : 2;
+    amrex::Real const lower_coordinate =
+        m_terminal_0.lo[transverse_physical_direction];
+    amrex::Real const upper_coordinate =
+        m_terminal_0.hi[transverse_physical_direction];
+    bool const omit_lower =
+        axial && lower_coordinate <= WarpX::GetInstance().Geom(0).ProbLo(0);
+    int const lower_index =
+        omit_lower ? 0
+                   : nearest_index(btheta, transverse_mesh_direction,
+                                   lower_coordinate);
+    int const upper_index =
+        nearest_index(btheta, transverse_mesh_direction, upper_coordinate);
+    amrex::Real const lower_radius =
+        axial && !omit_lower ? index_coordinate(btheta, 0, lower_index)
+                             : 0.0_rt;
+    amrex::Real const upper_radius =
+        axial ? index_coordinate(btheta, 0, upper_index) : 0.0_rt;
+    amrex::Real const plane_radius =
+        axial ? 0.0_rt : index_coordinate(btheta, 0, plane_index);
     amrex::Real const scale = PhysConst::mu0 * current_error / contour[1];
 
 #ifdef AMREX_USE_OMP
@@ -725,18 +815,26 @@ CurrentControlledPort::CorrectRZContour (
             flags = eb_flag->const_array(mfi);
         }
         for (int side = 0; side < 2; ++side) {
-            if (side == 0 && !has_inner) {
+            if (side == 0 && omit_lower) {
                 continue;
             }
-            int const radial_index = side == 0 ? inner_index : outer_index;
-            amrex::IntVect const point(
-                AMREX_D_DECL(radial_index, plane_index, 0));
+            int const transverse_index = side == 0 ? lower_index : upper_index;
+            amrex::IntVect const point =
+                axial ? amrex::IntVect(
+                            AMREX_D_DECL(transverse_index, plane_index, 0))
+                      : amrex::IntVect(
+                            AMREX_D_DECL(plane_index, transverse_index, 0));
             if (!mfi.validbox().contains(point)) {
                 continue;
             }
-            amrex::Real const radius = side == 0 ? inner_radius : outer_radius;
-            amrex::Real const weight = (side == 0 ? -1.0_rt : 1.0_rt) * 2.0_rt *
-                                       MathConst::pi * radius;
+            amrex::Real const radius =
+                axial ? (side == 0 ? lower_radius : upper_radius)
+                      : plane_radius;
+            amrex::Real const orientation =
+                axial ? (side == 0 ? -1.0_rt : 1.0_rt)
+                      : (side == 0 ? 1.0_rt : -1.0_rt);
+            amrex::Real const weight =
+                orientation * 2.0_rt * MathConst::pi * radius;
             amrex::Box const point_box(point, point, btheta.ixType());
             amrex::ParallelFor(point_box,
                                [=] AMREX_GPU_DEVICE(int i, int j, int k) {
@@ -860,8 +958,11 @@ CurrentControlledPort::ApplyRZ (
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
     amrex::Real const target_axis_current) {
     amrex::MultiFab& btheta = *Bfield[1];
-    int const plane_0 = nearest_index(btheta, 1, m_terminal_0.lo[2]);
-    int const plane_1 = nearest_index(btheta, 1, m_terminal_1.lo[2]);
+    int const terminal_mesh_direction = m_direction == 0 ? 0 : 1;
+    int const plane_0 = nearest_index(btheta, terminal_mesh_direction,
+                                      m_terminal_0.lo[m_direction]);
+    int const plane_1 = nearest_index(btheta, terminal_mesh_direction,
+                                      m_terminal_1.lo[m_direction]);
     int const first_plane = std::min(plane_0, plane_1);
     int const last_plane = std::max(plane_0, plane_1);
     int const number_of_planes = last_plane - first_plane + 1;
@@ -883,7 +984,7 @@ CurrentControlledPort::ApplyRZ (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             contour[1] > 0.0_rt && contour[2] > 0.0_rt,
             "The RZ current-controlled contour has no active field points; "
-            "place its radial contour outside covered EB cells.");
+            "place its contour outside covered EB cells.");
         amrex::Real const measured_current = contour[0] / PhysConst::mu0;
         CorrectRZContour(btheta, eb_update_B[1].get(), first_plane + offset,
                          target_axis_current - measured_current, contour);
@@ -910,7 +1011,8 @@ CurrentControlledPort::ApplyBfield (
         return;
     }
 
-    amrex::Real const requested_current = m_waveform.value(time);
+    amrex::Real const requested_current =
+        m_current_scale * m_waveform.value(time);
     amrex::Real const target_axis_current = m_axis_sign * requested_current;
     m_last_target = requested_current;
 
@@ -928,10 +1030,13 @@ CurrentControlledPort::ApplyBfield (
 void
 WarpX::ApplyCurrentControlledPort (int const lev, PatchType const patch_type,
                                    amrex::Real const time) {
-    if (!m_current_controlled_port || patch_type != PatchType::fine) {
+    if (m_current_controlled_ports.empty() || patch_type != PatchType::fine) {
         return;
     }
-    m_current_controlled_port->ApplyBfield(
-        m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp, lev),
-        m_eb_update_B[lev], lev, patch_type, time);
+    auto const Bfield =
+        m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp, lev);
+    for (auto& current_port : m_current_controlled_ports) {
+        current_port->ApplyBfield(Bfield, m_eb_update_B[lev], lev, patch_type,
+                                  time);
+    }
 }

@@ -436,7 +436,46 @@ WarpX::WarpX ()
     }
 
     if (CurrentControlledPort::is_enabled()) {
-        m_current_controlled_port = std::make_unique<CurrentControlledPort>();
+        amrex::ParmParse const parser("warpx");
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_hybrid_pic_model->m_has_external_current &&
+                    !m_hybrid_pic_model->m_add_external_fields,
+                "Hybrid-PIC current-controlled ports cannot currently be "
+                "combined with analytic external current or split external "
+                "fields.");
+        }
+        std::array<amrex::Real, 3> minimum_port_gap{};
+#ifdef WARPX_DIM_3D
+        for (int direction = 0; direction < 3; ++direction) {
+            minimum_port_gap[direction] = geom[0].CellSize(direction);
+        }
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        minimum_port_gap[0] = geom[0].CellSize(0);
+        minimum_port_gap[2] = geom[0].CellSize(1);
+#endif
+        int number_of_ports = 1;
+        bool const indexed_ports =
+            parser.query("current_controlled_port.n_ports", number_of_ports);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            number_of_ports >= 1,
+            "warpx.current_controlled_port.n_ports must be at least one.");
+        for (int port_index = 0; port_index < number_of_ports; ++port_index) {
+            std::string const prefix =
+                indexed_ports
+                    ? "current_controlled_port.port_" +
+                          std::to_string(port_index)
+                    : "current_controlled_port";
+            auto port = std::make_unique<CurrentControlledPort>(prefix);
+            for (auto const& existing_port : m_current_controlled_ports) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !port->correction_region_overlaps(*existing_port,
+                                                      minimum_port_gap),
+                    "Current-controlled port correction regions must be "
+                    "separated by more than one grid cell.");
+            }
+            m_current_controlled_ports.push_back(std::move(port));
+        }
     }
 
     current_buffer_masks.resize(nlevs_max);
@@ -569,10 +608,21 @@ WarpX::~WarpX ()
 std::array<amrex::Real, 3>
 WarpX::GetCurrentControlledPortStatus () const
 {
-    if (!m_current_controlled_port) {
+    if (m_current_controlled_ports.empty()) {
         return {0.0_rt, 0.0_rt, 0.0_rt};
     }
-    return m_current_controlled_port->status();
+    return m_current_controlled_ports.front()->status();
+}
+
+std::vector<std::array<amrex::Real, 3>>
+WarpX::GetCurrentControlledPortStatuses () const
+{
+    std::vector<std::array<amrex::Real, 3>> result;
+    result.reserve(m_current_controlled_ports.size());
+    for (auto const& port : m_current_controlled_ports) {
+        result.push_back(port->status());
+    }
+    return result;
 }
 
 void

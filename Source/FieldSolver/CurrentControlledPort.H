@@ -20,11 +20,13 @@
 
 #include <array>
 #include <memory>
+#include <string>
 
 /** Enforce one current waveform between two internal terminal surfaces.
  *
- * The two terminals are congruent, axis-aligned cross-sections.  On every
- * cross-section between them, this class projects the magnetic circulation to
+ * The two terminals are coordinate-aligned and share transverse bounds.  On
+ * every cross-section between them, this class projects the magnetic
+ * circulation to
  *
  *     integral B.dl = mu0 I(t).
  *
@@ -38,7 +40,8 @@
  */
 class CurrentControlledPort {
   public:
-    CurrentControlledPort ();
+    explicit CurrentControlledPort (
+        std::string parameter_prefix = "current_controlled_port");
     ~CurrentControlledPort () = default;
 
     CurrentControlledPort (CurrentControlledPort const&) = delete;
@@ -61,6 +64,11 @@ class CurrentControlledPort {
     /** {target, terminal-0 current, terminal-1 current}; A, or A/m in 2D XZ. */
     [[nodiscard]] std::array<amrex::Real, 3> status () const;
 
+    /** Whether port regions overlap or are closer than the requested gap. */
+    [[nodiscard]] bool correction_region_overlaps (
+        CurrentControlledPort const& other,
+        std::array<amrex::Real, 3> const& minimum_gap) const;
+
   private:
     struct Terminal {
         std::array<amrex::Real, 3> lo{};
@@ -71,6 +79,7 @@ class CurrentControlledPort {
     Terminal m_terminal_0;
     Terminal m_terminal_1;
     amrex::Real m_axis_sign{1};
+    amrex::Real m_current_scale{1};
     warpx::utils::CurrentWaveform m_waveform;
     bool m_initialized = false;
     amrex::Real m_last_target{};
