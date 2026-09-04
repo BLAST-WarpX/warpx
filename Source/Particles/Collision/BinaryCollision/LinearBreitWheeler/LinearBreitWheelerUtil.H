@@ -84,13 +84,7 @@ namespace {
         // calculated using the Lorentz invariance of the total four-momentum norm
         const amrex::ParticleReal E_star_sq = 0.5_prt*c2*p1_in*p2_in*(1._prt - cos_ang);
 
-        // Square of the norm of the momentum of the products in the center of mass frame
-        // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle:
-        // p_star_sq = E_star_sq/c2 - me*me*c2;
-        // The expression below is specifically written in a form that avoids returning
-        // small negative numbers due to machine precision errors, for low-energy particles
         const amrex::ParticleReal E_ratio = std::sqrt(E_star_sq)/(2._prt*me*c2);
-        const amrex::ParticleReal p_star_sq = me*me*c2 * ( powi<2>(2._prt*E_ratio) - 1._prt );
 
         // Compute momentum of first product in the center of mass frame.
         // The polar angle is sampled from the BW differential cross section
@@ -245,12 +239,10 @@ namespace {
         if ( vc_sq > std::numeric_limits<amrex::ParticleReal>::min() )
         {   // Convert momentum of first product to lab frame, using equation (13) of F. Perez et al.,
             // Phys.Plasmas.19.083104 (2012) (which is a regular Lorentz transformation)
-            // p1_lab = p1_CM + v_CM * [(gc-1)/v^2 * (v_CM \dot p1_CM) + me*g_star*gc]
-            // Lorentz factor of the product (electron/positron) in the CM frame
-            const amrex::ParticleReal g_star = std::sqrt(1._prt + p_star_sq / (me*me*c2));
+            // p1_lab = p1_CM + v_CM * [(gc-1)/v^2 * (v_CM \dot p1_CM) + me*gamma_star*gc]
             const amrex::ParticleReal vc_dot_ps = vcx*px_star + vcy*py_star + vcz*pz_star;
             const amrex::ParticleReal factor0 = (gc-1._prt)/vc_sq;
-            const amrex::ParticleReal factor = factor0*vc_dot_ps + me*g_star*gc;
+            const amrex::ParticleReal factor = factor0*vc_dot_ps + me*gamma_star*gc;
             p1x_out = px_star + vcx * factor;
             p1y_out = py_star + vcy * factor;
             p1z_out = pz_star + vcz * factor;
