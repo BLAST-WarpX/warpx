@@ -553,6 +553,30 @@ public:
 
     bool do_splitting = false;
 
+    // Molecular internal degrees of freedom with Borgnakke-Larsen energy exchange, configured via
+    // <species>.internal_dof = none|rotational|rovibrational (+ .theta_rot/.Z_rot/.rotational_dof
+    // /.theta_vib/.Z_vib and .rot_init_temperature/.vib_init_temperature). Adds runtime real comps
+    // "E_rot" (and "E_vib" for rovibrational), both stored in eV.
+    int m_internal_dof = 0;                                            // 0=none, 1=rotational, 2=rovibrational
+    amrex::ParticleReal m_theta_rot = amrex::ParticleReal(0.0);        // rotational characteristic temperature [K]
+    amrex::ParticleReal m_Z_rot     = amrex::ParticleReal(0.0);        // rotational collision number
+    int m_rotational_dof = 2;                                         // zeta_rot (2 for a diatomic)
+    amrex::ParticleReal m_theta_vib = amrex::ParticleReal(0.0);        // vibrational characteristic temperature [K]
+    amrex::ParticleReal m_Z_vib     = amrex::ParticleReal(0.0);        // vibrational collision number
+    amrex::ParticleReal m_rot_init_T = amrex::ParticleReal(0.0);       // initial rotational temperature [K]
+    amrex::ParticleReal m_vib_init_T = amrex::ParticleReal(0.0);       // initial vibrational temperature [K]
+
+    [[nodiscard]] int  getInternalDOF   () const noexcept { return m_internal_dof; }
+    [[nodiscard]] bool hasRotationalDOF () const noexcept { return m_internal_dof >= 1; }
+    [[nodiscard]] bool hasVibrationalDOF() const noexcept { return m_internal_dof >= 2; }
+    [[nodiscard]] amrex::ParticleReal getThetaRot () const noexcept { return m_theta_rot; }
+    [[nodiscard]] amrex::ParticleReal getZRot     () const noexcept { return m_Z_rot; }
+    [[nodiscard]] int  getRotationalDOF () const noexcept { return m_rotational_dof; }
+    [[nodiscard]] amrex::ParticleReal getThetaVib () const noexcept { return m_theta_vib; }
+    [[nodiscard]] amrex::ParticleReal getZVib     () const noexcept { return m_Z_vib; }
+    [[nodiscard]] amrex::ParticleReal getRotInitT () const noexcept { return m_rot_init_T; }
+    [[nodiscard]] amrex::ParticleReal getVibInitT () const noexcept { return m_vib_init_T; }
+
     int do_not_deposit = 0;
     bool initialize_self_fields = false;
     amrex::Real self_fields_required_precision = amrex::Real(1.e-11);

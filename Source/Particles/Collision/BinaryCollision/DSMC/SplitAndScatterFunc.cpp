@@ -8,11 +8,13 @@
  */
 
 #include "SplitAndScatterFunc.H"
+#include "Particles/MultiParticleContainer.H"
 
 SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
                                           MultiParticleContainer const * const mypc):
     m_collision_type{BinaryCollisionUtils::get_collision_type(collision_name, mypc)}
 {
+    using namespace amrex::literals;
     if (m_collision_type == CollisionType::DSMC)
     {
         const amrex::ParmParse pp_collision_name(collision_name);
@@ -75,6 +77,33 @@ SplitAndScatterFunc::SplitAndScatterFunc (const std::string& collision_name,
             m_num_product_species = 2;
             m_num_products_host.push_back(0);
             m_num_products_host.push_back(0);
+        }
+
+        // Resolve molecular internal-DOF (Borgnakke-Larsen) parameters for each reactant species so the
+        // collision kernel can exchange energy between relative translation and internal modes.
+        {
+            amrex::Vector<std::string> species_names;
+            pp_collision_name.getarr("species", species_names);
+            auto fill_slot = [&](BLSlot& slot, const std::string& name) {
+                auto& sp = mypc->GetParticleContainerFromName(name);
+                slot.has_rot = sp.hasRotationalDOF();
+                slot.has_vib = sp.hasVibrationalDOF();
+                if (slot.has_rot) {
+                    slot.zeta_rot = static_cast<amrex::ParticleReal>(sp.getRotationalDOF());
+                    const amrex::ParticleReal Zr = sp.getZRot();
+                    slot.inv_Zrot = (Zr > 0._prt) ? 1.0_prt/Zr : 0._prt;
+                    slot.Erot_idx = sp.GetRealCompIndex("E_rot") - WarpXParticleContainer::NArrayReal;
+                }
+                if (slot.has_vib) {
+                    slot.theta_vib = sp.getThetaVib();
+                    const amrex::ParticleReal Zv = sp.getZVib();
+                    slot.inv_Zvib = (Zv > 0._prt) ? 1.0_prt/Zv : 0._prt;
+                    slot.Evib_idx = sp.GetRealCompIndex("E_vib") - WarpXParticleContainer::NArrayReal;
+                }
+            };
+            fill_slot(m_bl0, species_names[0]);
+            fill_slot(m_bl1, species_names[1]);
+            m_do_internal_dof = m_bl0.has_rot || m_bl0.has_vib || m_bl1.has_rot || m_bl1.has_vib;
         }
     }
     else

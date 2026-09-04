@@ -159,6 +159,23 @@ This process operates in two ways:
 
 See :cite:t:`b-Janssen2016` for a recommended use of this process.
 
+Molecular internal degrees of freedom
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For molecular species, rotational and vibrational internal energy can be exchanged with
+translational energy during elastic collisions using the phenomenological Borgnakke-Larsen model
+(Borgnakke and Larsen, *J. Comput. Phys.* **18**, 405, 1975). Internal degrees of freedom are
+enabled per species with :pp:param:`<species_name>.internal_dof`. On each elastic collision, a
+partner's rotational energy is redistributed with probability :math:`1/Z_\mathrm{rot}` and its
+vibrational energy with probability :math:`1/Z_\mathrm{vib}`, where the relaxation collision numbers
+:math:`Z_\mathrm{rot}` and :math:`Z_\mathrm{vib}` set the rate of approach to equilibrium. Rotation
+is modelled as a classical continuous mode with :math:`\zeta_\mathrm{rot}` degrees of freedom, while
+vibration uses a quantum harmonic-oscillator treatment with characteristic temperature
+:math:`\theta_\mathrm{vib}`, so the vibrational mode stays effectively frozen at low temperature and
+activates only when the gas is hot. The total collision energy (relative translational plus both
+partners' internal energy) is conserved in each exchange, and the internal energies are stored per
+particle as the runtime attributes ``E_rot`` and ``E_vib`` (in eV).
+
 Benchmarks
 ----------
 
