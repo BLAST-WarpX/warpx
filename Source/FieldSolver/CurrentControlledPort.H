@@ -80,6 +80,25 @@ class CurrentControlledPort {
     void ValidateGeometry (ablastr::fields::VectorField const& Bfield) const;
 
 #ifdef WARPX_DIM_3D
+    void Apply3D (
+        ablastr::fields::VectorField const& Bfield,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+        amrex::Real target_axis_current);
+#endif
+#ifdef WARPX_DIM_XZ
+    void ApplyXZ (
+        ablastr::fields::VectorField const& Bfield,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+        amrex::Real target_axis_current);
+#endif
+#ifdef WARPX_DIM_RZ
+    void ApplyRZ (
+        ablastr::fields::VectorField const& Bfield,
+        std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+        amrex::Real target_axis_current);
+#endif
+
+#ifdef WARPX_DIM_3D
     // A solver-consistent curl of an axial top-hat vector potential.  Scaling
     // this basis on each axial plane changes the Ampere circulation without
     // changing the discrete divergence of B.
@@ -102,8 +121,6 @@ class CurrentControlledPort {
     };
 
     [[nodiscard]] std::array<Edge, 4> Edges () const;
-#endif
-#ifdef WARPX_DIM_3D
     void BuildCurlBasis (
         ablastr::fields::VectorField const& Bfield,
         std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B);

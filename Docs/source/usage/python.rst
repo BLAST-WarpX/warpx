@@ -38,7 +38,9 @@ Simulation and Grid Setup
 -------------------------
 
 .. autoclass:: pywarpx.picmi.Simulation
-    :members: step, add_species, add_laser, add_applied_field, add_interaction, add_diagnostic, add_prescribed_current_injection, add_current_controlled_port, write_input_file
+    :members: step, add_species, add_laser, add_applied_field, add_interaction,
+              add_diagnostic, add_prescribed_current_injection,
+              add_current_controlled_port, write_input_file
 
 .. autoclass:: pywarpx.picmi.Cartesian3DGrid
 

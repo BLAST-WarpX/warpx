@@ -96,11 +96,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
-#include <sstream>
 #include <limits>
 #include <optional>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -461,11 +460,7 @@ WarpX::WarpX ()
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
 
-    // The box-based impressed-current antenna is created by
-    // MultiParticleContainer. The paired current-controlled port above is a
-    // separate field-level Ampere constraint; both source types may coexist.
-
-
+    // Set default values for particle and cell weights for costs update.
     // Default values listed here for the case AMREX_USE_GPU are determined
     // from single-GPU tests on Summit.
     if (costs_heuristic_cells_wt<=0. && costs_heuristic_particles_wt<=0.

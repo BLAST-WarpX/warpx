@@ -6,10 +6,8 @@
  */
 #include "CurrentControlledPort.H"
 
-#include "EmbeddedBoundary/Enabled.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "Utils/Parser/ParserUtils.H"
-#include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
@@ -30,12 +28,18 @@
 #include <cmath>
 #include <limits>
 #include <string>
-#include <utility>
 #include <vector>
 
 using namespace amrex;
 
 namespace {
+[[nodiscard]] bool
+nearly_equal (amrex::Real const lhs, amrex::Real const rhs) {
+    amrex::Real const scale = std::max(std::abs(lhs), std::abs(rhs));
+    return std::abs(lhs - rhs) <=
+           64.0_rt * std::numeric_limits<amrex::Real>::epsilon() * scale;
+}
+
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 [[nodiscard]] int
 nearest_index (amrex::MultiFab const& field, int const direction,
@@ -172,9 +176,9 @@ CurrentControlledPort::CurrentControlledPort () {
     amrex::Real const position_0 = m_terminal_0.lo[m_direction];
     amrex::Real const position_1 = m_terminal_1.lo[m_direction];
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_terminal_0.hi[m_direction] == position_0 &&
-            m_terminal_1.hi[m_direction] == position_1 &&
-            position_0 != position_1,
+        nearly_equal(m_terminal_0.hi[m_direction], position_0) &&
+            nearly_equal(m_terminal_1.hi[m_direction], position_1) &&
+            !nearly_equal(position_0, position_1),
         "Each terminal must have zero thickness in "
         "current_controlled_port.direction, "
         "and the two terminal positions must differ.");
@@ -198,11 +202,11 @@ CurrentControlledPort::CurrentControlledPort () {
                 m_terminal_1.hi[direction] > m_terminal_1.lo[direction],
             "Terminal transverse upper bounds must exceed lower bounds.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            m_terminal_0.lo[direction] == m_terminal_1.lo[direction] &&
-                m_terminal_0.hi[direction] == m_terminal_1.hi[direction],
-            "The first current-controlled-port implementation requires "
-            "congruent "
-            "terminal contours.");
+            nearly_equal(m_terminal_0.lo[direction],
+                         m_terminal_1.lo[direction]) &&
+                nearly_equal(m_terminal_0.hi[direction],
+                             m_terminal_1.hi[direction]),
+            "Current-controlled ports require congruent terminal contours.");
     }
 }
 
@@ -280,6 +284,25 @@ CurrentControlledPort::ValidateGeometry (
                 "simulation domain.");
         }
     }
+
+#ifdef WARPX_DIM_3D
+    amrex::MultiFab const& terminal_field = *Bfield[(m_direction + 1) % 3];
+    int const terminal_mesh_direction = m_direction;
+#elif defined(WARPX_DIM_XZ)
+    amrex::MultiFab const& terminal_field = *Bfield[1];
+    int const terminal_mesh_direction = m_direction == 0 ? 0 : 1;
+#elif defined(WARPX_DIM_RZ)
+    amrex::MultiFab const& terminal_field = *Bfield[1];
+    int const terminal_mesh_direction = 1;
+#endif
+    int const terminal_plane_0 = nearest_index(
+        terminal_field, terminal_mesh_direction, m_terminal_0.lo[m_direction]);
+    int const terminal_plane_1 = nearest_index(
+        terminal_field, terminal_mesh_direction, m_terminal_1.lo[m_direction]);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        terminal_plane_0 != terminal_plane_1,
+        "The two current-controlled terminals must map to distinct field "
+        "planes.");
 #endif
 }
 
@@ -727,20 +750,12 @@ CurrentControlledPort::CorrectRZContour (
 }
 #endif
 
+#ifdef WARPX_DIM_3D
 void
-CurrentControlledPort::ApplyBfield (
+CurrentControlledPort::Apply3D (
     ablastr::fields::VectorField const& Bfield,
     std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
-    int const lev, PatchType const patch_type, amrex::Real const time) {
-    if (!m_initialized || lev != 0 || patch_type != PatchType::fine) {
-        return;
-    }
-
-    amrex::Real const requested_current = m_waveform.value(time);
-    amrex::Real const target_axis_current = m_axis_sign * requested_current;
-    m_last_target = requested_current;
-
-#ifdef WARPX_DIM_3D
+    amrex::Real const target_axis_current) {
     auto const edges = Edges();
     amrex::MultiFab const& reference_field = *Bfield[edges[0].component];
     int const plane_0 = nearest_index(reference_field, m_direction,
@@ -771,9 +786,8 @@ CurrentControlledPort::ApplyBfield (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             std::abs(basis_response) > 0.0_rt,
             "The current-controlled port contour has no solver-active curl "
-            "basis; "
-            "place its contour outside covered EB cells and away from the "
-            "domain edge.");
+            "basis; place its contour outside covered EB cells and away from "
+            "the domain edge.");
         AddScaledCurlBasis(Bfield, first_plane + offset,
                            (desired_circulation - circulation) /
                                basis_response);
@@ -786,7 +800,15 @@ CurrentControlledPort::ApplyBfield (
         m_last_terminal_current[terminal] =
             m_axis_sign * terminal_circulation[terminal] / PhysConst::mu0;
     }
-#elif defined(WARPX_DIM_XZ)
+}
+#endif
+
+#ifdef WARPX_DIM_XZ
+void
+CurrentControlledPort::ApplyXZ (
+    ablastr::fields::VectorField const& Bfield,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+    amrex::Real const target_axis_current) {
     amrex::MultiFab& by = *Bfield[1];
     int const axial_mesh_direction = m_direction == 0 ? 0 : 1;
     int const plane_0 =
@@ -828,7 +850,15 @@ CurrentControlledPort::ApplyBfield (
         m_last_terminal_current[terminal] =
             m_axis_sign * terminal_circulation[terminal] / PhysConst::mu0;
     }
-#elif defined(WARPX_DIM_RZ)
+}
+#endif
+
+#ifdef WARPX_DIM_RZ
+void
+CurrentControlledPort::ApplyRZ (
+    ablastr::fields::VectorField const& Bfield,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+    amrex::Real const target_axis_current) {
     amrex::MultiFab& btheta = *Bfield[1];
     int const plane_0 = nearest_index(btheta, 1, m_terminal_0.lo[2]);
     int const plane_1 = nearest_index(btheta, 1, m_terminal_1.lo[2]);
@@ -868,6 +898,28 @@ CurrentControlledPort::ApplyBfield (
         m_last_terminal_current[terminal] =
             m_axis_sign * terminal_circulation[terminal] / PhysConst::mu0;
     }
+}
+#endif
+
+void
+CurrentControlledPort::ApplyBfield (
+    ablastr::fields::VectorField const& Bfield,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_B,
+    int const lev, PatchType const patch_type, amrex::Real const time) {
+    if (!m_initialized || lev != 0 || patch_type != PatchType::fine) {
+        return;
+    }
+
+    amrex::Real const requested_current = m_waveform.value(time);
+    amrex::Real const target_axis_current = m_axis_sign * requested_current;
+    m_last_target = requested_current;
+
+#ifdef WARPX_DIM_3D
+    Apply3D(Bfield, eb_update_B, target_axis_current);
+#elif defined(WARPX_DIM_XZ)
+    ApplyXZ(Bfield, eb_update_B, target_axis_current);
+#elif defined(WARPX_DIM_RZ)
+    ApplyRZ(Bfield, eb_update_B, target_axis_current);
 #else
     amrex::ignore_unused(Bfield, eb_update_B, target_axis_current);
 #endif

@@ -2710,19 +2710,20 @@ class PrescribedCurrentDrive(picmistandard.base._ClassWithInit):
     ----------
     lower_bound: sequence of 3 floats
         Lower corner of the drive box ``[xlo, ylo, zlo]`` in meters.
-        In 2D XZ geometry the y-bounds are still required by the input parser
-        (they may be set to any values that contain the invariant plane).
+        In 2D XZ geometry the y-bounds are required but ignored.
     upper_bound: sequence of 3 floats
         Upper corner of the drive box ``[xhi, yhi, zhi]`` in meters.
-    area: float
+    area: float, optional
         Cross-sectional area ``A`` [m^2] used to form ``J = sign * I(t) / A``.
+        It may be omitted only for a radial RZ drive (``direction=0``), which
+        uses a conserved-total-current profile.
     direction: {0, 1, 2}, default=0
         Injected current density component (0 = x, 1 = y, 2 = z).
     sign: {+1, -1}, default=+1
         Sign of the local impressed current. This reverses its vector; it does
         not define a circuit return terminal.
     file: str, optional
-        Per-face two-column waveform file (``t [s]``, ``I [A]``). Overrides
+        Per-region two-column waveform file (``t [s]``, ``I [A]``). Overrides
         the global file set on ``PrescribedCurrentInjection`` when given.
     """
 
@@ -2730,7 +2731,7 @@ class PrescribedCurrentDrive(picmistandard.base._ClassWithInit):
         self,
         lower_bound,
         upper_bound,
-        area,
+        area=None,
         direction=0,
         sign=1,
         file=None,
@@ -2753,7 +2754,7 @@ class PrescribedCurrentDrive(picmistandard.base._ClassWithInit):
             raise ValueError("PrescribedCurrentDrive direction must be 0, 1, or 2.")
         if self.sign not in (1, -1):
             raise ValueError("PrescribedCurrentDrive sign must be +1 or -1.")
-        if self.area is None or self.area <= 0.0:
+        if self.area is not None and self.area <= 0.0:
             raise ValueError("PrescribedCurrentDrive area must be > 0.")
 
 
@@ -2762,7 +2763,7 @@ class PrescribedCurrentInjection(picmistandard.base._ClassWithInit):
     WarpX-specific PICMI interface for a file-driven impressed-current antenna.
 
     Deposits a user waveform ``I(t)`` as current density
-    ``J = sign * I(t) / A`` on one or more rectangular faces via
+    ``J = sign * I(t) / A`` on one or more rectangular regions via
     ``PrescribedCurrentParticleContainer`` (``warpx.current_injection.*``).
 
     Opposite-weight particle pairs deposit both the current and the
@@ -2838,7 +2839,8 @@ class PrescribedCurrentInjection(picmistandard.base._ClassWithInit):
             pywarpx.warpx.__setattr__(f"{base}.drive.yhi", drive.upper_bound[1])
             pywarpx.warpx.__setattr__(f"{base}.drive.zlo", drive.lower_bound[2])
             pywarpx.warpx.__setattr__(f"{base}.drive.zhi", drive.upper_bound[2])
-            pywarpx.warpx.__setattr__(f"{base}.drive.A", drive.area)
+            if drive.area is not None:
+                pywarpx.warpx.__setattr__(f"{base}.drive.A", drive.area)
             pywarpx.warpx.__setattr__(f"{base}.drive.dir", drive.direction)
             pywarpx.warpx.__setattr__(f"{base}.drive.sign", drive.sign)
 

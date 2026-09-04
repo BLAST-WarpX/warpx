@@ -19,50 +19,19 @@
 #include <string>
 #include <vector>
 
-/**
- * PrescribedCurrentParticleContainer is an impressed-current antenna that
- * imposes a user-prescribed, time-varying current density J = I(t)/A over one
- * or more axis-aligned rectangular boxes, using artificial macro-particles
- * deposited through the standard WarpX current-deposition path (like
- * LaserParticleContainer).
+/** An impressed-current antenna driven by external waveform files.
  *
- * Compared with writing J directly into `current_fp`, depositing through the
- * particle path means the imposed current (a) shows up in the Jx/Jy/Jz
- * diagnostics and (b) is handled identically by the explicit and implicit
- * field solvers.
+ * Each selected cell contains a coincident pair of opposite charge weights.
+ * The pair members move in opposite directions, so their currents add while
+ * their separation deposits the polarization charge required by discrete
+ * continuity.  Deposition uses the standard WarpX particle path for both
+ * explicit and implicit Maxwell solvers.
  *
- * Each filled cell carries a coincident pair of opposite signed weights.  The
- * pair members move in opposite directions, so their currents add while their
- * charge separation supplies the rho required by the discrete continuity
- * equation.  Their maximum excursion is kept below a fraction of one cell by
- * choosing the particle weight from the time-integrated waveform.
- *
- * This is not a terminal or circuit boundary.  A finite box generally has
- * div(J) != 0, so it polarizes its two ends and behaves as an antenna.  It
- * cannot enforce the same current through a separate conductor or plasma.
- *
- * Configured via the public `warpx.current_injection.*` input block:
- * n_pairs antenna regions, each with a box, area A, sign (+/-1), and an
- * optional per-pair waveform file (pair_N.file) that overrides the global
- * current_injection.file. The sign reverses the current vector; it does not
- * identify a circuit return terminal. Each region has its own current direction
- * `dir`. Requires algo.particle_shape >= 1 and a charge-conserving current
- * deposition scheme (Esirkepov or Villasenor).
- *
- * Dimensionality:
- *  - 3D and 2D (XZ): J = sign * I(t) / A is uniform over the drive box; the
- *    two pair members have weights +/-dV/(2*vel_coeff*A), and the requested
- *    sign is applied to their opposite velocities.
- *  - RZ: dir = 0/1/2 -> Jr/Jtheta/Jz. Antenna particles are seeded at theta = 0
- *    so the Cartesian push is a radial/azimuthal/axial step. The RZ current
- *    path deposits a raw J that ApplyInverseVolumeScalingToCurrentDensity later
- *    divides by 2*pi*r, so the per-cell weight is set to give the physical
- *    profile: dir = 0 (Jr) uses a uniform weight ->
- *    Jr = I(t)/(2*pi*r*Nz*dz), the 1/r coaxial profile with total radial
- *    current I conserved across shells and distributed across the axial extent
- *    of the box (A is unused/optional); dir = 1,2 (Jtheta/Jz) use a weight ~ r
- *    -> uniform J = sign * I(t) / A over the r-z box (A is the physical
- *    cross-section, e.g. pi*(r_o^2-r_i^2) for Jz, (r_o-r_i)*dz for Jtheta).
+ * A finite region is a local antenna, not a circuit terminal: it can polarize
+ * at its ends but cannot enforce through-current in a separate conductor.
+ * Configure independent regions with `warpx.current_injection.*`.  Esirkepov or
+ * Villasenor current deposition and a particle shape of at least one are
+ * required.
  */
 class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
   public:
@@ -114,19 +83,18 @@ class PrescribedCurrentParticleContainer : public WarpXParticleContainer {
     static bool is_enabled ();
 
   private:
-    //! One axis-aligned drive box with its own waveform.
-    struct Face {
+    //! One axis-aligned antenna region with its own waveform.
+    struct Drive {
         amrex::Real lo[3] = {0., 0., 0.};
         amrex::Real hi[3] = {0., 0., 0.};
-        amrex::Real A = 1.; //!< Face area perpendicular to dir [m^2]
+        amrex::Real A = 1.; //!< Cross-sectional area normal to dir [m^2]
         int dir = 0;        //!< Current component: 0=Jx, 1=Jy, 2=Jz
         int sign = 1;       //!< Current sign: +1 or -1 (J = sign*I(t)/A)
-        //! Per-region waveform (from pair_N.file if given, else the global
-        //! file).
+        //! Per-region waveform, falling back to the global waveform file.
         warpx::utils::CurrentWaveform waveform;
     };
 
-    std::vector<Face> m_faces;
+    std::vector<Drive> m_drives;
 
     amrex::Real m_vel_coeff = 0.; //!< C such that speed = C * I(t) [m/s/A]
     bool m_enabled = true;

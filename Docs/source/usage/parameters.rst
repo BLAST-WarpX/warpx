@@ -3850,8 +3850,8 @@ The antenna currently supports one mesh level in 2D XZ, 3D, and RZ.  It aborts f
     if every region sets ``pair_N.file``.
 
 * ``warpx.current_injection.n_pairs`` (`integer`, optional, default: ``1``)
-    Number of independent antenna boxes.  At least one must be defined.  The historical
-    ``pair_N`` spelling is retained for input compatibility; it does not pair terminals.
+    Number of independent antenna boxes.  At least one must be defined.  Here ``pair_N``
+    is an input-schema label for region ``N``; it does not pair circuit terminals.
 
 For each index ``N`` (starting from 0):
 
@@ -3870,8 +3870,8 @@ For each index ``N`` (starting from 0):
 
 * ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
     Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
-    In RZ these values denote r, theta, and z. Set independently per face. Drive boxes may
-    overlap; every drive retains its own waveform, direction, area, and sign.
+    In RZ these values denote r, theta, and z. Set independently per region. Drive boxes
+    may overlap; every drive retains its own waveform, direction, area, and sign.
 
 * ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
     Sign of the local antenna current: :math:`J = \mathrm{sign}\, I(t)/A`.  This reverses
@@ -3914,7 +3914,7 @@ ion and electron-fluid current.  The 3D correction is constructed as a discrete 
 does not introduce magnetic divergence.  The source is an ideal current constraint; an
 external circuit/power model is not yet coupled to it.
 
-The initial implementation supports a single mesh level with the Yee and Hybrid-PIC field
+The current-controlled port supports a single mesh level with the Yee and Hybrid-PIC field
 solvers.  It supports 3D, in-plane x or z current in 2D XZ, and axial z current in
 axisymmetric RZ with one azimuthal mode.  Terminal cross-sections must currently be
 congruent rectangles (an annulus or disk in RZ), aligned with coordinate axes.  Coordinates
@@ -3946,8 +3946,8 @@ extensions.
 and add it with ``Simulation.add_current_controlled_port``.  At most one global port is
 currently supported.  See
 ``Examples/Tests/current_controlled_port/inputs_test_current_controlled_port_picmi.py``.
-The antenna and paired port may be enabled together while their physical equivalence is
-being evaluated; their imposed fields then superpose.
+The antenna and paired port may be enabled together when their combined effect is intended;
+their imposed fields then superpose.
 
 .. _running-cpp-parameters-hybrid-model:
 

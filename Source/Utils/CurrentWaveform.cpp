@@ -9,8 +9,8 @@
 #include "Utils/TextMsg.H"
 
 #include <AMReX.H>
-#include <AMReX_GpuContainers.H>
 #include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Vector.H>
 
 #include <algorithm>
 #include <cmath>
