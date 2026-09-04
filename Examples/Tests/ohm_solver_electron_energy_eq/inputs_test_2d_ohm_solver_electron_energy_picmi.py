@@ -24,7 +24,7 @@
 # ---             time tau_R = mu0/(eta k^2).  Analyse with
 # ---             analysis_joule.py (B-energy decay + T_e ramp).
 # ---
-# ---   qei     : electron-ion thermal-equilibration sink only (B=0, eta=0),
+# ---   qei     : electron-ion thermal-equilibration sink only (eta=0),
 # ---                 dU_e/dt = -Q_ei,  Q_ei = 3 n_e k_B nu_ei (T_e - T_i),
 # ---             enabled by the rate parser
 # ---             hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t).
@@ -33,8 +33,10 @@
 # ---             energy.  For constant nu_ei (single proton species, Z=1),
 # ---                 (T_e - T_i)(t) = (T_e0 - T_i0) exp(-rate t),
 # ---                 rate = [3(gamma_e-1) + 2] nu_ei,
-# ---             and C_e T_e + C_i T_i is conserved.  Analyse with
-# ---             analysis_qei.py (difference rate + budget).
+# ---             and C_e T_e + C_i T_i is conserved. A force-free B field
+# ---             supplies an electron-ion drift without a Lorentz force;
+# ---             because Q_ei is thermal-only, the ion bulk current must stay
+# ---             at its initial noise level. Analyse with analysis_qei.py.
 # ---
 # ---   vacuum  : transport through a below-floor halo (B=0, eta=0, all
 # ---             sources off).  A slab (n = n0) drifts at c_s through a
@@ -79,7 +81,7 @@ class ElectronEnergyCase(object):
     # automatically on charged species when the Q_ei relaxation is configured,
     # which that case also exercises.
     set_temperature_deposition = True
-    load_B = False  # joule only: force-free initial field
+    load_B = False  # force-free initial field
     reduced_diags = False  # joule only: field/particle energy
 
     def __init__(self, test, verbose):
@@ -97,6 +99,20 @@ class ElectronEnergyCase(object):
 
     def density_expression(self):
         return "n0"
+
+    def load_initial_B(self):
+        """Set the linear force-free field B(x) = B0[0, sin(kx), cos(kx)]."""
+        Bx = simulation.fields.get("Bfield_fp_external", dir="x", level=0)
+        By = simulation.fields.get("Bfield_fp_external", dir="y", level=0)
+        Bz = simulation.fields.get("Bfield_fp_external", dir="z", level=0)
+
+        Bx[:, :] = 0.0
+        # Each component is evaluated on its own, possibly staggered mesh.
+        XBy, _ = np.meshgrid(By.mesh("x"), By.mesh("z"), indexing="ij")
+        XBz, _ = np.meshgrid(Bz.mesh("x"), Bz.mesh("z"), indexing="ij")
+        By[:, :] = self.B0 * np.sin(self.k * XBy)
+        Bz[:, :] = self.B0 * np.cos(self.k * XBz)
+        comm.Barrier()
 
     def setup_run(self):
         global simulation
@@ -472,28 +488,9 @@ class ForceFreeJoule(ElectronEnergyCase):
             f"                   = {self.dTe_dt_pred * constants.kb / constants.q_e:.4e} eV/s\n"
         )
 
-    def load_initial_B(self):
-        """Set the linear force-free field B(x) = B0[0, sin(kx), cos(kx)].
-
-        WarpX folds Bfield_fp_external into Bfield_fp at initialization, after
-        which it evolves self-consistently. div(B) = 0 analytically (B has no
-        x-component and the others depend only on x), so no cleaning needed.
-        """
-        Bx = simulation.fields.get("Bfield_fp_external", dir="x", level=0)
-        By = simulation.fields.get("Bfield_fp_external", dir="y", level=0)
-        Bz = simulation.fields.get("Bfield_fp_external", dir="z", level=0)
-
-        Bx[:, :] = 0.0
-        # Each component on its own (possibly staggered) mesh.
-        XBy, _ = np.meshgrid(By.mesh("x"), By.mesh("z"), indexing="ij")
-        XBz, _ = np.meshgrid(Bz.mesh("x"), Bz.mesh("z"), indexing="ij")
-        By[:, :] = self.B0 * np.sin(self.k * XBy)
-        Bz[:, :] = self.B0 * np.cos(self.k * XBz)
-        comm.Barrier()
-
 
 class QeiRelaxation(ElectronEnergyCase):
-    """Q_ei electron-ion thermal-equilibration test: pure exponential."""
+    """Q_ei thermal equilibration without ion bulk-momentum relaxation."""
 
     te_eV = 300.0  # initial (uniform) electron temperature (eV), hot
     ti_eV = 50.0  # ion temperature (eV); the relaxation target
@@ -501,6 +498,10 @@ class QeiRelaxation(ElectronEnergyCase):
     # ---- Relaxation ---------------------------------------------------------
     nu_ei = 1.0e6  # electron-ion relaxation rate (1/s), constant;
     #   Te sink rate = 3(gamma_e-1)*nu_ei = 2e6 1/s -> tau = 0.5 us
+
+    # ---- Force-free electron-ion drift -------------------------------------
+    B0 = 0.1
+    n_wave = 1
 
     # ---- Geometry (small; the physics is 0-D / uniform) / numerics ----------
     NX = 32
@@ -514,7 +515,8 @@ class QeiRelaxation(ElectronEnergyCase):
     # automatically on charged species when the Q_ei relaxation is
     # configured, which this test also exercises (T_ions is dumped below).
     set_temperature_deposition = False
-    diag_data_list = ["rho", "Te", "T_ions"]
+    load_B = True
+    diag_data_list = ["B", "J", "rho", "Te", "T_ions"]
 
     def configure(self):
         if self.test:
@@ -531,6 +533,9 @@ class QeiRelaxation(ElectronEnergyCase):
         mi = constants.m_p
         self.dx = self.Lx / self.NX
         self.Lz = self.dx * self.NZ
+        self.k = 2.0 * np.pi * self.n_wave / self.Lx
+        self.J0 = self.k * self.B0 / constants.mu0
+        self.v_drift = self.J0 / (constants.q_e * self.n0)
 
         # Analytic electron-sink rate and e-folding time.
         self.rate = 3.0 * (self.gamma_e - 1.0) * self.nu_ei
@@ -544,7 +549,8 @@ class QeiRelaxation(ElectronEnergyCase):
         self.diag_steps = max(1, self.total_steps // self.ndiag)
 
         self.vi_th = np.sqrt(constants.q_e * self.ti_eV / mi)
-        # No applied B (B=0). No resistivity (eta=0 -> no Joule, pure Q_ei).
+        # Zero resistivity: the force-free field supplies an electron-ion drift
+        # but no Lorentz force or Joule heating, so Q_ei remains the only source.
         self.eta = 0.0
         # Constant relaxation rate so the relaxation is a pure exponential.
         self.relaxation_rate = f"{self.nu_ei}"
@@ -557,11 +563,14 @@ class QeiRelaxation(ElectronEnergyCase):
             f"  nu_ei     = {self.nu_ei:.3e} 1/s   (constant)\n"
             f"  rate      = 3(gamma-1)nu_ei = {self.rate:.3e} 1/s\n"
             f"  tau       = 1/rate = {self.tau:.3e} s\n"
+            f"  B0        = {self.B0:.3e} T  (force-free)\n"
+            f"  |J|       = {self.J0:.3e} A/m^2  (electron current)\n"
+            f"  |Ve-Vi|   = {self.v_drift:.3e} m/s\n"
             f"  Grid      = {self.NX} x {self.NZ},  Lx x Lz = {self.Lx:.3f} x {self.Lz:.4f} m\n"
             f"  dt        = {self.dt:.3e} s   (rate*dt = {self.rate * self.dt:.3f})\n"
             f"  steps     = {self.total_steps},  diag every {self.diag_steps}\n"
-            f"  B = 0,  eta = 0  ->  Joule OFF, Q_ei ON (e-sink + conjugate ion heating)\n"
-            f"  CHECK:  (Te-Ti)(t) = (Te0-Ti0) exp(-[3(g-1)+2]nu t),  energy conserved\n"
+            f"  eta = 0  ->  Joule OFF, Q_ei ON (e-sink + conjugate ion heating)\n"
+            f"  CHECK:  thermal equilibration and energy conservation; ion bulk unchanged\n"
         )
 
 

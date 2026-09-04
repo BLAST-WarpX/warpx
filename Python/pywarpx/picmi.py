@@ -2218,6 +2218,18 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
 
+    plasma_resistivity_species: dict, optional
+        Per-species resistivity overlays added on top of ``plasma_resistivity``,
+        as a dictionary mapping a charged species name to a value or expression
+        in Ohm*m. The expression may depend on ``rho_s`` (the species charge
+        density), ``rho`` (total charge density which, by quasineutrality,
+        equals the electron charge density), ``Te`` (electron temperature
+        in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the
+        species current density magnitude), ``B`` (magnetic field magnitude)
+        and ``t`` (time). The effective resistivity applied to species ``s``
+        in Ohm's law, the Joule heating source and the resistive drag is
+        ``plasma_resistivity + plasma_resistivity_species[s]``.
+
     solve_electron_energy_equation: bool, default=False
         Solve the electron energy equation instead of the algebraic adiabatic
         pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is
@@ -2349,6 +2361,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         n_floor=None,
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
+        plasma_resistivity_species=None,
         solve_electron_energy_equation=None,
         include_joule_heating=None,
         joule_redirect_Te_threshold=None,
@@ -2377,6 +2390,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
+        self.plasma_resistivity_species = plasma_resistivity_species
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
         self.include_joule_heating = include_joule_heating
@@ -2435,6 +2449,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_hyper_resistivity, self.mangle_dict
             ),
         )
+        if self.plasma_resistivity_species is not None:
+            for name, expr in self.plasma_resistivity_species.items():
+                pywarpx.hybridpicmodel.__setattr__(
+                    f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
+                    pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
+                )
         # Only emit the electron-energy-equation attributes that were
         # explicitly set, so the generated input deck contains only
         # user-specified parameters.
@@ -3445,6 +3465,43 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
                 if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
+
+
+class HybridResistiveDragCollisions(picmistandard.base._ClassWithInit):
+    """
+    Custom class to handle setup of the hybrid-PIC resistive drag collision in
+    WarpX. If collision initialization is added to picmistandard this can be
+    changed to inherit that functionality.
+
+    This is the ion-side half of the electron-ion friction operator of the
+    hybrid-PIC (Ohm's law) solver: it relaxes the bulk velocity of the given
+    ion species toward the electron fluid velocity at the rate implied by the
+    resistivity of Ohm's law, pairing with the ``plasma_resistivity`` /
+    ``plasma_resistivity_species`` parameters of :class:`HybridPICSolver`.
+    With the drag registered, the resistive terms of Ohm's law are also
+    included in the particle-push E-field, so when used the drag must be
+    registered on every charged species (WarpX asserts this at
+    initialization).
+
+    Parameters
+    ----------
+    name: string
+        Name of instance (used in the inputs file)
+
+    species: species instance
+        The (positive, current-depositing) ion species the drag acts on
+    """
+
+    def __init__(self, name, species, **kw):
+        self.name = name
+        self.species = species
+
+        self.handle_init(kw)
+
+    def collision_initialize_inputs(self):
+        collision = pywarpx.Collisions.newcollision(self.name)
+        collision.type = "hybrid_resistive_drag"
+        collision.species = [self.species.name]
 
 
 class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):

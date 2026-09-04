@@ -4,6 +4,7 @@
  *
  * Authors: Roelof Groenewald (TAE Technologies)
  *          S. Eric Clark (Helion Energy)
+ *          Prabhat Kumar (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -546,6 +547,18 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
+    // With the resistive-drag collision active, the resistive terms belong
+    // in every E-solve, including the one that builds the particle-push
+    // field: the drag (-R_s on each species) and the resistive E
+    // (+(rho_s/rho) Sum_t R_t via the Lorentz force) are the two halves of
+    // the electron-ion friction, and only their sum conserves momentum.
+    // Without the drag they are excluded from the push field, which is
+    // exactly equivalent for a global eta (the two halves cancel per
+    // species, pointwise). The hyper-resistive term is numerical dissipation
+    // with no drag back-reaction and stays in the Faraday solves only.
+    const bool include_resistivity =
+        solve_for_Faraday || hybrid_model->m_has_resistive_drag;
+
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
@@ -590,6 +603,20 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     // by the nodal mesh.
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
+
+    // Per-species resistive friction added to Ohm's-law E alongside
+    // +eta_global J, as the frozen ion-drift remainder plus the lagged
+    // coefficient times the live plasma current (see
+    // HybridPICModel::ComputeResistiveOverlay, which fills the registered
+    // hybrid_eta_overlay_fp / hybrid_eta_overlay_coef_fp fields read here).
+    // The fields are not allocated when no per-species parser is registered.
+    const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
+    ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
+    ablastr::fields::VectorField eta_coef_mf = {nullptr, nullptr, nullptr};
+    if (has_eta_overlay) {
+        eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+        eta_coef_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
+    }
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -693,6 +720,17 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        // Default-constructed (never indexed) unless has_eta_overlay.
+        Array4<Real const> eta_overlay_r, eta_overlay_t, eta_overlay_z;
+        Array4<Real const> eta_coef_r, eta_coef_t, eta_coef_z;
+        if (has_eta_overlay) {
+            eta_overlay_r = eta_overlay_mf[0]->const_array(mfi);
+            eta_overlay_t = eta_overlay_mf[1]->const_array(mfi);
+            eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+            eta_coef_r = eta_coef_mf[0]->const_array(mfi);
+            eta_coef_t = eta_coef_mf[1]->const_array(mfi);
+            eta_coef_z = eta_coef_mf[2]->const_array(mfi);
+        }
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -754,8 +792,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // Resistive terms; see include_resistivity above.
+                if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -766,8 +804,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
+                    // Per-species resistive friction (Phys. Plasmas 31, 012902 (2024)):
+                    // frozen ion-drift remainder plus the lagged coefficient
+                    // times the live plasma current.
+                    if (has_eta_overlay) {
+                        Er(i, j, 0) += eta_overlay_r(i, j, 0)
+                                       + eta_coef_r(i, j, 0) * Jr(i, j, 0);
+                    }
 
-                    if (include_hyper_resistivity_term) {
+                    if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                         // Interpolate B field to appropriate staggering to match E field
                         Real btot_val = 0._rt;
@@ -825,8 +870,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Etheta(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // Resistive terms; see include_resistivity above.
+                if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if(resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -837,8 +882,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
+                    if (has_eta_overlay) {
+                        Etheta(i, j, 0) += eta_overlay_t(i, j, 0)
+                                           + eta_coef_t(i, j, 0) * Jtheta(i, j, 0);
+                    }
 
-                    if (include_hyper_resistivity_term) {
+                    if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                         // Interpolate B field to appropriate staggering to match E field
                         Real btot_val = 0._rt;
@@ -893,8 +942,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // Resistive terms; see include_resistivity above.
+                if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -905,8 +954,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
+                    if (has_eta_overlay) {
+                        Ez(i, j, 0) += eta_overlay_z(i, j, 0)
+                                       + eta_coef_z(i, j, 0) * Jz(i, j, 0);
+                    }
 
-                    if (include_hyper_resistivity_term) {
+                    if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                         // Interpolate B field to appropriate staggering to match E field
                         Real btot_val = 0._rt;
@@ -990,6 +1043,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
+    // Resistive terms in the push field when the drag is active; see the
+    // design notes in HybridPICSolveECylindrical.
+    const bool include_resistivity =
+        solve_for_Faraday || hybrid_model->m_has_resistive_drag;
+
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
@@ -1034,6 +1092,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // by the nodal mesh.
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
+
+    // Per-species resistive friction added to Ohm's-law E alongside
+    // +eta_global J: frozen ion-drift remainder plus lagged coefficient
+    // times the live plasma current (see HybridPICSolveECylindrical and
+    // HybridPICModel::ComputeResistiveOverlay). Not allocated when no
+    // per-species parser is registered.
+    const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
+    ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
+    ablastr::fields::VectorField eta_coef_mf = {nullptr, nullptr, nullptr};
+    if (has_eta_overlay) {
+        eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+        eta_coef_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
+    }
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -1137,6 +1208,17 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Bx = Bfield[0]->array(mfi);
         Array4<Real> const& By = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        // Default-constructed (never indexed) unless has_eta_overlay.
+        Array4<Real const> eta_overlay_x, eta_overlay_y, eta_overlay_z;
+        Array4<Real const> eta_coef_x, eta_coef_y, eta_coef_z;
+        if (has_eta_overlay) {
+            eta_overlay_x = eta_overlay_mf[0]->const_array(mfi);
+            eta_overlay_y = eta_overlay_mf[1]->const_array(mfi);
+            eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+            eta_coef_x = eta_coef_mf[0]->const_array(mfi);
+            eta_coef_y = eta_coef_mf[1]->const_array(mfi);
+            eta_coef_z = eta_coef_mf[2]->const_array(mfi);
+        }
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -1194,8 +1276,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
+            // Resistive terms; see include_resistivity above.
+            if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1206,8 +1288,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
+                // Per-species resistive friction: frozen ion-drift remainder
+                // plus the lagged coefficient times the live plasma current.
+                if (has_eta_overlay) {
+                    Ex(i, j, k) += eta_overlay_x(i, j, k)
+                                   + eta_coef_x(i, j, k) * Jx(i, j, k);
+                }
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1258,8 +1346,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
+            // Resistive terms; see include_resistivity above.
+            if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1270,8 +1358,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
+                if (has_eta_overlay) {
+                    Ey(i, j, k) += eta_overlay_y(i, j, k)
+                                   + eta_coef_y(i, j, k) * Jy(i, j, k);
+                }
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1322,8 +1414,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
+            // Resistive terms; see include_resistivity above.
+            if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1334,8 +1426,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
+                if (has_eta_overlay) {
+                    Ez(i, j, k) += eta_overlay_z(i, j, k)
+                                   + eta_coef_z(i, j, k) * Jz(i, j, k);
+                }
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;

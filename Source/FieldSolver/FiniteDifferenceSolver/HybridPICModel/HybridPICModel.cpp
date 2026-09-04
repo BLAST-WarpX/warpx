@@ -103,6 +103,7 @@ void HybridPICModel::ReadParameters ()
     //   S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,  nu_{s,e} = Z_s e^2 eta n_e / m_s
     // added per cell to T_e by QDSMCAddJouleHeating, using the e-i relative
     // drift J_plasma/(e n_e) and rho_fp(_s). Reduces to eta J^2 in single species.
+    // Independent of whether HybridResistiveDrag is registered.
     // Default off; only consulted when solve_electron_energy_equation is on.
     pp_hybrid.query("include_joule_heating", m_include_joule_heating);
 
@@ -122,11 +123,50 @@ void HybridPICModel::ReadParameters ()
     m_include_temperature_relaxation =
         pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
 
-    // The electron-energy equation's Joule and Q_ei sources read the
-    // per-species charge densities; this flag gates their allocation and
-    // the per-species deposition path, so hybrid-PIC runs without the
-    // energy equation carry zero extra cost.
-    m_need_per_species_fields = m_solve_electron_energy_equation;
+    // Determine, from the input deck alone, which optional per-species
+    // machinery is needed (the particle containers do not exist yet at
+    // parameter-parse time, but the species names are available):
+    //   * a per-species resistivity overlay parser for any species,
+    //   * a hybrid_resistive_drag collision on any species,
+    //   * the electron-energy equation (its Joule and Q_ei sources read the
+    //     per-species charge densities).
+    // These flags gate the per-species field allocations, the per-species
+    // rho/J deposition and the fluid-velocity computations, so hybrid-PIC
+    // runs that use none of these features carry zero extra cost.
+    {
+        std::vector<std::string> species_names;
+        const ParmParse pp_particles("particles");
+        pp_particles.queryarr("species_names", species_names);
+        for (auto const & spec_name : species_names) {
+            std::string expr;
+            if (pp_hybrid.query(
+                "plasma_resistivity_" + spec_name + "(rho_s,rho,Te,J,J_s,B,t)",
+                expr)) {
+                m_has_per_species_eta = true;
+            }
+        }
+
+        std::vector<std::string> collision_names;
+        const ParmParse pp_collisions("collisions");
+        pp_collisions.queryarr("collision_names", collision_names);
+        for (auto const & coll_name : collision_names) {
+            const ParmParse pp_coll(coll_name);
+            std::string coll_type;
+            pp_coll.query("type", coll_type);
+            if (coll_type == "hybrid_resistive_drag") {
+                m_has_resistive_drag = true;
+                std::vector<std::string> coll_species;
+                pp_coll.queryarr("species", coll_species);
+                m_resistive_drag_species.insert(
+                    coll_species.begin(), coll_species.end());
+            }
+        }
+
+        m_need_fluid_velocities   = m_has_per_species_eta || m_has_resistive_drag
+                                  || m_include_temperature_relaxation;
+        m_need_per_species_fields = m_need_fluid_velocities
+                                  || m_solve_electron_energy_equation;
+    }
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -233,37 +273,94 @@ void HybridPICModel::AllocateLevelMFs (
         lev, amrex::convert(ba, jz_nodal_flag),
         dm, ncomps, ngJ, 0.0_rt);
 
+    // Guard cells for the J-staggered fields the resistive-drag operator
+    // gathers at particle positions (J_plasma, Ve, per-species J and V). In
+    // radial geometries these fields receive the below-axis parity fill
+    // (WarpX::ApplyFieldBoundaryOnAxis), which writes the E/B gather guards
+    // -- get_ng_fieldgather(), bounded by ngEB -- so they must carry at
+    // least that many guard cells.
+    IntVect ngJ_gather = ngJ;
+    ngJ_gather.max(ngEB);
+    // J_plasma and the per-species currents only need the larger extent
+    // when the drag actually gathers them.
+    const IntVect ngJ_plasma = m_has_resistive_drag ? ngJ_gather : ngJ;
+
     // The "hybrid_current_fp_plasma" multifab stores the total plasma current calculated
     // as the curl of B minus any external current.
     fields.alloc_init(FieldType::hybrid_current_fp_plasma, Direction{0},
         lev, amrex::convert(ba, jx_nodal_flag),
-        dm, ncomps, ngJ, 0.0_rt);
+        dm, ncomps, ngJ_plasma, 0.0_rt);
     fields.alloc_init(FieldType::hybrid_current_fp_plasma, Direction{1},
         lev, amrex::convert(ba, jy_nodal_flag),
-        dm, ncomps, ngJ, 0.0_rt);
+        dm, ncomps, ngJ_plasma, 0.0_rt);
     fields.alloc_init(FieldType::hybrid_current_fp_plasma, Direction{2},
         lev, amrex::convert(ba, jz_nodal_flag),
-        dm, ncomps, ngJ, 0.0_rt);
+        dm, ncomps, ngJ_plasma, 0.0_rt);
 
-    // Per-species charge densities - one per charged species, deposited
-    // from particles and accumulated into the global rho_fp. Only
-    // allocated when a feature that consumes them is active (see
-    // m_need_per_species_fields).
+    // Per-species ion fields - one set per charged species. current_fp_s
+    // and rho_fp_s are deposited from particles and accumulated into the
+    // global current_fp / rho_fp; Vs_fp_s is the bulk velocity J_s/rho_s
+    // used by the resistive-drag operator.
     if (m_need_per_species_fields) {
         auto const & mypc = WarpX::GetInstance().GetPartContainer();
         for (auto const & spec : mypc.GetSpeciesNames()) {
             if (mypc.GetParticleContainerFromName(spec).getCharge() == 0._prt) { continue; }
+            fields.alloc_init("current_fp_" + spec, Direction{0},
+                lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ_plasma, 0.0_rt);
+            fields.alloc_init("current_fp_" + spec, Direction{1},
+                lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ_plasma, 0.0_rt);
+            fields.alloc_init("current_fp_" + spec, Direction{2},
+                lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ_plasma, 0.0_rt);
             fields.alloc_init("rho_fp_" + spec,
                 lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
+            if (m_need_fluid_velocities) {
+                fields.alloc_init("Vs_fp_" + spec, Direction{0},
+                    lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
+                fields.alloc_init("Vs_fp_" + spec, Direction{1},
+                    lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
+                fields.alloc_init("Vs_fp_" + spec, Direction{2},
+                    lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
+            }
         }
         // Species-summed physical charge density Sigma_s rho_fp_s, filled
-        // once per step in HybridPICDepositRhoAndJ (volume-scaled in radial
-        // geometries like the totals, but unfiltered: the same processing as
-        // the rho_fp_s numerators, so the species fraction
+        // once per step in HybridPICDepositRhoAndJ with the same processing
+        // as the rho_fp_s numerators, so the species fraction
         // f_s = rho_s / Sigma_t rho_t is well-defined and the physical
-        // rho_floor applies to it). Shared by the Joule and Q_ei consumers.
+        // rho_floor applies to it. Shared by the Joule, Q_ei and
+        // per-species-resistivity consumers.
         fields.alloc_init("hybrid_rho_species_sum_fp",
             lev, amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt);
+    }
+
+    // Electron fluid velocity V_e on the grid, V_e = (J_i - J_plasma)/rho.
+    // Face-staggered like J for direct gather by the resistive-drag operator.
+    if (m_need_fluid_velocities) {
+        fields.alloc_init("Ve_fp", Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
+        fields.alloc_init("Ve_fp", Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
+        fields.alloc_init("Ve_fp", Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ_gather, 0.0_rt);
+    }
+
+    // Species-summed resistive friction added to Ohm's-law E, stored in two
+    // parts (see ComputeResistiveOverlay): the frozen ion-drift vector
+    // (hybrid_eta_overlay_fp) and the lagged resistivity coefficient
+    // (hybrid_eta_overlay_coef_fp) that the E-solve multiplies by the live
+    // plasma current. Both staggered like J (== E component staggering).
+    if (m_has_per_species_eta) {
+        fields.alloc_init("hybrid_eta_overlay_fp", Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_fp", Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_fp", Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_coef_fp", Direction{0},
+            lev, amrex::convert(ba, jx_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_coef_fp", Direction{1},
+            lev, amrex::convert(ba, jy_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
+        fields.alloc_init("hybrid_eta_overlay_coef_fp", Direction{2},
+            lev, amrex::convert(ba, jz_nodal_flag), dm, ncomps, ngJ, 0.0_rt);
     }
 
     // the external current density multifab matches the current staggering and
@@ -310,7 +407,131 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
         utils::parser::makeParser(m_nu_ei_expression, {"rho","Te","Ti","t"}));
     m_nu_ei = m_nu_ei_parser->compile<4>();
 
+    // --- Per-species resistivity overlay (Phys. Plasmas 31, 012902 (2024), Eq. 10) ---
+    // Optional. For any charged species {spec} the user may supply
+    //   hybrid_pic_model.plasma_resistivity_{spec}(rho_s,rho,Te,J,J_s,B,t)="..."
+    // overlaid on the global parser: Ohm's law, the Joule-heating source and
+    // the resistive drag all use eta_s_eff = eta_global + eta_per_species_s.
+    // Compiled here rather than in ReadParameters because the particle
+    // containers (needed to reject uncharged species) exist only now.
+    {
+        const amrex::ParmParse pp_hybrid_init("hybrid_pic_model");
+        auto const & mypc = WarpX::GetInstance().GetPartContainer();
+        for (auto const & spec_name : mypc.GetSpeciesNames()) {
+            std::string const param_name =
+                "plasma_resistivity_" + spec_name + "(rho_s,rho,Te,J,J_s,B,t)";
+            std::string expr;
+            if (!pp_hybrid_init.query(param_name, expr)) {
+                continue;
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                mypc.GetParticleContainerFromName(spec_name).getCharge() != 0._prt,
+                "hybrid_pic_model.plasma_resistivity_" + spec_name +
+                " is set, but this species carries no charge: the "
+                "per-species resistivity overlay only applies to charged "
+                "species.");
+            auto parser = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(
+                    expr, {"rho_s","rho","Te","J","J_s","B","t"}));
+            m_eta_per_species[spec_name] = parser->compile<7>();
+            m_per_species_resistivity_parser[spec_name] = std::move(parser);
+        }
 
+        // Startup summary on rank 0: which species use only the global
+        // eta, and which additionally have a per-species overlay.
+        if (amrex::ParallelDescriptor::IOProcessor()) {
+            amrex::Print() << "\n[HybridPICModel] Resistivity configuration\n";
+            amrex::Print() << "  global plasma_resistivity(rho,J,t) = "
+                           << m_eta_expression << "\n";
+            if (m_has_per_species_eta) {
+                amrex::Print() << "  per-species overlays (eta_s_eff = "
+                                  "eta_global + eta_per_species):\n";
+                for (auto const & spec_name : mypc.GetSpeciesNames()) {
+                    if (mypc.GetParticleContainerFromName(spec_name).getCharge() == 0._prt) {
+                        continue;
+                    }
+                    auto it = m_per_species_resistivity_parser.find(spec_name);
+                    if (it != m_per_species_resistivity_parser.end()) {
+                        std::string expr;
+                        pp_hybrid_init.query(
+                            "plasma_resistivity_" + spec_name +
+                             "(rho_s,rho,Te,J,J_s,B,t)", expr);
+                        amrex::Print() << "    " << spec_name
+                                       << "  : " << expr << "\n";
+                    } else {
+                        amrex::Print() << "    " << spec_name
+                                       << "  : (global only)\n";
+                    }
+                }
+            } else {
+                amrex::Print() << "  per-species overlays              : none "
+                                  "(all charged species use the global parser)\n";
+            }
+            amrex::Print() << "\n";
+        }
+    }
+
+    // With the drag active the push-field E includes the resistive terms
+    // (see HybridPICSolveE), so the drag must cover every charged species
+    // for the friction to stay momentum-conserving.
+    if (m_has_resistive_drag) {
+        auto const & mypc_drag = WarpX::GetInstance().GetPartContainer();
+        for (auto const & spec_name : mypc_drag.GetSpeciesNames()) {
+            auto const & pc = mypc_drag.GetParticleContainerFromName(spec_name);
+            if (pc.getCharge() == 0._prt || pc.do_not_deposit) {
+                // Neutrals feel no resistive force; do_not_deposit tracers
+                // have no deposited V_s to relax. Both are exempt.
+                continue;
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                pc.getCharge() > 0._prt,
+                "A hybrid_resistive_drag collision is registered, but species "
+                "'" + spec_name + "' has negative charge. The eta-derived "
+                "drag rate nu = Z e^2 eta_eff n_e / m assumes positive ions "
+                "(for Z < 0 the exact-exponential update is an unstable "
+                "anti-drag), so the drag cannot be used in decks containing "
+                "negative kinetic species.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_resistive_drag_species.contains(spec_name),
+                "A hybrid_resistive_drag collision is registered, but not on "
+                "charged species '" + spec_name + "'. The drag must be "
+                "registered on every charged species (do_not_deposit tracers "
+                "excepted): with the drag active the resistive terms of "
+                "Ohm's law are included in the particle-push E-field, and a "
+                "species without the drag would feel that force with no "
+                "compensating friction.");
+        }
+        // And, conversely, every species the drag was registered on must be
+        // one it can act on.
+        for (auto const & spec_name : m_resistive_drag_species) {
+            auto const & pc = mypc_drag.GetParticleContainerFromName(spec_name);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                pc.getCharge() > 0._prt,
+                "hybrid_resistive_drag is registered on species '" + spec_name +
+                "', which has zero or negative charge; the drag only applies "
+                "to positive ions (and the per-species fields it gathers are "
+                "only allocated for charged species).");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !pc.do_not_deposit,
+                "hybrid_resistive_drag is registered on species '" + spec_name +
+                "', which has do_not_deposit set. Non-depositing species have "
+                "no deposited bulk velocity V_s to relax; remove the drag "
+                "from this species.");
+        }
+    }
+    // Without the Joule source the resistive dissipation is not returned
+    // to the electrons; warn since the drag user is tracking friction.
+    if (m_has_resistive_drag &&
+        !(m_solve_electron_energy_equation && m_include_joule_heating)) {
+        ablastr::warn_manager::WMRecordWarning(
+            "HybridPICModel",
+            "A hybrid_resistive_drag collision is registered, but the resistive "
+            "(Joule) electron heating is not active (requires both "
+            "hybrid_pic_model.solve_electron_energy_equation and "
+            "hybrid_pic_model.include_joule_heating), so the eta*J^2 "
+            "dissipation is not returned to the electron fluid.",
+            ablastr::warn_manager::WarnPriority::medium);
+    }
     // The Te-threshold Joule redirect only acts inside the Joule source.
     if (m_joule_redirect_to_ions &&
         !(m_solve_electron_energy_equation && m_include_joule_heating)) {
@@ -593,7 +814,423 @@ void HybridPICModel::CalculateElectronPressure(const int lev, bool const floor_d
         WarpX::do_single_precision_comms,
         warpx.Geom(lev).periodicity(),
         true);
+
+    // The resistive-drag operator gathers T_e at particle positions (for the
+    // per-species resistivity parser), so its ghosts must be exchanged too.
+    // On the energy-equation path this happens where T_e is evolved; here on
+    // the closure path it is only needed (and paid) when the drag is active.
+    if (m_need_fluid_velocities) {
+        amrex::MultiFab & Te = *warpx.m_fields.get(
+            FieldType::hybrid_electron_temperature_fp, lev);
+        ablastr::utils::communication::FillBoundary(
+            Te, WarpX::do_single_precision_comms,
+            warpx.Geom(lev).periodicity(), true);
+    }
 }
+
+void HybridPICModel::CalculateElectronFluidVelocity () const
+{
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        CalculateElectronFluidVelocity(lev);
+    }
+}
+
+void HybridPICModel::CalculateElectronFluidVelocity (const int lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::CalculateElectronFluidVelocity()");
+    using namespace ablastr::coarsen::sample;
+
+    auto & warpx = WarpX::GetInstance();
+    ablastr::fields::VectorField Ve = warpx.m_fields.get_alldirs("Ve_fp", lev);
+    ablastr::fields::VectorField Ji = warpx.m_fields.get_alldirs(FieldType::current_fp, lev);
+    ablastr::fields::VectorField J  =
+        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    amrex::MultiFab const & rho_field = *warpx.m_fields.get(FieldType::rho_fp, lev);
+
+    auto const Jx_stag = Jx_IndexType;
+    auto const Jy_stag = Jy_IndexType;
+    auto const Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    auto const rho_floor = m_n_floor * PhysConst::q_e;
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for ( MFIter mfi(*Ve[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+        Array4<Real> const& Vex = Ve[0]->array(mfi);
+        Array4<Real> const& Vey = Ve[1]->array(mfi);
+        Array4<Real> const& Vez = Ve[2]->array(mfi);
+        Array4<Real const> const& Jix = Ji[0]->const_array(mfi);
+        Array4<Real const> const& Jiy = Ji[1]->const_array(mfi);
+        Array4<Real const> const& Jiz = Ji[2]->const_array(mfi);
+        Array4<Real const> const& Jx  = J[0]->const_array(mfi);
+        Array4<Real const> const& Jy  = J[1]->const_array(mfi);
+        Array4<Real const> const& Jz  = J[2]->const_array(mfi);
+        Array4<Real const> const& rho = rho_field.const_array(mfi);
+
+        // Compute Ve in the first ghost layer as well: Ji and rho carry full
+        // valid ghost regions here and J_plasma is computed with one valid
+        // ghost layer (which sets the limit). The deeper ghost layers read
+        // by the drag operator's particle gather at shape order >= 3 are
+        // exchanged below, as are the ones a multi-pass binomial filter
+        // consumes.
+        Box const& tx = mfi.tilebox(Ve[0]->ixType().toIntVect(), IntVect(1));
+        Box const& ty = mfi.tilebox(Ve[1]->ixType().toIntVect(), IntVect(1));
+        Box const& tz = mfi.tilebox(Ve[2]->ixType().toIntVect(), IntVect(1));
+
+        amrex::ParallelFor(tx, ty, tz,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Real const rho_val =
+                    std::max(Interp(rho, nodal, Jx_stag, coarsen, i, j, k, 0), rho_floor);
+                Vex(i, j, k) = (Jix(i, j, k) - Jx(i, j, k)) / rho_val;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Real const rho_val =
+                    std::max(Interp(rho, nodal, Jy_stag, coarsen, i, j, k, 0), rho_floor);
+                Vey(i, j, k) = (Jiy(i, j, k) - Jy(i, j, k)) / rho_val;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                Real const rho_val =
+                    std::max(Interp(rho, nodal, Jz_stag, coarsen, i, j, k, 0), rho_floor);
+                Vez(i, j, k) = (Jiz(i, j, k) - Jz(i, j, k)) / rho_val;
+            }
+        );
+    }
+
+    // Apply the same binomial filter used on J (suppresses grid-scale noise
+    // that would otherwise be injected into particles by the gather inside
+    // the drag operator). The filter only writes valid cells, so refresh the
+    // ghosts afterwards; a multi-pass filter also reads ghosts beyond the
+    // single computed layer and needs them communicated first.
+    if (WarpX::use_filter) {
+        if (WarpX::filter_npass_each_dir.max() > 1) {
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *Ve[idim], WarpX::do_single_precision_comms,
+                    warpx.Geom(lev).periodicity(), true);
+            }
+        }
+        warpx.ApplyFilterMF(
+            warpx.m_fields.get_mr_levels_alldirs("Ve_fp", warpx.finestLevel()), lev);
+        for (int idim = 0; idim < 3; ++idim) {
+            ablastr::utils::communication::FillBoundary(
+                *Ve[idim], WarpX::do_single_precision_comms,
+                warpx.Geom(lev).periodicity(), true);
+        }
+    } else if (m_has_resistive_drag) {
+        // The drag operator gathers Ve at the particle shape order, whose
+        // stencil can reach beyond the single ghost layer computed above:
+        // make every allocated ghost layer neighbor-consistent.
+        for (int idim = 0; idim < 3; ++idim) {
+            ablastr::utils::communication::FillBoundary(
+                *Ve[idim], WarpX::do_single_precision_comms,
+                warpx.Geom(lev).periodicity(), true);
+        }
+    }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Fill the below-axis guard cells by parity reflection (as done for E
+    // and B) so the drag operator's particle gathers near r = 0 read
+    // physical values instead of stale deposit remnants.
+    warpx.ApplyFieldBoundaryOnAxis(Ve[0], Ve[1], Ve[2], lev);
+#endif
+}
+
+void HybridPICModel::CalculateIonFluidVelocity () const
+{
+    auto& warpx = WarpX::GetInstance();
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev)
+    {
+        CalculateIonFluidVelocity(lev);
+    }
+}
+
+void HybridPICModel::CalculateIonFluidVelocity (const int lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::CalculateIonFluidVelocity()");
+    using namespace ablastr::coarsen::sample;
+
+    auto & warpx = WarpX::GetInstance();
+    auto const & mypc = warpx.GetPartContainer();
+
+    auto const Jx_stag = Jx_IndexType;
+    auto const Jy_stag = Jy_IndexType;
+    auto const Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    auto const rho_floor = m_n_floor * PhysConst::q_e;
+
+    for (auto const & spec : mypc.GetSpeciesNames()) {
+        auto const & pc = mypc.GetParticleContainerFromName(spec);
+        // Non-depositing (tracer) species never fill their per-species
+        // deposits, so their bulk velocity is undefined; skip them (they are
+        // also exempt from the resistive drag).
+        if (pc.getCharge() == 0._prt || pc.do_not_deposit) { continue; }
+        ablastr::fields::VectorField Vs = warpx.m_fields.get_alldirs("Vs_fp_" + spec, lev);
+        ablastr::fields::VectorField Js = warpx.m_fields.get_alldirs("current_fp_" + spec, lev);
+        amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec, lev);
+
+        // Js and rho_s carry full valid ghost regions here (their deposits
+        // SumBoundary with dst_ng = nGrowVect()), so compute Vs directly in
+        // the ghost cells instead of communicating afterwards. The nodal ->
+        // staggered interpolation of rho_s reads one neighbor beyond the
+        // written cell, hence the -1 on its ghost extent.
+        amrex::IntVect ng_v = Vs[0]->nGrowVect();
+        ng_v.min(Js[0]->nGrowVect());
+        ng_v.min(rho_s.nGrowVect() - amrex::IntVect(1));
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for ( MFIter mfi(*Vs[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
+            Array4<Real> const& Vsx = Vs[0]->array(mfi);
+            Array4<Real> const& Vsy = Vs[1]->array(mfi);
+            Array4<Real> const& Vsz = Vs[2]->array(mfi);
+            Array4<Real const> const& Jsx = Js[0]->const_array(mfi);
+            Array4<Real const> const& Jsy = Js[1]->const_array(mfi);
+            Array4<Real const> const& Jsz = Js[2]->const_array(mfi);
+            Array4<Real const> const& rho = rho_s.const_array(mfi);
+
+            Box const& tx = mfi.tilebox(Vs[0]->ixType().toIntVect(), ng_v);
+            Box const& ty = mfi.tilebox(Vs[1]->ixType().toIntVect(), ng_v);
+            Box const& tz = mfi.tilebox(Vs[2]->ixType().toIntVect(), ng_v);
+
+            amrex::ParallelFor(tx, ty, tz,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Real const rho_val =
+                        std::max(Interp(rho, nodal, Jx_stag, coarsen, i, j, k, 0), rho_floor);
+                    Vsx(i, j, k) = Jsx(i, j, k) / rho_val;
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Real const rho_val =
+                        std::max(Interp(rho, nodal, Jy_stag, coarsen, i, j, k, 0), rho_floor);
+                    Vsy(i, j, k) = Jsy(i, j, k) / rho_val;
+                },
+                [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    Real const rho_val =
+                        std::max(Interp(rho, nodal, Jz_stag, coarsen, i, j, k, 0), rho_floor);
+                    Vsz(i, j, k) = Jsz(i, j, k) / rho_val;
+                }
+            );
+        }
+
+        // Same J-style binomial filter as in CalculateElectronFluidVelocity;
+        // the ghost cells were computed above, so only the post-filter
+        // refresh is needed (the filter writes valid cells only).
+        if (WarpX::use_filter) {
+            warpx.ApplyFilterMF(
+                warpx.m_fields.get_mr_levels_alldirs("Vs_fp_" + spec, warpx.finestLevel()),
+                lev);
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *Vs[idim], WarpX::do_single_precision_comms,
+                    warpx.Geom(lev).periodicity(), true);
+            }
+        } else if (m_has_resistive_drag) {
+            // As for Ve: the drag's particle gather at shape order >= 3 can
+            // reach beyond the ghost extent computed in place above; make
+            // every allocated ghost layer neighbor-consistent.
+            for (int idim = 0; idim < 3; ++idim) {
+                ablastr::utils::communication::FillBoundary(
+                    *Vs[idim], WarpX::do_single_precision_comms,
+                    warpx.Geom(lev).periodicity(), true);
+            }
+        }
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Below-axis guard cells by parity reflection, as for Ve above.
+        warpx.ApplyFieldBoundaryOnAxis(Vs[0], Vs[1], Vs[2], lev);
+#endif
+    }
+}
+
+void HybridPICModel::ComputeResistiveOverlay (int const lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::ComputeResistiveOverlay()");
+
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // The per-species friction contribution added to Ohm's-law E is
+    //   F_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum * (V_s_d - V_e_d) ]
+    // summed over charged species with a registered per-species parser, with
+    // eta_s_per evaluated at (rho_s, rho, T_e [K], |J|, |J_s|, |B|, t) per
+    // cell at the d-component staggering. It is emitted split about the
+    // current J_plasma (see the class docstring): the lagged coefficient
+    //   eta_coef_d = Sigma_s max(eta_s_per, 0) * max(rho_s, 0) / rho_sum
+    // that the E-solve multiplies by the live plasma current, and the frozen
+    // ion-drift remainder F_d - eta_coef_d * J_plasma_d.
+
+    if (!m_has_per_species_eta) { return; }
+
+    auto & warpx = WarpX::GetInstance();
+
+    ablastr::fields::VectorField overlay_mf =
+        warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+    ablastr::fields::VectorField coef_mf =
+        warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
+    for (int idim = 0; idim < 3; ++idim) {
+        overlay_mf[idim]->setVal(0.0_rt);
+        coef_mf[idim]->setVal(0.0_rt);
+    }
+    auto const & mypc = warpx.GetPartContainer();
+    auto const species_names = mypc.GetSpeciesNames();
+    auto const t_new = warpx.gett_new(lev);
+
+    amrex::MultiFab const & rho_total =
+        *warpx.m_fields.get(FieldType::rho_fp, lev);
+    amrex::MultiFab const & Te_K =
+        *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
+    ablastr::fields::VectorField J_plasma =
+        warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    ablastr::fields::VectorField B_fp =
+        warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+    ablastr::fields::VectorField Ve_fp =
+        warpx.m_fields.get_alldirs("Ve_fp", lev);
+
+    auto const rho_floor = PhysConst::q_e * m_n_floor;
+
+    // rho_sum = Sigma_t rho_fp_t over all charged species in physical charge
+    // density units. Filled once per step by HybridPICDepositRhoAndJ.
+    amrex::MultiFab const & rho_sum =
+        *warpx.m_fields.get("hybrid_rho_species_sum_fp", lev);
+
+    amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const & Bx_stag = Bx_IndexType;
+    amrex::GpuArray<int, 3> const & By_stag = By_IndexType;
+    amrex::GpuArray<int, 3> const & Bz_stag = Bz_IndexType;
+    amrex::GpuArray<int, 3> const nodal   = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+
+    // Single kernel pass per (species, direction) pair. Each pass reads
+    // the species's parser executor by value (amrex::ParserExecutor is
+    // device-callable), interpolates the global and per-species scalar
+    // fields to the d-component staggering, evaluates the parser, and
+    // accumulates the contribution into overlay_<d>. The d-component
+    // values of V_s and V_e are read directly because Vs_fp and Ve_fp are
+    // both at the d staggering by construction; only the cross components
+    // of J, J_s and B need interp to compute magnitudes.
+    for (auto const & spec_name : species_names) {
+        auto & pc = mypc.GetParticleContainerFromName(spec_name);
+        if (pc.getCharge() == 0._prt) { continue; }
+
+        auto eta_s_per_it = m_eta_per_species.find(spec_name);
+        if (eta_s_per_it == m_eta_per_species.end()) { continue; }
+        auto const eta_s_per = eta_s_per_it->second;
+
+        amrex::MultiFab const & rho_s_mf =
+            *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+        ablastr::fields::VectorField Vs_fp =
+            warpx.m_fields.get_alldirs("Vs_fp_" + spec_name, lev);
+        ablastr::fields::VectorField Js_fp =
+            warpx.m_fields.get_alldirs("current_fp_" + spec_name, lev);
+
+        // Lambda: accumulate this species's friction contribution into the
+        // remainder and coefficient multifabs at the given d staggering.
+        auto accumulate_one_direction = [&] (
+            amrex::MultiFab       & out,
+            amrex::MultiFab       & coef,
+            amrex::GpuArray<int,3>  const d_stag,
+            int                     d_idx)
+        {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(out, TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            {
+                amrex::Array4<amrex::Real>       const & out_arr     = out.array(mfi);
+                amrex::Array4<amrex::Real>       const & coef_arr    = coef.array(mfi);
+                amrex::Array4<amrex::Real const> const & rho_arr     = rho_total.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & rhos_arr    = rho_s_mf.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & rhosum_arr  = rho_sum.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Te_arr      = Te_K.const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jpx_arr =
+                    J_plasma[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jpy_arr =
+                    J_plasma[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jpz_arr =
+                    J_plasma[2]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jsx_arr     = Js_fp[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jsy_arr     = Js_fp[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Jsz_arr     = Js_fp[2]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Bx_arr      = B_fp[0]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & By_arr      = B_fp[1]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Bz_arr      = B_fp[2]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Vsd_arr =
+                    Vs_fp[d_idx]->const_array(mfi);
+                amrex::Array4<amrex::Real const> const & Ved_arr =
+                    Ve_fp[d_idx]->const_array(mfi);
+
+                amrex::Box const & tbox = mfi.tilebox(out.ixType().toIntVect());
+                amrex::ParallelFor(tbox, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                {
+                    using ablastr::coarsen::sample::Interp;
+                    amrex::Real const rho_val = Interp(rho_arr, nodal, d_stag, coarsen, i, j, k, 0);
+                    if (rho_val <= rho_floor) { return; }
+
+                    amrex::Real const rhos_val   =
+                        Interp(rhos_arr, nodal, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const rhosum_val = std::max(
+                        Interp(rhosum_arr, nodal, d_stag, coarsen, i, j, k, 0), rho_floor);
+                    amrex::Real const Te_val     =
+                        Interp(Te_arr, nodal, d_stag, coarsen, i, j, k, 0);
+
+                    // |J|, |J_s|, |B| at d staggering. Interp every Yee
+                    // component (the d-component interp from its own
+                    // staggering to itself is identity, so this is safe).
+                    amrex::Real const jpx = Interp(Jpx_arr, Jx_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jpy = Interp(Jpy_arr, Jy_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jpz = Interp(Jpz_arr, Jz_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const Jmag = std::sqrt(jpx*jpx + jpy*jpy + jpz*jpz);
+
+                    amrex::Real const jsx = Interp(Jsx_arr, Jx_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jsy = Interp(Jsy_arr, Jy_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jsz = Interp(Jsz_arr, Jz_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const Jsmag = std::sqrt(jsx*jsx + jsy*jsy + jsz*jsz);
+
+                    amrex::Real const bx = Interp(Bx_arr, Bx_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const by = Interp(By_arr, By_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const bz = Interp(Bz_arr, Bz_stag, d_stag, coarsen, i, j, k, 0);
+                    amrex::Real const Bmag = std::sqrt(bx*bx + by*by + bz*bz);
+
+                    amrex::Real const dv_d  = Vsd_arr(i,j,k) - Ved_arr(i,j,k);
+                    amrex::Real const eta_s = eta_s_per(rhos_val, rho_val, Te_val,
+                                                        Jmag, Jsmag, Bmag, t_new);
+
+                    // Split about the current J_plasma: the coefficient
+                    // (clamped so the live term stays dissipative) goes to
+                    // coef_arr; subtracting its baseline contribution here
+                    // makes overlay + coef * J_plasma reproduce the full
+                    // friction exactly at this linearization point. The
+                    // d-component of J_plasma at the d staggering is a
+                    // direct read (jpx/jpy/jpz above are identity interps
+                    // for their own direction).
+                    amrex::Real const jp_d =
+                        (d_idx == 0) ? jpx : ((d_idx == 1) ? jpy : jpz);
+                    amrex::Real const coef_s = amrex::max(eta_s, 0._rt)
+                        * amrex::max(rhos_val, 0._rt) / rhosum_val;
+
+                    out_arr(i,j,k) += eta_s * rhos_val * rho_val / rhosum_val * dv_d
+                                      - coef_s * jp_d;
+                    coef_arr(i,j,k) += coef_s;
+                });
+            }
+        };
+
+        accumulate_one_direction(*overlay_mf[0], *coef_mf[0], Jx_stag, 0);
+        accumulate_one_direction(*overlay_mf[1], *coef_mf[1], Jy_stag, 1);
+        accumulate_one_direction(*overlay_mf[2], *coef_mf[2], Jz_stag, 2);
+    }
+    // No ghost exchange: the E-solve kernels only read the overlay and
+    // coefficient at valid cells (the Yee E updates run on ungrown
+    // tileboxes).
+}
+
 
 void HybridPICModel::FillElectronPressureMF (
     amrex::MultiFab& Pe_field,
@@ -872,6 +1509,12 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp,                         lev);
     ablastr::fields::VectorField J_plasma =
         warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+    // B field on Yee staggering; needed (as |B|) only when a per-species
+    // resistivity parser is registered for a species visited in this loop.
+    // The Yee->nodal interp is cheap; we always compute it inside the kernel
+    // because the branch fast-paths to skip the parser call when not needed.
+    ablastr::fields::VectorField B_fp =
+        warpx.m_fields.get_alldirs(FieldType::Bfield_fp, lev);
 
     auto const gamma_minus_1 = m_gamma - 1.0_rt;
     auto const rho_floor     = PhysConst::q_e * m_n_floor;
@@ -881,6 +1524,9 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     amrex::GpuArray<int, 3> const & Jx_stag = Jx_IndexType;
     amrex::GpuArray<int, 3> const & Jy_stag = Jy_IndexType;
     amrex::GpuArray<int, 3> const & Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> const & Bx_stag = Bx_IndexType;
+    amrex::GpuArray<int, 3> const & By_stag = By_IndexType;
+    amrex::GpuArray<int, 3> const & Bz_stag = Bz_IndexType;
     amrex::GpuArray<int, 3> const nodal     = {1, 1, 1};
     amrex::GpuArray<int, 3> const coarsen   = {1, 1, 1};
 
@@ -927,8 +1573,19 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
 
         amrex::Real const Z_s = pc.getCharge() / PhysConst::q_e;
 
+        ablastr::fields::VectorField Js =
+            warpx.m_fields.get_alldirs("current_fp_" + spec_name, lev);
         amrex::MultiFab const & rho_s =
             *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+
+        // Per-species resistivity overlay parser, if registered. The
+        // captured executor is only called from inside the kernel when
+        // has_eta_per is true; default-constructed ParserExecutor is
+        // never invoked.
+        auto const eta_per_it     = m_eta_per_species.find(spec_name);
+        bool const has_eta_per    = (eta_per_it != m_eta_per_species.end());
+        amrex::ParserExecutor<7> eta_s_per{};
+        if (has_eta_per) { eta_s_per = eta_per_it->second; }
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -942,6 +1599,12 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
             amrex::Array4<amrex::Real const> const & Jpx        = J_plasma[0]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jpy        = J_plasma[1]->const_array(mfi);
             amrex::Array4<amrex::Real const> const & Jpz        = J_plasma[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Jsx        = Js[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Jsy        = Js[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Jsz        = Js[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Bx_arr     = B_fp[0]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & By_arr     = B_fp[1]->const_array(mfi);
+            amrex::Array4<amrex::Real const> const & Bz_arr     = B_fp[2]->const_array(mfi);
 
             // Redirect output (default Array4 when redirect off -> never indexed
             // because do_redirect gates the write).
@@ -953,7 +1616,7 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
             {
                 amrex::Real const rho_val = rho_arr(i,j,k);
                 if (rho_val <= rho_floor) { return; }
-                // n_e (m^-3) from the volume-scaled total rho_fp.
+                // n_e (m^-3) from the total rho_fp.
                 amrex::Real const ne = rho_val / PhysConst::q_e;
                 // Species charge fraction f_s = rho_fp_s / Sigma_t rho_fp_t
                 // = Z_s n_s / n_e (unitless; both sides physical and
@@ -964,16 +1627,17 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 amrex::Real const f_s           = rhos_val / rhos_sum_val;
                 amrex::Real const ns            = f_s * ne / Z_s;
 
-                // |J| at the nodal grid (where Te lives), for the eta parser.
+                // |J| at the nodal grid (where Te lives). Used by the
+                // global eta parser and forwarded to per-species parsers.
                 auto const jx = ablastr::coarsen::sample::Interp(Jpx, Jx_stag, nodal, coarsen, i, j, k, 0);
                 auto const jy = ablastr::coarsen::sample::Interp(Jpy, Jy_stag, nodal, coarsen, i, j, k, 0);
                 auto const jz = ablastr::coarsen::sample::Interp(Jpz, Jz_stag, nodal, coarsen, i, j, k, 0);
                 amrex::Real const Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
 
-                // eta: same Ohm's-law parser the E-solve uses, evaluated
+                // eta_global: same Ohm's-law parser the E-solve uses, evaluated
                 // per cell. This makes the per-cell heat reduce to eta J^2
-                // exactly in single species.
-                amrex::Real const eta_s_eff = eta(rho_val, Jmag, t_new);
+                // exactly in single species (when no per-species overlay).
+                amrex::Real eta_s_eff = eta(rho_val, Jmag, t_new);
 
                 // e-i relative drift = J_plasma/(e n_e), from the nodal plasma
                 // current and n_e. Energy-consistent with the eta*J dissipation
@@ -983,6 +1647,26 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 amrex::Real const dvy = jy * inv_ene;
                 amrex::Real const dvz = jz * inv_ene;
                 amrex::Real const dv2 = dvx*dvx + dvy*dvy + dvz*dvz;
+
+                // eta_per_species overlay (Phys. Plasmas 31, 012902 (2024)),
+                // evaluated only for species with a registered parser.
+                if (has_eta_per) {
+                    using ablastr::coarsen::sample::Interp;
+                    amrex::Real const Te_K_val = Te_arr(i,j,k);
+                    // J_s interpolated to nodal -- only needed for the parser's
+                    // |J_s| argument.
+                    auto const jsx_nodal = Interp(Jsx, Jx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jsy_nodal = Interp(Jsy, Jy_stag, nodal, coarsen, i, j, k, 0);
+                    auto const jsz_nodal = Interp(Jsz, Jz_stag, nodal, coarsen, i, j, k, 0);
+                    amrex::Real const Jsmag    = std::sqrt(
+                        jsx_nodal*jsx_nodal + jsy_nodal*jsy_nodal + jsz_nodal*jsz_nodal);
+                    auto const bx = Interp(Bx_arr, Bx_stag, nodal, coarsen, i, j, k, 0);
+                    auto const by = Interp(By_arr, By_stag, nodal, coarsen, i, j, k, 0);
+                    auto const bz = Interp(Bz_arr, Bz_stag, nodal, coarsen, i, j, k, 0);
+                    amrex::Real const Bmag = std::sqrt(bx*bx + by*by + bz*bz);
+                    eta_s_eff += eta_s_per(rhos_val, rho_val, Te_K_val,
+                                           Jmag, Jsmag, Bmag, t_new);
+                }
 
                 // Per-species contribution to S_e at this cell.
                 //   nu_{s,e} n_s m_s |V_s - V_e|^2 = Z_s e^2 eta_s_eff n_e n_s |dV|^2
@@ -1126,9 +1810,10 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 
     // Stochastic Ornstein-Uhlenbeck ion-heating operator delivering both e-i energy
     // channels per particle over dt:
-    //   v_p <- u_e + (v_p - u_e) exp(-nu_ei dt) + sig R,   R ~ N(0,1) per component.
-    // Q_ei (when do_relax) sets the drag toward the electron fluid u_e and the thermal
-    // diffusion sig^2 = k_B T_e/m_i (1 - exp(-2 nu_ei dt)). The Te-threshold redirect
+    //   v_p <- u_i + (v_p - u_i) exp(-nu_ei dt) + sig R,   R ~ N(0,1) per component.
+    // Q_ei (when do_relax) acts on the random velocity about the ion bulk u_i, so it
+    // exchanges thermal energy without adding an ion momentum source. Its thermal
+    // diffusion is sig^2 = k_B T_e/m_i (1 - exp(-2 nu_ei dt)). The Te-threshold redirect
     // (when do_redir) adds pure-diffusion heating E_s/m_i, with the per-species
     // redirected energy E_s [J] read from redirect_E. Both channels are per-species
     // correct (own mass, own T_i, own redirect_E comp).
@@ -1138,11 +1823,12 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
     bool const do_redir = (redirect_E != nullptr);
     if (!do_relax && !do_redir) { return; }
 
+    // Use the current step's freshly deposited ion moments as the center of
+    // the thermal update. The regular end-of-step refresh is too late here.
+    if (do_relax) { CalculateIonFluidVelocity(lev); }
+
     amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
-    ablastr::fields::VectorField Ve =
-        warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
-
     auto const rho_floor = PhysConst::q_e * m_n_floor;
     auto const nu_ei     = m_nu_ei;
     auto const t_new     = warpx.gett_new(0);
@@ -1155,6 +1841,17 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
     for (int d = AMREX_SPACEDIM; d < 3; ++d) { nodal_src[d] = 0; }
     amrex::GpuArray<int, 3> const cc_dst  = {0, 0, 0};
     amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    amrex::GpuArray<int, 3> const Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const Jz_stag = Jz_IndexType;
+    amrex::GpuArray<int, 3> cc_x = cc_dst;
+    amrex::GpuArray<int, 3> cc_y = cc_dst;
+    amrex::GpuArray<int, 3> cc_z = cc_dst;
+    for (int d = AMREX_SPACEDIM; d < 3; ++d) {
+        cc_x[d] = Jx_stag[d];
+        cc_y[d] = Jy_stag[d];
+        cc_z[d] = Jz_stag[d];
+    }
 
     amrex::BoxArray const cc_ba = amrex::convert(Te.boxArray(), amrex::IntVect::TheCellVector());
 
@@ -1170,6 +1867,10 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         ++ion_comp;
         auto const m_i = pc.getMass();
         if (m_i <= 0._prt) { continue; }
+        ablastr::fields::VectorField Vs{};
+        if (do_relax) {
+            Vs = warpx.m_fields.get_alldirs("Vs_fp_" + spec_name, lev);
+        }
 
         // Ion temperature [eV] (NGP) -- only needed as the nu_ei parser argument
         // (Q_ei drag/diffusion). Skipped when only the redirect is active. When
@@ -1185,7 +1886,7 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         }
 
         // Per-cell drag-diffusion coefficients on the cc field grid:
-        //   0 = nu_ei [1/s], 1-3 = u_e [m/s], 4 = T_e [K], 5 = redirected dTe [K].
+        //   0 = nu_ei [1/s], 1-3 = u_i [m/s], 4 = T_e [K], 5 = redirected dTe [K].
         // Defaults (0) leave inactive / below-floor cells as no-ops.
         amrex::MultiFab coef(cc_ba, Te.DistributionMap(), 6, 0);
         coef.setVal(0.0_rt);
@@ -1199,9 +1900,14 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             amrex::Array4<amrex::Real const> const & rho_arr  = rho.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Te_arr   = Te.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Ti_arr   = Ti_cc.const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vex_arr  = Ve[0]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vey_arr  = Ve[1]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vez_arr  = Ve[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> Vsx_arr;
+            amrex::Array4<amrex::Real const> Vsy_arr;
+            amrex::Array4<amrex::Real const> Vsz_arr;
+            if (do_relax) {
+                Vsx_arr = Vs[0]->const_array(mfi);
+                Vsy_arr = Vs[1]->const_array(mfi);
+                Vsz_arr = Vs[2]->const_array(mfi);
+            }
             amrex::Array4<amrex::Real const> redirect_arr;
             if (do_redir) { redirect_arr = redirect_E->const_array(mfi); }
 
@@ -1219,11 +1925,11 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                     amrex::Real const Ti_eV = Ti_arr(i,j,k);
                     coef_arr(i,j,k,0) = nu_ei(rho_val, amrex::max(Te_K / K_per_eV, Te_floor_eV), Ti_eV, t_new);
                     coef_arr(i,j,k,1) = ablastr::coarsen::sample::Interp(
-                        Vex_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                        Vsx_arr, Jx_stag, cc_x, coarsen, i, j, k, 0);
                     coef_arr(i,j,k,2) = ablastr::coarsen::sample::Interp(
-                        Vey_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                        Vsy_arr, Jy_stag, cc_y, coarsen, i, j, k, 0);
                     coef_arr(i,j,k,3) = ablastr::coarsen::sample::Interp(
-                        Vez_arr, nodal_src, cc_dst, coarsen, i, j, k, 0);
+                        Vsz_arr, Jz_stag, cc_z, coarsen, i, j, k, 0);
                 }
                 if (do_redir) {
                     // E_s for this species = redirect_E component ion_comp.
@@ -1255,6 +1961,10 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             amrex::ParticleReal* AMREX_RESTRICT uxp = pti.GetAttribs(PIdx::ux).dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT uyp = pti.GetAttribs(PIdx::uy).dataPtr();
             amrex::ParticleReal* AMREX_RESTRICT uzp = pti.GetAttribs(PIdx::uz).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            amrex::ParticleReal const* AMREX_RESTRICT thetap =
+                pti.GetAttribs(PIdx::theta).dataPtr();
+#endif
 
             amrex::Array4<amrex::Real const> const & coef_arr = coef_p.const_array(pti);
 
@@ -1274,13 +1984,24 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                     (-kb * Te_K * std::expm1(-2._prt * nu_dt) + E_s) / m_i;
                 if (drag <= 0._prt && sig2 <= 0._prt) { return; }
 
-                amrex::ParticleReal const uex = coef_arr(ii,jj,kk,1);
-                amrex::ParticleReal const uey = coef_arr(ii,jj,kk,2);
-                amrex::ParticleReal const uez = coef_arr(ii,jj,kk,3);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                // Rotate the cylindrical (r,theta) bulk-velocity components to
+                // the particle's Cartesian frame at its azimuthal position.
+                amrex::ParticleReal const costheta = std::cos(thetap[ip]);
+                amrex::ParticleReal const sintheta = std::sin(thetap[ip]);
+                amrex::ParticleReal const uix =
+                    coef_arr(ii,jj,kk,1)*costheta - coef_arr(ii,jj,kk,2)*sintheta;
+                amrex::ParticleReal const uiy =
+                    coef_arr(ii,jj,kk,1)*sintheta + coef_arr(ii,jj,kk,2)*costheta;
+#else
+                amrex::ParticleReal const uix = coef_arr(ii,jj,kk,1);
+                amrex::ParticleReal const uiy = coef_arr(ii,jj,kk,2);
+#endif
+                amrex::ParticleReal const uiz = coef_arr(ii,jj,kk,3);
                 amrex::ParticleReal const sig = std::sqrt(amrex::max(0._prt, sig2));
-                uxp[ip] += -drag*(uxp[ip]-uex) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
-                uyp[ip] += -drag*(uyp[ip]-uey) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
-                uzp[ip] += -drag*(uzp[ip]-uez) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uxp[ip] += -drag*(uxp[ip]-uix) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uyp[ip] += -drag*(uyp[ip]-uiy) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
+                uzp[ip] += -drag*(uzp[ip]-uiz) + sig*amrex::RandomNormal(0._prt, 1._prt, engine);
             });
         }
     }
