@@ -21,7 +21,6 @@
 #   CDASH_BUILD_NAME    dashboard build name, e.g. "CPU-3D" (required)
 #   CDASH_SITE          dashboard site name, e.g. "Azure" (required)
 #   CDASH_OPTIONS_FILE  file with one CMake configure option per line
-#   CDASH_BUILD_TARGET  build this target instead of the default one
 #   CDASH_SUBMIT        "ON" to submit right after the build (build-only jobs)
 #   CMAKE_GENERATOR     CMake generator, unless given as -G in the options
 #   CMAKE_BUILD_PARALLEL_LEVEL  build parallelism, passed on to ctest_build()
@@ -93,12 +92,10 @@ ctest_configure(OPTIONS "${configure_options}" RETURN_VALUE configure_rv)
 # A failed configure leaves nothing to build.
 set(build_rv 0)
 if(configure_rv EQUAL 0)
-    if(NOT "$ENV{CDASH_BUILD_TARGET}" STREQUAL "")
-        ctest_build(TARGET "$ENV{CDASH_BUILD_TARGET}"
-                    ${build_parallel_arg} RETURN_VALUE build_rv)
-    else()
-        ctest_build(${build_parallel_arg} RETURN_VALUE build_rv)
-    endif()
+    # Only ever the default target: CTest scrapes the build log for compiler
+    # errors, so a packaging target that shells out to pip would report its
+    # setuptools warnings as build errors.
+    ctest_build(${build_parallel_arg} RETURN_VALUE build_rv)
 endif()
 
 # Submit when the caller asked for it, and *always* when the configure failed.

@@ -234,14 +234,15 @@ jobs:
 
         export CXXFLAGS="-Werror -Wno-error=pass-failed"
 
-        # pip_install does not depend on the warpx app, so building the
-        # default target here would add a compile+link this job never did
-        CDASH_BUILD_TARGET=pip_install \
         Tools/CI/ctest_dashboard.sh build \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_QED_TABLE_GEN=ON
+        # deliberately outside the dashboard build: CTest scrapes the build log
+        # for compiler errors, and pip's setuptools warnings
+        # ("dist.py:318: UserWarning: ...") match its error pattern
+        cmake --build build -j 4 --target pip_install
 
         ccache -s
         du -hs ~/.cache/ccache

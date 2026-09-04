@@ -20,7 +20,6 @@
 #                     A failed configure is always submitted from here, because
 #                     that later command needs a DartConfiguration.tcl which
 #                     does not exist yet when the configure dies early.
-#   CDASH_BUILD_TARGET  build this target instead of the default one
 #
 # The build parallelism comes from CMAKE_BUILD_PARALLEL_LEVEL, which is passed
 # on to ctest_build(PARALLEL_LEVEL).
@@ -46,7 +45,6 @@ export CDASH_SOURCE_DIR="${source_dir}"
 export CDASH_BUILD_NAME="${CDASH_BUILD_NAME:?CDASH_BUILD_NAME must be set}"
 export CDASH_SITE="${CDASH_SITE:?CDASH_SITE must be set}"
 export CDASH_SUBMIT="${CDASH_SUBMIT:-OFF}"
-export CDASH_BUILD_TARGET="${CDASH_BUILD_TARGET:-}"
 
 # hand the options over in a file: one per line, no quoting games needed
 CDASH_OPTIONS_FILE="${CDASH_BINARY_DIR}/.cdash_configure_options"

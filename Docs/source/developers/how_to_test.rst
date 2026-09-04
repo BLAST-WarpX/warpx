@@ -246,7 +246,9 @@ which drives ``ctest_configure()`` and ``ctest_build()`` from a CTest script:
 
 The CMake options are passed through unchanged.
 The build parallelism comes from ``CMAKE_BUILD_PARALLEL_LEVEL``, which the script passes on to ``ctest_build(PARALLEL_LEVEL ...)``.
-Set ``CDASH_BUILD_TARGET`` to build a specific target instead of the default one.
+
+The script always builds the default target.
+Keep packaging steps such as ``--target pip_install`` outside of it: CTest scrapes the build log for compiler errors, and ``pip``'s setuptools warnings (``dist.py:318: UserWarning: ...``) match its error pattern, which would fail the job on a build that actually succeeded.
 
 The script leaves the test step to the caller, so that CI keeps using the plain ``ctest`` command line it already has, adding only ``-D ExperimentalTest``:
 
