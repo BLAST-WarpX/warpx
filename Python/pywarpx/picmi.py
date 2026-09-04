@@ -2900,6 +2900,10 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                 expression = pywarpx.my_constants.mangle_expression(
                     expression, self.mangle_dict
                 )
+                # Unspecified components default to 0 so that e.g. only
+                # Ez_expression can be set without omitting input keys.
+                if expression is None:
+                    expression = "0"
                 pywarpx.warpx.__setattr__(
                     f"E{sdir}_external_grid_function(x,y,z)", expression
                 )
@@ -2917,6 +2921,10 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                 expression = pywarpx.my_constants.mangle_expression(
                     expression, self.mangle_dict
                 )
+                # Unspecified components default to 0 so that e.g. only
+                # Bz_expression can be set without omitting input keys.
+                if expression is None:
+                    expression = "0"
                 pywarpx.warpx.__setattr__(
                     f"B{sdir}_external_grid_function(x,y,z)", expression
                 )
