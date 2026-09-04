@@ -15,6 +15,8 @@
 
 #include <ablastr/fields/PoissonSolver.H>
 
+#include <string>
+
 
 using namespace amrex;
 
@@ -34,19 +36,54 @@ void ElectrostaticSolver::ReadParameters () {
     // Note that with the relativistic version, these parameters would be
     // input for each species.
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_required_precision", self_fields_required_precision);
+        pp_warpx, "self_fields_required_precision", m_mlmg_options.relative_tolerance);
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_absolute_tolerance", self_fields_absolute_tolerance);
+        pp_warpx, "self_fields_absolute_tolerance", m_mlmg_options.absolute_tolerance);
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_max_iters", self_fields_max_iters);
+        pp_warpx, "self_fields_max_iters", m_mlmg_options.max_iters);
     utils::parser::queryWithParser(
-        pp_warpx, "self_fields_verbosity", self_fields_verbosity);
+        pp_warpx, "self_fields_verbosity", m_mlmg_options.verbosity);
 
-    utils::parser::queryWithParser(pp_warpx, "self_fields_num_final_sweeps", self_fields_num_final_sweeps); {
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_num_final_sweeps", m_mlmg_options.num_final_sweeps);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            self_fields_num_final_sweeps > 0,
-            "warpx.self_fields_num_final_sweeps must be > 0");
+        m_mlmg_options.num_final_sweeps > 0,
+        "warpx.self_fields_num_final_sweeps must be > 0");
+
+    // MLMG bottom solver options
+    std::string bottom_solver_name = "default";
+    pp_warpx.query("self_fields_bottom_solver", bottom_solver_name);
+    m_mlmg_options.bottom_solver = ablastr::fields::parseBottomSolver(bottom_solver_name);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_verbosity", m_mlmg_options.bottom_verbosity);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_max_iters", m_mlmg_options.bottom_max_iters);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_relative_tolerance",
+        m_mlmg_options.bottom_relative_tolerance);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_bottom_absolute_tolerance",
+        m_mlmg_options.bottom_absolute_tolerance);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_max_coarsening_level", m_mlmg_options.max_coarsening_level);
+
+    // MLMG coarse level distribution options
+    {
+        bool flag = false;
+        if (pp_warpx.query("self_fields_agglomeration", flag)) {
+            m_mlmg_options.agglomeration = static_cast<int>(flag);
+        }
+        if (pp_warpx.query("self_fields_consolidation", flag)) {
+            m_mlmg_options.consolidation = static_cast<int>(flag);
+        }
     }
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_agglomeration_grid_size",
+        m_mlmg_options.agglomeration_grid_size);
+    utils::parser::queryWithParser(
+        pp_warpx, "self_fields_consolidation_grid_size",
+        m_mlmg_options.consolidation_grid_size);
+
     // FFT solver flags
     utils::parser::queryWithParser(
         pp_warpx, "use_2d_slices_fft_solver", is_igf_2d_slices);
@@ -131,10 +168,7 @@ ElectrostaticSolver::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
     std::array<Real, 3> const beta,
-    Real const required_precision,
-    Real absolute_tolerance,
-    int const max_iters,
-    int const verbosity,
+    ablastr::fields::MLMGOptions const & mlmg_options,
     bool const is_igf_2d,
     std::optional<ablastr::fields::MultiLevelVectorField> efield
 ) const
@@ -207,10 +241,7 @@ ElectrostaticSolver::computePhi (
         sorted_rho,
         sorted_phi,
         beta,
-        required_precision,
-        absolute_tolerance,
-        max_iters,
-        verbosity,
+        mlmg_options,
         warpx.Geom(),
         warpx.DistributionMap(),
         warpx.boxArray(),
@@ -220,7 +251,6 @@ ElectrostaticSolver::computePhi (
         EB::enabled(),
         WarpX::do_single_precision_comms,
         warpx.refRatio(),
-        self_fields_num_final_sweeps,
         post_phi_calculation,
         *m_poisson_boundary_handler,
         warpx.gett_new(0),
