@@ -1,0 +1,40 @@
+# Init-only test bed: load a 1D cylindrical pressure-balance equilibrium
+# (screw pinch) from an openPMD file into the external grid fields and
+# dump the raw (staggered) fields at step 0. No particles, no evolution.
+#
+# The external-field file (written by generate_equilibrium_fields.py at
+# nodal or Yee staggering) is selected by the per-test input files, or on
+# the command line:
+#   warpx.3d inputs_base_3d warpx.read_fields_from_path=ext_fields_yee.h5
+
+max_step = 0
+
+amr.n_cell = 64 64 8
+amr.max_grid_size = 64
+amr.max_level = 0
+
+geometry.dims = 3
+geometry.prob_lo = -0.8 -0.8 0.0
+geometry.prob_hi =  0.8  0.8 0.2
+
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+
+algo.maxwell_solver = yee
+warpx.cfl = 0.9
+
+warpx.E_ext_grid_init_style = read_from_file
+warpx.B_ext_grid_init_style = read_from_file
+warpx.read_fields_from_path = ext_fields_yee.h5
+
+# The projection div cleaner defaults to ON when external B is read from
+# file with the Yee solver; disable it so the dumped fields measure the
+# reader's interpolation alone.
+warpx.do_initial_div_cleaning = 0
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = 1
+diag1.format = plotfile
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz
+diag1.plot_raw_fields = 1
