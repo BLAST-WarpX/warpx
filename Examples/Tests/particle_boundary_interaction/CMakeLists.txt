@@ -30,3 +30,23 @@ if(WarpX_EB)
         OFF  # dependency
     )
 endif()
+
+add_warpx_test(
+    test_rsphere_particle_boundary_interaction_reflecting  # name
+    RSPHERE  # dims
+    1  # nprocs
+    inputs_test_rsphere_particle_boundary_interaction_reflecting  # inputs
+    "analysis_rsphere_radial_boundary.py diags/diag000001 reflecting"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rsphere_particle_boundary_interaction_thermal  # name
+    RSPHERE  # dims
+    1  # nprocs
+    inputs_test_rsphere_particle_boundary_interaction_thermal  # inputs
+    "analysis_rsphere_radial_boundary.py diags/diag000001 thermal"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)

@@ -1,0 +1,44 @@
+# Copyright 2026 The WarpX Community
+#
+# This file is part of WarpX.
+#
+# License: BSD-3-Clause-LBNL
+
+max_step = 1
+warpx.const_dt = 1.2e-9
+
+amr.n_cell = 1
+amr.max_level = 0
+amr.blocking_factor = 1
+amr.max_grid_size = 1
+
+geometry.dims = RSPHERE
+geometry.prob_lo = 0.75
+geometry.prob_hi = 1.0
+
+boundary.field_lo = none
+boundary.field_hi = none
+boundary.particle_lo = none
+
+algo.maxwell_solver = none
+algo.particle_shape = 1
+
+particles.species_names = test
+
+test.charge = 0.0
+test.mass = m_e
+test.injection_style = NUniformPerCell
+test.num_particles_per_cell_each_dim = 2 4 4
+test.profile = constant
+test.density = 1.0
+test.momentum_distribution_type = parse_momentum_function
+test.momentum_function_ux(x,y,z) = "u0*x/sqrt(x*x+y*y+z*z)"
+test.momentum_function_uy(x,y,z) = "u0*y/sqrt(x*x+y*y+z*z)"
+test.momentum_function_uz(x,y,z) = "u0*z/sqrt(x*x+y*y+z*z)"
+my_constants.u0 = 1.0
+
+diagnostics.diags_names = diag
+diag.intervals = 1
+diag.diag_type = Full
+diag.fields_to_plot = none
+diag.write_species = 1

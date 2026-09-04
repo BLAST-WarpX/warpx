@@ -1,0 +1,4 @@
+FILE = inputs_base_rsphere_radial_boundary
+
+boundary.particle_hi = thermal
+boundary.test.u_th = 0.02
