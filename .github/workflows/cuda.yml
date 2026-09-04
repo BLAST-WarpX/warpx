@@ -11,6 +11,13 @@ concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-cuda
   cancel-in-progress: true
 
+# Configure and build through CTest, so that CDash records their timings as well
+# as compiler warnings and errors. Only merges to `development` are submitted;
+# PR runs produce the XML locally and drop it.
+env:
+  CDASH_SITE: GitHub-Actions
+  CDASH_SUBMIT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/development' && 'ON' || 'OFF' }}
+
 jobs:
 
   check_changes:
@@ -25,6 +32,8 @@ jobs:
     env:
       CXXFLAGS: "-Werror"
       CMAKE_GENERATOR: Ninja
+      CDASH_BUILD_NAME: Linux-NVCC-3D-SP
+      CMAKE_BUILD_PARALLEL_LEVEL: 3
     steps:
     - name: Free More Disk Space
       uses: ax3l/free-disk-space@main
@@ -83,7 +92,7 @@ jobs:
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
         which nvcc || echo "nvcc not in PATH!"
 
-        cmake -S . -B build_sp         \
+        Tools/CI/ctest_dashboard.sh build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
@@ -95,7 +104,6 @@ jobs:
           -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-        cmake --build build_sp -j 3
 
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools[core] wheel
@@ -161,9 +169,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
-    #env:
-    #  # For NVHPC, Ninja is slower than the default:
-    #  CMAKE_GENERATOR: Ninja
+    env:
+      CDASH_BUILD_NAME: Linux-NVHPC-3D
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      # For NVHPC, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
     steps:
     - name: Free More Disk Space
       uses: ax3l/free-disk-space@main
@@ -208,7 +218,7 @@ jobs:
         export CUDACXX=$(which nvcc)
         export CUDAHOSTCXX=${CXX}
 
-        cmake -S . -B build            \
+        Tools/CI/ctest_dashboard.sh build \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=CUDA         \
           -DWarpX_EB=ON                \
@@ -218,7 +228,6 @@ jobs:
           -DWarpX_FFT=ON               \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-        cmake --build build -j 4
 
         # work-around for mpi4py 3.1.1 build system issue with using
         # a GNU-built Python executable with non-GNU Python modules

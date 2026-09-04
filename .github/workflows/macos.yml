@@ -11,6 +11,13 @@ concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-macos
   cancel-in-progress: true
 
+# Configure and build through CTest, so that CDash records their timings as well
+# as compiler warnings and errors. Only merges to `development` are submitted;
+# PR runs produce the XML locally and drop it.
+env:
+  CDASH_SITE: GitHub-Actions
+  CDASH_SUBMIT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/development' && 'ON' || 'OFF' }}
+
 jobs:
 
   check_changes:
@@ -24,6 +31,7 @@ jobs:
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
       HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: TRUE
+      CMAKE_BUILD_PARALLEL_LEVEL: 3
       # For macOS, Ninja is slower than the default:
       #CMAKE_GENERATOR: Ninja
     steps:
@@ -73,21 +81,21 @@ jobs:
 
         export CXXFLAGS="-Werror -Wno-error=pass-failed -Wno-error=c++23-attribute-extensions"
 
-        cmake -S . -B build_dp         \
+        CDASH_BUILD_NAME=macOS-AppleClang-3D-DP \
+        Tools/CI/ctest_dashboard.sh build_dp \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_EB=OFF               \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_openpmd_internal=OFF
-        cmake --build build_dp -j 3
 
-        cmake -S . -B build_sp         \
+        CDASH_BUILD_NAME=macOS-AppleClang-3D-SP \
+        Tools/CI/ctest_dashboard.sh build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_EB=OFF               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_openpmd_internal=OFF \
           -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 3
         cmake --build build_sp --target pip_install
 
         du -hs ~/Library/Caches/ccache

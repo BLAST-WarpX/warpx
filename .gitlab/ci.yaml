@@ -27,16 +27,33 @@
     - python3 -m pip install --upgrade -r Regression/requirements.txt
     - python3 -m pip cache purge
 
+# Upload Configure.xml, Build.xml and Test.xml as one CDash build.
+#
+# Used as `after_script`, so that it also runs when the configure, build or test
+# step failed -- a broken build is exactly what the dashboard should show. Only
+# merges to `development` are submitted; PR pipelines write the XML but keep it.
+.cdash-submit: &cdash-submit
+  - |
+    # DartConfiguration.tcl is missing when the configure died before
+    # include(CTest); the driver script has already submitted in that case.
+    if [[ "${CI_COMMIT_BRANCH}" == "development" && -f build/DartConfiguration.tcl ]]; then
+      ctest --test-dir build -D ExperimentalSubmit
+    fi
+
 NVIDIA-H100:
   extends: .install-dependencies
   tags: [nvidia-h100]
   image: nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu24.04
+  variables:
+    CDASH_BUILD_NAME: GPU-H100-CUDA-SP
+    CDASH_SITE: Frank_UO
+    CMAKE_BUILD_PARALLEL_LEVEL: "16"
   script:
+    # configure and build through CTest, so that CDash records their timings
+    # as well as compiler warnings and errors
     - |
-      cmake -S . -B build                                  \
+      Tools/CI/ctest_dashboard.sh build                    \
           -DCMAKE_VERBOSE_MAKEFILE=ON                      \
-          -DBUILDNAME=GPU-H100-CUDA-SP                     \
-          -DSITE=Frank_UO                                  \
           -DWarpX_COMPUTE=CUDA                             \
           -DWarpX_EB=ON                                    \
           -DWarpX_PYTHON=OFF                               \
@@ -46,24 +63,22 @@ NVIDIA-H100:
           -DWarpX_FFT=ON                                   \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-    - cmake --build build -j 16
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
-      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
-        # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
-      else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error
-      fi
+      ctest --test-dir build -R test_3d_laser_acceleration_btd \
+        --output-on-failure --no-tests=error -D ExperimentalTest
+  after_script: *cdash-submit
 
 AMD-MI300:
   extends: .install-dependencies
   tags: [amd-mi300]
   image: rocm/dev-ubuntu-24.04:6.4.3-complete
+  variables:
+    CDASH_BUILD_NAME: GPU-MI300-HIP-SP
+    CDASH_SITE: Frank_UO
+    CMAKE_BUILD_PARALLEL_LEVEL: "16"
   script:
     - export ROCM_PATH=/opt/rocm-6.4.3
     - export PATH=$ROCM_PATH/bin:$ROCM_PATH/llvm/bin:$PATH
@@ -71,13 +86,13 @@ AMD-MI300:
     - export HIP_PATH=$ROCM_PATH
     - export HIP_CLANG_PATH=$ROCM_PATH/llvm/bin
     - export CMAKE_PREFIX_PATH=$ROCM_PATH:$CMAKE_PREFIX_PATH
+    # configure and build through CTest, so that CDash records their timings
+    # as well as compiler warnings and errors
     - |
-      cmake -S . -B build                              \
+      Tools/CI/ctest_dashboard.sh build                \
           -DCMAKE_C_COMPILER=$(which clang)            \
           -DCMAKE_CXX_COMPILER=$(which clang++)        \
           -DCMAKE_VERBOSE_MAKEFILE=ON                  \
-          -DBUILDNAME=GPU-MI300-HIP-SP                 \
-          -DSITE=Frank_UO                              \
           -DAMReX_AMD_ARCH=gfx942                      \
           -DWarpX_COMPUTE=HIP                          \
           -DWarpX_EB=ON                                \
@@ -86,19 +101,13 @@ AMD-MI300:
           -DWarpX_OPENPMD=ON                           \
           -DWarpX_PRECISION=SINGLE                     \
           -DWarpX_FFT=ON
-    - cmake --build build -j 16
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
-      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
-        # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
-      else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error
-      fi
+      ctest --test-dir build -R test_3d_laser_acceleration_btd \
+        --output-on-failure --no-tests=error -D ExperimentalTest
+  after_script: *cdash-submit
 
 Intel-PVC:
   # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
@@ -107,14 +116,18 @@ Intel-PVC:
   extends: .install-dependencies
   tags: [intel-data-center-max-1100]
   image: intel/oneapi-basekit:2025.3.0-0-devel-ubuntu24.04
+  variables:
+    CDASH_BUILD_NAME: GPU-PVC-SYCL-MP
+    CDASH_SITE: Frank_UO
+    CMAKE_BUILD_PARALLEL_LEVEL: "16"
   script:
     - sycl-ls
     - export ONEAPI_DEVICE_SELECTOR=level_zero:gpu
+    # configure and build through CTest, so that CDash records their timings
+    # as well as compiler warnings and errors
     - |
-      cmake -S . -B build                       \
+      Tools/CI/ctest_dashboard.sh build         \
           -DBUILD_SHARED_LIBS=ON                \
-          -DBUILDNAME=GPU-PVC-SYCL-MP           \
-          -DSITE=Frank_UO                       \
           -DCMAKE_VERBOSE_MAKEFILE=ON           \
           -DCMAKE_C_COMPILER=$(which icx)       \
           -DCMAKE_CXX_COMPILER=$(which icpx)    \
@@ -129,14 +142,8 @@ Intel-PVC:
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=SINGLE
-    - cmake --build build -j 16
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
-      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
-        # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
-      else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error
-      fi
+      ctest --test-dir build -R test_3d_laser_acceleration_btd \
+        --output-on-failure --no-tests=error -D ExperimentalTest
+  after_script: *cdash-submit
