@@ -13,6 +13,7 @@
 #define WARPX_HYBRIDPICMODEL_H_
 
 #include "HybridPICModel_fwd.H"
+#include "HybridMagDiffusion.H"
 
 #include "Fields.H"
 #include "Fluids/QdsmcParticleContainer_fwd.H"
@@ -509,6 +510,45 @@ public:
     amrex::GpuArray<int, 3> Ey_IndexType;
     /** Gpu Vector with index type of the Ez multifab */
     amrex::GpuArray<int, 3> Ez_IndexType;
+
+    /**
+     * \brief Implicit magnetic diffusion (operator-split, default off).
+     *
+     * When hybrid_pic_model.implicit_mag_diffusion is enabled, advances
+     * dB/dt = -curl((eta_D/mu0) curl B) after each hybrid B half-step, where
+     * eta_D = max(eta - mag_diff_eta_explicit_max, 0) is the residual after
+     * Ohm's law (which uses eta_Ohm = min(eta, mag_diff_eta_explicit_max)).
+     * With mag_diff_eta_explicit_max = 0 (default), eta_D = eta and all
+     * resistive diffusion is implicit.
+     */
+    HybridMagDiffusion m_mag_diffusion;
+
+    /**
+     * \brief Apply implicit magnetic diffusion for time interval dt on all levels.
+     *
+     * No-op when hybrid_pic_model.implicit_mag_diffusion is off.
+     */
+    void ApplyImplicitMagDiffusion (
+        ablastr::fields::MultiLevelVectorField const& Bfield,
+        amrex::Real dt) const;
+
+    /**
+     * \brief Evaluate resistivity on the Yee faces for variable-eta diffusion.
+     */
+    void BuildMagDiffResistivity (
+        ablastr::fields::VectorField& eta_field,
+        ablastr::fields::VectorField const& Jfield,
+        amrex::MultiFab const& rhofield,
+        int lev) const;
+
+    /** \brief True if implicit magnetic diffusion is enabled. */
+    [[nodiscard]] bool ImplicitMagDiffusionEnabled () const {
+        return m_mag_diffusion.Enabled();
+    }
+    /** \brief Maximum Ohm resistivity when mag diffusion is enabled [Ohm m]. */
+    [[nodiscard]] amrex::Real MagDiffEtaExplicitMax () const {
+        return m_mag_diffusion.EtaExplicitMax();
+    }
 
     /** QDSMC fictitious-particle container used to transport the electron
      *  entropy K_e by V_e over one PIC step. Lazily constructed in InitData

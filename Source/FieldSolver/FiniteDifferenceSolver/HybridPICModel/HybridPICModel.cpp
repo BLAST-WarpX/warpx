@@ -25,6 +25,8 @@
 
 #include <AMReX_Random.H>
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -81,6 +83,9 @@ void HybridPICModel::ReadParameters ()
 
     pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
+
+    // Implicit magnetic diffusion (default off).
+    m_mag_diffusion.ReadParameters();
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
 
@@ -1540,6 +1545,171 @@ void HybridPICModel::BfieldEvolve (
             Bfield, Efield, Jfield, rhofield, eb_update_E,
             step, dt_half, lev, subcycling_half, ng, nodal_sync
         );
+    }
+
+    // Implicit magnetic diffusion over the same half-step interval.
+    // No-op when hybrid_pic_model.implicit_mag_diffusion is off.
+    ApplyImplicitMagDiffusion(Bfield, dt_half);
+}
+
+void HybridPICModel::ApplyImplicitMagDiffusion (
+    ablastr::fields::MultiLevelVectorField const& Bfield,
+    amrex::Real dt) const
+{
+    if (!m_mag_diffusion.Enabled()) { return; }
+
+    auto& warpx = WarpX::GetInstance();
+
+
+    if (!m_mag_diffusion.UsesVariableEta()) {
+        amrex::Real eta = 0.0_rt;
+        if (m_mag_diffusion.HasConstantEta()) {
+            eta = m_mag_diffusion.ConstantEta();
+        } else {
+            const amrex::Real t = warpx.gett_new(0);
+            const amrex::Real rho_sample = m_n_floor * PhysConst::q_e;
+            eta = m_eta(rho_sample, 0.0_rt, t);
+        }
+
+        // Residual resistivity: Ohm already advances min(eta, eta_explicit_max).
+        // Implicit mag-diff must only apply the stiff excess so the split does
+        // not double-count soft eta. With the default eta_explicit_max = 0 this
+        // leaves the full map for D (CI / pure-implicit tests).
+        const amrex::Real eta_ohm_max = m_mag_diffusion.EtaExplicitMax();
+        eta = std::max(eta - eta_ohm_max, 0.0_rt);
+
+        if (eta <= 0.0_rt) { return; }
+
+        for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+            m_mag_diffusion.Advance(Bfield[lev], eta, dt, lev);
+        }
+        return;
+    }
+
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        // Only needed when eta depends on J; avoids an extra Ampere-like
+        // plasma-current rebuild each mag-diff call.
+        if (m_resistivity_has_J_dependence) {
+            CalculatePlasmaCurrent(Bfield[lev], warpx.GetEBUpdateEFlag()[lev], lev);
+        }
+        auto const Jfield = warpx.m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
+        auto * const rhofield = warpx.m_fields.get(FieldType::rho_fp, lev);
+
+        amrex::Array<amrex::MultiFab,3> eta_storage;
+        for (int idim = 0; idim < 3; ++idim) {
+            eta_storage[idim].define(Jfield[idim]->boxArray(), Jfield[idim]->DistributionMap(),
+                                     1, Jfield[idim]->nGrowVect());
+            // Initialize fully (including ghosts) so FormEtaTimesJ over fabbox
+            // never multiplies stale ghost values.
+            eta_storage[idim].setVal(0.0_rt);
+        }
+        amrex::MultiFab * const eta_ptr = eta_storage.data();
+        ablastr::fields::VectorField eta_field = {
+            eta_ptr, eta_ptr + 1, eta_ptr + 2};
+        BuildMagDiffResistivity(eta_field, Jfield, *rhofield, lev);
+        m_mag_diffusion.AdvanceVariable(Bfield[lev], eta_field, dt, lev);
+    }
+}
+
+void HybridPICModel::BuildMagDiffResistivity (
+    ablastr::fields::VectorField& eta_field,
+    ablastr::fields::VectorField const& Jfield,
+    amrex::MultiFab const& rhofield,
+    int lev) const
+{
+    ABLASTR_PROFILE("HybridPICModel::BuildMagDiffResistivity()");
+
+    using namespace ablastr::coarsen::sample;
+
+    auto& warpx = WarpX::GetInstance();
+    auto const eta_parser = m_eta;
+    auto const t_new = warpx.gett_new(lev);
+    auto const has_J_dependence = m_resistivity_has_J_dependence;
+    // Residual for the operator split: Ohm uses min(eta, eta_explicit_max);
+    // mag-diff uses max(eta - eta_explicit_max, 0) so soft and stiff branches
+    // partition eta without double-counting.
+    amrex::Real const eta_ohm_max = m_mag_diffusion.EtaExplicitMax();
+    amrex::GpuArray<int, 3> const nodal = {1, 1, 1};
+    amrex::GpuArray<int, 3> const coarsen = {1, 1, 1};
+    amrex::GpuArray<int, 3> const Jx_stag = Jx_IndexType;
+    amrex::GpuArray<int, 3> const Jy_stag = Jy_IndexType;
+    amrex::GpuArray<int, 3> const Jz_stag = Jz_IndexType;
+
+    // Stair-case EB mask for E/J faces (1 = active, 0 = covered). Used below to
+    // zero η on covered E faces (no diffusion into the solid). Safe to bind
+    // unconditionally; only dereferenced inside `if (eb_on)`.
+    bool const eb_on = EB::enabled();
+    auto const& eb_update_E = warpx.GetEBUpdateEFlag()[lev];
+
+    auto fill_eta = [&] (amrex::MultiFab& eta_mf,
+                         amrex::GpuArray<int, 3> const& eta_stag,
+                         int idim)
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(eta_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            auto const eta_arr = eta_mf.array(mfi);
+            auto const rho_arr = rhofield.const_array(mfi);
+            auto const Jx_arr = Jfield[0]->const_array(mfi);
+            auto const Jy_arr = Jfield[1]->const_array(mfi);
+            auto const Jz_arr = Jfield[2]->const_array(mfi);
+            // Valid tile only: growntilebox + OpenMP races on shared ghost faces
+            // and can OOB-read rho/J when interpolating. Ghosts are filled by
+            // setVal(0) (above) and FillBoundaryAndSync (below).
+            amrex::Box const box = mfi.tilebox();
+
+            amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                amrex::Real const rho_val = Interp(
+                    rho_arr, nodal, eta_stag, coarsen, i, j, k, 0);
+                amrex::Real Jmag = 0.0_rt;
+                if (has_J_dependence) {
+                    amrex::Real const jx = Interp(
+                        Jx_arr, Jx_stag, eta_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jy = Interp(
+                        Jy_arr, Jy_stag, eta_stag, coarsen, i, j, k, 0);
+                    amrex::Real const jz = Interp(
+                        Jz_arr, Jz_stag, eta_stag, coarsen, i, j, k, 0);
+                    Jmag = std::sqrt(jx*jx + jy*jy + jz*jz);
+                }
+                amrex::Real eta_val = eta_parser(rho_val, Jmag, t_new);
+                if (!(eta_val == eta_val)) { // NaN check (device-safe)
+                    eta_val = 0.0_rt;
+                } else {
+                    eta_val = std::max(eta_val, 0.0_rt);
+                }
+                // Residual after the Ohm cap: max(eta - eta_explicit_max, 0).
+                eta_arr(i, j, k) = std::max(eta_val - eta_ohm_max, 0.0_rt);
+            });
+
+            // Zero η on covered E faces (eb_update_E == 0): no diffusion into
+            // the solid. The matvec is already safe (computeAFull zeros Jwork,
+            // so J = 0 on covered E faces), but this keeps the B-face PC
+            // (SampleEtaOntoBFace) and the frozen-η PETSc Pmat (M2) clean near
+            // the EB. eta_field[idim] and eb_update_E[idim] share the E/J BA/DM.
+            if (eb_on) {
+                auto const mask_arr = eb_update_E[idim]->const_array(mfi);
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    if (mask_arr(i, j, k) == 0) { eta_arr(i, j, k) = 0.0_rt; }
+                });
+            }
+        }
+        eta_mf.FillBoundaryAndSync(warpx.Geom(lev).periodicity());
+    };
+
+    fill_eta(*eta_field[0], Jx_IndexType, 0);
+    fill_eta(*eta_field[1], Jy_IndexType, 1);
+    fill_eta(*eta_field[2], Jz_IndexType, 2);
+
+    if (m_mag_diffusion.Verbose() > 0) {
+        amrex::Print() << "HybridMagDiffusion frozen eta ranges:";
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::Print() << " [" << eta_field[idim]->min(0, 0)
+                           << ", " << eta_field[idim]->max(0, 0) << "]";
+        }
+        amrex::Print() << " Ohm m\n";
     }
 }
 

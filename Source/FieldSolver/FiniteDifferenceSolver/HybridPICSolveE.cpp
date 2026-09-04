@@ -28,6 +28,17 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
+namespace {
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real ohmResistivity (
+    amrex::Real eta, bool cap_enabled, amrex::Real eta_max) noexcept
+{
+    return cap_enabled ? amrex::min(eta, eta_max) : eta;
+}
+
+}
+
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
     ablastr::fields::VectorField & Jfield,
     ablastr::fields::VectorField const& Bfield,
@@ -545,6 +556,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
+    // Cap Ohm resistivity when implicit magnetic diffusion is enabled.
+    // Partition: Ohm uses eta_Ohm = min(eta, eta_explicit_max); mag-diff uses
+    // the residual max(eta - eta_explicit_max, 0). Default eta_explicit_max = 0
+    // puts all resistive diffusion in the implicit step.
+    const bool cap_eta_for_ohm = hybrid_model->ImplicitMagDiffusionEnabled();
+    const amrex::Real eta_ohm_max = hybrid_model->MagDiffEtaExplicitMax();
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -765,7 +782,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Er(i, j, 0) += eta_val * Jr(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -836,7 +855,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Etheta(i, j, 0) += eta_val * Jtheta(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -904,7 +925,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Ez(i, j, 0) += eta_val * Jz(i, j, 0);
 
                     if (include_hyper_resistivity_term) {
 
@@ -989,6 +1012,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
+    // Cap Ohm resistivity when implicit magnetic diffusion is enabled.
+    // Partition: Ohm uses eta_Ohm = min(eta, eta_explicit_max); mag-diff uses
+    // the residual max(eta - eta_explicit_max, 0). Default eta_explicit_max = 0
+    // puts all resistive diffusion in the implicit step.
+    const bool cap_eta_for_ohm = hybrid_model->ImplicitMagDiffusionEnabled();
+    const amrex::Real eta_ohm_max = hybrid_model->MagDiffEtaExplicitMax();
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -1205,7 +1234,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ex(i, j, k) += eta_val * Jx(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1269,7 +1300,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ey(i, j, k) += eta_val * Jy(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 
@@ -1333,7 +1366,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ez(i, j, k) += eta_val * Jz(i, j, k);
 
                 if (include_hyper_resistivity_term) {
 

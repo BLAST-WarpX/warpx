@@ -2218,6 +2218,62 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Can be a constant value or an expression depending on ``rho`` (charge density)
         and ``B`` (magnetic field magnitude).
 
+    implicit_mag_diffusion: bool, default=False
+        Advance the resistive magnetic-diffusion term with an operator-split
+        implicit theta-method solve after each hybrid magnetic-field half-step.
+
+    mag_diff_theta: float, default=1.0
+        Theta-method parameter in ``(0, 1]`` for implicit magnetic diffusion.
+        The default 1.0 is backward Euler; 0.5 is Crank-Nicolson.
+
+    mag_diff_eta_explicit_max: float, default=0.0
+        Maximum resistivity in Ohm*m retained in the explicit Ohm/Faraday
+        update when implicit magnetic diffusion is enabled. The implicit solve
+        advances the residual ``max(eta - mag_diff_eta_explicit_max, 0)``.
+        Zero keeps all resistive diffusion implicit. In coupled production
+        problems, a small positive, explicitly CFL-safe value can improve
+        robustness by retaining controlled damping in the explicit substeps;
+        the appropriate value depends on the problem, mesh, and timestep.
+
+    mag_diff_use_variable_eta: bool, default=False
+        Use the spatially varying resistivity assembled from the hybrid
+        resistivity parsers. If False, ``mag_diff_constant_eta`` is used when
+        provided; otherwise the plasma resistivity is sampled at ``n_floor``.
+
+    mag_diff_constant_eta: float, optional
+        Constant resistivity in Ohm*m for the implicit magnetic-diffusion solve.
+
+    mag_diff_linear_solver: str, default="amrex_gmres"
+        Linear solver for implicit magnetic diffusion: ``"amrex_gmres"`` or
+        ``"petsc"``. The PETSc option requires a PETSc-enabled WarpX build.
+
+    mag_diff_rtol: float, default=1e-8
+        Relative tolerance for the magnetic-diffusion linear solve.
+
+    mag_diff_atol: float, default=0.0
+        Absolute tolerance for the magnetic-diffusion linear solve.
+
+    mag_diff_max_iter: int, default=200
+        Maximum number of magnetic-diffusion linear iterations.
+
+    mag_diff_verbose: int, default=0
+        Verbosity level for the magnetic-diffusion solve.
+
+    mag_diff_petsc_pc_type: str, optional
+        PETSc preconditioner type. If omitted, PETSc selects its default.
+
+    mag_diff_petsc_asm_overlap: int, default=0
+        Number of graph-overlap layers when the PETSc preconditioner is ASM.
+
+    mag_diff_petsc_sub_ksp_type: str, default="preonly"
+        PETSc KSP type used for each ASM subdomain solve.
+
+    mag_diff_petsc_sub_pc_type: str, default="ilu"
+        PETSc preconditioner used inside each ASM subdomain.
+
+    mag_diff_petsc_ilu_factor_levels: int, default=2
+        Fill level used when the ASM subdomain preconditioner is ILU.
+
     solve_electron_energy_equation: bool, default=False
         Solve the electron energy equation instead of the algebraic adiabatic
         pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is
@@ -2349,6 +2405,21 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         n_floor=None,
         plasma_resistivity=None,
         plasma_hyper_resistivity=None,
+        implicit_mag_diffusion=None,
+        mag_diff_theta=None,
+        mag_diff_eta_explicit_max=None,
+        mag_diff_use_variable_eta=None,
+        mag_diff_constant_eta=None,
+        mag_diff_linear_solver=None,
+        mag_diff_rtol=None,
+        mag_diff_atol=None,
+        mag_diff_max_iter=None,
+        mag_diff_verbose=None,
+        mag_diff_petsc_pc_type=None,
+        mag_diff_petsc_asm_overlap=None,
+        mag_diff_petsc_sub_ksp_type=None,
+        mag_diff_petsc_sub_pc_type=None,
+        mag_diff_petsc_ilu_factor_levels=None,
         solve_electron_energy_equation=None,
         include_joule_heating=None,
         joule_redirect_Te_threshold=None,
@@ -2377,6 +2448,21 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.n_floor = n_floor
         self.plasma_resistivity = plasma_resistivity
         self.plasma_hyper_resistivity = plasma_hyper_resistivity
+        self.implicit_mag_diffusion = implicit_mag_diffusion
+        self.mag_diff_theta = mag_diff_theta
+        self.mag_diff_eta_explicit_max = mag_diff_eta_explicit_max
+        self.mag_diff_use_variable_eta = mag_diff_use_variable_eta
+        self.mag_diff_constant_eta = mag_diff_constant_eta
+        self.mag_diff_linear_solver = mag_diff_linear_solver
+        self.mag_diff_rtol = mag_diff_rtol
+        self.mag_diff_atol = mag_diff_atol
+        self.mag_diff_max_iter = mag_diff_max_iter
+        self.mag_diff_verbose = mag_diff_verbose
+        self.mag_diff_petsc_pc_type = mag_diff_petsc_pc_type
+        self.mag_diff_petsc_asm_overlap = mag_diff_petsc_asm_overlap
+        self.mag_diff_petsc_sub_ksp_type = mag_diff_petsc_sub_ksp_type
+        self.mag_diff_petsc_sub_pc_type = mag_diff_petsc_sub_pc_type
+        self.mag_diff_petsc_ilu_factor_levels = mag_diff_petsc_ilu_factor_levels
 
         self.solve_electron_energy_equation = solve_electron_energy_equation
         self.include_joule_heating = include_joule_heating
@@ -2435,6 +2521,28 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 self.plasma_hyper_resistivity, self.mangle_dict
             ),
         )
+        # Leave unspecified controls to the C++ defaults so PICMI and native
+        # input decks share one source of truth for solver behavior.
+        mag_diffusion_inputs = {
+            "implicit_mag_diffusion": self.implicit_mag_diffusion,
+            "mag_diff_theta": self.mag_diff_theta,
+            "mag_diff_eta_explicit_max": self.mag_diff_eta_explicit_max,
+            "mag_diff_use_variable_eta": self.mag_diff_use_variable_eta,
+            "mag_diff_constant_eta": self.mag_diff_constant_eta,
+            "mag_diff_linear_solver": self.mag_diff_linear_solver,
+            "mag_diff_rtol": self.mag_diff_rtol,
+            "mag_diff_atol": self.mag_diff_atol,
+            "mag_diff_max_iter": self.mag_diff_max_iter,
+            "mag_diff_verbose": self.mag_diff_verbose,
+            "mag_diff_petsc_pc_type": self.mag_diff_petsc_pc_type,
+            "mag_diff_petsc_asm_overlap": self.mag_diff_petsc_asm_overlap,
+            "mag_diff_petsc_sub_ksp_type": self.mag_diff_petsc_sub_ksp_type,
+            "mag_diff_petsc_sub_pc_type": self.mag_diff_petsc_sub_pc_type,
+            "mag_diff_petsc_ilu_factor_levels": self.mag_diff_petsc_ilu_factor_levels,
+        }
+        for name, value in mag_diffusion_inputs.items():
+            if value is not None:
+                setattr(pywarpx.hybridpicmodel, name, value)
         # Only emit the electron-energy-equation attributes that were
         # explicitly set, so the generated input deck contains only
         # user-specified parameters.

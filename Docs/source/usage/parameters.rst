@@ -3874,6 +3874,131 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
+.. pp:param:: hybrid_pic_model.implicit_mag_diffusion
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Advance resistive magnetic diffusion with an operator-split implicit solve
+    after each hybrid magnetic-field half-step.
+
+.. pp:param:: hybrid_pic_model.mag_diff_theta
+    :type: ``float``
+    :default: ``1.0``
+    :optional:
+
+    Theta-method parameter in ``(0, 1]``. The default ``1.0`` is backward Euler
+    and is L-stable for stiff resistive modes; ``0.5`` is Crank--Nicolson.
+
+.. pp:param:: hybrid_pic_model.mag_diff_eta_explicit_max
+    :type: ``float``
+    :default: ``0.0``
+    :optional:
+
+    Maximum resistivity, in :math:`\Omega m`, retained in the explicit Ohm/Faraday
+    update. The implicit solve advances the residual
+    ``max(eta - mag_diff_eta_explicit_max, 0)``, so resistivity is not counted twice.
+    Zero places all resistive diffusion in the implicit solve and avoids an explicit
+    resistive timestep restriction. In coupled production problems, a small positive,
+    explicitly CFL-safe cap can improve robustness by retaining controlled resistive
+    damping in the explicit substeps. The appropriate cap depends on the problem,
+    mesh, and timestep and should remain well below a stiff vacuum resistivity.
+
+.. pp:param:: hybrid_pic_model.mag_diff_use_variable_eta
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Use the spatially varying resistivity assembled from
+    :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`. If false,
+    :pp:param:`hybrid_pic_model.mag_diff_constant_eta` is used when provided;
+    otherwise the plasma resistivity is sampled at :pp:param:`hybrid_pic_model.n_floor`.
+
+.. pp:param:: hybrid_pic_model.mag_diff_constant_eta
+    :type: ``float``
+    :optional:
+
+    Constant resistivity, in :math:`\Omega m`, for the implicit magnetic-diffusion
+    solve. This is used when :pp:param:`hybrid_pic_model.mag_diff_use_variable_eta`
+    is false.
+
+.. pp:param:: hybrid_pic_model.mag_diff_linear_solver
+    :type: ``str``
+    :default: ``amrex_gmres``
+    :optional:
+
+    Linear solver for implicit magnetic diffusion: ``amrex_gmres`` or ``petsc``.
+    The PETSc option requires a PETSc-enabled WarpX build.
+
+.. pp:param:: hybrid_pic_model.mag_diff_rtol
+    :type: ``float``
+    :default: ``1.e-8``
+    :optional:
+
+    Relative tolerance for the magnetic-diffusion linear solve. Must be positive.
+
+.. pp:param:: hybrid_pic_model.mag_diff_atol
+    :type: ``float``
+    :default: ``0.0``
+    :optional:
+
+    Absolute tolerance for the magnetic-diffusion linear solve. Must be non-negative.
+
+.. pp:param:: hybrid_pic_model.mag_diff_max_iter
+    :type: ``int``
+    :default: ``200``
+    :optional:
+
+    Maximum number of magnetic-diffusion linear iterations. Must be positive.
+
+.. pp:param:: hybrid_pic_model.mag_diff_verbose
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    Verbosity level for the magnetic-diffusion linear solve.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_pc_type
+    :type: ``str``
+    :optional:
+
+    PETSc preconditioner type for implicit hybrid magnetic diffusion when
+    ``mag_diff_linear_solver = petsc``. If omitted, PETSc selects its default.
+    Common values include ``asm``, ``bjacobi`` and, on a single CPU rank, ``lu``.
+    Global ``lu`` is not supported in GPU builds; use ``asm`` with
+    :pp:param:`hybrid_pic_model.mag_diff_petsc_sub_pc_type` = ``lu`` instead.
+    The prefixed PETSc option ``-magdiff_pc_type`` takes precedence over this
+    input group without changing other PETSc solvers in the process.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_asm_overlap
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    Number of graph-overlap layers for ``mag_diff_petsc_pc_type = asm``.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_sub_ksp_type
+    :type: ``str``
+    :default: ``preonly``
+    :optional:
+
+    PETSc KSP type used for each ASM subdomain solve.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_sub_pc_type
+    :type: ``str``
+    :default: ``ilu``
+    :optional:
+
+    PETSc preconditioner used inside each ASM subdomain. ``lu`` selects an exact
+    local factorization and does not require a distributed sparse-direct package.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_ilu_factor_levels
+    :type: ``int``
+    :default: ``2``
+    :optional:
+
+    Fill level used when ``mag_diff_petsc_sub_pc_type = ilu``.
+
 .. pp:param:: hybrid_pic_model.solve_electron_energy_equation
     :type: ``bool``
     :default: ``false``
