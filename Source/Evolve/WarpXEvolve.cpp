@@ -214,11 +214,16 @@ WarpX::Evolve (int numsteps)
         }
 
         // If needed, deposit the initial ion charge and current densities that
-        // will be used to update the E-field in Ohm's law.
-        if (step == step_begin &&
+        // will be used to update the E-field in Ohm's law.  Evolve() can be
+        // called repeatedly by a Python co-simulation.  This initialization is
+        // once per WarpX instance, not once per Evolve() call: repeating it can
+        // re-add split external fields and, with the QDSMC electron equation,
+        // replace the evolved electron temperature by its initial closure.
+        if (!m_hybrid_pic_evolve_initialized &&
             electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC
         ) {
             HybridPICInitializeRhoJandB();
+            m_hybrid_pic_evolve_initialized = true;
         }
 
         // multi-physics: field ionization

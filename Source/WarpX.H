@@ -1440,6 +1440,12 @@ private:
 
     bool m_is_synchronized = true;
 
+    /** True after the one-time Hybrid-PIC deposition/field initialization at
+     *  the beginning of the first Evolve() call.  Python co-simulations call
+     *  Evolve() repeatedly on the same instance, so step_begin cannot be used
+     *  as the initialization sentinel. */
+    bool m_hybrid_pic_evolve_initialized = false;
+
     // Synchronization of nodal points
     static constexpr bool sync_nodal_points = true;
 
