@@ -16,9 +16,16 @@
 
 #include <AMReX_Functional.H>
 #include <AMReX_GpuAtomic.H>
+#include <AMReX_Math.H>
 #include <AMReX_Scan.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_MultiFab.H>
+
+#include <algorithm>
+#include <iomanip>
+#include <limits>
+#include <sstream>
+#include <string>
 
 using namespace ablastr::fields;
 
@@ -69,7 +76,142 @@ namespace
         return sums;
     }
 
+
+    /**
+    * \brief Check that face extensions conserved area and did not overdraft
+    * any lending face to S_mod <= 0.  The global sum of original areas S must
+    * equal sum of modified areas S_mod to within a round-off error tolerance.
+    * This routine must be called before BCK correction, which overwrites
+    * face_areas.
+    *
+    * @param[in] tag Annotation for verbose/error print statements
+    * @param[in] all_fields The field manager
+    * @param[in] owner_mask Per-direction face owner masks
+    * @param[in] max_level The maximum refinement level
+    * @param[in] verbose Integer level of verbosity for print statements
+    */
+    void CheckAreaLedger (
+        [[maybe_unused]] const std::string& tag,
+        [[maybe_unused]] const ablastr::fields::MultiFabRegister& all_fields,
+        [[maybe_unused]] const amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > >& owner_mask,
+        [[maybe_unused]] const int max_level,
+        [[maybe_unused]] const int verbose)
+    {
+#ifndef WARPX_DIM_RZ
+        using warpx::fields::FieldType;
+
+#ifdef WARPX_DIM_XZ
+        // In 2D we only need the case idim=1
+        for (int idim = 1; idim < AMREX_SPACEDIM; ++idim) {
+#elif defined(WARPX_DIM_3D)
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "CheckAreaLedger: Only implemented in 2D3V and 3D3V");
 #endif
+            auto* const S_mf     = all_fields.get(FieldType::face_areas, Direction{idim}, max_level);
+            auto* const S_mod_mf = all_fields.get(FieldType::area_mod,   Direction{idim}, max_level);
+            auto* const owner_mf = owner_mask[max_level][idim].get();
+
+            amrex::Real net;        // sum(S - S_mod)
+            amrex::Real S_max_sum;  // sum(max(S,S_mod)) to estimate roundoff error
+            amrex::Real S_mod_min;  // min(S_mod) verify no overdraft
+            {
+                amrex::ReduceOps< amrex::ReduceOpSum,
+                                  amrex::ReduceOpSum,
+                                  amrex::ReduceOpMin > reduce_ops;
+                amrex::ReduceData< amrex::Real,
+                                   amrex::Real,
+                                   amrex::Real > reduce_data(reduce_ops);
+
+                for (amrex::MFIter mfi(*S_mf); mfi.isValid(); ++mfi) {
+                    amrex::Box const &box   = mfi.validbox();
+                    auto       const &S     = S_mf    ->const_array(mfi);
+                    auto       const &S_mod = S_mod_mf->const_array(mfi);
+                    auto       const &owner = owner_mf->const_array(mfi);
+
+                    reduce_ops.eval(box, reduce_data,
+                        [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                        -> amrex::GpuTuple<amrex::Real, amrex::Real, amrex::Real> {
+
+                            const amrex::Real d = S(i,j,k) - S_mod(i,j,k);
+                            if (owner(i,j,k) == 0 || d == amrex::Real(0.)) {
+                                // skip non-owned faces on shared nodal planes
+                                // skip faces that neither lend nor borrow
+                                return { amrex::Real(0.),
+                                         amrex::Real(0.),
+                                         std::numeric_limits<amrex::Real>::max() };
+                            } else {
+                                return { d,
+                                         std::max(S(i,j,k),S_mod(i,j,k)),
+                                         S_mod(i,j,k) };
+                            }
+
+                        });
+                }
+
+                auto r = reduce_data.value();
+                net       = amrex::get<0>(r);
+                S_max_sum = amrex::get<1>(r);
+                S_mod_min = amrex::get<2>(r);
+                amrex::ParallelDescriptor::ReduceRealSum(net);
+                amrex::ParallelDescriptor::ReduceRealSum(S_max_sum);
+                amrex::ParallelDescriptor::ReduceRealMin(S_mod_min);
+            }
+
+            // Round-off error may arise from the parallel reduction or from
+            // the S -> S_mod debiting.  Worst-case estimates for each case:
+            //    error ~ releps * \sum |S - S_mod|
+            //    error ~ releps * \sum max(S_mod, S)
+            // Use the latter.  Prefactor 100x is a bit arbitrary; in practice
+            // large-N sums should have residual << tolerance.
+            constexpr auto rtol = amrex::Real(1.e2) * std::numeric_limits<amrex::Real>::epsilon();
+
+            // Perform assert checks + printout only if faces are lent.
+            // Otherwise, printing imbalance=0, residual=0, min(S_mod)=huge
+            // looks weird/confusing.
+            if (S_max_sum > amrex::Real(0.)) {
+
+                std::ostringstream msg;
+                msg << "Embedded Boundary: ECT CheckAreaLedger"
+                    << " " << tag << " (idim=" << idim << ")"
+                    << std::scientific << std::setprecision(6)
+                    << " imbalance sum(S-S_mod) = " << net
+                    << " tolerance = "              << rtol*S_max_sum;
+
+                const bool balance = amrex::Math::abs(net) <= rtol*S_max_sum;
+                if (balance) {
+                    msg << " OK.";
+                } else {
+                    msg << " exceeded, borrowed and lent area do not balance, exiting!";
+                }
+
+                msg << " Modified faces min(S_mod) = " << S_mod_min;
+
+                const bool no_overdraft = S_mod_min > amrex::Real(0.);
+                if (no_overdraft) {
+                    msg << " > 0 OK.";
+                } else {
+                    msg << " but expected > 0 for all faces, exiting!";
+                }
+
+                if (!balance || !no_overdraft ) {
+                    msg << " Try resolving embedded boundary with more cells, varying AMReX grid layout, and/or filing bug report.";
+                }
+
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(balance && no_overdraft,
+                                                 msg.str());
+
+                if (verbose >= 1) {
+                    amrex::Print() << Utils::TextMsg::Info(msg.str());
+                }
+            }
+
+        } // for(int idim)
+#endif // ifndef WARPX_DIM_RZ
+    } // void CheckAreaLedger(...)
+
+#endif // AMREX_USE_EB
 
 
     /**
@@ -566,6 +708,8 @@ WarpX::ComputeFaceExtensions ()
     ::init_borrowing(m_borrowing[maxLevel()], Bfield);
     ComputeOneWayExtensions();
 
+    ::CheckAreaLedger("after 1-way pass", m_fields, m_ect_face_owner_mask, maxLevel(), verbose);
+
     amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
             "Faces to be extended after one way extension in x:\t"
@@ -578,6 +722,9 @@ WarpX::ComputeFaceExtensions ()
     );
 
     ComputeEightWaysExtensions();
+
+    ::CheckAreaLedger("after 8-way pass", m_fields, m_ect_face_owner_mask, maxLevel(), verbose);
+
     ::shrink_borrowing(m_borrowing[maxLevel()], Bfield);
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
