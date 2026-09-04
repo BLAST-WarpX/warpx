@@ -4016,6 +4016,22 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
 
+.. pp:param:: hybrid_pic_model.vacuum_seam_switch_mode
+    :type: ``edge``, ``node`` or ``cell``
+    :default: ``edge``
+
+    Sampling of the density that decides the vacuum-seam treatment of the
+    generalized Ohm's law: the vacuum branch of
+    :pp:param:`hybrid_pic_model.holmstrom_vacuum_region` when that treatment
+    is on, and the selection of the density floor in the guarded Hall term
+    otherwise. The default per-component edge average lets the three E
+    components of a cell take inconsistent vacuum/plasma decisions along a
+    moving plasma/vacuum seam, a grid-patterned spurious-E source there.
+    ``node`` uses the endpoint minimum; ``cell`` uses the minimum over the
+    adjacent cells of the node-averaged density -- a single
+    piecewise-constant-per-cell decision for all three components. Both are
+    vacuum-favoring. Only supported in 3D and 2D (XZ) Cartesian geometry.
+
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
     :default: ``false``

@@ -1,0 +1,16 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# guarded Hall floor only (no holmstrom vacuum treatment). The bare guarded
+# vacuum supports grid-scale whistlers at the floor density (~1.25e11 rad/s
+# here), so the substep count must resolve them and a Chacon-style
+# hyper-resistivity damps them scale-selectively: eta_h = l_H^2 * B0 /
+# (n_floor*q_e) with hyper-resistive length l_H = 0.2 dx, i.e.
+# (0.2*0.0125)^2 * 0.02 / 8.0e-3 = 1.5625e-5, giving gamma/omega_whistler
+# = (0.2*pi)^2 ~ 0.4 at the grid scale and k^2-falloff at resolved scales.
+hybrid_pic_model.holmstrom_vacuum_region = 0
+hybrid_pic_model.substeps = 200
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = 1.5625e-5
+
+# vacuum-seam decision mode under test
+hybrid_pic_model.vacuum_seam_switch_mode = cell

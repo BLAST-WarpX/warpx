@@ -387,6 +387,15 @@ public:
 
     bool m_holmstrom_vacuum_region = false;
 
+    /** Sampling of the density that decides the vacuum-seam treatment --
+     *  the holmstrom vacuum branch when m_holmstrom_vacuum_region is on and
+     *  the density-floor selection of the guarded Hall term otherwise:
+     *  0 = "edge" (legacy per-component edge average; components of a cell
+     *  can take inconsistent branches at the plasma/vacuum seam), 1 = "node"
+     *  (endpoint-min), 2 = "cell" (adjacent-cell min -- a single decision for
+     *  all three components of an index). Cartesian only. */
+    int m_vacuum_seam_switch_mode = 0;
+
     /** Electron temperature: read from the input in eV, converted to
      * k_B T_e in J at the end of ReadParameters. */
     amrex::Real m_elec_temp;

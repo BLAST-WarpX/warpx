@@ -2302,6 +2302,15 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
         This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor.
 
+    vacuum_seam_switch_mode: str, default="edge"
+        Sampling of the density that decides the vacuum-seam treatment --
+        the Holmstrom vacuum branch when holmstrom_vacuum_region is True and
+        the density-floor selection of the guarded Hall term otherwise:
+        "edge" (legacy per-component edge average), "node" (endpoint
+        minimum), or "cell" (adjacent-cell minimum -- one decision for all
+        three E components of an index, removing the per-component half-cell
+        decision offsets at the plasma/vacuum seam). Cartesian only.
+
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
 
@@ -2361,6 +2370,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         substep_max_growth=None,
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
+        vacuum_seam_switch_mode=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2392,6 +2402,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.max_substep_attempts = max_substep_attempts
 
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
+        self.vacuum_seam_switch_mode = vacuum_seam_switch_mode
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2463,6 +2474,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.substep_max_growth = self.substep_max_growth
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
+        pywarpx.hybridpicmodel.vacuum_seam_switch_mode = self.vacuum_seam_switch_mode
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
