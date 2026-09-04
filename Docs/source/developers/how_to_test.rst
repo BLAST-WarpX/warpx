@@ -221,6 +221,56 @@ Alternatively, it is also possible to reset a checksum file locally by running t
 
 Note that it is possible that the checksum values generated locally on your computer architecture may differ from the ones generated remotely by the autometed tests on the architecture provided by the CI runners.
 
+.. _developers-testing-cdash:
+
+How CI results reach the CDash dashboard
+----------------------------------------
+
+Our CI runners publish their results to the `WarpX dashboard on CDash <https://my.cdash.org/index.php?project=WarpX>`__.
+A dashboard build collects three kinds of results, each produced by a separate CTest step:
+
+* **Configure** (``Configure.xml``): how long ``cmake`` took, plus any CMake warnings and errors.
+* **Build** (``Build.xml``): how long the compilation took, plus every compiler warning and error with its source file and line.
+* **Test** (``Test.xml``): the pass/fail status and runtime of each test.
+
+CDash only receives the configure and build results if those steps run *through* CTest.
+Calling ``cmake`` and ``cmake --build`` directly and then submitting only produces a ``Test.xml``.
+Our CI therefore configures and builds via the helper script
+`Tools/CI/ctest_dashboard.sh <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/CI/ctest_dashboard.sh>`__,
+which drives ``ctest_configure()`` and ``ctest_build()`` from a CTest script:
+
+.. code-block:: bash
+
+   CDASH_BUILD_NAME=CPU-3D CDASH_SITE=Azure CMAKE_BUILD_PARALLEL_LEVEL=2 \
+       Tools/CI/ctest_dashboard.sh build -DWarpX_DIMS=3 -DWarpX_FFT=ON
+
+The CMake options are passed through unchanged.
+Note that the build parallelism comes from ``CMAKE_BUILD_PARALLEL_LEVEL``: the CTest build step has no ``-j`` option of its own.
+
+The script leaves the test step to the caller, so that CI keeps using the plain ``ctest`` command line it already has, adding only ``-D ExperimentalTest``:
+
+.. code-block:: bash
+
+   ctest --test-dir build --output-on-failure -E AMReX -D ExperimentalTest
+
+All steps write into the same dashboard tag, so one final call uploads them as a single CDash build:
+
+.. code-block:: bash
+
+   ctest --test-dir build -D ExperimentalSubmit
+
+Two conventions keep the dashboard readable:
+
+* Every build gets a unique ``CDASH_BUILD_NAME``, and ``CDASH_SITE`` names the CI provider
+  (``Azure``, ``GitHub-Actions`` or ``Frank_UO`` for the GPU runners).
+  A job that configures more than one build directory sets a distinct name per directory.
+* Only merges to ``development`` are submitted.
+  Pull request runs perform the same steps and write the XML files, but drop them.
+
+Build-only jobs, such as the compile matrix in ``.github/workflows/``, submit from the script itself by setting ``CDASH_SUBMIT=ON``.
+Jobs that also run tests leave it ``OFF`` and submit once at the end, from a step that runs even when the build or the tests failed -- a broken build is exactly what the dashboard should show.
+
+
 .. _developers-testing-naming:
 
 Naming conventions for automated tests

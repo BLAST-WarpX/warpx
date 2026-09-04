@@ -83,6 +83,17 @@ Test output goes to `build/bin/<test_name>/`.
   runners, through a GitHub-to-GitLab mirror. Only triggered on merges to `development` and on
   PRs labeled `bot: run GPU`, so it is absent from a default PR's checks.
 
+### CDash Dashboard
+
+CI publishes to [CDash](https://my.cdash.org/index.php?project=WarpX). Configure and build results
+only reach it when those steps run *through* CTest, so CI configures and builds via
+`Tools/CI/ctest_dashboard.sh` (a wrapper around `Tools/CI/ctest_dashboard.cmake`) rather than
+calling `cmake` and `cmake --build` directly. The test step stays a plain `ctest` call with
+`-D ExperimentalTest` appended, and one `-D ExperimentalSubmit` uploads all parts as one build.
+Set `CDASH_BUILD_NAME` and `CDASH_SITE` per job; the build parallelism comes from
+`CMAKE_BUILD_PARALLEL_LEVEL`, since the CTest build step has no `-j`. See
+`Docs/source/developers/how_to_test.rst` for details.
+
 ### Adding a Test
 
 Use `add_warpx_test()` in the test directory's `CMakeLists.txt`. Generate checksums with `CHECKSUM_RESET=ON ctest --test-dir build -R your_test_name`.

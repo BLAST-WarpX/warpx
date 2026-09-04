@@ -32,6 +32,7 @@ jobs:
   # FIXME remove unused variables
   variables:
     BLASPP_HOME: '/usr/local'
+    CDASH_SITE: 'Azure'
     CEI_SUDO: 'sudo'
     CEI_TMP: '/tmp/cei'
     CMAKE_GENERATOR: 'Ninja'
@@ -184,17 +185,16 @@ jobs:
       set -o nounset errexit pipefail
       # display disk space usage
       df -h
-      # configure
+      # configure and build through CTest, so that CDash records their timings
+      # as well as compiler warnings and errors
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
       export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
-      cmake -S . -B build                    \
-        -DBUILDNAME="${CDASH_BUILD_NAME}"    \
-        -DSITE=Azure                         \
+      # CTest builds via `cmake --build`, which has no -j of its own
+      export CMAKE_BUILD_PARALLEL_LEVEL=2
+      Tools/CI/ctest_dashboard.sh build      \
         ${AMReX_CMAKE_FLAGS}                 \
         ${WARPX_CMAKE_FLAGS}                 \
         ${WARPX_TEST_FLAGS}
-      # build
-      cmake --build build -j 2
     displayName: 'Build'
 
   - bash: |
@@ -210,17 +210,21 @@ jobs:
       # allow oversubscription for Open MPI 4 and 5
       export OMPI_MCA_rmaps_base_oversubscribe=1
       export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
-      # determine if the build was triggered by a push to the development branch
-      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
-        # run tests (exclude pytest.AMReX when running Python tests)
-        # and submit results to CDash as Experimental
-        ctest --test-dir build --output-on-failure -E AMReX \
-          -D ExperimentalTest -D ExperimentalSubmit
-      else
-        # run tests (exclude pytest.AMReX when running Python tests)
-        ctest --test-dir build --output-on-failure -E AMReX
-      fi
+      # run tests (exclude pytest.AMReX when running Python tests)
+      ctest --test-dir build --output-on-failure -E AMReX -D ExperimentalTest
     displayName: 'Test'
+
+  # Upload Configure.xml, Build.xml and Test.xml as one CDash build. This runs
+  # even when the build or the tests failed, which is exactly what the dashboard
+  # should show. Only merges to `development` are submitted; PR pipelines write
+  # the XML but keep it.
+  - bash: |
+      set -o nounset errexit pipefail
+      if [[ "$(Build.SourceBranch)" == "refs/heads/development" ]]; then
+        ctest --test-dir build -D ExperimentalSubmit
+      fi
+    displayName: 'CDash Submit'
+    condition: always()
 
   - bash: |
       # set options
