@@ -245,7 +245,8 @@ which drives ``ctest_configure()`` and ``ctest_build()`` from a CTest script:
        Tools/CI/ctest_dashboard.sh build -DWarpX_DIMS=3 -DWarpX_FFT=ON
 
 The CMake options are passed through unchanged.
-Note that the build parallelism comes from ``CMAKE_BUILD_PARALLEL_LEVEL``: the CTest build step has no ``-j`` option of its own.
+The build parallelism comes from ``CMAKE_BUILD_PARALLEL_LEVEL``, which the script passes on to ``ctest_build(PARALLEL_LEVEL ...)``.
+Set ``CDASH_BUILD_TARGET`` to build a specific target instead of the default one.
 
 The script leaves the test step to the caller, so that CI keeps using the plain ``ctest`` command line it already has, adding only ``-D ExperimentalTest``:
 
@@ -269,6 +270,7 @@ Two conventions keep the dashboard readable:
 
 Build-only jobs, such as the compile matrix in ``.github/workflows/``, submit from the script itself by setting ``CDASH_SUBMIT=ON``.
 Jobs that also run tests leave it ``OFF`` and submit once at the end, from a step that runs even when the build or the tests failed -- a broken build is exactly what the dashboard should show.
+A configure that fails before ``include(CTest)`` is an exception: ``ctest -D ExperimentalSubmit`` needs a ``DartConfiguration.tcl`` that does not exist yet at that point, so the script submits such a failure itself.
 
 
 .. _developers-testing-naming:

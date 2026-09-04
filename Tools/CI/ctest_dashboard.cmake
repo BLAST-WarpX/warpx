@@ -21,13 +21,12 @@
 #   CDASH_BUILD_NAME    dashboard build name, e.g. "CPU-3D" (required)
 #   CDASH_SITE          dashboard site name, e.g. "Azure" (required)
 #   CDASH_OPTIONS_FILE  file with one CMake configure option per line
+#   CDASH_BUILD_TARGET  build this target instead of the default one
 #   CDASH_SUBMIT        "ON" to submit right after the build (build-only jobs)
 #   CMAKE_GENERATOR     CMake generator, unless given as -G in the options
-#
-# `cmake --build` honors CMAKE_BUILD_PARALLEL_LEVEL, and CTest builds via
-# `cmake --build`, so the build parallelism is inherited from the environment.
+#   CMAKE_BUILD_PARALLEL_LEVEL  build parallelism, passed on to ctest_build()
 
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 
 foreach(_required IN ITEMS CDASH_SOURCE_DIR CDASH_BINARY_DIR CDASH_BUILD_NAME CDASH_SITE)
     if("$ENV{${_required}}" STREQUAL "")
@@ -45,7 +44,8 @@ set(CTEST_SITE             "$ENV{CDASH_SITE}")
 # (-DWarpX_DIMS="1;2") survive without any shell or CMake list quoting games.
 set(configure_options "")
 if(NOT "$ENV{CDASH_OPTIONS_FILE}" STREQUAL "")
-    file(STRINGS "$ENV{CDASH_OPTIONS_FILE}" raw_options)
+    # ENCODING: file(STRINGS) otherwise drops non-ASCII bytes silently
+    file(STRINGS "$ENV{CDASH_OPTIONS_FILE}" raw_options ENCODING UTF-8)
     foreach(option IN LISTS raw_options)
         # escape embedded ";" so that each line stays a single list element
         string(REPLACE ";" "\;" option "${option}")
@@ -73,19 +73,50 @@ if(CTEST_CMAKE_GENERATOR STREQUAL "")
     set(CTEST_CMAKE_GENERATOR "Unix Makefiles")
 endif()
 
+# Pass the parallelism to ctest_build() explicitly rather than relying on it
+# leaking through the environment into `cmake --build`. When it is unset, pass
+# nothing at all: forcing a level here would drop Ninja from its own default of
+# one job per core down to whatever we picked.
+set(build_parallel_arg "")
+if("$ENV{CMAKE_BUILD_PARALLEL_LEVEL}" MATCHES "^[1-9][0-9]*$")
+    set(build_parallel_arg PARALLEL_LEVEL "$ENV{CMAKE_BUILD_PARALLEL_LEVEL}")
+endif()
+
+# ctest_start() reuses an existing Testing/TAG only while its date still matches
+# today's in UTC. A job that configures before and tests after midnight UTC
+# therefore splits into two dashboard builds; rare, and it heals on the next run.
+
 ctest_start(Experimental)
 
 ctest_configure(OPTIONS "${configure_options}" RETURN_VALUE configure_rv)
 
-# A failed configure leaves nothing to build, but Configure.xml is still worth
-# submitting: it carries the CMake error that broke the job.
+# A failed configure leaves nothing to build.
 set(build_rv 0)
 if(configure_rv EQUAL 0)
-    ctest_build(RETURN_VALUE build_rv)
+    if(NOT "$ENV{CDASH_BUILD_TARGET}" STREQUAL "")
+        ctest_build(TARGET "$ENV{CDASH_BUILD_TARGET}"
+                    ${build_parallel_arg} RETURN_VALUE build_rv)
+    else()
+        ctest_build(${build_parallel_arg} RETURN_VALUE build_rv)
+    endif()
 endif()
 
-if("$ENV{CDASH_SUBMIT}" STREQUAL "ON")
-    ctest_submit(RETRY_COUNT 3 RETRY_DELAY 15)
+# Submit when the caller asked for it, and *always* when the configure failed.
+# A caller that submits from its own `ctest -D ExperimentalSubmit` step cannot
+# do it in that case: that command reads the build directory through
+# DartConfiguration.tcl, which include(CTest) only writes once the configure has
+# got that far, so it would abort and discard the Configure.xml holding the
+# CMake error. Here the submit is driven by CTestConfig.cmake in the source
+# directory instead, and works no matter how early the configure died.
+if("$ENV{CDASH_SUBMIT}" OR NOT configure_rv EQUAL 0)
+    # Never let the dashboard decide whether the build passed: a CDash outage
+    # must not turn a green build red. RETURN_VALUE alone does not do that --
+    # CAPTURE_CMAKE_ERROR is what keeps ctest from exiting non-zero.
+    ctest_submit(RETRY_COUNT 3 RETRY_DELAY 15
+                 RETURN_VALUE submit_rv CAPTURE_CMAKE_ERROR submit_err)
+    if(NOT submit_rv EQUAL 0 OR NOT submit_err EQUAL 0)
+        message("ctest_dashboard: submission to CDash failed, continuing anyway")
+    endif()
 endif()
 
 if(NOT configure_rv EQUAL 0)

@@ -90,8 +90,8 @@ only reach it when those steps run *through* CTest, so CI configures and builds 
 `Tools/CI/ctest_dashboard.sh` (a wrapper around `Tools/CI/ctest_dashboard.cmake`) rather than
 calling `cmake` and `cmake --build` directly. The test step stays a plain `ctest` call with
 `-D ExperimentalTest` appended, and one `-D ExperimentalSubmit` uploads all parts as one build.
-Set `CDASH_BUILD_NAME` and `CDASH_SITE` per job; the build parallelism comes from
-`CMAKE_BUILD_PARALLEL_LEVEL`, since the CTest build step has no `-j`. See
+Set `CDASH_BUILD_NAME` and `CDASH_SITE` per job; build parallelism comes from
+`CMAKE_BUILD_PARALLEL_LEVEL` and the target from the optional `CDASH_BUILD_TARGET`. See
 `Docs/source/developers/how_to_test.rst` for details.
 
 ### Adding a Test

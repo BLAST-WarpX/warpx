@@ -34,7 +34,9 @@
 # merges to `development` are submitted; PR pipelines write the XML but keep it.
 .cdash-submit: &cdash-submit
   - |
-    if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
+    # DartConfiguration.tcl is missing when the configure died before
+    # include(CTest); the driver script has already submitted in that case.
+    if [[ "${CI_COMMIT_BRANCH}" == "development" && -f build/DartConfiguration.tcl ]]; then
       ctest --test-dir build -D ExperimentalSubmit
     fi
 
