@@ -794,6 +794,30 @@ public:
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
 
+    /** Reconstructed divergence-of-B diagnostic at level lev.
+     *
+     * Applies the aux-field composition rule to the divergence itself:
+     *   divB_aux(0)   = divB_fp(0)
+     *   divB_aux(lev) = divB_fp(lev) + I[ divB_aux(lev-1) - divB_cp(lev) ]
+     * Each term is evaluated from the solver fields of its own level
+     * (and spacing), so any curl-updated B yields machine-zero output
+     * on every level, while the composite stays consistent with the
+     * aux (gather) fields to interpolation order under MR. The
+     * divergence collapses staggered fields to a single centering, so
+     * the reconstruction needs only one unstaggered interpolation.
+     *
+     * \param[out] divB destination (cell-centered), filled on comp 0..ncomps
+     * \param[in] dcomp first destination component
+     * \param[in] lev mesh-refinement level
+     * \param[in] ngrow output grow cells to fill
+     */
+    void ComputeDivBAux (amrex::MultiFab& divB, int dcomp, int lev,
+                         amrex::IntVect ngrow);
+
+    /** Reconstructed divergence-of-E diagnostic at level lev (nodal
+     *  centering except RZ-PSATD); see ComputeDivBAux for the rule. */
+    void ComputeDivEAux (amrex::MultiFab& divE, int lev);
+
     void ProjectionCleanDivB ();
     void CalculateExternalCurlA ();
 
