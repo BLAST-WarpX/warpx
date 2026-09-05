@@ -313,43 +313,44 @@ print("Maxwell-Juttner low-theta distribution difference:", f10_error)
 assert f10_error < tolerance
 
 # ==============================================
-# maxwellian with constant bulk velocity
+# maxwellian with constant bulk (h6/h6uy folders) velocity and constant temperature in eV (h12/h12uy folders)
 # ==============================================
 
-# load data
-bin_value_g, bin_data_g = read_reduced_diags_histogram("h6.txt")[2:]
-bin_value_uy, bin_data_uy = read_reduced_diags_histogram("h6uy.txt")[2:]
+for i in [6, 12]:
+    # load data
+    bin_value_g, bin_data_g = read_reduced_diags_histogram(f"h{i}.txt")[2:]
+    bin_value_uy, bin_data_uy = read_reduced_diags_histogram(f"h{i}uy.txt")[2:]
 
-# Expected values for beta and u = beta*gamma
-beta_const = 0.2
-g_const = 1.0 / np.sqrt(1.0 - beta_const * beta_const)
-uy_const = beta_const * g_const
-g_bin_size = 0.004
-g_bin_min = 1.0
-uy_bin_size = 0.04
-uy_bin_min = -1.0
-V = 8.0  # volume in m^3
-n = 1.0e21  # number density in 1/m^3
+    # Expected values for beta and u = beta*gamma
+    beta_const = 0.2
+    g_const = 1.0 / np.sqrt(1.0 - beta_const * beta_const)
+    uy_const = beta_const * g_const
+    g_bin_size = 0.004
+    g_bin_min = 1.0
+    uy_bin_size = 0.04
+    uy_bin_min = -1.0
+    V = 8.0  # volume in m^3
+    n = 1.0e21  # number density in 1/m^3
 
-f_g = np.zeros_like(bin_value_g)
-i_g = int(np.floor((g_const - g_bin_min) / g_bin_size))
-f_g[i_g] = n * V
-f_peak = np.amax(f_g)
+    f_g = np.zeros_like(bin_value_g)
+    i_g = int(np.floor((g_const - g_bin_min) / g_bin_size))
+    f_g[i_g] = n * V
+    f_peak = np.amax(f_g)
 
-f_uy = np.zeros_like(bin_value_uy)
-i_uy = int(np.floor((-uy_const - uy_bin_min) / uy_bin_size))
-f_uy[i_uy] = n * V
+    f_uy = np.zeros_like(bin_value_uy)
+    i_uy = int(np.floor((-uy_const - uy_bin_min) / uy_bin_size))
+    f_uy[i_uy] = n * V
 
-f6_error = (
-    np.sum(np.abs(f_g - bin_data_g) + np.abs(f_uy - bin_data_uy))
-    / bin_value_g.size
-    / f_peak
-)
-
-print("Maxwell-Boltzmann constant velocity difference:", f6_error)
-
-assert f6_error < tolerance
-
+    error = (
+        np.sum(np.abs(f_g - bin_data_g) + np.abs(f_uy - bin_data_uy))
+        / bin_value_g.size
+        / f_peak
+    )
+    if i == 6:
+        print("Maxwell-Boltzmann constant velocity difference:", error)
+    elif i == 12:
+        print("Maxwell-Boltzmann constant temperature_in_eV difference:", error)
+    assert error < tolerance
 # ============================================
 # maxwellian with parser bulk velocity
 # ============================================
@@ -405,7 +406,9 @@ def check_standard_normal(u, mean_ref, std_ref, tolerance):
     r = (u - mean_ref) / std_ref
     r_mean = np.mean(r)
     r_std = np.std(r)
+    print(" abs(r_mean) = ", abs(r_mean))
     assert abs(r_mean) < tolerance
+    print(" abs(r_std - 1.0) = ", abs(r_std - 1.0))
     assert abs(r_std - 1.0) < tolerance
 
 
@@ -428,6 +431,27 @@ uy_std_interp = np.interp(z, z_array, 0.21 * np.abs(z_array))
 uz_std_interp = np.interp(z, z_array, 0.22 * np.abs(z_array))
 
 standard_normal_tolerance = 1e-2
+
+check_standard_normal(ux, ux_mean_interp, ux_std_interp, standard_normal_tolerance)
+check_standard_normal(uy, uy_mean_interp, uy_std_interp, standard_normal_tolerance)
+check_standard_normal(uz, uz_mean_interp, uz_std_interp, standard_normal_tolerance)
+
+
+# ==============================================
+# maxwellian with bulk velocity and temperature_in_eV from openPMD file
+# (isotropic u_std = 0.2 * |z| from temperature_in_eV)
+# ==============================================
+standard_normal_tolerance = 8e-2
+
+ux, uy, uz, z = ts.get_particle(
+    ["ux", "uy", "uz", "z"],
+    species="gaussian_temperature_in_eV_from_file",
+    iteration=0,
+)
+
+ux_std_interp = np.interp(z, z_array, 0.2 * np.abs(z_array))
+uy_std_interp = np.interp(z, z_array, 0.2 * np.abs(z_array))
+uz_std_interp = np.interp(z, z_array, 0.2 * np.abs(z_array))
 
 check_standard_normal(ux, ux_mean_interp, ux_std_interp, standard_normal_tolerance)
 check_standard_normal(uy, uy_mean_interp, uy_std_interp, standard_normal_tolerance)
@@ -528,13 +552,8 @@ for timestep in range(h8x.shape[0]):
     check_validity_uniform(bin_value_z, h8z[timestep] / N0, uz_min, uz_max)
 
 # =================================================
-# Gaussian with parser mean and standard deviation
+# Gaussian with parser mean and standard deviation (h9x,h9y,h9z folders) and parser temperature in eV (h13x/h13y/h13z folders)
 # =================================================
-
-# load data
-bin_value_ux, bin_data_ux = read_reduced_diags_histogram("h9x.txt")[2:]
-bin_value_uy, bin_data_uy = read_reduced_diags_histogram("h9y.txt")[2:]
-bin_value_uz, bin_data_uz = read_reduced_diags_histogram("h9z.txt")[2:]
 
 
 def Gaussian(mean, sigma, u):
@@ -545,20 +564,33 @@ def Gaussian(mean, sigma, u):
     )
 
 
-du = 2.0 / 50
-f_ux = Gaussian(0.1, 0.2, bin_value_ux) * du
-f_uy = Gaussian(0.12, 0.21, bin_value_uy) * du
-f_uz = Gaussian(0.14, 0.22, bin_value_uz) * du
+for i, i_tolerance in [(9, tolerance), (13, tolerance)]:
+    # load data
+    bin_value_ux, bin_data_ux = read_reduced_diags_histogram(f"h{i}x.txt")[2:]
+    bin_value_uy, bin_data_uy = read_reduced_diags_histogram(f"h{i}y.txt")[2:]
+    bin_value_uz, bin_data_uz = read_reduced_diags_histogram(f"h{i}z.txt")[2:]
 
-f9_error = (
-    np.sum(
-        np.abs(f_ux - bin_data_ux) / f_ux.max()
-        + np.abs(f_uy - bin_data_uy) / f_ux.max()
-        + np.abs(f_uz - bin_data_uz) / f_uz.max()
+    du = 2.0 / 50
+
+    if i == 9:
+        f_ux = Gaussian(0.1, 0.2, bin_value_ux) * du
+        f_uy = Gaussian(0.12, 0.21, bin_value_uy) * du
+        f_uz = Gaussian(0.14, 0.22, bin_value_uz) * du
+    elif i == 13:
+        f_ux = Gaussian(0.1, 0.2, bin_value_ux) * du
+        f_uy = Gaussian(0.12, 0.2, bin_value_uy) * du
+        f_uz = Gaussian(0.14, 0.2, bin_value_uz) * du
+
+    error = (
+        np.sum(
+            np.abs(f_ux - bin_data_ux) / f_ux.max()
+            + np.abs(f_uy - bin_data_uy) / f_ux.max()
+            + np.abs(f_uz - bin_data_uz) / f_uz.max()
+        )
+        / bin_value_ux.size
     )
-    / bin_value_ux.size
-)
-
-print("maxwellian parser mean/std velocity difference:", f9_error)
-
-assert f9_error < tolerance
+    if i == 9:
+        print("Maxwellian parser mean/std velocity difference:", error)
+    elif i == 13:
+        print("Maxwellian parser mean/temperature_in_eV difference:", error)
+    assert error < i_tolerance

@@ -29,7 +29,7 @@ algo.particle_shape = 1
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_drift maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser gaussian_momentum_from_file
+particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_drift maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser gaussian_momentum_from_file temperature_in_eV_constant gaussian_temperature_in_eV_from_file gaussian_parser_temperature_in_eV_from_file
 particles.rigid_injected_species = beam
 
 gaussian.charge                     = -q_e
@@ -142,6 +142,20 @@ velocity_constant.ux_mean =0
 velocity_constant.uy_mean = -0.20412414523193154
 velocity_constant.uz_mean =0
 
+temperature_in_eV_constant.charge                     = -q_e
+temperature_in_eV_constant.mass                       = m_e
+temperature_in_eV_constant.injection_style            = "NRandomPerCell"
+temperature_in_eV_constant.num_particles_per_cell     = 1000
+temperature_in_eV_constant.profile                    = constant
+temperature_in_eV_constant.density                    = 1.0e21
+temperature_in_eV_constant.momentum_distribution_type = "maxwellian"
+temperature_in_eV_constant.maxwellian_temperature_in_eV_distribution_type= "constant"
+temperature_in_eV_constant.temperature_in_eV = 0.0005109989506917532
+temperature_in_eV_constant.maxwellian_u_mean_distribution_type = "constant"
+temperature_in_eV_constant.ux_mean =0
+temperature_in_eV_constant.uy_mean = -0.20412414523193154
+temperature_in_eV_constant.uz_mean =0
+
 velocity_parser.charge                     = -q_e
 velocity_parser.mass                       = m_e
 velocity_parser.injection_style            = "NRandomPerCell"
@@ -200,6 +214,32 @@ gaussian_momentum_from_file.read_u_mean_from_path = "../test_3d_initial_distribu
 gaussian_momentum_from_file.maxwellian_u_std_distribution_type = "read_from_file"
 gaussian_momentum_from_file.read_u_std_from_path = "../test_3d_initial_distribution_prepare/example-u-std.h5"
 
+gaussian_temperature_in_eV_from_file.charge                           = -q_e
+gaussian_temperature_in_eV_from_file.mass                       = m_e
+gaussian_temperature_in_eV_from_file.injection_style            = "NRandomPerCell"
+gaussian_temperature_in_eV_from_file.num_particles_per_cell     = 1000
+gaussian_temperature_in_eV_from_file.profile                    = constant
+gaussian_temperature_in_eV_from_file.density                    = 1.0e21
+gaussian_temperature_in_eV_from_file.momentum_distribution_type = "maxwellian"
+gaussian_temperature_in_eV_from_file.maxwellian_u_mean_distribution_type = "read_from_file"
+gaussian_temperature_in_eV_from_file.read_u_mean_from_path = "../test_3d_initial_distribution_prepare/example-u-mean.h5"
+gaussian_temperature_in_eV_from_file.maxwellian_temperature_in_eV_distribution_type = "read_from_file"
+gaussian_temperature_in_eV_from_file.read_temperature_in_eV_from_path = "../test_3d_initial_distribution_prepare/example-temperature-in-eV.h5"
+
+gaussian_parser_temperature_in_eV_from_file.charge                     = -q_e
+gaussian_parser_temperature_in_eV_from_file.mass                       = m_e
+gaussian_parser_temperature_in_eV_from_file.injection_style            = "NRandomPerCell"
+gaussian_parser_temperature_in_eV_from_file.num_particles_per_cell     = 1000
+gaussian_parser_temperature_in_eV_from_file.profile                    = constant
+gaussian_parser_temperature_in_eV_from_file.density                    = 1.0e21
+gaussian_parser_temperature_in_eV_from_file.momentum_distribution_type = "maxwellian"
+gaussian_parser_temperature_in_eV_from_file.maxwellian_u_mean_distribution_type= "parser"
+gaussian_parser_temperature_in_eV_from_file.ux_mean_function(x,y,z) = "0.1*z"
+gaussian_parser_temperature_in_eV_from_file.uy_mean_function(x,y,z) = "0.12*z"
+gaussian_parser_temperature_in_eV_from_file.uz_mean_function(x,y,z) = "0.14*z"
+gaussian_parser_temperature_in_eV_from_file.maxwellian_temperature_in_eV_distribution_type= "parser"
+gaussian_parser_temperature_in_eV_from_file.temperature_in_eV_function(x,y,z) = "20439.958027670127 * z**2"
+
 #################################
 ########## DIAGNOSTIC ###########
 #################################
@@ -214,7 +254,9 @@ gaussian_momentum_from_file.read_u_std_from_path = "../test_3d_initial_distribut
 # 10 for maxwell-juttner with low theta (Gaussian fallback)
 # 11 for maxwell-juttner with constant diagonal bulk drift
 # 12 for maxwellian with mean and standard deviation from openPMD files
-warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z h10 h11
+# 13 for maxwellian with parser mean and parser temperature in eV
+
+warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z h10 h11 h12 h12uy h13x h13y h13z
 
 h1x.type                                 = ParticleHistogram
 h1x.intervals                            = 1
@@ -467,6 +509,51 @@ h11.bin_number                           = 50
 h11.bin_min                              = 1.0
 h11.bin_max                              = 12.0
 h11.histogram_function(t,x,y,z,ux,uy,uz) = "1.161895003862225*sqrt(1.0 + ux*ux + uy*uy + uz*uz) - 0.5*ux - 0.3*uy - 0.1*uz"
+
+h12.type                                   = ParticleHistogram
+h12.intervals                              = 1
+h12.path                                   = "./"
+h12.species                                = temperature_in_eV_constant
+h12.bin_number                             = 50
+h12.bin_min                                = 1.0
+h12.bin_max                                = 1.2
+h12.histogram_function(t,x,y,z,ux,uy,uz)   = "sqrt(1.0 + ux*ux + uy*uy + uz*uz)"
+
+h12uy.type                                   = ParticleHistogram
+h12uy.intervals                              = 1
+h12uy.path                                   = "./"
+h12uy.species                                = temperature_in_eV_constant
+h12uy.bin_number                             = 50
+h12uy.bin_min                                = -1.0
+h12uy.bin_max                                = 1.0
+h12uy.histogram_function(t,x,y,z,ux,uy,uz)   = "uy"
+
+h13x.type                                 = ParticleHistogram
+h13x.intervals                            = 1
+h13x.path                                 = "./"
+h13x.species                              = gaussian_parser_temperature_in_eV_from_file
+h13x.bin_number                           = 50
+h13x.bin_min                              = -1
+h13x.bin_max                              = 1
+h13x.histogram_function(t,x,y,z,ux,uy,uz) = "ux/z"
+
+h13y.type                                 = ParticleHistogram
+h13y.intervals                            = 1
+h13y.path                                 = "./"
+h13y.species                              = gaussian_parser_temperature_in_eV_from_file
+h13y.bin_number                           = 50
+h13y.bin_min                              = -1
+h13y.bin_max                              = 1
+h13y.histogram_function(t,x,y,z,ux,uy,uz) = "uy/z"
+
+h13z.type                                 = ParticleHistogram
+h13z.intervals                            = 1
+h13z.path                                 = "./"
+h13z.species                              = gaussian_parser_temperature_in_eV_from_file
+h13z.bin_number                           = 50
+h13z.bin_min                              = -1
+h13z.bin_max                              = 1
+h13z.histogram_function(t,x,y,z,ux,uy,uz) = "uz/z"
 
 # our little beam monitor
 bmmntr.type                              = BeamRelevant

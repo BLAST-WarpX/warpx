@@ -117,5 +117,32 @@
     "particle_position_y": 256011.49684468308,
     "particle_position_z": 256109.9226490142,
     "particle_weight": 8e+21
+  },
+  "temperature_in_eV_constant": {
+    "particle_momentum_x": 3.5285787492061906e-21,
+    "particle_momentum_y": 2.854131991544734e-17,
+    "particle_momentum_z": 3.52328932816798e-21,
+    "particle_position_x": 256013.9399284002,
+    "particle_position_y": 256011.5933546236,
+    "particle_position_z": 255905.84694351768,
+    "particle_weight": 8e+21
+  },
+  "gaussian_temperature_in_eV_from_file": {
+    "particle_momentum_x": 1.2956059014974661e-17,
+    "particle_momentum_y": 1.3566264317285339e-17,
+    "particle_momentum_z": 1.4185798889934373e-17,
+    "particle_position_x": 255862.65084565995,
+    "particle_position_y": 255935.2699936382,
+    "particle_position_z": 255968.0187925212,
+    "particle_weight": 8e+21
+  },
+  "gaussian_parser_temperature_in_eV_from_file": {
+    "particle_momentum_x": 1.2537256955983462e-17,
+    "particle_momentum_y": 1.3101027839551143e-17,
+    "particle_momentum_z": 1.3760320087390352e-17,
+    "particle_position_x": 256024.46311264794,
+    "particle_position_y": 256018.00713414286,
+    "particle_position_z": 256001.97548263433,
+    "particle_weight": 8e+21
   }
 }

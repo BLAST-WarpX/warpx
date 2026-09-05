@@ -1833,10 +1833,13 @@ Particle initialization
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
-        particle momentum. Here, ``u_std`` is a 3D vector (with components ``ux_std``,
+        particle momentum.
+        Here, ``u_std`` is a 3D vector (with components ``ux_std``,
         ``uy_std``, ``uz_std``) representing the standard deviation of the normalized momentum
         :math:`u_\mathrm{std} = \sqrt{\theta}`, where
         :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`.
+        Mutually exclusive with
+        ``<species_name>.maxwellian_temperature_in_eV_distribution_type``.
 
         * If ``constant``, the following are required: ``<species_name>.ux_std``,
           ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`, default ``0``).
@@ -1856,6 +1859,26 @@ Particle initialization
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
+
+      * ``<species_name>.maxwellian_temperature_in_eV_distribution_type`` (`string`):
+        Specifies the temperature in eV for the thermal spread of the particle momentum. This is an alternative to and mutually
+        exclusive with ``<species_name>.maxwellian_u_std_distribution_type`` for specifying the thermal spread.
+        Under the hood, the standard deviation of each normalized momentum component in the drift frame is computed as:
+        :math:`u_\mathrm{std} = \sqrt{\mathrm{temperature\_in\_eV}\, q_e / (m c^2)}`, where
+        :math:`m` is the species mass (from ``species_type`` or ``mass``).
+
+        * If ``constant``, the following is required: ``<species_name>.temperature_in_eV`` (`float`).
+        * If ``parser``, the following is required:
+          ``<species_name>.temperature_in_eV_function(x,y,z)``.
+        * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
+          from an openPMD file and converted to an isotropic vector
+          :math:`u_\mathrm{std}` at the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
+          contain a scalar openPMD mesh with the name given by
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
       More specifically, the plasma is initialized with a Maxwell-Juttner distribution
