@@ -248,6 +248,16 @@ Overall simulation parameters
         - Numerically stable for large :math:`\Delta t` (does not require resolving the plasma period or satisfying the CFL condition for light waves).
         - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
 
+      - **Electric field blanking:**
+        Selective components of the electric field can be prevented from evolving in time (set to zero in the implicit solve). This is useful when assumed symmetries permit neglecting those components.
+
+        - ``implicit_evolve.blank_electric_field`` (3 ``integers``, default: ``0 0 0``)
+          Three integer flags (0 or 1) corresponding to the x, y, and z components of the electric field.
+          Setting a component to 1 prevents that component from evolving during the implicit solve.
+
+          - Example: ``implicit_evolve.blank_electric_field = 1 1 0`` blanks Ex and Ey, allowing only Ez to evolve (electrostatic approximation in 1D Z geometry).
+          - Example: ``implicit_evolve.blank_electric_field = 0 1 0`` blanks Ey, allowing only Ex and Ez to evolve (useful for 2D XZ and RZ geometries if only interested in ``m = 0`` modes).
+
       - **Nonlinear solvers:**
         Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are ``picard`` and ``newton``.
 

@@ -52,8 +52,7 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
         m_theta>=0.5 && m_theta<=1.0,
         "theta parameter for theta implicit time solver must be between 0.5 and 1.0");
 
-    // Parse nonlinear solver parameters
-    parseNonlinearSolverParams( pp );
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -137,40 +136,47 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
     return exit_status;
 }
 
-void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
-                             const WarpXSolverVec&  a_E,
-                                   amrex::Real      start_time,
-                                   int              a_nl_iter,
-                                   bool             a_from_jacobian )
+void ThetaImplicitEM::ComputeRHS (WarpXSolverVec&  a_RHS,
+                            const WarpXSolverVec&  a_E,
+                                  amrex::Real      start_time,
+                                  int              a_nl_iter,
+                                  bool             a_from_jacobian)
 {
     BL_PROFILE("ThetaImplicitEM::ComputeRHS()");
 
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // Eg from the nonlinear solver at time n+theta
-    UpdateWarpXFields( a_E, start_time );
+    UpdateWarpXFields(a_E, start_time);
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
     const amrex::Real theta_time = start_time + m_theta*m_dt;
-    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+    PreRHSOp(theta_time, a_nl_iter, a_from_jacobian);
 
     // RHS = cvac^2*m_theta*dt*( curl(Bg^{n+theta}) - mu0*Jg^{n+1/2} )
-    m_WarpX->ImplicitComputeRHSE( m_theta*m_dt, a_RHS);
+    m_WarpX->ImplicitComputeRHSE(m_theta*m_dt, a_RHS);
+
+    ApplyElectricFieldBlanking(a_RHS);
+
+#if defined(WARPX_DIM_1D_Z)
+    // RHS += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+    Enforce1DESPeriodic(a_RHS);
+#endif
 
 }
 
-void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
-                                          amrex::Real start_time )
+void ThetaImplicitEM::UpdateWarpXFields (const WarpXSolverVec&  a_E,
+                                         amrex::Real start_time)
 {
     BL_PROFILE("ThetaImplicitEM::UpdateWarpXFields()");
 
     // Update Efield_fp owned by WarpX
     const amrex::Real theta_time = start_time + m_theta*m_dt;
-    m_WarpX->SetElectricFieldAndApplyBCs( a_E, theta_time );
+    m_WarpX->SetElectricFieldAndApplyBCs(a_E, theta_time);
 
     // Update Bfield_fp owned by WarpX
     ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
-    m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt, start_time );
+    m_WarpX->UpdateMagneticFieldAndApplyBCs(B_old, m_theta*m_dt, start_time);
 
 }
 

@@ -31,9 +31,7 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
     m_E.Copy(FieldType::Efield_fp);
     m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
-    // Parse implicit solver parameters
-    const amrex::ParmParse pp("implicit_evolve");
-    parseNonlinearSolverParams(pp);
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -114,23 +112,31 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     return exit_status;
 }
 
-void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
-                            const WarpXSolverVec&  a_E,
-                                  amrex::Real      start_time,
-                                  int              a_nl_iter,
-                                  bool             a_from_jacobian )
+void SemiImplicitEM::ComputeRHS (WarpXSolverVec&  a_RHS,
+                           const WarpXSolverVec&  a_E,
+                                 amrex::Real      start_time,
+                                 int              a_nl_iter,
+                                 bool             a_from_jacobian)
 {
     BL_PROFILE("SemiImplicitEM::ComputeRHS()");
 
     // Update WarpX-owned Efield_fp using current state of Eg from
     // the nonlinear solver at time n+theta
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;
-    m_WarpX->SetElectricFieldAndApplyBCs( a_E, half_time );
+    m_WarpX->SetElectricFieldAndApplyBCs(a_E, half_time);
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
-    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
+    PreRHSOp(half_time, a_nl_iter, a_from_jacobian);
 
     // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);
+
+    ApplyElectricFieldBlanking(a_RHS);
+
+#if defined(WARPX_DIM_1D_Z)
+    // RHS += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+    Enforce1DESPeriodic(a_RHS);
+#endif
+
 }

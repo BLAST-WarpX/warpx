@@ -190,6 +190,62 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
     return lbc;
 }
 
+#if defined(WARPX_DIM_1D_Z)
+void ImplicitSolver::setOneDElectrostaticPeriodicFlag ()
+{
+    // Check if doing electrostatic (must not evolve out-of-plane E)
+    if (m_blank_electric_field[0] && m_blank_electric_field[1]) {
+
+        auto const& fbc_lo = m_WarpX->GetFieldBoundaryLo();
+        auto const& fbc_hi = m_WarpX->GetFieldBoundaryHi();
+
+        // Check if using periodic boundary conditions
+        if (fbc_lo[0] == FieldBoundaryType::Periodic &&
+            fbc_hi[0] == FieldBoundaryType::Periodic)
+        {
+            m_oneD_electrostatic_periodic = true;
+        }
+
+    }
+}
+
+void ImplicitSolver::Enforce1DESPeriodic (WarpXSolverVec& a_RHS)
+{
+    BL_PROFILE("ImplicitSolver::Enforce1DESPeriodic()");
+
+    // Subtract the average Jz from a_RHS to enforce zero potential
+    // drop for 1D electrostatic model with periodic BCs.
+
+    // See G. Chen and L. Chacon and D. Barnes, An energy- and charge-conserving,
+    // implicit, electrostatic particle-in-cell algorithm, JCP 230 (2011).
+
+    if (!m_oneD_electrostatic_periodic) { return; }
+
+    const amrex::Real norm_factor = PhysConst::c2 * PhysConst::mu0 * m_theta * m_dt;
+
+    using warpx::fields::FieldType;
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+
+        const amrex::Geometry& geom = m_WarpX->Geom(lev);
+        amrex::Real const *dx = geom.CellSize();
+        const amrex::RealBox& prob_domain = geom.ProbDomain();
+        const amrex::Real Lz = prob_domain.hi(0) - prob_domain.lo(0);
+
+        // Compute the spatial average of Jz
+        const amrex::MultiFab& Jz = *m_WarpX->m_fields.get(FieldType::current_fp, Direction{2}, lev);
+        const bool local_sum = false;
+        const amrex::Real sumJz_global = Jz.sum(0,amrex::IntVect(0),local_sum);
+        const amrex::Real meanJz = sumJz_global*dx[0]/Lz;
+
+        // RHSz += cvac^2*m_theta*dt*mu0*sum(Jg^{n+1/2})*dz/Lz
+        amrex::MultiFab& RHSz = *a_RHS.getArrayVec()[lev][2];
+        RHSz.plus(norm_factor*meanJz,0,RHSz.nComp());
+    }
+
+}
+#endif
+
 void ImplicitSolver::CumulateJ ()
 {
 
@@ -358,6 +414,7 @@ void ImplicitSolver::ApplyMassMatrices (
             const amrex::IntVect ncomp_zy = m_ncomp_zy;
             const amrex::IntVect ncomp_zz = m_ncomp_zz;
 
+            if (!m_blank_electric_field[0]) {
             amrex::ParallelFor(
             outbx, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -425,6 +482,8 @@ void ImplicitSolver::ApplyMassMatrices (
                 if (use_baseline) { out_arr_x(i,j,k,n) += baseline_arr_x(i,j,k,n); }
                 out_arr_x(i,j,k,n) += a_scale * (Sxx_d_in_x + Sxy_d_in_y + Sxz_d_in_z);
             });
+            }
+            if (!m_blank_electric_field[1]) {
             amrex::ParallelFor(
             outby, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -492,6 +551,8 @@ void ImplicitSolver::ApplyMassMatrices (
                 if (use_baseline) { out_arr_y(i,j,k,n) += baseline_arr_y(i,j,k,n); }
                 out_arr_y(i,j,k,n) += a_scale * (Syx_d_in_x + Syy_d_in_y + Syz_d_in_z);
             });
+            }
+            if (!m_blank_electric_field[2]) {
             amrex::ParallelFor(
             outbz, ncomps, [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
             {
@@ -559,6 +620,7 @@ void ImplicitSolver::ApplyMassMatrices (
                 if (use_baseline) { out_arr_z(i,j,k,n) += baseline_arr_z(i,j,k,n); }
                 out_arr_z(i,j,k,n) += a_scale * (Szx_d_in_x + Szy_d_in_y + Szz_d_in_z);
             });
+            }
         }
     }
 }
@@ -589,7 +651,25 @@ void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 }
 
 
-void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
+void ImplicitSolver::parseBaseImplicitSolverParams ()
+{
+    const amrex::ParmParse pp("implicit_evolve");
+
+    amrex::Vector<int> tmp(3);
+    if (pp.queryarr("blank_electric_field", tmp)) {
+        for (int dir = 0; dir < 3; ++dir) {
+            m_blank_electric_field[dir] = (tmp[dir] != 0);
+        }
+    }
+
+#if defined(WARPX_DIM_1D_Z)
+    setOneDElectrostaticPeriodicFlag();
+#endif
+
+    parseNonlinearSolverParams(pp);
+}
+
+void ImplicitSolver::parseNonlinearSolverParams (const amrex::ParmParse& pp)
 {
 
     pp.get("nonlinear_solver", m_nlsolver_type);
@@ -1306,6 +1386,9 @@ void ImplicitSolver::FinishMassMatrices ()
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
 {
+    amrex::Print() << "Blank x-electric field:              " << (m_blank_electric_field[0] ? "true":"false") << "\n";
+    amrex::Print() << "Blank y-electric field:              " << (m_blank_electric_field[1] ? "true":"false") << "\n";
+    amrex::Print() << "Blank z-electric field:              " << (m_blank_electric_field[2] ? "true":"false") << "\n";
     amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
     amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
     amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
