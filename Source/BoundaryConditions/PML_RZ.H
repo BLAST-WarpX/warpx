@@ -49,9 +49,6 @@ public:
     void FillBoundaryB (ablastr::fields::MultiFabRegister& fields, PatchType patch_type,
         bool do_single_precision_comms, std::optional<bool> nodal_sync=std::nullopt);
 
-    void CheckPoint (ablastr::fields::MultiFabRegister& fields, std::string const& dir) const;
-    void Restart (ablastr::fields::MultiFabRegister& fields, std::string const& dir);
-
 private:
 
     int m_ncell;
