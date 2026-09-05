@@ -401,10 +401,9 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
                                       ua_x, ua_y, ua_z, M,
                                       u1x_out, u1y_out, u1z_out, m,
                                       u2x_out, u2y_out, u2z_out, M,
-                                      -scattering_process.m_energy_penalty*PhysConst::q_e,
-                                      // TwoProductComputeProductMomenta expects the *released* energy here, hence
-                                      // the negative sign; the energy penalty is also converted from eV to Joules.
-                                      scattering_process.m_scattering_angle_model,
+                                      -scattering_process.m_energy_penalty*PhysConst::q_e, // *released* energy (negative sign) converted from eV to Joules
+                                      scattering_process.m_scattering_angle_model, // angular distribution of the products in the center-of-mass frame
+                                      ScatteringUtils::AnisotropicCoefficientTable{}, // FIXME
                                       engine);
 
                                   // update projectile velocity with new components in labframe

@@ -25,6 +25,7 @@
 #include <AMReX_INT.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
+#include <AMReX_Reduce.H>
 #include <AMReX_Vector.H>
 
 /**
@@ -175,10 +176,26 @@ public:
         const int* AMREX_RESTRICT p_num_products_device = m_num_products_device.data();
         const CollisionType t_collision_type = m_collision_type;
         const ScatteringAngleModel t_scattering_angle_model = m_scattering_angle_model;
+        const ScatteringUtils::AnisotropicCoefficientTable t_anisotropic_coefficients{
+            m_fusion_angular_distribution_energies.empty() ? nullptr : m_fusion_angular_distribution_energies.data(),
+            m_fusion_angular_distribution_coefficients.empty() ? nullptr : m_fusion_angular_distribution_coefficients.data(),
+            m_fusion_angular_distribution_num_energies,
+            m_fusion_angular_distribution_num_coefficients,
+            nullptr
+        };
+        bool const check_anisotropic_energy_range =
+            t_scattering_angle_model == ScatteringAngleModel::Anisotropic;
+        amrex::Gpu::DeviceVector<int> energy_range_status(
+            check_anisotropic_energy_range ? n_total_pairs : 0);
+        int* const p_energy_range_status = check_anisotropic_energy_range
+            ? energy_range_status.data() : nullptr;
 
         amrex::ParallelForRNG(n_total_pairs,
         [=] AMREX_GPU_DEVICE (int i, amrex::RandomEngine const& engine) noexcept
         {
+            int event_energy_range_status = 0;
+            auto event_anisotropic_coefficients = t_anisotropic_coefficients;
+            event_anisotropic_coefficients.m_energy_range_status = &event_energy_range_status;
             if (p_mask[i])
             {
                 for (int j = 0; j < t_num_product_species; j++)
@@ -234,7 +251,8 @@ public:
                     ProtonBoronFusionInitializeMomentum(soa_1, soa_2, soa_products_data[0],
                                                         p_pair_indices_1[i], p_pair_indices_2[i],
                                                         product_start_index, m1, m2,
-                                                        t_scattering_angle_model, engine);
+                                                        t_scattering_angle_model,
+                                                        event_anisotropic_coefficients, engine);
                 }
                 else if (BinaryCollisionUtils::is_two_product_fusion_type(t_collision_type))
                 {
@@ -247,7 +265,7 @@ public:
                         products_np_data[0] + 2*p_offsets[i]*p_num_products_device[0],
                         products_np_data[1] + 2*p_offsets[i]*p_num_products_device[1],
                         m1, m2, products_mass_data[0], products_mass_data[1], fusion_energy,
-                        t_scattering_angle_model, engine);
+                        t_scattering_angle_model, event_anisotropic_coefficients, engine);
                 }
                 else if(t_collision_type == CollisionType::LinearBreitWheeler){
                     LinearBreitWheelerInitializeMomentum(soa_1, soa_2,
@@ -266,7 +284,16 @@ public:
                         engine);
                 }
             }
+            if (p_energy_range_status != nullptr) {
+                p_energy_range_status[i] = event_energy_range_status;
+            }
         });
+
+        if (check_anisotropic_energy_range) {
+            auto const [minimum_status, maximum_status] =
+                amrex::Reduce::MinMax(n_total_pairs, p_energy_range_status);
+            RecordEnergyRangeWarnings(minimum_status, maximum_status);
+        }
 
         // Initialize the user runtime components
         for (int i = 0; i < m_num_product_species; i++)
@@ -283,6 +310,8 @@ public:
     }
 
 private:
+    static void RecordEnergyRangeWarnings (int minimum_status, int maximum_status);
+
     // How many different type of species the collision produces
     int m_num_product_species;
     // Vectors of size m_num_product_species storing how many particles of a given species are
@@ -292,6 +321,10 @@ private:
     amrex::Gpu::HostVector<int> m_num_products_host;
     CollisionType m_collision_type;
     ScatteringAngleModel m_scattering_angle_model{ScatteringAngleModel::Default};
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_fusion_angular_distribution_energies;
+    amrex::Gpu::DeviceVector<amrex::ParticleReal> m_fusion_angular_distribution_coefficients;
+    int m_fusion_angular_distribution_num_energies = 0;
+    int m_fusion_angular_distribution_num_coefficients = 0;
 };
 
 

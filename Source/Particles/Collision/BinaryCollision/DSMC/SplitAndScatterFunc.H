@@ -289,10 +289,9 @@ public:
                     soa_products_data[1].m_rdata[PIdx::ux][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uy][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uz][slot1_idx], m1,
-                    -scattering_process.m_energy_penalty*PhysConst::q_e,
-                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the
-                    // negative sign; the energy penalty is also converted from eV to Joules.
-                    scattering_process.m_scattering_angle_model,
+                    -scattering_process.m_energy_penalty*PhysConst::q_e, // *released* energy (negative sign) converted from eV to Joules
+                    scattering_process.m_scattering_angle_model, // angular distribution of the products in the center-of-mass frame
+                    ScatteringUtils::AnisotropicCoefficientTable{}, // FIXME
                     engine);
             }
 
@@ -355,12 +354,9 @@ public:
                     soa_products_data[3].m_rdata[PIdx::ux][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uy][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uz][slot3_idx], mass_slot3,
-                    -scattering_process.m_energy_penalty*PhysConst::q_e,
-                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
-                    // We also convert from eV to Joules
-                    scattering_process.m_scattering_angle_model,
-                    // The angular distribution of the products in the center-of-mass frame is set by
-                    // the process's scattering angle model.
+                    -scattering_process.m_energy_penalty*PhysConst::q_e, // *released* energy (negative sign) converted from eV to Joules
+                    scattering_process.m_scattering_angle_model, // angular distribution of the products in the center-of-mass frame
+                    ScatteringUtils::AnisotropicCoefficientTable{}, // FIXME
                     engine);
             }
             else if (process_type == ScatteringProcessType::IONIZATION)
@@ -510,8 +506,8 @@ public:
                     // they will be multiplied by the right magnitude p_e further down.
                     amrex::ParticleReal scaled_ux0, scaled_uy0, scaled_uz0;
                     amrex::ParticleReal scaled_ux_new, scaled_uy_new, scaled_uz_new;
-                    ParticleUtils::getRandomVector(scaled_ux0, scaled_uy0, scaled_uz0, engine);
-                    ParticleUtils::getRandomVector(scaled_ux_new, scaled_uy_new, scaled_uz_new, engine);
+                    ParticleUtils::getRandomVector(scaled_ux0, scaled_uy0, scaled_uz0, engine, ScatteringAngleModel::Isotropic);
+                    ParticleUtils::getRandomVector(scaled_ux_new, scaled_uy_new, scaled_uz_new, engine, ScatteringAngleModel::Isotropic);
 
                     // Sum of the two electron directions; the ion momentum is
                     // proportional to its opposite (conservation of momentum in COM).

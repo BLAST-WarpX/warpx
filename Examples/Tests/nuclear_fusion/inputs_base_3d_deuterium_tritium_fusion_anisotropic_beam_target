@@ -1,0 +1,75 @@
+# ===== Numerics / grid =====
+algo.particle_shape = 1          # linear (1st-order) particle shape factor
+amr.blocking_factor = 1          # min grid dimension (allows tiny grids)
+amr.max_grid_size = 16           # max cells per grid block
+amr.max_level = 0                # no mesh refinement
+amr.n_cell = 6 9 1               # cells in x, y, z
+
+# ===== Boundary conditions =====
+boundary.field_hi = periodic periodic periodic   # periodic upper boundaries
+boundary.field_lo = periodic periodic periodic   # periodic lower boundaries
+
+# ===== Fusion collision module =====
+collisions.collision_names = DTNHeF                      # name of collision process
+DTNHeF.event_multiplier = 1.e10                          # variance reduction: boost rare event rate
+DTNHeF.fusion_angular_distribution_coefficients = ../../../../warpx-data/nuclear_fusion/T_d_n_He4/angular_distribution/endf/coefficients.txt
+DTNHeF.fusion_angular_distribution_coefficients_format = ENDF
+DTNHeF.product_species = helium4_1 neutron_1             # fusion products: He-4 + neutron
+DTNHeF.scattering_angle_model = anisotropic              # realistic data-driven emission angles
+DTNHeF.species = deuterium_beam tritium_target           # reactants
+DTNHeF.type = nuclearfusion                              # D + T -> He-4 + n
+
+# ===== Deuterium beam (drifting reactant) =====
+deuterium_beam.density = n0                              # number density
+deuterium_beam.do_not_deposit = 1                        # no charge/current deposition
+deuterium_beam.do_not_push = 1                           # particles held static (no EM push)
+deuterium_beam.injection_style = "NRandomPerCell"        # random placement per cell
+deuterium_beam.momentum_distribution_type = "parse_momentum_function"
+deuterium_beam.momentum_function_ux(x,y,z) = 0.          # no x drift
+deuterium_beam.momentum_function_uy(x,y,z) = 0.          # no y drift
+deuterium_beam.num_particles_per_cell = 20000            # macroparticles per cell
+deuterium_beam.profile = constant                        # uniform density
+deuterium_beam.species_type = deuterium                  # physical species
+
+# ===== Tritium target (stationary reactant) =====
+tritium_target.density = n0                              # number density
+tritium_target.do_not_deposit = 1                        # no charge/current deposition
+tritium_target.do_not_push = 1                           # particles held static (no EM push)
+tritium_target.injection_style = "NRandomPerCell"        # random placement per cell
+tritium_target.momentum_distribution_type = "parse_momentum_function"
+tritium_target.momentum_function_ux(x,y,z) = 0.          # at rest
+tritium_target.momentum_function_uy(x,y,z) = 0.          # at rest
+tritium_target.momentum_function_uz(x,y,z) = 0.          # at rest
+tritium_target.num_particles_per_cell = 20000            # macroparticles per cell
+tritium_target.profile = constant                        # uniform density
+tritium_target.species_type = tritium                    # physical species
+
+# ===== Diagnostics =====
+diag1.diag_type = Full                                   # full diagnostic
+diag1.dump_last_timestep = 1                             # always write final step
+diag1.fields_to_plot = rho                               # mesh field required by checksum
+diag1.format = openpmd                                   # openPMD output format
+diag1.intervals = 0                                      # no periodic dumps (only last step)
+diag1.neutron_1.variables = x y z ux uy uz w              # neutron phase-space data
+diag1.species = neutron_1                                # output only fusion neutrons
+diagnostics.diags_names = diag1                          # active diagnostics
+
+# ===== Geometry =====
+geometry.dims = 3                                        # 3D simulation
+geometry.prob_hi = 6.e-6  9.e-6  1.e-6                   # domain upper bounds [m]
+geometry.prob_lo = 0.     0.     0.                      # domain lower bounds [m]
+
+# ===== Fusion products =====
+helium4_1.do_not_deposit = 1                             # product: no deposition
+helium4_1.do_not_push = 1                                # product: not pushed
+helium4_1.species_type = helium4                         # He-4 nucleus
+
+neutron_1.do_not_deposit = 1                             # product: no deposition
+neutron_1.do_not_push = 1                                # product: not pushed
+neutron_1.species_type = neutron                         # fusion neutron
+
+# ===== Run control & constants =====
+max_step = 100                                           # number of timesteps
+my_constants.n0 = 5.e31                                  # reactant density [m^-3] (artificially high for statistics)
+particles.species_names = deuterium_beam tritium_target helium4_1 neutron_1  # all species
+warpx.verbose = 1                                        # verbose console output

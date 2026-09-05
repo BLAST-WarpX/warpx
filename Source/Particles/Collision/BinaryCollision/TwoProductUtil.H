@@ -47,6 +47,7 @@ namespace {
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -69,6 +70,7 @@ namespace {
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
                             ScatteringAngleModel scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -129,7 +131,15 @@ namespace {
         // total kinetic energy.
         const double E_rest_in_d = (m1_in_d + m2_in_d)*c2_d;
         const double E_rest_out_d = (m1_out_d + m2_out_d)*c2_d;
-        const double E_star_f_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d, 0.0);
+        const double E_star_f_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d
+                                             + E_rest_out_d + E_reaction_d, 0.0);
+        // Total kinetic energy in the COM frame and converted to MeV to look up
+        // the energy-dependent coefficients when anisotropic scattering is used.
+        // The kinetic energy is clamped to zero to avoid small negative numbers
+        // due to machine precision errors, for low-energy particles.
+        const double E_kin_star_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d, 0.0);
+        constexpr double joule_to_MeV_d = 1.e-6 / static_cast<double>(PhysConst::q_e);
+        const auto E_kin_star_MeV = static_cast<amrex::ParticleReal>(E_kin_star_d * joule_to_MeV_d);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -168,41 +178,39 @@ namespace {
         const double one_minus_beta_sq_d = amrex::max(1.0 - vc_sq_d*inv_c2_d, std::numeric_limits<double>::epsilon());
         const double gc_d = 1.0 / std::sqrt(one_minus_beta_sq_d);
 
+        // Compute the direction of the first incident particle in the center of mass frame.
+        double p1x_star_in_d;
+        double p1y_star_in_d;
+        double p1z_star_in_d;
+        if ( vc_sq_d > std::numeric_limits<double>::min() )
+        {
+            // Convert momentum of first incident particle to the COM frame, using equation (2)
+            // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
+            const double vcDps_d = vcx_d*p1x_in_d + vcy_d*p1y_in_d + vcz_d*p1z_in_d;
+            const double factor0_d = (gc_d-1.0)/vc_sq_d;
+            const double factor_d = factor0_d*vcDps_d - p1t_in*gc_d/c_d;
+            p1x_star_in_d = p1x_in_d + vcx_d * factor_d;
+            p1y_star_in_d = p1y_in_d + vcy_d * factor_d;
+            p1z_star_in_d = p1z_in_d + vcz_d * factor_d;
+        }
+        else // If center of mass velocity is zero, we are already in the lab frame
+        {
+            p1x_star_in_d = p1x_in_d;
+            p1y_star_in_d = p1y_in_d;
+            p1z_star_in_d = p1z_in_d;
+        }
+        const double p1_star_in_d = std::sqrt(
+            p1x_star_in_d*p1x_star_in_d + p1y_star_in_d*p1y_star_in_d
+            + p1z_star_in_d*p1z_star_in_d);
+
         // Compute momentum of first product in the center of mass frame
         amrex::ParticleReal px_star_out = 0.0_prt;
         amrex::ParticleReal py_star_out = 0.0_prt;
         amrex::ParticleReal pz_star_out = 0.0_prt;
-        if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
-            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
-            ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out, static_cast<amrex::ParticleReal>(p_star_f_d),
-                                             engine);
-        }
-        else if (scattering_angle_model == ScatteringAngleModel::Forward ||
-                 scattering_angle_model == ScatteringAngleModel::Backward) {
+        if (scattering_angle_model == ScatteringAngleModel::Forward ||
+            scattering_angle_model == ScatteringAngleModel::Backward) {
             // Forward scattering: the products have the same direction as the incident particle in the center of mass frame
             // Backward scattering: the products have the opposite direction of the incident particle in the center of mass frame
-            double p1x_star_in_d;
-            double p1y_star_in_d;
-            double p1z_star_in_d;
-            if ( vc_sq_d > std::numeric_limits<double>::min() )
-            {
-                // Convert momentum of first incident particle to lab frame, using equation (2)
-                // of F. Perez et al., Phys.Plasmas.19.083104 (2012)
-                const double vcDps_d = vcx_d*p1x_in_d + vcy_d*p1y_in_d + vcz_d*p1z_in_d;
-                const double factor0_d = (gc_d-1.0)/vc_sq_d;
-                const double factor_d = factor0_d*vcDps_d - p1t_in*gc_d/c_d;
-                p1x_star_in_d = p1x_in_d + vcx_d * factor_d;
-                p1y_star_in_d = p1y_in_d + vcy_d * factor_d;
-                p1z_star_in_d = p1z_in_d + vcz_d * factor_d;
-            }
-            else // If center of mass velocity is zero, we are already in the lab frame
-            {
-                p1x_star_in_d = p1x_in_d;
-                p1y_star_in_d = p1y_in_d;
-                p1z_star_in_d = p1z_in_d;
-            }
-            const double p1_star_in_d = std::sqrt(p1x_star_in_d*p1x_star_in_d + p1y_star_in_d*p1y_star_in_d + p1z_star_in_d*p1z_star_in_d);
-
             // Momentum of the first product in the center of mass frame:
             // same (forward) or opposite (backward) direction as the incident, scaled to have
             // the magnitude sqrt(p_star_f_sq)
@@ -219,8 +227,29 @@ namespace {
                 // Incident direction is undefined in the COM frame; fall back to an
                 // isotropic direction while conserving the outgoing COM momentum magnitude.
                 ParticleUtils::RandomizeVelocity(px_star_out, py_star_out, pz_star_out,
-                    static_cast<amrex::ParticleReal>(p_star_f_d), engine);
+                    static_cast<amrex::ParticleReal>(p_star_f_d), engine, ScatteringAngleModel::Isotropic);
             }
+        }
+        else {
+            // Isotropic or anisotropic scattering: the angle of emission of the products
+            // in the center of mass frame is random or determined by an anisotropic model.
+            if (scattering_angle_model == ScatteringAngleModel::Anisotropic)
+            {
+                const double p1_transverse_star_sq_d =
+                    p1x_star_in_d*p1x_star_in_d + p1y_star_in_d*p1y_star_in_d;
+                constexpr double alignment_tolerance_d =
+                    64.0 * std::numeric_limits<double>::epsilon();
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    p1z_star_in_d > 0.0 &&
+                        p1_transverse_star_sq_d <=
+                            alignment_tolerance_d*p1_star_in_d*p1_star_in_d,
+                    "Anisotropic two-product fusion requires the first reactant's momentum "
+                    "in the center-of-mass frame to point along the global +z axis.");
+            }
+            ParticleUtils::RandomizeVelocity(
+                px_star_out, py_star_out, pz_star_out,
+                static_cast<amrex::ParticleReal>(p_star_f_d),
+                engine, scattering_angle_model, anisotropic_coefficients, E_kin_star_MeV);
         }
 
         const auto px_star_out_d = static_cast<double>(px_star_out);
