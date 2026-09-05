@@ -111,6 +111,16 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
             pp_collision_name.get("ionization_species", secondary_species);
             m_species_names.push_back(secondary_species);
 
+            // The species that collects the freed electrons defaults to the
+            // colliding species itself, which is correct for electron-impact
+            // ionization. A different species must be specified here when the
+            // colliding species is not an electron (e.g. for ion-impact
+            // ionization), since the freed electrons cannot be added to the
+            // (ion) colliding species.
+            std::string electron_species = m_species_names[0];
+            pp_collision_name.query("ionization_electron_species", electron_species);
+            m_species_names.push_back(electron_species);
+
             m_ionization_processes.push_back(std::move(process));
         } else {
             m_scattering_processes.push_back(std::move(process));
@@ -195,11 +205,19 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
     using namespace amrex::literals;
 
     auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
-    // this is a very ugly hack to have species2 be a reference and be
-    // defined in the scope of doCollisions
+    // this is a very ugly hack to have species2/species3 be references and
+    // be defined in the scope of doCollisions
     auto& species2 = (
-                      (m_species_names.size() == 2) ?
+                      (m_species_names.size() >= 2) ?
                       mypc->GetParticleContainerFromName(m_species_names[1]) :
+                      mypc->GetParticleContainerFromName(m_species_names[0])
+                      );
+    // species3 collects the freed electrons produced by ionization; it is
+    // only relevant (and only present in m_species_names) when the
+    // ionization process is included
+    auto& species3 = (
+                      (m_species_names.size() == 3) ?
+                      mypc->GetParticleContainerFromName(m_species_names[2]) :
                       mypc->GetParticleContainerFromName(m_species_names[0])
                       );
 
@@ -241,6 +259,14 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
             // if an ionization process is included the secondary species mass
             // is taken as the background mass
             m_background_mass = species2.getMass();
+
+            // the species that collects the freed electrons must have a
+            // negative charge
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                species3.getCharge() < 0._prt,
+                "The species given as " + m_collision_name + ".ionization_electron_species ("
+                + m_species_names[2] + ") must have a negative charge."
+            );
         }
         // if no neutral species mass was specified and ionization is not
         // included assume that the collisions will be with neutrals of the
@@ -290,7 +316,7 @@ BackgroundMCCCollision::doCollisions (amrex::Real cur_time, amrex::Real dt, Mult
 
         // secondly perform ionization through the SmartCopyFactory if needed
         if (ionization_flag) {
-            doBackgroundIonization(lev, cost, species1, species2, cur_time);
+            doBackgroundIonization(lev, cost, species1, species2, species3, cur_time);
         }
     }
 }
@@ -421,11 +447,15 @@ void BackgroundMCCCollision::doBackgroundCollisionsWithinTile
 
 void BackgroundMCCCollision::doBackgroundIonization
 ( int lev, amrex::LayoutData<amrex::Real>* cost,
-  WarpXParticleContainer& species1, WarpXParticleContainer& species2, amrex::Real t)
+  WarpXParticleContainer& species1, WarpXParticleContainer& species2,
+  WarpXParticleContainer& species3, amrex::Real t)
 {
     ABLASTR_PROFILE("BackgroundMCCCollision::doBackgroundIonization()");
 
-    const SmartCopyFactory copy_factory_elec(species1, species1);
+    // species1 is the colliding (incident) species; species2 collects the
+    // newly created ions; species3 collects the freed electrons (species3
+    // is the same as species1 for electron-impact ionization)
+    const SmartCopyFactory copy_factory_elec(species1, species3);
     const SmartCopyFactory copy_factory_ion(species1, species2);
     const auto CopyElec = copy_factory_elec.getSmartCopy();
     const auto CopyIon = copy_factory_ion.getSmartCopy();
@@ -449,7 +479,8 @@ void BackgroundMCCCollision::doBackgroundIonization
         }
         auto wt = static_cast<amrex::Real>(amrex::second());
 
-        auto& elec_tile = species1.ParticlesAt(lev, pti);
+        auto& incident_tile = species1.ParticlesAt(lev, pti);
+        auto& elec_tile = species3.ParticlesAt(lev, pti);
         auto& ion_tile = species2.ParticlesAt(lev, pti);
 
         const auto np_elec = elec_tile.numParticles();
@@ -457,11 +488,11 @@ void BackgroundMCCCollision::doBackgroundIonization
 
         auto Transform = ImpactIonizationTransformFunc(
                                                        m_ionization_processes[0].getEnergyPenalty(),
-                                                       m_mass1, sqrt_kb_m, m_background_temperature_func, t
+                                                       m_mass1, m_background_mass, sqrt_kb_m, m_background_temperature_func, t
                                                        );
 
-        const auto num_added = filterCopyTransformParticles<1>(species1, species2,
-                                                               elec_tile, ion_tile, elec_tile, np_elec, np_ion,
+        const auto num_added = filterCopyTransformParticles<1>(species3, species2,
+                                                               elec_tile, ion_tile, incident_tile, np_elec, np_ion,
                                                                Filter, CopyElec, CopyIon, Transform
                                                                );
 

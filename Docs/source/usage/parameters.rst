@@ -3229,11 +3229,22 @@ Details about the collision models can be found in the :ref:`theory section <mul
     the opposite direction of the incident particle (in the center of mass frame).
 
 .. pp:param:: <collision_name>.ionization_species
-    :type: ``float``
+    :type: ``string``
 
     Only for ``background_mcc``. If the scattering process is ``ionization`` the
     produced species must also be given. For example if argon properties is used
     for the background gas, a species of argon ions should be specified here.
+
+.. pp:param:: <collision_name>.ionization_electron_species
+    :type: ``string``, optional
+
+    Only for ``background_mcc``. If the scattering process is ``ionization``,
+    this specifies which species collects the electrons freed by the
+    ionization reaction. If not given, the colliding species itself is used,
+    which is correct when the colliding species is the electron species (i.e.
+    for electron-impact ionization). A different species must be given here
+    when the colliding species (``<collision_name>.species``) is not an
+    electron species, for instance for ion-impact ionization.
 
 .. pp:param:: <collision_name>.ionization_target_species
     :type: ``string``
