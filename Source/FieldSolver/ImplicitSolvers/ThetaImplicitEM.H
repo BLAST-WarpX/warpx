@@ -67,16 +67,14 @@ public:
 
     void PrintParameters () const override;
 
-    /**
-     * \brief Advances the simulation one time step
-     *
-     * \param[in] start_time The time at the start of the time step
-     * \param[in] a_dt The time step size
-     * \param[in] a_step The time step number
-     */
-    int OneStep (amrex::Real  start_time,
-                 amrex::Real  a_dt,
+    void SetupStep (amrex::Real start_time) override;
+
+    int DoSolve (amrex::Real  start_time,
                  int          a_step) override;
+
+    void ResetStep (amrex::Real /* start_time */) override;
+
+    void FinishStep (amrex::Real start_time, int a_step) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,

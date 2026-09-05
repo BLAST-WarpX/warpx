@@ -62,12 +62,20 @@ public:
 
     bool DoParticleSuborbits () const { return m_particle_suborbits; }
 
+    virtual void SetupStep(amrex::Real /* start_time */) {}
+
+    virtual int DoSolve(amrex::Real a_start_time, int a_step) = 0;
+
+    virtual void ResetStep(amrex::Real /* start_time */) {}
+
+    virtual void FinishStep(amrex::Real /* a_start_time */, int /* a_step */) {}
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
-    virtual int OneStep (amrex::Real  a_time,
+    virtual int OneStep (amrex::Real  start_time,
                          amrex::Real  a_dt,
-                         int          a_step) = 0;
+                         int          a_step);
 
     //
     // the following routines are called by the linear and nonlinear solvers
@@ -188,6 +196,11 @@ protected:
     mutable amrex::Real m_dt = 0.0;
 
     /**
+     * \brief Number of substeps
+     */
+    int m_nsubsteps = 1;
+
+    /**
      * \brief Time-biasing parameter for fields used on RHS to advance system.
      */
     amrex::Real m_theta = 0.5;
@@ -287,6 +300,8 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
+    void CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src);
+
     void SaveEoldMultifab ();
 
     /**
@@ -301,7 +316,8 @@ protected:
      */
     void PreRHSOp ( amrex::Real  a_cur_time,
                     int          a_nl_iter,
-                    bool         a_from_jacobian );
+                    bool         a_from_jacobian,
+                    amrex::Real  a_dt_scale = amrex::Real(1.));
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions

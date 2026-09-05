@@ -31,6 +31,20 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
     m_E.Copy(FieldType::Efield_fp);
     m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
+    // Define B_old MultiFab
+    // This is only needed for substepping
+    using ablastr::fields::Direction;
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const auto& ba_Bx = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->boxArray();
+        const auto& ba_By = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev)->boxArray();
+        const auto& ba_Bz = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev)->boxArray();
+        const auto& dm = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->DistributionMap();
+        const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nGrowVect();
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{0}, lev, ba_Bx, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{1}, lev, ba_By, dm, 1, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{2}, lev, ba_Bz, dm, 1, ngb, 0.0_rt);
+    }
+
     // Parse implicit solver parameters
     const amrex::ParmParse pp("implicit_evolve");
     parseNonlinearSolverParams(pp);
@@ -57,18 +71,8 @@ void SemiImplicitEM::PrintParameters () const
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
-int SemiImplicitEM::OneStep (amrex::Real  start_time,
-                             amrex::Real  a_dt,
-                             int          a_step)
+void SemiImplicitEM::SetupStep (amrex::Real start_time)
 {
-    BL_PROFILE("SemiImplicitEM::OneStep()");
-
-    // Set the member time step
-    m_dt = a_dt;
-
-    // Fields have Eg^{n}, Bg^{n}
-    // Particles have up^{n} and xp^{n}.
-
     // Save up and xp at the start of the time step
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
@@ -77,25 +81,48 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
     // Save Eg at start of time step
-    SaveEoldMultifab();
-    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
+    m_Eold.Copy(FieldType::Efield_fp, FieldType::None, true); // Copy FieldType::Efield_fp to m_Eold
+
+    // Save Bg at start of time step
+    // In case it is needed to reset B if the nonlinear solver fails and substepping is used
+    CopyVectorField(FieldType::B_old, FieldType::Bfield_fp);
 
     // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
     m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::FirstHalf, start_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
+}
 
-    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
-
+int SemiImplicitEM::DoSolve (const amrex::Real start_time, const int a_step)
+{
     // Solve nonlinear system for Eg at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
     m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
+    return m_nlsolver->GetExitStatus();
+}
 
-    const int exit_status = m_nlsolver->GetExitStatus();
-    if (exit_status < 0) { return exit_status; }
+void SemiImplicitEM::ResetStep (amrex::Real start_time)
+{
+    // FieldType::E_old still holds E at n-1, m_Eold E at n
+    m_E.linComb(1.0_rt - m_theta, FieldType::E_old, FieldType::None, m_theta, m_Eold, true);
+    m_WarpX->ResetImplicitParticleData();
+
+    // Reset B field to start of step
+    CopyVectorField(FieldType::Bfield_fp, FieldType::B_old);
+
+    // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
+    m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::FirstHalf, start_time);
+    m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
+}
+
+void SemiImplicitEM::FinishStep (const amrex::Real start_time, const int a_step)
+{
+    m_Eold.copyTo(FieldType::E_old, FieldType::None, true); // Copy m_Eold to FieldType::E_old
+
+    const amrex::Real half_time = start_time + 0.5_rt*m_dt;
 
     // Update WarpX owned Efield_fp to t_{n+1/2}
     m_WarpX->SetElectricFieldAndApplyBCs(m_E, half_time);
-    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step, m_dt);
 
     const amrex::Real new_time = start_time + m_dt;
 
@@ -110,8 +137,6 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}
     m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::SecondHalf, half_time);
     m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
-
-    return exit_status;
 }
 
 void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,

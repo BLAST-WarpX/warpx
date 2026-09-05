@@ -1,0 +1,7 @@
+FILE = inputs_test_1d_theta_implicit_planar_pinch
+
+# Adjust the parameters to force the steps to fail at the nominal time step size
+newton.max_iterations = 3
+newton.relative_tolerance = 3.0e-8
+newton.require_convergence = true
+warpx.always_warn_immediately = 1

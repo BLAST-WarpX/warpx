@@ -58,6 +58,9 @@ public:
 
     void PrintParameters () const override;
 
+    int DoSolve (amrex::Real  /* start_time */,
+                 int          /* a_step */) override { return 0; }
+
     int OneStep (amrex::Real  start_time,
                  amrex::Real  a_dt,
                  int          a_step) override;

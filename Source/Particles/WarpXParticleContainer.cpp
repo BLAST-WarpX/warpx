@@ -3067,3 +3067,77 @@ WarpXParticleContainer::FinishImplicitParticleUpdate (
 
     }
 }
+
+void
+WarpXParticleContainer::ResetImplicitParticleData (int lev)
+{
+    using namespace amrex::literals;
+
+    // If the implicit advance fails, substepping is done. This resets the particle data
+    // to the values are the start of the step so that the step can be retried with
+    // a smaller step size.
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+    {
+
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti) {
+
+        const auto setPosition = SetParticlePosition(pti);
+
+        auto& attribs = pti.GetAttribs();
+        amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+        amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+#if !defined(WARPX_DIM_1D_Z)
+        amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+        amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+#endif
+        amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+        amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+        amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+
+        int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+
+        const long np = pti.numParticles();
+
+        amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+        {
+#if !defined(WARPX_DIM_1D_Z)
+            amrex::ParticleReal const xp = x_n[ip];
+#else
+            amrex::ParticleReal const xp = 0.0_prt;
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            amrex::ParticleReal const yp = y_n[ip];
+#else
+            amrex::ParticleReal const yp = 0.0_prt;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+            amrex::ParticleReal const zp = z_n[ip];
+#else
+            amrex::ParticleReal const zp = 0.0_prt;
+#endif
+
+            ux[ip] = ux_n[ip];
+            uy[ip] = uy_n[ip];
+            uz[ip] = uz_n[ip];
+
+            if (nsuborbits) {
+                nsuborbits[ip] = 1;
+            }
+
+            setPosition(ip, xp, yp, zp);
+        });
+
+    }
+
+    }
+}

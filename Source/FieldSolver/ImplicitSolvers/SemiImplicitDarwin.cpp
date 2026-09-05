@@ -343,7 +343,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices();
+    m_WarpX->DepositMassMatrices(m_dt);
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");

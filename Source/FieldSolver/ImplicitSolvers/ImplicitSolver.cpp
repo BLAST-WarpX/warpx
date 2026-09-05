@@ -190,6 +190,66 @@ Array<LinOpBCType,AMREX_SPACEDIM> ImplicitSolver::convertFieldBCToLinOpBC (const
     return lbc;
 }
 
+int ImplicitSolver::OneStep (const amrex::Real  start_time,
+                             const amrex::Real  a_dt,
+                             const int          a_step)
+{
+    BL_PROFILE("ImplicitSolver::OneStep()");
+
+    // Fields have Eg^{n} and Bg^{n}
+    // Particles have up^{n} and xp^{n}.
+
+    // Set the member time step
+    m_dt = a_dt;
+
+    // Setup variables to handle substepping in case it is needed
+    int isubstep = 0;
+    m_nsubsteps = 1;
+    int const max_substeps = 8;
+    amrex::Real substep_start_time = start_time;
+    int exit_status;
+
+    while (isubstep < m_nsubsteps) {
+
+        SetupStep(substep_start_time);
+
+        while (true) {
+            // Solve nonlinear system at t_{n+theta}
+            exit_status = DoSolve(substep_start_time, a_step);
+
+            if (exit_status >= 0) {
+                // The solve succeeded. Increment the step number and continue to the next.
+                isubstep += 1;
+                break;
+            } else {
+                // Try again, dividing the step size in half.
+                // This will restart from the end of the last substep that succeeded.
+                ablastr::warn_manager::WMRecordWarning("ThetaImplicitEM",
+                    "Notice: solver failed at step " + std::to_string(a_step+1) +
+                    "during subcycling step " + std::to_string(isubstep+1) +
+                    " of " + std::to_string(m_nsubsteps) +
+                    " substeps, with exit status " + std::to_string(exit_status) + ".",
+                    ablastr::warn_manager::WarnPriority::low);
+                m_nsubsteps *= 2;
+                if (m_nsubsteps > max_substeps) {
+                    // Give up and just return the bad exit status
+                    return exit_status;
+                }
+                m_dt /= 2._rt;
+                ResetStep(substep_start_time);
+                isubstep *= 2;
+            }
+        }
+
+        FinishStep(substep_start_time, a_step);
+
+        substep_start_time += m_dt;
+
+    }
+
+    return exit_status;
+}
+
 void ImplicitSolver::CumulateJ ()
 {
 
@@ -215,18 +275,9 @@ void ImplicitSolver::CumulateJ ()
 
 void ImplicitSolver::SaveE ()
 {
-
     // Copy Efield_fp to E0.
-
     using warpx::fields::FieldType;
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField E0 = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp_save, lev);
-        amrex::MultiFab::Copy(*E0[0], *E[0], 0, 0, E[0]->nComp(), E[0]->nGrowVect());
-        amrex::MultiFab::Copy(*E0[1], *E[1], 0, 0, E[1]->nComp(), E[1]->nGrowVect());
-        amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, E[2]->nComp(), E[2]->nGrowVect());
-    }
-
+    CopyVectorField(FieldType::Efield_fp_save, FieldType::Efield_fp);
 }
 
 void ImplicitSolver::ApplyMassMatrices (
@@ -665,17 +716,23 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
 
 }
 
-void ImplicitSolver::SaveEoldMultifab ()
+void ImplicitSolver::CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src)
 {
-    using warpx::fields::FieldType;
-    // E_old multifab is needed for diagnostics and saving at checkpoints
+    // Copy the MultiFabs in a VectorField
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        const ablastr::fields::VectorField Efp = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
-        ablastr::fields::VectorField E_old = m_WarpX->m_fields.get_alldirs(FieldType::E_old, lev);
+        const ablastr::fields::VectorField src_vec = m_WarpX->m_fields.get_alldirs(src, lev);
+        ablastr::fields::VectorField dst_vec = m_WarpX->m_fields.get_alldirs(dst, lev);
         for (int n = 0; n < 3; ++n) {
-            amrex::MultiFab::Copy(*E_old[n], *Efp[n], 0, 0, E_old[n]->nComp(), E_old[n]->nGrowVect());
+            amrex::MultiFab::Copy(*dst_vec[n], *src_vec[n], 0, 0, dst_vec[n]->nComp(), dst_vec[n]->nGrowVect());
         }
     }
+}
+
+void ImplicitSolver::SaveEoldMultifab ()
+{
+    // E_old multifab is needed for diagnostics and saving at checkpoints
+    using warpx::fields::FieldType;
+    CopyVectorField(FieldType::E_old, FieldType::Efield_fp);
 }
 
 void ImplicitSolver::InitializeMassMatrices ()
@@ -912,7 +969,7 @@ void ImplicitSolver::PreLinearSolve ()
 
     if (m_use_mass_matrices) {
 
-        m_WarpX->DepositMassMatrices();
+        m_WarpX->DepositMassMatrices(m_dt);
 
         if (m_use_mass_matrices_jacobian) {
             FinishMassMatrices();
@@ -931,7 +988,8 @@ void ImplicitSolver::PreLinearSolve ()
 
 void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                 const int          a_nl_iter,
-                                const bool         a_from_jacobian )
+                                const bool         a_from_jacobian,
+                                const amrex::Real  a_dt_scale)
 {
     BL_PROFILE("ImplicitSolver::PreRHSOp()");
 
@@ -969,13 +1027,13 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     if (m_use_mass_matrices_jacobian && a_from_jacobian) { // Called from linear stage of JFNK and using mass matrices for Jacobian
         if (m_particle_suborbits) {
             options.evolve_suborbit_particles_only = true;
-            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
+            m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, a_dt_scale, &options);
         }
         const bool J_from_MM_only = !options.evolve_suborbit_particles_only;
         ComputeJfromMassMatrices( J_from_MM_only );
     }
     else { // Conventional particle-suppressed JFNK
-        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, &options);
+        m_WarpX->PushParticlesandDeposit(a_cur_time, skip_deposition, PositionPushType::Full, MomentumPushType::Full, a_dt_scale, &options);
         CumulateJ();
     }
 

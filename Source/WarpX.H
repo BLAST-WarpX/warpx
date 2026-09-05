@@ -144,6 +144,7 @@ public:
     void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate (amrex::Real a_time);
+    void ResetImplicitParticleData ();
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_thetadt, amrex::Real start_time );
@@ -153,7 +154,7 @@ public:
     void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
                                const ablastr::fields::MultiLevelVectorField& Field_n,
                                amrex::Real theta );
-    void DepositMassMatrices ();
+    void DepositMassMatrices (amrex::Real a_dt);
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -656,12 +657,24 @@ public:
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
                                   PositionPushType position_push_type=PositionPushType::Full,
                                   MomentumPushType momentum_push_type=MomentumPushType::Full,
+                                  amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
 
     void PushParticlesandDeposit (amrex::Real cur_time, bool skip_deposition=false,
                                   PositionPushType position_push_type=PositionPushType::Full,
                                   MomentumPushType momentum_push_type=MomentumPushType::Full,
+                                  amrex::Real dt_scale=static_cast<amrex::Real>(1.),
                                   ImplicitOptions const * implicit_options = nullptr);
+
+    /** Perform essential particle house keeping at boundaries
+     *
+     * Inject, communicate, scrape and sort particles.
+     *
+     * @param step current step
+     * @param cur_time current time
+     * @param num_moved number of cells the moving window moved
+     */
+    void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
     // This function does aux(lev) = fp(lev) + I(aux(lev-1)-cp(lev)).
     // Caller must make sure fp and cp have ghost cells filled.
@@ -1496,16 +1509,6 @@ private:
      */
     [[nodiscard]]
     bool checkStopSimulation (amrex::Real cur_time);
-
-    /** Perform essential particle house keeping at boundaries
-     *
-     * Inject, communicate, scrape and sort particles.
-     *
-     * @param step current step
-     * @param cur_time current time
-     * @param num_moved number of cells the moving window moved
-     */
-    void HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved);
 
     /** Update the E and B fields in the explicit em PIC scheme.
      *

@@ -90,7 +90,7 @@ int StrangImplicitSpectralEM::OneStep (amrex::Real start_time,
 
     // Update WarpX owned Efield_fp and Bfield_fp to t_{n+1/2}
     UpdateWarpXFields(m_E, half_time);
-    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step, m_dt);
 
     amrex::Real const new_time = start_time + m_dt;
 
