@@ -592,7 +592,9 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
     }
 }
 
-void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const
+void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
+                                                     amrex::MultiFab& a_chi_yy_cc,
+                                                     amrex::MultiFab& a_chi_zz_cc ) const
 {
     BL_PROFILE("SemiImplicitDarwin::ComputeScaledMassMatrixCC()");
 
@@ -603,14 +605,16 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc )
         m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
         m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
         m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    amrex::MultiFab* chi_cc[3] = {&a_chi_xx_cc, &a_chi_yy_cc, &a_chi_zz_cc};
 
-    a_chi_cc.setVal(0.0);
-
-    // Average over the three diagonal blocks and scale by the same 2 mu0/dt
-    // prefactor the operator applies to the mass-matrix product.
-    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / (3.0_rt * m_dt);
+    // Scale by the same 2 mu0/dt prefactor the operator applies to the
+    // mass-matrix product. Each diagonal block is kept separate so the
+    // preconditioner can see the plasma response's anisotropy.
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
 
     for (int d = 0; d < 3; ++d) {
+        chi_cc[d]->setVal(0.0);
+
         const int nc = Sdiag[d]->nComp();
         const amrex::IntVect et = Sdiag[d]->ixType().toIntVect();
         const int e0 = et[0];
@@ -624,10 +628,10 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc )
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for (amrex::MFIter mfi(a_chi_cc, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (amrex::MFIter mfi(*chi_cc[d], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             const amrex::Box& tbx = mfi.tilebox();
-            amrex::Array4<amrex::Real> const& chi = a_chi_cc.array(mfi);
+            amrex::Array4<amrex::Real> const& chi = chi_cc[d]->array(mfi);
             amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
             amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
