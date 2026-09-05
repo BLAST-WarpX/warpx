@@ -3814,6 +3814,189 @@ Maxwell solver: macroscopic media
     computational medium, respectively. The default values are the corresponding values
     in vacuum.
 
+.. _running-cpp-parameters-prescribed-current:
+
+Maxwell solver: externally driven currents
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+WarpX provides two distinct, coexisting models for a current waveform supplied by an
+external source:
+
+* The **impressed-current antenna** deposits a local current density in one or more boxes.
+  It is useful when the desired source itself is an antenna or when the complete current
+  path is already divergence-free.  It does not connect two boxes into a circuit.
+* The **paired current-controlled port** requires two terminal surfaces and constrains one
+  global through-current between them.  Use this model to drive a rod, wire, plasma column,
+  or macroscopic conductor between spatially separated terminals.
+
+Both models read a plain-text, two-column waveform (time [s], current [A]) and linearly
+interpolate it.  Sample times must be finite and strictly increasing.  Values at the two
+endpoints are included, and the current is zero outside the tabulated time interval.  In
+2D XZ, port waveform values have units A/m and denote current per unit invariant-y length.
+
+Impressed-current antenna
+"""""""""""""""""""""""""
+
+The box source is implemented by ``PrescribedCurrentParticleContainer`` and deposits
+:math:`\boldsymbol{J}_{\mathrm{ext}} = \mathrm{sign}\,I(t)\hat{\boldsymbol{e}}/A`
+through the standard particle current-deposition path.  Each source cell contains a
+coincident pair with opposite charge weights and opposite velocities.  The currents add,
+while separation of the two charges deposits the external polarization charge required by
+
+.. math::
+
+   \frac{\partial \rho_{\mathrm{ext}}}{\partial t}
+   = -\boldsymbol{\nabla}\!\cdot\boldsymbol{J}_{\mathrm{ext}}.
+
+Consequently a finite open box polarizes at its ends; it is not a through-current port.
+Changing ``drive.sign`` only reverses that box's current vector.  In particular, a second
+box with negative sign does not automatically define a return terminal or cause current to
+flow through the material between the boxes.
+
+The antenna requires ``algo.particle_shape >= 1`` and a charge-conserving deposition,
+``algo.current_deposition = esirkepov`` or ``villasenor``.  It works with explicit and
+theta-implicit Yee Maxwell solves and with vacuum or macroscopic media.  It is rejected by
+Hybrid-PIC: the artificial particles are an external electromagnetic source and must not be
+included in the Hybrid-PIC ion current.
+
+The antenna currently supports one mesh level in 2D XZ, 3D, and RZ.  It aborts for AMR and
+1D Z instead of using an incorrectly normalized source.
+
+* ``warpx.current_injection`` (`bool`, optional, default: ``0``)
+    Enable the box impressed-current antenna.
+
+* ``warpx.current_injection.type`` (`string`, optional, default: ``antenna``)
+    Source model.  The only accepted value in this namespace is ``antenna``.  Paired
+    terminals use the separate ``warpx.current_controlled_port`` namespace below.
+
+* ``warpx.current_injection.file`` (`string`, optional)
+    Path to a global plain-text waveform file with two columns: ``t [s]`` and ``I [A]``,
+    used by every antenna region that does not specify its own file.  May be omitted only
+    if every region sets ``pair_N.file``.
+
+* ``warpx.current_injection.n_pairs`` (`integer`, optional, default: ``1``)
+    Number of independent antenna boxes.  At least one must be defined.  Here ``pair_N``
+    is an input-schema label for region ``N``; it does not pair circuit terminals.
+
+For each index ``N`` (starting from 0):
+
+* ``warpx.current_injection.pair_N.file`` (`string`, optional)
+    Per-region waveform file, overriding the global ``warpx.current_injection.file``.
+
+* ``warpx.current_injection.pair_N.drive.xlo``, ``...xhi``, ``...ylo``, ``...yhi``, ``...zlo``, ``...zhi`` (`float`)
+    Bounding box of the antenna region in physical coordinates [m].
+
+* ``warpx.current_injection.pair_N.drive.A`` (`float`)
+    Cross-sectional area of the antenna region [m^2] used to convert current :math:`I(t)`
+    to current density :math:`J = I(t)/A`. In RZ, this parameter is optional and unused
+    for a radial (``dir = 0``) drive: WarpX instead applies the coaxial profile
+    :math:`J_r = I(t)/(2\pi r L_z)`, where :math:`L_z` is the discrete axial extent of
+    the drive box.
+
+* ``warpx.current_injection.pair_N.drive.dir`` (`integer`: ``0``, ``1``, or ``2``, optional, default: ``0``)
+    Direction of the injected current density component: ``0`` = x, ``1`` = y, ``2`` = z.
+    In RZ these values denote r, theta, and z. Set independently per region. Drive boxes
+    may overlap; every drive retains its own waveform, direction, area, and sign.
+
+* ``warpx.current_injection.pair_N.drive.sign`` (`integer`: ``+1`` or ``-1``, optional, default: ``+1``)
+    Sign of the local antenna current: :math:`J = \mathrm{sign}\, I(t)/A`.  This reverses
+    the current vector only; it has no terminal or return-path semantics.
+
+**PICMI interface (WarpX extension).** The same feature is available from Python/PICMI
+via ``pywarpx.picmi.PrescribedCurrentDrive`` and
+``pywarpx.picmi.PrescribedCurrentInjection``, added to a simulation with
+``Simulation.add_prescribed_current_injection``. See the example
+``Examples/Tests/prescribed_current_injection/inputs_test_3d_prescribed_current_injection_picmi.py``
+and the :ref:`PICMI Python documentation <usage-picmi-parameters>`.
+Set ``particle_shape`` (and a current deposition algorithm) on the simulation, since
+injection uses the particle deposition path.
+Add at most one ``PrescribedCurrentInjection`` object to a simulation and put all antenna
+regions in its ``drives`` list.
+
+Paired current-controlled ports
+"""""""""""""""""""""""""""""""
+
+Each paired port defines two coordinate-aligned terminal surfaces with matching transverse
+bounds and a current waveform.  Positive current flows from terminal 0 to terminal 1.
+Neither terminal has to coincide with a simulation-domain boundary: both can be
+internal, and a terminal called ``ground`` may be placed in surrounding vacuum outside
+the modeled device.  A terminal surface can cut through plasma, a macroscopic material,
+or an embedded-boundary object.
+The perimeter used for the Ampere circulation must remain in field-carrying cells, so an EB
+conductor should be enclosed by, rather than cover, that perimeter.
+
+On every mesh cross-section between a port's two terminals, WarpX projects the magnetic
+circulation to
+
+.. math::
+
+   \oint_{\partial S} \boldsymbol{B}\!\cdot d\boldsymbol{\ell} = \mu_0 I(t).
+
+In a fully kinetic Maxwell solve this controls the **total Ampere current** through
+:math:`S`: particle current, macroscopic conduction current, and displacement current.  It
+does not require the carrier current alone to jump instantaneously to the requested value.
+In Hybrid-PIC, which omits displacement current, the same constraint controls the combined
+ion and electron-fluid current.  The 3D correction is constructed as a discrete curl, so it
+does not introduce magnetic divergence.  The source is an ideal current constraint; an
+external circuit/power model is not yet coupled to it.  Hybrid-PIC ports cannot currently
+be combined with analytic external current or split external fields because those would
+make the plasma-current target ambiguous.
+
+Current-controlled ports support a single mesh level with the Yee and Hybrid-PIC field
+solvers.  They support 3D, in-plane x or z current in 2D XZ, and radial or axial current in
+axisymmetric RZ with one azimuthal mode.  Terminal surfaces must currently be
+matching rectangles, disks or annuli for axial RZ current, or cylindrical surfaces for
+radial RZ current.  Coordinates are represented on the nearest compatible field plane.
+Multiple ports are supported when their correction regions are separated by more than one
+grid cell, as in separate coil gaps.  General curved terminal masks and AMR, moving
+windows, dynamic load balancing, and hybrid-staggered grids are future extensions.
+
+* ``warpx.current_controlled_port`` (`bool`, optional, default: ``0``)
+    Enable paired current-controlled ports.
+
+* ``warpx.current_controlled_port.n_ports`` (`integer`, optional)
+    Number of ports.  When this is present, define port ``N`` under
+    ``warpx.current_controlled_port.port_N`` for indices starting at zero.  When it is
+    omitted, the single-port parameters below retain their original unindexed names.
+
+* ``warpx.current_controlled_port.file`` (`string`)
+    Path to the two-column waveform file.  This one waveform controls both terminals and
+    all intervening cross-sections.
+
+* ``warpx.current_controlled_port.current_scale`` (`float`, optional, default: ``1``)
+    Positive multiplier applied to the waveform.  This lets several ports reuse one file
+    with different current fractions.
+
+* ``warpx.current_controlled_port.direction`` (`integer`: ``0``, ``1``, or ``2``)
+    Axis from terminal 0 to terminal 1.  In 3D, ``0``, ``1``, and ``2`` mean x, y, and z.
+    In 2D XZ, only ``0`` (x) and ``2`` (z) are representable.  In RZ, ``0`` selects radial
+    current through cylindrical terminal surfaces and ``2`` selects axial current through
+    disk or annular terminal surfaces.  Azimuthal current is not a two-terminal surface in
+    an axisymmetric model.
+
+* ``warpx.current_controlled_port.terminal_N.lower_bound`` (`3 floats`)
+* ``warpx.current_controlled_port.terminal_N.upper_bound`` (`3 floats`)
+    Lower and upper physical-coordinate bounds [m] of terminal ``N``, for ``N = 0, 1``.
+    The lower and upper coordinate in ``direction`` must be equal, making a zero-thickness
+    surface; the two terminal positions must differ.  Their transverse bounds must match.
+    The y entries are ignored in 2D XZ and RZ.  For axial RZ current, a radial lower bound
+    of zero defines a disk and a positive lower bound defines an annulus.  For radial RZ
+    current, each terminal radius must be positive and the z bounds define its axial span.
+
+For indexed input, replace the prefix in the four per-port parameters above with
+``warpx.current_controlled_port.port_N``.  Each indexed port may use its own waveform,
+direction, scale, and terminal pair.
+
+**PICMI interface (WarpX extension).** Construct ``pywarpx.picmi.CurrentControlledPort``
+and add each instance with ``Simulation.add_current_controlled_port``.  See
+``Examples/Tests/current_controlled_port/inputs_test_current_controlled_port_picmi.py``.
+After initialization, ``libwarpx.warpx.get_current_controlled_port_statuses()`` returns
+one ``[target, terminal_0, terminal_1]`` current row per port.  The singular status method
+is retained for one-port scripts and returns the first row.
+The antenna and paired port may be enabled together when their combined effect is intended;
+an antenna current that crosses a port contour is part of the total current controlled by
+that port.  Place them in disjoint regions when their effects should be independent.
+
 .. _running-cpp-parameters-hybrid-model:
 
 Maxwell solver: kinetic-fluid hybrid
@@ -4515,6 +4698,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
 
     Fields written to output.
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
+    For macroscopic electromagnetic solves, ``sigma``, ``epsilon``, and ``mu`` write the material-property fields used by the solver.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.

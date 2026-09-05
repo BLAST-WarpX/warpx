@@ -17,6 +17,7 @@
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
+#include "FieldSolver/CurrentControlledPort_fwd.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
@@ -162,6 +163,9 @@ public:
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
+    [[nodiscard]] std::array<amrex::Real, 3> GetCurrentControlledPortStatus () const;
+    [[nodiscard]] std::vector<std::array<amrex::Real, 3>>
+    GetCurrentControlledPortStatuses () const;
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
@@ -467,13 +471,19 @@ public:
     void ResetProbDomain (const amrex::RealBox& rb);
     void EvolveE (         amrex::Real dt, amrex::Real start_time);
     void EvolveE (int lev, amrex::Real dt, amrex::Real start_time);
-    void EvolveB (         amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
-    void EvolveB (int lev, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (amrex::Real dt, SubcyclingHalf subcycling_half,
+                  amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
+    void EvolveB (int lev, amrex::Real dt,
+                  SubcyclingHalf subcycling_half, amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
     void EvolveF (         amrex::Real dt, int rho_comp);
     void EvolveF (int lev, amrex::Real dt, int rho_comp);
     void EvolveG (         amrex::Real dt);
     void EvolveG (int lev, amrex::Real dt);
-    void EvolveB (int lev, PatchType patch_type, amrex::Real dt, SubcyclingHalf subcycling_half, amrex::Real start_time);
+    void EvolveB (int lev, PatchType patch_type, amrex::Real dt,
+                  SubcyclingHalf subcycling_half, amrex::Real start_time,
+                  bool apply_current_controlled_port = true);
     void EvolveE (int lev, PatchType patch_type, amrex::Real dt, amrex::Real start_time);
     void EvolveF (int lev, PatchType patch_type, amrex::Real dt, int rho_comp);
     void EvolveG (int lev, PatchType patch_type, amrex::Real dt);
@@ -610,6 +620,7 @@ public:
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
+    void ApplyCurrentControlledPort (int lev, PatchType patch_type, amrex::Real cur_time);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
@@ -992,6 +1003,11 @@ public:
     //! This function is called in amrex::AmrCore::InitFromScratch.
     void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
+    [[nodiscard]] MacroscopicProperties*
+    get_pointer_MacroscopicProperties () const {
+        return m_macroscopic_properties.get();
+    }
+
 #ifdef AMREX_USE_EB
     amrex::EB2::IndexSpace const* GetEBIndexSpace (int lev) const {
         // If EB data was built separately for each mesh-refinement level, return the one for
@@ -1363,6 +1379,10 @@ private:
 
     // Hybrid PIC algorithm parameters
     std::unique_ptr<HybridPICModel> m_hybrid_pic_model;
+
+    // Independent waveform-driven paired terminal constraints
+    std::vector<std::unique_ptr<CurrentControlledPort>>
+        m_current_controlled_ports;
 
     // Load balancing
     /** Load balancing intervals that reads the "load_balance_intervals" string int the input file

@@ -132,6 +132,16 @@ void init_WarpX (py::module& m)
         .def("evolve", &WarpX::Evolve,
             "Evolve the simulation the specified number of steps"
         )
+        .def("get_current_controlled_port_status",
+            &WarpX::GetCurrentControlledPortStatus,
+            "Return [target, terminal_0 current, terminal_1 current] in A "
+            "(A/m in 2D XZ)."
+        )
+        .def("get_current_controlled_port_statuses",
+            &WarpX::GetCurrentControlledPortStatuses,
+            "Return one [target, terminal_0 current, terminal_1 current] row "
+            "per current-controlled port."
+        )
 
         .def_property("omp_threads",
             [](WarpX & /* wx */){

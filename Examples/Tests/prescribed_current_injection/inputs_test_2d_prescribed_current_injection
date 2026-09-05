@@ -1,0 +1,59 @@
+# Quantitative XZ regression with three overlapping current components.
+
+max_step = 1
+amr.n_cell = 8 8
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+amr.max_level = 0
+
+geometry.dims = 2
+geometry.prob_lo = -0.5 -0.5
+geometry.prob_hi =  0.5  0.5
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+
+warpx.const_dt = 1.0e-12
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = esirkepov
+
+warpx.current_injection = 1
+warpx.current_injection.type = antenna
+warpx.current_injection.file = current_profile.txt
+warpx.current_injection.n_pairs = 3
+
+warpx.current_injection.pair_0.drive.xlo = -0.25
+warpx.current_injection.pair_0.drive.xhi =  0.25
+warpx.current_injection.pair_0.drive.ylo = -0.5
+warpx.current_injection.pair_0.drive.yhi =  0.5
+warpx.current_injection.pair_0.drive.zlo = -0.25
+warpx.current_injection.pair_0.drive.zhi =  0.25
+warpx.current_injection.pair_0.drive.A = 0.5
+warpx.current_injection.pair_0.drive.dir = 0
+
+warpx.current_injection.pair_1.file = current_profile_override.txt
+warpx.current_injection.pair_1.drive.xlo = -0.25
+warpx.current_injection.pair_1.drive.xhi =  0.25
+warpx.current_injection.pair_1.drive.ylo = -0.5
+warpx.current_injection.pair_1.drive.yhi =  0.5
+warpx.current_injection.pair_1.drive.zlo = -0.25
+warpx.current_injection.pair_1.drive.zhi =  0.25
+warpx.current_injection.pair_1.drive.A = 0.5
+warpx.current_injection.pair_1.drive.dir = 2
+warpx.current_injection.pair_1.drive.sign = -1
+
+warpx.current_injection.pair_2.drive.xlo = -0.25
+warpx.current_injection.pair_2.drive.xhi =  0.25
+warpx.current_injection.pair_2.drive.ylo = -0.5
+warpx.current_injection.pair_2.drive.yhi =  0.5
+warpx.current_injection.pair_2.drive.zlo = -0.25
+warpx.current_injection.pair_2.drive.zhi =  0.25
+warpx.current_injection.pair_2.drive.A = 0.25
+warpx.current_injection.pair_2.drive.dir = 1
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.intervals = -1
+diag1.fields_to_plot = jx jy jz rho divE
+diag1.format = plotfile
+diag1.file_prefix = diags/diag1

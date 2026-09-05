@@ -118,6 +118,11 @@ void WarpX::HybridPICEvolveFields ()
         SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
         WarpX::sync_nodal_points
     );
+    if (!m_current_controlled_ports.empty()) {
+        ApplyCurrentControlledPort(
+            0, PatchType::fine, gett_old(0) + 0.5_rt * dt[0]);
+        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+    }
 
     // Average rho^{n} and rho^{n+1} to get rho^{n+1/2} in rho_fp_temp
     for (int lev = 0; lev <= finest_level; ++lev)
@@ -150,6 +155,10 @@ void WarpX::HybridPICEvolveFields ()
         SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
         WarpX::sync_nodal_points
     );
+    if (!m_current_controlled_ports.empty()) {
+        ApplyCurrentControlledPort(0, PatchType::fine, gett_new(0));
+        FillBoundaryB(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
+    }
 
     // Extrapolate the ion current density to t=n+1 using
     // J_i^{n+1} = 1/2 * J_i^{n-1/2} + 3/2 * J_i^{n+1/2}, and recalling that
