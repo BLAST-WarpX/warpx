@@ -51,7 +51,8 @@ public:
           const Vec&   a_b,
           amrex::Real  a_time,
           amrex::Real  a_dt,
-          int          a_step) const override;
+          int          a_step,
+          bool verbose_step) const override;
 
     void GetSolverParams (amrex::Real&  a_rtol,
                           amrex::Real&  a_atol,
@@ -313,7 +314,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
                              const Vec&         a_b,
                                    amrex::Real  a_time,
                                    amrex::Real  a_dt,
-                                   int          a_step) const
+                                   int          a_step,
+                                   bool verbose_step) const
 {
     BL_PROFILE("NewtonSolver::Solve()");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -349,7 +351,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         norm_rel = norm_abs/norm0;
 
         // Check for convergence criteria
-        if (this->m_verbose || iter == m_maxits) {
+        if ((this->m_verbose and verbose_step) || iter == m_maxits) {
             amrex::Print() << "Newton: iteration = " << std::setw(3) << iter <<  ", norm = "
                            << std::scientific << std::setprecision(5) << norm_abs << " (abs.), "
                            << std::scientific << std::setprecision(5) << norm_rel << " (rel.)" << "\n";
@@ -357,7 +359,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         if (norm_abs < m_atol) {
             this->m_exit_status = 2;
-            if (this->m_verbose) {
+            if (this->m_verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied absolute tolerance " << m_atol << "\n";
             }
@@ -366,7 +368,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         if (norm_rel < m_rtol) {
             this->m_exit_status = 3;
-            if (this->m_verbose) {
+            if (this->m_verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied relative tolerance " << m_rtol << "\n";
             }
@@ -400,7 +402,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         iter++;
         if (iter >= m_maxits) {
-            if (this->m_verbose) {
+            if (this->m_verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
                                << ". Maximum iteration reached: iter = " << m_maxits << "\n";
             }

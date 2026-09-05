@@ -5848,6 +5848,7 @@ When developing, testing and :ref:`debugging WarpX <debugging_warpx>`, the follo
     If set to true, the information normally printed to the terminal at every time step
     is limited: it prints every step for the first 10 steps, every 10 steps for steps between 10 and 100,
     and once every 100 steps for steps greater than 100.
+    This also limits the output from the field solvers.
 
 .. pp:param:: warpx.always_warn_immediately
     :type: ``0`` or ``1``

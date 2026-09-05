@@ -73,10 +73,12 @@ public:
      * \param[in] start_time The time at the start of the time step
      * \param[in] a_dt The time step size
      * \param[in] a_step The time step number
+     * \param[in] verbose_step whether there is verbose output on this step
      */
     int OneStep (amrex::Real  start_time,
                  amrex::Real  a_dt,
-                 int          a_step) override;
+                 int          a_step,
+                 bool verbose_step) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,

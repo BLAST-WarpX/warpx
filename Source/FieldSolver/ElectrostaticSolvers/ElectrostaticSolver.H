@@ -52,7 +52,8 @@ public:
         ablastr::fields::MultiFabRegister& fields,
         MultiParticleContainer& mpc,
         MultiFluidContainer* mfl,
-        int max_level) = 0;
+        int max_level,
+        bool verbose_step) = 0;
 
     /**
      * \brief Set Dirichlet boundary conditions for the electrostatic solver.

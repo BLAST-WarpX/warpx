@@ -48,7 +48,8 @@ public:
 
     int OneStep ( amrex::Real  start_time,
                   amrex::Real  a_dt,
-                  int          a_step ) override;
+                  int          a_step,
+                  bool verbose_step) override;
 
     /**
      * \brief Not implemented for this solver.

@@ -85,7 +85,8 @@ void ThetaImplicitEM::PrintParameters () const
 
 int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
                               const amrex::Real  a_dt,
-                              const int          a_step)
+                              const int          a_step,
+                              const bool         verbose_step)
 {
     BL_PROFILE("ThetaImplicitEM::OneStep()");
 
@@ -117,7 +118,7 @@ int ThetaImplicitEM::OneStep (const amrex::Real  start_time,
 
     // Solve nonlinear system for Eg at t_{n+theta}
     // Particles will be advanced to t_{n+1/2}
-    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step);
+    m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step, verbose_step);
 
     const int exit_status = m_nlsolver->GetExitStatus();
     if (exit_status < 0) { return exit_status; }
