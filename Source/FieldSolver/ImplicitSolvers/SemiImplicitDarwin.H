@@ -84,11 +84,12 @@ public:
      * \brief Fill three cell-centered MultiFabs with the diagonal
      *  susceptibility components chi_xx(x), chi_yy(x), chi_zz(x): the
      *  (2 mu0/dt)-scaled row-sum of each diagonal mass-matrix block,
-     *  interpolated from its native (E-type) staggering to cell centers.
-     *  These are the local chi scales the curl(chi curl Z) operator term
-     *  applies to a uniform dA, used by the pc_darwin_mlmg preconditioner's
-     *  per-component Helmholtz factors. Must be called after the mass
-     *  matrices have been deposited and synced for the current step.
+     *  collocated from its native (E-type) staggering onto cell centers by
+     *  index identification. These are the local chi scales the
+     *  curl(chi curl Z) operator term applies to a uniform dA, used by the
+     *  pc_darwin_mlmg preconditioner's per-component Helmholtz factors. Must
+     *  be called after the mass matrices have been deposited and synced for
+     *  the current step.
      *
      *  The full mass matrix is a 3x3 block tensor (one block per Jx/Jy/Jz
      *  row/column pair) at every point of each block's native E-type
@@ -96,8 +97,12 @@ public:
      *  components representing the deposition-stencil bands rather than as
      *  a dense matrix. a_chi_xx_cc, a_chi_yy_cc, a_chi_zz_cc each collapse
      *  one diagonal block to a single scalar per cell: sum that block's
-     *  stencil-band components into a per-point row-sum, then interpolate
-     *  the result from the staggered points onto the cell center.
+     *  stencil-band components into a per-point row-sum at (i,j,k), then
+     *  read that same (i,j,k) index into the cell-centered array (a plain
+     *  index identification, not an average of neighboring staggered
+     *  points). This is the same convention DarwinMLMGPC uses to collocate
+     *  the B-staggered Z components, so chi_dd(x) ends up collocated with
+     *  where curl(Z)_d itself lands under that convention.
      */
     void ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
                                      amrex::MultiFab& a_chi_yy_cc,
