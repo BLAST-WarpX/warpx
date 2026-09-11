@@ -371,6 +371,12 @@ void CurlCurlMLMGPC<T,Ops>::Apply (T& a_x, const T& a_b)
         // number of iterations (m_max_iter V-cycles), for any right-hand side, so that the
         // preconditioner is a fixed linear operator, as required by GMRES.
         m_solver->solve({&solution}, {&rhs}, m_rtol, m_atol);
+
+        const bool blank_Ey = m_ops->GetBlankElectricField()[1];
+        if (blank_Ey) {
+            x_mfarrvec[n][1]->setVal(0.0);
+        }
+
     }
 }
 
