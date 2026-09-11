@@ -14,6 +14,7 @@ foreach(D IN LISTS WarpX_DIMS)
           PRIVATE
             # pybind11
             Config.cpp
+            ImplicitSolver.cpp
             MultiFabRegister.cpp
             WarpX.cpp
         )

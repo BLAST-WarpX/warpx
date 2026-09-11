@@ -160,6 +160,8 @@ public:
 
     MultiParticleContainer& GetPartContainer () { return *mypc; }
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
+    /** Return the implicit solver, or nullptr when the evolve scheme is explicit */
+    [[nodiscard]] ImplicitSolver* GetImplicitSolver () { return m_implicit_solver.get(); }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}

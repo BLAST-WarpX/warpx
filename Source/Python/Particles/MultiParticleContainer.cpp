@@ -7,9 +7,14 @@
 #include "Python/pyWarpX.H"
 
 #include <Particles/MultiParticleContainer.H>
+#include <Utils/WarpXAlgorithmSelection.H>
 
+#include <AMReX_Enum.H>
 #include <AMReX_GpuContainers.H>
+#include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
+
+#include <string>
 
 
 void init_MultiParticleContainer (py::module& m)
@@ -48,6 +53,39 @@ strength_E, strength_B: floats
                 return mpc.GetChargeDensity(lev, local);
             },
             py::arg("lev"), py::arg("local")
+        )
+
+        .def("push_p",
+            [](MultiParticleContainer& mpc, int lev, amrex::Real dt,
+               amrex::MultiFab const& Ex, amrex::MultiFab const& Ey, amrex::MultiFab const& Ez,
+               amrex::MultiFab const& Bx, amrex::MultiFab const& By, amrex::MultiFab const& Bz,
+               std::string const& momentum_push_type)
+            {
+                mpc.PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz,
+                          amrex::getEnumCaseInsensitive<MomentumPushType>(momentum_push_type));
+            },
+            py::arg("lev"), py::arg("dt"),
+            py::arg("Ex"), py::arg("Ey"), py::arg("Ez"),
+            py::arg("Bx"), py::arg("By"), py::arg("Bz"),
+            py::arg("momentum_push_type") = "Full",
+            R"pbdoc(Push the momentum of the particles of all species, leaving their positions unchanged
+
+The fields are gathered from the given MultiFabs, which must have their guard
+cells filled, with the field gathering settings of the simulation.
+
+Parameters
+----------
+lev: int
+  Mesh refinement level of the particles to push
+dt: float
+  Time step over which to push the momentum
+Ex, Ey, Ez: MultiFab
+  Components of the electric field, with the staggering of ``Efield_fp``
+Bx, By, Bz: MultiFab
+  Components of the magnetic field, with the staggering of ``Bfield_fp``
+momentum_push_type: str, optional
+  ``"Full"`` (default) for a full step, ``"FirstHalf"`` or ``"SecondHalf"`` for the
+  split push used by the collision algorithms)pbdoc"
         )
     ;
 }
