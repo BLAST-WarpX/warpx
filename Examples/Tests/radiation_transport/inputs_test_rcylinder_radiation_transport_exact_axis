@@ -1,0 +1,70 @@
+# Exact RCYLINDER streaming through the axis and back across a radial face.
+
+my_constants.path_length = 0.25
+my_constants.photon_weight = 1.0e16
+
+max_step = 2
+amr.n_cell = 4
+amr.max_level = 0
+amr.blocking_factor = 2
+amr.max_grid_size = 2
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = open
+
+warpx.const_dt = path_length/clight
+warpx.verbose = 0
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.20 0.0 0.0
+photons.single_particle_u = -1.0 0.0 0.0
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(sqrt(x*x+y*y) < 0.25, 2.0, 8.0)
+radiation_transport.path_cell_fraction = 1.0
+radiation_transport.require_cell_interface_exact_streaming = 1
+radiation_transport.material_coupling = none
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.write_species = 0
+diag.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = particle_energy radiation_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1

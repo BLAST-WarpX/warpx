@@ -1,0 +1,24 @@
+# Uniform directed gray radiation accelerates moving kinetic ions.
+# Independent homogeneous four-force ODE, not a FLASH fluid-closure match.
+FILE = inputs_1d_moving_moment_interface
+my_constants.n0 = 1.e-8/m_p
+my_constants.beta0 = 0.002
+my_constants.beam_inertia = 0.005
+amr.n_cell = 64
+amr.max_grid_size = 32
+geometry.prob_hi = 1.e-5
+max_step = 400
+warpx.const_dt = 10/(1.e4*clight*400)
+ions.density_function(x,y,z) = n0
+hybrid_pic_model.initial_elec_temp(x,y,z) = 1000
+radiation_transport.initial_diffusion_energy_density(x,y,z) = beam_inertia*n0*m_p*clight^2
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,ne,Te) = 1.e4
+radiation_transport.initial_moment_flux_ratio = 0 0 1
+diag1.intervals = 20
+chk.intervals = 20
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17
+radiation_momentum.include_moment_inventory = 1

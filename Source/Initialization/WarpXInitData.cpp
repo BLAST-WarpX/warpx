@@ -925,6 +925,10 @@ WarpX::InitData ()
     }
 
     if (restart_chkfile.empty() || write_diagnostics_on_restart) {
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC &&
+            m_hybrid_pic_model->m_solve_electron_energy_equation) {
+            HybridPICPrepareElectronStateForDiagnostics();
+        }
         // Write full diagnostics before the first iteration.
         multi_diags->FilterComputePackFlush(istep[0] - 1);
 

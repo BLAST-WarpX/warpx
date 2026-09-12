@@ -1,0 +1,5 @@
+FILE = inputs_test_1d_radiation_transport_kinetic_thermal_drift
+
+# One macroparticle has no cell-local momentum-neutral thermal degree of
+# freedom. Radiation heating must reject this state instead of changing drift.
+electrons.num_particles_per_cell_each_dim = 1

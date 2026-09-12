@@ -1,0 +1,20 @@
+# Oblique translating interface: normal (2,0,1)/sqrt(5).
+# Inherits physical material/radiation parameters, not dimensional validation.
+FILE = inputs_1d_moving_moment_interface
+geometry.dims = 2
+amr.n_cell = 64 128
+amr.max_grid_size = 32
+geometry.prob_lo = 0 0
+geometry.prob_hi = "0.001*sqrt(5)/2" "0.001*sqrt(5)"
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+algo.particle_shape = 4
+ions.num_particles_per_cell_each_dim = 2 2
+ions.ux = 2*beta0/(sqrt(5)*sqrt(1-beta0^2))
+ions.uz = beta0/(sqrt(5)*sqrt(1-beta0^2))
+ions.density_function(x,y,z) = "n0*(1+4.5*(tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00055)/0.00002)-tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00075)/0.00002)+tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00055+0.001)/0.00002)-tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00075+0.001)/0.00002)+tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00055-0.001)/0.00002)-tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00075-0.001)/0.00002)))"
+hybrid_pic_model.initial_elec_temp(x,y,z) = "100/(1+4.5*(tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00055)/0.00002)-tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00075)/0.00002)+tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00055+0.001)/0.00002)-tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00075+0.001)/0.00002)+tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00055-0.001)/0.00002)-tanh((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00075-0.001)/0.00002)))"
+radiation_transport.initial_diffusion_energy_density(x,y,z) = "7.565733250280007e-16*11604.5221^4*(1+(500^4-1)*(exp(-0.5*((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00025)/0.000075)^2)+exp(-0.5*((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00025+0.001)/0.000075)^2)+exp(-0.5*((((2*x+z)/sqrt(5)-0.001*floor((2*x+z)/(sqrt(5)*0.001)))-0.00025-0.001)/0.000075)^2)))*(1+beta0^2/3)/(1-beta0^2)"
+radiation_transport.initial_moment_flux_ratio = "8*beta0/(sqrt(5)*(3+beta0^2))" 0 "4*beta0/(sqrt(5)*(3+beta0^2))"

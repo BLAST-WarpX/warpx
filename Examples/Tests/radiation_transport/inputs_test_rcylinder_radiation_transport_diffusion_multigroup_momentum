@@ -1,0 +1,17 @@
+# Two-group grey-FLD radiation force and material-work coupling in RCYLINDER.
+#
+# Both groups receive nearly half of one localized LTE source and have the same
+# Rosseland coefficient. Their independently computed force contributions must
+# therefore add to the grey analytic result. Accumulating both groups directly
+# into one cell impulse is a concurrent scatter on GPU and can lose one of the
+# two contributions.
+
+FILE = inputs_test_rcylinder_radiation_transport_diffusion_momentum
+
+# The source temperature inherited from the parent input is 1.0e7 eV. A group
+# boundary at 3.503 k_B T splits the blackbody energy almost exactly in half.
+my_constants.group_boundary = 5.612424748902e-12
+
+radiation_transport.energy_group_boundaries = group_boundary
+radiation_transport.group_photon_energies = \
+    0.5*group_boundary 2.0*group_boundary

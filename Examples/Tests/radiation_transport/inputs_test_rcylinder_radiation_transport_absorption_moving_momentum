@@ -1,0 +1,25 @@
+# Conservative streaming-photon recoil on an inward-moving RCYLINDER liner.
+#
+# The photon impulse opposes the liner motion, so ion kinetic work is negative.
+# Energy conservation then requires the hybrid-electron heating to exceed the
+# absorbed photon energy by exactly the kinetic energy extracted from the liner.
+# Four grids exercise the OpenMP impulse and work reductions.
+
+FILE = inputs_test_rcylinder_radiation_transport_absorption_momentum
+
+amr.max_grid_size = 4
+
+my_constants.Vin = 1.0e6
+
+# The fields and ordinary particle motion are inert in this manufactured
+# radiation-work test. Avoid invoking the unrelated RCYL reflective-current
+# boundary path, which raises an FPE under trapping builds for a zero current.
+boundary.field_hi = none
+boundary.particle_hi = absorbing
+
+ions.momentum_distribution_type = parse_momentum_function
+ions.momentum_function_ux(x,y,z) = \
+    "(Vx0-Vin*x/sqrt(x*x+y*y+1.0e-100))/clight"
+ions.momentum_function_uy(x,y,z) = \
+    "(Vy0-Vin*y/sqrt(x*x+y*y+1.0e-100))/clight"
+ions.momentum_function_uz(x,y,z) = Vz0/clight

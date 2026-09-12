@@ -1,0 +1,14 @@
+FILE = inputs_base_1d_radiation_transport_registered_material_opacity
+
+# Exercise the schema-1 LTE detailed-balance path with two photon groups.
+my_constants.photon_weight = 0.0
+my_constants.Te0_eV = 5.0e4*kb/q_e
+
+radiation_transport.energy_group_boundaries = 2.0e-19
+radiation_transport.group_photon_energies = 1.0e-19 4.0e-19
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = frozen_temperature
+radiation_transport.require_cell_interface_exact_streaming = 0
+
+diag.fields_to_plot = rho Te Pe radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1

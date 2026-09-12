@@ -1,0 +1,104 @@
+# Isolate Rosseland scattering transport/recoil from Planck matter exchange.
+# Step 1 manufactures a localized diffusion field with Rosseland transport off.
+# Step 2 enables total transport opacity and optionally true absorption.
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 20.0
+my_constants.dt = 1.0e-12
+my_constants.dx = 1.0/16.0
+my_constants.alpha_seed = 1.0e6
+my_constants.alpha_transport = 64.0
+# Overridden by CTest: zero for pure scattering, positive for the control.
+my_constants.alpha_control = 0.0
+
+max_step = 2
+amr.n_cell = 16
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 16
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = pec
+boundary.field_hi = pec
+boundary.particle_lo = reflecting
+boundary.particle_hi = reflecting
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.random_seed = 20260826
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 0.01*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+
+particles.species_names = ions photons
+
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 16
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+ions.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = none
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = frozen_temperature
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t < 0.5*dt, if(z < 4.0*dx, alpha_seed, 0.0), \
+        if(z > dx, if(z < 2.0*dx, alpha_control, 0.0), 0.0))
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,ne,Te) = \
+    if(t < 0.5*dt, 0.0, alpha_transport)
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.diffusion_cfl = 0.1
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.diffusion_boundary_lo = reflecting
+radiation_transport.diffusion_boundary_hi = reflecting
+radiation_transport.enable_momentum_coupling = 1
+radiation_transport.momentum_species = ions
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.species = ions
+diag.fields_to_plot = rho Te radiation_material_energy radiation_diffusion_energy
+
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17

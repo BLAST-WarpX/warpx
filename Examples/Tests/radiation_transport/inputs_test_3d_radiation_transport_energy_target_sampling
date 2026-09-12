@@ -1,0 +1,2 @@
+FILE = inputs_base_3d_radiation_transport_packet_sampling
+radiation_transport.particle_conversion_target_packet_count = 4

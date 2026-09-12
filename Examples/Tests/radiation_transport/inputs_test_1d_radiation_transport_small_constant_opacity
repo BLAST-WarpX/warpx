@@ -1,0 +1,8 @@
+# Same optical path as Beer-Lambert, scaled to a small positive constant opacity.
+# Fixed-six-decimal formatting of a parser literal would turn this opacity off.
+FILE = inputs_test_1d_radiation_transport_beer_lambert
+
+my_constants.alpha = 3.0e-8
+my_constants.path_length = 7.0e7
+geometry.prob_hi = 1.0e8
+photons.single_particle_pos = 0.0 0.0 1.0e7

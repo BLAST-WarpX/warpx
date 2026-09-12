@@ -1,0 +1,2 @@
+FILE = inputs_test_3d_radiation_transport_energy_target_sampling
+radiation_transport.particle_conversion_max_packets_per_cell = 2

@@ -1,0 +1,3 @@
+FILE = inputs_test_3d_radiation_transport_energy_target_uniform
+amr.max_grid_size = 2
+amr.blocking_factor = 2

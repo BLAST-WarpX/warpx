@@ -91,7 +91,7 @@ public:
     void setVerbose (int v) override { m_solver->setVerbose(v); }
 
     //! Sets restart length. The default is 30.
-    void setRestartLength (int rl) override { amrex::ignore_unused(rl); }
+    void setRestartLength (int rl) override { m_solver->setRestartLength(rl); }
 
     //! Sets the max number of iterations
     void setMaxIters (int niters) override { m_solver->setMaxIters(niters); }

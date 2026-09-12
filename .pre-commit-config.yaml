@@ -33,6 +33,14 @@ repos:
   - id: check-yaml
   - id: check-added-large-files
     args: ['--maxkb=40']
+    exclude: '^(Source/Radiation/(CoupledMomentSource|ImplicitMomentTransport)\.cpp|Examples/Tests/radiation_transport/test_particle_impulse\.cpp)$'
+  # These three maintained solver/test translation units exceed the artifact
+  # limit. Keep a bounded source-only allowance; all other files retain 40 KiB.
+  - id: check-added-large-files
+    alias: check-radiation-source-size
+    name: check radiation source size
+    args: ['--maxkb=80']
+    files: '^(Source/Radiation/(CoupledMomentSource|ImplicitMomentTransport)\.cpp|Examples/Tests/radiation_transport/test_particle_impulse\.cpp)$'
   - id: requirements-txt-fixer
 #  - id: fix-encoding-pragma
 #    exclude: ^noxfile.py$

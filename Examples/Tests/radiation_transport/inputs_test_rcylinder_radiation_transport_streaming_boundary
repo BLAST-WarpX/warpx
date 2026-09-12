@@ -1,0 +1,58 @@
+# Escaped streaming-photon energy and cylindrical-basis momentum ledger.
+#
+# A packet at theta=pi/4 exits the radial high face with equal radial and
+# axial momentum. This tests both free-boundary accounting and the Cartesian
+# particle-momentum projection into the (r,theta,z) diagnostic basis.
+
+my_constants.photon_weight = 1.0e16
+
+max_step = 1
+amr.n_cell = 16
+amr.max_level = 0
+amr.max_grid_size = 8
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = 1.0e-9
+warpx.verbose = 0
+warpx.use_filter = 0
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.6 0.6 0.0
+photons.single_particle_u = 1.0 1.0 sqrt(2.0)
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.path_cell_fraction = 0.5
+radiation_transport.material_coupling = none
+
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17

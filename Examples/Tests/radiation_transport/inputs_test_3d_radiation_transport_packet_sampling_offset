@@ -1,0 +1,9 @@
+# Offset cell faces are deliberately not exactly representable in single
+# particle precision. Converted positions must still remain in the Real cell.
+
+FILE = inputs_base_3d_radiation_transport_packet_sampling
+
+geometry.prob_lo = 100000.1 100000.1 100000.1
+geometry.prob_hi = 100001.1 100001.1 100001.1
+radiation_transport.initial_diffusion_energy_density(x,y,z) = \
+    if(x < 100000.6, if(y < 100000.6, if(z < 100000.6, 8.0e-13, 0.0), 0.0), 0.0)

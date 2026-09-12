@@ -1,0 +1,33 @@
+# Conservative grey FLD force and material-work coupling in RCYLINDER.
+#
+# A localized one-step LTE source creates radiation in the second of four
+# radial cells. Reflecting boundaries leave only the two internal face fluxes.
+# The high electron temperature is a manufactured numerical-conditioning
+# choice, not a physical plasma regime: it keeps the recoil kinetic work well
+# above roundoff while LTE emission remains material-energy limited.
+
+FILE = inputs_test_rcylinder_radiation_transport_absorption_momentum
+
+max_step = 1
+amr.n_cell = 4
+amr.max_grid_size = 4
+geometry.prob_hi = 0.02
+warpx.const_dt = 1.0e-12
+
+hybrid_pic_model.elec_temp = 1.0e5*Te0_eV
+
+photons.single_particle_pos = 0.015 0.0 0.0
+photons.single_particle_weight = photon_weight/1.0e20
+
+radiation_transport.absorption_coefficient = alpha
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = frozen_temperature
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    "if(x > 0.005, if(x < 0.010, 400.0, 0.0), 0.0)"
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient = 400.0
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.diffusion_cfl = 0.1
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.diffusion_boundary_lo = reflecting
+radiation_transport.diffusion_boundary_hi = reflecting

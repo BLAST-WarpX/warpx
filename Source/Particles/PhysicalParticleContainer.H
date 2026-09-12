@@ -27,6 +27,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 
 #include <AMReX_GpuContainers.H>
+#include <AMReX_Parser.H>
 #include <AMReX_Particles.H>
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
@@ -222,6 +223,24 @@ public:
                                             const amrex::FArrayBox& Bx,
                                             const amrex::FArrayBox& By,
                                             const amrex::FArrayBox& Bz);
+
+    /**
+     * \brief Advance one adjacent hybrid ion charge-state transition.
+     *
+     * The configured parser supplies a Maxwellian rate coefficient K_Z
+     * [m^3/s]. Each accepted Z->Z+1 event increments the particle's runtime
+     * integer charge state and deposits its ionization-potential energy into
+     * \p binding_energy_density. No kinetic electron macro-particle is made;
+     * the hybrid electron fluid receives the conjugate density and energy
+     * update after charge/current are redeposited.
+     */
+    void DoHybridIonization (
+        int lev,
+        amrex::MultiFab const& electron_charge_density,
+        amrex::MultiFab const& electron_temperature,
+        amrex::MultiFab& binding_energy_density,
+        amrex::Real time,
+        amrex::Real dt);
 
     // Inject particles in Box 'part_box'
     virtual void AddParticles (int lev);
@@ -444,6 +463,12 @@ public:
 
 protected:
 
+    /** Per-call context for the exact hybrid pressure-work ledger. These fields
+     * are owned by WarpX; the container only borrows them while Evolve invokes
+     * the fused full Boris push. */
+    bool m_collect_hybrid_pressure_work = false;
+    ablastr::fields::VectorField m_hybrid_pressure_work_current_aux{};
+
     /*
        Finds the box defining the region where refine injection should be used, if that
        option is enabled. Currently this only works for numLevels() == 2 and static mesh
@@ -514,6 +539,10 @@ protected:
     amrex::Vector< std::unique_ptr<amrex::Parser> > m_user_int_attrib_parser;
     /* Vector of user-defined parser for initializing user-defined real attributes */
     amrex::Vector< std::unique_ptr<amrex::Parser> > m_user_real_attrib_parser;
+
+    std::string m_hybrid_ionization_rate_expression;
+    std::unique_ptr<amrex::Parser> m_hybrid_ionization_rate_parser;
+    amrex::ParserExecutor<7> m_hybrid_ionization_rate;
 
 };
 

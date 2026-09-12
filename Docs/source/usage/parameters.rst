@@ -271,13 +271,21 @@ Overall simulation parameters
           - ``newton.max_iterations`` (``int``, default: 100)
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
+          - ``newton.jfnk_epsilon`` (``float``, default: ``max(1.0e-6, sqrt(machine epsilon))``)
+            Relative perturbation scale for the finite-difference JVP in the
+            matrix-free linear solve. The value must be finite and greater
+            than zero; it is dimensionless under the solver's existing
+            perturbation scaling.
           - ``newton.diagnostic_file`` (``string``, default: None)
           - ``newton.diagnostic_interval`` (``int``, default: 1)
 
           - The PS-JFNK solver uses GMRES to solve the linear system at each nonlinear iteration:
 
           - ``gmres.verbose_int`` (``int``, default: 2)
-          - ``gmres.restart_length`` (``int``, default: 30)
+          - ``gmres.restart_length`` (``int``, default: 30) Positive, dimensionless Krylov basis size before restarting.
+            The default is 30 for both native GMRES and PETSc's GMRES; with
+            ``newton.linear_solver = petsc_ksp``, the PETSc command-line option
+            ``-ksp_gmres_restart`` takes precedence.
           - ``gmres.max_iterations`` (``int``, default: 1000)
           - ``gmres.relative_tolerance`` (``float``, default: 1.0e-4)
           - ``gmres.absolute_tolerance`` (``float``, default: 0.0)
@@ -2062,6 +2070,57 @@ Particle initialization
 
     Do field ionization for this species (using the ADK theory).
 
+.. pp:param:: <species_name>.do_hybrid_ionization
+    :type: ``0`` or ``1``
+    :default: ``0``
+    :optional:
+
+    Evolve this ion species through adjacent integer charge states using the
+    hybrid fluid-electron ionization operator. An accepted
+    :math:`Z\rightarrow Z+1` transition changes the particle charge used by the
+    pusher and charge/current deposition, increases the quasineutral hybrid
+    electron density by the same weighted particle count, and removes the
+    element's tabulated ionization potential from the hybrid electron internal
+    energy. It does not create a kinetic product-electron species. The initial
+    implementation permits at most one transition per macro-particle and PIC
+    step and supports Cartesian and RCYLINDER geometry. The rate is evaluated
+    at the operator-split endpoint :math:`t^{n+1}`, after ion transport and the
+    QDSMC electron-energy update. The new charge state is then used when ion
+    charge and midpoint current are redeposited for the field update; this is a
+    first-order Lie split in the ionization source.
+
+    This option requires the hybrid solver,
+    :pp:param:`hybrid_pic_model.solve_electron_energy_equation = 1`, base
+    particle ``charge = q_e``, positive particle mass, and
+    ``hybrid_pic_model.electron_thermodynamics = ideal_gas`` with finite
+    :pp:param:`hybrid_pic_model.gamma` greater than one. It cannot be combined
+    with ``do_field_ionization`` or the current
+    ``electron_ion_relaxation_rate`` implementation. Until all consumers use
+    each particle's runtime charge state, the initial implementation also
+    requires ``warpx.use_filter = 0`` and disallows collisions involving this
+    species, global-Debye-length and inverse-bremsstrahlung collision paths,
+    ``warpx.max_omegap_dt``, ``warpx.max_omegac_dt``, Joule heating redirected
+    to ions, and ``velocity_coincidence_thinning`` resampling. Unsupported
+    combinations abort during initialization rather than silently using the
+    base :math:`Z=1` charge.
+
+.. pp:param:: <species_name>.hybrid_ionization_rate_coefficient(x,y,z,t,ne,Te,Z)
+    :type: ``string``
+
+    Required when ``do_hybrid_ionization = 1``. Maxwellian ionization rate
+    coefficient :math:`K_Z` in :math:`\mathrm{m^3/s}`, evaluated at particle
+    position and endpoint time :math:`t^{n+1}`. ``ne`` is the gathered hybrid
+    electron number density in :math:`\mathrm{m^{-3}}`, ``Te`` is the gathered
+    electron temperature in eV, and ``Z`` is the current integer charge state.
+    The one-step transition probability is
+    :math:`1-\exp(-n_e K_Z\Delta t)`. The expression must return a finite
+    non-negative value.
+
+    The full diagnostics fields ``hybrid_ionization_electron_source_fp``
+    (:math:`\mathrm{m^{-3}}` liberated during the current step) and
+    ``hybrid_ionization_binding_energy_fp`` (:math:`\mathrm{J/m^3}` removed
+    during the current step) expose the two conservative source ledgers.
+
 .. pp:param:: <species_name>.do_adk_correction
     :type: ``0`` or ``1``
     :default: ``0``
@@ -2074,8 +2133,9 @@ Particle initialization
 .. pp:param:: <species_name>.physical_element
     :type: ``string``
 
-    Only read if ``do_field_ionization = 1``. Symbol of chemical element for
-    this species. Example: for Helium, use ``physical_element = He``.
+    Read if ``do_field_ionization = 1`` or ``do_hybrid_ionization = 1``. Symbol
+    of chemical element for this species. Example: for Helium, use
+    ``physical_element = He``.
     All the elements up to atomic number Z=100 (Fermium) are supported.
 
 .. pp:param:: <species_name>.ionization_product_species
@@ -2083,16 +2143,20 @@ Particle initialization
 
     Only read if ``do_field_ionization = 1``. Name of species in which ionized
     electrons are stored. This species must be created as a regular species
-    in the input file (in particular, it must be in :pp:param:`particles.species_names`).
+    in the input file (in particular, it must be in
+    :pp:param:`particles.species_names`) and must have
+    ``species_type = electron``, ``charge = -q_e`` and ``mass = m_e``.
 
 .. pp:param:: <species_name>.ionization_initial_level
     :type: ``int``
     :default: ``0``
     :optional:
 
-    Only read if ``do_field_ionization = 1``. Initial ionization level of the
-    species (must be smaller than the atomic number of chemical element given
-    in ``physical_element``).
+    Read if ``do_field_ionization = 1`` or ``do_hybrid_ionization = 1``.
+    Initial ionization level of the species. It must be between zero and the
+    atomic number of the chemical element given in ``physical_element``,
+    inclusive. A fully stripped initial state (equal to the atomic number)
+    produces no additional electrons.
 
 .. pp:param:: <species_name>.do_resampling
     :type: ``0`` or ``1``
@@ -3873,6 +3937,19 @@ Maxwell solver: kinetic-fluid hybrid
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the reference density, in :math:`m^{-3}`, used to calculate
     the electron pressure (see :ref:`here <theory-hybrid-model-elec-temp>`).
 
+.. pp:param:: hybrid_pic_model.initial_elec_temp(x,y,z)
+    :type: :ref:`parser_function <running-cpp-parameters-parser>`
+    :optional:
+
+    Cold-start electron-temperature profile in eV for
+    ``hybrid_pic_model.solve_electron_energy_equation = 1``.
+    Values must be finite and strictly positive at all temperature grid points,
+    including guard cells. Coordinates follow the usual geometry convention
+    (``z`` in 1D; ``x`` is radius in cylindrical geometries).
+    The required scalar ``hybrid_pic_model.elec_temp`` remains the reference
+    temperature. The profile is not reapplied on restart and does not select
+    a different electron-energy transport or material closure.
+
 .. pp:param:: hybrid_pic_model.gamma
     :type: ``float``
     :default: ``5/3``
@@ -3927,15 +4004,410 @@ Maxwell solver: kinetic-fluid hybrid
     (see the :ref:`theory section <theory-hybrid-model-electron-energy-eq>`), instead of evaluating the polytropic
     closure with the constant reference state :math:`(n_0, T_{e0})`.
 
+.. pp:param:: hybrid_pic_model.conservative_pressure_work
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    If :pp:param:`algo.maxwell_solver` is ``hybrid``, pair the electron-pressure
+    part of the electric force in each full Boris ion push with an equal and
+    opposite update of the evolved electron internal energy. The particle
+    gather and work-current scatter are discrete transpose operators, and the
+    pressure and charge-density denominator used by Ohm's law are checkpointed
+    for restart-consistent work accounting. See the
+    :ref:`theory section <theory-hybrid-model-electron-energy-eq>`.
+    The opposite electron work is applied before the mass-consistent
+    finite-volume remap so moving exact-vacuum fronts do not leave unsupported
+    energy behind. In this nonlinear path, EOS pressure uses the deposited
+    material support and vanishes at zero density; the configured density
+    floor remains confined to the Ohm-law denominator. A deterministic
+    conservative cleanup handles only machine-roundoff-sized finite-volume
+    cancellation at an evacuated node by returning that residual through
+    positive-support material-outflow faces. Larger residuals, missing
+    recipients, and outflow into endpoint vacuum abort rather than being
+    clipped.
+
+    This experimental option requires
+    :pp:param:`hybrid_pic_model.solve_electron_energy_equation`, a nonlinear
+    finite-volume electron-thermodynamics backend, double-precision fields,
+    one AMR level, periodic Cartesian field and particle boundaries (or the
+    separately enabled PEC-wall extension below), a
+    collocated grid, direct non-Galerkin field gather, particle shape order one
+    through four, the Boris pusher, ``collisions.split_momentum_push = 0`` and
+    ``warpx.synchronize_velocity_for_diagnostics = 0``. The conserved kinetic
+    energy is consequently the ordinary unsynchronized leapfrog value; the
+    temporary diagnostic half-push does not yet have an electron-energy
+    counterpart. External hybrid split fields, NCI filtering,
+    radiation-reaction/QED momentum changes and charged species that do not
+    gather, push or deposit are not yet supported. Rigid injected species are
+    also rejected because their per-particle field scaling does not yet have a
+    matching pressure-work adjoint.
+
+.. pp:param:: hybrid_pic_model.conservative_pressure_work_pec
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Experimental 1D stationary-wall extension of
+    :pp:param:`hybrid_pic_model.conservative_pressure_work`. It requires that
+    option and all its other restrictions. Every nonperiodic direction must
+    have PEC field boundaries and reflecting particle boundaries on both
+    faces; periodic directions retain their existing behavior. The domain
+    must span the work-current ghost support. This does not enable radiation
+    transport at physical particle boundaries or support thermal reemission,
+    open particle loss, radial geometries, or moving walls.
+
+    For this extension only, physical wall-node pressure remains the local EOS
+    pressure. Even ghost reflection supplies the normal Neumann condition
+    without replacing the pressure of an evolving half-volume energy node
+    with its neighbor's value. The isolated pressure electric field uses the
+    same PEC mask and ghost parity as the gathered total electric field.
+    Work-current deposits use its transpose boundary map, and the electron
+    work debit includes the physical nodal control-volume weights. Existing
+    boundary behavior is unchanged when this option is false.
+
+.. pp:param:: hybrid_pic_model.electron_thermodynamics
+    :type: ``string``
+    :default: ``ideal_gas``
+    :optional:
+
+    Electron thermodynamics backend used to reconstruct pressure and to apply
+    radiation/material energy exchange to the evolved hybrid electron
+    temperature. ``ideal_gas`` preserves :math:`P_e=n_e k_B T_e` and
+    :math:`u_e=P_e/(\gamma-1)`. ``fixed_charge_latent_energy`` adds one or
+    more bounded analytic internal-energy reservoirs while retaining the same
+    pressure and fixed electron charge. Its thermal energy, heat capacity, and
+    energy-to-temperature inverse are shared by the radiation LTE state and the
+    conservative cell-to-node electron-energy source.
+
+    ``singularity_spiner`` loads the ``ElectronOnly`` split from one
+    Singularity-EOS SP5 file per fixed-charge material species. WarpX deposits
+    each species' ion number independently of charge state, converts that
+    number to mass density using the particle mass, then sums the pure-material
+    electron pressures,
+    energies and heat capacities evaluated at the partial mass densities. The
+    current additive partial-density rule is an approximation rather than a
+    pressure-temperature-equilibrium mixture closure. For PIC shape tails
+    below a table's minimum density, specific energy and heat capacity are
+    evaluated at the minimum tabulated density while deposited mass is retained;
+    pressure is scaled by the actual-to-minimum density ratio. This controlled
+    dilute extension makes all extensive contributions approach zero
+    continuously. A density above the table maximum, or temperature outside
+    the common table range, aborts. The table's absolute specific-energy zero is
+    retained, while removable radiation energy is evaluated separately as
+    :math:`U_e(T)-U_e(T_\min)`. Negative absolute specific energies are valid:
+    nonlinear LTE residuals use per-node energy differences and do not require
+    a non-negative table reference. This backend requires a build configured
+    with ``WarpX_SINGULARITY_EOS=ON`` and is initially restricted to ``NOACC``
+    and ``OMP`` CPU builds, fixed-charge particle ions, and
+    ``warpx.use_filter=0``. Joule heating and electron-ion relaxation use the
+    same tabulated caloric inverse as radiation exchange. Cold-fluid species
+    are rejected until they provide matching per-material mass-density fields.
+    SINGLE-precision builds may compile with the Singularity-EOS dependency,
+    but selecting ``singularity_spiner`` requires ``WarpX_PRECISION=DOUBLE``;
+    SINGLE field precision is not qualified for tabulated electron-energy
+    source and ledger updates. C++ consumers must include WarpX's
+    Singularity-EOS adapter before any native Singularity-EOS or ports-of-call
+    header, and must not mix adapted and native definitions across translation
+    units.
+    SP5 files and material IDs are external, immutable restart dependencies:
+    checkpoints store the evolved electron temperature but do not embed or
+    checksum the tables, so a restarted run must use byte-identical table files
+    and the same IDs.
+
+    For radiation/material exchange, raw deposited density is first tested
+    against the radiation material-mask threshold; participating nodes then
+    evaluate thermodynamics at :math:`\max(n_e,n_\mathrm{floor})` using
+    :pp:param:`hybrid_pic_model.n_floor`. The supported single-material
+    Cartesian nonlinear transport path instead advances internal energy on
+    the raw nonnegative deposited support, inverts the configured caloric EOS,
+    and reconstructs pressure with an exact homogeneous vacuum limit. The
+    density floor is not material support for that finite-volume update.
+    Radial geometries and multi-material SP5 states retain the documented
+    ideal-entropy QDSMC fallback pending metric- and composition-aware finite
+    volumes. This backend is not used to compute the algebraic
+    electron-pressure closure, although its input value is still validated
+    when the hybrid model is initialized. Unavailable backends are rejected
+    rather than silently replaced by an ideal gas. The
+    ``implicit_temperature`` LTE solver uses the exact constant-heat-capacity
+    residual for ``ideal_gas`` and a bracketed common-temperature-increment
+    solve plus conservative cell-to-node remap for nonlinear caloric backends.
+    ``frozen_temperature`` remains available for an explicitly split source.
+    The analytic backend requires :math:`\gamma>1` and is a phenomenological
+    fixed-charge caloric reservoir, not evolving ionization: it does not change
+    particle charge, electron density, opacity, or atomic populations.
+
+    Both analytic and table-backed material states distinguish the
+    composition's nuclear atomic number from the represented plasma charge
+    state. The latter is computed as :math:`\bar Z=n_e/n_i`; the former must
+    never be used as an ionization state. This separation keeps mass and ion
+    count invariant when explicit hybrid ionization changes particle charge.
+
+.. pp:param:: hybrid_pic_model.electron_composition_species
+    :type: ``list of strings``
+    :default: none
+    :optional:
+
+    One massive, positively charged material species supplying an independent
+    ion-number density to the analytic ``ideal_gas`` or
+    ``fixed_charge_latent_energy`` electron closure. This first adapter is
+    deliberately single-material. It may be used with evolving hybrid charge
+    state because its number-density deposition ignores ionization level.
+    Every depositing charged hybrid material must be represented.
+
+.. pp:param:: hybrid_pic_model.electron_composition_atomic_mass
+    :type: ``list of real``
+    :unit: atomic mass unit
+    :default: none
+    :optional:
+
+    Atomic mass corresponding to ``electron_composition_species``. It is
+    a strict invariant of the electron-thermodynamics material contract: it
+    must match the corresponding particle mass, converted from atomic mass
+    units to SI, within a relative tolerance of :math:`10^{-6}`. WarpX aborts
+    during initialization on a mismatch; effective-mass mappings are currently
+    unsupported. The particle mass is the inertia mass for kinetic particles,
+    and the configured or tabulated composition mass must describe that same
+    physical material. This invariant prevents a density conversion intended
+    for an analytic closure or ``ElectronOnly`` EOS table from representing a
+    different material mass; it does not repair or certify any separate
+    density-conversion path. Allowing the masses to diverge would evolve
+    kinetic transport with one material mass while the thermodynamics or table
+    composition represented another.
+
+.. pp:param:: hybrid_pic_model.electron_composition_atomic_number
+    :type: ``list of real``
+    :default: none
+    :optional:
+
+    Nuclear atomic number corresponding to
+    ``electron_composition_species``. This is composition metadata, not an
+    equilibrium or represented ionization state.
+
+.. pp:param:: hybrid_pic_model.electron_eos_species
+    :type: ``list of strings``
+    :default: none
+    :optional:
+
+    Fixed-charge, massive, positively charged particle species that provide
+    the ion mass densities for ``electron_thermodynamics=singularity_spiner``.
+    Every positively charged hybrid material species must be listed exactly
+    once. Explicit hybrid ionization is rejected because an equilibrium
+    ``ElectronOnly`` table already incorporates an ionization model. When
+    ``materials.names`` is enabled, this list may be omitted; otherwise, it
+    must exactly match the registry's material-name-ordered carrier list.
+
+.. pp:param:: hybrid_pic_model.electron_eos_<species>_table_file
+    :type: ``string``
+    :default: none
+    :optional:
+
+    Singularity-EOS SP5 file containing the ``ElectronOnly`` split for the
+    corresponding entry of ``electron_eos_species``.
+
+.. pp:param:: hybrid_pic_model.electron_eos_<species>_material_id
+    :type: ``int``
+    :default: none
+    :optional:
+
+    Material identifier to load from
+    ``electron_eos_<species>_table_file``.
+
+.. rubric:: Experimental named-material registry
+
+The opt-in ``materials`` namespace provides one canonical, order-independent
+mapping from named materials to their particle carrier species and external
+table metadata.  In this initial configuration/validation foundation, material
+definitions are sorted by name and every depositing, massive, positively
+charged particle species must belong to exactly one material.  Carrier species
+must have a fixed charge state.  Unknown, duplicate, missing, non-depositing,
+massless, negatively charged, and evolving-charge carriers are rejected during
+initialization.
+
+Only ``vacuum`` plus one resolved material per cell is supported.  Native HDF5
+radiation opacity uses the device-safe selector at runtime: WarpX deposits the
+charge-independent number density of each registered carrier, forms one mass
+density per material, and evaluates only the dominant material's table.  Vacuum
+has exactly zero opacity.  Before each radiation advance, all owned cells are
+classified and a global mixed/invalid-cell result aborts before packets,
+diffusion energy, or material source ledgers are mutated.  Density guard cells
+are filled only after that classification succeeds.
+
+This selection is not a mixture model.  WarpX does not combine pure-material
+EOS tables or add independently group-averaged Rosseland opacities.  Native
+HDF5 opacity and the host-only Singularity-EOS adapter both use the same
+registry-order selector and evaluate only the resolved material's table.
+Unresolved mixed cells are rejected.  The EOS adapter currently requires
+exactly one carrier species for each registered material and its nonlinear
+finite-volume electron-energy transport remains restricted to one material;
+multi-material configurations use the documented ideal-entropy QDSMC
+fallback for compression and expansion.
+
+This first adapter is incompatible with evolving-charge carriers and with
+combining explicit ionization with a Singularity ``ElectronOnly`` EOS table.
+It therefore does **not** unlock an ionizing tungsten model.  The registry is
+table identity and membership metadata, not an atomic-population or equation-of-
+state model.
+
+.. pp:param:: materials.names
+    :type: ``list of strings``
+    :default: none
+    :optional:
+
+    Unique material names.  An absent or empty list disables the registry.  The
+    internal order is lexicographic and therefore independent of input order.
+
+.. pp:param:: materials.mixture_policy
+    :type: ``string``
+    :default: ``resolved_single_material``
+    :optional:
+
+    Cell-composition contract.  Only ``resolved_single_material`` is currently
+    accepted; no additive Rosseland or pure-table EOS mixture is implied.
+
+.. pp:param:: materials.mixed_cell_relative_tolerance
+    :type: ``real``
+    :default: ``1.e-12``
+    :optional:
+
+    Maximum ratio between the aggregate non-dominant material mass density and
+    the total mass density for a cell to resolve to its dominant material.  It
+    must be finite and in :math:`[0,0.5)`, which guarantees unique dominance.
+    The classifier accepts equality with the larger of this relative limit and
+    ``mixed_cell_absolute_tolerance``.
+
+.. pp:param:: materials.mixed_cell_absolute_tolerance
+    :type: ``real``
+    :default: ``0``
+    :unit: kg/m\ :sup:`3`
+    :optional:
+
+    Non-negative absolute aggregate non-dominant mass-density tolerance.  A
+    resolved cell ignores the non-dominant material below this numerical-tail
+    threshold; it does not combine material EOS or opacity tables.
+
+.. pp:param:: materials.vacuum_mass_density
+    :type: ``real``
+    :default: ``0``
+    :unit: kg/m\ :sup:`3`
+    :optional:
+
+    A cell whose total registered material mass density is at or below this
+    finite non-negative threshold is classified as vacuum without selecting a
+    material.
+
+.. pp:param:: materials.<name>.species
+    :type: ``list of strings``
+    :default: none
+
+    Nonempty, exclusive list of fixed-charge positive particle carriers for
+    material ``<name>``.  Every depositing massive positive species in the run
+    must occur in exactly one such list.
+
+.. pp:param:: materials.<name>.electron_eos_table_file
+    :type: ``string``
+    :default: none
+    :optional:
+
+    External EOS table identity.  It must be specified together with
+    ``materials.<name>.electron_eos_material_id``.  The
+    ``singularity_spiner`` adapter loads registered tables directly in sorted
+    material-name order.  A redundant legacy
+    ``hybrid_pic_model.electron_eos_<species>_table_file`` input is accepted
+    only when its normalized file and material ID match the registry handle.
+
+.. pp:param:: materials.<name>.electron_eos_material_id
+    :type: ``int``
+    :default: none
+    :optional:
+
+    Non-negative EOS material identifier paired with
+    ``materials.<name>.electron_eos_table_file``.
+
+.. pp:param:: materials.<name>.electron_eos_material_key
+    :type: ``string``
+    :default: material name
+    :optional:
+
+    Nonempty provenance key retained with the EOS handle.  The current SP5 API
+    does not expose an independent composition/provenance key to validate.
+
+.. pp:param:: materials.<name>.opacity_table_file
+    :type: ``string``
+    :default: none
+    :optional:
+
+    External HDF5 opacity table identity.  It must be specified together with
+    ``materials.<name>.opacity_material_id``.  If any registered material has
+    an opacity handle, every registered material must have one.  Up to eight
+    tables are loaded in order-independent material-name order.  Their material
+    keys and normalized file/material-ID selections must be unique, and their
+    group edges and representative energies must be identical.  A redundant
+    :pp:param:`radiation_transport.material_opacity_table_file`/ID pair is
+    accepted only for one registered material and must match its handle exactly.
+
+.. pp:param:: materials.<name>.opacity_material_id
+    :type: ``int``
+    :default: none
+    :optional:
+
+    Non-negative opacity material identifier paired with
+    ``materials.<name>.opacity_table_file``.
+
+.. pp:param:: materials.<name>.opacity_material_key
+    :type: ``string``
+    :default: material name
+    :optional:
+
+    Nonempty material/provenance key.  When the native HDF5 opacity API exposes
+    its material key, WarpX requires an exact match after loading the table.
+
+.. pp:param:: hybrid_pic_model.electron_latent_transition_temperature_eV
+    :type: ``list of real``
+    :unit: eV
+    :default: none
+    :optional:
+
+    Strictly increasing transition temperatures required by
+    ``electron_thermodynamics=fixed_charge_latent_energy``. For transition
+    :math:`j`, the stored fraction is
+    :math:`f_j(T)=[1+(T_j/T)^{p_j}]^{-1}` and equals one half at :math:`T_j`.
+    Between one and eight transitions may be configured.
+
+.. pp:param:: hybrid_pic_model.electron_latent_energy_eV
+    :type: ``list of real``
+    :unit: eV per effective electron
+    :default: none
+    :optional:
+
+    Positive saturation energy of each analytic reservoir. The list length
+    must match ``electron_latent_transition_temperature_eV``. The resulting
+    caloric energy is
+    :math:`u_e=n_e k_B T_e/(\gamma-1)+n_e\sum_j\epsilon_j f_j(T_e)`.
+
+.. pp:param:: hybrid_pic_model.electron_latent_sharpness
+    :type: ``list of real``
+    :default: ``4`` for every transition
+    :optional:
+
+    Finite transition exponents :math:`2\leq p_j\leq 64`. If specified, the
+    list length must match the transition-temperature list.
+
 .. pp:param:: hybrid_pic_model.include_joule_heating
     :type: ``bool``
     :default: ``false``
     :optional:
 
-    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this adds the Joule-heating source
-    consistent with the resistive friction in Ohm's law, applied per ion species with the effective resistivity
-    :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. For a single species this reduces to
-    :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`.
+    If :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, this
+    adds the Joule-heating source consistent with the resistive friction in
+    Ohm's law, applied per ion species with the effective resistivity
+    :math:`\eta_{s,\mathrm{eff}} = \eta + \eta_s`. The requested energy
+    increment is applied through the configured electron caloric inverse; for
+    an ideal gas and a single species this reduces to
+    :math:`dT_e/dt = (\gamma - 1)\,\eta J^2/(n_e k_B)`. The realized EOS
+    energy change is written to ``hybrid_joule_electron_energy_fp`` [J/m3]
+    and accumulated in
+    ``hybrid_joule_electron_energy_cumulative_fp``.
 
 .. pp:param:: hybrid_pic_model.joule_redirect_Te_threshold
     :type: ``float``
@@ -3955,14 +4427,42 @@ Maxwell solver: kinetic-fluid hybrid
 
     The electron-ion relaxation rate :math:`\nu_{ei}`, in :math:`s^{-1}`. If
     :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on, specifying this rate enables the
-    electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`
-    as a sink on the electron fluid, paired with matching heating of the ion macro-particles about
-    each species' bulk velocity. This exchanges thermal energy without changing the ion bulk momentum.
-    The required shape-aware ion temperature deposition
+    electron-ion thermal-equilibration exchange :math:`Q_{ei} = \sum_s 3 n_s k_B \nu_{ei} (T_e - T_{i,s})`.
+    The electron source uses the exact frozen-coefficient two-temperature
+    solution with both finite heat capacities, so a stiff step cannot
+    overshoot equilibrium. Its realized EOS energy change is written to
+    ``hybrid_qei_electron_energy_fp`` [J/m3] and accumulated in
+    ``hybrid_qei_electron_energy_cumulative_fp``. For material-aware states,
+    :math:`n_s` comes from the charge-independent ion-number deposit rather
+    than from a fixed charge, so changing high-Z charge state cannot create
+    ion mass.
+
+    The ion macro-particle update first makes a stochastic drag/diffusion
+    proposal and then applies a strict cell-local moment projection. The
+    projection preserves the pre-step ion momentum and sets the cell's
+    nonrelativistic ion thermal-energy change to the negative electron ledger,
+    integrated from nodal dual volumes through their physical cell corners.
+    It does not redistribute an unsupported request to another cell. A cell
+    that exchanges energy must therefore contain resolved ion thermal
+    variance, and an ion-cooling request cannot exceed its available thermal
+    energy; otherwise WarpX stops with an actionable error. This is the
+    nonrelativistic energy contract consistent with the present QDSMC
+    collision operator. The required
+    shape-aware ion temperature deposition
     (``<species>.do_temperature_deposition``) is enabled automatically on every charged species.
     The expression can depend on the total charge density ``rho`` (:math:`C/m^3`), the electron and ion
     temperatures ``Te`` and ``Ti`` (both in eV) and the time ``t`` (:math:`s`), which permits, e.g., the
     NRL-formulary Spitzer rate.
+
+    The exact per-species operands are available as
+    ``hybrid_qei_ion_temperature_fp_<species>`` [eV] and
+    ``hybrid_qei_electron_temperature_before_fp_<species>`` [eV], with
+    ``hybrid_qei_electron_energy_fp_<species>`` [J/m3]. The locally mapped ion
+    request is ``hybrid_qei_ion_energy_cc_<species>`` [J/m3] on particle
+    cells. They are deliberately
+    separate from the legacy ``T_<species>`` diagnostic, which recomputes an
+    NGP estimator instead of recording the shape-aware temperature consumed by
+    this source.
 
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``
@@ -4124,6 +4624,1110 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     This sets the relative strength of the external vector potential by a dimensionless implicit time function, which can compute the external B fields and E fields based on the value and first time derivative of the function.
+
+
+Hybrid multigroup radiation transport
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The radiation-transport module combines streaming photon macroparticles with a
+cell-centered, optically thick radiation representation. Streaming photons undergo
+continuous absorption. Their paths are divided into segments shorter than a fraction
+of the smallest cell size, and on each segment the photon weight is attenuated as
+
+.. math::
+
+   w^{n+1} = w^n \exp(-\alpha c\Delta t_s),
+
+where :math:`\alpha` is the local absorption coefficient and :math:`\Delta t_s` is the
+path-segment duration. Boundary conditions and particle redistribution are applied
+between segments, so attenuation is deposited in every traversed cell, including
+across grid and MPI-rank boundaries. The ordinary photon pusher does not advance the
+position a second time when radiation transport owns the photon path.
+
+Removed photon energy is accumulated in ``radiation_material_energy`` in joules per
+cell. This signed, conservative ledger can remain diagnostic-only or be coupled to
+hybrid-fluid or kinetic electrons. Positive values heat matter; negative values cool
+it.
+
+With ``material_coupling = hybrid_electrons``, radiation energy is added immediately
+after radiation transport and before the QDSMC electron-energy update. Thus, QDSMC
+advects the radiation-updated internal energy and continues to own electron advection,
+Joule heating and electron-ion exchange. The electron pressure is rebuilt from the resulting
+temperature. The evolved QDSMC temperature is checkpointed and restored together with
+the persistent radiation state. With ``material_coupling = kinetic_electrons``, each
+cell's absorbed energy changes only the velocity spread about the weighted cell-mean
+proper velocity. The moment basis is the same particle-local basis used by
+``DepositTotalNGPTemperature``: :math:`(x,y,z)` in Cartesian geometry,
+:math:`(r,\theta,z)` in cylindrical geometry, and :math:`(r,\theta,\phi)` in
+spherical geometry. A bracketed relativistic solve scales that spread to reproduce the
+requested kinetic energy while preserving the weighted electron momentum in this local
+basis. This cell-local invariant does not promise conservation of global Cartesian
+momentum or angular momentum for particles at different angles or on a coordinate axis.
+Exactly cold cells with two or more particles receive a deterministic seed spread keyed
+by AMReX's packed particle identity (particle ID and CPU at birth), which remains attached
+to a particle across migration and restart. The weighted seed mean is removed before
+scaling. Heating a one-particle cell and cooling below the minimum kinetic energy
+compatible with the local cell momentum abort with a diagnostic instead of silently
+violating the energy or momentum ledger.
+
+Optional LTE exchange evolves each component :math:`E_g` of the cell-integrated
+thick-radiation field ``radiation_diffusion_energy`` according to
+
+.. math::
+
+   \frac{dE_g}{dt} = c\alpha_{P,g}\left(f_g(T_e)aT_e^4 V-E_g\right),
+
+Here :math:`a` is the radiation constant, :math:`\alpha_{P,g}` is the group Planck
+absorption coefficient and :math:`V` is the physical cell volume, including
+cylindrical or spherical volume factors. By default, the material temperature and
+opacity are frozen over the PIC step and this equation is integrated exactly. For
+group bounds :math:`E_{g-1},E_g`, the blackbody fraction is
+
+.. math::
+
+   f_g(T) = \frac{15}{\pi^4}
+      \int_{E_{g-1}/k_BT}^{E_g/k_BT}\frac{x^3}{e^x-1}\,dx.
+
+The first and last groups include the zero- and infinite-energy tails, respectively,
+so :math:`\sum_g f_g=1`. With no configured boundaries there is one component,
+:math:`f_0=1`, which exactly recovers grey transport. The opposite of the summed group
+energy increment is placed in ``radiation_material_energy``. A single conservative
+limiter bounds simultaneous group emission by the locally available electron energy,
+while allowing absorption in one group to fund emission in another, so neither a
+hybrid temperature nor a kinetic-particle energy becomes negative.
+
+For stiff absorption/emission, ``lte_exchange_solver = implicit_temperature`` instead
+finds a common final material temperature :math:`T_*` from
+
+.. math::
+
+   C_V T_* + \sum_g \left[E_g^n
+   + \left(f_g(T_*)aT_*^4V-E_g^n\right)
+   \left(1-e^{-c\alpha_{P,g}(T_*)\Delta t}\right)\right]
+   = U_m^{\mathrm{start}} + \sum_g E_g^n.
+
+The cell-local effective heat capacity :math:`C_V` is held constant during this
+operator and inferred from the beginning-of-operator electron energy and temperature.
+:math:`U_m^{\mathrm{start}}` also includes streaming energy absorbed earlier in the
+same radiation step. A bounded bisection solve evaluates Planck opacities and group
+fractions at :math:`T_*`; Rosseland opacities are likewise refreshed at this coupled
+temperature. The resulting single signed material ledger remains exactly conservative
+and uses the same QDSMC or kinetic-particle adapter as the default solver. This option
+prevents a hot, frozen beginning-of-step temperature from over-emitting during an
+optically stiff step. It is a local constant-heat-capacity closure, not a tabulated
+material equation of state.
+
+Flux-limited diffusion transports every energy-group component independently through
+optically thick cells. It uses the Levermore--Pomraning limiter
+
+.. math::
+
+   D_g = \frac{c\lambda(R_g)}{\alpha_{R,g}}, \qquad
+   \lambda(R_g)=\frac{2+R_g}{6+3R_g+R_g^2}, \qquad
+   R_g=\frac{|\nabla u_g|}{\alpha_{R,g} u_g},
+
+with conservative finite-volume face fluxes and explicit stability subcycling. With
+particle conversion enabled, a streaming packet that enters a cell above its group's
+configured optical-depth threshold is thermalized into that diffusion component;
+conversely, group energy that reaches an optically thin cell is converted conservatively
+into an isotropically directed photon macroparticle at the group's representative energy.
+This bidirectional seam keeps free streaming
+in optically thin regions and avoids tracking long random walks in thick material. The
+particle-path and diffusion updates are first-order operator split over a PIC step. The
+persistent diffusion field is included in checkpoint/restart.
+
+Material coupling is operator split at the beginning of an explicit PIC step. For the
+QDSMC hybrid model, opacity and LTE exchange read :math:`n_e^n,T_e^n`, the conservative
+cell ledger is remapped immediately to the nodal electron internal energy, and QDSMC
+then advects that radiation-updated state to :math:`n+1`. The updated QDSMC temperature
+is checkpointed. For fully kinetic electrons, the same ledger changes particle kinetic
+energies before the ordinary particle push and collision operators. Consequently,
+opacity always reads the material state from the beginning of the split radiation
+operator; users should include this first-order splitting in timestep-convergence
+studies.
+
+.. warning::
+
+   Streaming and diffusion are explicit and support one AMR level. LTE exchange and
+   diffusion are not supported with a moving window because their persistent thick-
+   radiation field is not yet shifted with the window. The optional implicit-
+   temperature solve applies only to cell-local LTE material exchange. The
+   implementation does not yet sample scattering events or their momentum exchange,
+   evolve material composition, or provide an implicit Monte-Carlo/DDMC solve. The
+   optional absorption/diffusion momentum adapter is limited to the hybrid-ion
+   configurations documented below and is not a complete mixed-frame radiation-MHD
+   model. Diffusion faces support reflecting, vacuum/free-streaming and Marshak
+   conditions; periodic mesh directions remain periodic. Multigroup diffusion is
+   frequency-binned and uses one representative energy and group-mean opacity per
+   bin; it does not resolve spectral structure within a group.
+
+.. warning::
+
+   For ``material_coupling = kinetic_electrons``, the opacity/LTE temperature is the
+   cell-local NGP second central velocity moment computed by
+   ``DepositTotalNGPTemperature``. It is a non-relativistic temperature proxy and can
+   be noisy at low particles per cell or inappropriate for strongly non-Maxwellian or
+   relativistic distributions. The conservative kinetic-electron adapter changes
+   thermal kinetic energy at fixed cell-weighted local momentum in the same curvilinear
+   basis used by the temperature deposition. It does not promise global Cartesian or
+   angular-momentum preservation across different particle angles, and it does not
+   implement radiation momentum transfer. The cell-local relativistic root currently
+   requires repeated particle reductions and can be expensive when kinetic material
+   coupling is enabled. Sources below particle-energy floating-point resolution cannot
+   be reproduced separately from the cell's total kinetic energy; the adapter bounds and
+   checks that residual to :math:`2\times 10^{-10}` of the larger energy scale in double
+   precision. The optional first radiation-force adapter described below is restricted
+   to hybrid electrons with kinetic ions. The QDSMC hybrid adapter uses the evolved
+   electron internal-energy temperature directly.
+
+.. pp:param:: radiation_transport.enabled
+   :type: ``bool``
+   :default: ``false``
+   :optional:
+
+   Enable hybrid streaming-photon and thick-field radiation transport. With no
+   :pp:param:`radiation_transport.energy_group_boundaries`, the thick field is grey.
+
+.. pp:param:: radiation_transport.photon_species
+   :type: ``string``
+
+   Name of the existing photon species to transport. Required when radiation transport
+   is enabled.
+
+.. pp:param:: radiation_transport.energy_group_boundaries
+   :type: ``list of floats``
+   :unit: joules
+   :optional:
+
+   Finite internal photon-energy boundaries. ``N`` positive, strictly increasing
+   boundaries define ``N+1`` groups: :math:`[0,E_0)`, the interior intervals, and
+   :math:`[E_{N-1},\infty)`. Streaming packets are assigned from their physical photon
+   energy. The persistent ``radiation_diffusion_energy`` field has one component per
+   group. Omitting this parameter selects one grey group.
+
+.. pp:param:: radiation_transport.group_photon_energies
+   :type: ``list of floats``
+   :unit: joules
+   :optional:
+
+   One positive representative photon energy inside each configured group. These
+   energies evaluate spectral group opacities and set the physical photon energy when
+   diffusion energy converts back to packets. If particle conversion is disabled,
+   omitted values default to half the first boundary, geometric means for interior
+   groups and twice the last boundary. The list is required for multigroup particle
+   conversion. A grey calculation must also supply its single representative energy
+   when it uses a spectral Planck or Rosseland parser/table, or species-aware LTE or
+   diffusion opacity. When :pp:param:`radiation_transport.material_opacity_table_file`
+   is selected, omitted values are read from that table; explicitly configured values
+   must agree with the table representatives.
+
+.. pp:param:: radiation_transport.initial_diffusion_energy_density(x,y,z)
+   :type: ``string``
+   :unit: :math:`\mathrm{J\,m^{-3}}`
+   :optional:
+
+   Cell-centered radiation energy-density profile for a fresh grey calculation.
+   It requires :pp:param:`radiation_transport.enable_diffusion = 1` or
+   :pp:param:`radiation_transport.enable_lte_exchange = 1`, and every evaluation
+   must be finite and non-negative. If it is omitted, the persistent diffusion
+   field starts at zero.
+
+   Coordinates are in meters. In 3D the arguments are Cartesian ``(x,y,z)``;
+   in 2D Cartesian and RZ they are ``(x,0,z)``, where ``x`` is radius in RZ;
+   in 1D Cartesian they are ``(0,0,z)``; and in RCYLINDER or RSPHERE they are
+   ``(r,0,0)``. Although the input is an energy density, the persistent
+   ``radiation_diffusion_energy`` components store cell-integrated energy in
+   J/cell. WarpX multiplies the expression by the Cartesian cell volume, or by
+   the exact annular or spherical-shell volume in radial geometry; suppressed
+   Cartesian directions have unit extent.
+
+   The expression is applied only on a cold start and currently requires
+   :pp:param:`amr.max_level = 0`. It is ignored on restart, when the checkpointed
+   J/cell field takes precedence.
+
+.. pp:param:: radiation_transport.initial_diffusion_energy_density_g<group>(x,y,z)
+   :type: ``string``
+   :unit: :math:`\mathrm{J\,m^{-3}}`
+   :optional:
+
+   Multigroup form of
+   :pp:param:`radiation_transport.initial_diffusion_energy_density(x,y,z)`, with
+   zero-based group indices such as
+   ``initial_diffusion_energy_density_g0(x,y,z)``. Each omitted group starts at
+   zero. A multigroup calculation must use these suffixed parameters; the grey
+   unsuffixed form is rejected. The unsuffixed and group-specific forms are
+   mutually exclusive. Units, coordinate mapping, validation, J/cell storage,
+   cold-start restriction and restart behavior are otherwise identical to the
+   grey form.
+
+.. pp:param:: radiation_transport.initial_diffusion_temperature(x,y,z)
+   :type: ``math expression``
+   :unit: :math:`K`
+   :optional:
+
+   Alternative blackbody radiation-temperature profile, integrated over all
+   configured groups (including spectral tails). It is mutually exclusive with
+   every initial energy-density expression. Values must be finite and nonnegative.
+   The coordinate mapping, cold-start-only behavior and cell-integrated storage
+   are the same as the initial energy-density profiles above. It does not set the
+   material temperature or enable material/radiation exchange.
+
+.. pp:param:: radiation_transport.absorption_coefficient
+   :type: ``float`` or parser function
+   :unit: :math:`\mathrm{m}^{-1}`
+
+   Non-negative streaming-photon absorption coefficient :math:`\alpha`. It can be a
+   scalar or the function
+   ``absorption_coefficient(x,y,z,t,photon_energy,ne,Te)``. Coordinates are in meters,
+   time is in seconds, ``photon_energy`` is the energy of one physical photon in joules,
+   ``ne`` is in :math:`\mathrm{m}^{-3}`, and ``Te`` is in kelvin. Every evaluation must
+   be finite and non-negative. Required when radiation transport is enabled unless
+   :pp:param:`radiation_transport.absorption_coefficient_table_file` or
+   :pp:param:`radiation_transport.opacity_species` supplies a legacy per-species
+   backend, or :pp:param:`radiation_transport.material_opacity_table_file` is supplied.
+
+.. pp:param:: radiation_transport.absorption_coefficient_table_file
+   :type: ``string``
+   :optional:
+
+   Path to a structured three-dimensional spectral-opacity table, as an alternative
+   to :pp:param:`radiation_transport.absorption_coefficient`. The whitespace- or
+   comma-separated file contains ``n_ne n_T n_E``, followed by the electron-density
+   axis in :math:`\mathrm{m}^{-3}`, temperature axis in kelvin, photon-energy axis in
+   joules, and ``n_ne*n_T*n_E`` absorption coefficients in
+   density-major/temperature/photon-energy-fastest order. ``#`` begins a comment.
+   Every axis must contain at least two strictly increasing points. Values outside
+   the table are clamped to the closest endpoint.
+
+.. pp:param:: radiation_transport.opacity_species
+   :type: ``list of strings``
+   :optional:
+
+   List at most eight massive, positively charged WarpX ion species whose cell-centered
+   NGP number densities are deposited once per radiation step. Without
+   :pp:param:`radiation_transport.material_opacity_table_file`, this selects additive,
+   composition-aware opacity instead of the legacy global parser or table backends.
+   With a native material table, the same list supplies only the total material mass
+   density :math:`\rho=\sum_s n_s m_s`; it does not select or sum per-species opacity.
+   Both uses are available with hybrid- and kinetic-electron material coupling.
+
+   For packet absorption, every listed species ``s`` must define exactly one of the
+   analytic parser
+   ``absorption_coefficient_s(x,y,z,t,photon_energy,ni,ne,Te)`` and the spectral table
+   ``absorption_coefficient_table_file_s``. For Planck and Rosseland channels, each
+   species independently chooses exactly one parser, two-dimensional table or spectral
+   table. Their keys are ``planck_absorption_coefficient_table_file_s``,
+   ``planck_absorption_coefficient_spectral_table_file_s``,
+   ``rosseland_transport_coefficient_table_file_s`` and
+   ``rosseland_transport_coefficient_spectral_table_file_s``. A single mixture can use
+   different backend forms for different species.
+
+   Here ``ni`` and the first table axis are that species' number density in
+   :math:`\mathrm{m}^{-3}`. Species tables otherwise use the layouts described for the
+   corresponding global table, replacing the electron-density axis with ``ni``. Table
+   values are partial linear extinction coefficients in :math:`\mathrm{m}^{-1}`, not
+   mass opacities; externally supplied mass-opacity data must first be multiplied by
+   the material mass density. Parser arguments and units match the corresponding global
+   form. WarpX evaluates a partial coefficient only where ``ni`` is positive and sums
+   all listed contributions. Thus an absent species contributes exactly zero rather
+   than the value at a table's clamped lower-density endpoint. Every partial and total
+   coefficient must be finite and non-negative.
+
+   The species-aware backend is mutually exclusive with every global scalar, parser
+   and table form for all enabled opacity channels. Species not named in this list
+   contribute exactly zero opacity; their electrons can still participate in the
+   shared material-energy state. A grey LTE or diffusion calculation using this
+   backend must set its one :pp:param:`radiation_transport.group_photon_energies`
+   value. Spectral tables and parsers receive that representative energy.
+
+.. pp:param:: radiation_transport.material_opacity_table_file
+   :type: ``string``
+   :optional:
+
+   Path to a generator-independent HDF5 multigroup opacity table. This backend requires
+   a build configured with ``WarpX_MATERIAL_OPACITY_HDF5=ON``, a matching integer
+   :pp:param:`radiation_transport.material_opacity_table_id`, and a nonempty
+   :pp:param:`radiation_transport.opacity_species` list. It also requires
+   ``material_coupling = hybrid_electrons`` or ``kinetic_electrons`` to supply the local
+   electron temperature. Used without ``materials.names``, it represents one
+   pre-mixed, fixed-composition material and is mutually exclusive with every global
+   and per-species scalar, parser, and legacy opacity-table backend.
+
+   Alternatively, each ``materials.names`` entry can supply its own
+   ``opacity_table_file``, ``opacity_material_id``, and ``opacity_material_key``.
+   In that mode the legacy global file/ID inputs are omitted and
+   ``opacity_species`` defaults to the sorted union of all registered carrier
+   species. If supplied explicitly, it must match that union exactly. WarpX loads
+   up to eight pure-material tables with identical group structure and selects one
+   table per resolved cell. A vacuum cell returns zero; a mixed or invalid owned
+   cell is rejected by the classification preflight. Material IDs are local to
+   their files, while material keys and normalized file/ID selections must be
+   unique across the registry.
+
+   The selected HDF5 material stores SI mass density and electron-temperature axes,
+   complete group edges from exactly zero to positive infinity, representative photon
+   energies in joules, and Planck true-absorption, Rosseland total-transport, and
+   scattering mass opacities in :math:`\mathrm{m^2\,kg^{-1}}`. WarpX forms
+   :math:`\rho=\sum_s n_s m_s` for the selected material and converts each selected
+   group mass opacity to a linear coefficient
+   :math:`\alpha=\rho\kappa` in :math:`\mathrm{m^{-1}}`. The configured
+   :pp:param:`radiation_transport.energy_group_boundaries` must match all finite table
+   edges. Omitted representative energies are adopted from the table; explicit values
+   must match it. Density or temperature outside the table domain is an error rather
+   than an extrapolation.
+
+   Schema 1 tables are LTE tables. The ``planck_emission`` array is optional; when
+   present, every raw float64 entry ``e`` must satisfy
+   ``abs(a-e) <= 64*epsilon(double)*max(abs(a),abs(e))`` with the corresponding
+   ``planck_absorption`` entry ``a``. WarpX rejects a table that violates this
+   detailed-balance condition. After validation, WarpX canonicalizes the runtime
+   emission channel to the absorption channel, including when an explicit emission
+   array was supplied. Distinct non-LTE absorption and emission means are therefore
+   not supported by the schema 1 native-table backend.
+
+   Streaming packets are binned from their actual photon energy and attenuated with
+   that group's Planck true-absorption mean. This is a group-mean packet approximation,
+   not monochromatic opacity. LTE exchange uses the same true-absorption channel;
+   diffusion and packet-to-diffusion classification use the Rosseland total-transport
+   channel. The table's scattering values are not added to material heating, and this
+   backend does not yet sample scattering events or deposit scattering momentum. WarpX
+   does not validate that the simulated species retain the table's fixed number
+   fractions, so composition evolution is outside this first backend. Checkpoint files
+   do not embed the external HDF5 data; restarts must use the same table contents.
+
+.. pp:param:: radiation_transport.material_opacity_table_id
+   :type: ``integer``
+
+   Material identifier under the HDF5 file's ``/materials`` group. Required together
+   with :pp:param:`radiation_transport.material_opacity_table_file` and used to select
+   exactly one fixed-composition material table.
+
+.. pp:param:: radiation_transport.opacity_table_interpolation
+   :type: ``string``
+   :default: ``linear``
+   :optional:
+
+   Interpolation used by the legacy opacity-table backends. ``linear`` performs
+   multilinear interpolation of SI coordinates and coefficients and permits zero
+   coefficients. ``log_log`` performs multilinear interpolation after taking the
+   natural logarithm of every coordinate and coefficient; all table entries must then
+   be strictly positive. Log-log interpolation is generally preferable for opacity
+   data spanning many orders of magnitude. Native material-opacity HDF5 tables always
+   use log-log density/temperature interpolation and therefore require strictly
+   positive tabulated mass opacities.
+
+.. pp:param:: radiation_transport.path_cell_fraction
+   :type: ``float``
+   :default: ``0.5``
+   :optional:
+
+   Maximum photon transport-substep length as a fraction of the smallest cell size.
+   Must be in :math:`(0,1]`. In Cartesian geometry, every substep is split again at
+   crossed mesh faces, and opacity, attenuation, packet-to-diffusion conversion and
+   material deposition are evaluated in each traversed cell. In radial geometries,
+   the default path remains the bounded starting-cell approximation described below.
+
+.. pp:param:: radiation_transport.require_cell_interface_exact_streaming
+   :type: ``bool``
+   :default: ``0``
+   :optional:
+
+   Require face-exact streaming packet attenuation and deposition for the narrow
+   supported RCYLINDER subset. The domain must contain the axis
+   (``geometry.prob_lo[0] = 0``), the outer radial particle boundary must be
+   ``open``, material momentum coupling must be disabled, and packet-to-diffusion
+   conversion must be disabled. Existing level-0/no-AMR restrictions still apply.
+   The opt-in splits each bounded path at positive-radius circular cell faces;
+   the axis is not a face, and a packet reaching the open outer face is removed
+   there and recorded by the existing streaming-boundary ledger. Requests in
+   RZ or RSPHERE geometry abort at startup. Cartesian transport is already
+   face-exact and is unchanged by this option. When this option is false, radial
+   transport retains the bounded starting-cell approximation and warning.
+
+.. pp:param:: radiation_transport.max_transport_substeps
+   :type: ``integer``
+   :default: ``10000``
+   :optional:
+
+   Maximum photon path segments per PIC step. WarpX aborts with a diagnostic rather
+   than silently under-resolving a longer path.
+
+.. pp:param:: radiation_transport.material_coupling
+   :type: ``string``
+   :default: ``none``
+   :optional:
+
+   Material-energy adapter. Valid values are ``none``, ``hybrid_electrons`` and
+   ``kinetic_electrons``. The hybrid adapter requires
+   :pp:param:`algo.maxwell_solver = hybrid` and
+   :pp:param:`hybrid_pic_model.solve_electron_energy_equation = 1`.
+
+.. pp:param:: radiation_transport.electron_species
+   :type: ``string``
+
+   Name of the massive, negatively charged kinetic electron species. Required when
+   :pp:param:`radiation_transport.material_coupling = kinetic_electrons`.
+
+.. pp:param:: radiation_transport.enable_momentum_coupling
+   :type: ``bool``
+   :default: ``false``
+   :optional:
+
+   Enable the conservative grey/multigroup radiation-force adapter. Streaming absorption
+   deposits the removed packet momentum, and flux-limited diffusion deposits
+   :math:`\Delta t\,V\alpha_R\boldsymbol{F}/c`. The impulse is applied to the
+   configured kinetic ions, and the measured relativistic ion kinetic-energy change
+   is removed from absorbed packet energy or ``radiation_diffusion_energy``. Thus ion
+   work is not also deposited as electron heat.
+
+   With the default ``momentum_carry = cell``, if an increment is smaller than
+   the particle momentum representation can apply,
+   WarpX retains the unapplied impulse in separate, checkpointed streaming and
+   diffusion cell fields. A later increment applies the accumulated value once it is
+   representable; the energy update always uses the kinetic work actually realized by
+   the particles. Delayed streaming work is paired with a signed electron-internal-
+   energy source, so energy credited by the earlier absorption funds the later bulk
+   work. The material adapter aborts if that debit would take the material below its
+   supported minimum-energy state. A versioned checkpoint that declares momentum-carry
+   fields requires both fields on restart and requires momentum coupling to remain
+   enabled, so pending impulse cannot be discarded silently. Checkpoints from before
+   carry fields were introduced may omit them; WarpX reports that compatibility path
+   and initializes the absent inventories to zero.
+
+   In multigroup diffusion, each group applies half its impulse in ascending order,
+   followed by half in descending order. Its own radiation reservoir supplies the
+   represented kinetic work of those kicks; decelerating work returns energy to that
+   group. Thus opposing forces can transfer opposite amounts of energy even when
+   their net force vanishes. This symmetric splitting has the midpoint-work limit
+   for nonrelativistic material with fixed forces. Relativistic splitting error and
+   the transport/source splitting still require timestep refinement.
+   Per-group pending impulses are checkpointed separately. Schema-v3 checkpoints
+   require those fields and the same number of groups; an older multigroup checkpoint
+   with nonzero aggregate diffusion carry is rejected because its spectral origin
+   cannot be recovered. Each group must have enough energy to fund its own kick.
+
+   Current component-wise regression coverage includes RCYLINDER, RZ and Cartesian
+   3D. RSPHERE aborts during initialization when this option is enabled. That guard
+   remains until Cartesian-to-spherical particle initialization is corrected upstream
+   and a component-wise RSPHERE recoil test passes; a vector-magnitude comparison is
+   not sufficient validation of radial momentum. Momentum coupling also requires
+   double field and particle precision, ``enable_particle_conversion = 0``, and a
+   non-moving simulation window. The default pending carries are Eulerian cell inventories:
+   an old carry in a temporarily empty cell remains pending until eligible material is
+   again present; it is not attached to or advected with an individual ion parcel. The
+   operator does not yet advect trapped-radiation enthalpy or include all mixed-frame
+   :math:`O(v/c)` terms, and must not be described as a complete radiation-MHD model.
+
+.. pp:param:: radiation_transport.momentum_carry
+   :type: ``string``
+   :default: ``cell``
+   :optional:
+
+   ``cell`` retains the legacy deferred-impulse behavior described above.
+   Experimental ``particle`` keeps each path/group's unrepresented impulse and
+   signed kinetic-work rounding account on the receiving ion. Work associated
+   with a newly assigned impulse is debited immediately; its unrepresented part
+   moves with that ion instead of drawing energy later from an unrelated cell.
+   ``RadiationEnergy`` adds pending-work and work-account-change columns and
+   includes that change in total material exchange. ``RadiationMomentum`` reads
+   the live particle-owned pending impulse, including after redistribution.
+
+   This integration currently requires native hybrid electrons, Cartesian geometry,
+   periodic particle boundaries, and no collisions, field/hybrid ionization or ion
+   resampling. It requires double field and particle precision. Restart must retain
+   the same ownership mode, momentum species and group count; migration between
+   old cell-owned and new particle-owned checkpoints is not automatic.
+
+   This option addresses impulse/work ownership, not velocity-dependent radiation
+   transport. It does not add Doppler opacity, trapped-radiation advection or
+   compression, enable momentum with conversion, or lift the stationary
+   ``coupled_implicit`` guard. Its candidate step validates particle and radiation
+   work before commit; a whole native-electron/radiation/particle retry is not yet
+   implemented. It is not a complete moving-radiation production mode.
+
+.. pp:param:: radiation_transport.momentum_species
+   :type: ``list of strings``
+
+   Massive, positively charged ion species that receive radiation momentum when
+   :pp:param:`radiation_transport.enable_momentum_coupling = 1`. Every selected ion
+   in a cell receives the same proper-velocity increment, preserving relative drifts
+   and thermal spread to the accuracy of the particle representation. WarpX aborts
+   when radiation deposits a new momentum source in a cell containing none of these
+   species, or if an accumulated pending impulse is non-finite or exceeds its strict
+   particle-precision-scaled bound.
+
+.. pp:param:: radiation_transport.minimum_electron_density
+   :type: ``float``
+   :unit: :math:`\mathrm{m}^{-3}`
+   :default: ``hybrid_pic_model.n_floor`` for hybrid coupling; ``0`` otherwise
+   :optional:
+
+   Minimum material electron density at which photons are absorbed. This avoids
+   depositing radiation energy into vacuum or electron-density-floor regions.
+
+.. pp:param:: radiation_transport.enable_lte_exchange
+   :type: ``bool``
+   :default: ``false``
+   :optional:
+
+   Enable conservative group-integrated LTE emission and absorption between electron
+   material and ``radiation_diffusion_energy``. Requires ``material_coupling`` other
+   than ``none``.
+
+.. pp:param:: radiation_transport.lte_exchange_solver
+   :type: ``string``
+   :default: ``frozen_temperature``
+   :optional:
+
+   Material-temperature treatment for LTE exchange. ``frozen_temperature`` exactly
+   relaxes the radiation groups at the beginning-of-step material temperature and then
+   applies a conservative electron-energy limiter. ``implicit_temperature`` solves the
+   coupled, cell-local constant-heat-capacity energy equation above and evaluates group
+   fractions and Planck/Rosseland opacities at the resulting final temperature.
+
+.. pp:param:: radiation_transport.lte_exchange_max_iterations
+   :type: ``integer``
+   :default: ``64``
+   :optional:
+
+   Maximum bisection iterations for ``lte_exchange_solver = implicit_temperature``.
+   WarpX aborts if the requested tolerance is not reached.
+
+.. pp:param:: radiation_transport.lte_exchange_tolerance
+   :type: ``float``
+   :default: ``1.0e-10``
+   :optional:
+
+   Temperature-bracket tolerance relative to the cell's energy-equivalent upper
+   temperature bound for the implicit LTE solve. In single-precision builds the
+   effective tolerance is no smaller than ten times the floating-point machine
+   epsilon. Must be in :math:`(0,1)`.
+
+.. pp:param:: radiation_transport.planck_absorption_coefficient
+   :type: ``float`` or parser function
+   :unit: :math:`\mathrm{m}^{-1}`
+
+   Planck coefficient :math:`\alpha_{P,g}` used by LTE exchange. It can be a scalar,
+   the grey-compatible function ``planck_absorption_coefficient(x,y,z,t,ne,Te)``, or
+   the spectral function
+   ``planck_absorption_coefficient(x,y,z,t,photon_energy,ne,Te)``. The latter receives
+   the group's representative energy in joules. Other arguments use SI coordinates,
+   seconds, :math:`\mathrm{m}^{-3}` and kelvin. Required when LTE exchange is enabled
+   unless one of the Planck table parameters or
+   :pp:param:`radiation_transport.opacity_species` supplies legacy per-species opacity,
+   or :pp:param:`radiation_transport.material_opacity_table_file` is supplied.
+
+.. pp:param:: radiation_transport.planck_absorption_coefficient_table_file
+   :type: ``string``
+   :optional:
+
+   Path to a structured two-dimensional Planck-opacity table. The file contains
+   ``n_ne n_T``, the electron-density and temperature axes, then ``n_ne*n_T``
+   coefficients in density-major/temperature-fastest order. Comments, validation,
+   endpoint clamping and interpolation follow the spectral-table rules above.
+
+.. pp:param:: radiation_transport.planck_absorption_coefficient_spectral_table_file
+   :type: ``string``
+   :optional:
+
+   Path to a structured three-dimensional group Planck-opacity table with the same
+   density, temperature and photon-energy layout as
+   :pp:param:`radiation_transport.absorption_coefficient_table_file`. Each group is
+   evaluated at its representative photon energy. Mutually exclusive with the scalar,
+   parser and two-dimensional Planck table forms.
+
+.. pp:param:: radiation_transport.enable_diffusion
+   :type: ``bool``
+   :default: ``false``
+   :optional:
+
+   Enable conservative flux-limited diffusion of ``radiation_diffusion_energy``.
+   This can be used without LTE exchange and with ``material_coupling = none``
+   when the Rosseland coefficient is supplied by the scalar or analytic parser
+   form. In that transport-only mode the parser receives ``ne=0`` and ``Te=0``;
+   expressions must therefore not use those two arguments. State-dependent
+   Rosseland tables, native material tables and per-species opacity still require
+   a real material density/temperature provider and are rejected with
+   ``material_coupling = none``. They are not evaluated at an artificial
+   temperature. When a material coupling is configured while LTE exchange is
+   disabled, its current density and temperature are used as a read-only
+   Rosseland-opacity state; the Planck exchange operator and its material-energy
+   write-back are not run. Diffusion is rejected with a moving window until the
+   persistent ``radiation_diffusion_energy`` field is shifted conservatively with
+   that window.
+
+.. pp:param:: radiation_transport.rosseland_transport_coefficient
+   :type: ``float`` or parser function
+   :unit: :math:`\mathrm{m}^{-1}`
+
+   Rosseland transport coefficient :math:`\alpha_{R,g}`. It can be a scalar, the
+   grey-compatible function ``rosseland_transport_coefficient(x,y,z,t,ne,Te)``, or
+   ``rosseland_transport_coefficient(x,y,z,t,photon_energy,ne,Te)``. During diffusion
+   the latter receives the group representative energy; streaming packets use their
+   actual energy when testing conversion into diffusion. Required when diffusion is
+   enabled unless one of the Rosseland table parameters or
+   :pp:param:`radiation_transport.opacity_species` supplies legacy per-species opacity,
+   or :pp:param:`radiation_transport.material_opacity_table_file` is supplied.
+
+.. pp:param:: radiation_transport.rosseland_transport_coefficient_table_file
+   :type: ``string``
+   :optional:
+
+   Path to a structured two-dimensional Rosseland transport-opacity table with the
+   same file layout and interpolation rules as the Planck table.
+
+.. pp:param:: radiation_transport.rosseland_transport_coefficient_spectral_table_file
+   :type: ``string``
+   :optional:
+
+   Path to a structured three-dimensional group Rosseland-opacity table with the same
+   layout as the spectral Planck table. It is mutually exclusive with the scalar,
+   parser and two-dimensional Rosseland table forms.
+
+.. pp:param:: radiation_transport.minimum_diffusion_optical_depth
+   :type: ``float``
+   :default: ``1.0``
+   :optional:
+
+   Cell optical-depth threshold :math:`\alpha_R\min(\Delta x)` that classifies the
+   optically thick diffusion region. Must be positive.
+
+.. pp:param:: radiation_transport.diffusion_cfl
+   :type: ``float``
+   :default: ``0.1``
+   :optional:
+
+   Stability factor for explicit diffusion subcycling. Must be in :math:`(0,0.5]`.
+
+.. pp:param:: radiation_transport.max_diffusion_substeps
+   :type: ``integer``
+   :default: ``10000``
+   :optional:
+
+   Maximum flux-limited diffusion substeps per PIC step.
+
+.. pp:param:: radiation_transport.diffusion_solver
+   :type: ``string``
+   :default: ``explicit``
+   :optional:
+
+   ``explicit`` retains the existing subcycled update. The opt-in ``implicit``
+   prototype uses backward Euler with an AMReX variable-coefficient multigrid
+   solve and nonlinear iteration of the face flux limiter. It currently requires
+   double precision, a fixed mesh without embedded boundaries, all cells at or above the diffusion optical-depth
+   threshold, and LTE exchange, conversion and momentum coupling disabled.
+   Opacity is fixed during the spatial solve. This is not a coupled implicit
+   material-temperature solver, IMC, DDMC or a moving-material model.
+
+   Each group must meet its own nonlinear equation-residual tolerance and remain
+   nonnegative before any group is committed. A failed solve aborts; automatic
+   whole-PIC-step rollback/retry is not provided. Boundary accounting is computed
+   from accepted face fluxes, and the signed iterative energy defect is reported
+   in the numerical-energy-residual ledger. Solver iteration counts and the
+   maximum relative group residual are appended to ``RadiationEnergy``.
+
+   Explicit diffusion subcycle limits do not constrain this path. Electromagnetic,
+   material-transport and accuracy timestep requirements still apply: stability
+   at a large timestep is not temporal convergence.
+
+   The private qualification prototype also accepts ``coupled_implicit``. This
+   is not yet production-qualified. It couples spatial transport and LTE to the
+   native nodal hybrid-electron caloric state, rather than replacing that state
+   with a cell-centered fluid temperature. Its current envelope is Cartesian or RZ,
+   double precision, fixed mesh, native ideal-gas or fixed-charge latent-energy
+   electrons, or a single-material host-only Singularity/Spiner electron EOS,
+   and analytic or electron-state tabulated opacity. The tabulated EOS uses
+   frozen native material-carrier density fields separately from total electron
+   charge density; its fixed ion charge is not inferred from a FLASH closure.
+   Multi-material Spiner coupling remains guarded. Grey and spectral
+   ``(ne,Te[,photon_energy])`` tables use their existing interpolation and clamped
+   endpoint policy. Species-composition and HDF5 material opacity adapters remain
+   guarded on this path; electron-state tables are not an evolving-mixture model.
+   All species must have ``do_not_push=1``; live streaming photons,
+   changing hybrid ion charge states, embedded boundaries, conversion and
+   momentum coupling are rejected. The older ``implicit`` option retains its
+   transport-only LTE guard.
+
+   A block-Picard iteration updates Planck/Rosseland opacity and equilibrium
+   group radiation from each material trial. The native conservative source
+   map freezes the initial nodal heat-capacity weights and evaluates the exact
+   caloric inverse in scratch storage. Acceptance re-evaluates the spatial
+   equation at the actual native material response, checks the material-map
+   residual relative to nodal heating (not background temperature). Nonlinear
+   EOS residuals use actual caloric energy differences rather than temperature
+   or pressure differences. Acceptance also requires
+   raw stage energy closure below ``1.e-10`` relative to radiation and exchange.
+   The numerical-defect ledger is not used to pass that raw gate.
+
+   ``lte_exchange_max_iterations`` bounds the outer iteration and
+   ``lte_exchange_tolerance`` controls its native-electron material residual.
+   Spatial tolerances below still apply separately to every group. Only accepted
+   radiation, temperature and realized material source are committed. Failure
+   aborts without committing those candidates unless optional stage retries
+   succeed. Whole-PIC rollback is not implemented. With nonzero solver verbosity, the
+   outer iteration count, material residual and raw energy residual are printed.
+   ``RadiationEnergy`` spatial iteration counts include all outer trials.
+
+   The inner spatial solve uses one tenth of the final equation tolerance to
+   leave room for material coefficient updates. If the radiation equation is
+   already converged but the discrete caloric inverse creates a material-map
+   rounding cycle, bounded source-consistency trials adjust a strong absorbing
+   group's radiation energy to reproduce the request that generated the actual
+   material state. Nonnegative radiation, the original per-group equation gate,
+   the original material-map gate and raw energy closure are all re-evaluated;
+   no tolerance is waived. Accepted stages that used these trials report their
+   count and residuals in standard output even at zero solver verbosity.
+
+.. pp:param:: radiation_transport.coupled_max_subdivisions
+   :type: ``integer``
+   :default: ``0``
+   :optional:
+
+   For the private stationary ``coupled_implicit`` prototype, retry a failed
+   radiation/material interval with 2, 4, ... uniform substeps, up to
+   ``2**coupled_max_subdivisions`` (allowed range 0--10). Zero disables retries.
+   Each substep uses its own old native nodal caloric state and coefficient
+   evaluation time. Every substep must meet the unchanged equation, material,
+   positivity and raw-energy gates; the full interval is also checked for raw
+   energy conservation. If any substep fails, the entire attempted interval is
+   discarded, including all candidate source and boundary transfers. Only a
+   complete accepted interval changes the live radiation/material state.
+   This does not roll back the preceding PIC advance or qualify a larger
+   timestep for accuracy. Standard output reports accepted substeps and rejected
+   attempts when solver verbosity is nonzero.
+
+.. pp:param:: radiation_transport.diffusion_incremental_solve
+   :type: ``bool``
+   :default: ``true`` for ``coupled_implicit``, ``false`` for ``implicit``
+   :optional:
+
+   Solve the frozen-coefficient linear system for a correction to the current
+   field. The correction right-hand side is the same cell-integrated face/source
+   residual used for acceptance and boundary accounting. This avoids cancellation
+   between large equilibrium matrix products. The correction solve also uses
+   ``diffusion_linear_tolerance`` times the current group energy-density scale
+   as an absolute budget, reduced by the smallest/largest cell-volume ratio in
+   radial geometry. Positivity, the original nonlinear equation residual and
+   raw energy gates still apply to the actual stored final field. This improves
+   linear accuracy but cannot remove a representability floor in that field at
+   extremely stiff timesteps. The legacy absolute-field solve remains available
+   for comparison.
+
+.. pp:param:: <radiation_energy_diag>.include_solver_details
+   :type: ``bool``
+   :default: ``false``
+   :optional:
+
+   For a ``RadiationEnergy`` diagnostic with an implicit solver, append per-group
+   outward, inward and radiation-to-material transfers (J), their independently
+   accumulated histories, coupled iteration/substep/rejection/correction counts,
+   material and raw-stage residuals, and minimum group cell energy and native
+   material temperature. Positive group material transfer removes radiation
+   energy. These are accepted equation transfers before native EOS realization;
+   the existing numerical residual ledger separately reports the discrepancy.
+   Rejected attempts contribute no group or boundary transfer. Cumulative group
+   ledgers advance every step even with sparse diagnostic output and are stored
+   in a versioned checkpoint record. Do not change this option across restart.
+   Coupled-only counts/residuals are zero for transport-only implicit solves,
+   whose minimum material temperature is reported as ``-1`` (not applicable).
+
+.. pp:param:: radiation_transport.diffusion_gradient
+   :type: ``string``
+   :default: ``face_normal`` (``vector`` for ``coupled_implicit``)
+   :optional:
+
+   ``face_normal`` preserves the legacy directional limiter, using only the
+   normal energy-density derivative at each face. This is not the isotropic
+   multidimensional FLD closure: limiting each component separately does not
+   impose a bound on the vector flux magnitude for oblique gradients.
+
+   The opt-in ``vector`` path uses the full gradient magnitude at each interior
+   face, including transverse derivatives of the face-averaged energy density.
+   Physical transverse boundaries use one-sided derivatives. Both explicit and
+   implicit spatial updates support this option; they agree in one dimension.
+   New multidimensional FLD comparisons should select ``vector`` explicitly.
+   Existing directional-mode qualifications are not automatically qualifications
+   of the full-gradient path.
+
+.. pp:param:: radiation_transport.diffusion_implicit_tolerance
+   :type: ``float``
+   :default: ``1.0e-9``
+   :optional:
+
+   Maximum cell energy-density equation residual, normalized by that group's
+   maximum initial/current energy density. Each group is checked separately.
+
+.. pp:param:: radiation_transport.diffusion_linear_tolerance
+   :type: ``float``
+   :default: ``1.0e-12``
+   :optional:
+
+   Relative multigrid solve tolerance. Must be positive and smaller than the
+   nonlinear tolerance.
+
+   The coupled prototype solves its inner spatial equation to one tenth of the
+   final radiation equation tolerance and caps this linear tolerance at half of
+   that inner tolerance. The requested value can therefore be made stricter,
+   but never bypasses the separately evaluated final radiation, native-material,
+   positivity, or raw-energy gates. On refined double-precision grids, an
+   unnecessarily small linear tolerance can lie below the attainable residual
+   floor; increasing its requested value within this cap does not relax those
+   physical acceptance checks.
+
+.. pp:param:: radiation_transport.diffusion_implicit_max_iterations
+   :type: ``integer``
+   :default: ``100``
+   :optional:
+
+   Positive maximum nonlinear iterations per group.
+
+.. pp:param:: radiation_transport.diffusion_linear_max_iterations
+   :type: ``integer``
+   :default: ``200``
+   :optional:
+
+   Positive maximum multigrid iterations per nonlinear trial.
+
+.. pp:param:: radiation_transport.diffusion_picard_relaxation
+   :type: ``float``
+   :default: ``0.8`` (``implicit``), ``1.0`` (``coupled_implicit``)
+   :optional:
+
+   Positive fraction, at most one, of the new spatial Picard iterate retained
+   before re-evaluating the limiter and discrete residual. The transport-only
+   default retains its steep-front damping. The coupled prototype defaults to
+   a full update to avoid repeatedly damping weak material-coupling corrections.
+   This changes iteration behavior, never the equation or acceptance tolerances.
+
+.. pp:param:: radiation_transport.diffusion_solver_verbosity
+   :type: ``integer``
+   :default: ``0``
+   :optional:
+
+   Nonnegative multigrid verbosity for the implicit spatial path.
+
+.. pp:param:: radiation_transport.diffusion_boundary_lo
+   :type: ``string`` or list of strings
+   :default: ``reflecting``
+   :optional:
+
+   Diffusion-face condition on the low side of each mesh dimension. One value
+   applies to every low face; a per-dimension list is also accepted. Allowed
+   values are ``reflecting``, ``zero_flux``, ``vacuum``, ``free_streaming`` and
+   ``marshak`` and ``marshak_bath``.
+   ``reflecting`` / ``zero_flux`` is a homogeneous Neumann condition and is
+   the default. ``vacuum`` removes the free-streaming flux :math:`F=cE` from
+   the interior cell. ``marshak`` is the grey P1 / Eddington vacuum condition
+   :math:`F=cE/2`. Both open conditions use the same discrete face area as the
+   interior flux-limited stencil, including the cylindrical :math:`2\pi r`
+   (per unit axial length) area in RCYLINDER. A zero-energy Dirichlet face is
+   not provided: that condition is not a well-posed diffusion-limit vacuum
+   boundary and can produce a superluminal, mesh-dependent flux.
+
+   ``marshak_bath`` is a distinct driven Robin condition for stationary-material
+   energy transport. It uses the P1 relation
+   :math:`F_{out}=c(E_{face}-E_{bath})/2` with a half-cell diffusion resistance:
+   :math:`F_{out}=c(E_{cell}-E_{bath})/(2+3\alpha_R\Delta x/2)`.
+   Here :math:`D=c/(3\alpha_R)` is the boundary P1 diffusion coefficient;
+   interior faces retain the flux limiter. This does not change the legacy
+   ``marshak`` cell-centred vacuum discretization. Setting a bath energy to zero
+   is a Robin vacuum, not a zero-energy Dirichlet condition.
+
+   Bath faces must be nonperiodic, and their adjacent cells must satisfy
+   ``minimum_diffusion_optical_depth``. The current bath implementation requires
+   ``amr.max_level=0``, diffusion enabled, and momentum coupling and particle
+   conversion disabled. Embedded boundaries are rejected. It does not define an angular photon injector or qualify
+   moving-material radiation force/work. A bath is applied only at a domain face,
+   never at the radial thick/thin interface shortcut described below.
+
+   In RCYLINDER, RZ and RSPHERE the radial low face is the axis or origin and
+   must remain ``reflecting``. An open high-side condition also applies at the
+   first optically thin neighbor on that side so a radiating shell inside a
+   vacuum gap can lose energy at its physical outer radius. The opposite,
+   inward-facing material surface stays an interior diffusion face. This
+   radial-interface shortcut is disabled when particle conversion is enabled;
+   streaming photons then carry the energy across the gap to the actual domain
+   boundary. Cartesian shells require particle conversion for that transport,
+   because a Cartesian face condition alone cannot distinguish an outer surface
+   from an inward-facing cavity surface.
+
+.. pp:param:: radiation_transport.diffusion_boundary_hi
+   :type: ``string`` or list of strings
+   :default: ``reflecting``
+   :optional:
+
+   High-side counterpart of
+   :pp:param:`radiation_transport.diffusion_boundary_lo`. Use ``marshak`` or
+   ``vacuum`` at the physical outer radius of an RCYLINDER load.
+
+.. pp:param:: radiation_transport.diffusion_bath_energy_density_lo_<d>_g<g>(x,y,z,t)
+   :type: ``math expression``
+   :units: :math:`J/m^3`
+
+   Prescribed group-integrated bath radiation energy density at a ``marshak_bath``
+   low face. ``<d>`` is the zero-based mesh direction (0 is z in 1D; 0 and 1 are
+   x and z in 2D), and ``<g>`` is the zero-based energy group. Every group on
+   every bath face requires an expression, including ``g0`` in a grey run,
+   unless the temperature alternative below is selected for that face.
+   Expressions on non-bath faces are rejected. ``x,y,z`` are physical face-centre
+   coordinates in metres (x is r in radial geometries), and ``t`` is the radiation
+   diffusion substep midpoint in seconds. Values must be finite and nonnegative.
+   Specify zero explicitly for an undriven group. No Planck spectrum is inferred
+   from a group-energy expression.
+
+.. pp:param:: radiation_transport.diffusion_bath_energy_density_hi_<d>_g<g>(x,y,z,t)
+   :type: ``math expression``
+   :units: :math:`J/m^3`
+
+   High-face counterpart of the preceding bath expression. ``RadiationEnergy``
+   appends ``boundary_energy_injection`` and ``cumulative_boundary_energy_injection``
+   columns when bath faces are configured. Injection and the existing escape
+   columns accumulate the inward and outward parts of the **net** accepted face
+   flux separately; they are not a decomposition into microscopic incident and
+   emitted angular intensities. Energy balance includes escape minus injection.
+   The live cumulative injection ledger is preserved by a versioned checkpoint
+   extension. Runs without baths retain their existing diagnostic columns.
+   A checkpoint containing this ledger must retain at least one ``marshak_bath``
+   face on restart: turn off the drive by setting its temperature or all its
+   group energy densities to zero, rather than removing the bath boundary.
+   If baths are added when restarting a non-bath run, use a new reduced-diagnostic
+   output path. Appending rows with a changed bath-column layout is rejected.
+
+.. pp:param:: radiation_transport.diffusion_bath_temperature_lo_<d>(x,y,z,t)
+   :type: ``math expression``
+   :units: :math:`K`
+
+   Alternative blackbody bath temperature for one low face. WarpX integrates
+   :math:`aT^4` over the configured energy groups, including the implicit spectral
+   tails. This expression is mutually exclusive with all group-energy expressions
+   on that face. The temperature must be finite and nonnegative; zero switches
+   off the incoming bath while retaining the Robin vacuum loss.
+
+.. pp:param:: radiation_transport.diffusion_bath_temperature_hi_<d>(x,y,z,t)
+   :type: ``math expression``
+   :units: :math:`K`
+
+   High-face counterpart of the preceding bath temperature expression.
+
+.. pp:param:: radiation_transport.enable_particle_conversion
+   :type: ``bool``
+   :default: ``false``
+   :optional:
+
+   Enable bidirectional conversion at the particle/diffusion seam. Streaming packets
+   entering cells at or above the diffusion optical-depth threshold transfer their full
+   energy to ``radiation_diffusion_energy``. After diffusion, thick-field radiation in
+   cells below the threshold is converted into streaming photons. Requires diffusion.
+   Particle conversion is currently incompatible with
+   :pp:param:`radiation_transport.enable_momentum_coupling`: the scalar diffusion
+   field does not retain the directional momentum of a converted packet, so WarpX
+   aborts during initialization if both options are enabled. Conversion is also
+   rejected with embedded boundaries because insertion can remove a packet sampled
+   inside covered geometry without a conservative energy recipient.
+
+.. pp:param:: radiation_transport.emission_photon_energy
+   :type: ``float``
+   :unit: joules
+
+   Energy of one physical photon represented by a converted grey macroparticle. Its
+   weight is selected so that macroparticle energy equals the removed thick-field
+   energy. Required for one-group particle conversion. Multigroup conversion instead
+   requires :pp:param:`radiation_transport.group_photon_energies`; when both parameters
+   are present, the group energies take precedence.
+
+.. pp:param:: radiation_transport.particle_conversion_energy_threshold
+   :type: ``float``
+   :unit: joules per cell
+   :default: ``0``
+   :optional:
+
+   Do not create a photon for an optically thin cell until its thick-field energy
+   exceeds this value. Energy below the threshold remains in the diffusion field.
+
+.. pp:param:: radiation_transport.particle_conversion_packets_per_cell
+   :type: ``integer``
+   :default: ``1``
+   :optional:
+
+   Number of streaming macroparticles created when one optically thin cell/group
+   converts its diffusion energy. The cell energy is divided among this many
+   nearly equal-weight packets; any remainder below particle-weight precision
+   stays in ``radiation_diffusion_energy`` so conversion remains conservative.
+   Directions are stratified in equal-area polar bands and positions are sampled
+   uniformly within the cell volume, including annular/spherical volume weighting
+   in radial geometries. Samples are clamped to particle-precision coordinates that
+   are provably inside the original field-precision cell faces before insertion;
+   radial samples retain an additional inward margin for trigonometric reconstruction.
+
+   The counter-based samples are keyed by :pp:param:`warpx.random_seed`, the
+   integer simulation step, global cell indices, energy group and packet index.
+   A fixed seed therefore reproduces the conversion independently of loop order,
+   while different fixed seeds produce different packet ensembles. When
+   ``warpx.random_seed = random``, the resolved seed is stored in the checkpoint so
+   a restart reproduces the uninterrupted packet sequence. The value must be
+   positive.
+
+.. pp:param:: radiation_transport.particle_conversion_target_packet_count
+   :type: ``integer``
+   :default: ``0``
+   :optional:
+
+   Optional soft global packet budget for diffusion-to-streaming conversion.
+   Zero retains the fixed packet-count mode above. A positive value sets the
+   target macroparticle energy to the current global radiation energy divided
+   by this count, then creates
+   ``round(cell_group_energy / target_energy)`` packets, bounded below by one and
+   above by ``particle_conversion_max_packets_per_cell``. This allocates sampling
+   effort to energetic cells/groups instead of equally to nearly empty tails.
+   The full converted energy is retained even when the count cap is reached, so
+   the target is not a strict maximum packet energy or a hard global population
+   limit. New conversion follows the current radiation inventory, but existing
+   streaming packets are not resampled: late-time decaying pulses can still
+   become poorly resolved and require explicit count/seed refinement. It does not change the
+   physical group photon energy, opacity, field estimator, or acceptance gates.
+   Packet-count and timestep convergence must still be demonstrated. Keep this
+   setting and its cap unchanged for reproducible restart comparisons.
+
+.. pp:param:: radiation_transport.particle_conversion_max_packets_per_cell
+   :type: ``integer``
+   :default: ``4096``
+   :optional:
+
+   Positive per-cell/group packet-count cap in energy-targeted conversion mode.
+   This is not a global memory limit. The fixed-count mode does not use this cap.
+
+.. pp:param:: radiation_transport.particle_conversion_batch_size
+   :type: ``integer``
+   :default: ``0``
+   :optional:
+
+   Maximum number of newly converted packets staged together on each rank.
+   Zero retains the original whole-step staging. A positive value such as 65536
+   bounds temporary host packet arrays and pinned injection storage. Batches
+   are appended to their local destination grid; one collective redistribution
+   follows all local batches, including ranks that create no packets.
+   This changes storage/transfer scheduling, not packet counts, seeded birth
+   positions/directions, or the per-cell represented-energy calculation.
+   It does not bound the final photon population or total device memory.
+
+.. pp:param:: radiation_transport.particle_conversion_group_target_packet_counts
+   :type: ``list of integers``
+   :optional:
+
+   Alternative soft budgets for resolving weak spectral bands: one positive
+   count per energy group, mutually exclusive with a positive global
+   ``particle_conversion_target_packet_count``. Each group's target packet
+   energy is its current global streaming-plus-diffusion inventory divided by
+   its own budget. The same rounding, minimum of one, and per-cell/group cap
+   apply. Empty groups create no packets. No energy cutoff is introduced.
+   This changes sampling effort, not opacity or the transport equations, and
+   does not guarantee spectral convergence. Demonstrate timestep, packet-count,
+   and independent-seed convergence for each scientifically relevant band.
+   These budgets are not hard population or memory limits. Keep the budgets
+   and cap unchanged across reproducibility comparisons and restarts.
+   Only newly converted packets use the updated targets; the option does not
+   regenerate or remove sampling noise from packets that are already streaming.
+   Equal budgets are not necessarily efficient or accurate for every band.
 
 
 Grid types (collocated, staggered, hybrid)
@@ -4577,6 +6181,14 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
+
+    With the electron-energy equation enabled, the initial diagnostic thermal
+    state is prepared from the deposited material density and selected EOS,
+    including prescribed temperature profiles; a restart preserves the evolved
+    temperature. ``Pe`` includes the pressure boundary treatment required by the
+    Ohm solver. It is not an independently conserved caloric variable, so energy
+    audits should use the selected EOS with the primary temperature, density and
+    composition rather than assuming ``Pe/(gamma-1)`` is valid at every boundary.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
     Note that ``phi`` will only be written out when ``do_electrostatic==labframe``.
     Also, note that for :pp:param:`<diag_name>.diag_type = BackTransformed`, the only scalar field currently supported is ``rho``.
@@ -5023,6 +6635,82 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         where :math:`\boldsymbol{p}_i` is the relativistic momentum of the :math:`i`-th particle, :math:`c` is the speed of light, :math:`m_0` is the rest mass, :math:`N` is the number of particles, and :math:`w_i` is the weight of the :math:`i`-th particle.
 
         The output columns are the total energy of all species, the total energy per species, the total mean energy :math:`E_p / \sum_i w_i` of all species, and the total mean energy per species.
+
+    * ``RadiationEnergy``
+        This type reports the global energy represented by hybrid radiation
+        transport. Its columns are total radiation energy, streaming-photon energy,
+        ``radiation_diffusion_energy``, and the signed
+        ``radiation_material_energy`` exchange from the most recent PIC step, followed
+        by cumulative material exchange, current boundary energy loss and cumulative
+        boundary energy loss, all in joules. Total radiation is the sum of streaming and
+        diffusion energy. Positive material exchange means matter gained energy;
+        positive boundary loss is the discrete outward diffusion face flux plus any
+        streaming-photon energy removed by an absorbing particle boundary. The
+        cumulative columns are updated every PIC step even when
+        the diagnostic output interval is larger than one, and are preserved through
+        checkpoint/restart. In a closed accounting interval,
+        ``total_radiation + cumulative_material_exchange + cumulative_boundary_energy_loss``
+        remains equal to its initial value. RCYLINDER energies remain line
+        densities (J/m); multiply by the configured physical axial length in
+        post-processing, as for the other hybrid energy diagnostics.
+
+        Two final columns separately report the current material internal-energy
+        exchange and the actual material kinetic-energy exchange caused by radiation
+        momentum. Their sum is the existing current material-exchange column. They
+        are appended after any multigroup columns so established boundary and group
+        column indices remain unchanged. Four further columns split the current and
+        cumulative boundary-energy loss into streaming-packet and diffusion-face
+        contributions. The two current contributions sum to the existing current
+        boundary loss, and likewise for the cumulative values.
+
+        For multigroup runs, one additional ``diffusion_radiation_group_<g>`` column
+        per group follows the standard columns. These group columns sum to the global
+        diffusion-radiation column. Spatial full diagnostics can write individual
+        components as ``radiation_diffusion_energy_g0``,
+        ``radiation_diffusion_energy_g1``, and so on. The unsuffixed
+        ``radiation_diffusion_energy`` field name remains valid for grey runs and is
+        rejected for a multigroup full diagnostic to avoid silently selecting one
+        component.
+
+        This identity covers the changes owned by the radiation-transport advance.
+        Additional photon creation or destruction by QED, collisions, injection, or
+        other application operators must be accounted for separately when checking a
+        whole-step energy balance.
+
+        The photon species is read from
+        :pp:param:`radiation_transport.photon_species`. An explicitly supplied
+        ``<reduced_diags_name>.photon_species`` must match it so boundary accounting
+        remains conservative. Use an output interval of one when every individual
+        material-exchange increment is needed.
+
+    * ``RadiationMomentum``
+        This type reports the cell-integrated material impulse from the most recent
+        radiation advance, its cumulative value, and separate signed diffusion and
+        streaming boundary impulses for the current step and cumulatively. Each
+        quantity has three components. Cartesian labels are :math:`x,y,z`;
+        RCYLINDER and RZ use :math:`r,\theta,z`. Cumulative columns are updated every
+        step and preserved through checkpoint/restart.
+
+        With ``radiation_transport.diffusion_solver=coupled_moment``, setting
+        ``<reduced_diags_name>.include_moment_inventory=1`` appends three
+        ``moment_radiation_*`` columns containing the instantaneous lab-frame
+        radiation-field momentum, :math:`\sum_{\mathrm{cells}} (F/c)/c`.
+        This is not the cumulative impulse transferred to material. The default
+        is zero, preserving the existing output layout. The option is rejected
+        for scalar diffusion/packet modes, and must remain unchanged at restart.
+
+        For a diffusion vacuum face the outward normal impulse is
+        :math:`\Delta E/c`; for the P1 Marshak condition it is
+        :math:`2\Delta E/(3c)`. The RCYLINDER radial entry is an azimuthally
+        integrated scalar impulse ledger, not globally conserved Cartesian momentum:
+        Cartesian momentum cancels around a complete axisymmetric cylinder.
+        RCYLINDER values are per unit configured axial length.
+
+        Streaming-boundary momentum is the residual packet momentum carried through
+        an absorbing particle boundary. In multidimensional Cartesian geometry, a
+        packet that crosses simultaneous mixed absorbing and reflecting faces at a
+        corner is not yet supported as an exact pre-boundary momentum ledger; use
+        consistent boundary types at such corners when interpreting this diagnostic.
 
     * ``ParticleMomentum``
         This type computes the total and mean relativistic particle momentum among all species:

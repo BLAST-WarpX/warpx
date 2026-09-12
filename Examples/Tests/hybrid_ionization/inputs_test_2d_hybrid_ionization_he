@@ -1,0 +1,113 @@
+# Deterministic hybrid He+ -> He2+ ionization in a periodic Cartesian plasma.
+#
+# One fixed-position macro-ion carrying uniform proper velocity is placed at
+# every cell center.  Linear deposition on the periodic nodal grid therefore
+# gives exactly n0 and jx before the event, then doubles both.  Step 1
+# initializes the QDSMC electron state with the rate disabled; the
+# physical-endpoint rate window fires during step 2.  Its exposure is 128,
+# above the backend's probability-one threshold of 64 in both precisions.
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 200.0
+my_constants.dx = 1.0e-3
+my_constants.dt = 1.0e-12
+my_constants.ux0 = 1.0e-3
+
+max_step = 2
+amr.n_cell = 4 4
+amr.max_level = 0
+amr.blocking_factor = 4 4
+amr.max_grid_size = 4 4
+
+geometry.dims = 2
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 4.0*dx 4.0*dx
+
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+warpx.random_seed = 1
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 1.0e-3*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+particles.species_names = ions
+
+ions.mass = 6.646476989051294e-27
+ions.charge = q_e
+ions.injection_style = MultipleParticles
+ions.multiple_particles_pos_x = \
+    0.5*dx 1.5*dx 2.5*dx 3.5*dx \
+    0.5*dx 1.5*dx 2.5*dx 3.5*dx \
+    0.5*dx 1.5*dx 2.5*dx 3.5*dx \
+    0.5*dx 1.5*dx 2.5*dx 3.5*dx
+ions.multiple_particles_pos_y = \
+    0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 \
+    0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_pos_z = \
+    0.5*dx 0.5*dx 0.5*dx 0.5*dx \
+    1.5*dx 1.5*dx 1.5*dx 1.5*dx \
+    2.5*dx 2.5*dx 2.5*dx 2.5*dx \
+    3.5*dx 3.5*dx 3.5*dx 3.5*dx
+ions.multiple_particles_ux = \
+    ux0 ux0 ux0 ux0 ux0 ux0 ux0 ux0 \
+    ux0 ux0 ux0 ux0 ux0 ux0 ux0 ux0
+ions.multiple_particles_uy = \
+    0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 \
+    0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_uz = \
+    0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 \
+    0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+ions.multiple_particles_weight = \
+    n0*dx^2 n0*dx^2 n0*dx^2 n0*dx^2 \
+    n0*dx^2 n0*dx^2 n0*dx^2 n0*dx^2 \
+    n0*dx^2 n0*dx^2 n0*dx^2 n0*dx^2 \
+    n0*dx^2 n0*dx^2 n0*dx^2 n0*dx^2
+ions.do_not_push = 1
+
+# The user component is deliberately declared before InitIonizationModule adds
+# ionizationLevel.  The regression catches any component-index assumption.
+ions.addIntegerAttributes = sentinel
+ions.attribute.sentinel(x,y,z,ux,uy,uz,t) = 37
+ions.do_hybrid_ionization = 1
+ions.physical_element = He
+ions.ionization_initial_level = 1
+ions.hybrid_ionization_rate_coefficient(x,y,z,t,ne,Te,Z) = \
+    if(t>1.5*dt,if(t<2.5*dt,128.0/(ne*dt),0.0),0.0)
+
+diagnostics.diags_names = diag chk
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.species = ions
+diag.fields_to_plot = rho rho_ions Te Pe \
+    hybrid_ionization_electron_source_fp \
+    hybrid_ionization_binding_energy_fp \
+    Ex Ey Ez Bx By Bz jx jy jz
+
+# The restart acceptance resumes from the initialized, pre-event state.
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 1
+chk.file_prefix = diags/chk
+
+amrex.abort_on_unused_inputs = 1

@@ -66,6 +66,7 @@ void init_MultiFabRegister (py::module & m)
                  std::optional<const amrex::Real>,
                  bool,
                  bool,
+                 bool,
                  bool
              >(&MultiFabRegister::alloc_init<std::string>),
              py::return_value_policy::reference_internal,
@@ -78,7 +79,8 @@ void init_MultiFabRegister (py::module & m)
              py::arg("initial_value"),
              py::arg("redistribute"),
              py::arg("redistribute_on_remake"),
-             py::arg("checkpoint_restart") = false
+             py::arg("checkpoint_restart") = false,
+             py::arg("restart_optional") = false
         )
 
         .def("alloc_init",
@@ -91,6 +93,7 @@ void init_MultiFabRegister (py::module & m)
                  int,
                  amrex::IntVect const &,
                  std::optional<const amrex::Real>,
+                 bool,
                  bool,
                  bool,
                  bool
@@ -106,7 +109,8 @@ void init_MultiFabRegister (py::module & m)
              py::arg("initial_value"),
              py::arg("redistribute"),
              py::arg("redistribute_on_remake"),
-             py::arg("checkpoint_restart") = false
+             py::arg("checkpoint_restart") = false,
+             py::arg("restart_optional") = false
         )
 
         .def("alias_init",

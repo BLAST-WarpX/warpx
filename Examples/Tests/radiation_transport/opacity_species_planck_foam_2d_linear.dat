@@ -1,0 +1,7 @@
+# Manufactured grey Planck partial opacity,
+# alpha_P=500*ni/n0+500*Te[eV].
+# Axes are ion number density [m^-3] and electron temperature [K].
+2 2
+5.0e19 1.5e20
+5.80225906077504e3 1.740677718232512e4
+500.0 1000.0 1000.0 1500.0

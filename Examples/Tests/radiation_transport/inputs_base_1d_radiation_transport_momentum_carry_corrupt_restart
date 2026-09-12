@@ -1,0 +1,6 @@
+# Initialization must reject the missing required carry header before advancing.
+
+FILE = inputs_test_1d_radiation_transport_momentum_carry
+
+max_step = 149
+diagnostics.diags_names = diag

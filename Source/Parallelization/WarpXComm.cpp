@@ -508,6 +508,12 @@ WarpX::UpdateAuxiliaryData ()
         UpdateAuxiliaryDataStagToNodal();
     }
 
+    // Keep the pressure-only field on exactly the same particle-gather layout
+    // and centering path as total E, before external particle-field maps are
+    // added to total E_aux.  This makes pressure work an unambiguous additive
+    // component of the single physical particle push.
+    UpdateHybridPressureAuxiliaryData();
+
     // When loading particle fields from file, add the external fields.
     for (int lev = 0; lev <= finest_level; ++lev) {
 
@@ -568,6 +574,65 @@ WarpX::UpdateAuxiliaryData ()
         }
     }
 
+}
+
+void
+WarpX::UpdateHybridPressureAuxiliaryData ()
+{
+    if (!m_fields.has_vector(FieldType::hybrid_pressure_E_fp, 0)) { return; }
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        finest_level == 0,
+        "Conservative hybrid pressure work currently requires one AMR level.");
+
+    auto const pressure_fp =
+        m_fields.get_alldirs(FieldType::hybrid_pressure_E_fp, 0);
+    auto const pressure_aux =
+        m_fields.get_alldirs(FieldType::hybrid_pressure_E_aux, 0);
+
+    // Checkpoints restore valid cells, not a guaranteed current set of ghost
+    // and periodic-overlap values.  Reconstruct those in full precision before
+    // applying the same native-to-aux centering used by total E.
+    for (auto* pressure_component : pressure_fp) {
+        ablastr::utils::communication::FillBoundary(
+            *pressure_component, pressure_component->nGrowVect(),
+            /*do_single_precision_comms=*/false,
+            Geom(0).periodicity(), /*nodal_sync=*/true);
+    }
+    auto& pressure_work_state = *m_fields.get(
+        FieldType::hybrid_pressure_work_state_fp, 0);
+    ablastr::utils::communication::FillBoundary(
+        pressure_work_state, pressure_work_state.nGrowVect(),
+        /*do_single_precision_comms=*/false,
+        Geom(0).periodicity(), /*nodal_sync=*/true);
+
+    bool same_index_type = true;
+    for (int idim = 0; idim < 3; ++idim) {
+        same_index_type = same_index_type
+            && pressure_fp[idim]->ixType() == pressure_aux[idim]->ixType();
+    }
+
+    if (same_index_type) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Copy(
+                *pressure_aux[idim], *pressure_fp[idim], 0, 0,
+                pressure_aux[idim]->nComp(),
+                pressure_aux[idim]->nGrowVect());
+        }
+    } else {
+        InterpLevelZeroStagToNodal(
+            pressure_aux, pressure_fp,
+            device_field_centering_stencil_coeffs_x,
+            device_field_centering_stencil_coeffs_y,
+            device_field_centering_stencil_coeffs_z);
+    }
+
+    for (int idim = 0; idim < 3; ++idim) {
+        ablastr::utils::communication::FillBoundary(
+            *pressure_aux[idim], pressure_aux[idim]->nGrowVect(),
+            /*do_single_precision_comms=*/false,
+            Geom(0).periodicity(), /*nodal_sync=*/true);
+    }
 }
 
 void

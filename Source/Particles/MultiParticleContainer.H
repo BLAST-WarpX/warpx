@@ -214,6 +214,19 @@ public:
                             const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                             const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz);
 
+    /** Advance all configured hybrid-fluid ion charge states and deposit the
+     * associated atomic binding-energy density [J/m^3]. */
+    void doHybridIonization (
+        int lev,
+        amrex::MultiFab const& electron_charge_density,
+        amrex::MultiFab const& electron_temperature,
+        amrex::MultiFab& binding_energy_density,
+        amrex::Real time,
+        amrex::Real dt);
+
+    /** Whether at least one species uses hybrid-fluid ionization. */
+    [[nodiscard]] bool hasHybridIonization () const noexcept;
+
     void doCollisions (int step, amrex::Real cur_time, amrex::Real dt);
 
     /**

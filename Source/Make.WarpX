@@ -84,6 +84,7 @@ include $(WARPX_HOME)/Source/Laser/Make.package
 include $(WARPX_HOME)/Source/Parallelization/Make.package
 include $(WARPX_HOME)/Source/Particles/Make.package
 include $(WARPX_HOME)/Source/Python/Make.package
+include $(WARPX_HOME)/Source/Radiation/Make.package
 include $(WARPX_HOME)/Source/Utils/Make.package
 include $(WARPX_HOME)/Source/Evolve/Make.package
 

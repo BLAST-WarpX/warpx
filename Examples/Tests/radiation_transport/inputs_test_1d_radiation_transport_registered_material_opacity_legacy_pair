@@ -1,0 +1,69 @@
+# Compatibility check for a sole registry handle plus matching legacy file/ID.
+
+my_constants.n0 = 10.0/m_p
+
+max_step = 0
+amr.n_cell = 4
+amr.max_level = 0
+amr.max_grid_size = 4
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.verbose = 0
+warpx.const_dt = 1.0e-12
+warpx.grid_type = collocated
+warpx.use_filter = 0
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = 1.0
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 1.0e-6*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+
+particles.species_names = material_a photons
+material_a.charge = q_e
+material_a.mass = m_p
+material_a.injection_style = NUniformPerCell
+material_a.num_particles_per_cell_each_dim = 1
+material_a.profile = constant
+material_a.density = n0
+material_a.momentum_distribution_type = at_rest
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.0 0.0 0.5
+photons.single_particle_u = 0.0 0.0 1.0e-3
+photons.single_particle_weight = 1.0
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+materials.names = material_a
+materials.material_a.species = material_a
+materials.material_a.opacity_table_file = material_a.h5
+materials.material_a.opacity_material_id = 1001
+materials.material_a.opacity_material_key = material-a
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.opacity_species = material_a
+radiation_transport.material_opacity_table_file = material_a.h5
+radiation_transport.material_opacity_table_id = 1001
+radiation_transport.energy_group_boundaries = 2.0e-16
+radiation_transport.group_photon_energies = 1.0e-16 4.0e-16
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0

@@ -1,0 +1,2 @@
+FILE = inputs_base_rcylinder_radiation_transport_diffusion_boundary
+radiation_transport.diffusion_boundary_hi = reflecting

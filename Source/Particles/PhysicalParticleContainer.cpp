@@ -20,6 +20,7 @@
 #   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
 #endif
 #include "Particles/Deposition/TemperatureDeposition.H"
+#include "Particles/Deposition/BorisWorkCurrentDeposition.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Particles/ParticleCreation/DefaultInitialization.H"
@@ -47,6 +48,7 @@
 #include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
+#include <ablastr/particles/NodalFieldGather.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/utils/Communication.H>
 
@@ -250,9 +252,39 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     pp_species_name.query("self_fields_verbosity", self_fields_verbosity);
 
     pp_species_name.query("do_field_ionization", do_field_ionization);
+    pp_species_name.query("do_hybrid_ionization", do_hybrid_ionization);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !(do_field_ionization && do_hybrid_ionization),
+        "Species '" + species_name + "' cannot enable both "
+        "do_field_ionization and do_hybrid_ionization.");
+    if (do_hybrid_ionization) {
+        constexpr amrex::ParticleReal tolerance =
+            16.0_prt * std::numeric_limits<amrex::ParticleReal>::epsilon();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::abs(m_charge / PhysConst::q_e - 1.0_prt) <= tolerance,
+            "Hybrid-ionizing species '" + species_name
+                + "' must use base charge = q_e; its runtime "
+                  "ionizationLevel supplies the charge-state multiplier.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_mass > 0.0_prt,
+            "Hybrid-ionizing species '" + species_name
+                + "' must have positive mass.");
+    }
 
     pp_species_name.query("do_resampling", do_resampling);
-    if (do_resampling) { m_resampler = Resampling(species_name); }
+    if (do_resampling) {
+        std::string resampling_algorithm = "leveling_thinning";
+        pp_species_name.query(
+            "resampling_algorithm", resampling_algorithm);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_hybrid_ionization
+                || resampling_algorithm != "velocity_coincidence_thinning",
+            "Hybrid-ionizing species '" + species_name
+                + "' cannot use velocity_coincidence_thinning because that "
+                  "resampler does not yet conserve mixed integer charge "
+                  "states. Use leveling_thinning or disable resampling.");
+        m_resampler = Resampling(species_name);
+    }
 
     //check if Radiation Reaction is enabled and do consistency checks
     pp_species_name.query("do_classical_radiation_reaction", do_classical_radiation_reaction);
@@ -507,6 +539,59 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
 
+    bool const pressure_work_fields =
+        fields.has_vector(FieldType::hybrid_pressure_E_aux, lev)
+        && fields.has_vector(
+            FieldType::hybrid_pressure_work_current_aux, lev);
+    bool const is_full_physical_push =
+        lev == 0
+        && subcycling_half == SubcyclingHalf::None
+        && position_push_type == PositionPushType::Full
+        && momentum_push_type == MomentumPushType::Full
+        && push_type == PushType::Explicit;
+    bool const charged_species = m_charge != 0.0_prt;
+    if (pressure_work_fields && is_full_physical_push && charged_species) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_not_push && !do_not_gather && !do_not_deposit,
+            "Conservative hybrid pressure work requires every charged "
+            "material species to gather, push, and deposit. A charged "
+            "species with do_not_push, do_not_gather, or do_not_deposit "
+            "would break the ion/electron energy ledger.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_classical_radiation_reaction,
+            "Conservative hybrid pressure work does not yet support the "
+            "classical-radiation-reaction Boris variant.");
+#ifdef WARPX_QED
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !has_quantum_sync() && !m_do_qed_quantum_sync,
+            "Conservative hybrid pressure work does not yet support QED "
+            "momentum changes during the instrumented Boris push.");
+#endif
+    }
+    m_collect_hybrid_pressure_work =
+        pressure_work_fields && is_full_physical_push && charged_species;
+    if (m_collect_hybrid_pressure_work) {
+        auto const pressure_E_aux = fields.get_alldirs(
+            FieldType::hybrid_pressure_E_aux, lev);
+        m_hybrid_pressure_work_current_aux = fields.get_alldirs(
+            FieldType::hybrid_pressure_work_current_aux, lev);
+        for (int idim = 0; idim < 3; ++idim) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                pressure_E_aux[idim]->ixType()
+                        == m_hybrid_pressure_work_current_aux[idim]->ixType()
+                    && pressure_E_aux[idim]->boxArray()
+                        == m_hybrid_pressure_work_current_aux[idim]->boxArray()
+                    && pressure_E_aux[idim]->DistributionMap()
+                        == m_hybrid_pressure_work_current_aux[idim]
+                            ->DistributionMap(),
+                "Conservative hybrid pressure work requires its work-current "
+                "scatter grid to be the exact transpose of the isolated "
+                "pressure-E gather grid.");
+        }
+    } else {
+        m_hybrid_pressure_work_current_aux = {};
+    }
+
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
 
     const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
@@ -617,7 +702,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             if (deposit_charge) {
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
 
-                const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
+                const int* const AMREX_RESTRICT ion_lev = (HasEvolvingChargeState())?
                     pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
@@ -738,7 +823,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     // Deposit at t_{n+1/2} with explicit push
                     const amrex::Real relative_time = (push_type == PushType::Explicit ? -0.5_rt * dt : 0.0_rt);
 
-                    const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
+                    const int* const AMREX_RESTRICT ion_lev = (HasEvolvingChargeState())?
                         pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     // Deposit inside domains
@@ -748,7 +833,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type,
+                                       WarpX::current_deposition_algo);
                     }
                     else {
                         amrex::MultiFab * jx = fields.get(current_fp_string, Direction{0}, lev);
@@ -756,7 +842,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * jz = fields.get(current_fp_string, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, jx, jy, jz,
                                        0, np_to_deposit, thread_num,
-                                       lev, lev, dt, relative_time, push_type);
+                                       lev, lev, dt, relative_time, push_type,
+                                       WarpX::current_deposition_algo);
                     }
                     if (has_buffer)
                     {
@@ -766,7 +853,8 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                         amrex::MultiFab * cjz = fields.get(FieldType::current_buf, Direction{2}, lev);
                         DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev, cjx, cjy, cjz,
                                        np_to_deposit, np-np_to_deposit, thread_num,
-                                       lev, lev-1, dt, relative_time, push_type);
+                                       lev, lev-1, dt, relative_time, push_type,
+                                       WarpX::current_deposition_algo);
                     }
                 } // end of "if skip_deposition"
 
@@ -828,7 +916,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho->nComp() >= 2,
                         "Cannot deposit charge in rho component 1: only component 0 is allocated!");
 
-                    const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
+                    const int* const AMREX_RESTRICT ion_lev = (HasEvolvingChargeState())?
                         pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
 
                     DepositCharge(pti, wp, ion_lev, rho, 1, 0,
@@ -860,6 +948,10 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     if (split_particles) {
         SplitParticles(lev);
     }
+
+    // Do not retain borrowed MultiFab pointers beyond this synchronous call.
+    m_collect_hybrid_pressure_work = false;
+    m_hybrid_pressure_work_current_aux = {};
 }
 
 void
@@ -1269,7 +1361,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
 
             int* AMREX_RESTRICT ion_lev = nullptr;
-            if (do_field_ionization) {
+            if (HasEvolvingChargeState()) {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
 
@@ -1439,6 +1531,38 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr() + offset;
     ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr() + offset;
+    [[maybe_unused]] ParticleReal const* const AMREX_RESTRICT wp =
+        attribs[PIdx::w].dataPtr() + offset;
+
+    bool const collect_hybrid_pressure_work =
+        m_collect_hybrid_pressure_work;
+    amrex::Array4<amrex::Real> work_jx_arr;
+    amrex::Array4<amrex::Real> work_jy_arr;
+    amrex::Array4<amrex::Real> work_jz_arr;
+    amrex::IntVect pressure_field_type{};
+    if (collect_hybrid_pressure_work) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            gather_lev == lev && lev == 0,
+            "Conservative hybrid pressure work currently requires a single "
+            "level without particle gather buffers.");
+        auto& work_jxfab =
+            (*m_hybrid_pressure_work_current_aux[0])[pti];
+        auto& work_jyfab =
+            (*m_hybrid_pressure_work_current_aux[1])[pti];
+        auto& work_jzfab =
+            (*m_hybrid_pressure_work_current_aux[2])[pti];
+        pressure_field_type = work_jxfab.box().type();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            work_jyfab.box().type() == pressure_field_type
+                && work_jzfab.box().type() == pressure_field_type,
+            "Conservative hybrid pressure work phase one requires all "
+            "pressure-E and transpose-current components to be collocated.");
+        work_jx_arr = work_jxfab.array();
+        work_jy_arr = work_jyfab.array();
+        work_jz_arr = work_jzfab.array();
+    }
+    [[maybe_unused]] amrex::Real const pressure_work_invvol =
+        dinv.x * dinv.y * dinv.z;
 
     CopyParticleAttribs copyAttribs;
     if (copy_particle_attribs) {
@@ -1446,7 +1570,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
     }
 
     int* AMREX_RESTRICT ion_lev = nullptr;
-    if (do_field_ionization) {
+    if (HasEvolvingChargeState()) {
         ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr() + offset;
     }
 
@@ -1552,6 +1676,44 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             copyAttribs(ip);
         }
 
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+        if (collect_hybrid_pressure_work) {
+            amrex::ParticleReal qp = q;
+            if (ion_lev) { qp *= ion_lev[ip]; }
+            BorisElectricWorkVelocity const work_velocity =
+                UpdateMomentumBorisWithElectricWorkVelocity(
+                    ux[ip], uy[ip], uz[ip], Exp, Eyp, Ezp,
+                    Bxp, Byp, Bzp, qp, mass, dt,
+                    momentum_push_type);
+            amrex::ParticleReal const q_weight = qp * wp[ip];
+            if (nox == 1) {
+                doBorisWorkCurrentDepositionShapeN<1>(
+                    xp, yp, zp, q_weight, work_velocity,
+                    work_jx_arr, work_jy_arr, work_jz_arr,
+                    pressure_field_type, dinv, xyzmin,
+                    pressure_work_invvol, lo);
+            } else if (nox == 2) {
+                doBorisWorkCurrentDepositionShapeN<2>(
+                    xp, yp, zp, q_weight, work_velocity,
+                    work_jx_arr, work_jy_arr, work_jz_arr,
+                    pressure_field_type, dinv, xyzmin,
+                    pressure_work_invvol, lo);
+            } else if (nox == 3) {
+                doBorisWorkCurrentDepositionShapeN<3>(
+                    xp, yp, zp, q_weight, work_velocity,
+                    work_jx_arr, work_jy_arr, work_jz_arr,
+                    pressure_field_type, dinv, xyzmin,
+                    pressure_work_invvol, lo);
+            } else if (nox == 4) {
+                doBorisWorkCurrentDepositionShapeN<4>(
+                    xp, yp, zp, q_weight, work_velocity,
+                    work_jx_arr, work_jy_arr, work_jz_arr,
+                    pressure_field_type, dinv, xyzmin,
+                    pressure_work_invvol, lo);
+            }
+        } else
+#endif
+        {
 #ifdef WARPX_QED
         if (!do_sync) {
             doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
@@ -1577,6 +1739,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
                                       mass, q, pusher_algo, do_crr,
                                       dt, momentum_push_type);
 #endif
+        }
 
         if (position_push_type == PositionPushType::Full) {
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt, mass);
@@ -1604,8 +1767,63 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 void
 PhysicalParticleContainer::InitIonizationModule ()
 {
-    if (!do_field_ionization) { return; }
+    if (!HasEvolvingChargeState()) { return; }
     const ParmParse pp_species_name(species_name);
+    if (do_hybrid_ionization) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            WarpX::electromagnetic_solver_id
+                == ElectromagneticSolverAlgo::HybridPIC,
+            "do_hybrid_ionization for species '" + species_name
+                + "' requires algo.maxwell_solver=hybrid.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_not_deposit,
+            "Hybrid-ionizing species '" + species_name
+                + "' must participate in charge/current deposition.");
+
+        // The collision kernels currently use the species' fixed base charge
+        // rather than its per-particle ionizationLevel.  Reject only
+        // collisions that name this evolving-charge species; unrelated
+        // collision pairs remain valid.
+        amrex::Vector<std::string> collision_names;
+        amrex::ParmParse const pp_collisions("collisions");
+        pp_collisions.queryarr("collision_names", collision_names);
+        for (std::string const& collision_name : collision_names) {
+            amrex::Vector<std::string> collision_species;
+            amrex::ParmParse const pp_collision(collision_name);
+            pp_collision.queryarr("species", collision_species);
+            amrex::Vector<std::string> product_species;
+            pp_collision.queryarr("product_species", product_species);
+            std::string background_ionization_species;
+            pp_collision.query(
+                "ionization_species", background_ionization_species);
+            std::string collision_type = "pairwisecoulomb";
+            pp_collision.query("type", collision_type);
+            bool use_global_debye_length = false;
+            pp_collision.query(
+                "use_global_debye_length", use_global_debye_length);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::find(
+                    collision_species.begin(), collision_species.end(),
+                    species_name) == collision_species.end()
+                    && std::find(
+                        product_species.begin(), product_species.end(),
+                        species_name) == product_species.end()
+                    && background_ionization_species != species_name,
+                "Hybrid-ionizing species '" + species_name
+                    + "' is used as a reactant or product by collision '"
+                    + collision_name
+                    + "', but particle-collision rates do not yet consume "
+                      "runtime ionizationLevel. Disable that collision or "
+                      "hybrid charge-state evolution.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !use_global_debye_length
+                    && collision_type != "inverse_bremsstrahlung",
+                "Collision '" + collision_name
+                    + "' computes a global plasma property with fixed species "
+                      "charges and therefore cannot yet be combined with "
+                      "do_hybrid_ionization.");
+        }
+    }
     if (m_charge != PhysConst::q_e){
         ablastr::warn_manager::WMRecordWarning("Species",
             "charge != q_e for ionizable species '" +
@@ -1613,15 +1831,32 @@ PhysicalParticleContainer::InitIonizationModule ()
             "overriding user value and setting charge = q_e.");
         m_charge = PhysConst::q_e;
     }
-    utils::parser::queryWithParser(pp_species_name, "do_adk_correction", do_adk_correction);
 
     utils::parser::queryWithParser(
         pp_species_name, "ionization_initial_level", ionization_initial_level);
-    pp_species_name.get("ionization_product_species", ionization_product_name);
     pp_species_name.get("physical_element", physical_element);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        physical_element == "H" || !do_adk_correction,
-        "Correction to ADK by Zhang et al., PRA 90, 043410 (2014) only works with Hydrogen");
+
+    if (do_field_ionization) {
+        utils::parser::queryWithParser(
+            pp_species_name, "do_adk_correction", do_adk_correction);
+        pp_species_name.get(
+            "ionization_product_species", ionization_product_name);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            physical_element == "H" || !do_adk_correction,
+            "Correction to ADK by Zhang et al., PRA 90, 043410 (2014) "
+            "only works with Hydrogen");
+    }
+    if (do_hybrid_ionization) {
+        pp_species_name.get(
+            "hybrid_ionization_rate_coefficient(x,y,z,t,ne,Te,Z)",
+            m_hybrid_ionization_rate_expression);
+        m_hybrid_ionization_rate_parser =
+            std::make_unique<amrex::Parser>(utils::parser::makeParser(
+                m_hybrid_ionization_rate_expression,
+                {"x", "y", "z", "t", "ne", "Te", "Z"}));
+        m_hybrid_ionization_rate =
+            m_hybrid_ionization_rate_parser->compile<7>();
+    }
     // Add runtime integer component for ionization level
     if (!HasiAttrib("ionizationLevel")) {
         AddIntComp("ionizationLevel");
@@ -1629,12 +1864,32 @@ PhysicalParticleContainer::InitIonizationModule ()
     // Get atomic number and ionization energies from file
     const int ion_element_id = utils::physics::ion_map_ids.at(physical_element);
     ion_atomic_number = utils::physics::ion_atomic_numbers[ion_element_id];
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        ionization_initial_level >= 0 &&
+            ionization_initial_level <= ion_atomic_number,
+        "ionization_initial_level for species '" + species_name +
+            "' must satisfy 0 <= ionization_initial_level <= " +
+            std::to_string(ion_atomic_number) + " (the atomic number of " +
+            physical_element + ").");
     Vector<Real> h_ionization_energies(ion_atomic_number);
     const int offset = utils::physics::ion_energy_offsets[ion_element_id];
     for(int i=0; i<ion_atomic_number; i++){
         h_ionization_energies[i] =
             utils::physics::table_ionization_energies[i+offset];
     }
+
+    ionization_energies.resize(ion_atomic_number);
+    Gpu::copyAsync(Gpu::hostToDevice,
+                   h_ionization_energies.begin(), h_ionization_energies.end(),
+                   ionization_energies.begin());
+
+    // Hybrid ionization consumes the stage energies directly but does not use
+    // the field-ionization ADK prefactors below.
+    if (!do_field_ionization) {
+        Gpu::synchronize();
+        return;
+    }
+
     // Compute ADK prefactors (See Chen, JCP 236 (2013), equation (2))
     // For now, we assume l=0 and m=0.
     // The approximate expressions are used,
@@ -1649,14 +1904,9 @@ PhysicalParticleContainer::InitIonizationModule ()
 
     const Real dt = WarpX::GetInstance().getdt(0);
 
-    ionization_energies.resize(ion_atomic_number);
     adk_power.resize(ion_atomic_number);
     adk_prefactor.resize(ion_atomic_number);
     adk_exp_prefactor.resize(ion_atomic_number);
-
-    Gpu::copyAsync(Gpu::hostToDevice,
-                   h_ionization_energies.begin(), h_ionization_energies.end(),
-                   ionization_energies.begin());
 
     adk_correction_factors.resize(4);
     if (do_adk_correction) {
@@ -1686,6 +1936,160 @@ PhysicalParticleContainer::InitIonizationModule ()
     });
 
     Gpu::synchronize();
+}
+
+void
+PhysicalParticleContainer::DoHybridIonization (
+    int const lev,
+    amrex::MultiFab const& electron_charge_density,
+    amrex::MultiFab const& electron_temperature,
+    amrex::MultiFab& binding_energy_density,
+    amrex::Real const time,
+    amrex::Real const dt)
+{
+    if (!do_hybrid_ionization) { return; }
+
+    ABLASTR_PROFILE("PhysicalParticleContainer::DoHybridIonization()");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dt > 0.0_rt && amrex::Math::isfinite(dt),
+        "Hybrid ionization requires a finite positive timestep.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        electron_charge_density.ixType().nodeCentered()
+            && electron_temperature.ixType().nodeCentered()
+            && binding_energy_density.ixType().nodeCentered(),
+        "Hybrid ionization requires nodal rho, Te, and binding-energy fields.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        electron_charge_density.boxArray()
+                == electron_temperature.boxArray()
+            && electron_charge_density.boxArray()
+                == binding_energy_density.boxArray()
+            && electron_charge_density.DistributionMap()
+                == electron_temperature.DistributionMap()
+            && electron_charge_density.DistributionMap()
+                == binding_energy_density.DistributionMap(),
+        "Hybrid ionization fields must have identical layouts.");
+
+    auto const& geom = WarpX::GetInstance().Geom(lev);
+    auto const plo = geom.ProbLoArray();
+    auto const dx = geom.CellSizeArray();
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dxi;
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        dxi[d] = 1.0_rt / dx[d];
+    }
+
+    auto const rate_coefficient = m_hybrid_ionization_rate;
+    amrex::Real const* const ionization_energy_eV =
+        ionization_energies.dataPtr();
+    int const atomic_number = ion_atomic_number;
+    amrex::Gpu::DeviceScalar<int> invalid_rate(0);
+    int* const invalid_rate_ptr = invalid_rate.dataPtr();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+    {
+        int const thread_num = omp_get_thread_num();
+#else
+        int const thread_num = 0;
+#endif
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            long const np = pti.numParticles();
+            if (np == 0) { continue; }
+
+            auto const get_position = GetParticlePosition<PIdx>(pti);
+            amrex::ParticleReal const* const wp =
+                pti.GetAttribs(PIdx::w).dataPtr();
+            int* const ionization_level =
+                pti.GetiAttribs("ionizationLevel").dataPtr();
+            amrex::Array4<amrex::Real const> const rho_arr =
+                electron_charge_density.const_array(pti);
+            amrex::Array4<amrex::Real const> const Te_arr =
+                electron_temperature.const_array(pti);
+
+            // DepositCharge multiplies this equivalent weight by the species
+            // base charge q_e. Storing w*I[eV] therefore deposits exactly
+            // w*I[eV]*q_e joules per accepted event.
+            RealVector event_energy_equivalent_weight(np);
+            amrex::ParticleReal* const event_weight =
+                event_energy_equivalent_weight.dataPtr();
+
+            amrex::ParallelForRNG(
+                np,
+                [=] AMREX_GPU_DEVICE (
+                    long const ip,
+                    amrex::RandomEngine const& engine) noexcept
+                {
+                    event_weight[ip] = 0.0_prt;
+                    int const charge_state = ionization_level[ip];
+                    if (charge_state < 0 || charge_state > atomic_number) {
+                        amrex::HostDevice::Atomic::Add(invalid_rate_ptr, 1);
+                        return;
+                    }
+                    if (charge_state == atomic_number) { return; }
+
+                    amrex::ParticleReal xp, yp, zp;
+                    get_position(ip, xp, yp, zp);
+                    amrex::Real const ne = amrex::max(
+                        0.0_rt,
+                        ablastr::particles::doGatherScalarFieldNodal(
+                            xp, yp, zp, rho_arr, dxi, plo)
+                            / PhysConst::q_e);
+                    amrex::Real const Te_eV = amrex::max(
+                        0.0_rt,
+                        ablastr::particles::doGatherScalarFieldNodal(
+                            xp, yp, zp, Te_arr, dxi, plo)
+                            * PhysConst::kb / PhysConst::q_e);
+                    if (!(ne > 0.0_rt)) { return; }
+
+                    amrex::Real const coefficient = rate_coefficient(
+                        static_cast<amrex::Real>(xp),
+                        static_cast<amrex::Real>(yp),
+                        static_cast<amrex::Real>(zp), time, ne, Te_eV,
+                        static_cast<amrex::Real>(charge_state));
+                    if (!amrex::Math::isfinite(coefficient)
+                        || coefficient < 0.0_rt)
+                    {
+                        amrex::HostDevice::Atomic::Add(invalid_rate_ptr, 1);
+                        return;
+                    }
+                    if (coefficient == 0.0_rt) { return; }
+
+                    // Avoid overflow in n_e*K*dt. Above this threshold the
+                    // double- and single-precision probability both round to
+                    // exactly one, which also enables deterministic tests.
+                    amrex::Real const inverse_exposure = ne * dt;
+                    amrex::Real const exposure =
+                        coefficient >= 64.0_rt / ne / dt
+                        ? 64.0_rt
+                        : coefficient * inverse_exposure;
+                    amrex::Real const probability =
+                        exposure >= 64.0_rt
+                        ? 1.0_rt
+                        : -std::expm1(-exposure);
+                    if (amrex::Random(engine) >= probability) { return; }
+
+                    ionization_level[ip] = charge_state + 1;
+                    event_weight[ip] = wp[ip]
+                        * static_cast<amrex::ParticleReal>(
+                            ionization_energy_eV[charge_state]);
+                });
+
+            DepositCharge(
+                pti, event_energy_equivalent_weight,
+                /*ion_lev=*/nullptr, &binding_energy_density,
+                /*icomp=*/0, /*offset=*/0, np, thread_num, lev, lev);
+            // The temporary event vector must outlive both kernels.
+            amrex::Gpu::streamSynchronize();
+        }
+#ifdef AMREX_USE_OMP
+    }
+#endif
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        invalid_rate.dataValue() == 0,
+        "Hybrid ionization encountered an invalid charge state or a "
+        "non-finite/negative rate coefficient for species '" + species_name
+            + "'.");
 }
 
 IonizationFilterFunc

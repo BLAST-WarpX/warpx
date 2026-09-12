@@ -1,0 +1,46 @@
+# Exact circular-face streaming is intentionally unavailable in RZ.
+
+max_step = 1
+amr.n_cell = 4 4
+amr.max_level = 0
+amr.max_grid_size = 4
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 1.0 1.0
+
+boundary.field_lo = none none
+boundary.field_hi = pec pec
+boundary.particle_lo = none none
+boundary.particle_hi = open open
+
+warpx.const_dt = 1.0e-10
+warpx.verbose = 0
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.5 0.0 0.5
+photons.single_particle_u = 1.0 0.0 0.0
+photons.single_particle_weight = 1.0
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.require_cell_interface_exact_streaming = 1
+radiation_transport.material_coupling = none
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+amrex.abort_on_unused_inputs = 1

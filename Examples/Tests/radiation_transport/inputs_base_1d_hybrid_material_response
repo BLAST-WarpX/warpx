@@ -1,0 +1,6 @@
+FILE = inputs_test_1d_radiation_transport_material_profile
+max_step = 0
+amr.n_cell = 8
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+diagnostics.enable = 0

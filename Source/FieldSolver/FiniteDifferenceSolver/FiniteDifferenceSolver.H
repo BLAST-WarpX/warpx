@@ -147,6 +147,8 @@ class FiniteDifferenceSolver
           * https://link.springer.com/chapter/10.1007/3-540-36530-3_8
           *
           * \param[out] Efield  vector of electric field MultiFabs updated at a given level
+          * \param[out] pressure_Efield isolated electron-pressure contribution
+          * to the electric field, used by the conservative pressure-work update
           * \param[in] Jfield   vector of total plasma current MultiFabs at a given level
           * \param[in] Jifield  vector of ion current density MultiFabs at a given level
           * \param[in] Bfield   vector of magnetic field MultiFabs at a given level
@@ -158,6 +160,7 @@ class FiniteDifferenceSolver
           * \param[in] solve_for_Faraday boolean flag for whether the E-field is solved to be used in Faraday's equation
           */
         void HybridPICSolveE ( ablastr::fields::VectorField const& Efield,
+                               ablastr::fields::VectorField const& pressure_Efield,
                                ablastr::fields::VectorField & Jfield,
                                ablastr::fields::VectorField const& Jifield,
                                ablastr::fields::VectorField const& Bfield,
@@ -588,6 +591,7 @@ class FiniteDifferenceSolver
         template<typename T_Algo>
         void HybridPICSolveECartesian (
             ablastr::fields::VectorField const& Efield,
+            ablastr::fields::VectorField const& pressure_Efield,
             ablastr::fields::VectorField const& Jfield,
             ablastr::fields::VectorField const& Jifield,
             ablastr::fields::VectorField const& Bfield,

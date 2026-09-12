@@ -1,0 +1,15 @@
+# RAD-P0-004b2: preserve a nonzero below-ULP material-realization residual
+# through a checkpoint at step 2, then run a source-free step 3.
+
+FILE = inputs_test_1d_radiation_transport_hybrid_near_floor
+
+max_step = 3
+
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, if(t < 1.5*dt, alpha_planck, 0.0), 0.0)
+
+diagnostics.diags_names = diag chk
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 2
+chk.file_prefix = diags/chk

@@ -1,0 +1,3 @@
+FILE = inputs_test_1d_radiation_transport_lte_hybrid_implicit_boundary
+
+my_constants.alpha_planck = 0.0

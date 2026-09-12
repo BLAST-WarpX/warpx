@@ -1,0 +1,76 @@
+# One uniform, finite-capacity electron-ion exchange step.
+
+my_constants.n0 = 2.0e20
+my_constants.Te0_eV = 300.0
+my_constants.Ti0_eV = 50.0
+my_constants.nu_ei = 1.0e6
+my_constants.dt = 1.0e-8
+my_constants.dx = 1.0e-3
+
+max_step = 1
+amr.n_cell = 4 4
+amr.max_level = 0
+amr.blocking_factor = 4 4
+amr.max_grid_size = 4 4
+
+geometry.dims = 2
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 4.0*dx 4.0*dx
+
+boundary.field_lo = periodic periodic
+boundary.field_hi = periodic periodic
+boundary.particle_lo = periodic periodic
+boundary.particle_hi = periodic periodic
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.random_seed = 20260826
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 1.0e-6*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t) = nu_ei
+hybrid_pic_model.electron_composition_species = ions
+hybrid_pic_model.electron_composition_atomic_mass = 1.007276466621
+hybrid_pic_model.electron_composition_atomic_number = 1
+
+particles.species_names = ions
+ions.mass = m_p
+ions.charge = q_e
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 16 16
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = gaussian
+ions.ux_m = 0.0
+ions.uy_m = 0.0
+ions.uz_m = 0.0
+ions.ux_th = sqrt(Ti0_eV*q_e/m_p)/clight
+ions.uy_th = sqrt(Ti0_eV*q_e/m_p)/clight
+ions.uz_th = sqrt(Ti0_eV*q_e/m_p)/clight
+ions.do_not_push = 1
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/plt
+diag.species = ions
+diag.fields_to_plot = rho ni_charge_fp_ions Te \
+    hybrid_qei_ion_temperature_fp_ions \
+    hybrid_qei_electron_energy_fp \
+    hybrid_qei_electron_energy_fp_ions \
+    hybrid_qei_ion_energy_cc_ions \
+    hybrid_qei_electron_energy_cumulative_fp

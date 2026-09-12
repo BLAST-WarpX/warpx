@@ -1,0 +1,35 @@
+# RAD-P0-004b2: checkerboard LTE requests expose metric corner-capacity
+# realization at the radial axis, outer radius, and both physical z faces.
+
+FILE = inputs_test_rz_radiation_transport_lte_hybrid_implicit_boundary
+
+my_constants.n0 = 2.857275673921765e19
+my_constants.Te0_eV = 1.0
+my_constants.alpha_planck = 23.1209012123
+my_constants.dt = 1.0e-10
+my_constants.dr = 1.0e-3
+my_constants.dz = 1.0e-3
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.n_floor = n0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+ions.density = 0.25*n0
+radiation_transport.minimum_electron_density = 0.05*n0
+radiation_transport.lte_exchange_solver = frozen_temperature
+
+# Activate the even/even and odd/odd cells on step 2.  Keeping the parity
+# arithmetic inside nested if expressions avoids parser-dependent boolean
+# operators.
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, \
+        if(floor(x/dr)-2.0*floor(0.5*floor(x/dr)) \
+                + floor((z+4.0*dz)/dz) \
+                - 2.0*floor(0.5*floor((z+4.0*dz)/dz)) < 1.0, \
+            alpha_planck, \
+            if(floor(x/dr)-2.0*floor(0.5*floor(x/dr)) \
+                    + floor((z+4.0*dz)/dz) \
+                    - 2.0*floor(0.5*floor((z+4.0*dz)/dz)) > 1.0, \
+                alpha_planck, 0.0)), \
+        0.0)

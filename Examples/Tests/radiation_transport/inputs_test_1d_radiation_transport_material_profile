@@ -1,0 +1,14 @@
+# Nonuniform material initialization for radiation/material comparison cases.
+FILE = inputs_test_1d_radiation_transport_thermalization
+max_step = 2
+warpx.const_dt = 1.0e-12
+ions.do_not_push = 1
+ions.do_not_gather = 1
+hybrid_pic_model.initial_elec_temp(x,y,z) = "1.0 + 0.1*sin(2*pi*z)"
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 0.0
+diagnostics.diags_names = diag1 chk
+diag1.fields_to_plot = rho Te Pe radiation_material_energy radiation_diffusion_energy
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 1
+chk.file_prefix = diags/chk

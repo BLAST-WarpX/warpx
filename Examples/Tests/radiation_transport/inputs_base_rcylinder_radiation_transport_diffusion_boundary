@@ -1,0 +1,87 @@
+# Shared RCYLINDER flux-limited diffusion boundary ledger input.
+#
+# A photon packet is converted into the thick diffusion field near the outer
+# radius. Planck exchange is off, so the only radiation source after conversion
+# is the initial packet. The axis must remain a reflecting zero-area face.
+# Command-line overrides select reflecting, vacuum, or Marshak at r=R_max.
+
+my_constants.n0 = 1.0e25
+my_constants.Te0 = 1.0e4
+my_constants.alpha_rosseland = 1.0e4
+
+max_step = 12
+amr.n_cell = 32
+amr.max_level = 0
+amr.max_grid_size = 16
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0e-2
+
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = reflecting
+
+warpx.const_dt = 1.0e-12
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons photons
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 8 1
+electrons.radial_numpercell_power = 1.0
+electrons.profile = constant
+electrons.density = n0
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = sqrt(kb*Te0/m_e)/clight
+electrons.uy_th = sqrt(kb*Te0/m_e)/clight
+electrons.uz_th = sqrt(kb*Te0/m_e)/clight
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+# Last radial cell, so an open outer face sees the converted packet immediately.
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 9.84375e-3 0.0 0.0
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 1.0e16
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = frozen_temperature
+radiation_transport.planck_absorption_coefficient = 0.0
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient = alpha_rosseland
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.diffusion_cfl = 0.1
+radiation_transport.enable_particle_conversion = 1
+radiation_transport.emission_photon_energy = 1.0e-15
+radiation_transport.diffusion_boundary_lo = reflecting
+radiation_transport.diffusion_boundary_hi = reflecting
+
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17

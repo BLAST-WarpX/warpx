@@ -43,8 +43,10 @@
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
+#include "Radiation/RadiationTransport.H"
 #include "AcceleratorLattice/AcceleratorLattice.H"
 #include "Utils/TextMsg.H"
+#include "Utils/MaterialRegistry.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXUtil.H"
@@ -363,6 +365,10 @@ WarpX::WarpX ()
     dt.resize(nlevs_max, std::numeric_limits<Real>::max());
 
     mypc = std::make_unique<MultiParticleContainer>(this);
+    m_material_registry =
+        std::make_unique<warpx::materials::MaterialRegistry>();
+    m_material_registry->ReadParameters();
+    m_material_registry->ValidateSpecies(*mypc);
 
     // Loop over species (particles and lasers)
     // and set current injection position per species
@@ -428,8 +434,12 @@ WarpX::WarpX ()
     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC)
     {
         // Create hybrid-PIC model object if needed
-        m_hybrid_pic_model = std::make_unique<HybridPICModel>();
+        m_hybrid_pic_model = std::make_unique<HybridPICModel>(
+            m_material_registry.get());
     }
+
+    m_radiation_transport = std::make_unique<RadiationTransport>(
+        *mypc, m_hybrid_pic_model.get(), m_material_registry.get());
 
     current_buffer_masks.resize(nlevs_max);
     gather_buffer_masks.resize(nlevs_max);
@@ -2615,6 +2625,8 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         );
     }
 
+    m_radiation_transport->AllocateLevelMFs(m_fields, lev, ba, dm);
+
     // Allocate extra multifabs needed for fluids
     if (do_fluid_species) {
         myfl->AllocateLevelMFs(m_fields, ba, dm, lev);
@@ -2917,6 +2929,10 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::Efield_aux, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::Efield_aux, Direction{1}, lev, amrex::convert(ba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::Efield_aux, Direction{2}, lev, amrex::convert(ba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+    }
+
+    if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+        m_hybrid_pic_model->AllocateAuxiliaryLevelMFs(m_fields, lev);
     }
 
     // The external fields that are read from file

@@ -13,6 +13,10 @@
 #include "JacobiPC.H"
 #include "Utils/TextMsg.H"
 #include <AMReX_Config.H>
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <string>
 
 /**
@@ -135,7 +139,10 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     bool m_is_defined = false;
     bool m_is_linear = false;
     bool m_usePreCond = false;
-    RT m_epsJFNK = RT(1.0e-6);
+    // The finite-difference perturbation must be large enough to be resolved
+    // in the working precision.  Keep the historical DP value while avoiding
+    // roundoff-dominated JVPs in SP builds.
+    RT m_epsJFNK = std::max(RT(1.0e-6), std::sqrt(std::numeric_limits<RT>::epsilon()));
     RT m_normY0;
     RT m_cur_time, m_dt;
 

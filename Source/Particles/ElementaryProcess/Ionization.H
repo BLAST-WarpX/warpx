@@ -160,14 +160,20 @@ struct IonizationFilterFunc
 
 struct IonizationTransformFunc
 {
+    explicit IonizationTransformFunc (int const ionization_level_comp) noexcept
+        : m_ionization_level_comp{ionization_level_comp} {}
+
     template <typename DstData, typename SrcData>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator() (DstData& /*dst*/, SrcData& src,
         int i_src, int /*i_dst*/,
         amrex::RandomEngine const& /*engine*/) const noexcept
     {
-        src.m_runtime_idata[0][i_src] += 1;
+        src.m_runtime_idata[m_ionization_level_comp][i_src] += 1;
     }
+
+  private:
+    int m_ionization_level_comp;
 };
 
 #endif //WARPX_IONIZATION_H_
