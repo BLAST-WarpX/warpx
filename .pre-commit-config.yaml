@@ -45,6 +45,16 @@ repos:
 #  - id: fix-encoding-pragma
 #    exclude: ^noxfile.py$
 
+# Mirror the Source CI registration/naming gate before test changes are pushed.
+- repo: local
+  hooks:
+  - id: check-test-input-registrations
+    name: check test input registrations
+    entry: python .github/workflows/source/check_inputs.py
+    language: python
+    pass_filenames: false
+    files: '(^|/)CMakeLists\.txt$|^Examples/.*/inputs_(test|base)_|^\.github/workflows/source/check_inputs\.py$|^\.pre-commit-config\.yaml$'
+
 # documentation files: .rst
 - repo: https://github.com/pre-commit/pygrep-hooks
   rev: v1.10.0
