@@ -99,6 +99,17 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
         }
     }
     if (amrex::ParallelDescriptor::IOProcessor()) {
+        if (!m_nu_ei_species_expressions.empty()) {
+            std::ofstream rates(directory + "/HybridSpeciesQeiRates.txt");
+            rates << "species_qei_rates_v1 " << m_nu_ei_species_expressions.size() << ' '
+                  << std::quoted(m_nu_ei_expression) << '\n';
+            for (auto const& [name, expression] : m_nu_ei_species_expressions) {
+                rates << std::quoted(name) << ' ' << std::quoted(expression) << '\n';
+            }
+            rates.flush();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rates.good(),
+                "Could not checkpoint species-resolved Qei rates.");
+        }
         if (m_electron_heat_conduction) {
             std::ofstream conduction(directory + "/HybridElectronConduction.txt");
             conduction << "ideal_isotropic_lagged_harmonic_v1 "
@@ -152,6 +163,28 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
 
 void HybridPICModel::ReadMomentHistory (std::string const &directory)
 {
+    auto const species_rates_manifest = directory + "/HybridSpeciesQeiRates.txt";
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Exists(species_rates_manifest) == !m_nu_ei_species_expressions.empty(),
+        "Restart must preserve species-resolved Qei rates and their manifest.");
+    if (!m_nu_ei_species_expressions.empty()) {
+        amrex::Vector<char> buffer;
+        amrex::ParallelDescriptor::ReadAndBcastFile(species_rates_manifest, buffer);
+        std::istringstream rates(std::string(buffer.data()));
+        std::string version, global, trailing;
+        std::size_t count = 0;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE((rates >> version >> count >> std::quoted(global))
+            && version == "species_qei_rates_v1" && count == m_nu_ei_species_expressions.size()
+            && global == m_nu_ei_expression,
+            "Invalid or changed species-resolved Qei rate contract.");
+        for (auto const& [name, expression] : m_nu_ei_species_expressions) {
+            std::string stored_name, stored_expression;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE((rates >> std::quoted(stored_name) >> std::quoted(stored_expression))
+                && stored_name == name && stored_expression == expression,
+                "Invalid or changed species-resolved Qei rate expression.");
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!(rates >> trailing),
+            "Unexpected trailing species-resolved Qei rate metadata.");
+    }
     auto const conduction_manifest = directory + "/HybridElectronConduction.txt";
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Exists(conduction_manifest) == m_electron_heat_conduction,
         "Restart must preserve the electron heat-conduction model and its manifest.");

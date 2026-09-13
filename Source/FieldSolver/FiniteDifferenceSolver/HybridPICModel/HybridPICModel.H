@@ -724,6 +724,10 @@ public:
     std::string m_nu_ei_expression = "0.0";
     std::unique_ptr<amrex::Parser> m_nu_ei_parser;
     amrex::ParserExecutor<4> m_nu_ei;
+    /** Explicit species overrides; unlisted materials retain the global rate. */
+    std::map<std::string, std::string> m_nu_ei_species_expressions;
+    std::map<std::string, std::unique_ptr<amrex::Parser>> m_nu_ei_species_parsers;
+    std::map<std::string, amrex::ParserExecutor<5>> m_nu_ei_species;
 
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;

@@ -458,17 +458,26 @@ void WarpX::HybridPICDepositRhoAndJ (bool const deposit_energy_auxiliary)
                     *rho_spec[lev], 0, rho_spec[lev]->nComp(),
                     rho_spec[lev]->nGrowVect(), rho_spec[lev]->nGrowVect(),
                     WarpX::do_single_precision_comms, Geom(lev).periodicity());
-                // Match DepositCharge: radial deposits already fold the axis
-                // during inverse-volume scaling. The Cartesian reflective
-                // operator must not fold those contributions a second time.
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+                // RZ inverse-volume scaling folds only the coordinate axis.
+                // The axis has no reflective physical boundary,
+                // so this operator folds physical walls without repeating that
+                // axis fold. Skipping all radial boundaries loses physical-wall
+                // contributions and makes rho_s inconsistent with total rho.
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
                 // The total rho receives this physical boundary operator in
                 // SyncCurrentAndRho below. Apply the same linear operator to
                 // every material component before summing them, so table-EOS
                 // mass densities remain consistent at PEC/PMC and reflecting
                 // or thermal particle boundaries as well as in the interior.
-                ApplyRhofieldBoundary(
-                    lev, rho_spec[lev], PatchType::fine);
+#if defined(WARPX_DIM_RZ)
+                // The older RZ entropy/drag path retains its diagnostic-deposit
+                // convention. The FV caloric state instead consumes total rho
+                // and needs each component in that same physical-wall measure.
+                if (m_hybrid_pic_model->transportsElectronInternalEnergyAtRawDensity())
+#endif
+                {
+                    ApplyRhofieldBoundary(lev, rho_spec[lev], PatchType::fine);
+                }
 #endif
                 if (is_eos_material) {
                     ablastr::utils::communication::SumBoundary(
@@ -478,9 +487,13 @@ void WarpX::HybridPICDepositRhoAndJ (bool const deposit_energy_auxiliary)
                         ion_count_charge[lev]->nGrowVect(),
                         WarpX::do_single_precision_comms,
                         Geom(lev).periodicity());
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-                    ApplyRhofieldBoundary(
-                        lev, ion_count_charge[lev], PatchType::fine);
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ)
+                    if (m_hybrid_pic_model->transportsElectronInternalEnergyAtRawDensity())
+#endif
+                    {
+                        ApplyRhofieldBoundary(lev, ion_count_charge[lev], PatchType::fine);
+                    }
 #endif
                 }
                 for (int idim = 0; idim < 3; ++idim) {
@@ -489,6 +502,14 @@ void WarpX::HybridPICDepositRhoAndJ (bool const deposit_energy_auxiliary)
                         J_spec[lev][idim]->nGrowVect(), J_spec[lev][idim]->nGrowVect(),
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
+#if defined(WARPX_DIM_RZ)
+                // Use the same physical-wall operator as total current, so
+                // per-species fluid velocities use matching charge/current.
+                if (m_hybrid_pic_model->transportsElectronInternalEnergyAtRawDensity()) {
+                    ApplyJfieldBoundary(lev, J_spec[lev][0], J_spec[lev][1],
+                                        J_spec[lev][2], PatchType::fine);
+                }
+#endif
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after

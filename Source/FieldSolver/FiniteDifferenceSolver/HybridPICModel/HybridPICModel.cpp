@@ -38,10 +38,12 @@
 #include <AMReX_Reduce.H>
 #include <AMReX_VisMF.H>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace amrex;
@@ -1441,6 +1443,23 @@ void HybridPICModel::ReadParameters (
     //   expression (only consulted when solve_electron_energy_equation is on).
     m_include_temperature_relaxation =
         pp_hybrid.query("electron_ion_relaxation_rate(rho,Te,Ti,t)", m_nu_ei_expression);
+    std::vector<std::string> rate_species, available_species;
+    pp_hybrid.queryarr("electron_ion_relaxation_species", rate_species);
+    amrex::ParmParse("particles").queryarr("species_names", available_species);
+    for (auto const& name : rate_species) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::find(available_species.begin(), available_species.end(), name) != available_species.end()
+                && !m_nu_ei_species_expressions.contains(name),
+            "Qei rate species must be declared exactly once in particles.species_names.");
+        std::string expression;
+        pp_hybrid.get("electron_ion_relaxation_rate_" + name + "(rho_s,rho,Te,Ti,t)", expression);
+        m_nu_ei_species_expressions.emplace(name, expression);
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_nu_ei_species_expressions.empty()
+        || m_solve_electron_energy_equation,
+        "Species-resolved Qei rates require the evolved electron-energy equation.");
+    m_include_temperature_relaxation = m_include_temperature_relaxation
+        || !m_nu_ei_species_expressions.empty();
     pp_hybrid.query("resolved_qei_support", m_resolved_qei_support);
     pp_hybrid.query("resolved_qei_seed", m_resolved_qei_seed);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_resolved_qei_seed > 0,
@@ -2023,6 +2042,17 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     m_nu_ei_parser = std::make_unique<amrex::Parser>(
         utils::parser::makeParser(m_nu_ei_expression, {"rho","Te","Ti","t"}));
     m_nu_ei = m_nu_ei_parser->compile<4>();
+    for (auto const& [name, expression] : m_nu_ei_species_expressions) {
+        auto const& species = WarpX::GetInstance().GetPartContainer().GetParticleContainerFromName(name);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(species.getMass() > 0.0_prt
+            && species.getCharge() > 0.0_prt && !species.HasEvolvingChargeState()
+            && !species.do_not_deposit,
+            "Species-resolved Qei rates require depositing, massive, fixed-charge positive ions.");
+        auto parser = std::make_unique<amrex::Parser>(utils::parser::makeParser(
+            expression, {"rho_s", "rho", "Te", "Ti", "t"}));
+        m_nu_ei_species.emplace(name, parser->compile<5>());
+        m_nu_ei_species_parsers.emplace(name, std::move(parser));
+    }
 
     // --- Per-species resistivity overlay (Phys. Plasmas 31, 012902 (2024), Eq. 10) ---
     // Optional. For any charged species {spec} the user may supply
@@ -4986,6 +5016,10 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
         }
 
         amrex::MultiFab const & rho_s = *warpx.m_fields.get("rho_fp_" + spec_name, lev);
+        auto const rate_entry = m_nu_ei_species.find(spec_name);
+        bool const has_species_rate = rate_entry != m_nu_ei_species.end();
+        amrex::ParserExecutor<5> const species_rate = has_species_rate
+            ? rate_entry->second : amrex::ParserExecutor<5>{};
         amrex::MultiFab& qei_ion_temperature = *warpx.m_fields.get(
             "hybrid_qei_ion_temperature_fp_" + spec_name, lev);
         amrex::MultiFab& qei_electron_temperature_before = *warpx.m_fields.get(
@@ -5104,9 +5138,13 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
                                 supported_energy += thermal;
                                 auto const fragment_density = number / volume;
                                 auto const ion_temperature = thermal / (1.5_rt*number*PhysConst::kb);
-                                auto const rate = nu_ei(rho_val,
-                                    amrex::max(temperature / K_per_eV, Te_floor_eV),
-                                    ion_temperature / K_per_eV, t_new);
+                                auto const electron_temperature_eV =
+                                    amrex::max(temperature / K_per_eV, Te_floor_eV);
+                                auto const rate = has_species_rate
+                                    ? species_rate(rhos_arr(i,j,k), rho_val, electron_temperature_eV,
+                                        ion_temperature / K_per_eV, t_new)
+                                    : nu_ei(rho_val, electron_temperature_eV,
+                                        ion_temperature / K_per_eV, t_new);
                                 auto const state = thermodynamics
                                     .stateFromMaterialMassDensitiesTemperature(
                                         rho_val, material_mass_density, temperature);
@@ -5141,7 +5179,9 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
                 amrex::Real const Ti_K  = Ti_eV * K_per_eV;
                 qei_electron_temperature_before_arr(i, j, k) = Te_eV;
 
-                amrex::Real const nu = nu_ei(rho_val, amrex::max(Te_eV, Te_floor_eV), Ti_eV, t_new);
+                amrex::Real const nu = has_species_rate
+                    ? species_rate(rhos_arr(i,j,k), rho_val, amrex::max(Te_eV, Te_floor_eV), Ti_eV, t_new)
+                    : nu_ei(rho_val, amrex::max(Te_eV, Te_floor_eV), Ti_eV, t_new);
                 auto const material_mass_density = thermodynamics
                     .materialMassDensitiesFromChargeDensityArrays(
                         material_unit_charge_density, i, j, k);
@@ -5185,6 +5225,9 @@ void HybridPICModel::QDSMCAddTemperatureRelaxation (int const lev, amrex::Real c
             qei_electron_temperature_before.nGrowVect(), period);
     }
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Te.is_finite(0,1,0)
+        && qei_step.is_finite(0,1,0) && qei_cumulative.is_finite(0,1,0),
+        "Qei rate or caloric update is invalid; electron temperature is non-finite.");
     Te.FillBoundary(Te.nGrowVect(), period);
     for (auto const& spec_name : species_names) {
         auto& pc = mypc.GetParticleContainerFromName(spec_name);
@@ -5281,6 +5324,12 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
         auto const m_i = pc.getMass();
         if (m_i <= 0._prt) { continue; }
         auto const mass_real = static_cast<amrex::Real>(m_i);
+        auto const rate_entry = m_nu_ei_species.find(spec_name);
+        bool const has_species_rate = rate_entry != m_nu_ei_species.end();
+        amrex::ParserExecutor<5> const species_rate = has_species_rate
+            ? rate_entry->second : amrex::ParserExecutor<5>{};
+        auto const* species_charge = has_species_rate
+            ? warpx.m_fields.get("rho_fp_" + spec_name, lev) : nullptr;
         ablastr::fields::VectorField Vs{};
         if (do_relax) {
             Vs = warpx.m_fields.get_alldirs("Vs_fp_" + spec_name, lev);
@@ -5325,6 +5374,8 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             amrex::Array4<amrex::Real const> const & rho_arr  = rho.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Te_arr   = Te.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Ti_arr   = Ti_cc.const_array(mfi);
+            auto const rhos_arr = has_species_rate
+                ? species_charge->const_array(mfi) : amrex::Array4<amrex::Real const>{};
             amrex::Array4<amrex::Real const> Vsx_arr;
             amrex::Array4<amrex::Real const> Vsy_arr;
             amrex::Array4<amrex::Real const> Vsz_arr;
@@ -5348,7 +5399,11 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 
                 if (do_relax) {
                     amrex::Real const Ti_eV = Ti_arr(i,j,k);
-                    coef_arr(i,j,k,0) = nu_ei(rho_val, amrex::max(Te_K / K_per_eV, Te_floor_eV), Ti_eV, t_new);
+                    coef_arr(i,j,k,0) = has_species_rate
+                        ? species_rate(ablastr::coarsen::sample::Interp(
+                            rhos_arr, nodal_src, cc_dst, coarsen, i, j, k, 0), rho_val,
+                            amrex::max(Te_K / K_per_eV, Te_floor_eV), Ti_eV, t_new)
+                        : nu_ei(rho_val, amrex::max(Te_K / K_per_eV, Te_floor_eV), Ti_eV, t_new);
                     coef_arr(i,j,k,1) = ablastr::coarsen::sample::Interp(
                         Vsx_arr, Jx_stag, cc_x, coarsen, i, j, k, 0);
                     coef_arr(i,j,k,2) = ablastr::coarsen::sample::Interp(
@@ -5609,6 +5664,7 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 #if defined(WARPX_DIM_RZ)
             auto const qei_axis_factor = warpx.verboncoeurAxisCorrection()
                 ? 1.0_rt / 3.0_rt : 1.0_rt / 4.0_rt;
+            bool const qei_native_volume = m_fv_transport_internal_energy;
 #endif
             amrex::GpuArray<int, 3> periodic{0, 0, 0};
             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
@@ -5716,6 +5772,16 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
                                     hybrid_cell_corner_volume(i, j, k, di, dj,
                                                               dk, problo, dx,
                                                               domain_lo);
+#if defined(WARPX_DIM_RZ)
+                                if (qei_native_volume) {
+                                    // Recipient weights remain geometric, but
+                                    // integrate the source using the electron
+                                    // inventory's axis/physical-wall measure.
+                                    physical_node_volume = hybrid_transport_node_volume(
+                                        ni, nj, nk, problo, dx, domain_lo, qei_axis_factor,
+                                        domain_hi, periodic);
+                                }
+#endif
                                 electron_change +=
                                     source_density * physical_node_volume *
                                     cell_density * own_corner_volume / support;

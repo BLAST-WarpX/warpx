@@ -2286,6 +2286,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         (temperatures in eV) and ``t`` (time). Only used when
         ``solve_electron_energy_equation`` is True.
 
+    electron_ion_relaxation_rate_species: dict, optional
+        Map ion species names to rate values or expressions in 1/s. These
+        override the global rate for listed species. Expressions accept
+        ``rho_s,rho,Te,Ti,t`` (charge densities in C/m^3, temperatures in eV,
+        time in seconds); zero disables that species' exchange. Requires
+        evolved electron energy and fixed-charge depositing positive ions.
+
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full
         timestep (split evenly between the two half-steps, so ``substeps/2``
@@ -2419,6 +2426,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         electron_latent_transition_temperature_eV=None,
         electron_latent_energy_eV=None,
         electron_latent_sharpness=None,
+        electron_ion_relaxation_rate_species=None,
         **kw,
     ):
         self.grid = grid
@@ -2442,6 +2450,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.include_joule_heating = include_joule_heating
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
+        self.electron_ion_relaxation_rate_species = electron_ion_relaxation_rate_species
 
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
@@ -2535,9 +2544,20 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             pywarpx.hybridpicmodel.__setattr__(
                 "electron_ion_relaxation_rate(rho,Te,Ti,t)",
                 pywarpx.my_constants.mangle_expression(
-                    self.electron_ion_relaxation_rate, self.mangle_dict
+                    str(self.electron_ion_relaxation_rate), self.mangle_dict
                 ),
             )
+        if self.electron_ion_relaxation_rate_species is not None:
+            pywarpx.hybridpicmodel.electron_ion_relaxation_species = list(
+                self.electron_ion_relaxation_rate_species
+            )
+            for name, expression in self.electron_ion_relaxation_rate_species.items():
+                pywarpx.hybridpicmodel.__setattr__(
+                    f"electron_ion_relaxation_rate_{name}(rho_s,rho,Te,Ti,t)",
+                    pywarpx.my_constants.mangle_expression(
+                        str(expression), self.mangle_dict
+                    ),
+                )
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol

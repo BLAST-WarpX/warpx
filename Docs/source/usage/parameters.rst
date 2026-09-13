@@ -4672,6 +4672,30 @@ state model.
     NGP estimator instead of recording the shape-aware temperature consumed by
     this source.
 
+.. pp:param:: hybrid_pic_model.electron_ion_relaxation_species
+    :type: ``list of str``
+    :optional:
+
+    Names of depositing, massive, fixed-charge positive ion species with their
+    own electron-ion relaxation rate. Requires the evolved electron-energy
+    equation. Each listed name must occur exactly once and have the expression
+    below. Unlisted species retain the global relaxation rate (zero if omitted).
+
+.. pp:param:: hybrid_pic_model.electron_ion_relaxation_rate_<species>(rho_s,rho,Te,Ti,t)
+    :type: ``float`` or ``str``
+    :optional:
+
+    Overrides, rather than adds to, the global rate for the named species.
+    ``rho_s`` and ``rho`` are species and total charge densities [C/m3];
+    ``Te`` and ``Ti`` are electron and that species' ion temperatures [eV];
+    ``t`` is time [s]. The result is a finite nonnegative rate [1/s], with
+    the same normalization as the global rate. Zero disables exchange for
+    that species. Both electron exchange and the conjugate ion proposal use
+    the override. This is a user-supplied rate, not a built-in calibrated
+    Coulomb-logarithm or high-Z material model. Restart preserves the species
+    list and expression text; external parser constants must also be kept
+    unchanged by the caller.
+
 .. pp:param:: hybrid_pic_model.J[x/y/z]_external_grid_function(x,y,z,t)
     :type: ``float`` or ``str``
     :default: ``0``

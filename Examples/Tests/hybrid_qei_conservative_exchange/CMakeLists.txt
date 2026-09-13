@@ -3,6 +3,13 @@
 
 find_package(Python REQUIRED COMPONENTS Interpreter)
 
+if(WarpX_PYTHON)
+    add_test(NAME test_species_qei_rates_picmi
+        COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_species_rates_picmi.py)
+    set_tests_properties(test_species_qei_rates_picmi PROPERTIES
+        ENVIRONMENT "PYTHONPATH=${WarpX_SOURCE_DIR}/Python")
+endif()
+
 if(WarpX_LIB AND WarpX_PRECISION STREQUAL DOUBLE)
     foreach(dim IN LISTS WarpX_DIMS)
         if(dim STREQUAL RCYLINDER OR dim STREQUAL RSPHERE)
@@ -40,6 +47,52 @@ endif()
 
 if(RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL DOUBLE
    AND WarpX_PARTICLE_PRECISION STREQUAL DOUBLE)
+    add_executable(test_rz_species_qei_rates test_species_rates.cpp)
+    target_link_libraries(test_rz_species_qei_rates PRIVATE lib_rz)
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        setup_target_for_cuda_compilation(test_rz_species_qei_rates)
+    endif()
+    warpx_set_compile_warnings(test_rz_species_qei_rates)
+    foreach(case specific fallback legacy legacy_fallback)
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_${case})
+        set(rate_args)
+        if(case MATCHES fallback)
+            list(APPEND rate_args test.fallback=1)
+        endif()
+        if(case MATCHES legacy)
+            list(APPEND rate_args test.legacy=1)
+        endif()
+        add_test(NAME test_rz_species_qei_rates_${case}
+            COMMAND test_rz_species_qei_rates ${CMAKE_CURRENT_SOURCE_DIR}/inputs_species_rates ${rate_args})
+        set_tests_properties(test_rz_species_qei_rates_${case} PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_${case})
+    endforeach()
+    foreach(case specific legacy)
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_invalid_${case})
+        set(invalid_rate_args test.invalid_rate=1)
+        if(case STREQUAL legacy)
+            list(APPEND invalid_rate_args test.legacy=1)
+        endif()
+        add_test(NAME test_rz_species_qei_rates_invalid_${case}
+            COMMAND ${Python_EXECUTABLE}
+                ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+                --expect-failure --expect "Qei rate or caloric update is invalid" --
+                $<TARGET_FILE:test_rz_species_qei_rates>
+                ${CMAKE_CURRENT_SOURCE_DIR}/inputs_species_rates ${invalid_rate_args})
+        set_tests_properties(test_rz_species_qei_rates_invalid_${case} PROPERTIES
+            ENVIRONMENT "OMP_NUM_THREADS=1"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_invalid_${case})
+    endforeach()
+    if(WarpX_MPI)
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_mpi)
+        add_test(NAME test_rz_species_qei_rates_mpi
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                $<TARGET_FILE:test_rz_species_qei_rates>
+                ${CMAKE_CURRENT_SOURCE_DIR}/inputs_species_rates ${MPIEXEC_POSTFLAGS})
+        set_tests_properties(test_rz_species_qei_rates_mpi PROPERTIES
+            ENVIRONMENT "OMP_NUM_THREADS=1" PROCESSORS 2
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_mpi)
+    endif()
     set(conduction_native_args warpx.const_dt=2.e-12
         hybrid_pic_model.electron_heat_conduction=1
         "hybrid_pic_model.electron_thermal_conductivity(rho,Te)=100"

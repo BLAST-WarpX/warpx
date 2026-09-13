@@ -190,6 +190,7 @@ radiation_reflecting_cavity_qualification
 radiation_rz_pressure_work
 radiation_rz_face_streaming
 radiation_electron_conduction
+radiation_species_qei_rates
 ```
 
 Build/test artifacts referenced in these records are local qualification logs,
