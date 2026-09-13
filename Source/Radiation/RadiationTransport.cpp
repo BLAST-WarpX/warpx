@@ -56,6 +56,7 @@
 #include <AMReX_iMultiFab.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Print.H>
 #include <AMReX_Random.H>
 
 #include <algorithm>
@@ -3054,6 +3055,12 @@ RadiationTransport::RadiationTransport (
     amrex::ParmParse const pp("radiation_transport");
     pp.query("enabled", m_enabled);
     if (!m_enabled) { return; }
+    bool require_material_metadata_consistency = false;
+    pp.query("require_material_metadata_consistency", require_material_metadata_consistency);
+#ifndef WARPX_USE_MATERIAL_OPACITY_HDF5
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!require_material_metadata_consistency,
+        "Strict material metadata consistency requires WarpX_MATERIAL_OPACITY_HDF5=ON.");
+#endif
 
     pp.get("photon_species", m_photon_species);
     std::string photon_boundary = "inherit";
@@ -4573,6 +4580,65 @@ RadiationTransport::RadiationTransport (
             m_coupled_max_subdivisions <= 10,
             "coupled_max_subdivisions must be between zero and ten.");
     }
+#ifdef WARPX_USE_MATERIAL_OPACITY_HDF5
+    if (require_material_metadata_consistency) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_use_registered_material_opacity_tables
+                && material_registry != nullptr && material_registry->enabled()
+                && couplesToHybridElectrons() && m_hybrid_model != nullptr
+                && m_hybrid_model->electronThermodynamicsNumMaterials() > 0,
+            "Strict material metadata consistency requires registered opacity tables and "
+            "explicit native hybrid composition or table-EOS metadata.");
+        auto const thermodynamics = m_hybrid_model->electronThermodynamicsExecutor();
+        // Same compatibility scale as the existing EOS/PIC atomic-mass contract.
+        auto const agree = [](double a, double b) {
+            return std::isfinite(a) && std::isfinite(b) && a > 0 && b > 0
+                && std::abs(a - b) <= 1.e-6 * std::max(a, b);
+        };
+        for (int material = 0; material < material_registry->size(); ++material) {
+            auto const& definition = material_registry->material(material);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(definition.species.size() == 1,
+                "Strict material metadata consistency currently requires one carrier species "
+                "per registered material; fixed-mixture species populations are not inferred.");
+            auto const& species_name = definition.species.front();
+            int eos_material = -1;
+            for (int candidate = 0;
+                 candidate < m_hybrid_model->electronThermodynamicsNumMaterials(); ++candidate) {
+                if (m_hybrid_model->electronThermodynamicsMaterialSpeciesName(candidate)
+                    == species_name) { eos_material = candidate; }
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(eos_material >= 0,
+                "Strict material metadata consistency has no EOS composition for species '"
+                    + species_name + "'.");
+            auto const& table = m_registered_material_opacity_tables[material];
+            auto const& species = particles.GetParticleContainerFromName(species_name);
+            double const eos_mass = static_cast<double>(thermodynamics.m_atomic_mass[eos_material])
+                * static_cast<double>(PhysConst::m_u);
+            double const eos_nuclear_charge = thermodynamics.m_atomic_number[eos_material];
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(agree(table.meanAtomicMassKg(), eos_mass)
+                    && agree(table.meanAtomicMassKg(), static_cast<double>(species.getMass())),
+                "Opacity/EOS/PIC atomic-mass metadata mismatch for material '"
+                    + definition.name + "'.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(agree(table.meanAtomicNumber(), eos_nuclear_charge),
+                "Opacity/EOS nuclear-charge metadata mismatch for material '"
+                    + definition.name + "'.");
+            double const charge = static_cast<double>(species.getCharge())
+                / static_cast<double>(PhysConst::q_e);
+            double const roundoff = 64 * std::max(
+                static_cast<double>(std::numeric_limits<amrex::ParticleReal>::epsilon()),
+                static_cast<double>(std::numeric_limits<amrex::Real>::epsilon()))
+                * std::max(1.0, table.meanAtomicNumber());
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!species.HasEvolvingChargeState()
+                    && std::isfinite(charge) && charge > 0
+                    && charge <= table.meanAtomicNumber() + roundoff,
+                "Fixed PIC ion charge exceeds declared nuclear charge, or evolves, for material '"
+                    + definition.name + "'.");
+            amrex::Print() << "Material metadata audit passed for '" << definition.name
+                           << "': mean atomic mass=" << table.meanAtomicMassKg()
+                           << " kg, mean nuclear charge=" << table.meanAtomicNumber()
+                           << ", fixed PIC charge=" << charge << " e.\n";
+        }
+    }
+#endif
 }
 
 amrex::GpuArray<amrex::Real, 4>

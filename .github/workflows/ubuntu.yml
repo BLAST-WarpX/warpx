@@ -97,7 +97,9 @@ jobs:
         cmake --build build -j 4
         ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
-        ctest --test-dir build -R '^material_opacity_table$' --output-on-failure
+        ctest --test-dir build \
+          -R '^(material_opacity_table|test_1d_material_metadata_consistency)$' \
+          --output-on-failure
 
         ccache -s
         du -hs ~/.cache/ccache

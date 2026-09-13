@@ -43,6 +43,7 @@ namespace warpx::radiation
 
             Hdf5Handle (Hdf5Handle const&) = delete;
             Hdf5Handle& operator= (Hdf5Handle const&) = delete;
+            Hdf5Handle& operator= (Hdf5Handle&&) = delete;
             Hdf5Handle (Hdf5Handle&& other) noexcept
                 : m_id(std::exchange(other.m_id, -1)),
                   m_closer(std::exchange(other.m_closer, nullptr))
@@ -129,12 +130,12 @@ namespace warpx::radiation
             hid_t object, bool attribute, std::string const& object_name,
             std::string const& filename)
         {
-            hid_t raw_space = attribute
+            hid_t const raw_space = attribute
                 ? H5Aget_space(object) : H5Dget_space(object);
             require(
                 raw_space >= 0, filename,
                 "could not inspect the dataspace of '" + object_name + "'.");
-            Hdf5Handle space{raw_space, H5Sclose};
+            Hdf5Handle const space{raw_space, H5Sclose};
             require(
                 H5Sget_simple_extent_type(space.get()) == H5S_SCALAR,
                 filename, "'" + object_name + "' must be scalar.");
@@ -145,12 +146,12 @@ namespace warpx::radiation
             std::string const& filename)
         {
             require_scalar_space(object, attribute, object_name, filename);
-            hid_t raw_type = attribute
+            hid_t const raw_type = attribute
                 ? H5Aget_type(object) : H5Dget_type(object);
             require(
                 raw_type >= 0, filename,
                 "could not inspect the datatype of '" + object_name + "'.");
-            Hdf5Handle type{raw_type, H5Tclose};
+            Hdf5Handle const type{raw_type, H5Tclose};
             require(
                 H5Tget_class(type.get()) == H5T_STRING, filename,
                 "'" + object_name + "' must contain a string.");
@@ -159,10 +160,10 @@ namespace warpx::radiation
             if (H5Tis_variable_str(type.get()) > 0) {
                 char* value = nullptr;
                 herr_t const status = attribute
-                    ? H5Aread(object, type.get(), &value)
+                    ? H5Aread(object, type.get(), static_cast<void*>(&value))
                     : H5Dread(
                         object, type.get(), H5S_ALL, H5S_ALL,
-                        H5P_DEFAULT, &value);
+                        H5P_DEFAULT, static_cast<void*>(&value));
                 require(
                     status >= 0, filename,
                     "could not read string '" + object_name + "'.");
@@ -425,6 +426,8 @@ namespace warpx::radiation
             amrex::Vector<amrex::Real> group_edges;
             amrex::Vector<amrex::Real> representative_energy;
             std::string material_key;
+            double mean_atomic_mass_kg = 0.0;
+            double mean_atomic_number = 0.0;
             int num_density = 0;
             int num_temperature = 0;
             int num_groups = 0;
@@ -758,6 +761,17 @@ namespace warpx::radiation
                         "inside its group in the configured Real precision.");
             }
             result.material_key = material_key;
+            for (std::size_t element = 0; element < atomic_number.size(); ++element) {
+                result.mean_atomic_mass_kg +=
+                    number_fraction.values[element] * atomic_mass.values[element];
+                result.mean_atomic_number +=
+                    number_fraction.values[element] * atomic_number[element];
+            }
+            require(std::isfinite(result.mean_atomic_mass_kg)
+                        && result.mean_atomic_mass_kg > 0.0
+                        && std::isfinite(result.mean_atomic_number)
+                        && result.mean_atomic_number > 0.0,
+                    filename, "composition has invalid mean atomic mass or nuclear charge.");
             result.num_density = static_cast<int>(density.values.size());
             result.num_temperature = static_cast<int>(temperature.values.size());
             result.num_groups = static_cast<int>(representative.values.size());
@@ -780,6 +794,8 @@ namespace warpx::radiation
         if (m_initialized) { amrex::Gpu::streamSynchronize(); }
 
         m_log_density_h = std::move(loaded.log_density);
+        m_mean_atomic_mass_kg = loaded.mean_atomic_mass_kg;
+        m_mean_atomic_number = loaded.mean_atomic_number;
         m_log_temperature_h = std::move(loaded.log_temperature);
         m_log_planck_absorption_h = std::move(loaded.log_planck_absorption);
         m_log_planck_emission_h = std::move(loaded.log_planck_emission);

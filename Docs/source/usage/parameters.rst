@@ -5269,6 +5269,30 @@ studies.
    fractions, so composition evolution is outside this first backend. Checkpoint files
    do not embed the external HDF5 data; restarts must use the same table contents.
 
+.. pp:param:: radiation_transport.require_material_metadata_consistency
+   :type: ``bool``
+   :default: ``0``
+   :optional:
+
+   Opt-in startup audit for registered opacity tables and native hybrid material
+   composition metadata. Requires ``WarpX_MATERIAL_OPACITY_HDF5=ON``, one fixed-charge
+   carrier species per registered material, and explicit analytic composition or
+   tabulated electron-EOS metadata. The audit compares number-weighted mean atomic
+   masses across opacity, EOS and PIC and mean nuclear charges across opacity and
+   EOS, using the existing EOS/PIC mass-compatibility scale of ``1e-6`` relative.
+   It also requires positive fixed PIC charge no larger than the declared mean
+   nuclear charge, allowing only a precision-scaled roundoff margin. Missing or
+   nonpositive metadata cannot pass this audit. Accepted values are printed.
+
+   This is a metadata sanity check, not a calibrated high-Z model. Matching two
+   composition moments does not establish identical mixtures or isotope fractions.
+   Nuclear charge is not equilibrium plasma ionization: the check does not verify
+   that an LTE EOS's electron population agrees with the fixed PIC charge state.
+   Opacity and EOS calibration, charge-state evolution and their energy accounting
+   remain separate obligations. No coefficient, particle charge or EOS value is
+   adjusted by enabling this option. Its default preserves existing approximate
+   material mappings.
+
 .. pp:param:: radiation_transport.material_opacity_table_id
    :type: ``integer``
 

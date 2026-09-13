@@ -196,6 +196,9 @@ namespace
         double internal_group_edge = 2.0e-16;
         std::array<double, 2> representative_energies{1.0e-16, 4.0e-16};
         bool constant_mass_opacity = false;
+        std::vector<std::int32_t> atomic_number{6, 1};
+        std::vector<double> atomic_mass{1.994473472893265e-26, 1.673557692882144e-27};
+        std::vector<double> number_fraction{0.5, 0.5};
     };
 
     void write_table (
@@ -241,12 +244,13 @@ namespace
 
         auto composition = create_group(material.get(), "composition");
         write_int32_dataset(
-            composition.get(), "atomic_number", {6, 1}, "1");
+            composition.get(), "atomic_number", specification.atomic_number, "1");
         write_double_dataset(
-            composition.get(), "atomic_mass", {2},
-            {1.994473472893265e-26, 1.673557692882144e-27}, "kg");
+            composition.get(), "atomic_mass", {specification.atomic_mass.size()},
+            specification.atomic_mass, "kg");
         write_double_dataset(
-            composition.get(), "number_fraction", {2}, {0.5, 0.5}, "1");
+            composition.get(), "number_fraction", {specification.number_fraction.size()},
+            specification.number_fraction, "1");
 
         std::vector<double> const density = variant == Variant::ChConversion
             ? std::vector<double>{100.0}
@@ -571,6 +575,10 @@ namespace
         require_test(table.materialId() == 1001, "wrong selected material ID");
         require_test(
             table.materialKey() == "manufactured-ch", "wrong material key");
+        require_test(table.meanAtomicNumber() == 3.5, "wrong mean nuclear charge");
+        double const expected_mass = 0.5 * (1.994473472893265e-26 + 1.673557692882144e-27);
+        require_test(std::abs(table.meanAtomicMassKg() / expected_mass - 1.0) < 1.e-14,
+            "wrong number-weighted mean atomic mass");
         require_test(
             table.groupEdges().size() == 3U
                 && table.groupEdges().front() == 0.0_rt
@@ -747,6 +755,13 @@ namespace
             directory / "material_a.h5", Variant::Valid, material_a);
         write_table(
             directory / "material_b.h5", Variant::Valid, material_b);
+        auto tungsten_metadata = material_a;
+        tungsten_metadata.material_key = "manufactured-w-metadata";
+        tungsten_metadata.material_name = "manufactured tungsten metadata (not calibrated opacity)";
+        tungsten_metadata.atomic_number = {74};
+        tungsten_metadata.atomic_mass = {183.84 * PhysConst::m_u_v<double>};
+        tungsten_metadata.number_fraction = {1.0};
+        write_table(directory / "material_w_metadata.h5", Variant::Valid, tungsten_metadata);
 
         auto material_lte_a = material_a;
         material_lte_a.internal_group_edge = 2.0e-19;

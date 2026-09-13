@@ -18,6 +18,7 @@ still blocks the affected feature; no assertion is relaxed to move past it.
 | Material-specific Qei rates | Named species overrides, global fallback, fixed-charge support, PICMI and restart manifest | User-supplied rates, not calibrated high-Z atomic/Coulomb-log physics |
 | Python input access | PICMI material-energy controls and constant-name mangling | The same C++ model/backend guards remain authoritative |
 | RZ particle-owned absorption recoil | Finite material work, local diagnostic projection, Cartesian carry ownership and elastic material-wall transfer | Absorption-only bounded-segment lab-frame model; no RZ moment transport, face-exact recoil or conversion momentum closure |
+| Strict material metadata audit | Optional opacity/EOS/PIC atomic-mass matching, mean nuclear-charge matching and a fixed-ion charge bound | Matching composition moments does not establish calibration, identical mixtures or equilibrium ionization consistency |
 
 The material additions support radiation-driven matter response; they are not
 themselves photon transport. In particular, conservative **electron pressure
@@ -28,6 +29,13 @@ The follow-up RZ absorption/carry increment is described in
 [radiation_rz_particle_carry.md](radiation_rz_particle_carry.md). Its 256-step
 native-state energy check is distinct from its radiation-source ledger check;
 neither is a declaration of complete moving-frame or packet/diffusion coupling.
+
+The metadata audit is enabled with
+`radiation_transport.require_material_metadata_consistency=1`; its exact scope
+and limitations are documented in the input reference. Six manufactured
+acceptance/rejection scenarios and the surrounding HDF5 regression selection
+pass (21/21 stages). The fixtures test tungsten metadata only, not calibrated
+tungsten opacity. No physical coefficient or particle charge is adjusted.
 
 ## Bounded evidence and defects found
 

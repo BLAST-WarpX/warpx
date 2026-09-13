@@ -2729,6 +2729,15 @@ add_warpx_test(
 if(WarpX_MATERIAL_OPACITY_HDF5 AND 1 IN_LIST WarpX_DIMS AND WarpX_APP)
     set(registered_opacity_fixture_dir
         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/material_opacity_runtime_fixtures")
+    set(material_metadata_dir "${CMAKE_CURRENT_BINARY_DIR}/material_metadata")
+    file(MAKE_DIRECTORY ${material_metadata_dir})
+    add_test(NAME test_1d_material_metadata_consistency
+        COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_material_metadata.py
+            $<TARGET_FILE:app_1d> ${CMAKE_CURRENT_SOURCE_DIR}/inputs_base_1d_material_metadata
+            ${registered_opacity_fixture_dir}/material_w_metadata.h5)
+    set_tests_properties(test_1d_material_metadata_consistency PROPERTIES
+        WORKING_DIRECTORY ${material_metadata_dir} ENVIRONMENT "OMP_NUM_THREADS=1"
+        FIXTURES_REQUIRED material_opacity_runtime_fixtures)
     set(registered_opacity_fixture_args
         "materials.material_a.opacity_table_file='${registered_opacity_fixture_dir}/material_a.h5' materials.material_b.opacity_table_file='${registered_opacity_fixture_dir}/material_b.h5'")
     set(registered_lte_opacity_fixture_args

@@ -195,6 +195,7 @@ namespace warpx::radiation
     {
     public:
         MaterialOpacityTable () = default;
+        ~MaterialOpacityTable () = default;
         MaterialOpacityTable (
             std::string const& filename, std::int64_t material_id);
 
@@ -214,6 +215,16 @@ namespace warpx::radiation
         [[nodiscard]] std::string const& materialKey () const noexcept
         {
             return m_material_key;
+        }
+        /** Number-weighted mean atomic mass from the declared composition [kg]. */
+        [[nodiscard]] double meanAtomicMassKg () const noexcept
+        {
+            return m_mean_atomic_mass_kg;
+        }
+        /** Number-weighted mean nuclear charge, not equilibrium plasma ionization. */
+        [[nodiscard]] double meanAtomicNumber () const noexcept
+        {
+            return m_mean_atomic_number;
         }
         [[nodiscard]] amrex::Vector<amrex::Real> const& groupEdges () const noexcept
         {
@@ -248,6 +259,8 @@ namespace warpx::radiation
 #endif
         std::int64_t m_material_id = 0;
         std::string m_material_key;
+        double m_mean_atomic_mass_kg = 0.0;
+        double m_mean_atomic_number = 0.0;
         bool m_initialized = false;
     };
 }
