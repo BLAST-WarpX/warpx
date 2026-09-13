@@ -95,9 +95,10 @@ not call the C++ radiation operator.
 
 ## Next integration boundary
 
-The native RZ coupled source must pair this transport with actual particle work,
-native caloric deposition, and separately counted optical-wall/geometric terms.
-Rejected source iterations and interval retries must roll back all of them.
-Packet–diffusion conversion then needs the same momentum ownership across both
-representations. Those integrations remain guarded; this operator alone does
-not qualify a dynamic hohlraum or conservative magnetic work.
+The [low-level native RZ source transaction](radiation_rz_native_moment_source.md)
+now pairs this transport with actual particle work, native caloric deposition
+and separately counted optical-wall/geometric terms, including interval rollback.
+Its source/drift ordering and persistent runtime diagnostics are the next
+integration boundary. Packet–diffusion conversion then needs the same momentum
+ownership across both representations. The public runtime remains guarded;
+these operators do not qualify a dynamic hohlraum or conservative magnetic work.

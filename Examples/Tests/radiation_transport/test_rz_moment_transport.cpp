@@ -371,8 +371,19 @@ Run (bool radial, int nr, bool periodic_z)
     }
     ImplicitMomentTransportOptions options;
     options.reflecting_boundaries = true;
-    amrex::ParmParse("test").query("verbose", options.verbose);
-    amrex::Real material_energy = 0;
+        amrex::ParmParse("test").query("verbose", options.verbose);
+        {
+            amrex::MultiFab increment(p.boxes, p.distribution, 8, 0);
+            MomentTransportAccounting accounting;
+            AMREX_ALWAYS_ASSERT(ComputeMomentTransportIncrement(p.radiation, p.beta,
+                p.absorption, p.scattering, p.equilibrium, increment, p.geometry, dt,
+                true, &accounting));
+            // No axial variation: exact absence of a spurious axial force,
+            // including when radial pressure varies and CUDA uses fused math.
+            AMREX_ALWAYS_ASSERT(increment.norm0(3) == 0);
+            AMREX_ALWAYS_ASSERT(accounting.boundary[0] == 0 && accounting.geometric[0] == 0);
+        }
+        amrex::Real material_energy = 0;
     for (int step = 0; step < steps; ++step)
     {
         auto const result =

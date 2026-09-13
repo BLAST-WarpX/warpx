@@ -20,6 +20,7 @@ still blocks the affected feature; no assertion is relaxed to move past it.
 | RZ particle-owned absorption recoil | Finite material work, local diagnostic projection, Cartesian carry ownership and elastic material-wall transfer | Absorption-only bounded-segment lab-frame model; no RZ moment transport, face-exact recoil or conversion momentum closure |
 | Strict material metadata audit | Optional opacity/EOS/PIC atomic-mass matching, mean nuclear-charge matching and a fixed-ion charge bound | Matching composition moments does not establish calibration, identical mixtures or equilibrium ionization consistency |
 | Low-level meridional RZ M1 transport | Annular fluxes, cylindrical stress, prescribed moving-medium work and optical mirrors | No native RZ coupled-moment activation, azimuthal transport or packet/diffusion momentum closure |
+| Low-level native RZ moment source | Actual finite-mass particle work, native electron heat and transactional wall/geometric interval accounting | Positions/density are frozen within the source stage; public runtime, restart diagnostics and packet conversion remain separate integration |
 
 The material additions support radiation-driven matter response; they are not
 themselves photon transport. In particular, conservative **electron pressure
@@ -34,6 +35,8 @@ neither is a declaration of complete moving-frame or packet/diffusion coupling.
 The subsequent low-level moment operator and its independent radial diffusion,
 moving-mode and compression-work targets are described in
 [radiation_rz_moment_transport.md](radiation_rz_moment_transport.md).
+Its native finite-mass source follow-up is documented in
+[radiation_rz_native_moment_source.md](radiation_rz_native_moment_source.md).
 
 The metadata audit is enabled with
 `radiation_transport.require_material_metadata_consistency=1`; its exact scope

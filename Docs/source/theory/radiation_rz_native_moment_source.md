@@ -1,0 +1,96 @@
+# Native-material meridional RZ moment source
+
+This follow-up connects the low-level RZ M1 operator to **actual finite-mass
+particles and native nodal electron thermodynamics**. The source transaction
+updates radiation, ion velocity, particle-owned compensation and electron
+temperature together. It may include spatial radiation transport.
+
+It remains a low-level, opt-in meridional source adapter. The public RZ
+`coupled_moment` evolution path is still guarded. No particle drift, density
+advance, packet conversion, current-driven magnetic work or evolved charge
+state is performed by this source stage. The native integration tests freeze
+positions while evolving the source variables; they are not hohlraum runs.
+
+## Source and momentum ownership
+
+- Particle work is the finite change of relativistic kinetic energy from the
+  committed particle velocities. Unrepresentable increments retain their
+  particle-owned momentum/energy compensation.
+- The electron source is the caloric part of radiation exchange, evaluated
+  through the native electron-energy response and checked at the accepted
+  nodal temperature.
+- Spatial stages use the annular M1 flux operator. Optical-wall transfer and
+  cylindrical stress are recomputed directly on the **actual accepted
+  candidate**, not reconstructed from a global balance residual.
+- Accepted interval output accumulates only accepted substeps. Failure after
+  an earlier private success leaves live radiation, particles, temperature,
+  heat, and the caller's exchange output unchanged. Retrying the interval
+  discards the entire previous attempt's wall and geometric contributions.
+
+The radiation moment and material impulse use local `(r, theta, z)` components;
+particle-owned carry remains Cartesian. The radial-component inventory includes
+the cylindrical stress term and is not mistaken for a globally conserved
+Cartesian momentum. Optical-wall transfer is not charged to material recoil.
+
+Exactly meridional particle motion can acquire a tiny theta component when its
+secant velocity is rotated from Cartesian storage. The adapter canonicalizes
+only a `64*eps`-scaled meridional-velocity rounding bound; meaningful azimuthal
+flow rejects the candidate. It does not canonicalize arbitrary radiation states.
+
+Similarly, the raw relative theta momentum residual can be large when both its
+numerator and denominator are essentially zero. That raw diagnostic is retained.
+The RZ acceptance gate separately bounds the rotation products using the
+**uncancelled transverse requested/actual/carry impulse**, never radiation
+energy or the measured imbalance. The physical momentum tolerance remains
+`1e-10`; the new `momentum_balance_residual` reports the ratio to the combined
+physical and explicitly derived arithmetic bound. The Cartesian gate is unchanged.
+
+## Bounded evidence
+
+The native tests use a fixed `8 x 8` RZ domain, shaped nodal electron fields,
+nearest-cell radiation-to-ion assignment, one fixed-charge ion species and
+ideal finite-volume electrons. They compare against independently accumulated
+particle kinetic energy and independently weighted nodal electron energy,
+not merely the source's own energy ledger.
+
+| Case | Finite effect | Maximum independent total-energy residual, CPU |
+|---|---|---|
+| 64 recoil/scattering stages | Actual ion work `-6.6386e-8 J` | `4.04e-16` |
+| 64 LTE exchange stages | Electron caloric transfer `4.3968e-8 J`; finite ion work also checked | `3.32e-17` |
+| 64 spatial M1/recoil stages | Actual ion work `-6.8667e-8 J`, with direct wall/geometric accounting | `3.30e-16` |
+| Failed second substep and whole-interval retry | Live-state and output immutability; accepted four-step result compared with a private four-step reference | Pass, serial and two-rank MPI |
+
+The five-case CPU/MPI selection passes in 24.95 s locally. The combined RZ
+source/operator address/undefined-behavior sanitizer matrix passes 9/9 in
+236.83 s. The surrounding Cartesian transport/source/boundary and ideal
+conduction selection passes 127/127. Single-precision compiler checks pass
+12/12 affected source translation units across all four supported geometries.
+
+CUDA source-only recoil and LTE cases pass all 64 stages. The sustained
+spatial native source hit the original 1500 s wall-clock limit after at least
+23 accepted stages, with no reported physics-gate failure. This is incomplete
+GPU qualification and poor measured small-grid performance, not a full pass.
+The follow-up uses a single block for sustained serial cases and retains
+multiple blocks for rollback/MPI ownership tests. GPU spatial cases are marked
+slow and have a 5400 s execution budget; the 64-stage physics integration and
+all assertion tolerances remain unchanged. No scalable GPU performance claim
+is made. No checksum reference was refreshed for this feature.
+
+Rollback testing exposed undefined physical radiation ghosts in the new
+nonperiodic source candidate. The source now preserves caller-owned physical
+ghosts while synchronizing interior/periodic aliases. The verification scratch
+has no ghosts and copies only its own allocated extent. Both failure rollback
+and successful retry compare the complete advertised state, including ghosts.
+
+## Remaining runtime integration
+
+Before enabling the user-facing RZ coupled-moment path, connect its persistent
+diagnostics and restart state to the optical-wall/geometric accounting, qualify
+source/drift ordering and the supported particle boundaries, and verify native
+coefficient construction over the intended material range. The current source
+tests use explicit gray coefficients and native caloric callbacks.
+
+Packet–diffusion momentum conversion, general azimuthal/angular-momentum
+transport, table-EOS material coupling and conservative magnetic work remain
+distinct feature gaps. Passing this source transaction must not silently
+activate any of them.

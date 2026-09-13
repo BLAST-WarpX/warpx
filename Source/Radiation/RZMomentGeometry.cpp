@@ -10,10 +10,33 @@
 #include <AMReX_Reduce.H>
 
 #include <cmath>
+#include <limits>
 
 #if defined(WARPX_DIM_RZ)
 namespace warpx::radiation
 {
+    bool TryCanonicalizeRZMeridionalVelocity (amrex::MultiFab& beta)
+    {
+        AMREX_ALWAYS_ASSERT(beta.nComp() == 3 && beta.ixType().cellCentered());
+        amrex::ReduceOps<amrex::ReduceOpMax> ops;
+        amrex::ReduceData<int> data(ops);
+        using Tuple = typename decltype(data)::Type;
+        for (amrex::MFIter it(beta); it.isValid(); ++it) {
+            auto const b = beta.const_array(it);
+            ops.eval(it.validbox(), data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> Tuple {
+                auto const scale = std::abs(b(i,j,k,0)) + std::abs(b(i,j,k,2));
+                auto const allowance = 64 * std::numeric_limits<amrex::Real>::epsilon() * scale;
+                return {!std::isfinite(scale) || !std::isfinite(b(i,j,k,1))
+                    || std::abs(b(i,j,k,1)) > allowance};
+            });
+        }
+        int invalid = amrex::get<0>(data.value());
+        amrex::ParallelDescriptor::ReduceIntMax(invalid);
+        if (invalid) { return false; }
+        beta.setVal(0, 1, 1, 0);
+        return true;
+    }
+
 void
 FillRZMomentGhosts (amrex::MultiFab& field, amrex::Geometry const& geometry, int vector_offset)
 {

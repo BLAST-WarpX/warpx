@@ -1073,6 +1073,52 @@ if(WarpX_LIB)
 
     if(RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL "DOUBLE"
        AND WarpX_PARTICLE_PRECISION STREQUAL "DOUBLE")
+        add_executable(test_rz_coupled_moment_source test_rz_coupled_moment_source.cpp)
+        target_link_libraries(test_rz_coupled_moment_source PRIVATE lib_rz)
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(test_rz_coupled_moment_source)
+            target_compile_features(test_rz_coupled_moment_source PRIVATE cuda_std_20)
+        else()
+            target_compile_features(test_rz_coupled_moment_source PRIVATE cxx_std_20)
+        endif()
+        warpx_set_compile_warnings(test_rz_coupled_moment_source)
+        foreach(coupled_case IN ITEMS drag thermal spatial rollback)
+            set(rz_coupled_args)
+            if(coupled_case STREQUAL thermal)
+                list(APPEND rz_coupled_args test.thermal=1)
+            elseif(coupled_case STREQUAL spatial OR coupled_case STREQUAL rollback)
+                list(APPEND rz_coupled_args test.spatial=1)
+            endif()
+            if(coupled_case STREQUAL rollback)
+                list(APPEND rz_coupled_args test.rollback=1 amr.max_grid_size=4)
+            endif()
+            set(rz_coupled_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_coupled_${coupled_case}")
+            file(MAKE_DIRECTORY ${rz_coupled_dir})
+            add_test(NAME test_rz_coupled_moment_source_${coupled_case}
+                COMMAND test_rz_coupled_moment_source inputs_rz_coupled_moment_source ${rz_coupled_args})
+            set_tests_properties(test_rz_coupled_moment_source_${coupled_case} PROPERTIES
+                WORKING_DIRECTORY ${rz_coupled_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=2;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+            if(WarpX_COMPUTE STREQUAL CUDA AND (coupled_case STREQUAL spatial OR coupled_case STREQUAL rollback))
+                set_tests_properties(test_rz_coupled_moment_source_${coupled_case} PROPERTIES
+                    TIMEOUT 5400 LABELS slow)
+            endif()
+        endforeach()
+        if(WarpX_MPI)
+            set(rz_coupled_mpi_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_coupled_rollback_mpi")
+            file(MAKE_DIRECTORY ${rz_coupled_mpi_dir})
+            add_test(NAME test_rz_coupled_moment_source_rollback_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_coupled_moment_source> ${MPIEXEC_POSTFLAGS}
+                    inputs_rz_coupled_moment_source test.spatial=1 test.rollback=1 amr.max_grid_size=4)
+            set_tests_properties(test_rz_coupled_moment_source_rollback_mpi PROPERTIES
+                PROCESSORS 2 RUN_SERIAL TRUE WORKING_DIRECTORY ${rz_coupled_mpi_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+            if(WarpX_COMPUTE STREQUAL CUDA)
+                set_tests_properties(test_rz_coupled_moment_source_rollback_mpi PROPERTIES
+                    TIMEOUT 5400 LABELS slow)
+            endif()
+        endif()
         add_executable(test_rz_moment_transport test_rz_moment_transport.cpp)
         target_link_libraries(test_rz_moment_transport PRIVATE lib_rz)
         if(WarpX_COMPUTE STREQUAL CUDA)

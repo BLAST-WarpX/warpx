@@ -5,6 +5,7 @@
 
 #include "ImplicitMomentSource.H"
 #include "ParticleImpulse.H"
+#include "RZMomentGeometry.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
 
@@ -133,7 +134,8 @@ namespace warpx::radiation
             CoupledMomentCallbacks const& callbacks, CoupledMomentExchange* exchange)
         {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                geometry.isAllPeriodic() && radiation.nComp() == 4 &&
+                (geometry.isAllPeriodic() || options.transport.reflecting_boundaries) &&
+                    radiation.nComp() == 4 &&
                     radiation.ixType().cellCentered() && nodal_temperature.nComp() == 1 &&
                     nodal_temperature.ixType().nodeCentered() &&
                     nodal_temperature.nGrowVect().allGE(1) &&
@@ -150,8 +152,17 @@ namespace warpx::radiation
                     options.maximum_beta > 0 && options.maximum_beta <= 0.01 && std::isfinite(time) &&
                     std::isfinite(dt) && dt > 0,
                 "Invalid coupled gray moment source configuration.");
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             amrex::Abort("Coupled moment source is initially qualified only in Cartesian geometry.");
+#elif defined(WARPX_DIM_RZ)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(options.transport.reflecting_boundaries
+                && !geometry.isPeriodic(0) && geometry.ProbLo(0) == 0
+                && options.particle_assignment == ParticleImpulseAssignment::NearestCell,
+                "Experimental RZ coupled source requires an axis, optical mirrors "
+                "and nearest-cell assignment.");
+#else
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(geometry.isAllPeriodic(),
+                "Cartesian coupled moment source requires periodic geometry.");
 #endif
             auto const& boxes = radiation.boxArray();
             auto const& distribution = radiation.DistributionMap();
@@ -211,6 +222,11 @@ namespace warpx::radiation
                 amrex::MultiFab::Copy(beta, initial_particle.WorkVelocity(), 0, 0, 3, 0);
             }
             beta.mult(1 / PhysConst::c);
+#if defined(WARPX_DIM_RZ)
+            if (radiation.norm0(2) != 0 || !TryCanonicalizeRZMeridionalVelocity(beta)) {
+                return fail(CoupledMomentFailure::Radiation);
+            }
+#endif
 
             auto source = [&] (amrex::MultiFab const& temperature, amrex::MultiFab const& material_beta,
                                amrex::MultiFab& trial_radiation, amrex::MultiFab& heat,
@@ -220,6 +236,13 @@ namespace warpx::radiation
                 }
                 callbacks.coefficients(temperature, absorption, scattering, equilibrium, time + dt);
                 heat.setVal(0);
+#if defined(WARPX_DIM_RZ)
+                // Optical fluxes use their own density/parity cache. Preserve
+                // caller-owned physical radiation ghosts; FillBoundary below
+                // synchronizes only interior/periodic ghosts in this geometry.
+                amrex::MultiFab::Copy(trial_radiation, radiation, 0, 0, 4,
+                                      trial_radiation.nGrowVect());
+#endif
                 if (options.spatial_transport) {
                     amrex::MultiFab::Copy(trial_radiation, radiation, 0, 0, 4, 0);
                     auto transport_options = options.transport;
@@ -244,7 +267,8 @@ namespace warpx::radiation
                     }
                     if (!ComputeMomentTransportIncrement(trial_radiation, material_beta, absorption, scattering,
                                                          equilibrium, spatial_flux_precision, geometry,
-                                                         dt)) {
+                                                         dt,
+                                                         options.transport.reflecting_boundaries)) {
                         return false;
                     }
                 }
@@ -416,6 +440,11 @@ namespace warpx::radiation
                 }
                 amrex::MultiFab::Copy(next_beta, particle_candidate.WorkVelocity(), 0, 0, 3, 0);
                 next_beta.mult(1 / PhysConst::c);
+#if defined(WARPX_DIM_RZ)
+                if (!TryCanonicalizeRZMeridionalVelocity(next_beta)) {
+                    return fail(CoupledMomentFailure::Particle);
+                }
+#endif
                 bool const prescribed_material =
                     options.spatial_transport && static_cast<bool>(callbacks.material_at_temperature);
                 amrex::Real native_error = 0;
@@ -455,10 +484,13 @@ namespace warpx::radiation
                     }
                     return fail(CoupledMomentFailure::Radiation);
                 }
+                MomentTransportAccounting transport_accounting;
                 if (options.spatial_transport &&
                     !ComputeMomentTransportIncrement(candidate_radiation, next_beta, absorption,
                                                      scattering, equilibrium, transport_increment,
-                                                     geometry, dt)) {
+                                                     geometry, dt,
+                                                     options.transport.reflecting_boundaries,
+                                                     &transport_accounting)) {
                     if (backtrack()) {
                         continue;
                     }
@@ -667,15 +699,38 @@ namespace warpx::radiation
                 }
                 result.raw_energy_residual = scale > 0 ? std::abs(raw) / scale : std::abs(raw);
                 result.raw_momentum_residual = 0;
+#if defined(WARPX_DIM_RZ)
+                result.momentum_balance_residual = 0;
+                // Rotating requested r/theta impulse to Cartesian particles
+                // and actual/carry increments back mixes two components. A
+                // zero theta force therefore has a rounding scale set by the
+                // uncancelled transverse vector, not its near-zero theta sum.
+                // Bound those products/sums independently of radiation energy
+                // or the measured imbalance; retain the raw diagnostic below.
+                amrex::Real rotation_scale = 0;
+                for (int d = 0; d < 2; ++d) {
+                    rotation_scale += PhysConst::c * (impulse.norm1(d)
+                        + particle_candidate.ActualImpulse().norm1(d)
+                        + particle_candidate.MomentumCarryChange().norm1(d));
+                }
+                auto const rotation_noise = 64 * std::numeric_limits<amrex::Real>::epsilon()
+                    * rotation_scale;
+#endif
                 for (int d = 0; d < 3; ++d) {
-                    auto const imbalance =
+                    auto imbalance =
                         candidate_radiation.sum(d + 1) - radiation.sum(d + 1) +
                         PhysConst::c * (particle_candidate.ActualImpulse().sum(d) +
                                         particle_candidate.MomentumCarryChange().sum(d));
-                    auto const momentum_scale =
+                    auto momentum_scale =
                         candidate_radiation.norm1(d + 1) + radiation.norm1(d + 1) +
                         PhysConst::c * (impulse.norm1(d) + particle_candidate.ActualImpulse().norm1(d) +
                                         particle_candidate.MomentumCarryChange().norm1(d));
+#if defined(WARPX_DIM_RZ)
+                    imbalance += transport_accounting.boundary[d + 1]
+                        - transport_accounting.geometric[d + 1];
+                    momentum_scale += std::abs(transport_accounting.boundary[d + 1])
+                        + std::abs(transport_accounting.geometric[d + 1]);
+#endif
                     if (!std::isfinite(imbalance) || !std::isfinite(momentum_scale)) {
                         return fail(CoupledMomentFailure::Radiation);
                     }
@@ -683,13 +738,32 @@ namespace warpx::radiation
                         amrex::max(result.raw_momentum_residual,
                                    momentum_scale > 0 ? std::abs(imbalance) / momentum_scale
                                                       : std::abs(imbalance));
+#if defined(WARPX_DIM_RZ)
+                    auto const bound = options.energy_tolerance * momentum_scale
+                        + (d < 2 ? rotation_noise : 0);
+                    auto const ratio =
+                        bound > 0 ? std::abs(imbalance) / bound : std::abs(imbalance);
+                    result.momentum_balance_residual =
+                        amrex::max(result.momentum_balance_residual, ratio);
+                    if (options.verbose && result.iterations == options.max_iterations) {
+                        amrex::Print() << "RZ momentum balance component=" << d
+                            << " imbalance=" << imbalance << " bound=" << bound << '\n';
+                    }
+#endif
                 }
+#if defined(WARPX_DIM_RZ)
+                bool const momentum_balanced = result.momentum_balance_residual <= 1;
+#else
+                bool const momentum_balanced =
+                    result.raw_momentum_residual <= options.energy_tolerance;
+#endif
                 if (result.material_residual <= tolerance && result.source_residual <= tolerance &&
                     result.work_residual <= tolerance &&
                     result.raw_energy_residual <= options.energy_tolerance &&
-                    result.raw_momentum_residual <= options.energy_tolerance) {
+                    momentum_balanced) {
                     CoupledMomentExchange accepted_exchange;
                     if (exchange != nullptr) {
+                        accepted_exchange.transport = transport_accounting;
                         accepted_exchange.kinetic_work.define(radiation.boxArray(),
                             radiation.DistributionMap(), 1, 0);
                         accepted_exchange.momentum.define(radiation.boxArray(),
@@ -880,6 +954,11 @@ namespace warpx::radiation
                 carry_change += result.last_source.carry_energy_change;
                 amrex::MultiFab::Add(total_heat, heat, 0, 0, 1, heat.nGrowVect());
                 if (exchange != nullptr) {
+                    for (int d = 0; d < 4; ++d) {
+                        total_exchange.transport.boundary[d] += step_exchange.transport.boundary[d];
+                        total_exchange.transport.geometric[d] +=
+                            step_exchange.transport.geometric[d];
+                    }
                     amrex::MultiFab::Add(total_exchange.kinetic_work,
                         step_exchange.kinetic_work, 0, 0, 1, 0);
                     amrex::MultiFab::Add(total_exchange.momentum,
@@ -892,10 +971,16 @@ namespace warpx::radiation
                 auto const scale = trial_radiation.norm1(0) + radiation.norm1(0) +
                                    total_heat.norm1(0) + std::abs(kinetic_work) +
                                    std::abs(carry_change);
-                bool const finite =
+                bool finite =
                     total_heat.is_finite() && std::isfinite(raw) && std::isfinite(scale) &&
                     (exchange == nullptr || (total_exchange.kinetic_work.is_finite() &&
                                              total_exchange.momentum.is_finite()));
+                if (exchange != nullptr) {
+                    for (int d = 0; d < 4; ++d) {
+                        finite = finite && std::isfinite(total_exchange.transport.boundary[d])
+                            && std::isfinite(total_exchange.transport.geometric[d]);
+                    }
+                }
                 result.raw_energy_residual =
                     finite ? (scale > 0 ? std::abs(raw) / scale : std::abs(raw))
                            : std::numeric_limits<amrex::Real>::infinity();

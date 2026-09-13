@@ -13,6 +13,13 @@
 #if defined(WARPX_DIM_RZ)
 namespace warpx::radiation
 {
+    /** Private native-material secant velocity: remove only azimuthal
+     * Cartesian/cylindrical projection noise (64 eps times meridional magnitude).
+     * Real azimuthal flow rejects the candidate before any modification.
+     * This is not a general swirl model or a radiation-state canonicalization.
+     */
+    bool TryCanonicalizeRZMeridionalVelocity (amrex::MultiFab& beta);
+
 /** Annular radiation-cell measures, distinct from nodal material volumes. */
 struct RZMomentMetric
 {

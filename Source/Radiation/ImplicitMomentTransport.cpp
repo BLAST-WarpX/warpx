@@ -1414,7 +1414,8 @@ namespace warpx::radiation
                                      amrex::MultiFab const& scattering,
                                      amrex::MultiFab const& equilibrium, amrex::MultiFab& increment,
                                      amrex::Geometry const& geometry, amrex::Real dt,
-                                     bool reflecting_boundaries)
+                                     bool reflecting_boundaries,
+                                     MomentTransportAccounting* accounting)
     {
         if (std::numeric_limits<amrex::Real>::digits < 53 || radiation.nComp() != 4 ||
             !radiation.ixType().cellCentered() ||
@@ -1448,6 +1449,11 @@ namespace warpx::radiation
             return false;
         }
         op.buildFlux(state, true);
+        op.updateBoundaryExchange();
+        for (int d = 0; d < 4; ++d) {
+            if (!std::isfinite(op.m_boundary_exchange[d]) ||
+                !std::isfinite(op.m_geometric_exchange[d])) { return false; }
+        }
         amrex::MultiFab trial(radiation.boxArray(), radiation.DistributionMap(), 8, 0);
         op.writeTransportIncrement(trial);
         if (!trial.is_finite()) {
@@ -1455,6 +1461,9 @@ namespace warpx::radiation
         }
         amrex::MultiFab::Copy(increment, trial, 0, 0, 8, 0);
         increment.FillBoundary(geometry.periodicity());
+        if (accounting) {
+            *accounting = {op.m_boundary_exchange, op.m_geometric_exchange};
+        }
         return true;
 #endif
     }

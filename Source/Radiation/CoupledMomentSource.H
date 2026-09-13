@@ -61,6 +61,7 @@ namespace warpx::radiation
     struct CoupledMomentExchange {
         amrex::MultiFab kinetic_work;
         amrex::MultiFab momentum;
+        MomentTransportAccounting transport;
     };
 
     struct CoupledMomentResult {
@@ -71,6 +72,9 @@ namespace warpx::radiation
         amrex::Real work_residual = 0;
         amrex::Real raw_energy_residual = 0;
         amrex::Real raw_momentum_residual = 0;
+        // RZ basis-rotation balance divided by its physical + arithmetic bound.
+        // raw_momentum_residual remains the unadjusted relative diagnostic.
+        amrex::Real momentum_balance_residual = 0;
         amrex::Real actual_kinetic_work = 0;
         amrex::Real carry_energy_change = 0;
         amrex::Real native_realization_residual = 0;
@@ -83,7 +87,9 @@ namespace warpx::radiation
      * from the accepted nodal temperature. Spatial moment transport is optional;
      * no PIC drift or density advance is performed,
      * and no interval-wide subcycling/retry is implied by this single stage.
-     * Initial boundary scope is periodic Cartesian geometry. */
+     * Boundary scope is periodic Cartesian geometry or experimental meridional
+     * RZ with opt-in fixed optical mirrors and nearest-cell particle assignment.
+     * Native RZ runtime activation and particle drift remain separate guards. */
     CoupledMomentResult TryAdvanceCoupledMomentSource (
         MultiParticleContainer& particles, std::vector<std::string> const& momentum_species,
         std::string const& carry_path, amrex::MultiFab& radiation,

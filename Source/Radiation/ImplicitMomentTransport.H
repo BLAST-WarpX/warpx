@@ -13,6 +13,11 @@ namespace warpx::radiation
 {
     using PrescribedMomentFaceFluxes =
         std::array<amrex::MultiFab const*, AMREX_SPACEDIM>;
+    /** Independently integrated transport terms, in energy/c*momentum units. */
+    struct MomentTransportAccounting {
+        FourVector boundary{};
+        FourVector geometric{};
+    };
     struct ImplicitMomentTransportOptions {
         int max_nonlinear_iterations = 50;
         int max_linear_iterations = 500;
@@ -79,6 +84,7 @@ namespace warpx::radiation
                                           amrex::MultiFab const& equilibrium,
                                           amrex::MultiFab& increment,
                                           amrex::Geometry const& geometry, amrex::Real dt,
-                                          bool reflecting_boundaries = false);
+                                          bool reflecting_boundaries = false,
+                                          MomentTransportAccounting* accounting = nullptr);
 } // namespace warpx::radiation
 #endif
