@@ -1,8 +1,99 @@
 # Add tests (alphabetical order) ##############################################
 #
 
+find_package(Python REQUIRED COMPONENTS Interpreter)
+
+if(WarpX_LIB AND WarpX_PRECISION STREQUAL DOUBLE)
+    foreach(dim IN LISTS WarpX_DIMS)
+        if(dim STREQUAL RCYLINDER OR dim STREQUAL RSPHERE)
+            continue()
+        endif()
+        warpx_set_suffix_dims(suffix ${dim})
+        set(conduction_target test_${suffix}_electron_heat_conduction)
+        add_executable(${conduction_target} test_electron_heat_conduction.cpp)
+        target_link_libraries(${conduction_target} PRIVATE lib_${suffix})
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(${conduction_target})
+        endif()
+        warpx_set_compile_warnings(${conduction_target})
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix})
+        add_test(NAME ${conduction_target} COMMAND ${conduction_target})
+        set_tests_properties(${conduction_target} PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix})
+        add_test(NAME ${conduction_target}_invalid
+            COMMAND ${Python_EXECUTABLE}
+                ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+                --expect-failure --expect "conductivity and temperature must be finite" --
+                $<TARGET_FILE:${conduction_target}> test.invalid_conductivity=1)
+        set_tests_properties(${conduction_target}_invalid PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix})
+        if(WarpX_MPI)
+            file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix}_mpi)
+            add_test(NAME ${conduction_target}_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:${conduction_target}> ${MPIEXEC_POSTFLAGS})
+            set_tests_properties(${conduction_target}_mpi PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1"
+                PROCESSORS 2 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix}_mpi)
+        endif()
+    endforeach()
+endif()
+
 if(RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL DOUBLE
    AND WarpX_PARTICLE_PRECISION STREQUAL DOUBLE)
+    set(conduction_native_args warpx.const_dt=2.e-12
+        hybrid_pic_model.electron_heat_conduction=1
+        "hybrid_pic_model.electron_thermal_conductivity(rho,Te)=100"
+        hybrid_pic_model.electron_conduction_flux_limiter=0
+        "diag.fields_to_plot=rho Te Pe hybrid_conduction_energy_fp")
+    foreach(case native restart mpi_restart)
+        if(case STREQUAL mpi_restart AND NOT WarpX_MPI)
+            continue()
+        endif()
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${case})
+        set(conduction_restart_args)
+        set(conduction_launch)
+        if(NOT case STREQUAL native)
+            set(conduction_restart_args
+                "amr.restart=${CMAKE_CURRENT_BINARY_DIR}/conduction_native/diags/chk000200")
+        endif()
+        if(case STREQUAL mpi_restart)
+            set(conduction_launch ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS})
+        endif()
+        add_test(NAME test_rz_electron_conduction_${case}
+            COMMAND ${conduction_launch} $<TARGET_FILE:test_rz_pressure_work>
+                ${CMAKE_CURRENT_SOURCE_DIR}/inputs_base_rz_pressure_work
+                ${conduction_native_args} ${conduction_restart_args})
+        set_tests_properties(test_rz_electron_conduction_${case} PROPERTIES
+            ENVIRONMENT "OMP_NUM_THREADS=1"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${case}
+            FIXTURES_SETUP electron_conduction_${case})
+        if(NOT case STREQUAL native)
+            set_tests_properties(test_rz_electron_conduction_${case} PROPERTIES
+                FIXTURES_REQUIRED electron_conduction_native)
+            add_test(NAME test_rz_electron_conduction_${case}_comparison
+                COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_pressure_work_restart.py
+                    ${CMAKE_CURRENT_BINARY_DIR}/conduction_native
+                    ${CMAKE_CURRENT_BINARY_DIR}/conduction_${case})
+            set_tests_properties(test_rz_electron_conduction_${case}_comparison PROPERTIES
+                FIXTURES_REQUIRED "electron_conduction_native;electron_conduction_${case}"
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${case})
+        endif()
+        if(case STREQUAL mpi_restart)
+            set_tests_properties(test_rz_electron_conduction_${case} PROPERTIES PROCESSORS 2)
+        endif()
+    endforeach()
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_rejection)
+    add_test(NAME test_rz_electron_conduction_changed_restart
+        COMMAND ${Python_EXECUTABLE} ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+            --expect-failure --expect "Invalid or changed electron heat-conduction checkpoint" --
+            $<TARGET_FILE:test_rz_pressure_work>
+            ${CMAKE_CURRENT_SOURCE_DIR}/inputs_base_rz_pressure_work
+            ${conduction_native_args}
+            "amr.restart=${CMAKE_CURRENT_BINARY_DIR}/conduction_native/diags/chk000200"
+            "hybrid_pic_model.electron_thermal_conductivity(rho,Te)=101")
+    set_tests_properties(test_rz_electron_conduction_changed_restart PROPERTIES
+        FIXTURES_REQUIRED electron_conduction_native ENVIRONMENT "OMP_NUM_THREADS=1"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_rejection)
     add_executable(test_rz_pressure_work test_rz_pressure_work.cpp)
     target_link_libraries(test_rz_pressure_work PRIVATE lib_rz)
     if(WarpX_COMPUTE STREQUAL CUDA)

@@ -229,8 +229,12 @@ Unsupported boundary, staggering, geometry, diagnostic-synchronization and
 split-push combinations abort rather than silently using a non-adjoint
 approximation.
 
-Neither transport discretization includes a heat-flux term, so thermal
-conduction is neglected (:math:`\nabla\cdot\vec{q}_e = 0`).
+By default neither transport discretization includes a heat-flux term, so
+thermal conduction is neglected (:math:`\nabla\cdot\vec{q}_e = 0`). The opt-in
+``hybrid_pic_model.electron_heat_conduction`` adds a separate conservative,
+isotropic heat-transport step for ideal finite-volume electrons. Its guarded
+model, lagged flux limitation and substep budget are described in the input
+reference; it is not a fluid-ion closure or a nonlinear table-EOS solver.
 
 Two source terms can be enabled on the right-hand side. The first is the Joule
 (Ohmic) heating consistent with the resistive friction in Ohm's law

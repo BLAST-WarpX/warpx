@@ -4529,6 +4529,78 @@ state model.
     Finite transition exponents :math:`2\leq p_j\leq 64`. If specified, the
     list length must match the transition-temperature list.
 
+.. pp:param:: hybrid_pic_model.electron_heat_conduction
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Opt-in conservative isotropic heat conduction for ideal finite-volume
+    hybrid electrons. Requires the evolved electron-energy equation, explicit
+    selection of finite-volume electron transport, double field/particle
+    precision, no material EOS tables or EB, and one level. Cartesian
+    geometries and axis-containing RZ are supported. Thermal boundaries are
+    insulating on nonperiodic faces and periodic otherwise; existing material
+    transport boundary restrictions remain. This does not replace kinetic ions
+    with a fluid or include magnetically anisotropic conduction.
+
+    Symmetric harmonic face conductances exchange heat using the native nodal
+    caloric volumes, including RZ axis and wall factors. Vacuum faces have zero
+    conductance; the density floor does not create conducting material. An
+    implicit positive graph solve advances temperature on private candidates,
+    retaining the existing strict matrix-residual and global energy checks.
+    Conductivity and its optional limiter are frozen on each adaptive substep.
+    This is a first-order, lagged-coefficient method, not a nonlinear converged
+    Spitzer solve. The limiter below limits the old-state flux used to form
+    conductances, not an independently enforced hard cap on the final flux.
+
+    Exactly zero conductivity or zero face-temperature differences preserve
+    live temperature without an inverse/solve round trip. The plottable,
+    checkpointed ``hybrid_conduction_energy_fp`` is the actual local electron
+    energy redistribution [J/m3] during the last interval, not external heat
+    injection. Its native-volume integral is zero to the solve's arithmetic
+    accuracy. Conduction follows local Qei/Joule sources and precedes rebuilding
+    pressure. ``HybridElectronConduction.txt`` requires the same model,
+    conductivity-expression text and limiter on restart. Preserve any external
+    parser constants as well; the manifest does not fingerprint those constants.
+
+.. pp:param:: hybrid_pic_model.electron_thermal_conductivity(rho,Te)
+    :type: :ref:`parser_function <running-cpp-parameters-parser>`
+
+    Required with ``electron_heat_conduction=1``. Returns conductivity in
+    W/(m K), given physical charge density ``rho`` in C/m3 and electron
+    temperature ``Te`` in eV. Values must be finite and nonnegative at every
+    participating node. A constant expression is allowed. No calibrated
+    material conductivity or evolving ionization model is supplied implicitly.
+
+.. pp:param:: hybrid_pic_model.electron_conduction_flux_limiter
+    :type: ``float``
+    :default: ``0.05``
+    :optional:
+
+    In [0,1]. Zero selects classical conduction. Otherwise the harmonic
+    conductivity is reduced with the old-state harmonic flux limiter using
+    ``q_sat = f * min(ne_left,ne_right) * kb*T_face * sqrt(kb*T_face/me)``,
+    where ``T_face`` is the arithmetic mean in K. This is a declared local,
+    nonrelativistic approximation, not kinetic/nonlocal electron transport.
+
+.. pp:param:: hybrid_pic_model.electron_conduction_max_substeps
+    :type: ``int`` > 0
+    :default: ``256``
+    :optional:
+
+    Maximum adaptive conduction substeps in one PIC step. Each substep limits
+    its diagonal conductive rate times dt to eight, keeping the positive
+    iteration within a useful conditioning range. Exhaustion aborts before
+    committing live temperature. This bounded solver is not a multigrid
+    replacement for arbitrarily stiff or very large heat-transport problems.
+
+.. pp:param:: hybrid_pic_model.electron_conduction_verbosity
+    :type: ``int`` >= 0
+    :default: ``0``
+    :optional:
+
+    A positive value reports accepted conduction substeps and graph iterations.
+
 .. pp:param:: hybrid_pic_model.include_joule_heating
     :type: ``bool``
     :default: ``false``

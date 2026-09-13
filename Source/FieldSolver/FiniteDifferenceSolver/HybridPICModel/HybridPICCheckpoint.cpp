@@ -99,6 +99,16 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
         }
     }
     if (amrex::ParallelDescriptor::IOProcessor()) {
+        if (m_electron_heat_conduction) {
+            std::ofstream conduction(directory + "/HybridElectronConduction.txt");
+            conduction << "ideal_isotropic_lagged_harmonic_v1 "
+                       << std::quoted(m_electron_conductivity_expression) << ' '
+                       << std::setprecision(std::numeric_limits<amrex::Real>::max_digits10)
+                       << m_electron_conduction_flux_limiter << '\n';
+            conduction.flush();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(conduction.good(),
+                "Could not checkpoint electron heat-conduction model.");
+        }
 #if defined(WARPX_DIM_RZ)
         if (m_conservative_pressure_work) {
             std::ofstream pressure(directory + "/HybridRZPressureWork.txt");
@@ -142,6 +152,21 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
 
 void HybridPICModel::ReadMomentHistory (std::string const &directory)
 {
+    auto const conduction_manifest = directory + "/HybridElectronConduction.txt";
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Exists(conduction_manifest) == m_electron_heat_conduction,
+        "Restart must preserve the electron heat-conduction model and its manifest.");
+    if (m_electron_heat_conduction) {
+        amrex::Vector<char> buffer;
+        amrex::ParallelDescriptor::ReadAndBcastFile(conduction_manifest, buffer);
+        std::istringstream conduction(std::string(buffer.data()));
+        std::string version, expression, trailing;
+        amrex::Real limiter = -1;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE((conduction >> version >> std::quoted(expression) >> limiter)
+            && version == "ideal_isotropic_lagged_harmonic_v1"
+            && expression == m_electron_conductivity_expression
+            && limiter == m_electron_conduction_flux_limiter && !(conduction >> trailing),
+            "Invalid or changed electron heat-conduction checkpoint contract.");
+    }
 #if defined(WARPX_DIM_RZ)
     auto const pressure_manifest = directory + "/HybridRZPressureWork.txt";
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Exists(pressure_manifest) == m_conservative_pressure_work,

@@ -4,6 +4,8 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
       HybridPICModel.cpp
       HybridPICCheckpoint.cpp
+      ElectronHeatConduction.cpp
+      HybridElectronConduction.cpp
       ExternalVectorPotential.cpp
     )
 endforeach()

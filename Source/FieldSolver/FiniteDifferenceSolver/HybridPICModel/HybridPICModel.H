@@ -308,6 +308,7 @@ public:
      * cells receiving no marker weight retain their previous temperature.
      */
     void QDSMCUpdateThermodynamics (int lev, amrex::Real dt) const;
+    void AdvanceElectronHeatConduction (int lev, amrex::Real dt) const;
 
     /** Transpose the isolated pressure-E PEC ghost extension before summing
      * particle work-current deposits. No physical-current boundary rule is reused. */
@@ -666,6 +667,15 @@ public:
     bool m_conservative_pressure_work = false;
     /** Experimental stationary PEC/reflecting material-wall pressure adjoint. */
     bool m_conservative_pressure_work_pec = false;
+
+    /** Opt-in isotropic ideal-electron conduction on the native FV support. */
+    bool m_electron_heat_conduction = false;
+    amrex::Real m_electron_conduction_flux_limiter = amrex::Real(0.05);
+    int m_electron_conduction_max_substeps = 256;
+    int m_electron_conduction_verbosity = 0;
+    std::string m_electron_conductivity_expression;
+    std::unique_ptr<amrex::Parser> m_electron_conductivity_parser;
+    amrex::ParserExecutor<2> m_electron_conductivity;
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as

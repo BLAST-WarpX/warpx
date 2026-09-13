@@ -11,6 +11,7 @@
 
 #include <cmath>
 #include <limits>
+#include <string>
 
 namespace warpx::hybrid
 {
@@ -33,12 +34,13 @@ inline int
 implicitChargeEnergyRemap (amrex::MultiFab& energy, amrex::MultiFab const& old_energy,
                            amrex::MultiFab const& new_rho, amrex::MultiFab const& outflow,
                            amrex::MultiFab const& inflow, amrex::MultiFab const& node_volume,
-                           amrex::Geometry const& geometry)
+                           amrex::Geometry const& geometry,
+                           char const* const model_name = "Implicit charge-energy remap")
 {
     using namespace amrex::literals;
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         inflow.nComp() == 2 * AMREX_SPACEDIM,
-        "Implicit charge-energy remap needs one incoming coefficient per face.");
+        std::string(model_name) + " needs one incoming coefficient per face.");
     amrex::MultiFab specific(energy.boxArray(), energy.DistributionMap(), 1, 1);
     amrex::MultiFab next(energy.boxArray(), energy.DistributionMap(), 1, 1);
     amrex::MultiFab errors(energy.boxArray(), energy.DistributionMap(), 1, 0);
@@ -93,7 +95,7 @@ implicitChargeEnergyRemap (amrex::MultiFab& energy, amrex::MultiFab const& old_e
         relative_residual = errors.norm0(0, 0, false);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             std::isfinite(relative_residual) && relative_residual <= 1.0_rt,
-            "Implicit charge-energy remap found invalid coefficients or unsupported old energy.");
+            std::string(model_name) + " found invalid coefficients or unsupported old energy.");
         // Residual was measured for specific, not for the newly proposed iterate.
         if (relative_residual <= tolerance) {
             break;
@@ -102,7 +104,7 @@ implicitChargeEnergyRemap (amrex::MultiFab& energy, amrex::MultiFab const& old_e
     }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         relative_residual <= tolerance,
-        "Implicit charge-energy remap did not converge; reduce the transport timestep.");
+        std::string(model_name) + " did not converge; reduce the transport timestep.");
     for (amrex::MFIter mfi(energy); mfi.isValid(); ++mfi) {
         auto const output = energy.array(mfi);
         auto const rho = new_rho.const_array(mfi);
@@ -138,7 +140,7 @@ implicitChargeEnergyRemap (amrex::MultiFab& energy, amrex::MultiFab const& old_e
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         std::isfinite(before) && std::isfinite(after) && std::isfinite(transported) &&
             std::isfinite(roundoff_bound) && std::abs(after - before) <= roundoff_bound,
-        "Implicit charge-energy remap violated its native-volume energy inventory.");
+        std::string(model_name) + " violated its native-volume energy inventory.");
     return iterations;
 }
 } // namespace warpx::hybrid

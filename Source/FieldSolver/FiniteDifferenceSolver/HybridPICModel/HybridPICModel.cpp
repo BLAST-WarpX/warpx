@@ -17,6 +17,7 @@
 
 #include "BoundaryConditions/WarpX_PEC.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "ElectronHeatConduction.H"
 #include "Python/callbacks.H"
 #include "Fields.H"
 #include "Fluids/QdsmcParticleContainer.H"
@@ -1394,6 +1395,28 @@ void HybridPICModel::ReadParameters (
 #endif
     }
 
+    pp_hybrid.query("electron_heat_conduction", m_electron_heat_conduction);
+    if (m_electron_heat_conduction) {
+        pp_hybrid.get("electron_thermal_conductivity(rho,Te)", m_electron_conductivity_expression);
+        utils::parser::queryWithParser(pp_hybrid, "electron_conduction_flux_limiter",
+                                      m_electron_conduction_flux_limiter);
+        pp_hybrid.query("electron_conduction_max_substeps", m_electron_conduction_max_substeps);
+        pp_hybrid.query("electron_conduction_verbosity", m_electron_conduction_verbosity);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_solve_electron_energy_equation
+            && m_fv_transport_internal_energy && m_electron_thermodynamics.executor().isIdealGas()
+            && m_electron_thermodynamics.numMaterials() == 0 && !EB::enabled()
+            && std::isfinite(m_gamma) && m_gamma > 1.0_rt
+            && std::isfinite(m_electron_conduction_flux_limiter)
+            && m_electron_conduction_flux_limiter >= 0.0_rt
+            && m_electron_conduction_flux_limiter <= 1.0_rt
+            && m_electron_conduction_max_substeps > 0 && m_electron_conduction_verbosity >= 0,
+            "Electron heat conduction requires ideal finite-volume electrons without tables/EB "
+            "and finite nonnegative controls (flux limiter at most one).");
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        WARPX_ABORT_WITH_MESSAGE("Electron heat conduction supports Cartesian and RZ only.");
+#endif
+    }
+
     // Resistive electron-heating source (Phys. Plasmas 31, 012902 (2024), Eq. 12):
     //   S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,  nu_{s,e} = Z_s e^2 eta n_e / m_s
     // added per cell to U_e by QDSMCAddJouleHeating, using the e-i relative
@@ -1648,6 +1671,11 @@ void HybridPICModel::AllocateLevelMFs (
             lev, amrex::convert(ba, rho_nodal_flag),
             dm, ncomps, ngRho, 0.0_rt);
 
+        if (m_electron_heat_conduction) {
+            fields.alloc_init("hybrid_conduction_energy_fp", lev,
+                amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt,
+                /*remake=*/true, /*redistribute_on_remake=*/true, /*checkpoint_restart=*/true);
+        }
         if (m_include_joule_heating) {
             // Realized electron-side Joule increments [J/m^3].  The step
             // field exposes the exact caloric update; the cumulative field is
@@ -1968,6 +1996,11 @@ void HybridPICModel::AllocateAuxiliaryLevelMFs (
 
 void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 {
+    if (m_electron_heat_conduction) {
+        m_electron_conductivity_parser = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(m_electron_conductivity_expression, {"rho", "Te"}));
+        m_electron_conductivity = m_electron_conductivity_parser->compile<2>();
+    }
     if (m_has_initial_elec_pressure) {
         m_initial_elec_pressure_parser = std::make_unique<amrex::Parser>(
             utils::parser::makeParser(m_initial_elec_pressure_expression, {"x", "y", "z"}));
@@ -6943,6 +6976,10 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
         if (redirect_active) {
             QDSMCApplyIonHeating(lev, dt, &ion_redirect_E, nullptr);
         }
+
+        // Spatial electron heat transport follows local material sources. It
+        // redistributes native electron energy, not an additional ion source.
+        AdvanceElectronHeatConduction(lev, dt);
 
         // Step 7: emit P_e = n_e * k_B * T_e for the downstream Ohm's-law
         // solve, with the same boundary treatment the algebraic closure gets
