@@ -75,7 +75,7 @@ void doBorisWorkCurrentDepositionShapeN (
     Compute_shape_factor<depos_order> const compute_shape_factor;
 
 #if defined(WARPX_DIM_RZ)
-    amrex::Real const radius = static_cast<amrex::Real>(std::sqrt(xp*xp + yp*yp));
+    auto const radius = static_cast<amrex::Real>(std::sqrt(xp*xp + yp*yp));
     amrex::Real const cosine = radius > amrex::Real(0.0)
         ? static_cast<amrex::Real>(xp / radius) : amrex::Real(1.0);
     amrex::Real const sine = radius > amrex::Real(0.0)
