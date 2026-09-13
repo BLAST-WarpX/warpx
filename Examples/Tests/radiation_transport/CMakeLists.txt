@@ -1112,12 +1112,13 @@ if(WarpX_LIB)
         endif()
         set(rz_carry_runtime_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_carry_runtime")
         file(MAKE_DIRECTORY ${rz_carry_runtime_dir})
-        foreach(input IN ITEMS inputs_test_rz_radiation_transport_particle_carry
+        foreach(input IN ITEMS inputs_base_rz_radiation_transport_particle_carry
                                inputs_test_rz_radiation_transport_absorption_momentum)
             configure_file(${input} ${rz_carry_runtime_dir}/${input} COPYONLY)
         endforeach()
         add_test(NAME test_rz_particle_carry_native_energy
-            COMMAND test_rz_particle_impulse inputs_test_rz_radiation_transport_particle_carry
+            COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_rz_particle_carry.py
+                $<TARGET_FILE:test_rz_particle_impulse> inputs_base_rz_radiation_transport_particle_carry
                 test.radiation_runtime=1)
         set_tests_properties(test_rz_particle_carry_native_energy PROPERTIES
             WORKING_DIRECTORY ${rz_carry_runtime_dir} ENVIRONMENT "OMP_NUM_THREADS=2")
@@ -1135,7 +1136,7 @@ if(WarpX_LIB)
                     ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
                     --expect-failure --expect "${carry_reject_message}"
                     -- $<TARGET_FILE:test_rz_particle_impulse>
-                    inputs_test_rz_radiation_transport_particle_carry
+                    inputs_base_rz_radiation_transport_particle_carry
                     test.radiation_runtime=1 ${carry_reject_arg} amrex.throw_exception=1)
             set_tests_properties(test_rz_particle_carry_rejects_${unsupported} PROPERTIES
                 WORKING_DIRECTORY ${rz_carry_runtime_dir}
@@ -1143,9 +1144,10 @@ if(WarpX_LIB)
         endforeach()
         if(WarpX_MPI)
             add_test(NAME test_rz_particle_carry_native_energy_mpi
-                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+                COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_rz_particle_carry.py
+                    ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
                     ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_rz_particle_impulse>
-                    ${MPIEXEC_POSTFLAGS} inputs_test_rz_radiation_transport_particle_carry
+                    ${MPIEXEC_POSTFLAGS} inputs_base_rz_radiation_transport_particle_carry
                     test.radiation_runtime=1)
             set_tests_properties(test_rz_particle_carry_native_energy_mpi PROPERTIES
                 WORKING_DIRECTORY ${rz_carry_runtime_dir}
@@ -3016,15 +3018,6 @@ if(WarpX_PRECISION STREQUAL "DOUBLE"
         "analysis_momentum.py"  # analysis
         OFF  # checksum
         OFF  # dependency
-    )
-    add_warpx_test(
-        test_rz_radiation_transport_particle_carry
-        RZ
-        1
-        inputs_test_rz_radiation_transport_particle_carry
-        "analysis_rz_particle_carry.py"
-        OFF
-        OFF
     )
     add_warpx_test(
         test_3d_radiation_transport_absorption_momentum  # name

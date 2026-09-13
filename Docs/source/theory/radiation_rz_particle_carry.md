@@ -81,11 +81,12 @@ radiation transport, conversion momentum ownership, or a magnetic-energy ledger.
 Those remain separate release gates. Numerical results are recorded only after
 the final implementation passes; intermediate fixture failures are not passes.
 
-Current checks: the RZ CPU selection passes 9/9 (6.68 s), including native
+Current checks: the consolidated RZ CPU selection passes 7/7 (4.99 s), including native
 particle-boundary calls, radial/axial corners, compensated wall history,
 redistribution, particle/wall checkpoint round trips and unsupported-path guards.
-All corresponding CUDA checks pass, including both MPI cases; the guard-output
-fixture was rerun after accounting for the standard wrapped error message.
+All corresponding CUDA checks pass, including both MPI cases. The native-energy
+and analytic attenuation gates share one simulation, avoiding duplicate runs.
+The guard-output fixture was rerun after accounting for the wrapped error message.
 The unchanged Cartesian particle-impulse/reflecting-wall/restart selection passes
 36/36 (14.04 s). CI-style single-precision compiler analysis of the changed
 boundary translation unit passes in 1D, 2D, 3D and RZ. The expanded compiler

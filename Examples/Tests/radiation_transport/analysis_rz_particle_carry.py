@@ -7,6 +7,8 @@
 This is a lab-frame opacity test, not a boosted-equilibrium or diffusion test.
 """
 
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +23,11 @@ def read_table(name):
     assert np.all(np.isfinite(data))
     return {key: data[:, i] for i, key in enumerate(labels)}
 
+
+# CTest supplies the native inventory executable (and optionally an MPI launcher).
+# One simulation supplies both the independent native-energy and analytic gates.
+if len(sys.argv) > 1:
+    subprocess.run(sys.argv[1:], check=True)
 
 energy = read_table("radiation_energy.txt")
 momentum = read_table("radiation_momentum.txt")
