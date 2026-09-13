@@ -1,3 +1,4 @@
+# Shared legacy/exact-face multigroup conversion setup.
 FILE = inputs_test_rz_radiation_transport_conversion
 
 radiation_transport.energy_group_boundaries = 2.0e-19

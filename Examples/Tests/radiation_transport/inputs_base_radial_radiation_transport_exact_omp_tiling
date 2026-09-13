@@ -1,4 +1,4 @@
-# Exact RCYLINDER material scatter across CPU particle-tile boundaries.
+# Shared radial material scatter across CPU particle-tile boundaries.
 
 my_constants.path_length = 0.1
 my_constants.photon_weight = 1.0e16
