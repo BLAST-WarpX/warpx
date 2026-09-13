@@ -66,6 +66,11 @@ and consistent material/EOS/opacity/charge-state closures over the intended
 high-Z range. Stiff nonlinear and anisotropic conduction are additional
 model/performance work. These are not gaps to hide by tuning a hohlraum movie.
 
+In particular, the present hybrid Faraday solve omits electron-pressure
+induction. The pressure-work checks are not evidence for Biermann generation
+under nonparallel density/temperature gradients. Qualify that together with
+magnetic-energy work, not by removing the present guard alone.
+
 No new hohlraum run or FLASH run is claimed by this increment. Existing
 application results predate these features and remain exploratory. The next
 application step is a bounded integration check of supported combinations,

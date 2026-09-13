@@ -16,6 +16,17 @@ or PEC/reflecting axial faces. Ampere plasma current must be zero; otherwise
 the electron update rejects the unqualified electromagnetic work channel.
 Existing filter, particle-operation and diagnostic synchronization guards stay.
 
+The current hybrid Faraday solve also omits the electron-pressure term:
+`HybridPICSolveE.cpp` sets its pressure gradient to zero when
+`solve_for_Faraday` is true, in Cartesian and RZ paths. Thus these checks do
+not qualify pressure-driven magnetic-field generation (the Biermann effect).
+Although the curl of a pressure gradient vanishes, the curl of that gradient
+divided by a spatially varying charge density generally does not. Extending
+the present pressure-only model needs magnetic-energy accounting and matched
+field operators; simply enabling the omitted term would not close that work
+channel. This matters when radiation or conduction makes temperature and
+density gradients nonparallel.
+
 Legacy RZ calls the forward cylindrical Yee pressure difference even on a
 collocated grid. The new option instead selects the centered nodal pressure
 gradient G, with zero radial gradient at the axis. Axial force can be nonzero
