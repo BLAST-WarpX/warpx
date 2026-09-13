@@ -80,10 +80,10 @@ void doBorisWorkCurrentDepositionShapeN (
         ? static_cast<amrex::Real>(xp / radius) : amrex::Real(1.0);
     amrex::Real const sine = radius > amrex::Real(0.0)
         ? static_cast<amrex::Real>(yp / radius) : amrex::Real(0.0);
-    amrex::Real const wqvx = static_cast<amrex::Real>(q_weight)
-        * (cosine * work_velocity.x + sine * work_velocity.y) * invvol;
-    amrex::Real const wqvy = static_cast<amrex::Real>(q_weight)
-        * (-sine * work_velocity.x + cosine * work_velocity.y) * invvol;
+    amrex::Real const wqvx = static_cast<amrex::Real>(
+        q_weight * (cosine * work_velocity.x + sine * work_velocity.y)) * invvol;
+    amrex::Real const wqvy = static_cast<amrex::Real>(
+        q_weight * (-sine * work_velocity.x + cosine * work_velocity.y)) * invvol;
 #else
     amrex::Real const wqvx = static_cast<amrex::Real>(
         q_weight * work_velocity.x) * invvol;
