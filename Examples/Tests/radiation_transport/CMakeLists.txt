@@ -1802,7 +1802,7 @@ add_radiation_failure_test(
     test_rcylinder_radiation_transport_exact_annular_rejected
     RCYLINDER
     "inputs_test_rcylinder_radiation_transport_exact_layered geometry.prob_lo=0.1"
-    "requires an axis-containing RCYLINDER domain")
+    "requires an axis-containing cylindrical domain")
 
 add_radiation_failure_test(
     test_rcylinder_radiation_transport_exact_momentum_rejected
