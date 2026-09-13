@@ -1,4 +1,4 @@
-# Exact circular-face streaming is intentionally unavailable in RZ.
+# Face-exact RZ streaming still rejects packet/diffusion conversion.
 
 max_step = 1
 amr.n_cell = 4 4

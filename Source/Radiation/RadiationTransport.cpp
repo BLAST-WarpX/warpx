@@ -24,6 +24,7 @@
 #include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "RadialFaceMarching.H"
+#include "RZFaceMarching.H"
 #include "RadiationEnergyUpdate.H"
 #include "RadiationKineticEnergyUpdate.H"
 #include "Utils/MaterialRegistry.H"
@@ -4016,17 +4017,32 @@ RadiationTransport::RadiationTransport (
             ablastr::warn_manager::WarnPriority::low);
     }
 #elif defined(WARPX_DIM_RZ)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !m_require_cell_interface_exact_streaming,
-        "radiation_transport.require_cell_interface_exact_streaming=1 is not "
-        "supported in RZ geometry.");
-    ablastr::warn_manager::WMRecordWarning(
-        "Radiation transport",
-        "Streaming attenuation in radial geometry still samples and deposits "
-        "each bounded path segment in its starting radial cell. Set "
-        "radiation_transport.require_cell_interface_exact_streaming=1 to make "
-        "this unsupported approximation a startup error.",
-        ablastr::warn_manager::WarnPriority::low);
+    if (m_require_cell_interface_exact_streaming) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_enable_momentum_coupling,
+            "Face-exact RZ streaming is incompatible with "
+            "radiation_transport.enable_momentum_coupling=1.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_enable_particle_conversion,
+            "Face-exact RZ streaming is incompatible with "
+            "radiation_transport.enable_particle_conversion=1.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!EB::enabled(),
+            "Face-exact RZ streaming does not support embedded boundaries.");
+        if (!m_absorb_nonperiodic_photons) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                WarpX::particle_boundary_hi[0] == ParticleBoundaryType::Open
+                && ((WarpX::particle_boundary_lo[1] == ParticleBoundaryType::Periodic
+                     && WarpX::particle_boundary_hi[1] == ParticleBoundaryType::Periodic)
+                    || (WarpX::particle_boundary_lo[1] == ParticleBoundaryType::Open
+                        && WarpX::particle_boundary_hi[1] == ParticleBoundaryType::Open)),
+                "Face-exact RZ streaming requires independent absorbing photon boundaries "
+                "or Open outer radial and Open/periodic axial particle boundaries.");
+        }
+    } else {
+        ablastr::warn_manager::WMRecordWarning(
+            "Radiation transport",
+            "Streaming attenuation in RZ samples each bounded path in its starting cell. "
+            "Set radiation_transport.require_cell_interface_exact_streaming=1 for the "
+            "supported face-exact subset.", ablastr::warn_manager::WarnPriority::low);
+    }
 #elif defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_require_cell_interface_exact_streaming,
@@ -6060,12 +6076,12 @@ RadiationTransport::Advance (
         dt >= 0.0_rt, "RadiationTransport requires a non-negative timestep.");
 
     auto& warpx = WarpX::GetInstance();
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
     if (m_require_cell_interface_exact_streaming) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             warpx.Geom(0).ProbLo(0) == 0.0_rt,
             "radiation_transport.require_cell_interface_exact_streaming=1 "
-            "requires an axis-containing RCYLINDER domain with "
+            "requires an axis-containing cylindrical domain with "
             "geometry.prob_lo[0]==0.");
     }
 #endif
@@ -6405,8 +6421,11 @@ RadiationTransport::Advance (
         periodic_direction[direction] =
             warpx.Geom(lev).isPeriodic(direction) ? 1 : 0;
     }
-#elif defined(WARPX_DIM_RCYLINDER)
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
     auto const radial_domain_hi = amrex::ubound(warpx.Geom(lev).Domain());
+#if defined(WARPX_DIM_RZ)
+    bool const streaming_periodic_z = warpx.Geom(lev).isPeriodic(1);
+#endif
 #endif
 
     if (gate_on_kinetic_density) {
@@ -6521,7 +6540,7 @@ RadiationTransport::Advance (
     int* const invalid_opacity_ptr = invalid_opacity.dataPtr();
     amrex::Gpu::DeviceScalar<int> incomplete_path(0);
     int* const incomplete_path_ptr = incomplete_path.dataPtr();
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
     amrex::Gpu::DeviceScalar<int> invalid_radial_face_input(0);
     int* const invalid_radial_face_input_ptr =
         invalid_radial_face_input.dataPtr();
@@ -6542,12 +6561,12 @@ RadiationTransport::Advance (
     auto const* const streaming_opacity_ptr = device_streaming_opacity.dataPtr();
 
     // Advance photons in paths no longer than one cell. Cartesian paths are
-    // split exactly at every crossed mesh face. In exact RCYLINDER mode, the
-    // one-cell bound c*transport_dt <= dx[0] permits a finite local face
-    // handoff loop; a packet can therefore write at most one radial guard cell
+    // split exactly at every crossed mesh face. In exact cylindrical modes,
+    // c*transport_dt <= min(dx) permits a finite local face-handoff loop;
+    // a packet can therefore write at most one guard cell per direction
     // before the existing sums and redistribution transfer the deposit.
-#if defined(WARPX_DIM_RCYLINDER)
-    bool const exact_rcyl_streaming =
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+    bool const exact_cylindrical_streaming =
         m_require_cell_interface_exact_streaming;
 #endif
     for (int transport_step = 0; transport_step < transport_substeps; ++transport_step)
@@ -6612,7 +6631,11 @@ RadiationTransport::Advance (
                 int i = initial_i;
                 int const j = initial_j;
                 int const k = initial_k;
-#elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)
+#elif defined(WARPX_DIM_RZ)
+                int i = initial_i;
+                int j = initial_j;
+                int const k = initial_k;
+#elif defined(WARPX_DIM_RSPHERE)
                 int const i = initial_i;
                 int const j = initial_j;
                 int const k = initial_k;
@@ -6629,11 +6652,11 @@ RadiationTransport::Advance (
                     Algorithms::KineticEnergyPhotons(uxp[ip], uyp[ip], uzp[ip]);
 
                 amrex::Real remaining_transport_dt = transport_dt;
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
                 amrex::ParticleReal nx = 0.0_prt;
                 amrex::ParticleReal ny = 0.0_prt;
                 amrex::ParticleReal nz = 0.0_prt;
-                if (exact_rcyl_streaming) {
+                if (exact_cylindrical_streaming) {
                     amrex::ParticleReal const momentum_norm = std::sqrt(
                         uxp[ip] * uxp[ip] + uyp[ip] * uyp[ip]
                         + uzp[ip] * uzp[ip]);
@@ -6690,9 +6713,13 @@ RadiationTransport::Advance (
                 // cross more than one full cell. The larger fixed bound also
                 // covers a zero-length crossing when a negative-going packet
                 // starts exactly on a face and simultaneous corner crossings.
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ)
+                constexpr int max_exact_radial_segments = 2 * AMREX_SPACEDIM + 4;
+#else
                 constexpr int max_exact_radial_segments = 4;
-                int const max_segments = exact_rcyl_streaming
+#endif
+                int const max_segments = exact_cylindrical_streaming
                     ? max_exact_radial_segments
                     : 2 * AMREX_SPACEDIM + 2;
 #else
@@ -6705,23 +6732,36 @@ RadiationTransport::Advance (
                     ++segment;
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ) \
     || defined(WARPX_DIM_RSPHERE)
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
                     amrex::Real segment_dt = remaining_transport_dt;
 #else
                     amrex::Real const segment_dt = remaining_transport_dt;
 #endif
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
                     bool radial_face_crossed = false;
                     bool radial_face_outside = false;
                     int radial_next_cell = i;
-                    if (exact_rcyl_streaming) {
+#if defined(WARPX_DIM_RZ)
+                    int axial_next_cell = j;
+#endif
+                    if (exact_cylindrical_streaming) {
                         auto const radial_face =
+#if defined(WARPX_DIM_RZ)
+                            warpx::radiation::FindNextRZFace(
+                                x, y, z, nx, ny, nz, i, j, domain_lo.x, radial_domain_hi.x,
+                                domain_lo.y, radial_domain_hi.y, plo[0], plo[1], dx[0], dx[1],
+                                streaming_periodic_z,
+                                static_cast<amrex::ParticleReal>(PhysConst::c)
+                                    * static_cast<amrex::ParticleReal>(remaining_transport_dt));
+                        axial_next_cell = radial_face.next_axial_cell;
+#else
                             warpx::radiation::FindNextRadialFace(
                                 x, y, nx, ny, nz, i, domain_lo.x,
                                 radial_domain_hi.x, plo[0], dx[0],
                                 static_cast<amrex::ParticleReal>(PhysConst::c)
                                     * static_cast<amrex::ParticleReal>(
                                         remaining_transport_dt));
+#endif
                         if (!radial_face.valid_input) {
                             amrex::HostDevice::Atomic::Add(
                                 invalid_radial_face_input_ptr, 1);
@@ -6962,8 +7002,8 @@ RadiationTransport::Advance (
                         auto const removed_energy =
                             static_cast<amrex::Real>(
                                 removed_weight * photon_energy);
-#if defined(WARPX_DIM_RCYLINDER)
-                        if (exact_rcyl_streaming) {
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                        if (exact_cylindrical_streaming) {
                             // Face handoff can scatter from one CPU particle
                             // tile into a cell concurrently visited by another
                             // tile.  This must be atomic on both host and device.
@@ -7113,8 +7153,8 @@ RadiationTransport::Advance (
                         }
                     }
 #else
-#if defined(WARPX_DIM_RCYLINDER)
-                    if (exact_rcyl_streaming) {
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+                    if (exact_cylindrical_streaming) {
                         if (radial_face_crossed) {
                             if (radial_face_outside) {
                                 // The open outer radial boundary owns the
@@ -7130,6 +7170,9 @@ RadiationTransport::Advance (
                                 // Preserve the returned handoff, including a
                                 // zero-length departure from an exact face.
                                 i = radial_next_cell;
+#if defined(WARPX_DIM_RZ)
+                                j = axial_next_cell;
+#endif
                             }
                         } else {
                             remaining_transport_dt = 0.0_rt;
@@ -7233,10 +7276,10 @@ RadiationTransport::Advance (
         "A streaming absorption or Rosseland transport coefficient evaluated "
         "to a negative or non-finite value. Radiation opacity expressions and "
         "tables must be non-negative and finite for every transported photon state.");
-#if defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         invalid_radial_face_input.dataValue() == 0,
-        "Exact RCYLINDER radiation face streaming received invalid particle "
+        "Exact cylindrical radiation face streaming received invalid particle "
         "direction or face-march data.");
 #endif
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(

@@ -1825,8 +1825,55 @@ add_radiation_failure_test(
 add_radiation_failure_test(
     test_rz_radiation_transport_exact_rejected
     RZ
-    inputs_base_rz_radiation_transport_exact_rejected
-    "not supported in RZ geometry.")
+    "inputs_base_rz_radiation_transport_exact_rejected radiation_transport.enable_particle_conversion=1 radiation_transport.emission_photon_energy=1.e-19"
+    "radiation_transport.enable_particle_conversion=1.")
+
+foreach(case corner oblique axis radial_exit axial_exit axial_low periodic)
+    set(position "0.1 0 0.05")
+    set(direction "0.6 0 0.8")
+    set(distance 0.8)
+    set(boundary_override "")
+    set(analysis_override "")
+    if(case STREQUAL oblique)
+        set(position "0.35 0.3 0.1")
+    elseif(case STREQUAL axis)
+        set(position "0.35 0 0.6")
+        set(direction "-1 0 0")
+    elseif(case STREQUAL radial_exit)
+        set(position "0.75 0 0.6")
+        set(direction "1 0 0")
+        set(distance 0.25)
+    elseif(case STREQUAL axial_exit)
+        set(position "0.35 0 0.75")
+        set(direction "0 0 1")
+        set(distance 0.25)
+    elseif(case STREQUAL axial_low)
+        set(position "0.35 0 0.75")
+        set(direction "0 0 -1")
+        set(distance 0.75)
+    elseif(case STREQUAL periodic)
+        set(position "0.35 0.1 0.75")
+        set(direction "0 0 1")
+        set(boundary_override " boundary.field_lo=none periodic boundary.field_hi=pec periodic boundary.particle_lo=none periodic boundary.particle_hi=reflecting periodic")
+        set(analysis_override " --periodic-z")
+    endif()
+    string(REPLACE " " ";" position_components "${position}")
+    string(REPLACE " " ";" direction_components "${direction}")
+    list(GET position_components 0 px)
+    list(GET position_components 1 py)
+    list(GET position_components 2 pz)
+    list(GET direction_components 0 nx)
+    list(GET direction_components 1 ny)
+    list(GET direction_components 2 nz)
+    set(exact_rz_input "inputs_base_rz_radiation_transport_exact my_constants.px=${px} my_constants.py=${py} my_constants.pz=${pz} my_constants.nx=${nx} my_constants.ny=${ny} my_constants.nz=${nz} my_constants.path_length=${distance}${boundary_override}")
+    set(exact_rz_analysis "analysis_exact_rz.py --position ${position} --direction ${direction} --distance ${distance}${analysis_override} --precision ${WarpX_PRECISION} --particle-precision ${WarpX_PARTICLE_PRECISION}")
+    add_warpx_test(test_rz_radiation_transport_exact_${case} RZ 1
+        "${exact_rz_input}" "${exact_rz_analysis}" OFF OFF)
+    if(case STREQUAL oblique AND WarpX_MPI)
+        add_warpx_test(test_rz_radiation_transport_exact_oblique_mpi RZ 2
+            "${exact_rz_input}" "${exact_rz_analysis}" OFF OFF)
+    endif()
+endforeach()
 
 add_radiation_failure_test(
     test_rsphere_radiation_transport_exact_rejected

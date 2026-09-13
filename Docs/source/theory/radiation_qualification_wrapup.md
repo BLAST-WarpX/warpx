@@ -188,6 +188,7 @@ radiation_material_wall_qualification
 radiation_oblique_interface_qualification
 radiation_reflecting_cavity_qualification
 radiation_rz_pressure_work
+radiation_rz_face_streaming
 ```
 
 Build/test artifacts referenced in these records are local qualification logs,

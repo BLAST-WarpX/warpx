@@ -5185,14 +5185,27 @@ studies.
    :optional:
 
    Require face-exact streaming packet attenuation and deposition for the narrow
-   supported RCYLINDER subset. The domain must contain the axis
-   (``geometry.prob_lo[0] = 0``), the outer radial particle boundary must be
-   ``open``, material momentum coupling must be disabled, and packet-to-diffusion
+   supported RCYLINDER and RZ subsets. The domain must contain the axis
+   (``geometry.prob_lo[0] = 0``), material momentum coupling and packet-to-diffusion
    conversion must be disabled. Existing level-0/no-AMR restrictions still apply.
+   For RCYLINDER the outer radial particle boundary must be ``open``.
    The opt-in splits each bounded path at positive-radius circular cell faces;
    the axis is not a face, and a packet reaching the open outer face is removed
-   there and recorded by the existing streaming-boundary ledger. Requests in
-   RZ or RSPHERE geometry abort at startup. Cartesian transport is already
+   there and recorded by the existing streaming-boundary ledger.
+
+   In RZ, the opt-in additionally splits at axial cell faces, including corner
+   crossings and periodic axial interfaces. It requires either
+   ``photon_boundary=absorbing`` or an Open outer radial particle face and
+   Open/periodic axial particle faces. The independent absorbing option lets
+   material remain reflecting while photons escape at their exact exit faces.
+   Momentum coupling, packet/diffusion conversion and EB remain unsupported
+   by this first RZ subset. Opacity parsers receive Cartesian path sample
+   coordinates; use ``sqrt(x*x+y*y)`` for a cylindrical radial profile.
+   Face-exact means exact cell path lengths, not exact quadrature of an
+   arbitrary continuously varying opacity inside a cell: that still uses the
+   segment midpoint and requires path-substep refinement.
+
+   Requests in RSPHERE geometry still abort at startup. Cartesian transport is already
    face-exact and is unchanged by this option. When this option is false, radial
    transport retains the bounded starting-cell approximation and warning.
 

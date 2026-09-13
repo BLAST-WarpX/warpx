@@ -6,6 +6,7 @@
  */
 
 #include "Radiation/RadialFaceMarching.H"
+#include "Radiation/RZFaceMarching.H"
 
 #include <AMReX.H>
 #include <AMReX_GpuContainers.H>
@@ -26,6 +27,16 @@ using namespace amrex::literals;
 
 namespace
 {
+    struct RZInput
+    {
+        amrex::GpuArray<amrex::ParticleReal, 3> position;
+        amrex::GpuArray<amrex::ParticleReal, 3> direction;
+        int radial_cell;
+        int axial_cell;
+        bool periodic_z;
+        warpx::radiation::RZFaceMarchResult expected;
+    };
+
     struct TestInput
     {
         amrex::ParticleReal x;
@@ -66,6 +77,66 @@ namespace
         amrex::ParticleReal const tolerance =
             amrex::ParticleReal(128.0) * epsilon * scale;
         return std::abs(actual - expected) <= tolerance;
+    }
+
+    bool CheckRZ ()
+    {
+        using Result = warpx::radiation::RZFaceMarchResult;
+        std::vector<RZInput> const cases{
+            {{0.2_prt, 0, 0.1_prt}, {1,0,0}, 0,0,false, {0.8_prt,1,0,true,false,true}},
+            {{0.2_prt, 0, 0.1_prt}, {0,0,1}, 0,0,false, {0.9_prt,0,1,true,false,true}},
+            {{0.4_prt, 0, 0.2_prt}, {0.6_prt,0,0.8_prt}, 0,0,false,
+             {1,1,1,true,false,true}},
+            {{0.2_prt, 0, 0.3_prt}, {-1,0,0}, 0,0,false, {1,0,0,false,false,true}},
+            {{0.2_prt, 0, 1}, {0,0,-1}, 0,1,false, {0,0,0,true,false,true}},
+            {{0.2_prt, 0, 2.8_prt}, {0,0,1}, 0,2,true, {0.2_prt,0,3,true,false,true}},
+            {{0.2_prt, 0, 2.8_prt}, {0,0,1}, 0,2,false, {0.2_prt,0,3,true,true,true}},
+            {{0.2_prt, 0, 0.2_prt}, {1,0,1.e-30_prt}, 0,0,false,
+             {0.8_prt,1,0,true,false,true}},
+            {{0,1,0.2_prt}, {1,0,0}, 1,0,false, {1,1,0,false,false,true}},
+            {{0.2_prt, 0, 2.8_prt}, {0,0,1}, 0,0,false, {0,0,0,false,false,false}},
+            {{0.2_prt, 0, std::numeric_limits<amrex::ParticleReal>::quiet_NaN()},
+             {0,0,1}, 0,0,false, {0,0,0,false,false,false}}};
+        bool pass = true;
+        for (auto const scale : {1.e-12_prt, 1.0_prt, 1.e12_prt}) {
+            amrex::Gpu::DeviceVector<RZInput> inputs(cases.size());
+            amrex::Gpu::DeviceVector<Result> results(cases.size());
+            amrex::Gpu::copy(amrex::Gpu::hostToDevice, cases.begin(), cases.end(), inputs.begin());
+            auto const* input = inputs.data();
+            auto* output = results.data();
+            amrex::ParallelFor(static_cast<int>(cases.size()),
+                [=] AMREX_GPU_DEVICE (int n) {
+                    auto const& c = input[n];
+                    output[n] = warpx::radiation::FindNextRZFace(
+                        c.position[0]*scale, c.position[1]*scale, c.position[2]*scale,
+                        c.direction[0], c.direction[1], c.direction[2], c.radial_cell,
+                        c.axial_cell, 0, 2, 0, 2, 0, 0, scale, scale, c.periodic_z, scale);
+                });
+            std::vector<Result> actual(cases.size());
+            amrex::Gpu::copy(amrex::Gpu::deviceToHost, results.begin(), results.end(), actual.begin());
+            for (std::size_t n = 0; n < cases.size(); ++n) {
+                auto const& expected = cases[n].expected;
+                auto const& value = actual[n];
+                bool const valid = value.valid_input == expected.valid_input
+                    && (!expected.valid_input || (NearlyEqual(value.distance,
+                        expected.distance * scale, scale)
+                        && value.next_radial_cell == expected.next_radial_cell
+                        && value.next_axial_cell == expected.next_axial_cell
+                        && value.crossed == expected.crossed
+                        && value.outside_domain == expected.outside_domain));
+                if (!valid) {
+                    std::cerr << "RZ face case " << n << " scale " << scale
+                              << " failed: distance=" << value.distance
+                              << " radial=" << value.next_radial_cell
+                              << " axial=" << value.next_axial_cell
+                              << " valid=" << value.valid_input << '\n';
+                }
+                pass = pass && valid;
+            }
+        }
+        std::cout << "RZ face/axis/corner/periodic/scale semantics: "
+                  << (pass ? "PASS" : "FAIL") << '\n';
+        return pass;
     }
 
     amrex::ParticleReal TestScale (TestInput const& input)
@@ -397,6 +468,7 @@ int main (int argc, char* argv[])
             device_outputs.end(), device_outputs_host.begin());
         pass = CheckHostDevice(inputs, host_outputs, device_outputs_host)
             && pass;
+        pass = CheckRZ() && pass;
 
         std::cout << "radial face marching host/device semantics: "
                   << (pass ? "PASS" : "FAIL") << '\n';
