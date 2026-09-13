@@ -19,6 +19,7 @@ still blocks the affected feature; no assertion is relaxed to move past it.
 | Python input access | PICMI material-energy controls and constant-name mangling | The same C++ model/backend guards remain authoritative |
 | RZ particle-owned absorption recoil | Finite material work, local diagnostic projection, Cartesian carry ownership and elastic material-wall transfer | Absorption-only bounded-segment lab-frame model; no RZ moment transport, face-exact recoil or conversion momentum closure |
 | Strict material metadata audit | Optional opacity/EOS/PIC atomic-mass matching, mean nuclear-charge matching and a fixed-ion charge bound | Matching composition moments does not establish calibration, identical mixtures or equilibrium ionization consistency |
+| Low-level meridional RZ M1 transport | Annular fluxes, cylindrical stress, prescribed moving-medium work and optical mirrors | No native RZ coupled-moment activation, azimuthal transport or packet/diffusion momentum closure |
 
 The material additions support radiation-driven matter response; they are not
 themselves photon transport. In particular, conservative **electron pressure
@@ -29,6 +30,10 @@ The follow-up RZ absorption/carry increment is described in
 [radiation_rz_particle_carry.md](radiation_rz_particle_carry.md). Its 256-step
 native-state energy check is distinct from its radiation-source ledger check;
 neither is a declaration of complete moving-frame or packet/diffusion coupling.
+
+The subsequent low-level moment operator and its independent radial diffusion,
+moving-mode and compression-work targets are described in
+[radiation_rz_moment_transport.md](radiation_rz_moment_transport.md).
 
 The metadata audit is enabled with
 `radiation_transport.require_material_metadata_consistency=1`; its exact scope

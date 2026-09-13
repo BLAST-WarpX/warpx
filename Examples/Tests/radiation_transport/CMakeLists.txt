@@ -1073,6 +1073,37 @@ if(WarpX_LIB)
 
     if(RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL "DOUBLE"
        AND WarpX_PARTICLE_PRECISION STREQUAL "DOUBLE")
+        add_executable(test_rz_moment_transport test_rz_moment_transport.cpp)
+        target_link_libraries(test_rz_moment_transport PRIVATE lib_rz)
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(test_rz_moment_transport)
+            target_compile_features(test_rz_moment_transport PRIVATE cuda_std_20)
+        else()
+            target_compile_features(test_rz_moment_transport PRIVATE cxx_std_20)
+        endif()
+        warpx_set_compile_warnings(test_rz_moment_transport)
+        foreach(moment_case IN ITEMS uniform radial axial lte)
+            add_test(NAME test_rz_moment_transport_${moment_case}
+                COMMAND test_rz_moment_transport test.case=${moment_case}
+                    amrex.the_arena_init_size=0)
+            set_tests_properties(test_rz_moment_transport_${moment_case} PROPERTIES
+                ENVIRONMENT "OMP_NUM_THREADS=2")
+        endforeach()
+        set(rz_moment_compression_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moment_compression")
+        file(MAKE_DIRECTORY ${rz_moment_compression_dir})
+        add_test(NAME test_rz_moment_transport_compression
+            COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_rz_moment_compression.py
+                $<TARGET_FILE:test_rz_moment_transport>)
+        set_tests_properties(test_rz_moment_transport_compression PROPERTIES
+            WORKING_DIRECTORY ${rz_moment_compression_dir} ENVIRONMENT "OMP_NUM_THREADS=2")
+        if(WarpX_MPI)
+            add_test(NAME test_rz_moment_transport_radial_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_moment_transport> ${MPIEXEC_POSTFLAGS}
+                    test.case=radial amrex.the_arena_init_size=0)
+            set_tests_properties(test_rz_moment_transport_radial_mpi PROPERTIES
+                PROCESSORS 2 ENVIRONMENT "OMP_NUM_THREADS=1" RUN_SERIAL TRUE)
+        endif()
         add_executable(test_rz_particle_impulse test_rz_particle_impulse.cpp)
         target_link_libraries(test_rz_particle_impulse PRIVATE lib_rz)
         if(WarpX_COMPUTE STREQUAL CUDA)

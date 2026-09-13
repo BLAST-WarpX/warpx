@@ -13,12 +13,16 @@
 
 namespace warpx::radiation
 {
-    /** Independently integrate Cartesian physical-boundary face fluxes.
+    /** Independently integrate physical-boundary face fluxes.
      * Each face MultiFab has four components (E,q=F/c), positive in its
      * coordinate direction, with the same cell-volume normalization as the
      * moment transport operator. The returned outward exchange is dt/dx times
      * the signed boundary-face sum. Its q components divided by c are physical
      * momentum. Periodic directions contribute exactly zero.
+     * In compiled RZ geometry the inputs instead have physical density-flux
+     * units and are integrated with dt times annular face area. The axis area
+     * is zero. Radial/azimuthal components remain local-basis transfers, not
+     * a global Cartesian vector or an angular-momentum inventory.
      * This performs no time acceptance or diagnostic accumulation. Callers must
      * commit the result only with the corresponding accepted transport stage.
      * Invalid inputs leave exchange unchanged. No inputs or ghosts are changed.

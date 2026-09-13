@@ -3,6 +3,8 @@
  */
 #include "MomentBoundaryExchange.H"
 
+#include "RZMomentGeometry.H"
+
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Reduce.H>
 
@@ -15,9 +17,15 @@ namespace warpx::radiation
                                    amrex::Geometry const& geometry, amrex::Real dt,
                                    FourVector& exchange)
     {
-        if (geometry.Coord() != 0 || !(dt >= 0) || !std::isfinite(dt)) {
+        if (!(dt >= 0) || !std::isfinite(dt)) {
             return false;
         }
+#if defined(WARPX_DIM_RZ)
+        if (geometry.isPeriodic(0) || geometry.ProbLo(0) < 0) { return false; }
+        RZMomentMetric const metric(geometry);
+#else
+        if (geometry.Coord() != 0) { return false; }
+#endif
         // Validate metadata before entering collectives. Every rank must supply
         // the same globally defined face layouts, as for a MultiFab operation.
         for (int direction = 0; direction < AMREX_SPACEDIM; ++direction) {
@@ -44,7 +52,7 @@ namespace warpx::radiation
                 continue;
             }
             auto const& flux = *fluxes[direction];
-            auto const factor = dt / geometry.CellSize(direction);
+            [[maybe_unused]] auto const factor = dt / geometry.CellSize(direction);
             for (int component = 0; component < 4; ++component) {
                 amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpMax> ops;
                 amrex::ReduceData<amrex::Real, int> data(ops);
@@ -62,7 +70,11 @@ namespace warpx::radiation
                         face.setBig(direction, index);
                         ops.eval(face, data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> Tuple {
                             auto const value = values(i, j, k, component);
+#if defined(WARPX_DIM_RZ)
+                            auto const increment = side * dt * metric.Area(direction, i) * value;
+#else
                             auto const increment = side * factor * value;
+#endif
                             bool const valid =
                                 amrex::Math::isfinite(value) && amrex::Math::isfinite(increment);
                             return {valid ? increment : 0, valid ? 0 : 1};

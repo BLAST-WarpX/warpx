@@ -1,3 +1,4 @@
 CEXE_sources += CoupledImplicitDiffusion.cpp CoupledMomentSource.cpp ImplicitDiffusion.cpp ImplicitMomentTransport.cpp MomentBoundaryExchange.cpp OpacityTable.cpp ParticleImpulse.cpp ParticleImpulseBoundary.cpp RadiationTransport.cpp
+CEXE_sources += MomentBalance.cpp RZMomentGeometry.cpp
 
 VPATH_LOCATIONS += $(WARPX_HOME)/Source/Radiation

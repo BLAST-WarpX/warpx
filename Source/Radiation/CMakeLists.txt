@@ -9,10 +9,12 @@ foreach(D IN LISTS WarpX_DIMS)
         CoupledMomentSource.cpp
         ImplicitDiffusion.cpp
         ImplicitMomentTransport.cpp
+        MomentBalance.cpp
         MomentBoundaryExchange.cpp
         OpacityTable.cpp
         ParticleImpulse.cpp
         ParticleImpulseBoundary.cpp
         RadiationTransport.cpp
+        RZMomentGeometry.cpp
     )
 endforeach()

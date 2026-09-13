@@ -32,13 +32,19 @@ namespace warpx::radiation
         amrex::Real momentum_residual = 0;
         // Accepted outward (energy,c*momentum); zero on rejected stages.
         FourVector boundary_exchange{};
+        // Direct cylindrical stress contribution to the radial-component
+        // inventory. This is neither material impulse nor a boundary transfer.
+        FourVector geometric_exchange{};
         bool valid = false;
     };
 
     /** Joint backward-Euler gray M1 transport/source stage with prescribed
      * beta, opacity and equilibrium energy. Radiation and material transfer are
      * cell-integrated (energy,c*momentum). Opacities are proper inverse lengths.
-     * Scope is Cartesian geometry and |beta| <= 0.01. Nonperiodic directions
+     * Scope is Cartesian geometry and |beta| <= 0.01, or experimental meridional
+     * RZ with zero azimuthal state/velocity, an axis and fixed optical mirrors.
+     * RZ geometric stress is reported separately from material and wall exchange.
+     * Nonperiodic directions
      * require either externally prescribed lab (E,q) face fluxes, fixed throughout
      * the stage with radiation face layout and cell-volume normalization, or
      * opt-in fixed reflecting optical walls. The latter reevaluate their M1
@@ -63,13 +69,16 @@ namespace warpx::radiation
     /** Evaluate dt*div(flux) in components 0:3 and absolute Jacobian-weighted
      * face operand contributions in 4:7 for material-feedback rounding bounds.
      * The latter measure cancellation sensitivity, not the net flux magnitude.
-     * Inputs (including ghosts) and output remain unchanged on failure. */
+     * Inputs (including ghosts) and output remain unchanged on failure.
+     * RZ requires reflecting_boundaries=true; native material coupling remains
+     * a separate, guarded adapter. */
     bool ComputeMomentTransportIncrement (amrex::MultiFab const& radiation,
                                           amrex::MultiFab const& beta,
                                           amrex::MultiFab const& absorption,
                                           amrex::MultiFab const& scattering,
                                           amrex::MultiFab const& equilibrium,
                                           amrex::MultiFab& increment,
-                                          amrex::Geometry const& geometry, amrex::Real dt);
+                                          amrex::Geometry const& geometry, amrex::Real dt,
+                                          bool reflecting_boundaries = false);
 } // namespace warpx::radiation
 #endif
