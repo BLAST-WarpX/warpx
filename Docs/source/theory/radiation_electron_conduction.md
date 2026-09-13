@@ -36,6 +36,13 @@ temperature ghosts. Live temperature and the local redistribution diagnostic
 are committed only after the entire requested interval succeeds. The new
 manifest preserves model/expression/limiter identity on restart.
 
+PICMI's `HybridPICSolver` accepts `electron_energy_transport`,
+`electron_heat_conduction`, `electron_thermal_conductivity`, and the three
+`electron_conduction_*` controls with the same names and units as the input
+deck. `electron_thermal_conductivity` omits the `(rho,Te)` suffix in Python.
+Numeric values and expressions both work; solver keyword constants are
+name-mangled consistently. Omitted controls do not change legacy defaults.
+
 ## Bounded results
 
 - A periodic Fourier mode loses more than half its initial amplitude over ten

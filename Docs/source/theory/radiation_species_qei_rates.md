@@ -7,6 +7,12 @@ the hybrid particle thermal closure with FLASH fluid hydrodynamics.
 
 ## Input contract
 
+PICMI users can supply `electron_ion_relaxation_rate_species` as a dictionary
+of species names to numeric rates or expressions on `HybridPICSolver`.
+It generates the species list and named parsers below, including consistent
+renaming of solver keyword constants. The input-only contract test also
+covers numeric fallback/zero rates when a constant name is already in use.
+
 ```text
 hybrid_pic_model.electron_ion_relaxation_rate(rho,Te,Ti,t) = 1.e9
 hybrid_pic_model.electron_ion_relaxation_species = shell foam

@@ -2293,6 +2293,34 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         time in seconds); zero disables that species' exchange. Requires
         evolved electron energy and fixed-charge depositing positive ions.
 
+    electron_energy_transport: str, optional
+        ``auto``, ``finite_volume`` or ``finite_volume_implicit``. Explicitly
+        selecting finite-volume transport retains its backend/model guards.
+
+    conservative_pressure_work: bool, optional
+        Enable the conservative particle/electron pressure-work pair in its
+        supported collocated ideal-electron configurations.
+
+    conservative_pressure_work_pec: bool, optional
+        Opt into the supported PEC/reflecting-wall pressure-work treatment.
+
+    electron_heat_conduction: bool, optional
+        Enable isotropic ideal-electron heat conduction on native finite volumes.
+
+    electron_thermal_conductivity: float or str, optional
+        Conductivity in W/(m K), required when conduction is enabled. Expressions
+        accept ``rho`` in C/m^3 and ``Te`` in eV.
+
+    electron_conduction_flux_limiter: float, optional
+        Lagged harmonic flux-limiter fraction in [0,1]; zero selects classical
+        conduction. This is not a hard cap on the final implicit flux.
+
+    electron_conduction_max_substeps: int, optional
+        Maximum adaptive conduction substeps; exceeding it is a guarded failure.
+
+    electron_conduction_verbosity: int, optional
+        Conduction diagnostic verbosity; zero is silent.
+
     substeps: int, default=10
         Total number of substeps used to advance the B-field over one full
         timestep (split evenly between the two half-steps, so ``substeps/2``
@@ -2427,6 +2455,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         electron_latent_energy_eV=None,
         electron_latent_sharpness=None,
         electron_ion_relaxation_rate_species=None,
+        electron_energy_transport=None,
+        conservative_pressure_work=None,
+        conservative_pressure_work_pec=None,
+        electron_heat_conduction=None,
+        electron_thermal_conductivity=None,
+        electron_conduction_flux_limiter=None,
+        electron_conduction_max_substeps=None,
+        electron_conduction_verbosity=None,
         **kw,
     ):
         self.grid = grid
@@ -2451,6 +2487,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
         self.electron_ion_relaxation_rate_species = electron_ion_relaxation_rate_species
+        self.electron_energy_transport = electron_energy_transport
+        self.conservative_pressure_work = conservative_pressure_work
+        self.conservative_pressure_work_pec = conservative_pressure_work_pec
+        self.electron_heat_conduction = electron_heat_conduction
+        self.electron_thermal_conductivity = electron_thermal_conductivity
+        self.electron_conduction_flux_limiter = electron_conduction_flux_limiter
+        self.electron_conduction_max_substeps = electron_conduction_max_substeps
+        self.electron_conduction_verbosity = electron_conduction_verbosity
 
         self.substeps = substeps
         self.use_rkf45 = use_rkf45
@@ -2558,6 +2602,25 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                         str(expression), self.mangle_dict
                     ),
                 )
+        for name in (
+            "electron_energy_transport",
+            "conservative_pressure_work",
+            "conservative_pressure_work_pec",
+            "electron_heat_conduction",
+            "electron_conduction_flux_limiter",
+            "electron_conduction_max_substeps",
+            "electron_conduction_verbosity",
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                setattr(pywarpx.hybridpicmodel, name, value)
+        if self.electron_thermal_conductivity is not None:
+            pywarpx.hybridpicmodel.__setattr__(
+                "electron_thermal_conductivity(rho,Te)",
+                pywarpx.my_constants.mangle_expression(
+                    str(self.electron_thermal_conductivity), self.mangle_dict
+                ),
+            )
         pywarpx.hybridpicmodel.substeps = self.substeps
         pywarpx.hybridpicmodel.use_rkf45 = self.use_rkf45
         pywarpx.hybridpicmodel.substep_rtol = self.substep_rtol
