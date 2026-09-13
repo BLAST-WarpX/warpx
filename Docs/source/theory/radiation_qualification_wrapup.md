@@ -191,6 +191,7 @@ radiation_rz_pressure_work
 radiation_rz_face_streaming
 radiation_electron_conduction
 radiation_species_qei_rates
+radiation_september13_features
 ```
 
 Build/test artifacts referenced in these records are local qualification logs,
