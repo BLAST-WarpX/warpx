@@ -47,7 +47,7 @@ parser.add_argument("--reference", type=Path)
 parser.add_argument("--seed-checkpoint", type=Path)
 add_precision_arguments(parser)
 args = parser.parse_args()
-_, particle_dtype, cross_dtype = precision_dtypes(args)
+field_dtype, particle_dtype, cross_dtype = precision_dtypes(args)
 
 before_conversion = particle_records(Path("diags/diag1000001"))
 after_conversion = particle_records(Path("diags/diag1000002"))
@@ -56,6 +56,17 @@ assert after_conversion.shape == (64, 7)
 assert np.all(np.isfinite(after_conversion))
 
 photon_energy = 1.0e-15
+# Conversion constructs the normalized momentum in field precision before
+# storing it in particles. Plotfile output multiplies by the field-precision
+# electron mass. Account for that declared mixed-precision representation;
+# comparing with an unrounded E/c spuriously fails SP-fields/DP-particles by
+# 1.7e-8 even when the emitted momentum is represented exactly. Keep the
+# particle-level assertion and bitwise restart comparison unchanged.
+electron_mass = field_dtype(9.1093837139e-31)  # WarpX SI constant [kg]
+normalized_momentum = particle_dtype(
+    field_dtype(photon_energy) / (electron_mass * field_dtype(c))
+)
+expected_momentum = float(normalized_momentum) * float(electron_mass)
 expected_energy = 8.0e-13
 particle_rtol = 3.0e-6 if particle_dtype == np.float32 else 2.0e-12
 ledger_rtol = 4.0e-6 if cross_dtype == np.float32 else 3.0e-13
@@ -64,7 +75,7 @@ represented_energy = np.sum(
 )
 np.testing.assert_allclose(
     np.linalg.norm(after_conversion[:, 3:6], axis=1),
-    photon_energy / c,
+    expected_momentum,
     rtol=particle_rtol,
 )
 np.testing.assert_allclose(

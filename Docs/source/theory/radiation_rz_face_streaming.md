@@ -1,12 +1,12 @@
-# Opt-in face-exact RZ photon absorption
+# Opt-in face-exact RZ photon transport
 
 Status, 13 September 2026: implemented and bounded CPU/CUDA qualification passes.
 This extends the geometric packet marcher; it does not enable moving-frame
 radiation, direct recoil with conversion, or arbitrary material-wall handling.
 
 `radiation_transport.require_cell_interface_exact_streaming=1` now supports
-RZ absorption with an axis-containing domain, no EB, and no momentum coupling
-or packet/diffusion conversion. Select `photon_boundary=absorbing` to keep
+RZ absorption and packet/diffusion conversion with an axis-containing domain,
+no EB, and no momentum coupling. Select `photon_boundary=absorbing` to keep
 material walls reflecting while photons leave. Alternatively, inherited
 particle faces must be Open radially and Open or periodic axially. Unsupported
 combinations retain explicit rejection. Legacy RZ remains unchanged when the
@@ -50,6 +50,30 @@ receive Cartesian x/y/z; radial profiles must use `sqrt(x*x+y*y)`.
   `build-demo/rz-face-oracle-tests.log` and `build-demo/rz-face-cuda-tests.log`.
 
 This is an interface-accuracy feature gate, not a dynamic-hohlraum run or a
-full application accuracy claim. Packet/diffusion conversion with this new
-RZ policy, coupled momentum ownership and moving spectral transport remain
-separate feature increments.
+full application accuracy claim. Coupled momentum ownership and moving
+spectral transport remain separate feature increments.
+
+## Packet/diffusion ownership
+
+The same face policy now supports gray and multigroup conversion. A packet
+entering an optically thick cell first deposits its thin-cell absorption, then
+hands its remaining energy to that cell's diffusion inventory. Reemission
+uses the existing diffusion-to-packet path. This does not add direct recoil
+to conversion or change the diffusion closure.
+
+A zero-length face departure performs only an ownership update: opacity,
+absorption and conversion are not evaluated in the cell with zero residence.
+This fixes a defect that could convert an entire departing packet in a thick
+cell it never traversed. The fix also applies to Cartesian face marching;
+a dedicated 1D regression exercises that path. Shared packet-to-grid energy
+and momentum scatters use host/device atomics, including OpenMP tiles within
+the same FAB.
+
+Independent checks cover thin-to-thick entry, zero-residence thick-to-thin
+departure, complete diffusion reemission, and 32 packets crossing OpenMP tile
+boundaries. They assert per-cell and global ownership, not only total energy.
+The entry reference uses very large but finite thick-cell opacity to bound
+diffusion leakage below the fixed comparison bound. CPU and local CUDA
+conversion/regression selections each pass 31/31 stages; the dedicated 1D
+departure passes 2/2. These are bounded correctness gates, not a claim of
+convergence for arbitrary heterogeneous applications.

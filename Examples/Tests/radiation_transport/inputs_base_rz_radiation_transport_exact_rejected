@@ -1,4 +1,4 @@
-# Face-exact RZ streaming still rejects packet/diffusion conversion.
+# Face-exact RZ streaming still rejects material momentum coupling.
 
 max_step = 1
 amr.n_cell = 4 4

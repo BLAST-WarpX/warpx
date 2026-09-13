@@ -4021,9 +4021,6 @@ RadiationTransport::RadiationTransport (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_enable_momentum_coupling,
             "Face-exact RZ streaming is incompatible with "
             "radiation_transport.enable_momentum_coupling=1.");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_enable_particle_conversion,
-            "Face-exact RZ streaming is incompatible with "
-            "radiation_transport.enable_particle_conversion=1.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!EB::enabled(),
             "Face-exact RZ streaming does not support embedded boundaries.");
         if (!m_absorb_nonperiodic_photons) {
@@ -6829,275 +6826,271 @@ RadiationTransport::Advance (
                     }
 #endif
 
-                    amrex::ParticleReal sample_x = x;
-                    amrex::ParticleReal sample_y = y;
-                    amrex::ParticleReal sample_z = z;
-                    UpdatePosition(
-                        sample_x, sample_y, sample_z, uxp[ip], uyp[ip], uzp[ip],
-                        0.5_rt * segment_dt, 0.0_prt);
-                    amrex::Real const sample_time = transport_time
-                        + (transport_dt - remaining_transport_dt)
-                        + 0.5_rt * segment_dt;
-                    bool absorb_here = true;
-                    amrex::Real electron_density = 0.0_rt;
-                    amrex::Real electron_temperature = 0.0_rt;
+                    // A departure from an exact face has no residence in
+                    // the cell being left. In particular, it must not hand
+                    // an entire packet to that cell's diffusion reservoir.
+                    // Apply the zero-length ownership handoff below before
+                    // consulting any unvisited material state.
+                    if (segment_dt > 0.0_rt) {
+                        amrex::ParticleReal sample_x = x;
+                        amrex::ParticleReal sample_y = y;
+                        amrex::ParticleReal sample_z = z;
+                        UpdatePosition(
+                            sample_x, sample_y, sample_z, uxp[ip], uyp[ip], uzp[ip],
+                            0.5_rt * segment_dt, 0.0_prt);
+                        amrex::Real const sample_time = transport_time
+                            + (transport_dt - remaining_transport_dt)
+                            + 0.5_rt * segment_dt;
+                        bool absorb_here = true;
+                        amrex::Real electron_density = 0.0_rt;
+                        amrex::Real electron_temperature = 0.0_rt;
 
-                    if (gate_on_hybrid_density) {
+                        if (gate_on_hybrid_density) {
 #if AMREX_SPACEDIM == 1
-                        amrex::Real const rho_cell =
-                            0.5_rt * (rho_arr(i, j, k) + rho_arr(i + 1, j, k));
-                        amrex::Real const temperature_cell = 0.5_rt * (
-                            hybrid_temperature_arr(i, j, k)
-                            + hybrid_temperature_arr(i + 1, j, k));
+                            amrex::Real const rho_cell =
+                                0.5_rt * (rho_arr(i, j, k) + rho_arr(i + 1, j, k));
+                            amrex::Real const temperature_cell = 0.5_rt * (
+                                hybrid_temperature_arr(i, j, k)
+                                + hybrid_temperature_arr(i + 1, j, k));
 #elif AMREX_SPACEDIM == 2
-                        amrex::Real const rho_cell = 0.25_rt * (
-                            rho_arr(i, j, k) + rho_arr(i + 1, j, k)
-                            + rho_arr(i, j + 1, k) + rho_arr(i + 1, j + 1, k));
-                        amrex::Real const temperature_cell = 0.25_rt * (
-                            hybrid_temperature_arr(i, j, k)
-                            + hybrid_temperature_arr(i + 1, j, k)
-                            + hybrid_temperature_arr(i, j + 1, k)
-                            + hybrid_temperature_arr(i + 1, j + 1, k));
+                            amrex::Real const rho_cell = 0.25_rt * (
+                                rho_arr(i, j, k) + rho_arr(i + 1, j, k)
+                                + rho_arr(i, j + 1, k) + rho_arr(i + 1, j + 1, k));
+                            amrex::Real const temperature_cell = 0.25_rt * (
+                                hybrid_temperature_arr(i, j, k)
+                                + hybrid_temperature_arr(i + 1, j, k)
+                                + hybrid_temperature_arr(i, j + 1, k)
+                                + hybrid_temperature_arr(i + 1, j + 1, k));
 #else
-                        amrex::Real const rho_cell = 0.125_rt * (
-                            rho_arr(i, j, k) + rho_arr(i + 1, j, k)
-                            + rho_arr(i, j + 1, k) + rho_arr(i + 1, j + 1, k)
-                            + rho_arr(i, j, k + 1) + rho_arr(i + 1, j, k + 1)
-                            + rho_arr(i, j + 1, k + 1)
-                            + rho_arr(i + 1, j + 1, k + 1));
-                        amrex::Real const temperature_cell = 0.125_rt * (
-                            hybrid_temperature_arr(i, j, k)
-                            + hybrid_temperature_arr(i + 1, j, k)
-                            + hybrid_temperature_arr(i, j + 1, k)
-                            + hybrid_temperature_arr(i + 1, j + 1, k)
-                            + hybrid_temperature_arr(i, j, k + 1)
-                            + hybrid_temperature_arr(i + 1, j, k + 1)
-                            + hybrid_temperature_arr(i, j + 1, k + 1)
-                            + hybrid_temperature_arr(i + 1, j + 1, k + 1));
+                            amrex::Real const rho_cell = 0.125_rt * (
+                                rho_arr(i, j, k) + rho_arr(i + 1, j, k)
+                                + rho_arr(i, j + 1, k) + rho_arr(i + 1, j + 1, k)
+                                + rho_arr(i, j, k + 1) + rho_arr(i + 1, j, k + 1)
+                                + rho_arr(i, j + 1, k + 1)
+                                + rho_arr(i + 1, j + 1, k + 1));
+                            amrex::Real const temperature_cell = 0.125_rt * (
+                                hybrid_temperature_arr(i, j, k)
+                                + hybrid_temperature_arr(i + 1, j, k)
+                                + hybrid_temperature_arr(i, j + 1, k)
+                                + hybrid_temperature_arr(i + 1, j + 1, k)
+                                + hybrid_temperature_arr(i, j, k + 1)
+                                + hybrid_temperature_arr(i + 1, j, k + 1)
+                                + hybrid_temperature_arr(i, j + 1, k + 1)
+                                + hybrid_temperature_arr(i + 1, j + 1, k + 1));
 #endif
-                        electron_density = rho_cell / PhysConst::q_e;
-                        electron_temperature = temperature_cell;
-                        absorb_here = electron_density > density_floor;
-                    }
+                            electron_density = rho_cell / PhysConst::q_e;
+                            electron_temperature = temperature_cell;
+                            absorb_here = electron_density > density_floor;
+                        }
 
-                    if (absorb_here && gate_on_kinetic_density) {
+                        if (absorb_here && gate_on_kinetic_density) {
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
-                        amrex::Real const r_lo =
-                            plo[0] + (i - domain_lo.x) * dx[0];
-                        amrex::Real const r_hi = r_lo + dx[0];
+                            amrex::Real const r_lo =
+                                plo[0] + (i - domain_lo.x) * dx[0];
+                            amrex::Real const r_hi = r_lo + dx[0];
 #if defined(WARPX_DIM_RCYLINDER)
-                        amrex::Real const cell_volume =
-                            MathConst::pi * (r_hi * r_hi - r_lo * r_lo);
+                            amrex::Real const cell_volume =
+                                MathConst::pi * (r_hi * r_hi - r_lo * r_lo);
 #else
-                        amrex::Real const cell_volume = MathConst::pi
-                            * (r_hi * r_hi - r_lo * r_lo) * dx[1];
+                            amrex::Real const cell_volume = MathConst::pi
+                                * (r_hi * r_hi - r_lo * r_lo) * dx[1];
 #endif
 #elif defined(WARPX_DIM_RSPHERE)
-                        amrex::Real const r_lo =
-                            plo[0] + (i - domain_lo.x) * dx[0];
-                        amrex::Real const r_hi = r_lo + dx[0];
-                        amrex::Real const cell_volume =
-                            4.0_rt / 3.0_rt * MathConst::pi
-                            * (r_hi * r_hi * r_hi - r_lo * r_lo * r_lo);
+                            amrex::Real const r_lo =
+                                plo[0] + (i - domain_lo.x) * dx[0];
+                            amrex::Real const r_hi = r_lo + dx[0];
+                            amrex::Real const cell_volume =
+                                4.0_rt / 3.0_rt * MathConst::pi
+                                * (r_hi * r_hi * r_hi - r_lo * r_lo * r_lo);
 #else
-                        amrex::Real const cell_volume =
-                            AMREX_D_TERM(dx[0], * dx[1], * dx[2]);
+                            amrex::Real const cell_volume =
+                                AMREX_D_TERM(dx[0], * dx[1], * dx[2]);
 #endif
-                        electron_density =
-                            electron_weight_arr(i, j, k, 0) / cell_volume;
-                        electron_temperature = kinetic_temperature_arr(i, j, k)
-                            * PhysConst::q_e / PhysConst::kb;
-                        absorb_here = electron_density > density_floor;
-                    }
+                            electron_density =
+                                electron_weight_arr(i, j, k, 0) / cell_volume;
+                            electron_temperature = kinetic_temperature_arr(i, j, k)
+                                * PhysConst::q_e / PhysConst::kb;
+                            absorb_here = electron_density > density_floor;
+                        }
 
-                    amrex::GpuArray<amrex::Real, max_opacity_species>
-                        opacity_number_density{};
-                    for (int species = 0; species < num_opacity_species; ++species) {
-                        opacity_number_density[species] =
-                            opacity_number_density_arr[species](i, j, k);
-                    }
+                        amrex::GpuArray<amrex::Real, max_opacity_species>
+                            opacity_number_density{};
+                        for (int species = 0; species < num_opacity_species; ++species) {
+                            opacity_number_density[species] =
+                                opacity_number_density_arr[species](i, j, k);
+                        }
 
 #ifdef WARPX_USE_MATERIAL_OPACITY_HDF5
-                    warpx::radiation::MaterialOpacityCoefficients
-                        material_opacity_coefficients;
-                    bool const use_native_material_opacity =
-                        opacity.material.enabled
-                        || opacity.registered_material.enabled;
-                    if (absorb_here && use_native_material_opacity) {
-                        material_opacity_coefficients =
-                            opacity.registered_material.enabled
-                            ? opacity.registered_material(
-                                opacity_number_density, photon_energy,
-                                electron_temperature)
-                            : opacity.material(
-                                opacity_number_density, photon_energy,
-                                electron_temperature);
-                    }
+                        warpx::radiation::MaterialOpacityCoefficients
+                            material_opacity_coefficients;
+                        bool const use_native_material_opacity =
+                            opacity.material.enabled
+                            || opacity.registered_material.enabled;
+                        if (absorb_here && use_native_material_opacity) {
+                            material_opacity_coefficients =
+                                opacity.registered_material.enabled
+                                ? opacity.registered_material(
+                                    opacity_number_density, photon_energy,
+                                    electron_temperature)
+                                : opacity.material(
+                                    opacity_number_density, photon_energy,
+                                    electron_temperature);
+                        }
 #endif
-                    if (absorb_here && convert_particles_to_diffusion) {
-                        amrex::Real rosseland_opacity_value;
+                        if (absorb_here && convert_particles_to_diffusion) {
+                            amrex::Real rosseland_opacity_value;
 #ifdef WARPX_USE_MATERIAL_OPACITY_HDF5
-                        if (use_native_material_opacity) {
-                            rosseland_opacity_value =
-                                material_opacity_coefficients.rosseland_transport;
-                        } else
+                            if (use_native_material_opacity) {
+                                rosseland_opacity_value =
+                                    material_opacity_coefficients.rosseland_transport;
+                            } else
 #endif
-                        {
-                            rosseland_opacity_value = opacity.rosseland(
-                                opacity_number_density, sample_x, sample_y,
-                                sample_z, sample_time, photon_energy,
-                                electron_density, electron_temperature);
+                            {
+                                rosseland_opacity_value = opacity.rosseland(
+                                    opacity_number_density, sample_x, sample_y,
+                                    sample_z, sample_time, photon_energy,
+                                    electron_density, electron_temperature);
+                            }
+                            if (rosseland_opacity_value < 0.0_rt
+                                || !amrex::Math::isfinite(rosseland_opacity_value))
+                            {
+                                amrex::HostDevice::Atomic::Add(
+                                    invalid_opacity_ptr, 1);
+                            } else if (rosseland_opacity_value * min_cell_size
+                                       >= minimum_diffusion_optical_depth)
+                            {
+                                // Once a streaming packet enters an optically thick
+                                // cell, hand its complete radiation energy to the
+                                // diffusion representation. LTE exchange below can
+                                // then couple that energy to matter in the same step.
+                                int const group = energy_groups.index(photon_energy);
+                                amrex::HostDevice::Atomic::Add(
+                                    &diffusion_arr(i, j, k, group),
+                                    static_cast<amrex::Real>(wp[ip] * photon_energy));
+                                wp[ip] = 0.0_prt;
+                                idcpu[ip] = amrex::ParticleIdCpus::Invalid;
+                                return;
+                            }
                         }
-                        if (rosseland_opacity_value < 0.0_rt
-                            || !amrex::Math::isfinite(rosseland_opacity_value))
-                        {
-                            amrex::HostDevice::Atomic::Add(
-                                invalid_opacity_ptr, 1);
-                        } else if (rosseland_opacity_value * min_cell_size
-                                   >= minimum_diffusion_optical_depth)
-                        {
-                            // Once a streaming packet enters an optically thick
-                            // cell, hand its complete radiation energy to the
-                            // diffusion representation. LTE exchange below can
-                            // then couple that energy to matter in the same step.
-                            int const group = energy_groups.index(photon_energy);
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &diffusion_arr(i, j, k, group),
-                                static_cast<amrex::Real>(wp[ip] * photon_energy));
-                            wp[ip] = 0.0_prt;
-                            idcpu[ip] = amrex::ParticleIdCpus::Invalid;
-                            return;
-                        }
-                    }
 
-                    if (absorb_here) {
-                        amrex::Real alpha;
+                        if (absorb_here) {
+                            amrex::Real alpha;
 #ifdef WARPX_USE_MATERIAL_OPACITY_HDF5
-                        if (use_native_material_opacity) {
-                            // Packet attenuation uses the group's Planck true
-                            // absorption. Scattering neither heats nor deposits
-                            // an event momentum in this first table backend.
-                            alpha = material_opacity_coefficients.planck_absorption;
-                        } else
+                            if (use_native_material_opacity) {
+                                // Packet attenuation uses the group's Planck true
+                                // absorption. Scattering neither heats nor deposits
+                                // an event momentum in this first table backend.
+                                alpha = material_opacity_coefficients.planck_absorption;
+                            } else
 #endif
-                        {
-                            alpha = opacity.absorption(
-                                opacity_number_density, sample_x, sample_y,
-                                sample_z, sample_time, photon_energy,
-                                electron_density, electron_temperature);
-                        }
-                        if (alpha < 0.0_rt || !amrex::Math::isfinite(alpha)) {
-                            amrex::HostDevice::Atomic::Add(
-                                invalid_opacity_ptr, 1);
-                            alpha = 0.0_rt;
-                        }
-                        auto const absorbed_fraction =
-                            static_cast<amrex::ParticleReal>(-std::expm1(
-                                -alpha * PhysConst::c * segment_dt));
-                        amrex::ParticleReal const old_weight = wp[ip];
-                        amrex::ParticleReal const removed_weight =
-                            old_weight * absorbed_fraction;
-                        wp[ip] = old_weight - removed_weight;
+                            {
+                                alpha = opacity.absorption(
+                                    opacity_number_density, sample_x, sample_y,
+                                    sample_z, sample_time, photon_energy,
+                                    electron_density, electron_temperature);
+                            }
+                            if (alpha < 0.0_rt || !amrex::Math::isfinite(alpha)) {
+                                amrex::HostDevice::Atomic::Add(
+                                    invalid_opacity_ptr, 1);
+                                alpha = 0.0_rt;
+                            }
+                            auto const absorbed_fraction =
+                                static_cast<amrex::ParticleReal>(-std::expm1(
+                                    -alpha * PhysConst::c * segment_dt));
+                            amrex::ParticleReal const old_weight = wp[ip];
+                            amrex::ParticleReal const removed_weight =
+                                old_weight * absorbed_fraction;
+                            wp[ip] = old_weight - removed_weight;
 
-                        auto const removed_energy =
-                            static_cast<amrex::Real>(
-                                removed_weight * photon_energy);
-#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
-                        if (exact_cylindrical_streaming) {
-                            // Face handoff can scatter from one CPU particle
-                            // tile into a cell concurrently visited by another
-                            // tile.  This must be atomic on both host and device.
+                            auto const removed_energy =
+                                static_cast<amrex::Real>(
+                                    removed_weight * photon_energy);
+                            // Face handoff can cross CPU particle-tile boundaries
+                            // within one FAB, in Cartesian and cylindrical modes.
                             amrex::HostDevice::Atomic::Add(
                                 &energy_arr(i, j, k), removed_energy);
-                        } else {
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &energy_arr(i, j, k), removed_energy);
-                        }
-#else
-                        amrex::Gpu::Atomic::AddNoRet(
-                            &energy_arr(i, j, k), removed_energy);
-#endif
-                        if (enable_momentum_coupling && removed_weight > 0.0_prt) {
-                            amrex::ParticleReal const momentum_scale =
-                                removed_weight * PhysConst::m_e;
+                            if (enable_momentum_coupling && removed_weight > 0.0_prt) {
+                                amrex::ParticleReal const momentum_scale =
+                                    removed_weight * PhysConst::m_e;
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
-                            amrex::ParticleReal radius;
-                            amrex::ParticleReal position_theta;
-                            amrex::ParticleReal position_z;
-                            get_position.AsStored(
-                                ip, radius, position_theta, position_z);
-                            (void)radius;
-                            (void)position_z;
-                            amrex::ParticleReal const cos_theta =
-                                std::cos(position_theta);
-                            amrex::ParticleReal const sin_theta =
-                                std::sin(position_theta);
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 0),
-                                static_cast<amrex::Real>(
-                                    momentum_scale * (uxp[ip] * cos_theta
-                                                      + uyp[ip] * sin_theta)));
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 1),
-                                static_cast<amrex::Real>(
-                                    momentum_scale * (-uxp[ip] * sin_theta
-                                                      + uyp[ip] * cos_theta)));
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 2),
-                                static_cast<amrex::Real>(
-                                    momentum_scale * uzp[ip]));
+                                amrex::ParticleReal radius;
+                                amrex::ParticleReal position_theta;
+                                amrex::ParticleReal position_z;
+                                get_position.AsStored(
+                                    ip, radius, position_theta, position_z);
+                                (void)radius;
+                                (void)position_z;
+                                amrex::ParticleReal const cos_theta =
+                                    std::cos(position_theta);
+                                amrex::ParticleReal const sin_theta =
+                                    std::sin(position_theta);
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 0),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale * (uxp[ip] * cos_theta
+                                                          + uyp[ip] * sin_theta)));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 1),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale * (-uxp[ip] * sin_theta
+                                                          + uyp[ip] * cos_theta)));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 2),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale * uzp[ip]));
 #elif defined(WARPX_DIM_RSPHERE)
-                            amrex::ParticleReal radius;
-                            amrex::ParticleReal position_theta;
-                            amrex::ParticleReal position_phi;
-                            get_position.AsStored(
-                                ip, radius, position_theta, position_phi);
-                            (void)radius;
-                            amrex::ParticleReal const cos_theta =
-                                std::cos(position_theta);
-                            amrex::ParticleReal const sin_theta =
-                                std::sin(position_theta);
-                            amrex::ParticleReal const cos_phi =
-                                std::cos(position_phi);
-                            amrex::ParticleReal const sin_phi =
-                                std::sin(position_phi);
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 0),
-                                static_cast<amrex::Real>(
-                                    momentum_scale
-                                    * (uxp[ip] * cos_theta * cos_phi
-                                       + uyp[ip] * sin_theta * cos_phi
-                                       + uzp[ip] * sin_phi)));
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 1),
-                                static_cast<amrex::Real>(
-                                    momentum_scale
-                                    * (-uxp[ip] * sin_theta
-                                       + uyp[ip] * cos_theta)));
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 2),
-                                static_cast<amrex::Real>(
-                                    momentum_scale
-                                    * (-uxp[ip] * cos_theta * sin_phi
-                                       - uyp[ip] * sin_theta * sin_phi
-                                       + uzp[ip] * cos_phi)));
+                                amrex::ParticleReal radius;
+                                amrex::ParticleReal position_theta;
+                                amrex::ParticleReal position_phi;
+                                get_position.AsStored(
+                                    ip, radius, position_theta, position_phi);
+                                (void)radius;
+                                amrex::ParticleReal const cos_theta =
+                                    std::cos(position_theta);
+                                amrex::ParticleReal const sin_theta =
+                                    std::sin(position_theta);
+                                amrex::ParticleReal const cos_phi =
+                                    std::cos(position_phi);
+                                amrex::ParticleReal const sin_phi =
+                                    std::sin(position_phi);
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 0),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale
+                                        * (uxp[ip] * cos_theta * cos_phi
+                                           + uyp[ip] * sin_theta * cos_phi
+                                           + uzp[ip] * sin_phi)));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 1),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale
+                                        * (-uxp[ip] * sin_theta
+                                           + uyp[ip] * cos_theta)));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 2),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale
+                                        * (-uxp[ip] * cos_theta * sin_phi
+                                           - uyp[ip] * sin_theta * sin_phi
+                                           + uzp[ip] * cos_phi)));
 #else
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 0),
-                                static_cast<amrex::Real>(
-                                    momentum_scale * uxp[ip]));
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 1),
-                                static_cast<amrex::Real>(
-                                    momentum_scale * uyp[ip]));
-                            amrex::Gpu::Atomic::AddNoRet(
-                                &momentum_arr(i, j, k, 2),
-                                static_cast<amrex::Real>(
-                                    momentum_scale * uzp[ip]));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 0),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale * uxp[ip]));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 1),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale * uyp[ip]));
+                                amrex::HostDevice::Atomic::Add(
+                                    &momentum_arr(i, j, k, 2),
+                                    static_cast<amrex::Real>(
+                                        momentum_scale * uzp[ip]));
 #endif
+                            }
                         }
-                    }
 
+                    }
                     UpdatePosition(
                         x, y, z, uxp[ip], uyp[ip], uzp[ip], segment_dt, 0.0_prt);
                     remaining_transport_dt = amrex::max(

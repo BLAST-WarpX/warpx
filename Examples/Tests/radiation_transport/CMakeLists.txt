@@ -1825,8 +1825,8 @@ add_radiation_failure_test(
 add_radiation_failure_test(
     test_rz_radiation_transport_exact_rejected
     RZ
-    "inputs_base_rz_radiation_transport_exact_rejected radiation_transport.enable_particle_conversion=1 radiation_transport.emission_photon_energy=1.e-19"
-    "radiation_transport.enable_particle_conversion=1.")
+    "inputs_base_rz_radiation_transport_exact_rejected radiation_transport.enable_momentum_coupling=1 radiation_transport.momentum_species=ions"
+    "radiation_transport.enable_momentum_coupling=1.")
 
 foreach(case corner oblique axis radial_exit axial_exit axial_low periodic)
     set(position "0.1 0 0.05")
@@ -1874,6 +1874,43 @@ foreach(case corner oblique axis radial_exit axial_exit axial_low periodic)
             "${exact_rz_input}" "${exact_rz_analysis}" OFF OFF)
     endif()
 endforeach()
+
+add_warpx_test(test_1d_radiation_transport_zero_residence 1 1
+    inputs_test_1d_radiation_transport_zero_residence
+    "analysis_zero_residence.py --precision ${WarpX_PRECISION} --particle-precision ${WarpX_PARTICLE_PRECISION}"
+    OFF OFF)
+
+foreach(case entry departure reemission)
+    set(conversion_overrides "my_constants.px=0.35 my_constants.py=0.3 my_constants.pz=0.1 my_constants.nx=0.6 my_constants.ny=0 my_constants.nz=0.8")
+    set(conversion_opacity "if(sqrt(x*x+y*y)<0.5,0,1.e24)")
+    set(conversion_absorption 2)
+    if(case STREQUAL departure)
+        set(conversion_overrides "my_constants.px=0.5 my_constants.py=0 my_constants.pz=0.1 my_constants.nx=-1 my_constants.ny=0 my_constants.nz=0 my_constants.path_length=0.1")
+    elseif(case STREQUAL reemission)
+        set(conversion_overrides "photons.single_particle_weight=0 radiation_transport.initial_diffusion_energy_density(x,y,z)=100")
+        set(conversion_opacity 0)
+        set(conversion_absorption 0)
+    endif()
+    set(conversion_input "inputs_base_rz_radiation_transport_exact ${conversion_overrides} radiation_transport.enable_diffusion=1 radiation_transport.enable_particle_conversion=1 radiation_transport.emission_photon_energy=1.e-13 radiation_transport.absorption_coefficient(x,y,z,t,photon_energy,ne,Te)=${conversion_absorption} radiation_transport.rosseland_transport_coefficient(x,y,z,t,ne,Te)=${conversion_opacity} diag.fields_to_plot=radiation_material_energy radiation_diffusion_energy")
+    set(conversion_analysis "analysis_exact_rz_conversion.py --case ${case} --precision ${WarpX_PRECISION} --particle-precision ${WarpX_PARTICLE_PRECISION}")
+    add_warpx_test(test_rz_radiation_transport_exact_conversion_${case} RZ 1
+        "${conversion_input}" "${conversion_analysis}" OFF OFF)
+    if(case STREQUAL entry AND WarpX_MPI)
+        add_warpx_test(test_rz_radiation_transport_exact_conversion_entry_mpi RZ 2
+            "${conversion_input}" "${conversion_analysis}" OFF OFF)
+    endif()
+endforeach()
+
+# Reuse the declared 32-packet Cartesian-coordinate list; RZ geometry and
+# optical/material faces are overridden explicitly, with one FAB and tiny tiles.
+add_warpx_test(test_rz_radiation_transport_exact_conversion_tiling RZ 1
+    "inputs_test_rcylinder_radiation_transport_exact_omp_tiling geometry.dims=RZ amr.n_cell=4 4 geometry.prob_lo=0 0 geometry.prob_hi=1 1 boundary.field_lo=none pec boundary.field_hi=pec pec boundary.particle_lo=none reflecting boundary.particle_hi=reflecting reflecting particles.tile_size=1 1 radiation_transport.photon_boundary=absorbing radiation_transport.enable_diffusion=1 radiation_transport.enable_particle_conversion=1 radiation_transport.emission_photon_energy=1.e-13 radiation_transport.rosseland_transport_coefficient(x,y,z,t,ne,Te)=if(sqrt(x*x+y*y)<0.5,0,1.e24) diag.fields_to_plot=radiation_material_energy radiation_diffusion_energy"
+    "analysis_exact_rz_conversion.py --case tiling --precision ${WarpX_PRECISION} --particle-precision ${WarpX_PARTICLE_PRECISION}"
+    OFF OFF)
+if(TEST test_rz_radiation_transport_exact_conversion_tiling.run)
+    set_property(TEST test_rz_radiation_transport_exact_conversion_tiling.run PROPERTY ENVIRONMENT
+        "AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/" "OMP_NUM_THREADS=4")
+endif()
 
 add_radiation_failure_test(
     test_rsphere_radiation_transport_exact_rejected
@@ -2896,6 +2933,10 @@ add_warpx_test(
     OFF  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(test_rz_radiation_transport_exact_multigroup_conversion RZ 1
+    "inputs_test_rz_radiation_transport_multigroup_conversion radiation_transport.require_cell_interface_exact_streaming=1 radiation_transport.photon_boundary=absorbing"
+    analysis_rz.py OFF OFF)
 
 add_warpx_test(
     test_3d_radiation_transport_conversion  # name
