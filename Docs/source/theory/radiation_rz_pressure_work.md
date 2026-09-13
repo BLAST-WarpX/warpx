@@ -1,7 +1,7 @@
 # Opt-in native RZ pressure-work exchange
 
-Status, 13 September 2026: implemented in the private qualification branch;
-bounded CPU and local CUDA qualification pass. Packaging is in progress.
+Status, 13 September 2026: implemented and ported to the radiation PR branch;
+bounded CPU and local CUDA qualification pass within the contract below.
 This is a material-coupling prerequisite, not a claim that the
 hohlraum application or full moving radiation module is qualified.
 

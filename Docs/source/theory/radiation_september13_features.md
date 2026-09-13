@@ -26,6 +26,8 @@ in every geometry.
 ## Bounded evidence and defects found
 
 - RZ CPU feature/continuity/restart selection: 80/80 stages, 44.88 s locally.
+- Public-worktree RZ/Python selection: 91/91 stages, 43.54 s, including the
+  original species-drag regression (zero density error) and PICMI input test.
 - Cartesian radiation/conduction/Qei/pressure regressions: 292/292 stages,
   109.09 s locally. These include existing tests, not 292 new physics cases.
 - Single-precision fields/double-precision particles, exact-face and conversion
@@ -36,6 +38,11 @@ in every geometry.
   compression, conduction decay/contact tests and two-material Qei checks are
   described in the linked records below. CPU and local CUDA evidence are
   distinguished; no remote P40 result is inferred from a local CUDA pass.
+- Combined local CUDA feature/restart selection: 70/70 stages, 1042.01 s.
+  The longer timing includes repeated 400-step material integrations, not
+  extra physical features. Single-precision compiler checking separately
+  caught an implicit double-to-field cast in RZ work deposition; conversions
+  at the particle/field boundary are now explicit.
 
 Implementation/qualification found and fixed stale RZ pressure-gather ghosts,
 conversion in a cell with zero path residence, host tile scatter races, missing
