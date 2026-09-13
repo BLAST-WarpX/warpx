@@ -4758,7 +4758,7 @@ RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
     warpx::radiation::CoupledMomentExchange exchange;
     auto const result = warpx::radiation::TryAdvanceCoupledMomentInterval(particles,
         m_momentum_species, "diffusion_0", radiation, temperature, heat, geometry,
-        current_time, dt, options, callbacks, &exchange);
+        current_time, dt, options, callbacks, &exchange, &m_moment_transport_ledger);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(result.valid,
         "Coupled moving radiation solve failed; no source candidate committed. Failure=" +
         std::to_string(static_cast<int>(result.last_source.failure)));
@@ -4952,9 +4952,15 @@ RadiationTransport::WriteCheckpointData (std::string const& dir) const
     }
     if (m_use_coupled_moment_transport) {
         std::ofstream model{dir + "/RadiationMomentModel_data.txt"};
-        model << "gray_m1_low_beta_nodal_shape_v2 " << WarpX::nox << '\n';
+        model << "gray_m1_low_beta_nodal_shape_ledger_v3 " << WarpX::nox << '\n';
+        model.flush();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(model.good(),
             "Could not checkpoint moving radiation model.");
+        std::ofstream ledger{dir + "/RadiationMomentTransportLedger_data.txt"};
+        bool const written = m_moment_transport_ledger.Write(ledger);
+        ledger.flush();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(written && ledger.good(),
+            "Could not checkpoint moment wall/geometric accounting.");
     }
     if (m_particle_momentum_carry) {
         std::ofstream owner{dir + "/RadiationParticleCarry_data.txt"};
@@ -4997,6 +5003,9 @@ RadiationTransport::ReadCheckpointData (std::string const& dir)
             && !(boundary >> trailing), "Invalid independent photon boundary manifest.");
     }
     std::ifstream model{dir + "/RadiationMomentModel_data.txt"};
+    std::ifstream moment_ledger{dir + "/RadiationMomentTransportLedger_data.txt"};
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_use_coupled_moment_transport || !moment_ledger.good(),
+        "Cannot discard a moment transport ledger on scalar radiation restart.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(model.good() == m_use_coupled_moment_transport,
         "Restart must preserve the radiation moment model; scalar/moment conversion "
         "is not implicit.");
@@ -5005,7 +5014,8 @@ RadiationTransport::ReadCheckpointData (std::string const& dir)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(static_cast<bool>(model >> version),
             "Invalid moving radiation model checkpoint schema.");
         int order = 1;
-        if (version == "gray_m1_low_beta_nodal_shape_v2") {
+        bool const has_ledger = version == "gray_m1_low_beta_nodal_shape_ledger_v3";
+        if (version == "gray_m1_low_beta_nodal_shape_v2" || has_ledger) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(static_cast<bool>(model >> order),
                 "Moving radiation checkpoint is missing its particle shape order.");
         } else {
@@ -5014,6 +5024,16 @@ RadiationTransport::ReadCheckpointData (std::string const& dir)
         }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(order == WarpX::nox && !(model >> trailing),
             "Moving radiation restart must preserve its particle shape order.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(moment_ledger.good() == has_ledger,
+            "Moving radiation checkpoint must preserve its declared transport ledger.");
+        if (has_ledger) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_moment_transport_ledger.Read(moment_ledger),
+                "Invalid moment wall/geometric checkpoint accounting.");
+        } else {
+            // Legacy native moment runtime is periodic Cartesian: these two
+            // independent transport accounts are identically zero there.
+            m_moment_transport_ledger = {};
+        }
     }
     std::ifstream owner{dir + "/RadiationParticleCarry_data.txt"};
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(owner.good() == m_particle_momentum_carry,

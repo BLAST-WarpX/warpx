@@ -6,6 +6,7 @@
 #include "Initialization/WarpXInit.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Radiation/CoupledMomentSource.H"
+#include "Radiation/MomentTransportLedger.H"
 #include "Radiation/ParticleImpulse.H"
 #include "Radiation/RZMomentGeometry.H"
 #include "WarpX.H"
@@ -19,6 +20,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <sstream>
 #include <string>
 
 using namespace amrex::literals;
@@ -206,6 +208,7 @@ main (int argc, char* argv[])
         options.spatial_transport = spatial;
         options.transport.reflecting_boundaries = true;
         pp.query("verbose", options.verbose);
+        pp.query("relaxation", options.relaxation);
         auto const original = ParticleInventory(ions);
         auto const initial_electrons = ElectronEnergy(simulation, temperature);
         auto const initial_radiation = radiation.sum(0);
@@ -246,6 +249,10 @@ main (int argc, char* argv[])
             exchange.transport.boundary = {41, 43, 47, 53};
             exchange.transport.geometric = {59, 61, 67, 71};
             auto const original_accounting = exchange.transport;
+            MomentTransportLedger ledger;
+            AMREX_ALWAYS_ASSERT(ledger.TryAccumulate(original_accounting));
+            std::ostringstream original_ledger;
+            AMREX_ALWAYS_ASSERT(ledger.Write(original_ledger));
             heat.setVal(79);
             bool faulted = false;
             auto guarded = callbacks;
@@ -267,8 +274,11 @@ main (int argc, char* argv[])
             interval.max_refinements = 0;
             auto const rejected = TryAdvanceCoupledMomentInterval(
                 particles, {"ions"}, "rz_coupled", radiation, temperature, heat, geometry, 0, dt,
-                interval, guarded, &exchange);
+                interval, guarded, &exchange, &ledger);
             AMREX_ALWAYS_ASSERT(!rejected.valid && rejected.completed_trial_substeps == 1);
+            std::ostringstream rejected_ledger;
+            AMREX_ALWAYS_ASSERT(ledger.Write(rejected_ledger));
+            AMREX_ALWAYS_ASSERT(rejected_ledger.str() == original_ledger.str());
             AMREX_ALWAYS_ASSERT(ParticleInventory(ions) == original);
             AMREX_ALWAYS_ASSERT(heat.min(0, 1) == 79 && heat.max(0, 1) == 79);
             AMREX_ALWAYS_ASSERT(exchange.kinetic_work.min(0, 1) == 31 &&
@@ -296,16 +306,22 @@ main (int argc, char* argv[])
             amrex::MultiFab::Copy(old_radiation, radiation, 0, 0, 4, 1);
             amrex::MultiFab::Copy(old_temperature, temperature, 0, 0, 1, temperature.nGrowVect());
             MomentTransportAccounting reference;
+            auto reference_ledger = ledger;
             {
                 ParticleImpulseMaterial material(particles, {"ions"});
                 amrex::MultiFab reference_heat(heat.boxArray(), heat.DistributionMap(), 1, 1);
                 for (int step = 0; step < 4; ++step)
                 {
                     CoupledMomentExchange part;
+                    // Match the interval's representable time endpoints; dt/4
+                    // need not equal end-begin for the last floating-point slice.
+                    auto const begin = dt * (static_cast<amrex::Real>(step) / 4);
+                    auto const end = dt * (static_cast<amrex::Real>(step + 1) / 4);
                     auto const result = TryAdvanceCoupledMomentSource(
                         material, "rz_coupled", old_radiation, old_temperature, reference_heat,
-                        geometry, dt * step / 4, dt / 4, options, callbacks, &part);
+                        geometry, begin, end - begin, options, callbacks, &part);
                     AMREX_ALWAYS_ASSERT(result.valid);
+                    AMREX_ALWAYS_ASSERT(reference_ledger.TryAccumulate(part.transport));
                     for (int d = 0; d < 4; ++d)
                     {
                         reference.boundary[d] += part.transport.boundary[d];
@@ -318,9 +334,13 @@ main (int argc, char* argv[])
             interval.max_refinements = 1;
             auto const accepted = TryAdvanceCoupledMomentInterval(
                 particles, {"ions"}, "rz_coupled", radiation, temperature, heat, geometry, 0, dt,
-                interval, guarded, &exchange);
+                interval, guarded, &exchange, &ledger);
             AMREX_ALWAYS_ASSERT(accepted.valid && accepted.attempts == 2 &&
                                 accepted.substeps == 4 && accepted.completed_trial_substeps == 5);
+            std::ostringstream accepted_ledger, expected_ledger;
+            AMREX_ALWAYS_ASSERT(ledger.Write(accepted_ledger));
+            AMREX_ALWAYS_ASSERT(reference_ledger.Write(expected_ledger));
+            AMREX_ALWAYS_ASSERT(accepted_ledger.str() == expected_ledger.str());
             for (int d = 0; d < 4; ++d)
             {
                 AMREX_ALWAYS_ASSERT(

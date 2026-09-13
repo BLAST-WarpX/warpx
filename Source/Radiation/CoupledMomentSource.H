@@ -18,6 +18,7 @@ class MultiParticleContainer;
 
 namespace warpx::radiation
 {
+    class MomentTransportLedger;
     class ParticleImpulseMaterial;
     struct CoupledMomentCallbacks {
         // Physical inverse-length absorption/scattering and cell-integrated
@@ -132,6 +133,8 @@ namespace warpx::radiation
      * substeps touch live state. Callbacks must not mutate external state.
      * The optional spatial moment solve can be included in each substep. No
      * PIC drift, density update or derived native-pressure commit is performed.
+     * An optional cumulative transport ledger commits atomically with the
+     * accepted interval; rejected attempts do not change its compensation.
      */
     CoupledMomentIntervalResult TryAdvanceCoupledMomentInterval (
         MultiParticleContainer& particles, std::vector<std::string> const& momentum_species,
@@ -139,6 +142,6 @@ namespace warpx::radiation
         amrex::MultiFab& nodal_temperature, amrex::MultiFab& realized_material_energy,
         amrex::Geometry const& geometry, amrex::Real time, amrex::Real dt,
         CoupledMomentIntervalOptions const& options, CoupledMomentCallbacks const& callbacks,
-        CoupledMomentExchange* exchange = nullptr);
+        CoupledMomentExchange* exchange = nullptr, MomentTransportLedger* ledger = nullptr);
 } // namespace warpx::radiation
 #endif

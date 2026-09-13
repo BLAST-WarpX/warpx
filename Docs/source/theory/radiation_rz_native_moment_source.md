@@ -94,3 +94,49 @@ Packet–diffusion momentum conversion, general azimuthal/angular-momentum
 transport, table-EOS material coupling and conservative magnetic work remain
 distinct feature gaps. Passing this source transaction must not silently
 activate any of them.
+
+## Persistent transport accounting (September 14 integration work)
+
+`MomentTransportLedger` independently accumulates outward optical-wall transfer
+and cylindrical stress in `(E,c*p)` units. It uses compensated sums, including
+when subtracting the two accounts: weak net exchange must not disappear merely
+because their cumulative values are large. These are direct accepted transport
+terms, not an inferred conservation residual or an additional material reservoir.
+
+The interval API optionally accepts this ledger. Each attempt starts from a
+private copy, accumulates its accepted substeps and publishes it only with the
+final particle/field commit. Failed later substeps discard the trial history.
+Its versioned stream record preserves the compensation as well as the totals;
+malformed, nonfinite or overflowing records/updates reject without changing the
+previous ledger.
+
+The native moment runtime now owns this ledger and writes it alongside the
+`gray_m1_low_beta_nodal_shape_ledger_v3` checkpoint manifest. Restart requires the
+declared ledger. Older v1/v2 native Cartesian checkpoints retain their original
+shape checks and initialize these identically-zero periodic transport accounts.
+This schema remains Cartesian: it does **not** enable or certify native RZ drift.
+An RZ runtime must declare its different geometry and assignment contract.
+
+Qualification adds cancellation/serialization/overflow unit checks and extends
+the existing serial/MPI interval-rejection gates with persistent-ledger checks.
+The native checkpoint corruption harness also tests a missing declared ledger.
+Passing these checks is infrastructure evidence, not a moving-material trajectory
+or changed-rank RZ restart result.
+
+The ledger plus source selection passes 6/6 CPU tests in 22.04 s, including
+serial and two-rank rollback. Twelve affected single-precision compiler checks
+pass across Cartesian and RZ builds. The native Cartesian moving-pulse producer,
+physics analysis, shape guard and missing-manifest/moment/ledger checks pass
+8/8 in 14.63 s; normal restarted evolution and its comparison pass 2/2 in 5.11 s.
+The CUDA-build ledger unit test passes in 0.71 s.
+
+A bounded performance probe of the existing CUDA source binary completes one
+spatial stage in 78.38 s versus 0.2302 s on CPU. The profile attributes 48.89%
+of GPU time to dot products and 24.33% to vector increments in repeated Krylov
+orthogonalization. The default half-relaxed source requires 32 outer iterations.
+The test-only full-relaxation probe requires six on its first stage and passes
+all 64 CPU spatial stages in 2.468 s, with independent energy residual
+`1.64e-15`. The current CUDA binary also passes the full-relaxation single-stage
+probe in 12.55 s with six outer iterations; its sustained run is still pending.
+This is a bounded solver-control comparison, not a change to defaults
+or acceptance tolerances, and does not close the sustained CUDA qualification gap.

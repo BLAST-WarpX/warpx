@@ -4,6 +4,7 @@
 #include "CoupledMomentSource.H"
 
 #include "ImplicitMomentSource.H"
+#include "MomentTransportLedger.H"
 #include "ParticleImpulse.H"
 #include "RZMomentGeometry.H"
 #include "Utils/TextMsg.H"
@@ -893,7 +894,7 @@ namespace warpx::radiation
                                      amrex::Geometry const& geometry, amrex::Real time,
                                      amrex::Real dt, CoupledMomentIntervalOptions const& options,
                                      CoupledMomentCallbacks const& callbacks,
-                                     CoupledMomentExchange* exchange)
+                                     CoupledMomentExchange* exchange, MomentTransportLedger* ledger)
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             options.initial_substeps > 0 && options.max_refinements >= 0 &&
@@ -911,8 +912,11 @@ namespace warpx::radiation
                              realized_material_energy.nGrowVect());
         amrex::MultiFab total_heat(heat.boxArray(), heat.DistributionMap(), 1, heat.nGrowVect());
         int substeps = options.initial_substeps;
+        bool const collect_exchange = exchange != nullptr || ledger != nullptr;
         for (int attempt = 0; attempt <= options.max_refinements; ++attempt) {
             ++result.attempts;
+            MomentTransportLedger trial_ledger =
+                ledger != nullptr ? *ledger : MomentTransportLedger{};
             ParticleImpulseMaterial material(particles, momentum_species);
             amrex::MultiFab::Copy(trial_radiation, radiation, 0, 0, radiation.nComp(),
                                   radiation.nGrowVect());
@@ -920,7 +924,7 @@ namespace warpx::radiation
                                   nodal_temperature.nComp(), nodal_temperature.nGrowVect());
             total_heat.setVal(0);
             CoupledMomentExchange total_exchange;
-            if (exchange != nullptr) {
+            if (collect_exchange) {
                 total_exchange.kinetic_work.define(radiation.boxArray(),
                     radiation.DistributionMap(), 1, 0);
                 total_exchange.momentum.define(radiation.boxArray(),
@@ -944,16 +948,22 @@ namespace warpx::radiation
                 result.last_source = TryAdvanceCoupledMomentSource(
                     material, carry_path, trial_radiation, trial_temperature, heat, geometry, begin,
                     end - begin, options.source, callbacks,
-                    exchange != nullptr ? &step_exchange : nullptr);
+                    collect_exchange ? &step_exchange : nullptr);
                 if (!result.last_source.valid) {
                     accepted = false;
                     break;
                 }
                 ++result.completed_trial_substeps;
+                if (ledger != nullptr && !trial_ledger.TryAccumulate(step_exchange.transport)) {
+                    accepted = false;
+                    result.last_source.valid = false;
+                    result.last_source.failure = CoupledMomentFailure::Material;
+                    break;
+                }
                 kinetic_work += result.last_source.actual_kinetic_work;
                 carry_change += result.last_source.carry_energy_change;
                 amrex::MultiFab::Add(total_heat, heat, 0, 0, 1, heat.nGrowVect());
-                if (exchange != nullptr) {
+                if (collect_exchange) {
                     for (int d = 0; d < 4; ++d) {
                         total_exchange.transport.boundary[d] += step_exchange.transport.boundary[d];
                         total_exchange.transport.geometric[d] +=
@@ -973,9 +983,9 @@ namespace warpx::radiation
                                    std::abs(carry_change);
                 bool finite =
                     total_heat.is_finite() && std::isfinite(raw) && std::isfinite(scale) &&
-                    (exchange == nullptr || (total_exchange.kinetic_work.is_finite() &&
-                                             total_exchange.momentum.is_finite()));
-                if (exchange != nullptr) {
+                    (!collect_exchange || (total_exchange.kinetic_work.is_finite() &&
+                                           total_exchange.momentum.is_finite()));
+                if (collect_exchange) {
                     for (int d = 0; d < 4; ++d) {
                         finite = finite && std::isfinite(total_exchange.transport.boundary[d])
                             && std::isfinite(total_exchange.transport.geometric[d]);
@@ -1003,6 +1013,7 @@ namespace warpx::radiation
                 amrex::MultiFab::Copy(realized_material_energy, total_heat, 0, 0, 1,
                                       realized_material_energy.nGrowVect());
                 if (exchange != nullptr) { *exchange = std::move(total_exchange); }
+                if (ledger != nullptr) { *ledger = trial_ledger; }
                 result.actual_kinetic_work = kinetic_work;
                 result.carry_energy_change = carry_change;
                 result.substeps = substeps;

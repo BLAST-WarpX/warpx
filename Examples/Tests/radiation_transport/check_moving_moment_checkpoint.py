@@ -12,10 +12,12 @@ from pathlib import Path
 
 def check(executable, checkpoint, missing):
     checkpoint = checkpoint.resolve(strict=True)
-    relative = (
-        Path("RadiationMomentModel_data.txt")
-        if missing == "model"
-        else Path("Level_0") / f"radiation_moment_q{missing}[level=0]_H"
+    manifests = {
+        "model": Path("RadiationMomentModel_data.txt"),
+        "ledger": Path("RadiationMomentTransportLedger_data.txt"),
+    }
+    relative = manifests.get(
+        missing, Path("Level_0") / f"radiation_moment_q{missing}[level=0]_H"
     )
     assert (checkpoint / relative).is_file()
     # Only the disposable copy is corrupted; retain the failed child's output.
@@ -43,14 +45,13 @@ def check(executable, checkpoint, missing):
             timeout=60,
         )
     Path(f"missing_{missing}.log").write_text(result.stdout)
-    expected = (
-        "Restart must preserve the radiation moment model"
-        if missing == "model"
-        else "Checkpoint is missing the required MultiFab header"
-    )
+    expected = {
+        "model": "Restart must preserve the radiation moment model",
+        "ledger": "Moving radiation checkpoint must preserve its declared transport",
+    }.get(missing, "Checkpoint is missing the required MultiFab header")
     assert result.returncode != 0, result.stdout
     assert expected in result.stdout, result.stdout
-    if missing != "model":
+    if missing not in manifests:
         assert relative.name in result.stdout, result.stdout
     assert "STEP 201 ends" not in result.stdout, result.stdout
     print(f"Missing {missing}: rejected before advancing the restarted state")
@@ -60,6 +61,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("executable", type=Path)
     parser.add_argument("checkpoint", type=Path)
-    parser.add_argument("missing", choices=("model", "x", "y", "z"))
+    parser.add_argument("missing", choices=("model", "ledger", "x", "y", "z"))
     args = parser.parse_args()
     check(args.executable, args.checkpoint, args.missing)

@@ -11,6 +11,7 @@ foreach(D IN LISTS WarpX_DIMS)
         ImplicitMomentTransport.cpp
         MomentBalance.cpp
         MomentBoundaryExchange.cpp
+        MomentTransportLedger.cpp
         OpacityTable.cpp
         ParticleImpulse.cpp
         ParticleImpulseBoundary.cpp

@@ -9,6 +9,7 @@
 
 #include "EnergyGroups.H"
 #include "ImplicitDiffusion.H"
+#include "MomentTransportLedger.H"
 #ifdef WARPX_USE_MATERIAL_OPACITY_HDF5
 #   include "MaterialOpacityTable.H"
 #   include "Utils/MaterialRegistry.H"
@@ -214,6 +215,12 @@ public:
         return m_last_streaming_boundary_energy_loss;
     }
 
+    /** Independent cumulative moment wall and cylindrical-stress accounts. */
+    [[nodiscard]] warpx::radiation::MomentTransportLedger const& momentTransportLedger () const
+    {
+        return m_moment_transport_ledger;
+    }
+
     /** Radiation energy lost through boundaries since initialization. */
     [[nodiscard]] amrex::Real cumulativeBoundaryEnergyLoss () const noexcept
     {
@@ -417,6 +424,7 @@ private:
     mutable amrex::Real m_last_diffusion_boundary_energy_loss = 0.0;
     mutable amrex::Real m_last_streaming_boundary_energy_loss = 0.0;
     mutable amrex::Real m_cumulative_boundary_energy_loss = 0.0;
+    mutable warpx::radiation::MomentTransportLedger m_moment_transport_ledger;
     mutable amrex::Real m_last_boundary_energy_injection = 0.0;
     mutable amrex::Real m_cumulative_boundary_energy_injection = 0.0;
     mutable amrex::Real m_last_numerical_energy_residual = 0.0;
