@@ -99,6 +99,17 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
         }
     }
     if (amrex::ParallelDescriptor::IOProcessor()) {
+#if defined(WARPX_DIM_RZ)
+        if (m_conservative_pressure_work) {
+            std::ofstream pressure(directory + "/HybridRZPressureWork.txt");
+            pressure << "rz_centered_pressure_work_v1 "
+                     << simulation.verboncoeurAxisCorrection() << ' '
+                     << simulation.Geom(0).isPeriodic(1) << '\n';
+            pressure.flush();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pressure.good(),
+                "Could not checkpoint RZ pressure-work model.");
+        }
+#endif
         if (m_resolved_qei_support) {
             std::ofstream support(directory + "/HybridQeiSupport.txt");
             support << "resolved_pairwise_v3 " << m_resolved_qei_seed << ' '
@@ -131,6 +142,25 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
 
 void HybridPICModel::ReadMomentHistory (std::string const &directory)
 {
+#if defined(WARPX_DIM_RZ)
+    auto const pressure_manifest = directory + "/HybridRZPressureWork.txt";
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Exists(pressure_manifest) == m_conservative_pressure_work,
+        "Restart must preserve the RZ pressure-work model and its manifest.");
+    if (m_conservative_pressure_work) {
+        amrex::Vector<char> buffer;
+        amrex::ParallelDescriptor::ReadAndBcastFile(pressure_manifest, buffer);
+        std::istringstream pressure(std::string(buffer.data()));
+        std::string version, trailing;
+        int axis = -1, periodic_z = -1;
+        auto const& simulation = WarpX::GetInstance();
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE((pressure >> version >> axis >> periodic_z)
+            && version == "rz_centered_pressure_work_v1"
+            && axis == static_cast<int>(simulation.verboncoeurAxisCorrection())
+            && periodic_z == static_cast<int>(simulation.Geom(0).isPeriodic(1))
+            && !(pressure >> trailing),
+            "Invalid or changed RZ pressure-work checkpoint contract.");
+    }
+#endif
     auto const support_manifest = directory + "/HybridQeiSupport.txt";
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(Exists(support_manifest) == m_resolved_qei_support,
         "Restart must preserve the Qei thermal support model and its manifest.");

@@ -25,6 +25,7 @@
 #include "ExternalVectorPotential.H"
 #include "QdsmcMetricTransport.H"
 #include "QeiThermalSupport.H"
+#include "RZPressureWork.H"
 #include "TwoTemperatureExchange.H"
 #include "Utils/MaterialRegistry.H"
 #include "WarpX.H"
@@ -1024,7 +1025,7 @@ namespace
     }
 #endif
 
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    [[maybe_unused]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real qdsmc_cartesian_ratio_velocity_divergence (
         amrex::Array4<amrex::Real const> const& numerator_x,
         amrex::Array4<amrex::Real const> const& numerator_y,
@@ -1080,7 +1081,7 @@ namespace
     /** D(V_work) for the exact collocated pressure-force adjoint.  The nodal
      * Ohm-law pressure gradient is centered in every active Cartesian
      * direction, hence on a periodic uniform grid D=-G*=G. */
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    [[maybe_unused]] AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     amrex::Real qdsmc_pressure_work_velocity_divergence (
         amrex::Array4<amrex::Real const> const& work_current_x,
         amrex::Array4<amrex::Real const> const& work_current_y,
@@ -1221,12 +1222,20 @@ void HybridPICModel::FoldPressureWorkBoundary (
                     target[d] = 2 * (low ? domain.smallEnd(d) : domain.bigEnd(d)) - source[d];
 #if defined(WARPX_DIM_1D_Z)
                     int const normal = 2;
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     int const normal = d == 0 ? 0 : 2;
 #else
                     int const normal = d;
 #endif
+#if defined(WARPX_DIM_RZ)
+                    // Axis E_r/E_theta are odd, E_z even; a PEC face has
+                    // the opposite normal/tangential convention.
+                    bool const axis_face = d == 0 && low;
+                    parity *= axis_face ? (component == 2 ? 1 : -1)
+                                        : (component == normal ? 1 : -1);
+#else
                     parity *= component == normal ? 1 : -1;
+#endif
                     reflected = true;
                 }
             }
@@ -1320,9 +1329,9 @@ void HybridPICModel::ReadParameters (
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !m_conservative_pressure_work_pec || m_conservative_pressure_work,
         "PEC pressure work requires conservative_pressure_work=1.");
-#if !defined(WARPX_DIM_1D_Z)
+#if !defined(WARPX_DIM_1D_Z) && !defined(WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_conservative_pressure_work_pec,
-        "Experimental PEC pressure work currently supports 1D only.");
+        "Experimental PEC pressure work currently supports 1D and RZ only.");
 #endif
 #if defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -2160,11 +2169,20 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
             "double-precision fields. The moving-vacuum-front cancellation "
             "cleanup has not yet been validated with single-precision "
             "continuity and flux arithmetic.");
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::Abort(
             "hybrid_pic_model.conservative_pressure_work is initially "
             "restricted to periodic Cartesian geometry. Radial adjoint "
             "metrics require a separate analytic validation.");
+#endif
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            m_conservative_pressure_work_pec && electronThermodynamicsExecutor().isIdealGas()
+                && m_electron_thermodynamics.numMaterials() == 0
+                && warpx.Geom(0).ProbLo(0) == 0.0_rt && !EB::enabled(),
+            "RZ conservative pressure work requires ideal finite-volume electrons without "
+            "material tables, conservative_pressure_work_pec=1, an axis-containing domain "
+            "and no embedded boundaries.");
 #endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             WarpX::grid_type == GridType::Collocated,
@@ -2223,6 +2241,17 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
             "periodic field boundaries; reflecting and conducting boundaries "
             "need an even pressure-energy boundary adjoint.");
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+#if defined(WARPX_DIM_RZ)
+            if (d == 0) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !warpx.Geom(0).isPeriodic(0)
+                    && WarpX::field_boundary_hi[0] == FieldBoundaryType::PEC
+                    && WarpX::particle_boundary_hi[0] == ParticleBoundaryType::Reflecting,
+                    "RZ conservative pressure work requires a stationary outer PEC "
+                    "field boundary and reflecting material boundary.");
+                continue; // r=0 is the coordinate axis, not a material wall.
+            }
+#endif
             if (m_conservative_pressure_work_pec && !warpx.Geom(0).isPeriodic(d)) {
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     WarpX::field_boundary_lo[d] == FieldBoundaryType::PEC &&
@@ -2788,6 +2817,10 @@ void HybridPICModel::HybridPICSolveE (
                 WarpX::field_boundary_hi, FieldBoundaryType::PEC,
                 warpx.get_ng_fieldgather(), warpx.Geom(lev), lev, patch_type, warpx.refRatio());
         }
+#if defined(WARPX_DIM_RZ)
+        warpx.ApplyFieldBoundaryOnAxis(
+            pressure_Efield[0], pressure_Efield[1], pressure_Efield[2], lev);
+#endif
         for (auto* pressure_component : pressure_Efield) {
             ablastr::utils::communication::FillBoundary(
                 *pressure_component, pressure_component->nGrowVect(),
@@ -3700,6 +3733,15 @@ void HybridPICModel::QDSMCUpdateThermodynamics (
 #endif
         bool const conservative_pressure_work = m_conservative_pressure_work;
         bool const pec_pressure_work = m_conservative_pressure_work_pec;
+#if defined(WARPX_DIM_RZ)
+        if (conservative_pressure_work) {
+            for (auto const* component : plasma_current) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(component->norm0(0, 0) == 0.0_rt,
+                    "RZ conservative pressure work currently requires zero Ampere plasma "
+                    "current. The electromagnetic pressure-work channel is not yet qualified.");
+            }
+        }
+#endif
 
         // The exact particle/electron pressure-work pair is evaluated from
         // the frozen old pressure state.  Apply the electron-side increment
@@ -3747,10 +3789,21 @@ void HybridPICModel::QDSMCUpdateThermodynamics (
                     amrex::Real const old_rho_node =
                         amrex::max(raw_old_rho, 0.0_rt);
                     amrex::Real const work_divergence =
+#if defined(WARPX_DIM_RZ)
+                        warpx::hybrid::rzPressureWorkDivergence(
+                            work_current_x, work_current_z, pressure_state,
+                            i, j, nodal_lo.x, nodal_hi.x, nodal_lo.y, nodal_hi.y,
+                            periodic[1] != 0, inv_dx[0], inv_dx[1],
+                            hybrid_transport_node_volume(i, j, k, problo, dx,
+                                physical_domain_lo, axis_volume_factor,
+                                physical_domain_hi, periodic));
+                    amrex::ignore_unused(work_current_y, pec_pressure_work);
+#else
                         qdsmc_pressure_work_velocity_divergence(
                             work_current_x, work_current_y, work_current_z,
                             pressure_state, i, j, k, inv_dx, pec_pressure_work,
                             nodal_lo, nodal_hi, periodic);
+#endif
                     amrex::Real const source_loaded_energy =
                         old_energy(i, j, k) - dt
                             * pressure_state(i, j, k, 0)
@@ -4318,11 +4371,17 @@ void HybridPICModel::QDSMCUpdateThermodynamics (
                     // than subtracting two independently discretized ion and
                     // electron divergences.  The latter leaves a spurious
                     // residual at an exact-vacuum front even when J_plasma=0.
+#if defined(WARPX_DIM_RZ)
+                    // The supported RZ subset checks zero J_plasma above;
+                    // do not silently omit magnetic pressure-energy transfer.
+                    plasma_ratio_divergence = 0.0_rt;
+#else
                     plasma_ratio_divergence =
                         qdsmc_cartesian_ratio_velocity_divergence(
                             plasma_current_x, plasma_current_y,
                             plasma_current_z, midpoint_charge_density,
                             i, j, k, nodal_lo, nodal_hi, inv_dx, periodic);
+#endif
                     pressure_heun_divergence = -plasma_ratio_divergence;
                 }
                 amrex::Real const advected_energy_density =

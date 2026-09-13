@@ -9,6 +9,7 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
+#include "BoundaryConditions/WarpX_PEC.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
@@ -494,6 +495,18 @@ void
 WarpX::UpdateAuxiliaryData ()
 {
     ABLASTR_PROFILE("WarpX::UpdateAuxiliaryData()");
+#if defined(WARPX_DIM_RZ)
+    if (m_fields.has_vector(FieldType::hybrid_pressure_E_fp, 0)) {
+        // Build C from current valid/periodic data, then physical extensions.
+        // Applying the axis before inter-FAB exchange leaves stale z-corner
+        // ghosts on axis-touching boxes, which is not the C paired by C^T.
+        for (auto* component : m_fields.get_alldirs(FieldType::Efield_fp, 0)) {
+            ablastr::utils::communication::FillBoundary(*component,
+                component->nGrowVect(), false, Geom(0).periodicity(), true);
+        }
+        ApplyEfieldBoundary(0, PatchType::fine, gett_new(0));
+    }
+#endif
 
     using ablastr::fields::Direction;
 
@@ -599,6 +612,11 @@ WarpX::UpdateHybridPressureAuxiliaryData ()
             /*do_single_precision_comms=*/false,
             Geom(0).periodicity(), /*nodal_sync=*/true);
     }
+#if defined(WARPX_DIM_RZ)
+    PEC::ApplyPECtoEfield(pressure_fp, field_boundary_lo, field_boundary_hi,
+        FieldBoundaryType::PEC, get_ng_fieldgather(), Geom(0), 0, PatchType::fine, refRatio());
+    ApplyFieldBoundaryOnAxis(pressure_fp[0], pressure_fp[1], pressure_fp[2], 0);
+#endif
     auto& pressure_work_state = *m_fields.get(
         FieldType::hybrid_pressure_work_state_fp, 0);
     ablastr::utils::communication::FillBoundary(

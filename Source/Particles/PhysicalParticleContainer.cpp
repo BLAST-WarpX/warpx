@@ -1563,7 +1563,11 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
         work_jz_arr = work_jzfab.array();
     }
     [[maybe_unused]] amrex::Real const pressure_work_invvol =
+#if defined(WARPX_DIM_RZ)
+        1.0_rt; // Integrated work current; the adjoint applies the RZ metric once.
+#else
         dinv.x * dinv.y * dinv.z;
+#endif
 
     CopyParticleAttribs copyAttribs;
     if (copy_particle_attribs) {
@@ -1670,7 +1674,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             copyAttribs(ip);
         }
 
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
         if (collect_hybrid_pressure_work) {
             amrex::ParticleReal qp = q;
             if (ion_lev) { qp *= ion_lev[ip]; }

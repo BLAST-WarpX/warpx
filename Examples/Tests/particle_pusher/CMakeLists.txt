@@ -30,7 +30,8 @@ if(WarpX_LIB)
 
     if(WarpX_DIMS_LAST STREQUAL "1d" OR
        WarpX_DIMS_LAST STREQUAL "2d" OR
-       WarpX_DIMS_LAST STREQUAL "3d")
+       WarpX_DIMS_LAST STREQUAL "3d" OR
+       WarpX_DIMS_LAST STREQUAL "rz")
         add_executable(
             test_boris_work_current_transpose
             test_boris_work_current_transpose.cpp)

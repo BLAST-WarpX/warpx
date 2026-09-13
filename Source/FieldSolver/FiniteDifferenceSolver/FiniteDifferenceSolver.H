@@ -342,6 +342,7 @@ class FiniteDifferenceSolver
         template<typename T_Algo>
         void HybridPICSolveECylindrical (
             ablastr::fields::VectorField const& Efield,
+            ablastr::fields::VectorField const& pressure_Efield,
             ablastr::fields::VectorField const& Jfield,
             ablastr::fields::VectorField const& Jifield,
             ablastr::fields::VectorField const& Bfield,

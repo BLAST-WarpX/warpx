@@ -18,6 +18,8 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 
+#include <cmath>
+
 /** \brief Scatter one particle's exact Boris electric-work current.
  *
  * This is the transpose of the Cartesian, collocated, direct
@@ -34,8 +36,11 @@
  * Host/device atomics protect shared nodes across CPU threads and GPU lanes,
  * but do not satisfy a CPU SIMD promise of independent loop iterations.
  * The three destination arrays must be collocated and have `field_type`.
- * Cylindrical/spherical coordinate transforms and their metric-weighted
- * adjoints are intentionally outside this first Cartesian implementation.
+ * In RZ (m=0), rotate the work velocity by the transpose of the gather's
+ * cylindrical-to-Cartesian rotation. The native RZ caller passes invvol=1,
+ * retaining integrated [C m/s] contributions until the metric-weighted
+ * pressure-gradient transpose divides by native caloric node volumes.
+ * Higher modes and other radial geometries remain unsupported.
  *
  * \tparam depos_order full particle shape order (0 through 4)
  */
@@ -59,9 +64,9 @@ void doBorisWorkCurrentDepositionShapeN (
     static_assert(depos_order >= 0 && depos_order <= 4,
         "Boris work-current deposition supports particle shape orders 0-4");
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     static_assert(depos_order < 0,
-        "Boris work-current deposition currently supports Cartesian geometry only");
+        "Boris work-current deposition supports Cartesian and m=0 RZ geometry only");
     amrex::ignore_unused(
         q_weight, work_velocity, jx_arr, jy_arr, jz_arr, field_type,
         dinv, xyzmin, invvol, lo);
@@ -69,17 +74,31 @@ void doBorisWorkCurrentDepositionShapeN (
     constexpr int NODE = amrex::IndexType::NODE;
     Compute_shape_factor<depos_order> const compute_shape_factor;
 
+#if defined(WARPX_DIM_RZ)
+    amrex::Real const radius = std::sqrt(xp*xp + yp*yp);
+    amrex::Real const cosine = radius > 0.0 ? xp / radius : 1.0;
+    amrex::Real const sine = radius > 0.0 ? yp / radius : 0.0;
+    amrex::Real const wqvx = static_cast<amrex::Real>(q_weight)
+        * (cosine * work_velocity.x + sine * work_velocity.y) * invvol;
+    amrex::Real const wqvy = static_cast<amrex::Real>(q_weight)
+        * (-sine * work_velocity.x + cosine * work_velocity.y) * invvol;
+#else
     amrex::Real const wqvx = static_cast<amrex::Real>(
         q_weight * work_velocity.x) * invvol;
     amrex::Real const wqvy = static_cast<amrex::Real>(
         q_weight * work_velocity.y) * invvol;
+#endif
     amrex::Real const wqvz = static_cast<amrex::Real>(
         q_weight * work_velocity.z) * invvol;
 
 #if !defined(WARPX_DIM_1D_Z)
     // Match the gather arithmetic and precision exactly: FieldGather.H forms
     // these coordinates and shape factors in amrex::Real.
+#if defined(WARPX_DIM_RZ)
+    amrex::Real const x = (radius - xyzmin.x) * dinv.x;
+#else
     amrex::Real const x = (xp - xyzmin.x) * dinv.x;
+#endif
     amrex::Real sx[depos_order + 1] = {0.0};
     int const j = compute_shape_factor(
         sx, x - (field_type[0] == NODE
@@ -111,7 +130,7 @@ void doBorisWorkCurrentDepositionShapeN (
         amrex::HostDevice::Atomic::Add(
             &jz_arr(lo.x + l + iz, 0, 0, 0), shape * wqvz);
     }
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
     for (int iz = 0; iz <= depos_order; ++iz) {
         for (int ix = 0; ix <= depos_order; ++ix) {
             amrex::Real const shape = sx[ix] * sz[iz];

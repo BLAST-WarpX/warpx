@@ -49,6 +49,8 @@ namespace
         return "2D_XZ";
 #elif defined(WARPX_DIM_3D)
         return "3D";
+#elif defined(WARPX_DIM_RZ)
+        return "RZ";
 #else
         return "unsupported";
 #endif
@@ -76,6 +78,13 @@ namespace
                 xyzmin.y + static_cast<amrex::Real>(gy) / dinv.y);
             particle.z = static_cast<amrex::ParticleReal>(
                 xyzmin.z + static_cast<amrex::Real>(gz) / dinv.z);
+#if defined(WARPX_DIM_RZ)
+            amrex::ParticleReal const radius = particle.x;
+            amrex::ParticleReal const angle = static_cast<amrex::ParticleReal>(ip)
+                * amrex::ParticleReal(0.731);
+            particle.x = radius * std::cos(angle);
+            particle.y = radius * std::sin(angle);
+#endif
 
             amrex::ParticleReal const sign =
                 (ip % 2 == 0) ? amrex::ParticleReal(1.0)
@@ -207,14 +216,14 @@ namespace
         };
 
         // Exercise actual host-thread contention in the OpenMP build.  GPU
-        // builds use the same ParallelFor launch as the fused particle pusher.
+        // builds use the same non-SIMD-promising For launch as the pusher.
 #if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
 #pragma omp parallel for schedule(static)
         for (int ip = 0; ip < num_particles; ++ip) {
             particle_operator(ip);
         }
 #else
-        amrex::ParallelFor(num_particles, particle_operator);
+        amrex::For(num_particles, particle_operator);
 #endif
 
         auto const particle_inner_product =
@@ -275,7 +284,7 @@ int main (int argc, char* argv[])
     amrex::Initialize(argc, argv);
     bool pass = true;
     {
-#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         pass = check_exact_case<1>(true) && pass;
         pass = check_exact_case<2>(true) && pass;
         pass = check_exact_case<3>(true) && pass;

@@ -4038,8 +4038,9 @@ Maxwell solver: kinetic-fluid hybrid
     Double field/particle precision, the evolved electron-energy equation,
     at most one material table, and all existing finite-volume geometry and
     particle-operation restrictions are required. In particular, material
-    boundaries must remain impermeable or periodic. The radial pressure-work
-    adjoint is still unsupported; selecting finite volumes alone does not
+    boundaries must remain impermeable or periodic. RZ pressure-work pairing
+    requires the separately guarded ``conservative_pressure_work_pec`` option;
+    selecting finite volumes alone does not
     establish exact ion/electron work closure. Ideal finite-volume checkpoints
     require their transport-model manifest and the same selection on restart.
 
@@ -4066,8 +4067,8 @@ Maxwell solver: kinetic-fluid hybrid
     clips energy nor changes the explicit method's CFL gate. Endpoint charge
     continuity, EOS-domain, source-realization, and boundary restrictions
     remain enforced. Backward-Euler transport is first-order and more diffusive;
-    timestep/resolution studies are required. It does not repair the separate
-    RZ pressure-work closure. Restart must preserve this distinct transport
+    timestep/resolution studies are required. It does not select the separate
+    RZ pressure-work pairing. Restart must preserve this distinct transport
     policy and its manifest.
 
 .. pp:param:: hybrid_pic_model.resolved_qei_support
@@ -4164,14 +4165,14 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``false``
     :optional:
 
-    Experimental 1D stationary-wall extension of
+    Experimental 1D and RZ stationary-wall extensions of
     :pp:param:`hybrid_pic_model.conservative_pressure_work`. It requires that
     option and all its other restrictions. Every nonperiodic direction must
     have PEC field boundaries and reflecting particle boundaries on both
     faces; periodic directions retain their existing behavior. The domain
     must span the work-current ghost support. This does not enable radiation
     transport at physical particle boundaries or support thermal reemission,
-    open particle loss, radial geometries, or moving walls.
+    open particle loss, RCYLINDER/RSPHERE, or moving walls.
 
     For this extension only, physical wall-node pressure remains the local EOS
     pressure. Even ghost reflection supplies the normal Neumann condition
@@ -4181,6 +4182,25 @@ Maxwell solver: kinetic-fluid hybrid
     Work-current deposits use its transpose boundary map, and the electron
     work debit includes the physical nodal control-volume weights. Existing
     boundary behavior is unchanged when this option is false.
+
+    The RZ extension requires ideal finite-volume electrons (explicit or
+    implicit remap), no material tables or EB, an axis-containing domain,
+    collocated fields, and zero Ampere plasma current. Nonzero plasma current
+    is rejected at the energy update until electromagnetic pressure-work
+    transfer is qualified. The outer radial face must be PEC/reflecting;
+    axial faces must both be periodic or both PEC/reflecting. The coordinate
+    axis is not a physical wall. The other pressure-work restrictions above
+    remain in force.
+
+    This explicitly selected RZ path uses a centered nodal pressure gradient,
+    rather than the legacy forward Yee difference on collocated fields. It
+    pairs the actual cylindrical gather with its rotated work-current scatter
+    and uses the native axis and wall-node caloric volumes exactly once.
+    Physical field ghosts are rebuilt after inter-FAB/periodic exchange so
+    axis corners use current data. ``HybridRZPressureWork.txt`` records the
+    pressure-work model, axis-volume correction and axial boundary policy;
+    restart must preserve them. It does not enable moving-moment radiation,
+    evolving material mixtures or magnetic pressure-energy coupling.
 
 .. pp:param:: hybrid_pic_model.electron_thermodynamics
     :type: ``string``
