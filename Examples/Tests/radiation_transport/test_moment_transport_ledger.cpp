@@ -6,7 +6,7 @@
 
 #include <AMReX.H>
 
-#include <cmath>
+#include <cstdint>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -33,8 +33,11 @@ main (int argc, char* argv[])
         MomentTransportAccounting increment;
         // A weak physical imbalance must survive large cancelling wall/stress
         // accounts, including checkpoint and subsequent continuation.
-        amrex::Real const large =
-            std::ldexp(amrex::Real(1), std::numeric_limits<amrex::Real>::digits + 2);
+        // Construct the exact power of two without ldexp: NVHPC 25.1's
+        // x86 optimizer can lower ldexp to an unsupported SCALEFS instruction.
+        static_assert(std::numeric_limits<amrex::Real>::digits + 2 < 64);
+        amrex::Real const large = static_cast<amrex::Real>(
+            std::uint64_t{1} << (std::numeric_limits<amrex::Real>::digits + 2));
         increment.boundary = {large, large, large, large};
         increment.geometric = increment.boundary;
         AMREX_ALWAYS_ASSERT(ledger.TryAccumulate(increment));
