@@ -1399,7 +1399,14 @@ void HybridPICModel::ReadParameters (
 
     pp_hybrid.query("electron_heat_conduction", m_electron_heat_conduction);
     if (m_electron_heat_conduction) {
-        pp_hybrid.get("electron_thermal_conductivity(rho,Te)", m_electron_conductivity_expression);
+        bool const simple_conductivity = pp_hybrid.contains("electron_thermal_conductivity(rho,Te)");
+        m_conductivity_uses_charge_moments =
+            pp_hybrid.contains("electron_thermal_conductivity(rho,Te,Zbar,Zeff)");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(simple_conductivity != m_conductivity_uses_charge_moments,
+            "Specify exactly one electron conductivity signature: (rho,Te) or (rho,Te,Zbar,Zeff).");
+        pp_hybrid.get(m_conductivity_uses_charge_moments
+            ? "electron_thermal_conductivity(rho,Te,Zbar,Zeff)"
+            : "electron_thermal_conductivity(rho,Te)", m_electron_conductivity_expression);
         utils::parser::queryWithParser(pp_hybrid, "electron_conduction_flux_limiter",
                                       m_electron_conduction_flux_limiter);
         pp_hybrid.query("electron_conduction_max_substeps", m_electron_conduction_max_substeps);
@@ -1694,6 +1701,14 @@ void HybridPICModel::AllocateLevelMFs (
             fields.alloc_init("hybrid_conduction_energy_fp", lev,
                 amrex::convert(ba, rho_nodal_flag), dm, ncomps, ngRho, 0.0_rt,
                 /*remake=*/true, /*redistribute_on_remake=*/true, /*checkpoint_restart=*/true);
+            if (m_conductivity_uses_charge_moments) {
+                for (auto const* name : {"hybrid_conduction_mean_charge_fp",
+                                         "hybrid_conduction_effective_charge_fp"}) {
+                    fields.alloc_init(name, lev, amrex::convert(ba, rho_nodal_flag),
+                        dm, ncomps, ngRho, 0.0_rt, /*remake=*/true,
+                        /*redistribute_on_remake=*/true, /*checkpoint_restart=*/true);
+                }
+            }
         }
         if (m_include_joule_heating) {
             // Realized electron-side Joule increments [J/m^3].  The step
@@ -2016,9 +2031,16 @@ void HybridPICModel::AllocateAuxiliaryLevelMFs (
 void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
 {
     if (m_electron_heat_conduction) {
-        m_electron_conductivity_parser = std::make_unique<amrex::Parser>(
-            utils::parser::makeParser(m_electron_conductivity_expression, {"rho", "Te"}));
-        m_electron_conductivity = m_electron_conductivity_parser->compile<2>();
+        if (m_conductivity_uses_charge_moments) {
+            m_electron_conductivity_parser = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(m_electron_conductivity_expression,
+                                         {"rho", "Te", "Zbar", "Zeff"}));
+            m_electron_composition_conductivity = m_electron_conductivity_parser->compile<4>();
+        } else {
+            m_electron_conductivity_parser = std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(m_electron_conductivity_expression, {"rho", "Te"}));
+            m_electron_conductivity = m_electron_conductivity_parser->compile<2>();
+        }
     }
     if (m_has_initial_elec_pressure) {
         m_initial_elec_pressure_parser = std::make_unique<amrex::Parser>(

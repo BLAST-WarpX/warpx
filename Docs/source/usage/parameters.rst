@@ -4566,11 +4566,37 @@ state model.
 .. pp:param:: hybrid_pic_model.electron_thermal_conductivity(rho,Te)
     :type: :ref:`parser_function <running-cpp-parameters-parser>`
 
-    Required with ``electron_heat_conduction=1``. Returns conductivity in
+    Supply this or the composition-dependent signature below (not both) with
+    ``electron_heat_conduction=1``. Returns conductivity in
     W/(m K), given physical charge density ``rho`` in C/m3 and electron
     temperature ``Te`` in eV. Values must be finite and nonnegative at every
     participating node. A constant expression is allowed. No calibrated
     material conductivity or evolving ionization model is supplied implicitly.
+
+.. pp:param:: hybrid_pic_model.electron_thermal_conductivity(rho,Te,Zbar,Zeff)
+    :type: :ref:`parser_function <running-cpp-parameters-parser>`
+    :optional:
+
+    Composition-dependent alternative, with the same units as above.
+    The dimensionless moments of depositing, fixed-charge positive ions are
+    ``Zbar = sum(Z_s*n_s)/sum(n_s)`` and
+    ``Zeff = sum(Z_s*Z_s*n_s)/sum(Z_s*n_s)``, where ``Z_s = q_s/q_e``.
+    ``Z_s`` is the prescribed simulation charge state, not an automatically
+    inferred nuclear charge or temperature-dependent ionization state.
+    These are different averages: they must not be substituted silently for
+    one another. Neutral/non-depositing species are excluded; this is not an
+    EOS mean charge including neutrals or a charge-state evolution model.
+    The physical species deposits must sum to total ion charge. Exact vacuum
+    has zero moments and does not evaluate the conductivity expression.
+
+    Charge moments are frozen with density over a conduction interval, while
+    the expression is reevaluated with each substep's electron temperature.
+    ``hybrid_conduction_mean_charge_fp`` and
+    ``hybrid_conduction_effective_charge_fp`` record the last evaluated nodal
+    moments (zero before the first interval) and are checkpointed. Restart
+    must preserve the selected signature; old two-argument checkpoints retain
+    their original contract. External parser constants and species charges
+    must also be preserved by the caller.
 
 .. pp:param:: hybrid_pic_model.electron_conduction_flux_limiter
     :type: ``float``

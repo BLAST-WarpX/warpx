@@ -2311,6 +2311,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Conductivity in W/(m K), required when conduction is enabled. Expressions
         accept ``rho`` in C/m^3 and ``Te`` in eV.
 
+    electron_thermal_conductivity_composition: float or str, optional
+        Alternative expression accepting ``rho,Te,Zbar,Zeff``. ``Zbar`` is the
+        ion-number-weighted mean charge and ``Zeff`` the charge-weighted charge
+        of the fixed-charge ion mixture. Mutually exclusive with
+        ``electron_thermal_conductivity``; no calibrated atomic model is implied.
+
     electron_conduction_flux_limiter: float, optional
         Lagged harmonic flux-limiter fraction in [0,1]; zero selects classical
         conduction. This is not a hard cap on the final implicit flux.
@@ -2463,6 +2469,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         electron_conduction_flux_limiter=None,
         electron_conduction_max_substeps=None,
         electron_conduction_verbosity=None,
+        electron_thermal_conductivity_composition=None,
         **kw,
     ):
         self.grid = grid
@@ -2492,6 +2499,16 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.conservative_pressure_work_pec = conservative_pressure_work_pec
         self.electron_heat_conduction = electron_heat_conduction
         self.electron_thermal_conductivity = electron_thermal_conductivity
+        self.electron_thermal_conductivity_composition = (
+            electron_thermal_conductivity_composition
+        )
+        if (
+            electron_thermal_conductivity is not None
+            and electron_thermal_conductivity_composition is not None
+        ):
+            raise ValueError(
+                "Specify only one electron thermal conductivity expression."
+            )
         self.electron_conduction_flux_limiter = electron_conduction_flux_limiter
         self.electron_conduction_max_substeps = electron_conduction_max_substeps
         self.electron_conduction_verbosity = electron_conduction_verbosity
@@ -2619,6 +2636,14 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                 "electron_thermal_conductivity(rho,Te)",
                 pywarpx.my_constants.mangle_expression(
                     str(self.electron_thermal_conductivity), self.mangle_dict
+                ),
+            )
+        if self.electron_thermal_conductivity_composition is not None:
+            pywarpx.hybridpicmodel.__setattr__(
+                "electron_thermal_conductivity(rho,Te,Zbar,Zeff)",
+                pywarpx.my_constants.mangle_expression(
+                    str(self.electron_thermal_conductivity_composition),
+                    self.mangle_dict,
                 ),
             )
         pywarpx.hybridpicmodel.substeps = self.substeps

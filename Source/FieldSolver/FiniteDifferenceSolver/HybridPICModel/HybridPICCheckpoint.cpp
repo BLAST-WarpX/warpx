@@ -112,7 +112,9 @@ void HybridPICModel::WriteMomentHistory (std::string const &directory) const
         }
         if (m_electron_heat_conduction) {
             std::ofstream conduction(directory + "/HybridElectronConduction.txt");
-            conduction << "ideal_isotropic_lagged_harmonic_v1 "
+            conduction << (m_conductivity_uses_charge_moments
+                ? "ideal_isotropic_charge_moments_lagged_harmonic_v1 "
+                : "ideal_isotropic_lagged_harmonic_v1 ")
                        << std::quoted(m_electron_conductivity_expression) << ' '
                        << std::setprecision(std::numeric_limits<amrex::Real>::max_digits10)
                        << m_electron_conduction_flux_limiter << '\n';
@@ -195,7 +197,9 @@ void HybridPICModel::ReadMomentHistory (std::string const &directory)
         std::string version, expression, trailing;
         amrex::Real limiter = -1;
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE((conduction >> version >> std::quoted(expression) >> limiter)
-            && version == "ideal_isotropic_lagged_harmonic_v1"
+            && version == (m_conductivity_uses_charge_moments
+                ? "ideal_isotropic_charge_moments_lagged_harmonic_v1"
+                : "ideal_isotropic_lagged_harmonic_v1")
             && expression == m_electron_conductivity_expression
             && limiter == m_electron_conduction_flux_limiter && !(conduction >> trailing),
             "Invalid or changed electron heat-conduction checkpoint contract.");

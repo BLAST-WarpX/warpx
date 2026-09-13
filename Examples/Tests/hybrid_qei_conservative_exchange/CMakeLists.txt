@@ -34,6 +34,16 @@ if(WarpX_LIB AND WarpX_PRECISION STREQUAL DOUBLE)
                 $<TARGET_FILE:${conduction_target}> test.invalid_conductivity=1)
         set_tests_properties(${conduction_target}_invalid PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1"
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix})
+        if(dim STREQUAL RZ)
+            add_test(NAME ${conduction_target}_invalid_composition
+                COMMAND ${Python_EXECUTABLE}
+                    ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+                    --expect-failure --expect "Electron charge moments require consistent" --
+                    $<TARGET_FILE:${conduction_target}> test.invalid_composition=1)
+            set_tests_properties(${conduction_target}_invalid_composition PROPERTIES
+                ENVIRONMENT "OMP_NUM_THREADS=1"
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix})
+        endif()
         if(WarpX_MPI)
             file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/conduction_${suffix}_mpi)
             add_test(NAME ${conduction_target}_mpi
@@ -93,6 +103,36 @@ if(RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL DOUBLE
             ENVIRONMENT "OMP_NUM_THREADS=1" PROCESSORS 2
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/species_rates_mpi)
     endif()
+    foreach(case native mpi ambiguous changed_signature)
+        if(case STREQUAL mpi AND NOT WarpX_MPI)
+            continue()
+        endif()
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/composition_conduction_${case})
+        set(composition_launch)
+        set(composition_args test.composition_conduction=1)
+        if(case STREQUAL mpi)
+            set(composition_launch ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS})
+        elseif(case STREQUAL ambiguous)
+            set(composition_launch ${Python_EXECUTABLE}
+                ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+                --expect-failure --expect "Specify exactly one electron conductivity signature" --)
+            list(APPEND composition_args test.ambiguous_conductivity=1)
+        elseif(case STREQUAL changed_signature)
+            set(composition_launch ${Python_EXECUTABLE}
+                ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+                --expect-failure --expect "Invalid or changed electron heat-conduction" --)
+            list(APPEND composition_args test.changed_conduction_signature=1)
+        endif()
+        add_test(NAME test_rz_composition_conduction_${case}
+            COMMAND ${composition_launch} $<TARGET_FILE:test_rz_species_qei_rates>
+                ${CMAKE_CURRENT_SOURCE_DIR}/inputs_species_rates ${composition_args})
+        set_tests_properties(test_rz_composition_conduction_${case} PROPERTIES
+            ENVIRONMENT "OMP_NUM_THREADS=1"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/composition_conduction_${case})
+        if(case STREQUAL mpi)
+            set_property(TEST test_rz_composition_conduction_${case} PROPERTY PROCESSORS 2)
+        endif()
+    endforeach()
     set(conduction_native_args warpx.const_dt=2.e-12
         hybrid_pic_model.electron_heat_conduction=1
         "hybrid_pic_model.electron_thermal_conductivity(rho,Te)=100"

@@ -133,12 +133,97 @@ faceConductivity (amrex::Real left, amrex::Real right, amrex::Real tl, amrex::Re
 }
 } // namespace
 
+void
+computeElectronChargeMoments (
+    amrex::MultiFab& mean_charge, amrex::MultiFab& effective_charge, amrex::MultiFab const& charge,
+    std::vector<std::pair<amrex::MultiFab const*, amrex::Real>> const& species)
+{
+    auto const compatible = [&] (amrex::MultiFab const& field)
+    {
+        return field.nComp() == 1 && field.boxArray() == charge.boxArray() &&
+               field.DistributionMap() == charge.DistributionMap();
+    };
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        charge.nComp() == 1 && charge.ixType().nodeCentered() && compatible(mean_charge) &&
+            compatible(effective_charge) && !species.empty() && &mean_charge != &effective_charge &&
+            &mean_charge != &charge && &effective_charge != &charge,
+        "Electron charge moments require matching nodal fields and charged species.");
+    mean_charge.setVal(0.0_rt);
+    effective_charge.setVal(0.0_rt);
+    amrex::MultiFab species_sum(charge.boxArray(), charge.DistributionMap(), 1, 0);
+    species_sum.setVal(0.0_rt);
+    for (auto const& entry : species)
+    {
+        auto const* density = entry.first;
+        auto const z = entry.second;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            density != nullptr && compatible(*density) && density != &mean_charge &&
+                density != &effective_charge && std::isfinite(z) && z > 0.0_rt &&
+                density->is_finite(0, 1, 0) && density->min(0) >= 0.0_rt,
+            "Electron charge moments require finite nonnegative species density and positive Z.");
+        for (amrex::MFIter mfi(mean_charge); mfi.isValid(); ++mfi)
+        {
+            auto const number = mean_charge.array(mfi);
+            auto const squared = effective_charge.array(mfi);
+            auto const sum = species_sum.array(mfi);
+            auto const rho_s = density->const_array(mfi);
+            amrex::ParallelFor(mfi.validbox(),
+                               [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                               {
+                                   number(i, j, k) += rho_s(i, j, k) / z;
+                                   squared(i, j, k) += rho_s(i, j, k) * z;
+                                   sum(i, j, k) += rho_s(i, j, k);
+                               });
+        }
+    }
+    for (amrex::MFIter mfi(mean_charge); mfi.isValid(); ++mfi)
+    {
+        auto const mean = mean_charge.array(mfi), effective = effective_charge.array(mfi);
+        auto const rho = charge.const_array(mfi), sum = species_sum.const_array(mfi);
+        amrex::ParallelFor(
+            mfi.validbox(),
+            [=] AMREX_GPU_DEVICE(int i, int j, int k)
+            {
+                auto const total = rho(i, j, k);
+                auto const scale = amrex::max(std::abs(total), std::abs(sum(i, j, k)));
+                bool const consistent =
+                    amrex::Math::isfinite(total) && total >= 0.0_rt &&
+                    amrex::Math::isfinite(sum(i, j, k)) && amrex::Math::isfinite(mean(i, j, k)) &&
+                    amrex::Math::isfinite(effective(i, j, k)) &&
+                    std::abs(total - sum(i, j, k)) <=
+                        512.0_rt * std::numeric_limits<amrex::Real>::epsilon() * scale;
+                if (!consistent ||
+                    (total > 0.0_rt && (mean(i, j, k) <= 0.0_rt || effective(i, j, k) <= 0.0_rt)))
+                {
+                    mean(i, j, k) = std::numeric_limits<amrex::Real>::quiet_NaN();
+                    effective(i, j, k) = std::numeric_limits<amrex::Real>::quiet_NaN();
+                }
+                else if (total == 0.0_rt)
+                {
+                    mean(i, j, k) = 0.0_rt;
+                    effective(i, j, k) = 0.0_rt;
+                }
+                else
+                {
+                    mean(i, j, k) = total / mean(i, j, k);
+                    effective(i, j, k) /= total;
+                }
+            });
+    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        mean_charge.is_finite(0, 1, 0) && effective_charge.is_finite(0, 1, 0),
+        "Electron charge moments require consistent total and species charge deposits.");
+}
+
 HeatConductionResult
 advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& realized_energy,
                                amrex::MultiFab const& charge, amrex::Geometry const& geometry,
                                amrex::Real const gamma, amrex::ParserExecutor<2> const conductivity,
                                amrex::Real const flux_limiter, amrex::Real const dt,
-                               int const maximum_substeps, amrex::Real const axis_volume_factor)
+                               int const maximum_substeps, amrex::Real const axis_volume_factor,
+                               amrex::MultiFab const* const mean_charge,
+                               amrex::MultiFab const* const effective_charge,
+                               amrex::ParserExecutor<4> const composition_conductivity)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         std::isfinite(dt) && dt >= 0.0_rt && std::isfinite(gamma) && gamma > 1.0_rt &&
@@ -151,6 +236,21 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
             realized_energy.DistributionMap() == temperature.DistributionMap() &&
             realized_energy.nComp() == 1,
         "Electron heat conduction needs a compatible ideal nodal state and finite controls.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        (mean_charge == nullptr) == (effective_charge == nullptr),
+        "Composition-dependent conduction requires both Zbar and Zeff fields.");
+    bool const use_composition = mean_charge != nullptr;
+    if (use_composition)
+    {
+        for (auto const* field : {mean_charge, effective_charge})
+        {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                field->nComp() == 1 && field->boxArray() == temperature.boxArray() &&
+                    field->DistributionMap() == temperature.DistributionMap() &&
+                    field->is_finite(0, 1, 0) && field->min(0) >= 0.0_rt,
+                "Composition-dependent conductivity needs matching finite charge moments.");
+        }
+    }
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::Abort("Electron heat conduction currently supports Cartesian and RZ geometries.");
 #endif
@@ -177,6 +277,10 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
         realized_energy.setVal(0.0_rt);
         return result;
     }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        use_composition ? static_cast<bool>(composition_conductivity)
+                        : static_cast<bool>(conductivity),
+        "Electron heat conduction requires a compiled parser for the selected signature.");
     auto const node_domain = amrex::surroundingNodes(geometry.Domain());
     HeatGeometry const metric{geometry.CellSizeArray(), geometry.isPeriodicArray(),
                               amrex::lbound(node_domain), amrex::ubound(node_domain),
@@ -218,16 +322,25 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
         {
             auto const out = kappa.array(mfi);
             auto const t = candidate.const_array(mfi), rho = density.const_array(mfi);
+            auto const zbar = use_composition ? mean_charge->const_array(mfi)
+                                              : amrex::Array4<amrex::Real const>{};
+            auto const zeff = use_composition ? effective_charge->const_array(mfi)
+                                              : amrex::Array4<amrex::Real const>{};
             amrex::ParallelFor(
                 mfi.validbox(),
                 [=] AMREX_GPU_DEVICE(int i, int j, int k)
                 {
-                    bool const valid = amrex::Math::isfinite(t(i, j, k)) && t(i, j, k) >= 0.0_rt;
+                    bool const valid = amrex::Math::isfinite(t(i, j, k)) && t(i, j, k) >= 0.0_rt &&
+                                       (!use_composition || rho(i, j, k) == 0.0_rt ||
+                                        (zbar(i, j, k) > 0.0_rt && zeff(i, j, k) > 0.0_rt));
+                    auto const te = t(i, j, k) * PhysConst::kb / PhysConst::q_e;
                     out(i, j, k) =
                         !valid ? std::numeric_limits<amrex::Real>::quiet_NaN()
                                : (rho(i, j, k) > 0.0_rt
-                                      ? conductivity(rho(i, j, k),
-                                                     t(i, j, k) * PhysConst::kb / PhysConst::q_e)
+                                      ? (use_composition
+                                             ? composition_conductivity(
+                                                   rho(i, j, k), te, zbar(i, j, k), zeff(i, j, k))
+                                             : conductivity(rho(i, j, k), te))
                                       : 0.0_rt);
                 });
         }

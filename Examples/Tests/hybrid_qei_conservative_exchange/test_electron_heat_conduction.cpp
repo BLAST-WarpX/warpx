@@ -88,8 +88,25 @@ main (int argc, char* argv[])
         amrex::DistributionMapping const dm(ba);
         amrex::MultiFab temperature(ba, dm, 1, 1), charge(ba, dm, 1, 1), delta(ba, dm, 1, 1);
         amrex::MultiFab saved(ba, dm, 1, 1), error(ba, dm, 1, 0);
+        amrex::MultiFab first_species(ba, dm, 1, 0), second_species(ba, dm, 1, 0);
+        amrex::MultiFab mean_charge(ba, dm, 1, 0), effective_charge(ba, dm, 1, 0);
         auto const density = capacity * (gamma_e - 1.0_rt) * PhysConst::q_e / PhysConst::kb;
         charge.setVal(density);
+        first_species.setVal(0.5_rt * density);
+        second_species.setVal(0.5_rt * density);
+        bool invalid_composition = false;
+        amrex::ParmParse("test").query("invalid_composition", invalid_composition);
+        if (invalid_composition)
+        {
+            charge.mult(2.0_rt, 0, 1, 0);
+        }
+        warpx::hybrid::computeElectronChargeMoments(
+            mean_charge, effective_charge, charge,
+            {{&first_species, 1.0_rt}, {&second_species, 2.0_rt}});
+        AMREX_ALWAYS_ASSERT(std::abs(mean_charge.min(0) - 4.0_rt / 3.0_rt) < 1.e-14_rt &&
+                            std::abs(mean_charge.max(0) - 4.0_rt / 3.0_rt) < 1.e-14_rt &&
+                            std::abs(effective_charge.min(0) - 1.5_rt) < 1.e-14_rt &&
+                            std::abs(effective_charge.max(0) - 1.5_rt) < 1.e-14_rt);
         temperature.setVal(-7.0_rt); // Physical ghosts must also survive a no-op unchanged.
         for (amrex::MFIter mfi(temperature); mfi.isValid(); ++mfi)
         {
@@ -111,6 +128,8 @@ main (int argc, char* argv[])
         }
         contact.setConstant("rho0", density);
         contact.registerVariables({"rho", "Te"});
+        amrex::Parser composition_contact("if(Te>0.08,if(Te<0.18,2000/Zeff,-1),-1)");
+        composition_contact.registerVariables({"rho", "Te", "Zbar", "Zeff"});
         bool invalid_conductivity = false;
         amrex::ParmParse("test").query("invalid_conductivity", invalid_conductivity);
         if (invalid_conductivity)
@@ -170,59 +189,81 @@ main (int argc, char* argv[])
         // A two-node thermal contact bounded by exact vacuum. The transverse
         // state is uniform, so the independent two-capacity solution applies
         // in every geometry, including the RZ axis and outer half-volumes.
-        for (auto const limiter : {0.0_rt, 0.001_rt})
+        for (bool const composition : {false, true})
         {
-            for (amrex::MFIter mfi(temperature); mfi.isValid(); ++mfi)
+            for (auto const limiter : {0.0_rt, 0.001_rt})
             {
-                auto const t = temperature.array(mfi), rho = charge.array(mfi);
-                amrex::ParallelFor(mfi.validbox(),
-                                   [=] AMREX_GPU_DEVICE(int i, int j, int k)
-                                   {
-                                       amrex::GpuArray<int, 3> const p{i, j, k};
-                                       int const z = p[axial_dir];
-                                       rho(i, j, k) =
-                                           z == 8 ? 2.0_rt * density : (z == 9 ? density : 0.0_rt);
-                                       t(i, j, k) = z == 8 ? 2000.0_rt : 1000.0_rt;
-                                   });
+                for (amrex::MFIter mfi(temperature); mfi.isValid(); ++mfi)
+                {
+                    auto const t = temperature.array(mfi), rho = charge.array(mfi);
+                    auto const first = first_species.array(mfi), second = second_species.array(mfi);
+                    amrex::ParallelFor(mfi.validbox(),
+                                       [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                                       {
+                                           amrex::GpuArray<int, 3> const p{i, j, k};
+                                           int const z = p[axial_dir];
+                                           rho(i, j, k) =
+                                               z == 8 ? (composition ? density : 2.0_rt * density)
+                                                      : (z == 9 ? density : 0.0_rt);
+                                           first(i, j, k) = z == 8 ? rho(i, j, k) : 0.0_rt;
+                                           second(i, j, k) = z == 9 ? rho(i, j, k) : 0.0_rt;
+                                           t(i, j, k) = z == 8 ? 2000.0_rt : 1000.0_rt;
+                                       });
+                }
+                auto const initial = inventory(temperature, charge, geometry);
+                if (composition)
+                {
+                    warpx::hybrid::computeElectronChargeMoments(
+                        mean_charge, effective_charge, charge,
+                        {{&first_species, 1.0_rt}, {&second_species, 2.0_rt}});
+                    AMREX_ALWAYS_ASSERT(mean_charge.min(0) == 0.0_rt &&
+                                        effective_charge.min(0) == 0.0_rt);
+                }
+                auto const result = warpx::hybrid::advanceElectronHeatConduction(
+                    temperature, delta, charge, geometry, gamma_e, contact.compile<2>(), limiter,
+                    1.e-6_rt, 256, 1.0_rt / 3.0_rt, composition ? &mean_charge : nullptr,
+                    composition ? &effective_charge : nullptr, composition_contact.compile<4>());
+                AMREX_ALWAYS_ASSERT(result.substeps == 1);
+                auto conductivity = 4000.0_rt / 3.0_rt; // Harmonic mean of 2000 and 1000.
+                if (limiter > 0)
+                {
+                    auto const thermal = PhysConst::kb * 1500.0_rt;
+                    auto const saturated_flux = limiter * density / PhysConst::q_e * thermal *
+                                                std::sqrt(thermal / PhysConst::m_e);
+                    conductivity =
+                        1.0_rt / (1.0_rt / conductivity + 1000.0_rt * axial_cells / saturated_flux);
+                }
+                auto const difference =
+                    1000.0_rt / (1.0_rt + (composition ? 2.0_rt : 1.5_rt) * conductivity *
+                                              1.e-6_rt * axial_cells * axial_cells / capacity);
+                for (amrex::MFIter mfi(error); mfi.isValid(); ++mfi)
+                {
+                    auto const out = error.array(mfi);
+                    auto const t = temperature.const_array(mfi);
+                    amrex::ParallelFor(
+                        mfi.validbox(),
+                        [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                        {
+                            amrex::GpuArray<int, 3> const p{i, j, k};
+                            int const z = p[axial_dir];
+                            auto const expected =
+                                composition
+                                    ? (z == 8 ? (3000.0_rt + difference) / 2.0_rt
+                                              : (z == 9 ? (3000.0_rt - difference) / 2.0_rt
+                                                        : 1000.0_rt))
+                                    : (z == 8 ? (5000.0_rt + difference) / 3.0_rt
+                                              : (z == 9 ? (5000.0_rt - 2.0_rt * difference) / 3.0_rt
+                                                        : 1000.0_rt));
+                            out(i, j, k) = std::abs(t(i, j, k) - expected) / 2000.0_rt;
+                        });
+                }
+                amrex::Print() << "Conduction contact: limiter=" << limiter
+                               << " composition=" << composition << " error=" << error.norm0(0, 0)
+                               << '\n';
+                AMREX_ALWAYS_ASSERT(error.norm0(0, 0) < 2.e-11_rt);
+                AMREX_ALWAYS_ASSERT(std::abs(inventory(temperature, charge, geometry) - initial) <
+                                    1.e-11_rt * initial);
             }
-            auto const initial = inventory(temperature, charge, geometry);
-            auto const result = warpx::hybrid::advanceElectronHeatConduction(
-                temperature, delta, charge, geometry, gamma_e, contact.compile<2>(), limiter,
-                1.e-6_rt, 256, 1.0_rt / 3.0_rt);
-            AMREX_ALWAYS_ASSERT(result.substeps == 1);
-            auto conductivity = 4000.0_rt / 3.0_rt; // Harmonic mean of 2000 and 1000.
-            if (limiter > 0)
-            {
-                auto const thermal = PhysConst::kb * 1500.0_rt;
-                auto const saturated_flux = limiter * density / PhysConst::q_e * thermal *
-                                            std::sqrt(thermal / PhysConst::m_e);
-                conductivity =
-                    1.0_rt / (1.0_rt / conductivity + 1000.0_rt * axial_cells / saturated_flux);
-            }
-            auto const difference = 1000.0_rt / (1.0_rt + 1.5_rt * conductivity * 1.e-6_rt *
-                                                              axial_cells * axial_cells / capacity);
-            for (amrex::MFIter mfi(error); mfi.isValid(); ++mfi)
-            {
-                auto const out = error.array(mfi);
-                auto const t = temperature.const_array(mfi);
-                amrex::ParallelFor(
-                    mfi.validbox(),
-                    [=] AMREX_GPU_DEVICE(int i, int j, int k)
-                    {
-                        amrex::GpuArray<int, 3> const p{i, j, k};
-                        int const z = p[axial_dir];
-                        auto const expected =
-                            z == 8
-                                ? (5000.0_rt + difference) / 3.0_rt
-                                : (z == 9 ? (5000.0_rt - 2.0_rt * difference) / 3.0_rt : 1000.0_rt);
-                        out(i, j, k) = std::abs(t(i, j, k) - expected) / 2000.0_rt;
-                    });
-            }
-            amrex::Print() << "Conduction contact: limiter=" << limiter
-                           << " error=" << error.norm0(0, 0) << '\n';
-            AMREX_ALWAYS_ASSERT(error.norm0(0, 0) < 2.e-11_rt);
-            AMREX_ALWAYS_ASSERT(std::abs(inventory(temperature, charge, geometry) - initial) <
-                                1.e-11_rt * initial);
         }
         temperature.setVal(1234.0_rt);
         auto const uniform = warpx::hybrid::advanceElectronHeatConduction(

@@ -676,6 +676,8 @@ public:
     std::string m_electron_conductivity_expression;
     std::unique_ptr<amrex::Parser> m_electron_conductivity_parser;
     amrex::ParserExecutor<2> m_electron_conductivity;
+    bool m_conductivity_uses_charge_moments = false;
+    amrex::ParserExecutor<4> m_electron_composition_conductivity;
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as

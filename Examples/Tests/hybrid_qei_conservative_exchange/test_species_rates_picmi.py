@@ -59,4 +59,28 @@ picmi.HybridPICSolver(grid=grid, Te=100).solver_initialize_inputs()
 assert not any("conduction" in name or "pressure_work" in name for name in inputs)
 assert "electron_energy_transport" not in inputs
 assert "electron_ion_relaxation_species" not in inputs
+
+composition_solver = picmi.HybridPICSolver(
+    grid=grid,
+    Te=100,
+    electron_heat_conduction=True,
+    electron_thermal_conductivity_composition="rate_scale*Te^2.5/(Zbar+Zeff)",
+    rate_scale=3,
+)
+composition_solver.solver_initialize_inputs()
+assert "electron_thermal_conductivity(rho,Te)" not in inputs
+assert inputs["electron_thermal_conductivity(rho,Te,Zbar,Zeff)"] == (
+    composition_solver.mangle_dict["rate_scale"] + "*Te^2.5/(Zbar+Zeff)"
+)
+try:
+    picmi.HybridPICSolver(
+        grid=grid,
+        Te=100,
+        electron_thermal_conductivity=1,
+        electron_thermal_conductivity_composition=2,
+    )
+except ValueError:
+    pass
+else:
+    raise AssertionError("Ambiguous conductivity signatures were accepted.")
 print("Material-energy PICMI input and constant-mangling contract PASS")

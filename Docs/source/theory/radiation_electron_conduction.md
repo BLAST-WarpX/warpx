@@ -43,6 +43,50 @@ deck. `electron_thermal_conductivity` omits the `(rho,Te)` suffix in Python.
 Numeric values and expressions both work; solver keyword constants are
 name-mangled consistently. Omitted controls do not change legacy defaults.
 
+## Fixed-charge composition dependence
+
+The optional `electron_thermal_conductivity(rho,Te,Zbar,Zeff)` signature can
+distinguish materials at equal charge density and temperature. Select exactly
+one conductivity signature. PICMI calls the new expression
+`electron_thermal_conductivity_composition`.
+
+For depositing positive fixed-charge ions, `Z_s=q_s/e`,
+`Zbar=sum(Z_s n_s)/sum(n_s)` and `Zeff=sum(Z_s^2 n_s)/sum(Z_s n_s)`.
+Species charge densities come from the same physical FV deposits as total
+charge, including the corrected RZ walls. The builder rejects inconsistent
+total/species charge, rather than adding a floor or inventing composition.
+Vacuum has zero moments and no conductivity evaluation. Neutral species are
+excluded: this is a charged-ion average, not the ionization fraction of a
+partly neutral gas. Mixture moments change as particles redistribute, but
+remain frozen with density during one heat-conduction interval.
+
+`hybrid_conduction_mean_charge_fp` and
+`hybrid_conduction_effective_charge_fp` expose the last evaluated nodal
+moments, initially zero. Their checkpoint fields and the distinct signature
+manifest preserve the interpretation on restart. The two-argument signature
+retains its existing manifest; external constants/charges remain the caller's
+responsibility.
+
+The local FLASH4.8 `ConductivityMain/SpitzerHighZ` implementation uses an EOS
+mean charge and its Coulomb-log model, while `Spitzer` uses a temperature
+power law. This motivates making composition available, not claiming a
+calibrated preset. The new interface deliberately exposes both different
+charge averages without choosing a high-Z atomic or mixing closure for the
+user. No FLASH source or new FLASH numerical result is included here.
+
+Bounded checks distinguish Zbar=4/3 from Zeff=3/2 for equal charge-density
+contributions with charges one and two. Vacuum-bounded contacts with **equal
+charge density but unequal conductivity** match independent two-capacity
+classical and limited solutions (normalized error below 2e-13 on local CPU).
+A native two-species case follows 50 finite Qei exchanges with composition-
+dependent conduction: temperature contrast decreases to 0.621 of its prior
+value, total-energy residual is 1.62e-13, and the disabled heavy-species
+velocities remain bitwise unchanged. MPI and signature/charge-consistency
+rejection gates pass in the focused CPU selection (15/15). These are operator
+and coupling contracts. The same focused local CUDA selection passes 15/15;
+Cartesian CPU serial/MPI operator checks pass 9/9. This is not front-propagation
+agreement with a FLASH fluid closure.
+
 ## Bounded results
 
 - A periodic Fourier mode loses more than half its initial amplitude over ten
