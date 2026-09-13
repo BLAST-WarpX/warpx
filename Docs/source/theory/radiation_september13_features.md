@@ -17,11 +17,17 @@ still blocks the affected feature; no assertion is relaxed to move past it.
 | Electron heat conduction | Conservative isotropic ideal-electron heat flux, lagged harmonic limiter, insulating/periodic faces | No nonlinear table-EOS/anisotropic/nonlocal conduction; bounded substep stiffness, not multigrid scalability |
 | Material-specific Qei rates | Named species overrides, global fallback, fixed-charge support, PICMI and restart manifest | User-supplied rates, not calibrated high-Z atomic/Coulomb-log physics |
 | Python input access | PICMI material-energy controls and constant-name mangling | The same C++ model/backend guards remain authoritative |
+| RZ particle-owned absorption recoil | Finite material work, local diagnostic projection, Cartesian carry ownership and elastic material-wall transfer | Absorption-only bounded-segment lab-frame model; no RZ moment transport, face-exact recoil or conversion momentum closure |
 
 The material additions support radiation-driven matter response; they are not
 themselves photon transport. In particular, conservative **electron pressure
 work** must not be mistaken for completion of **radiation momentum coupling**
 in every geometry.
+
+The follow-up RZ absorption/carry increment is described in
+[radiation_rz_particle_carry.md](radiation_rz_particle_carry.md). Its 256-step
+native-state energy check is distinct from its radiation-source ledger check;
+neither is a declaration of complete moving-frame or packet/diffusion coupling.
 
 ## Bounded evidence and defects found
 

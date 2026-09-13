@@ -65,6 +65,18 @@ namespace warpx::radiation
             amrex::Gpu::DeviceVector<Candidate> candidates;
             amrex::Gpu::DeviceVector<CarryPointers> carries;
         };
+
+        [[maybe_unused]] AMREX_GPU_HOST_DEVICE MaterialCarryReflection
+        ReflectCarry (amrex::GpuArray<amrex::Real, 4> const& values,
+                      Candidate const& candidate, bool thermalized = false, bool lost = false)
+        {
+#if defined(WARPX_DIM_RZ)
+            return EvaluateCylindricalMaterialCarryReflection(
+                values, candidate.reflected, candidate.position[1], thermalized, lost);
+#else
+            return EvaluateMaterialCarryReflection(values, candidate.reflected, thermalized, lost);
+#endif
+        }
     } // namespace
 
     bool TryReflectParticleImpulseState (
@@ -74,11 +86,11 @@ namespace warpx::radiation
     {
         auto const paths = RegisteredParticleImpulsePaths(species);
         if (paths.empty() || WarpX::do_moving_window || species.finestLevel() != 0 ||
-            species.Geom(0).Coord() != 0 || std::numeric_limits<amrex::Real>::digits < 53 ||
+            std::numeric_limits<amrex::Real>::digits < 53 ||
             std::numeric_limits<amrex::ParticleReal>::digits < 53) {
             return false;
         }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::ignore_unused(boundaries, transfers, accept);
         return false;
 #else
@@ -88,15 +100,30 @@ namespace warpx::radiation
         amrex::GpuArray<ParticleBoundaryType, 3> const upper_type{
             settings.xmax_bc, settings.ymax_bc, settings.zmax_bc};
         auto const &geometry = species.Geom(0);
+#if defined(WARPX_DIM_RZ)
+        // WarpX's compiled RZ geometry supplies the cylindrical interpretation;
+        // its AMReX Geometry need not carry CoordType::RZ.
+        if (geometry.ProbLo(0) != 0 || geometry.isPeriodic(0) ||
+            lower_type[0] != ParticleBoundaryType::None ||
+            upper_type[0] != ParticleBoundaryType::Reflecting) { return false; }
+#else
+        if (geometry.Coord() != 0) { return false; }
+#endif
         amrex::XDim3 lo{}, hi{};
         amrex::GpuArray<bool, 3> periodic{true, true, true};
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
 #if defined(WARPX_DIM_1D_Z)
             int const axis = 2;
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             int const axis = d == 0 ? 0 : 2;
 #else
             int const axis = d;
+#endif
+#if defined(WARPX_DIM_RZ)
+            if (d == 0) {
+                periodic[axis] = false;
+                continue;
+            }
 #endif
             auto const expected = geometry.isPeriodic(d) ? ParticleBoundaryType::Periodic
                                                          : ParticleBoundaryType::Reflecting;
@@ -165,12 +192,33 @@ namespace warpx::radiation
                 }
                 bool lost = false;
                 ApplyParticleBoundaries::BoundaryEvent event;
+#if defined(WARPX_DIM_RZ)
+                bool const outside = next.position[0] < lower[0] || next.position[0] > upper[0]
+                    || next.position[2] < lower[2] || next.position[2] > upper[2];
+                auto const cosine = std::cos(next.position[1]);
+                auto const sine = std::sin(next.position[1]);
+                if (outside) {
+                    auto const x = next.velocity[0];
+                    auto const y = next.velocity[1];
+                    next.velocity[0] = x * cosine + y * sine;
+                    next.velocity[1] = -x * sine + y * cosine;
+                }
+#endif
                 ApplyParticleBoundaries::apply_boundaries(
                     next.position[0], next.position[1], next.position[2], lo, hi, next.velocity[0],
                     next.velocity[1], next.velocity[2], lost, settings, engine, &event);
+#if defined(WARPX_DIM_RZ)
+                if (outside) {
+                    auto const radial = next.velocity[0];
+                    auto const azimuthal = next.velocity[1];
+                    next.velocity[0] = radial * cosine - azimuthal * sine;
+                    next.velocity[1] = radial * sine + azimuthal * cosine;
+                }
+#endif
                 next.reflected = event.coordinate_reflection;
                 for (int d = 0; d < 3; ++d) {
-                    next.valid = next.valid && (periodic[d] || (next.position[d] >= lower[d] &&
+                    next.valid = next.valid && amrex::Math::isfinite(next.velocity[d]) &&
+                        (periodic[d] || (next.position[d] >= lower[d] &&
                                                                 next.position[d] <= upper[d]));
                 }
                 for (int group = 0; group < count; ++group) {
@@ -178,8 +226,7 @@ namespace warpx::radiation
                     for (int d = 0; d < 4; ++d) {
                         values[d] = carry[group][d][ip];
                     }
-                    auto const candidate = EvaluateMaterialCarryReflection(values, next.reflected,
-                                                                           event.thermalized, lost);
+                    auto const candidate = ReflectCarry(values, next, event.thermalized, lost);
                     next.valid = next.valid && candidate.valid;
                     for (int d = 0; d < 3; ++d) {
                         next.valid =
@@ -208,11 +255,12 @@ namespace warpx::radiation
                         return {0, 0, 0, 0};
                     }
                     amrex::GpuArray<amrex::Real, 3> transfer{};
+                    amrex::GpuArray<amrex::Real, 4> values{};
+                    for (int d = 0; d < 4; ++d) { values[d] = carries[group][d][ip]; }
+                    auto const reflected = ReflectCarry(values, candidate);
                     for (int d = 0; d < 3; ++d) {
-                        if (candidate.reflected[d]) {
-                            transfer[d] =
-                                data.m_rdata[PIdx::w][ip] * mass * (2 * carries[group][d][ip]);
-                        }
+                        transfer[d] = data.m_rdata[PIdx::w][ip] * mass
+                            * reflected.boundary_transfer[d];
                     }
                     return {transfer[0], transfer[1], transfer[2], 1};
                 });
@@ -236,7 +284,7 @@ namespace warpx::radiation
         if (!accepted_by_caller) {
             return false;
         }
-        // Only exact sign changes are repeated here, not a force/work solve or sum.
+        // Repeat only the accepted reflection map, not a force/work solve or sum.
         for (auto const &trial : trials) {
             auto const *candidates = trial->candidates.data();
             auto const *carry = trial->carries.data();
@@ -246,18 +294,19 @@ namespace warpx::radiation
                 auto const &candidate = candidates[ip];
 #if defined(WARPX_DIM_1D_Z)
                 p.pos(0) = candidate.position[2];
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 p.pos(0) = candidate.position[0]; p.pos(1) = candidate.position[2];
 #else
                 for (int d = 0; d < 3; ++d) { p.pos(d) = candidate.position[d]; }
 #endif
                 for (int d = 0; d < 3; ++d) {
                     data.m_rdata[PIdx::ux + d][ip] = candidate.velocity[d];
-                    if (candidate.reflected[d]) {
-                        for (int group = 0; group < count; ++group) {
-                            carry[group][d][ip] = -carry[group][d][ip];
-                        }
-                    }
+                }
+                for (int group = 0; group < count; ++group) {
+                    amrex::GpuArray<amrex::Real, 4> values{};
+                    for (int d = 0; d < 4; ++d) { values[d] = carry[group][d][ip]; }
+                    auto const reflected = ReflectCarry(values, candidate);
+                    for (int d = 0; d < 3; ++d) { carry[group][d][ip] = reflected.carry[d]; }
                 }
             });
         }

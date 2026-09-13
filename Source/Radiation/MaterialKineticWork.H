@@ -125,6 +125,42 @@ namespace warpx::radiation
         return result;
     }
 
+    /** Elastic reflection of a Cartesian carry at a cylindrical material wall.
+     * Event flags are in (r,theta,z), while storage and wall transfer remain
+     * Cartesian. Interior particles and a simultaneous transverse sign reversal
+     * avoid a coordinate round trip. The scalar pending work is invariant.
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE MaterialCarryReflection
+    EvaluateCylindricalMaterialCarryReflection (
+        amrex::GpuArray<amrex::Real, 4> const& carry,
+        amrex::GpuArray<bool, 3> const& reflection,
+        amrex::Real theta, bool thermalized, bool lost) noexcept
+    {
+        auto result = EvaluateMaterialCarryReflection(carry, {false, false, reflection[2]},
+                                                       thermalized, lost);
+        if (!result.valid || !amrex::Math::isfinite(theta)) { return {}; }
+        if (reflection[0] == reflection[1]) {
+            if (reflection[0]) {
+                result.carry[0] = -carry[0];
+                result.carry[1] = -carry[1];
+            }
+        } else {
+            auto const cosine = std::cos(theta);
+            auto const sine = std::sin(theta);
+            auto const nx = reflection[0] ? cosine : -sine;
+            auto const ny = reflection[0] ? sine : cosine;
+            auto const projection = carry[0] * nx + carry[1] * ny;
+            result.carry[0] = carry[0] - 2 * projection * nx;
+            result.carry[1] = carry[1] - 2 * projection * ny;
+        }
+        for (int d = 0; d < 2; ++d) {
+            result.boundary_transfer[d] = carry[d] - result.carry[d];
+            if (!amrex::Math::isfinite(result.carry[d]) ||
+                !amrex::Math::isfinite(result.boundary_transfer[d])) { return {}; }
+        }
+        return result;
+    }
+
     /** Pure candidate for a particle-owned radiation impulse. All vectors are
      * Cartesian proper velocities or impulses divided by particle rest mass.
      * No mesh reservoir, particle state or diagnostic is mutated. The caller

@@ -79,8 +79,12 @@ namespace warpx::radiation
     amrex::GpuArray<amrex::Real, 4>
     ParticleImpulseInventory (MultiParticleContainer& particles,
                               std::vector<std::string> const& species_names,
-                              std::string const& path)
+                              std::string const& path, bool local_cylindrical)
     {
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!local_cylindrical,
+            "Local cylindrical carry inventory requires RZ or RCYLINDER.");
+#endif
         auto const attributes = AttributeNames(path);
         amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum,
                          amrex::ReduceOpSum, amrex::ReduceOpSum> ops;
@@ -95,6 +99,9 @@ namespace warpx::radiation
             for (WarpXParIter iterator(species, 0); iterator.isValid(); ++iterator)
             {
                 auto const* weight = iterator.GetStructOfArrays().GetRealData(PIdx::w).dataPtr();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                auto const* theta = iterator.GetStructOfArrays().GetRealData(PIdx::theta).dataPtr();
+#endif
                 amrex::GpuArray<amrex::ParticleReal const*, 4> carry{};
                 for (int d = 0; d < 4; ++d)
                 {
@@ -103,6 +110,16 @@ namespace warpx::radiation
                 ops.eval(iterator.numParticles(), data, [=] AMREX_GPU_DEVICE (long ip) -> Tuple
                 {
                     auto const weighted_mass = weight[ip] * mass;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                    if (local_cylindrical) {
+                        auto const angle = static_cast<amrex::Real>(theta[ip]);
+                        auto const cosine = std::cos(angle);
+                        auto const sine = std::sin(angle);
+                        return {weighted_mass * (carry[0][ip] * cosine + carry[1][ip] * sine),
+                                weighted_mass * (-carry[0][ip] * sine + carry[1][ip] * cosine),
+                                weighted_mass * carry[2][ip], weighted_mass * carry[3][ip]};
+                    }
+#endif
                     return {weighted_mass * carry[0][ip], weighted_mass * carry[1][ip],
                             weighted_mass * carry[2][ip], weighted_mass * carry[3][ip]};
                 });

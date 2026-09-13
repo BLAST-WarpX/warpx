@@ -50,10 +50,13 @@ namespace warpx::radiation
      * This does not enable a radiation model or migrate old cell-owned state. */
     void RegisterParticleImpulseState (WarpXParticleContainer& species, std::string const& path);
 
-    /** Global Cartesian pending impulse [kg m/s] and pending work [J]. */
+    /** Pending impulse [kg m/s] and pending work [J]. By default momentum is
+     * global Cartesian. The optional cylindrical projection sums local (r,theta,z)
+     * components at current particle positions; it is not a conserved global vector.
+     */
     amrex::GpuArray<amrex::Real, 4> ParticleImpulseInventory (
         MultiParticleContainer& particles, std::vector<std::string> const& species_names,
-        std::string const& path);
+        std::string const& path, bool local_cylindrical = false);
 
     /** Stage a material impulse without mutating any live particle or reservoir.
      * The particle layout and velocities must remain unchanged between Stage and

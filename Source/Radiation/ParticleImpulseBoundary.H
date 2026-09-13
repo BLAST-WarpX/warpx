@@ -24,7 +24,10 @@ namespace warpx::radiation
 
     std::vector<std::string> RegisteredParticleImpulsePaths(WarpXParticleContainer &species);
 
-    /** Native elastic Cartesian reflection plus all registered radiation carries.
+    /** Native elastic Cartesian or axis-containing RZ reflection with radiation carries.
+     * RZ requires a reflecting outer radial wall and periodic or reflecting axial
+     * faces. Event directions are cylindrical, but carry and transfer are Cartesian.
+     * This adapter does not enable radial radiation moment transport.
      * Stage the complete container and direct event transfers before committing.
      * Failure leaves particles and the supplied transfer vector unchanged.
      * Success does not redistribute particles or accumulate a persistent ledger.

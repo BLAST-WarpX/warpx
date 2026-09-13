@@ -136,7 +136,7 @@ public:
     [[nodiscard]] amrex::Real lastMaterialCarryEnergyChange () const noexcept
     { return m_last_material_carry_energy_change; }
     [[nodiscard]] amrex::GpuArray<amrex::Real, 4> pendingMaterialImpulse (
-        MultiParticleContainer& particles, bool streaming) const;
+        MultiParticleContainer& particles, bool streaming, bool local_cylindrical = false) const;
 
     /** Record whether a versioned restart checkpoint declares momentum-carry
      * fields. This is set from WarpXHeader before per-level fields allocate. */

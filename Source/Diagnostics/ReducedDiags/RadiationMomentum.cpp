@@ -145,8 +145,13 @@ void RadiationMomentum::ComputeDiags (int const step)
     auto const& radiation = warpx.GetRadiationTransport();
     if (radiation.usesParticleMomentumCarry()) {
         auto& particles = warpx.GetPartContainer();
-        auto const streaming = radiation.pendingMaterialImpulse(particles, true);
-        auto const diffusion = radiation.pendingMaterialImpulse(particles, false);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        constexpr bool local_cylindrical = true;
+#else
+        constexpr bool local_cylindrical = false;
+#endif
+        auto const streaming = radiation.pendingMaterialImpulse(particles, true, local_cylindrical);
+        auto const diffusion = radiation.pendingMaterialImpulse(particles, false, local_cylindrical);
         for (int d = 0; d < 3; ++d) {
             pending_streaming_impulse[d] = streaming[d];
             pending_diffusion_impulse[d] = diffusion[d];

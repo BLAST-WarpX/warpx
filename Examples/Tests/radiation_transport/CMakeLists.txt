@@ -1071,6 +1071,88 @@ if(WarpX_LIB)
         NAME test_radiation_kinetic_energy_update
         COMMAND test_radiation_kinetic_energy_update)
 
+    if(RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL "DOUBLE"
+       AND WarpX_PARTICLE_PRECISION STREQUAL "DOUBLE")
+        add_executable(test_rz_particle_impulse test_rz_particle_impulse.cpp)
+        target_link_libraries(test_rz_particle_impulse PRIVATE lib_rz)
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(test_rz_particle_impulse)
+            target_compile_features(test_rz_particle_impulse PRIVATE cuda_std_20)
+        else()
+            target_compile_features(test_rz_particle_impulse PRIVATE cxx_std_20)
+        endif()
+        warpx_set_compile_warnings(test_rz_particle_impulse)
+        set(rz_impulse_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_particle_impulse")
+        file(MAKE_DIRECTORY ${rz_impulse_dir})
+        foreach(input IN ITEMS inputs_base_rz_particle_impulse inputs_base_1d_particle_impulse)
+            configure_file(${input} ${rz_impulse_dir}/${input} COPYONLY)
+        endforeach()
+        add_test(NAME test_rz_particle_impulse
+            COMMAND test_rz_particle_impulse inputs_base_rz_particle_impulse)
+        set_tests_properties(test_rz_particle_impulse PROPERTIES
+            WORKING_DIRECTORY ${rz_impulse_dir}
+            ENVIRONMENT "OMP_NUM_THREADS=2")
+        add_test(NAME test_rz_particle_impulse_corners
+            COMMAND test_rz_particle_impulse inputs_base_rz_particle_impulse
+                "boundary.field_lo=none pec" "boundary.field_hi=pec pec"
+                "boundary.particle_lo=none reflecting"
+                "boundary.particle_hi=reflecting reflecting")
+        set_tests_properties(test_rz_particle_impulse_corners PROPERTIES
+            WORKING_DIRECTORY ${rz_impulse_dir}
+            ENVIRONMENT "OMP_NUM_THREADS=2" RUN_SERIAL TRUE)
+        if(WarpX_MPI)
+            add_test(NAME test_rz_particle_impulse_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+                    ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_rz_particle_impulse>
+                    ${MPIEXEC_POSTFLAGS} inputs_base_rz_particle_impulse)
+            set_tests_properties(test_rz_particle_impulse_mpi PROPERTIES
+                WORKING_DIRECTORY ${rz_impulse_dir}
+                PROCESSORS 2 ENVIRONMENT "OMP_NUM_THREADS=1"
+                RUN_SERIAL TRUE)
+        endif()
+        set(rz_carry_runtime_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_carry_runtime")
+        file(MAKE_DIRECTORY ${rz_carry_runtime_dir})
+        foreach(input IN ITEMS inputs_test_rz_radiation_transport_particle_carry
+                               inputs_test_rz_radiation_transport_absorption_momentum)
+            configure_file(${input} ${rz_carry_runtime_dir}/${input} COPYONLY)
+        endforeach()
+        add_test(NAME test_rz_particle_carry_native_energy
+            COMMAND test_rz_particle_impulse inputs_test_rz_radiation_transport_particle_carry
+                test.radiation_runtime=1)
+        set_tests_properties(test_rz_particle_carry_native_energy PROPERTIES
+            WORKING_DIRECTORY ${rz_carry_runtime_dir} ENVIRONMENT "OMP_NUM_THREADS=2")
+        foreach(unsupported IN ITEMS diffusion exact)
+            if(unsupported STREQUAL diffusion)
+                set(carry_reject_arg radiation_transport.enable_diffusion=1
+                    radiation_transport.rosseland_transport_coefficient=10)
+                set(carry_reject_message "RZ particle-owned radiation carry currently requires")
+            else()
+                set(carry_reject_arg radiation_transport.require_cell_interface_exact_streaming=1)
+                set(carry_reject_message "Face-exact RZ streaming is incompatible")
+            endif()
+            add_test(NAME test_rz_particle_carry_rejects_${unsupported}
+                COMMAND ${Python_EXECUTABLE}
+                    ${WarpX_SOURCE_DIR}/Examples/Tests/implicit/check_command_output.py
+                    --expect-failure --expect "${carry_reject_message}"
+                    -- $<TARGET_FILE:test_rz_particle_impulse>
+                    inputs_test_rz_radiation_transport_particle_carry
+                    test.radiation_runtime=1 ${carry_reject_arg} amrex.throw_exception=1)
+            set_tests_properties(test_rz_particle_carry_rejects_${unsupported} PROPERTIES
+                WORKING_DIRECTORY ${rz_carry_runtime_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=1" RUN_SERIAL TRUE)
+        endforeach()
+        if(WarpX_MPI)
+            add_test(NAME test_rz_particle_carry_native_energy_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+                    ${MPIEXEC_PREFLAGS} $<TARGET_FILE:test_rz_particle_impulse>
+                    ${MPIEXEC_POSTFLAGS} inputs_test_rz_radiation_transport_particle_carry
+                    test.radiation_runtime=1)
+            set_tests_properties(test_rz_particle_carry_native_energy_mpi PROPERTIES
+                WORKING_DIRECTORY ${rz_carry_runtime_dir}
+                PROCESSORS 2 ENVIRONMENT "OMP_NUM_THREADS=1" RUN_SERIAL TRUE)
+        endif()
+    endif()
+
     add_executable(
         test_radial_face_marching
         test_radial_face_marching.cpp)
@@ -2934,6 +3016,15 @@ if(WarpX_PRECISION STREQUAL "DOUBLE"
         "analysis_momentum.py"  # analysis
         OFF  # checksum
         OFF  # dependency
+    )
+    add_warpx_test(
+        test_rz_radiation_transport_particle_carry
+        RZ
+        1
+        inputs_test_rz_radiation_transport_particle_carry
+        "analysis_rz_particle_carry.py"
+        OFF
+        OFF
     )
     add_warpx_test(
         test_3d_radiation_transport_absorption_momentum  # name

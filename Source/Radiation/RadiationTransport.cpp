@@ -4476,16 +4476,37 @@ RadiationTransport::RadiationTransport (
         if (m_particle_momentum_carry) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(couplesToHybridElectrons(),
                 "Particle-owned radiation carry currently requires native hybrid electrons.");
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             amrex::Abort("Particle-owned radiation carry runtime is initially Cartesian only; "
                          "radial boundary and diagnostic projection qualification is pending.");
 #endif
+#if defined(WARPX_DIM_RZ)
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_enable_diffusion && !m_enable_lte_exchange && !m_enable_particle_conversion
+                    && configured_max_level == 0 && !EB::enabled()
+                    && WarpX::n_rz_azimuthal_modes == 1
+                    && WarpX::particle_boundary_lo[0] == ParticleBoundaryType::None
+                    && WarpX::particle_boundary_hi[0] == ParticleBoundaryType::Reflecting,
+                "RZ particle-owned radiation carry currently requires absorption-only transport, "
+                "one azimuthal mode, level zero, no EB and an axis/reflecting radial domain. "
+                "Moment transport, LTE and packet/diffusion conversion are not qualified.");
+#endif
             for (int direction = 0; direction < AMREX_SPACEDIM; ++direction) {
+#if defined(WARPX_DIM_RZ)
+                if (direction == 0) { continue; }
+                bool const reflecting =
+                    WarpX::particle_boundary_lo[direction] == ParticleBoundaryType::Reflecting &&
+                    WarpX::particle_boundary_hi[direction] == ParticleBoundaryType::Reflecting;
+#else
+                constexpr bool reflecting = false;
+#endif
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    WarpX::particle_boundary_lo[direction] == ParticleBoundaryType::Periodic &&
-                    WarpX::particle_boundary_hi[direction] == ParticleBoundaryType::Periodic,
+                    reflecting ||
+                    (WarpX::particle_boundary_lo[direction] == ParticleBoundaryType::Periodic &&
+                     WarpX::particle_boundary_hi[direction] == ParticleBoundaryType::Periodic),
                     "Particle-owned radiation carry initially requires periodic particle "
-                    "boundaries until exported/reflected residuals are accounted for.");
+                    "boundaries (or qualified RZ reflecting faces); loss and thermalization "
+                    "are unsupported.");
             }
             std::vector<std::string> collisions;
             amrex::ParmParse("collisions").queryarr("collision_names", collisions);
@@ -4555,17 +4576,18 @@ RadiationTransport::RadiationTransport (
 }
 
 amrex::GpuArray<amrex::Real, 4>
-RadiationTransport::pendingMaterialImpulse (MultiParticleContainer& particles, bool streaming) const
+RadiationTransport::pendingMaterialImpulse (
+    MultiParticleContainer& particles, bool streaming, bool local_cylindrical) const
 {
     amrex::GpuArray<amrex::Real, 4> total{};
     if (!m_particle_momentum_carry) { return total; }
     if (streaming) {
         return warpx::radiation::ParticleImpulseInventory(
-            particles, m_momentum_species, "streaming");
+            particles, m_momentum_species, "streaming", local_cylindrical);
     }
     for (int group = 0; group < m_num_groups; ++group) {
         auto const values = warpx::radiation::ParticleImpulseInventory(
-            particles, m_momentum_species, "diffusion_" + std::to_string(group));
+            particles, m_momentum_species, "diffusion_" + std::to_string(group), local_cylindrical);
         for (int d = 0; d < 4; ++d) { total[d] += values[d]; }
     }
     return total;
@@ -6081,6 +6103,10 @@ RadiationTransport::Advance (
             "requires an axis-containing cylindrical domain with "
             "geometry.prob_lo[0]==0.");
     }
+#endif
+#if defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_particle_momentum_carry || warpx.Geom(0).ProbLo(0) == 0,
+        "RZ particle-owned radiation carry requires an axis-containing domain.");
 #endif
 
     m_last_boundary_energy_loss = 0.0_rt;
