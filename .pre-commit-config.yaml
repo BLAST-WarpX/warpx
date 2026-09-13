@@ -54,6 +54,12 @@ repos:
     language: python
     pass_filenames: false
     files: '(^|/)CMakeLists\.txt$|^Examples/.*/inputs_(test|base)_|^\.github/workflows/source/check_inputs\.py$|^\.pre-commit-config\.yaml$'
+  - id: check-radiation-document-navigation
+    name: check radiation document navigation
+    entry: python .github/workflows/source/check_radiation_docs.py
+    language: python
+    pass_filenames: false
+    files: '^Docs/source/theory/radiation_.*\.md$|^\.github/workflows/source/check_radiation_docs\.py$|^\.pre-commit-config\.yaml$'
 
 # documentation files: .rst
 - repo: https://github.com/pre-commit/pygrep-hooks
