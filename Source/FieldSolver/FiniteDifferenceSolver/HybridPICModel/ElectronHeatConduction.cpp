@@ -16,6 +16,7 @@
 
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 namespace warpx::hybrid
 {
@@ -28,6 +29,7 @@ fillInsulatingGhosts (amrex::MultiFab& field, amrex::Geometry const& geometry)
 {
     ablastr::utils::communication::FillBoundary(field, field.nGrowVect(), false,
                                                 geometry.periodicity(), true);
+    if (geometry.isAllPeriodic()) { return; }
     auto const domain = amrex::convert(geometry.Domain(), field.ixType());
     auto const periodic = geometry.isPeriodicArray();
     for (amrex::MFIter mfi(field); mfi.isValid(); ++mfi)
@@ -270,8 +272,6 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
     amrex::Abort("Electron heat conduction currently supports Cartesian and RZ geometries.");
 #endif
 #if defined(WARPX_DIM_RZ)
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!nonlinear,
-        "Nonideal electron conduction is initially qualified only in Cartesian geometry.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         geometry.ProbLo(0) == 0.0_rt &&
             (axis_volume_factor == 1.0_rt / 3.0_rt || axis_volume_factor == 1.0_rt / 4.0_rt),
@@ -357,8 +357,10 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(capacity.is_finite() && old_energy.is_finite(),
                 "Nonlinear conduction received an invalid EOS state or nonpositive heat capacity.");
         }
-        ablastr::utils::communication::FillBoundary(candidate, candidate.nGrowVect(), false,
-                                                    geometry.periodicity(), true);
+        // Define physical as well as periodic ghosts before the nonlinear
+        // solver validates its input. Native arena reuse can otherwise expose
+        // uninitialized insulating ghosts even with valid interior temperatures.
+        fillInsulatingGhosts(candidate, geometry);
         for (amrex::MFIter mfi(kappa); mfi.isValid(); ++mfi)
         {
             auto const out = kappa.array(mfi);
@@ -456,18 +458,30 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
         // solver's iteration, positivity, residual or energy-inventory gates.
         if (nonlinear) {
             bool accepted = false;
+            NonlinearHeatSolveResult last_solve;
             for (int refinement = 0; refinement <= 20; ++refinement) {
                 auto const solve = tryNonlinearHeatConduction(candidate, energy, old_energy,
                     density, outgoing, incoming, volume, geometry, eos, material_mass_density);
                 result.iterations += solve.iterations;
+                last_solve = solve;
                 if (solve.valid) { accepted = true; break; }
                 ++result.rejected_steps;
                 step *= 0.5_rt;
                 incoming.mult(0.5_rt, 0, incoming.nComp(), 0);
                 outgoing.mult(0.5_rt, 0, 1, 0);
             }
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(accepted && remaining-step < remaining,
-                "Nonlinear conduction exhausted its retry budget; live temperature is unchanged.");
+            auto const failure_message = [&last_solve] () {
+                std::ostringstream message;
+                message.precision(8);
+                message << std::scientific
+                    << "Nonlinear conduction exhausted its retry budget; live temperature is unchanged. "
+                    << "Failure (1=input,2=local solve,3=iterations,4=energy)="
+                    << static_cast<int>(last_solve.failure)
+                    << ", equation residual=" << last_solve.residual
+                    << ", energy residual=" << last_solve.energy_residual;
+                return message.str();
+            };
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(accepted && remaining-step < remaining, failure_message());
         } else {
             result.iterations +=
                 implicitChargeEnergyRemap(energy, old_energy, capacity, outgoing, incoming, volume,

@@ -3,6 +3,114 @@
 
 find_package(Python REQUIRED COMPONENTS Interpreter)
 
+if(WarpX_LIB AND RZ IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL DOUBLE)
+    add_executable(test_rz_native_conduction test_rz_native_conduction.cpp)
+    target_link_libraries(test_rz_native_conduction PRIVATE lib_rz)
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        setup_target_for_cuda_compilation(test_rz_native_conduction)
+        target_compile_features(test_rz_native_conduction PRIVATE cuda_std_20)
+    else()
+        target_compile_features(test_rz_native_conduction PRIVATE cxx_std_20)
+    endif()
+    warpx_set_compile_warnings(test_rz_native_conduction)
+    set(rz_native_cases serial mpi)
+    if(WarpX_SINGULARITY_EOS)
+        list(APPEND rz_native_cases table_serial table_mpi)
+        set(rz_table_fixture_dir "${CMAKE_CURRENT_BINARY_DIR}/nonlinear_conduction_fixture")
+        set(rz_table_fixture "${rz_table_fixture_dir}/electron_only_fixture.sp5")
+        if(NOT 1 IN_LIST WarpX_DIMS)
+            add_test(NAME nonlinear_conduction_eos_fixture
+                COMMAND ${CMAKE_COMMAND} -E env
+                    "WARPX_SPINER_FIXTURE_PATH=${rz_table_fixture}"
+                    "WARPX_SPINER_FIXTURE_NUM_T=512"
+                    $<TARGET_FILE:test_hybrid_electron_thermodynamics_spiner>)
+            set_tests_properties(nonlinear_conduction_eos_fixture PROPERTIES
+                FIXTURES_SETUP nonlinear_conduction_eos_fixture ENVIRONMENT "OMP_NUM_THREADS=2")
+        endif()
+    endif()
+    foreach(native_case IN LISTS rz_native_cases)
+        if(native_case MATCHES "mpi$" AND NOT WarpX_MPI)
+            continue()
+        endif()
+        set(native_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_native_conduction_${native_case}")
+        file(MAKE_DIRECTORY ${native_dir})
+        set(native_launcher)
+        set(native_postflags)
+        set(native_input inputs_rz_native_nonlinear_conduction)
+        set(native_arguments)
+        if(native_case MATCHES "^table")
+            set(native_input inputs_rz_native_table_conduction)
+            list(APPEND native_arguments "hybrid_pic_model.electron_eos_ions_table_file=${rz_table_fixture}")
+        endif()
+        if(native_case MATCHES "mpi$")
+            set(native_launcher ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS})
+            set(native_postflags ${MPIEXEC_POSTFLAGS})
+        endif()
+        add_test(NAME test_rz_native_conduction_${native_case}.run COMMAND ${native_launcher}
+            $<TARGET_FILE:test_rz_native_conduction> ${native_postflags} ${native_input} ${native_arguments}
+            amrex.abort_on_unused_inputs=1)
+        set_tests_properties(test_rz_native_conduction_${native_case}.run PROPERTIES
+            WORKING_DIRECTORY ${native_dir} FIXTURES_SETUP rz_native_conduction_${native_case}
+            ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        if(native_case MATCHES "^table")
+            set_tests_properties(test_rz_native_conduction_${native_case}.run PROPERTIES
+                FIXTURES_REQUIRED nonlinear_conduction_eos_fixture)
+        endif()
+        if(native_case MATCHES "mpi$")
+            set_tests_properties(test_rz_native_conduction_${native_case}.run PROPERTIES PROCESSORS 2 RUN_SERIAL TRUE)
+        endif()
+        add_test(NAME test_rz_native_conduction_${native_case}.analysis COMMAND ${Python_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/analysis_rz_native_conduction.py ${native_dir})
+        set_tests_properties(test_rz_native_conduction_${native_case}.analysis PROPERTIES
+            FIXTURES_REQUIRED rz_native_conduction_${native_case})
+    endforeach()
+    add_executable(test_rz_nonlinear_electron_conduction test_nonlinear_electron_conduction.cpp)
+    target_link_libraries(test_rz_nonlinear_electron_conduction PRIVATE lib_rz)
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        setup_target_for_cuda_compilation(test_rz_nonlinear_electron_conduction)
+        target_compile_features(test_rz_nonlinear_electron_conduction PRIVATE cuda_std_20)
+    else()
+        target_compile_features(test_rz_nonlinear_electron_conduction PRIVATE cxx_std_20)
+    endif()
+    warpx_set_compile_warnings(test_rz_nonlinear_electron_conduction)
+    set(rz_nonlinear_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_nonlinear_conduction")
+    file(MAKE_DIRECTORY ${rz_nonlinear_dir})
+    add_test(NAME test_rz_nonlinear_conduction_latent COMMAND ${Python_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/analysis_nonlinear_electron_conduction.py
+        $<TARGET_FILE:test_rz_nonlinear_electron_conduction> --rz)
+    set_tests_properties(test_rz_nonlinear_conduction_latent PROPERTIES
+        WORKING_DIRECTORY ${rz_nonlinear_dir} ENVIRONMENT "OMP_NUM_THREADS=2")
+    add_test(NAME test_rz_nonlinear_conduction_budget COMMAND test_rz_nonlinear_electron_conduction
+        test.reject_budget=1 amrex.throw_exception=1 amrex.the_arena_init_size=0)
+    set_tests_properties(test_rz_nonlinear_conduction_budget PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=2")
+    if(WarpX_SINGULARITY_EOS)
+        foreach(table_case IN ITEMS table table_negative)
+            set(table_path "${rz_table_fixture}")
+            if(table_case STREQUAL table_negative)
+                set(table_path "${rz_table_fixture_dir}/electron_only_fixture_negative_reference.sp5")
+            endif()
+            set(table_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_nonlinear_conduction_${table_case}")
+            file(MAKE_DIRECTORY ${table_dir})
+            add_test(NAME test_rz_nonlinear_conduction_${table_case} COMMAND ${Python_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/analysis_nonlinear_electron_conduction.py
+                $<TARGET_FILE:test_rz_nonlinear_electron_conduction> --rz --table-file ${table_path})
+            set_tests_properties(test_rz_nonlinear_conduction_${table_case} PROPERTIES
+                WORKING_DIRECTORY ${table_dir} ENVIRONMENT "OMP_NUM_THREADS=2"
+                FIXTURES_REQUIRED nonlinear_conduction_eos_fixture)
+        endforeach()
+    endif()
+    if(WarpX_MPI)
+        set(rz_nonlinear_mpi_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_nonlinear_conduction_mpi")
+        file(MAKE_DIRECTORY ${rz_nonlinear_mpi_dir})
+        add_test(NAME test_rz_nonlinear_conduction_latent_mpi COMMAND ${Python_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/analysis_nonlinear_electron_conduction.py
+            $<TARGET_FILE:test_rz_nonlinear_electron_conduction> --rz --mpi-exec ${MPIEXEC_EXECUTABLE})
+        set_tests_properties(test_rz_nonlinear_conduction_latent_mpi PROPERTIES
+            PROCESSORS 2 RUN_SERIAL TRUE WORKING_DIRECTORY ${rz_nonlinear_mpi_dir}
+            ENVIRONMENT "OMP_NUM_THREADS=1")
+    endif()
+endif()
+
 if(WarpX_LIB AND 1 IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL DOUBLE)
     add_executable(test_nonlinear_electron_conduction test_nonlinear_electron_conduction.cpp)
     target_link_libraries(test_nonlinear_electron_conduction PRIVATE lib_1d)

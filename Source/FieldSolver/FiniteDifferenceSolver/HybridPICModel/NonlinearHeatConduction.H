@@ -10,9 +10,13 @@
 
 namespace warpx::hybrid
 {
+enum class NonlinearHeatFailure { None, Input, LocalSolve, Iterations, Energy };
 struct NonlinearHeatSolveResult
 {
     int iterations = 0;
+    NonlinearHeatFailure failure = NonlinearHeatFailure::Input;
+    amrex::Real residual = 0;
+    amrex::Real energy_residual = 0;
     bool valid = false;
 };
 

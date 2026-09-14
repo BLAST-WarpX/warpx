@@ -1427,10 +1427,6 @@ void HybridPICModel::ReadParameters (
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         WARPX_ABORT_WITH_MESSAGE("Electron heat conduction supports Cartesian and RZ only.");
 #endif
-#if defined(WARPX_DIM_RZ)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_electron_thermodynamics.executor().isIdealGas(),
-            "Nonideal electron heat conduction is initially qualified only in Cartesian geometry.");
-#endif
     }
 
     // Resistive electron-heating source (Phys. Plasmas 31, 012902 (2024), Eq. 12):

@@ -90,7 +90,7 @@ jobs:
         cmake -S . -B build            \
           -GNinja                      \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
-          -DWarpX_DIMS="1;2"           \
+          -DWarpX_DIMS="1;2;RZ"        \
           -DWarpX_EB=OFF               \
           -DWarpX_FFT=ON               \
           -DWarpX_MATERIAL_OPACITY_HDF5=ON \
@@ -103,7 +103,7 @@ jobs:
         ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
         ctest --test-dir build \
-          -R '^(material_opacity_table|test_1d_material_metadata_consistency|test_hybrid_electron_thermodynamics.*|test_1d_nonlinear_conduction_.*)$' \
+          -R '^(material_opacity_table|test_1d_material_metadata_consistency|test_hybrid_electron_thermodynamics.*|test_1d_nonlinear_conduction_.*|test_rz_nonlinear_conduction_.*|test_rz_native_conduction_.*)$' \
           --output-on-failure
 
         ccache -s

@@ -85,6 +85,7 @@ tryNonlinearHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& energ
     constexpr auto tolerance = 128 * epsilon;
     bool const tabulated = eos.isSingularitySpiner();
     bool converged = false;
+    result.failure = NonlinearHeatFailure::Iterations;
     for (int iteration = 0; iteration < 512; ++iteration)
     {
         ++result.iterations;
@@ -175,8 +176,10 @@ tryNonlinearHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& energ
                 });
         }
         auto const residual = errors.norm0(0);
+        result.residual = residual;
         if (!std::isfinite(residual))
         {
+            result.failure = NonlinearHeatFailure::LocalSolve;
             return result;
         }
         if (residual <= tolerance)
@@ -211,14 +214,17 @@ tryNonlinearHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& energ
                            });
     }
     auto const before = inventory.sum(0), after = inventory.sum(1), scale = inventory.sum(2);
+    result.energy_residual = scale > 0 ? std::abs(after - before) / scale : std::abs(after - before);
     if (!std::isfinite(before) || !std::isfinite(after) || !std::isfinite(scale) || scale < 0 ||
         std::abs(after - before) > 4096 * epsilon * scale)
     {
+        result.failure = NonlinearHeatFailure::Energy;
         return result;
     }
     amrex::MultiFab::Copy(temperature, current, 0, 0, 1, 0);
     amrex::MultiFab::Copy(energy, trial_energy, 0, 0, 1, 0);
     result.valid = true;
+    result.failure = NonlinearHeatFailure::None;
     return result;
 }
 } // namespace warpx::hybrid

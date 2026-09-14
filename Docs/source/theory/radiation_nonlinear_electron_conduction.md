@@ -1,11 +1,13 @@
 # Conduction with a nonideal electron EOS
 
 The heat-conduction path now supports fixed-charge latent-energy electrons and
-one file-backed Singularity-EOS electron material in **Cartesian geometry**.
+one file-backed Singularity-EOS electron material in Cartesian geometry, with
+the RZ CPU extension qualified below.
 It solves the nonlinear caloric equation; it does not approximate a finite
 energy change as a frozen heat capacity multiplied by a temperature change.
 The original ideal-electron Cartesian/RZ solver and its arithmetic remain
-unchanged.
+unchanged. Insulating scratch ghosts are now initialized deterministically;
+they are not allowed to inherit allocator contents.
 
 This is useful material-energy infrastructure for radiation calculations,
 not a calibrated tungsten transport model. Ions remain kinetic; latent-energy
@@ -84,7 +86,8 @@ budget rollback and native table run/analysis.
 
 ## Remaining boundaries
 
-- Nonideal RZ caloric-volume/deposition coupling remains guarded.
+- Moving nonideal RZ radiation/pressure-work coupling remains guarded; the
+  conduction extension does not remove those independent restrictions.
 - Multiple table materials, evolving charge state and calibrated high-Z
   conductivity/opacity/EOS consistency are not supplied by this increment.
 - Conductivity is isotropic; no magnetic anisotropy or nonlocal heat transport
@@ -95,5 +98,45 @@ budget rollback and native table run/analysis.
   hohlraum application run is claimed here.
 
 The implementation and tests address a missing material-energy feature first.
-The next conduction work should qualify nonideal RZ metrics and a scalable
-stiff solve, then add anisotropy where the intended physical regime requires it.
+The next conduction work should provide a scalable stiff solve, then add
+anisotropy where the intended physical regime requires it.
+
+## RZ nonlinear calorics and native thermal interface
+
+The radial tests evolve an insulating hot core/cool exterior over 30 ns in a
+1 mm-radius cylinder, using 64 radial cells and 64 time steps. The low-level
+reference independently solves the cylindrical nonlinear heat equation on
+256/512-point grids. Native tests additionally evolve the real hybrid electron
+state at the actual PIC-deposited nodal density. They inspect nodal EOS energy,
+not a nonlinear EOS evaluated at a cell-averaged temperature. No flat-density
+FLASH fluid closure is imposed near the axis or wall.
+
+| RZ case | Relative profile error | Relative energy error |
+|---|---|---|
+| Latent-energy radial heat redistribution | 0.2314% | `5.87e-13` |
+| Manufactured table EOS | 0.3629% | `3.33e-12` |
+| Same table with negative energy reference | 0.3629% | `3.16e-12` |
+| Native latent-energy thermal evolution | 0.2827% | `5.95e-13` |
+| Native fixed-Z=20 table thermal evolution | 0.3931% | `3.32e-12` |
+
+The registered table-enabled RZ CPU matrix passes 14/14 checks, including
+serial/MPI native profiles, generated fixtures, rollback and both table energy
+references. The surrounding Cartesian latent/budget/MPI selection passes 3/3.
+The 12 affected single-precision source checks pass. The RZ latent-energy CUDA
+matrix passes 7/7 native/reference/rollback/MPI checks in 70.99 s; table EOS
+remains host-only. The table-enabled CI job now includes the RZ cases alongside
+the existing Cartesian gates.
+
+Native qualification exposed uninitialized insulating ghosts in the private
+temperature candidate. The nonlinear solver correctly rejected its non-finite
+input. Filling those ghosts before the solve repaired the defect without
+weakening the finite-state check. A poisoned-input-ghost case now requires
+finite completed output. Retry failures also distinguish invalid inputs,
+local solves, iteration exhaustion and energy balance, with residuals reported
+in scientific notation.
+
+Native nonideal thermal cases select `electron_energy_transport=finite_volume`.
+The separate implicit advective option remains ideal-only; implicit nonlinear
+conduction does not qualify that advective solver. These native thermal tests
+hold ion positions fixed. Actual moving radiation evidence is documented
+separately, and is not automatically extended to nonideal EOSs.
