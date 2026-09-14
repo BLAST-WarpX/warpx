@@ -1,8 +1,10 @@
 # Experimental gray moving-material runtime
 
-Status: private qualification branch; not a declaration that the complete
+Status: experimental qualification; not a declaration that the complete
 radiation module is production-ready. The public PR stays WIP. This runtime
 path now calls the coupled M1 solver from the actual native PIC evolution loop.
+This page covers the periodic Cartesian variant. The bounded meridional RZ
+variant has a [separate contract and qualification](radiation_rz_moving_runtime.md).
 
 ## Supported contract
 

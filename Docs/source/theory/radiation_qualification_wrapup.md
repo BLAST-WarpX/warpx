@@ -12,6 +12,11 @@ requirement for this work.
 - Opt-in gray moving moment transport in periodic Cartesian geometry, coupled
   to native kinetic ions and hybrid electron energy. Actual finite ion work and
   deferred particle-owned impulse/work are separately accounted and restarted.
+- Bounded meridional RZ native evolution with annular radiation measures,
+  required conservative electron-pressure work, persistent optical-wall and
+  geometric accounts, actual axial/radial material motion and changed-rank
+  restart checks. General swirl, magnetic work and packet conversion remain
+  outside this [RZ qualification](radiation_rz_moving_runtime.md).
 - Native shape-consistent force assignment and adjoint work, with independent
   moving-beam ODE, trapped-pulse transport and oblique-interface checks.
 - Particle diagnostics use output copies for unit conversion, preserving live
@@ -191,6 +196,7 @@ radiation_rz_pressure_work
 radiation_rz_particle_carry
 radiation_rz_moment_transport
 radiation_rz_native_moment_source
+radiation_rz_moving_runtime
 radiation_rz_face_streaming
 radiation_electron_conduction
 radiation_species_qei_rates

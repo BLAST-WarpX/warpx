@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <limits>
 #include <vector>
 
@@ -69,8 +71,12 @@ NativeInventory (WarpX& simulation)
     }
     auto& particles = simulation.GetPartContainer();
     auto const pending = simulation.GetRadiationTransport().pendingMaterialImpulse(particles, true);
+    auto radiation = particles.GetParticleContainerFromName("photons").sumParticleEnergy();
+    if (simulation.m_fields.has(FieldType::radiation_diffusion_energy, 0)) {
+        radiation += simulation.m_fields.get(FieldType::radiation_diffusion_energy, 0)->sum(0);
+    }
     return {particles.GetParticleContainerFromName("ions").sumParticleEnergy(), energy.sum(0),
-            particles.GetParticleContainerFromName("photons").sumParticleEnergy(), pending[3]};
+            radiation, pending[3]};
 }
 
 Snapshot
@@ -289,6 +295,8 @@ main (int argc, char* argv[])
         auto& ions = particles.GetParticleContainerFromName("ions");
         bool runtime = false;
         amrex::ParmParse("test").query("radiation_runtime", runtime);
+        bool moment_runtime = false;
+        amrex::ParmParse("test").query("moment_runtime", moment_runtime);
         if (runtime)
         {
             simulation.InitData();
@@ -303,8 +311,23 @@ main (int argc, char* argv[])
                 difference += final[d] - initial[d];
             }
             amrex::Print() << "Native RZ radiation/material energy residual=" << difference / total
-                           << " photon loss=" << initial[2] - final[2] << '\n';
-            AMREX_ALWAYS_ASSERT(initial[2] - final[2] > 0.5_rt * initial[2]);
+                           << (moment_runtime ? " moment loss=" : " photon loss=")
+                           << initial[2] - final[2] << '\n';
+            if (moment_runtime) {
+                AMREX_ALWAYS_ASSERT(initial[2] > 0 && final[2] > 0);
+                AMREX_ALWAYS_ASSERT(std::abs(final[0] - initial[0]) > 1.e-8_rt * initial[0]);
+                if (amrex::ParallelDescriptor::IOProcessor()) {
+                    std::ofstream inventory("native_inventory.txt");
+                    inventory << std::setprecision(17);
+                    for (auto const& state : {initial, final}) {
+                        for (auto const value : state) { inventory << value << ' '; }
+                        inventory << '\n';
+                    }
+                    AMREX_ALWAYS_ASSERT(inventory.good());
+                }
+            } else {
+                AMREX_ALWAYS_ASSERT(initial[2] - final[2] > 0.5_rt * initial[2]);
+            }
             AMREX_ALWAYS_ASSERT(std::abs(difference) < 1.e-10_rt * total);
             WarpX::Finalize();
             warpx::initialization::finalize_external_libraries();

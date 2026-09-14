@@ -1101,6 +1101,11 @@ if(WarpX_LIB)
             elseif(coupled_case STREQUAL spatial OR coupled_case STREQUAL rollback)
                 list(APPEND rz_coupled_args test.spatial=1)
             endif()
+            if(coupled_case STREQUAL spatial)
+                # Qualified full-relaxation solve: identical physical gates,
+                # fewer outer fixed-point iterations on CPU and CUDA.
+                list(APPEND rz_coupled_args test.relaxation=1)
+            endif()
             if(coupled_case STREQUAL rollback)
                 list(APPEND rz_coupled_args test.rollback=1 amr.max_grid_size=4)
             endif()
@@ -1171,6 +1176,64 @@ if(WarpX_LIB)
             target_compile_features(test_rz_particle_impulse PRIVATE cxx_std_20)
         endif()
         warpx_set_compile_warnings(test_rz_particle_impulse)
+        set(rz_moving_environment
+            "OMP_NUM_THREADS=2;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        function(add_rz_moving_runtime_case case_name input_file analysis_file)
+            set(case_dir "${CMAKE_CURRENT_BINARY_DIR}/${case_name}")
+            set(restart_dir "${CMAKE_CURRENT_BINARY_DIR}/${case_name}_restart")
+            file(MAKE_DIRECTORY ${case_dir} ${restart_dir})
+            add_test(NAME test_${case_name}.run COMMAND test_rz_particle_impulse ${input_file}
+                test.radiation_runtime=1 test.moment_runtime=1 amrex.throw_exception=1
+                amrex.abort_on_unused_inputs=1 amrex.the_arena_init_size=0)
+            set_tests_properties(test_${case_name}.run PROPERTIES PROCESSORS 2
+                WORKING_DIRECTORY ${case_dir} ENVIRONMENT "${rz_moving_environment}"
+                FIXTURES_SETUP ${case_name}_checkpoint)
+            add_test(NAME test_${case_name}.analysis COMMAND ${Python_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/${analysis_file} ${case_dir})
+            set_tests_properties(test_${case_name}.analysis PROPERTIES
+                FIXTURES_REQUIRED ${case_name}_checkpoint)
+            set(restart_launcher)
+            set(restart_postflags)
+            if(WarpX_MPI)
+                set(restart_launcher ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS})
+                set(restart_postflags ${MPIEXEC_POSTFLAGS})
+            endif()
+            add_test(NAME test_${case_name}_restart.run COMMAND ${restart_launcher}
+                $<TARGET_FILE:test_rz_particle_impulse> ${restart_postflags} ${input_file}
+                test.radiation_runtime=1 test.moment_runtime=1 amr.restart=${case_dir}/diags/chk000128
+                amrex.throw_exception=1 amrex.abort_on_unused_inputs=1 amrex.the_arena_init_size=0)
+            set_tests_properties(test_${case_name}_restart.run PROPERTIES PROCESSORS 2
+                WORKING_DIRECTORY ${restart_dir} ENVIRONMENT "${rz_moving_environment}"
+                FIXTURES_REQUIRED ${case_name}_checkpoint FIXTURES_SETUP ${case_name}_restarted)
+            if(WarpX_MPI)
+                set_tests_properties(test_${case_name}_restart.run PROPERTIES
+                    ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+            endif()
+            add_test(NAME test_${case_name}_restart.analysis COMMAND ${Python_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/${analysis_file} ${restart_dir} --reference-directory ${case_dir})
+            set_tests_properties(test_${case_name}_restart.analysis PROPERTIES
+                FIXTURES_REQUIRED "${case_name}_checkpoint;${case_name}_restarted")
+            if(WarpX_COMPUTE STREQUAL CUDA)
+                set_tests_properties(test_${case_name}.run test_${case_name}_restart.run
+                    PROPERTIES TIMEOUT 5400 LABELS slow)
+            endif()
+        endfunction()
+        add_rz_moving_runtime_case(rz_moving_moment inputs_base_rz_moving_moment_pulse
+            analysis_rz_moving_moment.py)
+        add_rz_moving_runtime_case(rz_moving_compression inputs_base_rz_moving_moment_compression
+            analysis_rz_moving_compression.py)
+        set(rz_moving_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moving_moment")
+        foreach(corrupt IN ITEMS ledger cartesian_model)
+            set(rz_corrupt_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moving_moment_${corrupt}")
+            file(MAKE_DIRECTORY ${rz_corrupt_dir})
+            add_test(NAME test_rz_moving_moment_rejects_${corrupt} COMMAND ${Python_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/check_moving_moment_checkpoint.py
+                $<TARGET_FILE:test_rz_particle_impulse> ${rz_moving_dir}/diags/chk000128
+                ${corrupt} --rz)
+            set_tests_properties(test_rz_moving_moment_rejects_${corrupt} PROPERTIES
+                WORKING_DIRECTORY ${rz_corrupt_dir} ENVIRONMENT "${rz_moving_environment}"
+                FIXTURES_REQUIRED rz_moving_moment_checkpoint TIMEOUT 90)
+        endforeach()
         set(rz_impulse_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_particle_impulse")
         file(MAKE_DIRECTORY ${rz_impulse_dir})
         foreach(input IN ITEMS inputs_base_rz_particle_impulse inputs_base_1d_particle_impulse)
@@ -1332,6 +1395,18 @@ endfunction()
 
 if(WarpX_PRECISION STREQUAL DOUBLE)
     if(WarpX_PARTICLE_PRECISION STREQUAL DOUBLE)
+        add_radiation_failure_test(
+            test_rz_moving_moment_requires_pressure_work
+            RZ "inputs_base_rz_moving_moment_pulse hybrid_pic_model.conservative_pressure_work=0 hybrid_pic_model.conservative_pressure_work_pec=0"
+            "Meridional RZ coupled_moment requires ideal electrons")
+        add_radiation_failure_test(
+            test_rz_moving_moment_rejects_shape
+            RZ "inputs_base_rz_moving_moment_pulse algo.particle_shape=2"
+            "Meridional RZ coupled_moment requires ideal electrons")
+        add_radiation_failure_test(
+            test_rz_moving_moment_rejects_theta
+            RZ "inputs_base_rz_moving_moment_pulse radiation_transport.initial_moment_flux_ratio='0 0.001 0'"
+            "Meridional RZ coupled_moment requires zero initial theta")
         add_radiation_failure_test(
             test_1d_radiation_transport_material_wall_requires_work
             1 "inputs_base_1d_material_wall_control hybrid_pic_model.conservative_pressure_work_pec=1 hybrid_pic_model.conservative_pressure_work=0"

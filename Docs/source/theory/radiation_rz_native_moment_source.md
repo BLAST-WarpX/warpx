@@ -5,8 +5,10 @@ particles and native nodal electron thermodynamics**. The source transaction
 updates radiation, ion velocity, particle-owned compensation and electron
 temperature together. It may include spatial radiation transport.
 
-It remains a low-level, opt-in meridional source adapter. The public RZ
-`coupled_moment` evolution path is still guarded. No particle drift, density
+This page describes the low-level, opt-in meridional source adapter. The bounded
+native drifting integration is documented separately in
+[the RZ moving-runtime qualification](radiation_rz_moving_runtime.md).
+No particle drift, density
 advance, packet conversion, current-driven magnetic work or evolved charge
 state is performed by this source stage. The native integration tests freeze
 positions while evolving the source variables; they are not hohlraum runs.
@@ -82,13 +84,13 @@ ghosts while synchronizing interior/periodic aliases. The verification scratch
 has no ghosts and copies only its own allocated extent. Both failure rollback
 and successful retry compare the complete advertised state, including ghosts.
 
-## Remaining runtime integration
+## Separate runtime qualification
 
-Before enabling the user-facing RZ coupled-moment path, connect its persistent
-diagnostics and restart state to the optical-wall/geometric accounting, qualify
-source/drift ordering and the supported particle boundaries, and verify native
-coefficient construction over the intended material range. The current source
-tests use explicit gray coefficients and native caloric callbacks.
+These source tests use explicit gray coefficients and native caloric callbacks.
+The bounded native adapter, its annular coefficient normalization, actual drift,
+pressure-work requirements and restart evidence are documented in the
+[RZ moving-runtime qualification](radiation_rz_moving_runtime.md). Its supported
+contract must not be inferred from the source-only tests on this page.
 
 Packet–diffusion momentum conversion, general azimuthal/angular-momentum
 transport, table-EOS material coupling and conservative magnetic work remain
@@ -114,8 +116,8 @@ The native moment runtime now owns this ledger and writes it alongside the
 `gray_m1_low_beta_nodal_shape_ledger_v3` checkpoint manifest. Restart requires the
 declared ledger. Older v1/v2 native Cartesian checkpoints retain their original
 shape checks and initialize these identically-zero periodic transport accounts.
-This schema remains Cartesian: it does **not** enable or certify native RZ drift.
-An RZ runtime must declare its different geometry and assignment contract.
+This v3 schema remains Cartesian. The bounded RZ runtime uses a distinct
+meridional nearest-cell model manifest rather than reinterpreting it.
 
 Qualification adds cancellation/serialization/overflow unit checks and extends
 the existing serial/MPI interval-rejection gates with persistent-ledger checks.
@@ -137,6 +139,7 @@ orthogonalization. The default half-relaxed source requires 32 outer iterations.
 The test-only full-relaxation probe requires six on its first stage and passes
 all 64 CPU spatial stages in 2.468 s, with independent energy residual
 `1.64e-15`. The current CUDA binary also passes the full-relaxation single-stage
-probe in 12.55 s with six outer iterations; its sustained run is still pending.
+probe in 12.55 s with six outer iterations. Its sustained 64-stage run completes
+in 993.8 s with independent energy residual `2.75e-16`.
 This is a bounded solver-control comparison, not a change to defaults
-or acceptance tolerances, and does not close the sustained CUDA qualification gap.
+or acceptance tolerances. It qualifies this source case, not native CUDA drift.

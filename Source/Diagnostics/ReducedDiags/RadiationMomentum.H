@@ -33,6 +33,7 @@ public:
 
 private:
     bool m_include_moment_inventory = false;
+    bool m_include_moment_transport = false;
     amrex::GpuArray<amrex::Real, 3> m_cumulative_material_impulse{
         0.0, 0.0, 0.0};
     amrex::GpuArray<amrex::Real, 3> m_cumulative_boundary_impulse{

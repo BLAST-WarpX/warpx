@@ -7010,6 +7010,16 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         is zero, preserving the existing output layout. The option is rejected
         for scalar diffusion/packet modes, and must remain unchanged at restart.
 
+        Additionally setting ``<reduced_diags_name>.include_moment_transport=1``
+        appends twelve cumulative columns: outward moment-boundary transfer,
+        cylindrical geometric stress, and their compensated difference. Each
+        account contains energy in J followed by three momentum components in
+        kg*m/s. This requires ``include_moment_inventory=1`` and must also remain
+        unchanged at restart. Geometric stress is not material recoil, nor is
+        the RZ radial-component inventory globally conserved Cartesian momentum.
+        These accounts are owned by the transport runtime, independent of the
+        diagnostic output cadence. The default is zero.
+
         For a diffusion vacuum face the outward normal impulse is
         :math:`\Delta E/c`; for the P1 Marshak condition it is
         :math:`2\Delta E/(3c)`. The RCYLINDER radial entry is an azimuthally

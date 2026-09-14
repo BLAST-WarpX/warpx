@@ -5,6 +5,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "RadiationTransport.H"
+#include "CellVolume.H"
 #include "CoupledImplicitDiffusion.H"
 #include "CoupledMomentSource.H"
 #include "DiffusionGradient.H"
@@ -25,6 +26,7 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "RadialFaceMarching.H"
 #include "RZFaceMarching.H"
+#include "RZMomentGeometry.H"
 #include "RadiationEnergyUpdate.H"
 #include "RadiationKineticEnergyUpdate.H"
 #include "Utils/MaterialRegistry.H"
@@ -1064,13 +1066,15 @@ ConvertGrayMomentCoefficients (amrex::MultiFab const& density, amrex::MultiFab& 
                               amrex::Geometry const& geometry)
 {
     auto const dx = geometry.CellSizeArray();
-    amrex::Real const volume = AMREX_D_TERM(dx[0], * dx[1], * dx[2]);
+    auto const lower = geometry.ProbLoArray();
+    auto const domain_lo = amrex::lbound(geometry.Domain());
     for (amrex::MFIter iterator(absorption); iterator.isValid(); ++iterator) {
         auto const rho = density.const_array(iterator);
         auto const a = absorption.array(iterator);
         auto const s = scattering.array(iterator);
         auto const b = equilibrium.array(iterator);
         amrex::ParallelFor(iterator.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            auto const volume = warpx::radiation::CellVolume(i, dx, lower, domain_lo);
             bool empty = true;
             for (int corner = 0; corner < (1 << AMREX_SPACEDIM); ++corner) {
                 empty = empty && rho(i + (corner & 1), j + ((corner >> 1) & 1),
@@ -4040,12 +4044,6 @@ RadiationTransport::RadiationTransport (
                 "Face-exact RZ streaming requires independent absorbing photon boundaries "
                 "or Open outer radial and Open/periodic axial particle boundaries.");
         }
-    } else {
-        ablastr::warn_manager::WMRecordWarning(
-            "Radiation transport",
-            "Streaming attenuation in RZ samples each bounded path in its starting cell. "
-            "Set radiation_transport.require_cell_interface_exact_streaming=1 for the "
-            "supported face-exact subset.", ablastr::warn_manager::WarnPriority::low);
     }
 #elif defined(WARPX_DIM_RSPHERE)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -4214,6 +4212,15 @@ RadiationTransport::RadiationTransport (
     m_use_coupled_implicit_diffusion = diffusion_solver == "coupled_implicit";
     m_use_coupled_moment_transport = diffusion_solver == "coupled_moment";
     m_use_implicit_diffusion = diffusion_solver == "implicit" || m_use_coupled_implicit_diffusion;
+#if defined(WARPX_DIM_RZ)
+    if (!m_require_cell_interface_exact_streaming && !m_use_coupled_moment_transport) {
+        ablastr::warn_manager::WMRecordWarning(
+            "Radiation transport",
+            "Streaming attenuation in RZ samples each bounded path in its starting cell. "
+            "Set radiation_transport.require_cell_interface_exact_streaming=1 for the "
+            "supported face-exact subset.", ablastr::warn_manager::WarnPriority::low);
+    }
+#endif
     if (m_use_implicit_diffusion) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             m_enable_diffusion && (!m_enable_lte_exchange || m_use_coupled_implicit_diffusion) &&
@@ -4489,14 +4496,16 @@ RadiationTransport::RadiationTransport (
 #endif
 #if defined(WARPX_DIM_RZ)
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                !m_enable_diffusion && !m_enable_lte_exchange && !m_enable_particle_conversion
+                (m_use_coupled_moment_transport || (!m_enable_diffusion && !m_enable_lte_exchange))
+                    && !m_enable_particle_conversion
                     && configured_max_level == 0 && !EB::enabled()
                     && WarpX::n_rz_azimuthal_modes == 1
                     && WarpX::particle_boundary_lo[0] == ParticleBoundaryType::None
                     && WarpX::particle_boundary_hi[0] == ParticleBoundaryType::Reflecting,
-                "RZ particle-owned radiation carry currently requires absorption-only transport, "
+                "RZ particle-owned radiation carry currently requires absorption-only "
+                "or meridional moment transport, "
                 "one azimuthal mode, level zero, no EB and an axis/reflecting radial domain. "
-                "Moment transport, LTE and packet/diffusion conversion are not qualified.");
+                "Packet/diffusion conversion is not qualified.");
 #endif
             for (int direction = 0; direction < AMREX_SPACEDIM; ++direction) {
 #if defined(WARPX_DIM_RZ)
@@ -4535,7 +4544,7 @@ RadiationTransport::RadiationTransport (
             WarpX::nox >= 1 && WarpX::nox <= 4,
             "coupled_moment currently requires one gray group, native hybrid electrons, "
             "one ion species plus an empty photon species, diffusion/LTE/momentum enabled, "
-            "momentum_carry=particle, particle shapes 1-4 and a fixed Cartesian grid. "
+            "momentum_carry=particle, particle shapes 1-4 and a fixed grid. "
             "Conversion, spectral/species/material opacities and EB are unsupported.");
 #ifdef WARPX_USE_MATERIAL_OPACITY_HDF5
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_use_registered_material_opacity_tables,
@@ -4544,6 +4553,13 @@ RadiationTransport::RadiationTransport (
         auto const eos = m_hybrid_model->electronThermodynamicsExecutor();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(eos.isIdealGas() || eos.isFixedChargeLatentEnergy(),
             "coupled_moment initially supports native analytic electron caloric models.");
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(eos.isIdealGas() && WarpX::nox == 1 &&
+            m_hybrid_model->m_conservative_pressure_work &&
+            m_hybrid_model->m_conservative_pressure_work_pec,
+            "Meridional RZ coupled_moment requires ideal electrons, particle_shape=1 "
+            "and conservative_pressure_work=conservative_pressure_work_pec=1.");
+#endif
         EvolveScheme scheme = EvolveScheme::Default;
         amrex::ParmParse("algo").query_enum_case_insensitive("evolve_scheme", scheme);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(scheme == EvolveScheme::Default ||
@@ -4553,8 +4569,8 @@ RadiationTransport::RadiationTransport (
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 m_diffusion_boundary_lo[d] == static_cast<int>(DiffusionBoundary::Reflecting) &&
                 m_diffusion_boundary_hi[d] == static_cast<int>(DiffusionBoundary::Reflecting),
-                "coupled_moment uses periodic geometry; physical diffusion boundaries "
-                "are unsupported.");
+                "coupled_moment requires reflecting optical boundary settings; "
+                "vacuum and bath boundaries are unsupported.");
         }
         if (!pp.contains("lte_exchange_tolerance")) { m_lte_exchange_tolerance = 1.e-11_rt; }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_lte_exchange_tolerance <= 1.e-11_rt,
@@ -4567,7 +4583,8 @@ RadiationTransport::RadiationTransport (
         std::vector<amrex::Real> ratio{0, 0, 0};
         utils::parser::queryArrWithParser(pp, "initial_moment_flux_ratio", ratio);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ratio.size() == 3,
-            "initial_moment_flux_ratio requires three Cartesian components of F/(c E).");
+            "initial_moment_flux_ratio requires three components of F/(c E): "
+            "(x,y,z) in Cartesian geometry or (r,theta,z) in RZ.");
         amrex::Real norm = 0;
         for (int d = 0; d < 3; ++d) {
             m_initial_moment_flux_ratio[d] = ratio[d];
@@ -4575,6 +4592,10 @@ RadiationTransport::RadiationTransport (
         }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::isfinite(norm) && norm <= 1,
             "initial_moment_flux_ratio must be finite and realizable (norm <= 1).");
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_initial_moment_flux_ratio[1] == 0,
+            "Meridional RZ coupled_moment requires zero initial theta radiation moment.");
+#endif
         pp.query("coupled_max_subdivisions", m_coupled_max_subdivisions);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_coupled_max_subdivisions >= 0 &&
             m_coupled_max_subdivisions <= 10,
@@ -4695,8 +4716,19 @@ RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
 {
     auto& simulation = WarpX::GetInstance();
     auto const& geometry = simulation.Geom(0);
+#if defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(geometry.ProbLo(0) == 0 && geometry.isPeriodic(1) &&
+        !geometry.isPeriodic(0) && WarpX::n_rz_azimuthal_modes == 1 &&
+        WarpX::field_boundary_lo[0] == FieldBoundaryType::None &&
+        WarpX::field_boundary_hi[0] == FieldBoundaryType::PEC &&
+        WarpX::particle_boundary_lo[0] == ParticleBoundaryType::None &&
+        WarpX::particle_boundary_hi[0] == ParticleBoundaryType::Reflecting,
+        "Meridional RZ coupled_moment requires an axis, a fixed PEC/reflecting radial wall "
+        "and periodic axial boundaries.");
+#else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(geometry.Coord() == 0 && geometry.isAllPeriodic(),
         "coupled_moment currently requires periodic Cartesian geometry.");
+#endif
     auto const& live_temperature = *fields.get(FieldType::hybrid_electron_temperature_fp, 0);
     auto const& live_density = *fields.get(FieldType::rho_fp, 0);
     auto& energy = *fields.get(FieldType::radiation_diffusion_energy, 0);
@@ -4706,6 +4738,7 @@ RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
     amrex::MultiFab density(live_density.boxArray(), live_density.DistributionMap(),
                             live_density.nComp(), live_density.nGrowVect());
     amrex::MultiFab radiation(energy.boxArray(), energy.DistributionMap(), 4, 1);
+    radiation.setVal(0);
     amrex::MultiFab::Copy(temperature, live_temperature, 0, 0, 1, temperature.nGrowVect());
     amrex::MultiFab::Copy(density, live_density, 0, 0, density.nComp(), density.nGrowVect());
     density.FillBoundary(geometry.periodicity());
@@ -4715,6 +4748,9 @@ RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
         amrex::MultiFab::Copy(radiation, *fields.get(MomentFieldName(d), 0), 0, d + 1, 1, 0);
     }
     radiation.FillBoundary(geometry.periodicity());
+#if defined(WARPX_DIM_RZ)
+    warpx::radiation::FillRZMomentGhosts(radiation, geometry, 1);
+#endif
     auto const initial_energy = radiation.sum(0);
     auto const eos = m_hybrid_model->electronThermodynamicsExecutor();
     auto const minimum_density = m_minimum_electron_density;
@@ -4748,8 +4784,13 @@ RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
     };
     warpx::radiation::CoupledMomentIntervalOptions options;
     options.source.spatial_transport = true;
+#if defined(WARPX_DIM_RZ)
+    options.source.particle_assignment = warpx::radiation::ParticleImpulseAssignment::NearestCell;
+    options.source.transport.reflecting_boundaries = true;
+#else
     options.source.particle_assignment =
         warpx::radiation::ParticleImpulseAssignment::NativeNodalCellAverage;
+#endif
     options.source.max_iterations = m_lte_exchange_max_iterations;
     options.source.tolerance = m_lte_exchange_tolerance;
     options.source.relaxation = m_moment_relaxation;
@@ -4952,7 +4993,11 @@ RadiationTransport::WriteCheckpointData (std::string const& dir) const
     }
     if (m_use_coupled_moment_transport) {
         std::ofstream model{dir + "/RadiationMomentModel_data.txt"};
+#if defined(WARPX_DIM_RZ)
+        model << "gray_m1_meridional_rz_nearest_cell_ledger_v1 " << WarpX::nox << '\n';
+#else
         model << "gray_m1_low_beta_nodal_shape_ledger_v3 " << WarpX::nox << '\n';
+#endif
         model.flush();
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(model.good(),
             "Could not checkpoint moving radiation model.");
@@ -5014,6 +5059,11 @@ RadiationTransport::ReadCheckpointData (std::string const& dir)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(static_cast<bool>(model >> version),
             "Invalid moving radiation model checkpoint schema.");
         int order = 1;
+#if defined(WARPX_DIM_RZ)
+        bool const has_ledger = version == "gray_m1_meridional_rz_nearest_cell_ledger_v1";
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(has_ledger && static_cast<bool>(model >> order),
+            "RZ moment restart requires the meridional nearest-cell model and transport ledger.");
+#else
         bool const has_ledger = version == "gray_m1_low_beta_nodal_shape_ledger_v3";
         if (version == "gray_m1_low_beta_nodal_shape_v2" || has_ledger) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(static_cast<bool>(model >> order),
@@ -5022,6 +5072,7 @@ RadiationTransport::ReadCheckpointData (std::string const& dir)
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(version == "gray_m1_low_beta_linear_shape_v1",
                 "Unknown moving radiation model checkpoint schema.");
         }
+#endif
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(order == WarpX::nox && !(model >> trailing),
             "Moving radiation restart must preserve its particle shape order.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(moment_ledger.good() == has_ledger,

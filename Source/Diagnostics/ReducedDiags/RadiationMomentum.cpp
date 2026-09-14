@@ -9,6 +9,7 @@
 #include "Fields.H"
 #include "Radiation/RadiationTransport.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -37,10 +38,13 @@ RadiationMomentum::RadiationMomentum (std::string const& rd_name)
     std::string diffusion_solver = "explicit";
     pp_radiation.query("diffusion_solver", diffusion_solver);
     amrex::ParmParse(rd_name).query("include_moment_inventory", m_include_moment_inventory);
+    amrex::ParmParse(rd_name).query("include_moment_transport", m_include_moment_transport);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_moment_transport || m_include_moment_inventory,
+        "RadiationMomentum.include_moment_transport requires include_moment_inventory=1.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_moment_inventory ||
         diffusion_solver == "coupled_moment",
         "RadiationMomentum.include_moment_inventory requires coupled_moment transport.");
-    m_data.resize(m_include_moment_inventory ? 27 : 24, 0.0_rt);
+    m_data.resize(m_include_moment_transport ? 39 : (m_include_moment_inventory ? 27 : 24), 0.0_rt);
 
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
     std::array<std::string, 3> const labels{"r", "theta", "z"};
@@ -95,6 +99,16 @@ RadiationMomentum::RadiationMomentum (std::string const& rd_name)
             for (std::string const& label : labels) {
                 output << m_sep << "[" << column++ << "]moment_radiation_"
                        << label << "(kg*m/s)";
+            }
+        }
+        if (m_include_moment_transport) {
+            for (char const* account : {"boundary", "geometric", "boundary_minus_geometric"}) {
+                output << m_sep << "[" << column++ << "]cumulative_moment_"
+                       << account << "_energy(J)";
+                for (std::string const& label : labels) {
+                    output << m_sep << "[" << column++ << "]cumulative_moment_"
+                           << account << '_' << label << "(kg*m/s)";
+                }
             }
         }
         output << "\n";
@@ -195,6 +209,19 @@ void RadiationMomentum::ComputeDiags (int const step)
             m_data[24 + component] = inventory[component];
         }
     }
+    if (m_include_moment_transport) {
+        auto const& ledger = radiation.momentTransportLedger();
+        std::array<warpx::radiation::FourVector, 3> const accounts{
+            ledger.Boundary(), ledger.Geometric(), ledger.Balance()};
+        int offset = 27;
+        for (auto const& account : accounts) {
+            m_data[offset] = account[0];
+            for (int component = 1; component < 4; ++component) {
+                m_data[offset + component] = account[component] / PhysConst::c;
+            }
+            offset += 4;
+        }
+    }
 }
 
 void RadiationMomentum::WriteCheckpointData (std::string const& dir)
@@ -218,7 +245,8 @@ void RadiationMomentum::WriteCheckpointData (std::string const& dir)
     }
     checkpoint << m_last_accumulated_step << "\n";
     if (m_include_moment_inventory) {
-        checkpoint << "moment_inventory_v1\n";
+        checkpoint << (m_include_moment_transport ? "moment_inventory_transport_v2\n"
+                                                 : "moment_inventory_v1\n");
     }
 }
 
@@ -249,9 +277,12 @@ void RadiationMomentum::ReadCheckpointData (std::string const& dir)
         "RadiationMomentum checkpoint state is truncated or invalid.");
     std::string schema, trailing;
     bool const has_inventory_schema = static_cast<bool>(checkpoint >> schema);
+    std::string const expected_schema = m_include_moment_transport
+        ? "moment_inventory_transport_v2" : "moment_inventory_v1";
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         has_inventory_schema == m_include_moment_inventory &&
-            (!has_inventory_schema || (schema == "moment_inventory_v1" &&
+            (!has_inventory_schema || (schema == expected_schema &&
                                        !(checkpoint >> trailing))),
-        "RadiationMomentum restart must preserve include_moment_inventory and its schema.");
+        "RadiationMomentum restart must preserve include_moment_inventory, "
+        "include_moment_transport and their schema.");
 }
