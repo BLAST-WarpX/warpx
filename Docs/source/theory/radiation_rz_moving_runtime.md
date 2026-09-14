@@ -133,9 +133,25 @@ material-energy contract.
 The source-only CUDA performance investigation is separate: full relaxation
 reduces the first source stage from 32 to six outer iterations. All 64 spatial
 source stages pass on CUDA in 993.8 s with independent energy residual
-`2.75e-16`. That is source-layer evidence, **not** CUDA qualification of these
-new native drifting cases. Their current evidence is CPU/MPI; backend
-performance and further qualification remain visible obligations.
+`2.75e-16`.
+
+The native drifting cases subsequently pass **8/8 CUDA stages**: both full
+256-step runs, their independent analyses, and their one-to-two-rank restart
+runs/comparisons. The selection takes 2918.66 s locally. The axial full run
+takes 908.62 s and the radial compression run 808.67 s; this is substantial
+small-grid GPU overhead, not a scalable-performance claim. The matching CPU
+source/runtime/rejection selection passes 20/20 (53.10 s private, 61.28 s in
+the clean public worktree), and Cartesian pulse/restart regressions pass 10/10.
+
+CPU/CUDA density, temperature, radiation energy and dominant radiation-momentum
+components differ by less than `1.6e-13` relative in these two smooth cases.
+Small transverse components require physical/roundoff scales, not division by
+an almost-zero reference. Particle comparison must use
+local cylindrical velocities: the backends can sample different initial
+azimuthal angles, making raw Cartesian velocity components incomparable as
+individual trajectories. Local proper-velocity (`gamma*v`) differences are below `2e-9 m/s`;
+these observations do not qualify arbitrary sharp-interface cross-backend
+trajectories or general angular material dynamics.
 
 ## Still outside this qualification
 
