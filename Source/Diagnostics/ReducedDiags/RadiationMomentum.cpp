@@ -1,0 +1,308 @@
+/* Copyright 2026 The WarpX Community
+ *
+ * This file is part of WarpX.
+ *
+ * License: BSD-3-Clause-LBNL
+ */
+#include "RadiationMomentum.H"
+
+#include "Fields.H"
+#include "Radiation/RadiationTransport.H"
+#include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
+#include "WarpX.H"
+
+#include <ablastr/fields/MultiFabRegister.H>
+
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_ParmParse.H>
+#include <AMReX_REAL.H>
+
+#include <array>
+#include <fstream>
+#include <string>
+
+using namespace amrex::literals;
+using warpx::fields::FieldType;
+
+RadiationMomentum::RadiationMomentum (std::string const& rd_name)
+    : ReducedDiags{rd_name}
+{
+    amrex::ParmParse const pp_radiation("radiation_transport");
+    bool radiation_enabled = false;
+    pp_radiation.query("enabled", radiation_enabled);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        radiation_enabled,
+        "RadiationMomentum requires radiation_transport.enabled=1.");
+
+    std::string diffusion_solver = "explicit";
+    pp_radiation.query("diffusion_solver", diffusion_solver);
+    amrex::ParmParse(rd_name).query("include_moment_inventory", m_include_moment_inventory);
+    amrex::ParmParse(rd_name).query("include_moment_transport", m_include_moment_transport);
+    amrex::ParmParse(rd_name).query("include_angular_inventory", m_include_angular_inventory);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_angular_inventory || m_include_moment_transport,
+        "RadiationMomentum.include_angular_inventory requires include_moment_transport=1.");
+#if !defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_angular_inventory,
+        "RadiationMomentum.include_angular_inventory requires RZ geometry.");
+#endif
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_moment_transport || m_include_moment_inventory,
+        "RadiationMomentum.include_moment_transport requires include_moment_inventory=1.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_moment_inventory ||
+        diffusion_solver == "coupled_moment",
+        "RadiationMomentum.include_moment_inventory requires coupled_moment transport.");
+    m_data.resize(m_include_angular_inventory ? 42 :
+        (m_include_moment_transport ? 39 : (m_include_moment_inventory ? 27 : 24)), 0.0_rt);
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
+    std::array<std::string, 3> const labels{"r", "theta", "z"};
+#elif defined(WARPX_DIM_RSPHERE)
+    std::array<std::string, 3> const labels{"r", "theta", "phi"};
+#else
+    std::array<std::string, 3> const labels{"x", "y", "z"};
+#endif
+
+    if (amrex::ParallelDescriptor::IOProcessor() && m_write_header) {
+        std::ofstream output{
+            m_path + m_rd_name + "." + m_extension, std::ofstream::out};
+        output << "#[0]step()" << m_sep << "[1]time(s)";
+        int column = 2;
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++ << "]material_"
+                   << label << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++ << "]cumulative_material_"
+                   << label << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++ << "]diffusion_boundary_"
+                   << label << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++
+                   << "]cumulative_diffusion_boundary_" << label
+                   << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++ << "]streaming_boundary_"
+                   << label << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++
+                   << "]cumulative_streaming_boundary_" << label
+                   << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++
+                   << "]pending_streaming_material_" << label
+                   << "(kg*m/s)";
+        }
+        for (std::string const& label : labels) {
+            output << m_sep << "[" << column++
+                   << "]pending_diffusion_material_" << label
+                   << "(kg*m/s)";
+        }
+        if (m_include_moment_inventory) {
+            for (std::string const& label : labels) {
+                output << m_sep << "[" << column++ << "]moment_radiation_"
+                       << label << "(kg*m/s)";
+            }
+        }
+        if (m_include_moment_transport) {
+            for (char const* account : {"boundary", "geometric", "boundary_minus_geometric"}) {
+                output << m_sep << "[" << column++ << "]cumulative_moment_"
+                       << account << "_energy(J)";
+                for (std::string const& label : labels) {
+                    output << m_sep << "[" << column++ << "]cumulative_moment_"
+                           << account << '_' << label << "(kg*m/s)";
+                }
+            }
+        }
+        if (m_include_angular_inventory) {
+            for (char const* account : {"radiation", "represented_material", "pending_material"}) {
+                output << m_sep << "[" << column++ << "]angular_" << account << "_z(kg*m^2/s)";
+            }
+        }
+        output << "\n";
+    }
+}
+
+void RadiationMomentum::ComputeDiags (int const step)
+{
+    auto& warpx = WarpX::GetInstance();
+    amrex::GpuArray<amrex::Real, 3> material_impulse{0.0_rt, 0.0_rt, 0.0_rt};
+    amrex::GpuArray<amrex::Real, 3> boundary_impulse{0.0_rt, 0.0_rt, 0.0_rt};
+    amrex::GpuArray<amrex::Real, 3> streaming_boundary_impulse{
+        0.0_rt, 0.0_rt, 0.0_rt};
+    amrex::GpuArray<amrex::Real, 3> pending_streaming_impulse{
+        0.0_rt, 0.0_rt, 0.0_rt};
+    amrex::GpuArray<amrex::Real, 3> pending_diffusion_impulse{
+        0.0_rt, 0.0_rt, 0.0_rt};
+    for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
+        if (warpx.m_fields.has(FieldType::radiation_material_momentum, lev)) {
+            auto const* momentum = warpx.m_fields.get(
+                FieldType::radiation_material_momentum, lev);
+            for (int component = 0; component < 3; ++component) {
+                material_impulse[component] += momentum->sum(
+                    component, /*local=*/false);
+            }
+        }
+        if (warpx.m_fields.has(
+                FieldType::radiation_streaming_momentum_carry, lev))
+        {
+            auto const* carry = warpx.m_fields.get(
+                FieldType::radiation_streaming_momentum_carry, lev);
+            for (int component = 0; component < 3; ++component) {
+                pending_streaming_impulse[component] += carry->sum(
+                    component, /*local=*/false);
+            }
+        }
+        if (warpx.m_fields.has(
+                FieldType::radiation_diffusion_momentum_carry, lev))
+        {
+            auto const* carry = warpx.m_fields.get(
+                FieldType::radiation_diffusion_momentum_carry, lev);
+            for (int component = 0; component < 3; ++component) {
+                pending_diffusion_impulse[component] += carry->sum(
+                    component, /*local=*/false);
+            }
+        }
+    }
+    auto const& radiation = warpx.GetRadiationTransport();
+    if (radiation.usesParticleMomentumCarry()) {
+        auto& particles = warpx.GetPartContainer();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        constexpr bool local_cylindrical = true;
+#else
+        constexpr bool local_cylindrical = false;
+#endif
+        auto const streaming = radiation.pendingMaterialImpulse(particles, true, local_cylindrical);
+        auto const diffusion = radiation.pendingMaterialImpulse(particles, false, local_cylindrical);
+        for (int d = 0; d < 3; ++d) {
+            pending_streaming_impulse[d] = streaming[d];
+            pending_diffusion_impulse[d] = diffusion[d];
+        }
+    }
+    for (int component = 0; component < 3; ++component) {
+        boundary_impulse[component] =
+            radiation.lastDiffusionBoundaryMomentumLoss(component);
+        streaming_boundary_impulse[component] =
+            radiation.lastStreamingBoundaryMomentumLoss(component);
+    }
+
+    if (step >= 0 && step != m_last_accumulated_step) {
+        for (int component = 0; component < 3; ++component) {
+            m_cumulative_material_impulse[component] +=
+                material_impulse[component];
+            m_cumulative_boundary_impulse[component] +=
+                boundary_impulse[component];
+            m_cumulative_streaming_boundary_impulse[component] +=
+                streaming_boundary_impulse[component];
+        }
+        m_last_accumulated_step = step;
+    }
+
+    if (!m_intervals.contains(step + 1)) { return; }
+
+    for (int component = 0; component < 3; ++component) {
+        m_data[component] = material_impulse[component];
+        m_data[3 + component] = m_cumulative_material_impulse[component];
+        m_data[6 + component] = boundary_impulse[component];
+        m_data[9 + component] = m_cumulative_boundary_impulse[component];
+        m_data[12 + component] = streaming_boundary_impulse[component];
+        m_data[15 + component] =
+            m_cumulative_streaming_boundary_impulse[component];
+        m_data[18 + component] = pending_streaming_impulse[component];
+        m_data[21 + component] = pending_diffusion_impulse[component];
+    }
+    if (m_include_moment_inventory) {
+        auto const inventory = radiation.momentMomentumInventory(warpx.m_fields);
+        for (int component = 0; component < 3; ++component) {
+            m_data[24 + component] = inventory[component];
+        }
+    }
+    if (m_include_moment_transport) {
+        auto const& ledger = radiation.momentTransportLedger();
+        std::array<warpx::radiation::FourVector, 3> const accounts{
+            ledger.Boundary(), ledger.Geometric(), ledger.Balance()};
+        int offset = 27;
+        for (auto const& account : accounts) {
+            m_data[offset] = account[0];
+            for (int component = 1; component < 4; ++component) {
+                m_data[offset + component] = account[component] / PhysConst::c;
+            }
+            offset += 4;
+        }
+    }
+    if (m_include_angular_inventory) {
+        auto const inventory = radiation.momentAngularInventory(warpx.GetPartContainer(), warpx.m_fields);
+        for (int component = 0; component < 3; ++component) {
+            m_data[39 + component] = inventory[component];
+        }
+    }
+}
+
+void RadiationMomentum::WriteCheckpointData (std::string const& dir)
+{
+    std::ofstream checkpoint{
+        dir + "/" + m_rd_name + "_RadiationMomentum_data.txt",
+        std::ofstream::out};
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        checkpoint.good(),
+        "RadiationMomentum could not write its checkpoint state.");
+    checkpoint.precision(17);
+    for (int component = 0; component < 3; ++component) {
+        checkpoint << m_cumulative_material_impulse[component] << "\n";
+    }
+    for (int component = 0; component < 3; ++component) {
+        checkpoint << m_cumulative_boundary_impulse[component] << "\n";
+    }
+    for (int component = 0; component < 3; ++component) {
+        checkpoint << m_cumulative_streaming_boundary_impulse[component]
+                   << "\n";
+    }
+    checkpoint << m_last_accumulated_step << "\n";
+    if (m_include_moment_inventory) {
+        checkpoint << (m_include_angular_inventory ? "moment_inventory_transport_angular_v3\n" :
+            (m_include_moment_transport ? "moment_inventory_transport_v2\n" : "moment_inventory_v1\n"));
+    }
+}
+
+void RadiationMomentum::ReadCheckpointData (std::string const& dir)
+{
+    std::ifstream checkpoint{
+        dir + "/" + m_rd_name + "_RadiationMomentum_data.txt",
+        std::ifstream::in};
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        checkpoint.good(),
+        "RadiationMomentum could not read its checkpoint state.");
+    bool valid = true;
+    for (int component = 0; component < 3; ++component) {
+        valid = valid && static_cast<bool>(
+            checkpoint >> m_cumulative_material_impulse[component]);
+    }
+    for (int component = 0; component < 3; ++component) {
+        valid = valid && static_cast<bool>(
+            checkpoint >> m_cumulative_boundary_impulse[component]);
+    }
+    for (int component = 0; component < 3; ++component) {
+        valid = valid && static_cast<bool>(
+            checkpoint >> m_cumulative_streaming_boundary_impulse[component]);
+    }
+    valid = valid && static_cast<bool>(checkpoint >> m_last_accumulated_step);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        valid,
+        "RadiationMomentum checkpoint state is truncated or invalid.");
+    std::string schema, trailing;
+    bool const has_inventory_schema = static_cast<bool>(checkpoint >> schema);
+    std::string const expected_schema = m_include_angular_inventory
+        ? "moment_inventory_transport_angular_v3"
+        : (m_include_moment_transport ? "moment_inventory_transport_v2" : "moment_inventory_v1");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        has_inventory_schema == m_include_moment_inventory &&
+            (!has_inventory_schema || (schema == expected_schema &&
+                                       !(checkpoint >> trailing))),
+        "RadiationMomentum restart must preserve include_moment_inventory, "
+        "include_moment_transport, include_angular_inventory and their schema.");
+}

@@ -1,0 +1,94 @@
+# Conservative streaming-photon recoil in RCYLINDER.
+#
+# One outward packet is attenuated inside a stationary ion annulus. The packet
+# energy loss must equal ion bulk work plus hybrid-electron heating, while its
+# radial momentum loss is deposited as an ion impulse.
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 100.0
+my_constants.photon_weight = 1.0e20
+my_constants.alpha = 10.0
+my_constants.Vx0 = 0.0
+my_constants.Vy0 = 0.0
+my_constants.Vz0 = 0.0
+
+max_step = 1
+amr.n_cell = 16
+amr.max_level = 0
+amr.max_grid_size = 16
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = reflecting
+
+warpx.const_dt = 1.0e-10
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = n0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 0.01*n0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+
+particles.species_names = ions photons
+
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 16 1
+ions.radial_numpercell_power = 1.0
+ions.profile = constant
+ions.density = n0
+ions.momentum_distribution_type = parse_momentum_function
+ions.momentum_function_ux(x,y,z) = Vx0/clight
+ions.momentum_function_uy(x,y,z) = Vy0/clight
+ions.momentum_function_uz(x,y,z) = Vz0/clight
+# Suppress the ordinary Lorentz push so nonzero ion kinetic work comes only
+# from the radiation impulse adapter.
+ions.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.5 0.0 0.0
+photons.single_particle_u = 1.0 0.0 0.0
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = alpha
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 1
+radiation_transport.momentum_species = ions
+
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17

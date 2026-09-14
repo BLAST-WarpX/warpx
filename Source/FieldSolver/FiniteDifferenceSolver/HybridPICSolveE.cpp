@@ -21,6 +21,7 @@
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 #include "HybridPICModel/HybridPICModel.H"
+#include "HybridPICModel/RZPressureWork.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -540,6 +541,7 @@ void FiniteDifferenceSolver::CalculateCurrentAmpereCartesian (
 
 void FiniteDifferenceSolver::HybridPICSolveE (
     ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& pressure_Efield,
     ablastr::fields::VectorField& Jfield,
     ablastr::fields::VectorField const& Jifield,
     ablastr::fields::VectorField const& Bfield,
@@ -549,13 +551,14 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday)
 {
+    amrex::ignore_unused(pressure_Efield);
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 
         HybridPICSolveECylindrical <CylindricalYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, pressure_Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
             eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
 
@@ -570,12 +573,12 @@ void FiniteDifferenceSolver::HybridPICSolveE (
     if (WarpX::grid_type == GridType::Staggered)
     {
         HybridPICSolveECartesian <CartesianYeeAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, pressure_Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
             eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
     } else {
         HybridPICSolveECartesian <CartesianNodalAlgorithm> (
-            Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
+            Efield, pressure_Efield, Jfield, Jifield, Bfield, rhofield, Pefield,
             eb_update_E, lev, hybrid_model, solve_for_Faraday
         );
     }
@@ -590,6 +593,7 @@ void FiniteDifferenceSolver::HybridPICSolveE (
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& pressure_Efield,
     ablastr::fields::VectorField const& Jfield,
     ablastr::fields::VectorField const& Jifield,
     ablastr::fields::VectorField const& Bfield,
@@ -599,6 +603,19 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     int lev, HybridPICModel const* hybrid_model,
     const bool solve_for_Faraday )
 {
+    bool const write_pressure_E = pressure_Efield[0] != nullptr;
+    auto const& geometry = WarpX::GetInstance().Geom(lev);
+    auto const pressure_domain = amrex::surroundingNodes(geometry.Domain());
+    int const pressure_axis = pressure_domain.smallEnd(0);
+    int const pressure_outer = pressure_domain.bigEnd(0);
+#if defined(WARPX_DIM_RZ)
+    int const pressure_zlo = pressure_domain.smallEnd(1);
+    int const pressure_zhi = pressure_domain.bigEnd(1);
+    bool const pressure_periodic_z = geometry.isPeriodic(1);
+#else
+    int const pressure_zlo = 0, pressure_zhi = 0;
+    bool const pressure_periodic_z = true;
+#endif
     // Both steps below do not currently support m > 0 and should be
     // modified if such support wants to be added
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -788,6 +805,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real const> const& enE = enE_nodal_mf.const_array(mfi);
         Array4<Real const> const& rho = rhofield.const_array(mfi);
         Array4<Real const> const& Pe = Pefield.const_array(mfi);
+        Array4<Real> pressure_Er, pressure_Et, pressure_Ez;
+        if (write_pressure_E) {
+            pressure_Er = pressure_Efield[0]->array(mfi);
+            pressure_Et = pressure_Efield[1]->array(mfi);
+            pressure_Ez = pressure_Efield[2]->array(mfi);
+        }
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
@@ -839,6 +862,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
             // Er calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
 
+                if (write_pressure_E) { pressure_Er(i, j, 0) = 0.0_rt; }
+
                 // Skip field update in the embedded boundaries
                 if (update_Er_arr && update_Er_arr(i, j, 0) == 0) { return; }
 
@@ -851,7 +876,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                     const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
+                        (write_pressure_E ? warpx::hybrid::rzPressureGradient(
+                            Pe, i, j, 0, pressure_axis, pressure_outer,
+                            pressure_zlo, pressure_zhi, pressure_periodic_z, coefs_r[0])
+                         : T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0))
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
@@ -861,6 +889,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
+                    if (write_pressure_E) {
+                        pressure_Er(i, j, 0) = -grad_Pe / rho_val_limited;
+                    }
                 }
 
                 // Resistive terms; see include_resistivity above.
@@ -910,6 +941,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
 
             // Etheta calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
+
+                if (write_pressure_E) { pressure_Et(i, j, 0) = 0.0_rt; }
 
                 // Skip field update in the embedded boundaries
                 if (update_Etheta_arr && update_Etheta_arr(i, j, 0) == 0) { return; }
@@ -989,6 +1022,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
             // Ez calculation
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
 
+                if (write_pressure_E) { pressure_Ez(i, j, 0) = 0.0_rt; }
+
                 // Skip field update in the embedded boundaries
                 if (update_Ez_arr && update_Ez_arr(i, j, 0) == 0) { return; }
 
@@ -1001,7 +1036,10 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                     const Real grad_Pe = (!solve_for_Faraday) ?
-                        T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
+                        (write_pressure_E ? warpx::hybrid::rzPressureGradient(
+                            Pe, i, j, 2, pressure_axis, pressure_outer,
+                            pressure_zlo, pressure_zhi, pressure_periodic_z, coefs_z[0])
+                         : T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0))
                         : 0._rt;
 
                     // interpolate the nodal neE values to the Yee grid
@@ -1011,6 +1049,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const auto rho_val_limited = std::max(rho_val, rho_floor);
 
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
+                    if (write_pressure_E) {
+                        pressure_Ez(i, j, 0) = -grad_Pe / rho_val_limited;
+                    }
                 }
 
                 // Resistive terms; see include_resistivity above.
@@ -1092,6 +1133,7 @@ void FiniteDifferenceSolver::HybridPICSolveESpherical (
 template<typename T_Algo>
 void FiniteDifferenceSolver::HybridPICSolveECartesian (
     ablastr::fields::VectorField const& Efield,
+    ablastr::fields::VectorField const& pressure_Efield,
     ablastr::fields::VectorField const& Jfield,
     ablastr::fields::VectorField const& Jifield,
     ablastr::fields::VectorField const& Bfield,
@@ -1122,6 +1164,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+    bool const write_pressure_E = pressure_Efield[0] != nullptr;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !write_pressure_E
+            || (pressure_Efield[1] != nullptr && pressure_Efield[2] != nullptr),
+        "The isolated hybrid pressure electric field requires all three components.");
     // Decision-density sampling for the vacuum seam (VacuumSeamSwitchMode):
     // Edge is the legacy per-component average; Node and Cell give one
     // decision field for all three E components. The decision drives the
@@ -1276,6 +1323,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Ex = Efield[0]->array(mfi);
         Array4<Real> const& Ey = Efield[1]->array(mfi);
         Array4<Real> const& Ez = Efield[2]->array(mfi);
+        Array4<Real> pressure_Ex, pressure_Ey, pressure_Ez;
+        if (write_pressure_E) {
+            pressure_Ex = pressure_Efield[0]->array(mfi);
+            pressure_Ey = pressure_Efield[1]->array(mfi);
+            pressure_Ez = pressure_Efield[2]->array(mfi);
+        }
         Array4<Real const> const& Jx = Jfield[0]->const_array(mfi);
         Array4<Real const> const& Jy = Jfield[1]->const_array(mfi);
         Array4<Real const> const& Jz = Jfield[2]->const_array(mfi);
@@ -1343,6 +1396,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ex(i, j, k) = 0._rt;
+                if (write_pressure_E) { pressure_Ex(i, j, k) = 0._rt; }
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
@@ -1362,6 +1416,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     ? rho_floor : std::max(rho_val, rho_floor);
 
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+                if (write_pressure_E) {
+                    pressure_Ex(i, j, k) = -grad_Pe / rho_val_limited;
+                }
             }
 
             // Resistive terms; see include_resistivity above.
@@ -1424,6 +1481,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ey(i, j, k) = 0._rt;
+                if (write_pressure_E) { pressure_Ey(i, j, k) = 0._rt; }
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
@@ -1443,6 +1501,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     ? rho_floor : std::max(rho_val, rho_floor);
 
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
+                if (write_pressure_E) {
+                    pressure_Ey(i, j, k) = -grad_Pe / rho_val_limited;
+                }
             }
 
             // Resistive terms; see include_resistivity above.
@@ -1503,6 +1564,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ez(i, j, k) = 0._rt;
+                if (write_pressure_E) { pressure_Ez(i, j, k) = 0._rt; }
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
@@ -1522,6 +1584,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     ? rho_floor : std::max(rho_val, rho_floor);
 
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
+                if (write_pressure_E) {
+                    pressure_Ez(i, j, k) = -grad_Pe / rho_val_limited;
+                }
             }
 
             // Resistive terms; see include_resistivity above.

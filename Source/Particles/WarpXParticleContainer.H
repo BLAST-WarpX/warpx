@@ -17,6 +17,7 @@
 #include "Particles/Algorithms/KineticEnergy.H"
 #include "Particles/ParticleBoundaries.H"
 #include "SpeciesPhysicalProperties.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 
 #ifdef WARPX_QED
 #    include "ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper_fwd.H"
@@ -315,6 +316,16 @@ public:
                          amrex::Real dt, amrex::Real relative_time,
                          PushType push_type = PushType::Explicit);
 
+    /** Deposit current using an explicitly selected algorithm without
+     * changing the simulation's primary current-deposition setting.  This is
+     * used by conservative auxiliary ledgers that require a staggered,
+     * charge-conserving flux even when the field solver uses collocated
+     * direct current deposition. */
+    void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
+                         amrex::Real dt, amrex::Real relative_time,
+                         PushType push_type,
+                         CurrentDepositionAlgo deposition_algo);
+
     /**
      * \brief Deposit current density, sum guard values, and apply boundary conditions.
      *
@@ -350,6 +361,20 @@ public:
                         bool apply_boundary_and_scale_volume = false,
                         int icomp = 0);
 
+    /** Deposit q_e times the physical macro-particle number density.
+     *
+     * Unlike DepositCharge, this deliberately ignores a particle's fixed or
+     * evolving ionization level.  The charge-density staggering and shape are
+     * retained so material mass/ion count can share the hybrid EOS grid while
+     * remaining invariant under charge-changing ionization reactions.
+     */
+    void DepositUnitChargeDensity (
+        const ablastr::fields::MultiLevelScalarField& unit_charge_density,
+        bool local = false, bool reset = false,
+        bool apply_boundary_and_scale_volume = false,
+        bool interpolate_across_levels = true,
+        int icomp = 0);
+
     std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
 
     virtual void DepositCharge (WarpXParIter& pti,
@@ -379,7 +404,8 @@ public:
                                 int depos_lev,
                                 amrex::Real dt,
                                 amrex::Real relative_time,
-                                PushType push_type);
+                                PushType push_type,
+                                CurrentDepositionAlgo deposition_algo);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *
@@ -466,6 +492,10 @@ public:
 
     bool doContinuousInjection() const {return do_continuous_injection;}
 
+    /** Whether runtime particle resampling can change this species' discrete
+     * charge representation between consecutive field deposits. */
+    bool DoResampling () const noexcept { return do_resampling != 0; }
+
     // Inject a continuous flux of particles from a defined plane
     virtual void ContinuousFluxInjection(amrex::Real /*t*/, amrex::Real /*dt*/) {}
 
@@ -475,10 +505,12 @@ public:
     /// This returns the total energy/weight/charge for all the particles in this ParticleContainer.
     /// The total charge is needed when solving Poisson's equation with periodic boundary conditions.
     ///
-    std::pair<amrex::ParticleReal, amrex::ParticleReal> sumParticleWeightAndEnergy (bool local = false) const;
+    /// Energy diagnostics retain the field-precision reduction, including when
+    /// particle storage uses lower precision. Per-particle dynamics are unchanged.
+    std::pair<amrex::Real, amrex::Real> sumParticleWeightAndEnergy (bool local = false) const;
     amrex::ParticleReal sumParticleCharge (bool local = false) const;
     amrex::ParticleReal sumParticleWeight (bool local = false) const;
-    amrex::ParticleReal sumParticleEnergy (bool local = false) const;
+    amrex::Real sumParticleEnergy (bool local = false) const;
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 
@@ -596,6 +628,17 @@ public:
 
     int DoFieldIonization() const { return do_field_ionization; }
 
+    /** Whether the hybrid fluid-electron ionization operator evolves this
+     * species' integer charge state without creating kinetic electrons. */
+    bool DoHybridIonization () const noexcept { return do_hybrid_ionization != 0; }
+
+    /** Whether this species carries the runtime ``ionizationLevel`` integer
+     * used by particle push and charge/current deposition. */
+    bool HasEvolvingChargeState () const noexcept
+    {
+        return do_field_ionization != 0 || do_hybrid_ionization != 0;
+    }
+
 #ifdef WARPX_QED
     //Species for which QED effects are relevant should override these methods
     virtual bool has_quantum_sync() const {return false;}
@@ -651,6 +694,7 @@ public:
 #endif
 
     void setDoNotPush (bool flag) { do_not_push = flag; }
+    [[nodiscard]] bool doNotPush () const noexcept { return do_not_push; }
     void setDoNotGather (int flag) { do_not_gather = flag; }
     void setDoNotDeposit (int flag) { do_not_deposit = flag; }
 
@@ -694,6 +738,7 @@ protected:
     int do_continuous_injection = 0;
 
     int do_field_ionization = 0;
+    int do_hybrid_ionization = 0;
     int do_adk_correction = 0;
     int ionization_product;
     std::string ionization_product_name;

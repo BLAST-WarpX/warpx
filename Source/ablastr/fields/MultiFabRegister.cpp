@@ -10,6 +10,9 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_MakeType.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Print.H>
+#include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
 #include <array>
@@ -34,12 +37,18 @@ namespace ablastr::fields
         std::optional<amrex::Real const> initial_value,
         bool remake,
         bool redistribute_on_remake,
-        bool checkpoint_restart
+        bool checkpoint_restart,
+        bool restart_optional
     )
     {
         // checks
         if (has(name, level)) {
             throw std::runtime_error("MultiFabRegister::alloc_init failed because " + name + " already exists.");
+        }
+        if (restart_optional && !checkpoint_restart) {
+            throw std::runtime_error(
+                "MultiFabRegister::alloc_init restart_optional requires "
+                "checkpoint_restart for " + name + ".");
         }
 
         // fully qualified name
@@ -56,6 +65,7 @@ namespace ablastr::fields
                 remake,
                 redistribute_on_remake,
                 checkpoint_restart,
+                restart_optional,
                 ""   // we own the memory
             }
         );
@@ -86,7 +96,8 @@ namespace ablastr::fields
         std::optional<amrex::Real const> initial_value,
         bool remake,
         bool redistribute_on_remake,
-        bool checkpoint_restart
+        bool checkpoint_restart,
+        bool restart_optional
     )
     {
         // checks
@@ -96,6 +107,11 @@ namespace ablastr::fields
                 mf_name(name, dir, level) +
                 " already exists."
             );
+        }
+        if (restart_optional && !checkpoint_restart) {
+            throw std::runtime_error(
+                "MultiFabRegister::alloc_init restart_optional requires "
+                "checkpoint_restart for " + mf_name(name, dir, level) + ".");
         }
 
         // fully qualified name
@@ -112,6 +128,7 @@ namespace ablastr::fields
                 remake,
                 redistribute_on_remake,
                 checkpoint_restart,
+                restart_optional,
                 ""   // we own the memory
             }
         );
@@ -171,6 +188,7 @@ namespace ablastr::fields
                 alias.m_remake,
                 alias.m_redistribute_on_remake,
                 alias.m_checkpoint_restart,
+                alias.m_restart_optional,
                 internal_alias_name
             }
 
@@ -232,6 +250,7 @@ namespace ablastr::fields
                 alias.m_remake,
                 alias.m_redistribute_on_remake,
                 alias.m_checkpoint_restart,
+                alias.m_restart_optional,
                 internal_alias_name
             }
         );
@@ -341,13 +360,29 @@ namespace ablastr::fields
                 // only owning MultiFabs are read in
                 amrex::MultiFab & mf = mf_owner.m_mf;
                 const std::string & name = element.first;
-                if (!amrex::VisMF::Exist(dir + name)) {
-                    // The checkpoint predates this field being flagged (or was
-                    // written by a run that did not flag it): keep the runtime
-                    // initialization instead of failing the whole restart.
+                std::string const checkpoint_prefix = dir + name;
+                int checkpoint_header_exists = 0;
+                if (amrex::ParallelDescriptor::IOProcessor()) {
+                    checkpoint_header_exists =
+                        amrex::FileExists(checkpoint_prefix + "_H") ? 1 : 0;
+                }
+                amrex::ParallelDescriptor::Bcast(
+                    &checkpoint_header_exists, 1,
+                    amrex::ParallelDescriptor::IOProcessorNumber());
+                if (checkpoint_header_exists == 0) {
+                    if (!mf_owner.m_restart_optional) {
+                        throw std::runtime_error(
+                            "Checkpoint is missing the required MultiFab header '"
+                            + checkpoint_prefix + "_H'.");
+                    }
+                    amrex::Print()
+                        << "WARNING: Optional checkpoint MultiFab header '"
+                        << checkpoint_prefix
+                        << "_H' is absent; initializing the field to zero.\n";
+                    mf.setVal(0.0);
                     continue;
                 }
-                amrex::VisMF::Read(mf, dir + name);
+                amrex::VisMF::Read(mf, checkpoint_prefix);
             }
         }
     }

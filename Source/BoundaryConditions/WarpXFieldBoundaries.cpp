@@ -400,7 +400,8 @@ void WarpX::ApplyElectronPressureBoundary (const int lev, PatchType patch_type)
             PEC::ApplyPECtoElectronPressure(
                 electron_pressure_fp,
                 field_boundary_lo, field_boundary_hi,
-                Geom(lev), lev, patch_type, ref_ratio);
+                Geom(lev), lev, patch_type, ref_ratio,
+                m_hybrid_pic_model && m_hybrid_pic_model->m_conservative_pressure_work_pec);
         } else {
             amrex::Abort(Utils::TextMsg::Err(
             "ApplyElectronPressureBoundary: Only one level implemented for hybrid solver."));

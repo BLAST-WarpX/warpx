@@ -118,12 +118,16 @@ namespace PEC {
      * \param[in]     lev                 level of the Multifab
      * \param[in]     patch_type          coarse or fine
      * \param[in]     ref_ratios          vector containing the refinement ratios of the refinement levels
+     * \param[in] preserve_boundary_nodes Retain physical EOS pressure at evolved
+     * boundary control volumes and apply only even ghost reflection.
      */
     void ApplyPECtoElectronPressure (
                                 amrex::MultiFab* Pefield,
                                 const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
                                 const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
                                 const amrex::Geometry& geom,
-                                int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
+                                int lev, PatchType patch_type,
+                                const amrex::Vector<amrex::IntVect>& ref_ratios,
+                                bool preserve_boundary_nodes = false);
 }
 #endif // WarpX_PEC_KERNELS_H_

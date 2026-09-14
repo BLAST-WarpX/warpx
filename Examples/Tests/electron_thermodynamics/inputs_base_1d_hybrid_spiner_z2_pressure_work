@@ -1,0 +1,86 @@
+# One-push fixed-Z=2 regression for conservative hybrid pressure work with a
+# tabulated electron EOS.  The physical material density remains inside the
+# SP5 table, while the historical M/q_e mapping would place high-density nodes
+# above the table ceiling during the old-state source-load inversion.
+
+my_constants.formula_mass = 2.1618558138269478e-26
+my_constants.formula_charge = 2.0*q_e
+my_constants.rho0 = 7000.0
+my_constants.density_amplitude = 0.20
+my_constants.n_formula = rho0/formula_mass
+my_constants.ne0 = 2.0*n_formula
+my_constants.Te0_eV = 100.0
+my_constants.domain_length = 1.0
+my_constants.dt = 2.0e-7
+my_constants.k = 2.0*pi/domain_length
+
+max_step = 1
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = domain_length
+
+amr.n_cell = 32
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 16
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.do_single_precision_comms = 0
+warpx.serialize_initial_conditions = 1
+warpx.synchronize_velocity_for_diagnostics = 0
+warpx.used_inputs_file = warpx_used_inputs
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+algo.particle_pusher = boris
+
+hybrid_pic_model.elec_temp = Te0_eV
+hybrid_pic_model.n0_ref = ne0
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.n_floor = 0.10*ne0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = singularity_spiner
+hybrid_pic_model.electron_eos_species = ions
+hybrid_pic_model.electron_eos_ions_material_id = 7400
+hybrid_pic_model.conservative_pressure_work = 1
+
+particles.species_names = ions
+ions.charge = formula_charge
+ions.mass = formula_mass
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 8
+ions.profile = parse_density_function
+ions.density_function(x,y,z) = n_formula*(1.0+density_amplitude*cos(k*z))
+ions.momentum_distribution_type = constant
+ions.ux = 0.0
+ions.uy = 0.0
+ions.uz = 0.0
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.species = ions
+diag.fields_to_plot = rho Te Pe
+
+warpx.reduced_diags_names = particle_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1

@@ -1,0 +1,46 @@
+/* Copyright 2026 The WarpX Community
+ * License: BSD-3-Clause-LBNL
+ */
+#ifndef WARPX_RADIATION_PARTICLEIMPULSEBOUNDARY_H_
+#define WARPX_RADIATION_PARTICLEIMPULSEBOUNDARY_H_
+
+#include <AMReX_Array.H>
+#include <AMReX_REAL.H>
+
+#include <functional>
+#include <string>
+#include <vector>
+
+struct ParticleBoundaries;
+class WarpXParticleContainer;
+
+namespace warpx::radiation
+{
+    struct ParticleImpulseBoundaryTransfer {
+        std::string path;
+        // Global pending-only wall momentum [kg m/s], NOT represented ion impulse.
+        amrex::GpuArray<amrex::Real, 3> momentum{};
+    };
+
+    std::vector<std::string> RegisteredParticleImpulsePaths(WarpXParticleContainer &species);
+
+    /** Native elastic Cartesian or axis-containing RZ reflection with radiation carries.
+     * RZ requires a reflecting outer radial wall and periodic or reflecting axial
+     * faces. Event directions are cylindrical, but carry and transfer are Cartesian.
+     * This adapter does not enable radial radiation moment transport.
+     * Stage the complete container and direct event transfers before committing.
+     * Failure leaves particles and the supplied transfer vector unchanged.
+     * Success does not redistribute particles or accumulate a persistent ledger.
+     * The optional collective accept callback must stage external accounting
+     * privately; it can reject the proposed transfers before particle commit.
+     * angular_trajectory additionally requires RZ saved Cartesian prev_x/y,
+     * a specular radial wall (not reflect-all) and periodic z. It continues the
+     * actual collision-point path and applies its matrix to momentum and carry.
+     */
+    bool TryReflectParticleImpulseState(
+        WarpXParticleContainer &species, ParticleBoundaries const &boundaries,
+        std::vector<ParticleImpulseBoundaryTransfer> &transfers,
+        std::function<bool(std::vector<ParticleImpulseBoundaryTransfer> const &)> const &accept =
+            {}, bool angular_trajectory = false);
+} // namespace warpx::radiation
+#endif

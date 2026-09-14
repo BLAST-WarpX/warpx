@@ -1,0 +1,7 @@
+# Manufactured spectral Rosseland partial opacity,
+# alpha_R=100*ni/n0+100*Te[eV]+200*photon_energy/(100 eV).
+2 2 2
+5.0e19 1.5e20
+5.80225906077504e3 1.740677718232512e4
+8.01088317e-18 4.005441585e-17
+200.0 600.0 300.0 700.0 300.0 700.0 400.0 800.0

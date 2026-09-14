@@ -6,6 +6,7 @@
 #include "Particles/Filter/FilterFunctors.H"
 #include "Particles/ParticleIO.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Radiation/RadiationTransport.H"
 #include "Utils/Interpolate.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -264,7 +265,19 @@ FlushFormatPlotfile::WriteWarpXHeader(
 
         HeaderFile.precision(17);
 
-        HeaderFile << "Checkpoint version: 1\n";
+        // Keep radiation restart schema information on the version line so the
+        // legacy header layout remains unchanged for all following records.
+        auto const& radiation = warpx.GetRadiationTransport();
+        bool const spectral_carry = radiation.usesMomentumCoupling()
+            && radiation.numEnergyGroups() > 1;
+        HeaderFile << "Checkpoint version: " << (spectral_carry ? 3 : 2)
+                   << " radiation_momentum_carry_fields: "
+                   << radiation.usesMomentumCoupling();
+        if (spectral_carry) {
+            HeaderFile << " radiation_diffusion_momentum_groups: "
+                       << radiation.numEnergyGroups();
+        }
+        HeaderFile << "\n";
 
         const int nlevels = warpx.finestLevel()+1;
         HeaderFile << nlevels << "\n";
@@ -360,9 +373,12 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
         WarpXParticleContainer* pc = part_diag.getParticleContainer();
         WarpXParticleContainer::Base* pinned_pc = part_diag.getPinnedParticleContainer();
         auto tmp = isBTD ?
-            pinned_pc->make_alike<>() :
-            pc->make_alike<>();
-        tmp.SetArena(amrex::The_Pinned_Arena());
+            pinned_pc->make_alike<amrex::PinnedArenaAllocator>() :
+            pc->make_alike<amrex::PinnedArenaAllocator>();
+        // Use a pinned allocator for the entire tile, including runtime
+        // attribute pointer caches. Setting only a polymorphic tile's payload
+        // arena leaves those pointer tables on the device in AMReX 26.09;
+        // CPU plotfile packing then dereferences device-only pointers.
 
         Vector<std::string> real_names;
         Vector<std::string> int_names;
@@ -431,12 +447,11 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
                                    utils::parser::compileParser<ParticleDiag::m_nvars>
                                        (part_diag.m_particle_filter_parser.get()),
                                    pc->getMass(), time);
-        parser_filter.m_units = InputUnits::SI;
+        parser_filter.m_units = InputUnits::WarpX;
         GeometryFilter const geometry_filter(part_diag.m_do_geom_filter,
                                              part_diag.m_diag_domain);
 
         if (!isBTD) {
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pc, mass);
             using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
             tmp.copyParticles(*pc,
                               [random_filter,uniform_filter,parser_filter,geometry_filter]
@@ -447,9 +462,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
                 return random_filter(p, engine) * uniform_filter(p, engine)
                     * parser_filter(p, engine) * geometry_filter(p, engine);
             }, true);
-            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
         } else {
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
             using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
             tmp.copyParticles(*pinned_pc,
                               [random_filter,uniform_filter,parser_filter,geometry_filter]
@@ -460,8 +473,10 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
                 return random_filter(p, engine) * uniform_filter(p, engine)
                     * parser_filter(p, engine) * geometry_filter(p, engine);
             }, true);
-            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pinned_pc, mass);
         }
+        // Convert the filtered output copy only. A live SI round trip is not
+        // an exact inverse in floating point and perturbs particle/carry state.
+        particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
 
         // real_names contains a list of all particle attributes.
         // real_flags & int_flags are 1 or 0, whether quantity is dumped or not.

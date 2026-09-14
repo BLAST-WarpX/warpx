@@ -3,6 +3,10 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
       HybridPICModel.cpp
+      HybridPICCheckpoint.cpp
+      ElectronHeatConduction.cpp
+      NonlinearHeatConduction.cpp
+      HybridElectronConduction.cpp
       ExternalVectorPotential.cpp
     )
 endforeach()

@@ -1,0 +1,8 @@
+# Convert every cell in the one-box serial reference. The MPI companion splits
+# this same 4^3-cell physical state into eight boxes over two ranks.
+
+FILE = inputs_base_3d_radiation_transport_packet_sampling
+
+amr.n_cell = 4 4 4
+amr.max_grid_size = 4
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 8.0e-13

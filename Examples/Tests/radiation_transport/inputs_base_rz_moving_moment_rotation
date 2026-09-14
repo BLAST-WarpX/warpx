@@ -1,0 +1,12 @@
+# Experimental native angular integration; not yet production qualification.
+FILE = inputs_base_rz_moving_moment_compression
+my_constants.angular_frequency = 1.e8
+my_constants.inward_speed = 0
+ions.save_previous_position = 1
+radiation_transport.rz_angular_transport = 1
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 1.e13
+radiation_transport.planck_absorption_coefficient = 0
+ions.momentum_function_ux(x,y,z) = "(-angular_frequency*y-inward_speed*x/max(sqrt(x*x+y*y),1.e-30)*sin(pi*sqrt(x*x+y*y)/radius))/clight"
+ions.momentum_function_uy(x,y,z) = "(angular_frequency*x-inward_speed*y/max(sqrt(x*x+y*y),1.e-30)*sin(pi*sqrt(x*x+y*y)/radius))/clight"
+radiation_momentum.include_angular_inventory = 1
+radiation_momentum.precision = 17

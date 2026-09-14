@@ -7,6 +7,8 @@
 # --- with the analytically calculated density based on the input parameters
 # --- of the test simulation at each output timestep.
 
+import argparse
+
 import dill
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +18,10 @@ from scipy.interpolate import RegularGridInterpolator
 from pywarpx import picmi
 
 constants = picmi.constants
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--precision", choices=["SINGLE", "DOUBLE"], required=True)
+args = parser.parse_args()
 
 # load simulation parameters
 with open("sim_parameters.dpkl", "rb") as f:
@@ -75,4 +81,5 @@ plt.legend()
 plt.show()
 
 print("RMS error (%) in density: ", rms_errors)
-assert np.all(rms_errors < 0.07)
+error_cap = 0.13 if args.precision == "SINGLE" else 0.07
+assert np.all(rms_errors < error_cap)

@@ -1,0 +1,14 @@
+# Precision/ownership integration test, not a moving-frame opacity benchmark.
+# Opacity is externally prescribed in the lab. Ions traverse multiple cells
+# while absorption supplies both represented and deferred momentum/work.
+FILE = inputs_base_1d_radiation_transport_streaming_momentum_carry
+amr.max_grid_size = 4
+warpx.const_dt = 1.e-9
+ions.do_not_push = 0
+radiation_transport.momentum_carry = particle
+diagnostics.diags_names = diag chk
+diag.intervals = 1
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 15
+chk.file_prefix = diags/chk

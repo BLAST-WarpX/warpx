@@ -1,0 +1,33 @@
+# ET-2: force the hybrid electron state below its thermodynamic density floor
+# while keeping it above the radiation material threshold.  The raw-density
+# ideal-gas heat capacity is then four times too small, so the one-step LTE
+# result distinguishes the shared ElectronThermodynamics path from the legacy
+# radiation-side reconstruction.
+
+FILE = inputs_test_rcylinder_radiation_transport_matter_exchange
+
+# Iteration-0 diagnostics precede hybrid rho/Pe/Te initialization.  Use one
+# zero-opacity warm-up step, followed by exactly one active LTE exchange step.
+max_step = 2
+amr.n_cell = 32
+amr.blocking_factor = 8
+amr.max_grid_size = 32
+
+my_constants.alpha_planck = 5.0e3
+
+# n0 remains both the reference density and thermodynamic floor.  Only the
+# deposited ion/electron density is reduced.
+ions.density = 0.25*n0
+ions.num_particles_per_cell_each_dim = 128 1
+hybrid_pic_model.n_floor = n0
+radiation_transport.minimum_electron_density = 0.05*n0
+radiation_transport.lte_exchange_tolerance = 1.0e-11
+radiation_transport.planck_absorption_coefficient(x,y,z,t,ne,Te) = \
+    if(t > 0.5*dt, \
+        if(x > 0.0025, if(x < 0.0075, alpha_planck, 0.0), 0.0), \
+        0.0)
+
+# Write the warm and one-active-step states.  Pe and Te expose the ideal-gas
+# U_e=Pe/(gamma-1) and C_Ve=Pe/((gamma-1)Te) used by the acceptance analysis.
+diag.intervals = 1
+diag.fields_to_plot = rho Te Pe radiation_material_energy radiation_diffusion_energy

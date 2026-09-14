@@ -32,12 +32,7 @@ the ion thermal velocity about the ion bulk, not relax the ion bulk toward the
 electron flow. The deposited ion current projected onto the force-free mode
 must therefore remain at its initial shot-noise level.
 
-This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) from the
-post-step dumps -- the iteration-0 dump is skipped, since it is written before
-the first field solve while T_e still holds its zero allocation value (T_e is
-filled from the closure at the first step) -- so (Te0, Ti0) is the first
-post-step dump; the exponential fit does not depend on the normalisation
-point. It checks
+This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) and checks
   (1) the difference-decay rate vs [3(gamma_e-1)+2] nu_ei, and
   (2) energy conservation: C_e T_e + C_i T_i constant over the run, and
   (3) ion bulk momentum remains unchanged despite the electron-ion drift.
@@ -59,18 +54,12 @@ K_B = 1.380649e-23
 K_PER_EV = Q_E / K_B  # T[eV] * this = T[K];  T[K] / this = T[eV]
 
 
-def post_step_iterations(ts):
-    """Iterations to analyse: all dumps except iteration 0 (T_e = 0 there)."""
-    return [it for it in ts.iterations if it > 0]
-
-
-def domain_means(ts, its):
-    """Return (t[s], <Te>[eV], <Ti>[eV]) density-weighted domain means over
-    the iterations `its`."""
-    t = np.asarray(ts.t, dtype=float)[-len(its) :]
+def domain_means(ts):
+    """Return (t[s], <Te>[eV], <Ti>[eV]) density-weighted domain means."""
+    t = np.asarray(ts.t, dtype=float)
 
     Te_m, Ti_m = [], []
-    for it in its:
+    for it in ts.iterations:
         Te, _ = ts.get_field("Te", iteration=it)
         Ti, _ = ts.get_field("T_ions", iteration=it)
         rho, _ = ts.get_field("rho", iteration=it)
@@ -123,20 +112,17 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     ts = OpenPMDTimeSeries(args.diag_dir)
-    its = post_step_iterations(ts)
-    t, Te, Ti = domain_means(ts, its)
+    t, Te, Ti = domain_means(ts)
     if t.size < 3:
-        print(f"ERROR: need >=3 post-step dumps, found {t.size} in {args.diag_dir}")
+        print(f"ERROR: need >=3 dumps, found {t.size} in {args.diag_dir}")
         return 1
 
     g = args.gamma
     # rate at which (Te - Ti) decays = [3(g-1) + 2] nu_ei.
     rate_pred = (3.0 * (g - 1.0) + 2.0) * args.nu_ei
-    # Reference = first post-step dump (t[0] > 0); the fitted slope is
-    # independent of where the difference is normalised.
     Te0, Ti0 = Te[0], Ti[0]
 
-    # (1) fit ln((Te-Ti)/(Te0-Ti0)) = -rate (t - t0).
+    # (1) fit ln((Te-Ti)/(Te0-Ti0)) = -rate t.
     d = (Te - Ti) / (Te0 - Ti0)
     # Fit only while the difference is well above the particle-noise floor;
     # long (multi-tau) runs otherwise flatten the tail and bias the rate low.
@@ -158,7 +144,7 @@ def main(argv=None):
     k = 2.0 * np.pi / args.Lx
     J0 = k * args.B0 / mu_0
     current_projection = []
-    for iteration in its:
+    for iteration in ts.iterations:
         Jy, info_y = ts.get_field(field="j", coord="y", iteration=iteration)
         Jz, info_z = ts.get_field(field="j", coord="z", iteration=iteration)
         ay = np.mean(Jy * np.sin(k * info_y.x)[np.newaxis, :])
@@ -201,18 +187,10 @@ def main(argv=None):
 
     ax[1].semilogy(tus[good], d[good], "o", ms=5, label="measured")
     ax[1].semilogy(
-        tus,
-        np.exp(-rate_fit * (t - t[0])),
-        "-",
-        lw=2,
-        label=f"fit  rate={rate_fit:.2e}",
+        tus, np.exp(-rate_fit * t), "-", lw=2, label=f"fit  rate={rate_fit:.2e}"
     )
     ax[1].semilogy(
-        tus,
-        np.exp(-rate_pred * (t - t[0])),
-        "--",
-        lw=2,
-        label=f"pred rate={rate_pred:.2e}",
+        tus, np.exp(-rate_pred * t), "--", lw=2, label=f"pred rate={rate_pred:.2e}"
     )
     ax[1].set_xlabel(r"time ($\mu$s)")
     ax[1].set_ylabel(r"$(T_e-T_i)/(T_{e0}-T_{i0})$")

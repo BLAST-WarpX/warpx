@@ -1,0 +1,4 @@
+# Actual rotating material, direct radiative heating and specular wall encounters.
+FILE = inputs_base_rz_moving_moment_rotation
+radiation_transport.planck_absorption_coefficient = 1
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 1.e11

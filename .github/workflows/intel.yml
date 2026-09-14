@@ -122,13 +122,15 @@ jobs:
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
 
+        # Serialize PVC AOT links to keep peak compiler memory bounded as the
+        # WarpX device image grows. This is also the AMReX default.
         cmake -S . -B build_dpsp       \
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
           -DAMReX_SYCL_AOT=ON          \
           -DAMReX_INTEL_ARCH=pvc       \
-          -DAMReX_PARALLEL_LINK_JOBS=4 \
+          -DAMReX_PARALLEL_LINK_JOBS=1 \
           -DWarpX_EB=ON                \
           -DWarpX_FFT=ON               \
           -DWarpX_PYTHON=ON            \

@@ -63,7 +63,7 @@ namespace
         for (int d = 0; d < AMREX_SPACEDIM; ++d) {
             vol *= dx[d];
         }
-#if defined(WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         // The midpoint expression is the exact annular volume for every
         // cell-centered marker, including the first radial cell at r = dr/2.
         vol *= 2.0_rt * MathConst::pi * amrex::Math::abs(r);

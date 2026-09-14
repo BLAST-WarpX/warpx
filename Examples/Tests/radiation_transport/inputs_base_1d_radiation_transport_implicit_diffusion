@@ -1,0 +1,14 @@
+FILE = inputs_test_1d_radiation_transport_diffusion_only
+# Radiation-only stiff-step oracle: no EM field evolution or moving particles.
+# Leaving Yee enabled would impose an unrelated light-wave CFL/guard-cell cost.
+algo.maxwell_solver = none
+amr.n_cell = 32
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+warpx.const_dt = 100*(1.0/32)^2/(2*299792458.0/300)
+radiation_transport.rosseland_transport_coefficient = 100.0
+radiation_transport.diffusion_solver = implicit
+radiation_transport.diffusion_implicit_tolerance = 1.0e-10
+radiation_transport.diffusion_linear_tolerance = 1.0e-13
+radiation_transport.max_diffusion_substeps = 1
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 1+0.01*cos(2*pi*z)

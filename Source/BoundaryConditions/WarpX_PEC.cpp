@@ -522,7 +522,8 @@ namespace
                           amrex::Array4<amrex::Real> const& field,
                           amrex::GpuArray<GpuArray<int, 2>, AMREX_SPACEDIM> const& mirrorfac,
                           amrex::GpuArray<GpuArray<bool, 2>, AMREX_SPACEDIM> const& is_pec,
-                          amrex::Box const& fabbox )
+                          amrex::Box const& fabbox,
+                          bool const preserve_boundary_nodes)
     {
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim)
         {
@@ -537,8 +538,10 @@ namespace
                 // On the PEC boundary the field value is set equal to the
                 // first value in the domain (nodal fields)
                 if (ijk_vec == iv_mirror) {
-                    iv_mirror[idim] += (iside == 0) ? 1 : -1;
-                    if (fabbox.contains(iv_mirror)) { field(ijk_vec, n) = field(iv_mirror, n); }
+                    if (!preserve_boundary_nodes) {
+                        iv_mirror[idim] += (iside == 0) ? 1 : -1;
+                        if (fabbox.contains(iv_mirror)) { field(ijk_vec, n) = field(iv_mirror, n); }
+                    }
                 }
                 // otherwise set the mirror guard cell equal to the internal cell value
                 else if (fabbox.contains(iv_mirror))
@@ -1134,7 +1137,8 @@ PEC::ApplyPECtoElectronPressure (
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_lo,
     const amrex::Array<FieldBoundaryType,AMREX_SPACEDIM>& field_boundary_hi,
     const amrex::Geometry& geom,
-    const int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios)
+    const int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
+    bool const preserve_boundary_nodes)
 {
     amrex::Box domain_box = geom.Domain();
     if (patch_type == PatchType::coarse && (lev > 0)) {
@@ -1187,7 +1191,8 @@ PEC::ApplyPECtoElectronPressure (
             // Store the array index
             const amrex::IntVect iv(AMREX_D_DECL(i,j,k));
 
-            ::SetNeumannOnPEC(n, iv, Pe_array, mirrorfac, is_pec, fabbox);
+            ::SetNeumannOnPEC(n, iv, Pe_array, mirrorfac, is_pec, fabbox,
+                             preserve_boundary_nodes);
         });
     }
 }

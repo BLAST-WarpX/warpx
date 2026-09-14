@@ -1,0 +1,12 @@
+# Structured spectral opacity table:
+# n_ne n_temperature n_photon_energy
+2 2 2
+# electron density [m^-3]
+1.0e19 1.0e21
+# electron temperature [K]
+1.0e3 1.0e6
+# photon energy [J]
+1.0e-20 1.0e-10
+# alpha [m^-1], density-major / temperature / photon-energy-fastest.
+# This is alpha=ne/1e19, so interpolation at ne=1e20 must return 10.
+1.0 1.0 1.0 1.0 100.0 100.0 100.0 100.0

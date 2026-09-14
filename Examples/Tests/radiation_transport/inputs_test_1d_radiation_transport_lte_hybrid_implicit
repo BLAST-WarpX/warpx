@@ -1,0 +1,9 @@
+FILE = inputs_test_1d_radiation_transport_lte_hybrid
+
+# Stiff two-group LTE exchange must solve for the final material temperature.
+my_constants.alpha_planck = 1.0e5
+radiation_transport.energy_group_boundaries = q_e
+radiation_transport.lte_exchange_solver = implicit_temperature
+
+diag1.fields_to_plot = rho Te radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1

@@ -79,6 +79,12 @@ public:
         ablastr::fields::MultiFabRegister& fields,
         int lev,  amrex::Real t, amrex::Real dt) override;
 
+    /** Let radiation transport subcycle photon positions instead of PushPX. */
+    void setRadiationTransportManaged (bool const managed) noexcept
+    {
+        m_radiation_transport_managed = managed;
+    }
+
     // Do nothing
     void PushP (int /*lev*/,
                         amrex::Real /*dt*/,
@@ -119,7 +125,8 @@ public:
                                  int const /*depos_lev*/,
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
-                                 PushType /*push_type*/) override {}
+                                 PushType /*push_type*/,
+                                 CurrentDepositionAlgo /*deposition_algo*/) override {}
 
     /**
      * \brief No-op override: photons are massless and carry no charge, so
@@ -130,6 +137,9 @@ public:
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& /*fields*/,
                               int /*lev*/,
                               amrex::Real /*dt*/) override {}
+
+private:
+    bool m_radiation_transport_managed = false;
 };
 
 #endif // #ifndef WARPX_PhotonParticleContainer_H_

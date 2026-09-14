@@ -92,6 +92,35 @@ int initializeIntValue (const InitializationPolicy policy) noexcept
 
 namespace ParticleCreation {
 
+    /** Initialize radiation rounding accounts only in the newly created range.
+     * Bulk plasma injection also uses this helper because it initializes native,
+     * QED and user attributes directly rather than calling the generic routine.
+     * The component offset preserves any attributes supplied by an external caller.
+     */
+    template <typename PTile, typename DstPC>
+    void InitializeRadiationImpulseAttributes (
+        PTile& ptile, DstPC const& pc, amrex::Long start, amrex::Long stop,
+        int first_component = PIdx::nattribs)
+    {
+        using namespace amrex::literals;
+        if (stop <= start) { return; }
+        auto const& names = pc.GetRealSoANames();
+        auto const* arena = pc.arena();
+        bool const run_on_gpu = arena->isManaged() || arena->isDevice();
+        for (int component = first_component; component < ptile.NumRealComps(); ++component) {
+            if (!names[component].starts_with("radiation_impulse_")) { continue; }
+            auto* const values = ptile.GetStructOfArrays().GetRealData(component).data();
+            if (run_on_gpu) {
+                amrex::ParallelFor(stop - start,
+                    [=] AMREX_GPU_DEVICE (amrex::Long i) noexcept {
+                        values[start + i] = 0._prt;
+                    });
+            } else {
+                for (amrex::Long i = start; i < stop; ++i) { values[i] = 0._prt; }
+            }
+        }
+    }
+
     /**
      * \brief Default initialize runtime attributes in a tile. This routine does not initialize the
      * first n_external_attr_real real attributes and the first n_external_attr_int integer
@@ -151,6 +180,9 @@ void DefaultInitializeRuntimeAttributes (PTile& ptile,
         amrex::Arena const * const pc_arena = pc.arena();
         const bool run_on_gpu =
             pc_arena->isManaged() || pc_arena->isDevice();
+
+        InitializeRadiationImpulseAttributes(
+            ptile, pc, start, stop, PIdx::nattribs + n_external_attr_real);
 
         // Initialize the last NumRuntimeRealComps() - n_external_attr_real runtime real attributes
         for (int j = PIdx::nattribs + n_external_attr_real; j < ptile.NumRealComps() ; ++j)

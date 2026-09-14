@@ -1,0 +1,16 @@
+# Homogeneous source-operator tests: real kinetic ions and native electron EOS.
+FILE = inputs_base_1d_particle_impulse
+geometry.prob_hi = 1.e-3
+ions.uz = 1.e5/clight
+algo.maxwell_solver = hybrid
+algo.current_deposition = direct
+warpx.use_filter = 0
+hybrid_pic_model.elec_temp = 1
+hybrid_pic_model.initial_elec_temp(x,y,z) = 1
+hybrid_pic_model.n0_ref = 1.e20
+hybrid_pic_model.n_floor = 1.e18
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0

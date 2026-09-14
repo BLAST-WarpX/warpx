@@ -1,0 +1,16 @@
+# Spatial cold-start profile and restart coverage for the persistent grey
+# radiation field. No material model or LTE exchange is involved.
+
+FILE = inputs_base_1d_radiation_transport_cold_start_profiles
+
+max_step = 2
+
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 1.0 + 2.0*z
+
+diagnostics.diags_names = diag1 chk
+diag1.fields_to_plot = radiation_material_energy radiation_diffusion_energy
+
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 1
+chk.file_prefix = diags/chk

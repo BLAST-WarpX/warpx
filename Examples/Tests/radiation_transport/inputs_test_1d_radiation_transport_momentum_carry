@@ -1,0 +1,107 @@
+# Sustained FLD recoil on a fixed ion foil with uniform Hybrid temperature and
+# LTE exchange disabled. The 250 fs timestep previously failed when a cell
+# impulse fell below one ULP of the accumulated ion proper velocity. Step 149
+# is checkpointed with a nonzero carry so the dependent restart test also
+# exercises persistence of deferred momentum.
+
+max_step = 400
+amr.n_cell = 512
+amr.max_level = 0
+amr.max_grid_size = 128
+amr.blocking_factor = 8
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0e-3
+
+boundary.field_lo = pec
+boundary.field_hi = pec
+boundary.particle_lo = reflecting
+boundary.particle_hi = reflecting
+
+warpx.const_dt = 2.5e-13
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+warpx.random_seed = 42
+
+algo.maxwell_solver = hybrid
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+hybrid_pic_model.elec_temp = 10.0
+hybrid_pic_model.n0_ref = 6.02214076208112328e27
+hybrid_pic_model.n_floor = 6.02214076208112355e26
+hybrid_pic_model.gamma = 5.0/3.0
+hybrid_pic_model.substeps = 2
+hybrid_pic_model.plasma_resistivity(rho,J,t) = 0.0
+hybrid_pic_model.solve_electron_energy_equation = 1
+hybrid_pic_model.include_joule_heating = 0
+hybrid_pic_model.electron_thermodynamics = ideal_gas
+
+particles.species_names = ions photons
+
+ions.species_type = proton
+ions.injection_style = NUniformPerCell
+ions.num_particles_per_cell_each_dim = 1
+ions.profile = constant
+ions.density = 6.02214076208112328e27
+ions.momentum_distribution_type = at_rest
+ions.do_not_gather = 1
+ions.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = none
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    "if((z>=4.0e-4)*(z<=6.0e-4),500.0,50.0)"
+radiation_transport.material_coupling = hybrid_electrons
+radiation_transport.minimum_electron_density = 6.02214076208112355e26
+radiation_transport.group_photon_energies = 300.0*q_e
+radiation_transport.initial_diffusion_energy_density(x,y,z) = \
+    "if((z>=4.0e-4)*(z<=6.0e-4),1.11133224212682816e11,1.37201516916722059e5)"
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    "if((z>=4.0e-4)*(z<=6.0e-4),1.0e5,2.0e4)"
+radiation_transport.minimum_diffusion_optical_depth = 0.0385
+radiation_transport.diffusion_cfl = 0.5
+radiation_transport.max_diffusion_substeps = 20000
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.diffusion_boundary_lo = reflecting
+radiation_transport.diffusion_boundary_hi = marshak
+radiation_transport.enable_momentum_coupling = 1
+radiation_transport.momentum_species = ions
+
+diagnostics.diags_names = diag chk
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 40
+diag.file_prefix = diags/diag
+diag.write_species = 1
+diag.species = ions
+# Momentum carry is a three-component checkpoint state; RadiationMomentum
+# exposes its named Cartesian components without an ambiguous scalar plot alias.
+diag.fields_to_plot = radiation_diffusion_energy
+
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 149
+chk.file_prefix = diags/chk
+
+warpx.reduced_diags_names = radiation_energy radiation_momentum
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+radiation_momentum.type = RadiationMomentum
+radiation_momentum.intervals = 1
+radiation_momentum.path = diags/
+radiation_momentum.precision = 17
+
+amrex.abort_on_unused_inputs = 1

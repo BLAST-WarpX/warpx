@@ -1,0 +1,16 @@
+# CPU/CUDA runtime coverage of the vector-gradient MLMG path, not a production run.
+FILE = inputs_base_1d_radiation_transport_implicit_diffusion
+geometry.dims = 3
+geometry.prob_lo = 0 0 0
+geometry.prob_hi = 1 1 1
+amr.n_cell = 16 16 16
+amr.max_grid_size = 8 8 8
+amr.blocking_factor = 8 8 8
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+warpx.const_dt = 100*(1.0/16)^2/(6*299792458.0/300)
+radiation_transport.diffusion_gradient = vector
+radiation_transport.initial_diffusion_energy_density(x,y,z) = 1+0.01/3*(cos(2*pi*x)+cos(2*pi*y)+cos(2*pi*z))
+amrex.the_arena_init_size = 0

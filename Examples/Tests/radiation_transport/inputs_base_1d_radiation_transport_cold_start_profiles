@@ -1,0 +1,56 @@
+# Material-free base for grey and multigroup radiation cold-start profiles.
+
+max_step = 0
+amr.n_cell = 16
+amr.max_level = 0
+amr.max_grid_size = 8
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 1.0e-12
+warpx.verbose = 0
+warpx.use_filter = 0
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+photons.species_type = photon
+photons.injection_style = none
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.material_coupling = none
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 1
+# Every cell is optically thin, so FLD leaves initialized fields unchanged.
+radiation_transport.rosseland_transport_coefficient = 1.0
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.enable_particle_conversion = 0
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.write_species = 0
+diag1.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = radiation_energy
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1

@@ -1,0 +1,124 @@
+# Quantitative species-aware Planck opacity with kinetic electrons in
+# RCYLINDER.
+#
+# Two equal-weight electrons with opposite radial velocities occupy every
+# cell, giving an exact zero drift and Te=Te0_eV. Foam and tungsten occupy one
+# whole cell each, so their one-step LTE emission can be checked analytically.
+
+my_constants.n0 = 1.0e20
+my_constants.Te0_eV = 1.0
+my_constants.alpha_foam = 10.0
+my_constants.alpha_tungsten = 4.0*alpha_foam
+my_constants.group_photon_energy = 100.0*q_e
+my_constants.dr = 1.0e-3
+my_constants.dt = 1.0e-10
+my_constants.u0 = sqrt(3.0*q_e*Te0_eV/m_e)/clight
+
+max_step = 1
+amr.n_cell = 4
+amr.max_level = 0
+amr.blocking_factor = 4
+amr.max_grid_size = 4
+
+geometry.dims = RCYLINDER
+geometry.prob_lo = 0.0
+geometry.prob_hi = 4.0*dr
+
+boundary.field_lo = none
+boundary.field_hi = none
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.grid_type = collocated
+warpx.use_filter = 0
+warpx.serialize_initial_conditions = 1
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons foam tungsten photons
+
+electrons.species_type = electron
+electrons.injection_style = MultipleParticles
+electrons.multiple_particles_pos_x = \
+    0.5*dr 0.5*dr 1.5*dr 1.5*dr 2.5*dr 2.5*dr 3.5*dr 3.5*dr
+electrons.multiple_particles_pos_y = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_pos_z = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_ux = u0 -u0 u0 -u0 u0 -u0 u0 -u0
+electrons.multiple_particles_uy = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_uz = 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+electrons.multiple_particles_weight = \
+    0.5*n0*pi*dr^2 0.5*n0*pi*dr^2 \
+    1.5*n0*pi*dr^2 1.5*n0*pi*dr^2 \
+    2.5*n0*pi*dr^2 2.5*n0*pi*dr^2 \
+    3.5*n0*pi*dr^2 3.5*n0*pi*dr^2
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+foam.species_type = proton
+foam.injection_style = SingleParticle
+foam.single_particle_pos = 1.5*dr 0.0 0.0
+foam.single_particle_u = 0.0 0.0 0.0
+foam.single_particle_weight = 3.0*n0*pi*dr^2
+foam.do_not_deposit = 1
+foam.do_not_push = 1
+
+tungsten.species_type = proton
+tungsten.injection_style = SingleParticle
+tungsten.single_particle_pos = 2.5*dr 0.0 0.0
+tungsten.single_particle_u = 0.0 0.0 0.0
+tungsten.single_particle_weight = 5.0*n0*pi*dr^2
+tungsten.do_not_deposit = 1
+tungsten.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.5*dr 0.0 0.0
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 1.0
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+radiation_transport.minimum_electron_density = 0.5*n0
+radiation_transport.opacity_species = foam tungsten
+radiation_transport.group_photon_energies = group_photon_energy
+radiation_transport.absorption_coefficient_foam(x,y,z,t,photon_energy,ni,ne,Te) = 0.0
+radiation_transport.absorption_coefficient_tungsten(x,y,z,t,photon_energy,ni,ne,Te) = 0.0
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = frozen_temperature
+radiation_transport.planck_absorption_coefficient_foam(x,y,z,t,photon_energy,ni,ne,Te) = \
+    alpha_foam*ni/n0*photon_energy/group_photon_energy
+radiation_transport.planck_absorption_coefficient_tungsten(x,y,z,t,photon_energy,ni,ne,Te) = \
+    alpha_tungsten*ni/n0*photon_energy/group_photon_energy
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.write_species = 0
+diag1.fields_to_plot = radiation_material_energy radiation_diffusion_energy
+
+warpx.reduced_diags_names = radiation_energy particle_energy
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17

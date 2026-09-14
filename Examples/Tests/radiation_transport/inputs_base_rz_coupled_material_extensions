@@ -1,0 +1,16 @@
+FILE = inputs_base_1d_coupled_material_extensions
+geometry.dims = RZ
+geometry.prob_lo = 0 0
+geometry.prob_hi = 1.e-3 1.e-3
+amr.n_cell = 8 8
+amr.max_grid_size = 8
+amr.max_grid_size_y = 4
+amr.blocking_factor = 4 4
+warpx.n_rz_azimuthal_modes = 1
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = reflecting periodic
+ions.num_particles_per_cell_each_dim = 8 1 8
+ions.radial_numpercell_power = 1
+radiation_transport.initial_diffusion_energy_density(x,y,z) = "2.e9*(1+0.3*cos(2*pi*x/1.e-3)*cos(2*pi*z/1.e-3))"

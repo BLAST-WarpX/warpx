@@ -9,6 +9,7 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
+#include "BoundaryConditions/WarpX_PEC.H"
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
@@ -494,6 +495,18 @@ void
 WarpX::UpdateAuxiliaryData ()
 {
     ABLASTR_PROFILE("WarpX::UpdateAuxiliaryData()");
+#if defined(WARPX_DIM_RZ)
+    if (m_fields.has_vector(FieldType::hybrid_pressure_E_fp, 0)) {
+        // Build C from current valid/periodic data, then physical extensions.
+        // Applying the axis before inter-FAB exchange leaves stale z-corner
+        // ghosts on axis-touching boxes, which is not the C paired by C^T.
+        for (auto* component : m_fields.get_alldirs(FieldType::Efield_fp, 0)) {
+            ablastr::utils::communication::FillBoundary(*component,
+                component->nGrowVect(), false, Geom(0).periodicity(), true);
+        }
+        ApplyEfieldBoundary(0, PatchType::fine, gett_new(0));
+    }
+#endif
 
     using ablastr::fields::Direction;
 
@@ -507,6 +520,12 @@ WarpX::UpdateAuxiliaryData ()
     } else {
         UpdateAuxiliaryDataStagToNodal();
     }
+
+    // Keep the pressure-only field on exactly the same particle-gather layout
+    // and centering path as total E, before external particle-field maps are
+    // added to total E_aux.  This makes pressure work an unambiguous additive
+    // component of the single physical particle push.
+    UpdateHybridPressureAuxiliaryData();
 
     // When loading particle fields from file, add the external fields.
     for (int lev = 0; lev <= finest_level; ++lev) {
@@ -568,6 +587,70 @@ WarpX::UpdateAuxiliaryData ()
         }
     }
 
+}
+
+void
+WarpX::UpdateHybridPressureAuxiliaryData ()
+{
+    if (!m_fields.has_vector(FieldType::hybrid_pressure_E_fp, 0)) { return; }
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        finest_level == 0,
+        "Conservative hybrid pressure work currently requires one AMR level.");
+
+    auto const pressure_fp =
+        m_fields.get_alldirs(FieldType::hybrid_pressure_E_fp, 0);
+    auto const pressure_aux =
+        m_fields.get_alldirs(FieldType::hybrid_pressure_E_aux, 0);
+
+    // Checkpoints restore valid cells, not a guaranteed current set of ghost
+    // and periodic-overlap values.  Reconstruct those in full precision before
+    // applying the same native-to-aux centering used by total E.
+    for (auto* pressure_component : pressure_fp) {
+        ablastr::utils::communication::FillBoundary(
+            *pressure_component, pressure_component->nGrowVect(),
+            /*do_single_precision_comms=*/false,
+            Geom(0).periodicity(), /*nodal_sync=*/true);
+    }
+#if defined(WARPX_DIM_RZ)
+    PEC::ApplyPECtoEfield(pressure_fp, field_boundary_lo, field_boundary_hi,
+        FieldBoundaryType::PEC, get_ng_fieldgather(), Geom(0), 0, PatchType::fine, refRatio());
+    ApplyFieldBoundaryOnAxis(pressure_fp[0], pressure_fp[1], pressure_fp[2], 0);
+#endif
+    auto& pressure_work_state = *m_fields.get(
+        FieldType::hybrid_pressure_work_state_fp, 0);
+    ablastr::utils::communication::FillBoundary(
+        pressure_work_state, pressure_work_state.nGrowVect(),
+        /*do_single_precision_comms=*/false,
+        Geom(0).periodicity(), /*nodal_sync=*/true);
+
+    bool same_index_type = true;
+    for (int idim = 0; idim < 3; ++idim) {
+        same_index_type = same_index_type
+            && pressure_fp[idim]->ixType() == pressure_aux[idim]->ixType();
+    }
+
+    if (same_index_type) {
+        for (int idim = 0; idim < 3; ++idim) {
+            amrex::MultiFab::Copy(
+                *pressure_aux[idim], *pressure_fp[idim], 0, 0,
+                pressure_aux[idim]->nComp(),
+                pressure_aux[idim]->nGrowVect());
+        }
+    } else {
+        InterpLevelZeroStagToNodal(
+            pressure_aux, pressure_fp,
+            device_field_centering_stencil_coeffs_x,
+            device_field_centering_stencil_coeffs_y,
+            device_field_centering_stencil_coeffs_z);
+    }
+
+    for (int idim = 0; idim < 3; ++idim) {
+        ablastr::utils::communication::FillBoundary(
+            *pressure_aux[idim], pressure_aux[idim]->nGrowVect(),
+            /*do_single_precision_comms=*/false,
+            Geom(0).periodicity(), /*nodal_sync=*/true);
+    }
 }
 
 void

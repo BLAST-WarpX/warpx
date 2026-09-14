@@ -33,9 +33,33 @@ repos:
   - id: check-yaml
   - id: check-added-large-files
     args: ['--maxkb=40']
+    exclude: '^(Source/Radiation/(CoupledMomentSource|ImplicitMomentTransport)\.cpp|Examples/Tests/radiation_transport/test_particle_impulse\.cpp)$'
+  # These three maintained solver/test translation units exceed the artifact
+  # limit. Keep a bounded source-only allowance; all other files retain 40 KiB.
+  - id: check-added-large-files
+    alias: check-radiation-source-size
+    name: check radiation source size
+    args: ['--maxkb=80']
+    files: '^(Source/Radiation/(CoupledMomentSource|ImplicitMomentTransport)\.cpp|Examples/Tests/radiation_transport/test_particle_impulse\.cpp)$'
   - id: requirements-txt-fixer
 #  - id: fix-encoding-pragma
 #    exclude: ^noxfile.py$
+
+# Mirror the Source CI registration/naming gate before test changes are pushed.
+- repo: local
+  hooks:
+  - id: check-test-input-registrations
+    name: check test input registrations
+    entry: python .github/workflows/source/check_inputs.py
+    language: python
+    pass_filenames: false
+    files: '(^|/)CMakeLists\.txt$|^Examples/.*/inputs_(test|base)_|^\.github/workflows/source/check_inputs\.py$|^\.pre-commit-config\.yaml$'
+  - id: check-radiation-document-navigation
+    name: check radiation document navigation
+    entry: python .github/workflows/source/check_radiation_docs.py
+    language: python
+    pass_filenames: false
+    files: '^Docs/source/theory/radiation_.*\.md$|^\.github/workflows/source/check_radiation_docs\.py$|^\.pre-commit-config\.yaml$'
 
 # documentation files: .rst
 - repo: https://github.com/pre-commit/pygrep-hooks

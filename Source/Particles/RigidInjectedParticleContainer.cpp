@@ -380,7 +380,7 @@ RigidInjectedParticleContainer::PushP (int lev, Real dt,
             amrex::ParticleReal* const AMREX_RESTRICT uzpp = attribs[PIdx::uz].dataPtr();
 
             int* AMREX_RESTRICT ion_lev = nullptr;
-            if (do_field_ionization) {
+            if (HasEvolvingChargeState()) {
                 ion_lev = pti.GetiAttribs("ionizationLevel").dataPtr();
             }
 

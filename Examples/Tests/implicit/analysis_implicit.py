@@ -10,11 +10,16 @@
 # This script analyses conservation of energy and charge from simulations of
 # a uniform thermal plasma using the exactly energy-conserving EM implicit method
 # in 1D, 2D, or 3D with any combination of periodic and symmetry boundaries.
-import sys
+import argparse
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
+
+parser = argparse.ArgumentParser()
+parser.add_argument("pltdir")
+parser.add_argument("--precision", required=True, choices=("SINGLE", "DOUBLE"))
+args = parser.parse_args()
 
 field_energy = np.loadtxt("diags/reduced_files/field_energy.txt", skiprows=1)
 particle_energy = np.loadtxt("diags/reduced_files/particle_energy.txt", skiprows=1)
@@ -24,9 +29,14 @@ total_energy = field_energy[:, 2] + particle_energy[:, 2]
 delta_E = (total_energy - total_energy[0]) / total_energy[0]
 max_delta_E = np.abs(delta_E).max()
 
-# This case should have near machine precision conservation of charge and energy
-tolerance_rel_energy = 2.0e-14
-tolerance_rel_charge = 2.0e-14
+# These precision-qualified physical/test contracts are not generic solver defaults.
+if args.precision == "SINGLE":
+    tolerance_rel_energy = 64.0 * np.finfo(np.float32).eps
+    tolerance_rel_charge = 4.0 * np.finfo(np.float32).eps
+else:
+    # This case should have near machine precision conservation of charge and energy
+    tolerance_rel_energy = 2.0e-14
+    tolerance_rel_charge = 2.0e-14
 
 print(f"max change in energy: {max_delta_E}")
 print(f"tolerance: {tolerance_rel_energy}")
@@ -35,7 +45,7 @@ assert max_delta_E < tolerance_rel_energy
 
 # check for machine precision conservation of charge density
 
-pltdir = sys.argv[1]
+pltdir = args.pltdir
 ds = yt.load(pltdir)
 data = ds.covering_grid(
     level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions

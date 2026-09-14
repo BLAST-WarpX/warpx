@@ -147,6 +147,9 @@ class KSP_impl : public PETScSolver_impl
         //! Set max iters
         void setMaxIters(int);
 
+        //! Set GMRES restart length
+        void setRestartLength(int);
+
         //! Solve
         void solve(VecType&, const VecType&);
 
@@ -179,6 +182,8 @@ class KSP_impl : public PETScSolver_impl
         amrex::Real m_rtol = 1e-8;
         //! maximum iterations
         int m_maxits= 100;
+        //! GMRES Krylov basis size before restarting
+        int m_restart_length = 30;
         //! verbosity
         int m_verbose = 1;
 

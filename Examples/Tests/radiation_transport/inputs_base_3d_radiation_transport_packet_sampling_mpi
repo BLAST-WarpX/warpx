@@ -1,0 +1,7 @@
+# Split the seeded packet-conversion domain over two ranks. The global-cell/
+# event RNG contract must reproduce the same eight-box serial result exactly.
+
+FILE = inputs_base_3d_radiation_transport_packet_sampling_uniform
+
+amr.blocking_factor = 2
+amr.max_grid_size = 2

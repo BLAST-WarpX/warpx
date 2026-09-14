@@ -46,12 +46,32 @@
 #include <AMReX_Vector.H>
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <memory>
+#include <string_view>
+#include <system_error>
 #include <vector>
 
 using namespace amrex::literals;
 using warpx::fields::FieldType;
+
+namespace
+{
+    int radiationDiffusionGroup (std::string const& name) noexcept
+    {
+        constexpr std::string_view prefix = "radiation_diffusion_energy_g";
+        if (!name.starts_with(prefix)) { return -1; }
+        std::string_view const suffix{
+            name.data() + prefix.size(), name.size() - prefix.size()};
+        int group = -1;
+        auto const [end, error] =
+            std::from_chars(suffix.data(), suffix.data() + suffix.size(), group);
+        return error == std::errc{} && end == suffix.data() + suffix.size()
+            ? group
+            : -1;
+    }
+}
 
 FullDiagnostics::FullDiagnostics (int i, const std::string& name, DiagTypes diag_type):
     Diagnostics{i, name, diag_type},
@@ -457,6 +477,22 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
                 if (update_varnames) {
                     AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
                 }
+            } else if (int const group =
+                           radiationDiffusionGroup(m_varnames_fields[comp]);
+                       group >= 0 && idir == 0)
+            {
+                amrex::MultiFab const* mf = warpx.m_fields.get(
+                    FieldType::radiation_diffusion_energy, lev);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    group < mf->nComp(),
+                    m_varnames_fields[comp]
+                        + " exceeds the configured radiation energy-group count.");
+                m_all_field_functors[lev][comp] =
+                    std::make_unique<CellCenterFunctor>(
+                        mf, lev, m_crse_ratio, false, 1, group);
+                if (update_varnames) {
+                    m_varnames.push_back(m_varnames_fields[comp]);
+                }
             } else if ( warpx.m_fields.has(m_varnames_fields[comp].substr(0, m_varnames_fields[comp].size() - 1), lev) &&
                         m_varnames_fields[comp].back() == field_names[idir].front()) {
                 // This assumes a name like fieldname + field_names[idir]
@@ -579,6 +615,12 @@ FullDiagnostics::InitializeFieldFunctorsRZopenPMD (int lev)
         } else if ( warpx.m_fields.has(m_varnames_fields[comp], lev) ) {
             amrex::MultiFab * mf = warpx.m_fields.get(m_varnames_fields[comp], lev);
             const int mf_ncomp = mf->nComp();
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_varnames_fields[comp] != "radiation_diffusion_energy"
+                    || mf_ncomp == 1,
+                "Multigroup radiation diagnostics require explicit fields "
+                "radiation_diffusion_energy_g0, _g1, ... instead of the "
+                "unsuffixed radiation_diffusion_energy name.");
             m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio, false, mf_ncomp);
             if (mf_ncomp == ncomp) {
                 AddRZModesToOutputNames(m_varnames_fields[comp], ncomp);
@@ -946,6 +988,19 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
                 std::string T_arr_str = std::string(m_varnames[comp]);
                 T_arr_str.erase(T_arr_str.begin() + 1);
                 m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(T_arr_str, Direction{idir}, lev), lev, m_crse_ratio);
+            } else if (int const group =
+                           radiationDiffusionGroup(m_varnames[comp]);
+                       group >= 0 && idir == 0)
+            {
+                amrex::MultiFab const* mf = warpx.m_fields.get(
+                    FieldType::radiation_diffusion_energy, lev);
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    group < mf->nComp(),
+                    m_varnames[comp]
+                        + " exceeds the configured radiation energy-group count.");
+                m_all_field_functors[lev][comp] =
+                    std::make_unique<CellCenterFunctor>(
+                        mf, lev, m_crse_ratio, false, 1, group);
             } else if ( warpx.m_fields.has(m_varnames[comp].substr(0, m_varnames[comp].size() - 1), lev) &&
                         m_varnames[comp].back() == field_names[idir].front()) {
                 // This assumes a name like fieldname + field_names[idir]
@@ -1007,7 +1062,14 @@ FullDiagnostics::InitializeFieldFunctors (int lev)
         } else if ( m_varnames[comp] == "eb_covered" ){
             m_all_field_functors[lev][comp] = std::make_unique<EBCoveredFunctor>(lev, m_crse_ratio);
         } else if ( warpx.m_fields.has(m_varnames[comp], lev) ) {
-            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(warpx.m_fields.get(m_varnames[comp], lev), lev, m_crse_ratio);
+            amrex::MultiFab const* mf = warpx.m_fields.get(m_varnames[comp], lev);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_varnames[comp] != "radiation_diffusion_energy"
+                    || mf->nComp() == 1,
+                "Multigroup radiation diagnostics require explicit fields "
+                "radiation_diffusion_energy_g0, _g1, ... instead of the "
+                "unsuffixed radiation_diffusion_energy name.");
+            m_all_field_functors[lev][comp] = std::make_unique<CellCenterFunctor>(mf, lev, m_crse_ratio);
         } else {
             WARPX_ABORT_WITH_MESSAGE(
                 "Error on component " + m_varnames[comp] + ": "

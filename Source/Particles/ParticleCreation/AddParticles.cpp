@@ -161,7 +161,8 @@ namespace
      * \param idcpu particle id soa data
      * \param pa particle real soa data
      * \param ip index for soa data
-     * \param do_field_ionization whether species has ionization
+     * \param has_evolving_charge_state whether the species carries an
+     *        evolving integer ionization level
      * \param pi ionization level data
      * \param has_quantum_sync whether species has quantum synchrotron
      * \param p_optical_depth_QSR quantum synchrotron optical depth data
@@ -172,7 +173,7 @@ namespace
     void ZeroInitializeAndSetNegativeID (
         uint64_t * AMREX_RESTRICT idcpu,
         const amrex::GpuArray<ParticleReal*,PIdx::nattribs>& pa, long& ip,
-        const bool& do_field_ionization, int* pi
+        const bool& has_evolving_charge_state, int* pi
 #ifdef WARPX_QED
         ,const QEDHelper& qed_helper
 #endif
@@ -181,7 +182,7 @@ namespace
         for (int idx=0 ; idx < PIdx::nattribs ; idx++) {
             pa[idx][ip] = 0._rt;
         }
-        if (do_field_ionization) {pi[ip] = 0;}
+        if (has_evolving_charge_state) {pi[ip] = 0;}
 #ifdef WARPX_QED
         if (qed_helper.has_quantum_sync) {qed_helper.p_optical_depth_QSR[ip] = 0._rt;}
         if (qed_helper.has_breit_wheeler) {qed_helper.p_optical_depth_BW[ip] = 0._rt;}
@@ -874,6 +875,14 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 const amrex::Long r = (fine_overlap_box.ok() && fine_overlap_box.contains(iv))?
                     (AMREX_D_TERM(rrfac[0],*rrfac[1],*rrfac[2])) : (1);
                 pcounts[index] = num_ppc*r;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                // These are logical cell coordinates. Nonuniform radial
+                // loading maps them to different physical radii below, so a
+                // zero logical-corner density cannot reject those candidates.
+                // The physical per-particle bounds and density checks remain
+                // authoritative after the coordinate transformation.
+                if (radial_numpercell_power != 0.0_rt) { return; }
+#endif
                 // update pcount by checking if cell-corners or cell-center
                 // has non-zero density
                 const auto xlim = amrex::GpuArray<Real, 3>{lo.x,(lo.x+hi.x)/2._rt,hi.x};
@@ -925,6 +934,8 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         auto const old_size = static_cast<amrex::Long>(particle_tile.size());
         auto const new_size = old_size + max_new_particles;
         particle_tile.resize(new_size);
+        ParticleCreation::InitializeRadiationImpulseAttributes(
+            particle_tile, *this, old_size, new_size);
 
         auto& soa = particle_tile.GetStructOfArrays();
         amrex::GpuArray<ParticleReal*,PIdx::nattribs> pa;
@@ -940,7 +951,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
         amrex::ParserExecutor<7> const* user_real_parserexec_data = plasma_parser_helper.getUserRealParserExecData();
 
         int* pi = nullptr;
-        if (do_field_ionization) {
+        if (HasEvolvingChargeState()) {
             pi = soa.GetIntData("ionizationLevel").data() + old_size;
         }
 
@@ -950,7 +961,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                                    m_shr_p_qs_engine, m_shr_p_bw_engine);
 #endif
 
-        const bool loc_do_field_ionization = do_field_ionization;
+        const bool loc_has_evolving_charge_state = HasEvolvingChargeState();
         const int loc_ionization_initial_level = ionization_initial_level;
 
         // Loop over all new particles and inject them (creates too many
@@ -998,7 +1009,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                 bool const box_contains = tile_realbox.contains(XDim3{pos.x,0.0_rt,0.0_rt});
 #endif
                 if (!box_contains) {
-                    ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
+                    ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_has_evolving_charge_state, pi
 #ifdef WARPX_QED
                                                    ,qed_helper
 #endif
@@ -1069,7 +1080,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     const amrex::Real z0 = applyBallisticCorrection(pos, inj_mom, gamma_boost,
                                                              beta_boost, t);
                     if (!inj_pos->insideBounds(xb, yb, z0)) {
-                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
+                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_has_evolving_charge_state, pi
 #ifdef WARPX_QED
                                                    ,qed_helper
 #endif
@@ -1082,7 +1093,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
                     // Remove particle if density below threshold
                     if ( dens < density_min ){
-                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
+                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_has_evolving_charge_state, pi
 #ifdef WARPX_QED
                                                    ,qed_helper
 #endif
@@ -1099,7 +1110,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     // If the particle is not within the lab-frame zmin, zmax, etc.
                     // go to the next generated particle.
                     if (!inj_pos->insideBounds(xb, yb, z0_lab)) {
-                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
+                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_has_evolving_charge_state, pi
 #ifdef WARPX_QED
                                                    ,qed_helper
 #endif
@@ -1110,7 +1121,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     dens = inj_rho->getDensity(pos.x, pos.y, z0_lab);
                     // Remove particle if density below threshold
                     if ( dens < density_min ){
-                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_do_field_ionization, pi
+                        ZeroInitializeAndSetNegativeID(pa_idcpu, pa, ip, loc_has_evolving_charge_state, pi
 #ifdef WARPX_QED
                                                    ,qed_helper
 #endif
@@ -1131,7 +1142,7 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
                     u.z = gamma_boost * ( u.z -beta_boost*gamma_lab );
                 }
 
-                if (loc_do_field_ionization) {
+                if (loc_has_evolving_charge_state) {
                     pi[ip] = loc_ionization_initial_level;
                 }
 
@@ -1423,7 +1434,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         amrex::ParserExecutor<7> const* user_real_parserexec_data = plasma_parser_helper.getUserRealParserExecData();
 
         int* p_ion_level = nullptr;
-        if (do_field_ionization) {
+        if (HasEvolvingChargeState()) {
             p_ion_level = soa.GetIntData("ionizationLevel").data() + old_size;
         }
 
@@ -1433,7 +1444,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                                    m_shr_p_qs_engine, m_shr_p_bw_engine);
 #endif
 
-        const bool loc_do_field_ionization = do_field_ionization;
+        const bool loc_has_evolving_charge_state = HasEvolvingChargeState();
         const int loc_ionization_initial_level = ionization_initial_level;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         int const loc_flux_normal_axis = plasma_injector.flux_normal_axis;
@@ -1623,7 +1634,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                     continue;
                 }
 
-                if (loc_do_field_ionization) {
+                if (loc_has_evolving_charge_state) {
                     p_ion_level[ip] = loc_ionization_initial_level;
                 }
 
@@ -1747,6 +1758,16 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     // (This eliminates invalid particles, and makes sure that particles
     // are in the right tile.)
     tmp_pc.Redistribute();
+
+    // Runtime components in the temporary flux container are not communicated.
+    // Initialize these newborn accounts after redistribution, including on receivers.
+    for (auto& entry : tmp_pc.GetParticles(0)) {
+        auto& tile = entry.second;
+        ParticleCreation::InitializeRadiationImpulseAttributes(
+            tile, tmp_pc, 0, tile.numParticles());
+    }
+    // addParticles may select other streams while copying the temporary tiles.
+    amrex::Gpu::streamSynchronize();
 
     // Add the particles to the current container
     this->addParticles(tmp_pc, true);

@@ -14,6 +14,8 @@
 # ---    set the cell-size and time step such that the explicit electrostatic
 # ---    solver is unstable.
 
+import argparse
+
 import dill
 import numpy as np
 from mpi4py import MPI as mpi
@@ -22,6 +24,12 @@ from scipy.special import erf
 from pywarpx import picmi
 
 constants = picmi.constants
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--precision", choices=["SINGLE", "DOUBLE"], required=True)
+args = parser.parse_args()
+
+required_precision = 5.0e-5 if args.precision == "SINGLE" else 1.0e-11
 
 comm = mpi.COMM_WORLD
 
@@ -150,6 +158,7 @@ simulation.embedded_boundary = embedded_boundary
 solver = picmi.ElectrostaticSolver(
     grid=grid,
     method="Multigrid",
+    required_precision=required_precision,
     warpx_effective_potential=True,
     warpx_effective_potential_factor=C_EP,
     warpx_self_fields_verbosity=0,

@@ -1,0 +1,75 @@
+# Resolve warpx.random_seed=random once, checkpoint before conversion, and
+# convert on the following step. A restart must restore the resolved seed so
+# the post-checkpoint particle realization is identical to the continuous run.
+
+my_constants.dt = 1.0e-16
+my_constants.initial_radiation_energy_density = 8.0e-13
+my_constants.thick_rosseland = 4.0
+my_constants.thin_rosseland = 0.5
+
+max_step = 2
+amr.n_cell = 2 2 2
+amr.max_level = 0
+amr.max_grid_size = 2
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 1.0 1.0 1.0
+
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+warpx.const_dt = dt
+warpx.verbose = 0
+warpx.use_filter = 0
+warpx.random_seed = random
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = photons
+photons.species_type = photon
+photons.injection_style = none
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 0.0
+radiation_transport.material_coupling = none
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(t < 0.5*dt, thick_rosseland, thin_rosseland)
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.diffusion_cfl = 0.5
+radiation_transport.enable_particle_conversion = 1
+radiation_transport.emission_photon_energy = 1.0e-15
+radiation_transport.particle_conversion_packets_per_cell = 8
+radiation_transport.initial_diffusion_energy_density(x,y,z) = \
+    initial_radiation_energy_density
+
+diagnostics.diags_names = diag1 chk
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 1
+diag1.file_prefix = diags/diag1
+diag1.write_species = 1
+diag1.species = photons
+diag1.fields_to_plot = radiation_diffusion_energy
+
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 1
+chk.file_prefix = diags/chk
+
+warpx.reduced_diags_names = radiation_energy
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
+
+amrex.abort_on_unused_inputs = 1

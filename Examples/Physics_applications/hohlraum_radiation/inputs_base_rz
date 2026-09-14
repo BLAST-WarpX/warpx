@@ -1,0 +1,90 @@
+# Common RZ geometry and grey radiation model for a hohlraum-like cavity.
+# The opacity values are illustrative placeholders, not material data.
+
+my_constants.r_wall = 7.5e-4
+my_constants.z_wall = 1.2e-3
+my_constants.r_leh = 2.0e-4
+my_constants.n_wall = 1.0e28
+my_constants.n_fill = 1.0e24
+my_constants.Te_wall_eV = 100.0
+my_constants.alpha_wall = 1.0e5
+my_constants.alpha_fill = 10.0
+my_constants.grey_photon_energy = 300.0*q_e
+
+max_step = 20
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.max_grid_size = 32
+geometry.dims = RZ
+geometry.prob_lo = 0.0 -1.5e-3
+geometry.prob_hi = 1.0e-3 1.5e-3
+warpx.n_rz_azimuthal_modes = 1
+
+boundary.field_lo = none pec
+boundary.field_hi = pec pec
+boundary.particle_lo = none absorbing
+boundary.particle_hi = absorbing absorbing
+
+warpx.const_dt = 5.0e-14
+warpx.verbose = 1
+warpx.use_filter = 0
+warpx.random_seed = 42
+
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+# The cavity is low-density fill. A dense cylindrical wall and two endcaps
+# surround it; the small axial holes are low-density laser entrance holes.
+# In RZ particle parsers, sqrt(x*x+y*y) is the cylindrical radius.
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.0 0.0 0.0
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 1.0
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(ne > 0.5*n_wall, alpha_wall, alpha_fill)
+radiation_transport.minimum_electron_density = 1.01*n_fill
+radiation_transport.path_cell_fraction = 0.5
+radiation_transport.max_transport_substeps = 10000
+
+radiation_transport.enable_lte_exchange = 1
+radiation_transport.lte_exchange_solver = implicit_temperature
+radiation_transport.planck_absorption_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(ne > 0.5*n_wall, alpha_wall, alpha_fill)
+radiation_transport.enable_diffusion = 1
+radiation_transport.rosseland_transport_coefficient(x,y,z,t,photon_energy,ne,Te) = \
+    if(ne > 0.5*n_wall, alpha_wall, alpha_fill)
+radiation_transport.minimum_diffusion_optical_depth = 1.0
+radiation_transport.diffusion_cfl = 0.1
+radiation_transport.max_diffusion_substeps = 10000
+
+# Bidirectional seam: packets thermalize in the dense wall and diffusive
+# radiation entering the cavity becomes streaming photon macroparticles.
+radiation_transport.enable_particle_conversion = 1
+radiation_transport.emission_photon_energy = grey_photon_energy
+radiation_transport.particle_conversion_energy_threshold = 1.0e-9
+
+diagnostics.diags_names = diag1
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.intervals = 5
+diag1.file_prefix = diags/diag1
+diag1.fields_to_plot = radiation_material_energy radiation_diffusion_energy
+
+warpx.reduced_diags_names = particle_energy radiation_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17

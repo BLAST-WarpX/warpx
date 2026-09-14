@@ -1,0 +1,14 @@
+FILE = inputs_test_1d_radiation_transport_lte_kinetic
+
+# Split the LTE field around the nominal electron thermal energy.
+radiation_transport.energy_group_boundaries = kb*Te0
+radiation_transport.group_photon_energies = 0.5*kb*Te0 2.0*kb*Te0
+
+diag1.fields_to_plot = radiation_material_energy \
+    radiation_diffusion_energy_g0 radiation_diffusion_energy_g1
+
+warpx.reduced_diags_names = particle_energy radiation_energy
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17

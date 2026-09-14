@@ -8,6 +8,7 @@
 #ifndef WARPX_CURRENTDEPOSITION_H_
 #define WARPX_CURRENTDEPOSITION_H_
 
+#include "Particles/Deposition/ShapeIntegral.H"
 #include "Particles/Deposition/SharedDepositionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
@@ -696,6 +697,10 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
  * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
  * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ * \param stable_shape_integrals Use two-sided shape integrals for RZ hybrid energy fluxes.
+ * \param previous_position Optional saved Cartesian endpoints for the opt-in m=0 RZ
+ * angular auxiliary flux. A reflected velocity cannot reconstruct the old endpoint.
+ * \param periodic_z_length Axial period for choosing the nearest old endpoint image.
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -716,7 +721,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Real q,
                                   [[maybe_unused]] int n_rz_azimuthal_modes,
                                   const amrex::Array4<const int>& reduced_particle_shape_mask,
-                                  bool enable_reduced_shape
+                                  bool enable_reduced_shape,
+                                  [[maybe_unused]] bool stable_shape_integrals = false,
+                                  [[maybe_unused]] amrex::GpuArray<amrex::ParticleReal const*, 3>
+                                      previous_position = {},
+                                  [[maybe_unused]] amrex::Real periodic_z_length = 0
                                   )
 {
     using namespace amrex;
@@ -769,8 +778,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
             Real const xp_mid = xp_new - 0.5_rt*dt*uxp[ip]*gaminv;
             Real const yp_mid = yp_new - 0.5_rt*dt*uyp[ip]*gaminv;
-            Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+            Real const xp_old = previous_position[0] != nullptr
+                ? previous_position[0][ip] : xp_new - dt*uxp[ip]*gaminv;
+            Real const yp_old = previous_position[1] != nullptr
+                ? previous_position[1][ip] : yp_new - dt*uyp[ip]*gaminv;
             Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
             Real const rp_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
             Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
@@ -826,7 +837,21 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // Keep these double to avoid bug in single precision
             double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
-            double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
+            double const z_old =
+#if defined(WARPX_DIM_RZ)
+                previous_position[2] != nullptr
+                ? (previous_position[2][ip] - xyzmin.z
+                    - (periodic_z_length > 0 ? periodic_z_length * std::floor(
+                        (previous_position[2][ip] - zp) / periodic_z_length + 0.5_rt) : 0)) * dinv.z
+                :
+                stable_shape_integrals
+                // Match radial backtracking and the physical-coordinate charge
+                // deposition before converting to grid units. Subtracting the
+                // displacement after grid scaling can invent tiny empty-side tails.
+                ? (zp + (relative_time - 0.5_rt*dt)*uzp[ip]*gaminv - xyzmin.z)*dinv.z
+                :
+#endif
+                z_new - dt*dinv.z*uzp[ip]*gaminv;
 #endif
 
             // Check whether the particle is close to the EB at the old and new position
@@ -1019,7 +1044,16 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real sdxi = 0._rt;
                 for (int i=dil; i<=depos_order+1-diu; i++) {
-                    sdxi += wq*invdtd.x*(sx_old[i] - sx_new[i])*0.5_rt*(sz_new[k] + sz_old[k]);
+#if defined(WARPX_DIM_RZ)
+                    if (stable_shape_integrals) {
+                        sdxi = static_cast<amrex::Real>(wq*invdtd.x
+                            *warpx::deposition::shapeIntegral(sx_old, sx_new, i)
+                            *0.5_rt*(sz_new[k] + sz_old[k]));
+                    } else
+#endif
+                    {
+                        sdxi += wq*invdtd.x*(sx_old[i] - sx_new[i])*0.5_rt*(sz_new[k] + sz_old[k]);
+                    }
                     amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, lo.y+k_new-1+k, 0, 0), sdxi);
 #if defined(WARPX_DIM_RZ)
                     Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}
@@ -1063,7 +1097,16 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 Real sdzk = 0._rt;
                 for (int k=dkl; k<=depos_order+1-dku; k++) {
-                    sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k])*0.5_rt*(sx_new[i] + sx_old[i]);
+#if defined(WARPX_DIM_RZ)
+                    if (stable_shape_integrals) {
+                        sdzk = static_cast<amrex::Real>(wq*invdtd.z
+                            *warpx::deposition::shapeIntegral(sz_old, sz_new, k)
+                            *0.5_rt*(sx_new[i] + sx_old[i]));
+                    } else
+#endif
+                    {
+                        sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k])*0.5_rt*(sx_new[i] + sx_old[i]);
+                    }
                     amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, lo.y+k_new-1+k, 0, 0), sdzk);
 #if defined(WARPX_DIM_RZ)
                     Complex xy_mid = xy_mid0; // Throughout the following loop, xy_mid takes the value e^{i m theta}

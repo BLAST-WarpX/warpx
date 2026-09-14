@@ -21,10 +21,12 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "FieldIO.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Python/callbacks.H"
+#include "Radiation/RadiationTransport.H"
 #include "Utils/TextMsg.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
@@ -118,6 +120,65 @@ WarpX::InitFromCheckpoint ()
         std::string line, word;
 
         std::getline(is, line);
+        {
+            std::istringstream version_stream(line);
+            std::string checkpoint_label;
+            std::string version_label;
+            int checkpoint_version = 0;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                static_cast<bool>(version_stream >> checkpoint_label
+                    >> version_label >> checkpoint_version)
+                    && checkpoint_label == "Checkpoint"
+                    && version_label == "version:"
+                    && (checkpoint_version >= 1 && checkpoint_version <= 3),
+                "WarpX checkpoint header has an invalid version record.");
+
+            bool momentum_carry_fields_present = false;
+            if (checkpoint_version >= 2) {
+                std::string carry_label;
+                int carry_fields = -1;
+                std::string trailing_token;
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    static_cast<bool>(version_stream >> carry_label
+                        >> carry_fields)
+                        && carry_label
+                            == "radiation_momentum_carry_fields:"
+                        && (carry_fields == 0 || carry_fields == 1),
+                    "WarpX checkpoint header has an invalid radiation momentum-"
+                    "carry schema record.");
+                momentum_carry_fields_present = carry_fields == 1;
+                if (checkpoint_version == 3) {
+                    std::string group_label;
+                    int groups = 0;
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                        static_cast<bool>(version_stream >> group_label >> groups)
+                            && group_label == "radiation_diffusion_momentum_groups:"
+                            && carry_fields == 1 && groups > 1
+                            && groups == GetRadiationTransport().numEnergyGroups(),
+                        "Radiation spectral momentum-carry checkpoint groups do not "
+                        "match the configured radiation groups.");
+                    GetRadiationTransport().SetRestartDiffusionMomentumGroups(groups);
+                }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !(version_stream >> trailing_token),
+                    "WarpX checkpoint header has unexpected trailing schema data.");
+            } else {
+                std::string trailing_token;
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !(version_stream >> trailing_token),
+                    "WarpX schema-v1 checkpoint header has unexpected trailing "
+                    "data.");
+            }
+            GetRadiationTransport().SetRestartMomentumCarryFieldsPresent(
+                momentum_carry_fields_present);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !momentum_carry_fields_present
+                    || GetRadiationTransport().usesMomentumCoupling(),
+                "This checkpoint contains radiation momentum-carry fields. "
+                "Restart with radiation_transport.enabled=1 and "
+                "radiation_transport.enable_momentum_coupling=1 so conserved "
+                "pending impulse is not discarded.");
+        }
 
         int nlevs;
         is >> nlevs;
@@ -406,7 +467,7 @@ WarpX::InitFromCheckpoint ()
 
         // Read any fields flagged checkpoint_restart in the field register
         // (mirrors FlushFormatCheckpoint's write_checkpoints call). Flagged
-        // fields absent from an older checkpoint are skipped, not errors.
+        // Only explicitly optional fields may be absent from an older checkpoint.
         m_fields.read_restarts(lev, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, ""));
     }
 
@@ -427,6 +488,10 @@ WarpX::InitFromCheckpoint ()
 
     if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
 
+    GetRadiationTransport().ReadCheckpointData(restart_chkfile);
+    if (m_hybrid_pic_model) {
+        m_hybrid_pic_model->ReadMomentHistory(restart_chkfile);
+    }
     reduced_diags->ReadCheckpointData(restart_chkfile);
 
     // Initialize particles

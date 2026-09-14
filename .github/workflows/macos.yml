@@ -46,9 +46,9 @@ jobs:
         brew install open-mpi
         brew install pkg-config
         set -e
-        brew tap openpmd/openpmd
-        brew trust openpmd/openpmd
         brew uninstall cmake  # https://github.com/actions/runner-images/issues/12912
+        # A fully qualified install trusts only this formula. An explicit tap
+        # can fail while validating its not-yet-trusted formula under Homebrew 6.
         brew install openpmd/openpmd/openpmd-api
     - name: install pip dependencies
       run: |

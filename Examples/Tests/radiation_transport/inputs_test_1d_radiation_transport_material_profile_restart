@@ -1,0 +1,3 @@
+FILE = inputs_test_1d_radiation_transport_material_profile
+# Restart must not overwrite evolved temperature with a new cold-start value.
+hybrid_pic_model.initial_elec_temp(x,y,z) = 10.0

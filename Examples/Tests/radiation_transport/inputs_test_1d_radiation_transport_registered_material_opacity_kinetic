@@ -1,0 +1,128 @@
+# Registry-native HDF5 opacity with the fully kinetic electron-temperature path.
+
+my_constants.rho0 = 10.0
+my_constants.n0 = rho0/m_p
+my_constants.Te0 = 10000.0
+my_constants.photon_weight = 1.0e20
+
+max_step = 1
+amr.n_cell = 40
+amr.max_level = 0
+amr.max_grid_size = 20
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 1.0
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 0.775/clight
+warpx.verbose = 0
+warpx.use_filter = 0
+warpx.random_seed = 42
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons material_a material_b photons
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 32
+electrons.profile = constant
+electrons.density = n0
+electrons.momentum_distribution_type = gaussian
+electrons.ux_th = sqrt(kb*Te0/m_e)/clight
+electrons.uy_th = sqrt(kb*Te0/m_e)/clight
+electrons.uz_th = sqrt(kb*Te0/m_e)/clight
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+material_a.charge = q_e
+material_a.mass = m_p
+material_a.injection_style = MultipleParticles
+material_a.multiple_particles_pos_x = 0 0 0 0 0 0 0 0
+material_a.multiple_particles_pos_y = 0 0 0 0 0 0 0 0
+material_a.multiple_particles_pos_z = \
+    0.2125 0.2375 0.2625 0.2875 0.3125 0.3375 0.3625 0.3875
+material_a.multiple_particles_ux = 0 0 0 0 0 0 0 0
+material_a.multiple_particles_uy = 0 0 0 0 0 0 0 0
+material_a.multiple_particles_uz = 0 0 0 0 0 0 0 0
+material_a.multiple_particles_weight = \
+    n0*0.025 n0*0.025 n0*0.025 n0*0.025 \
+    n0*0.025 n0*0.025 n0*0.025 n0*0.025
+material_a.do_not_gather = 1
+material_a.do_not_push = 1
+
+material_b.charge = q_e
+material_b.mass = m_p
+material_b.injection_style = MultipleParticles
+material_b.multiple_particles_pos_x = 0 0 0 0 0 0 0 0
+material_b.multiple_particles_pos_y = 0 0 0 0 0 0 0 0
+material_b.multiple_particles_pos_z = \
+    0.6125 0.6375 0.6625 0.6875 0.7125 0.7375 0.7625 0.7875
+material_b.multiple_particles_ux = 0 0 0 0 0 0 0 0
+material_b.multiple_particles_uy = 0 0 0 0 0 0 0 0
+material_b.multiple_particles_uz = 0 0 0 0 0 0 0 0
+material_b.multiple_particles_weight = \
+    n0*0.025 n0*0.025 n0*0.025 n0*0.025 \
+    n0*0.025 n0*0.025 n0*0.025 n0*0.025
+material_b.do_not_gather = 1
+material_b.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.0 0.0 0.1125
+photons.single_particle_u = 0.0 0.0 1.0e-3
+photons.single_particle_weight = photon_weight
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+materials.names = material_b material_a
+materials.vacuum_mass_density = 1.0e-20
+materials.mixed_cell_absolute_tolerance = 0.0
+materials.mixed_cell_relative_tolerance = 1.0e-12
+materials.material_a.species = material_a
+materials.material_a.opacity_table_file = material_a.h5
+materials.material_a.opacity_material_id = 1001
+materials.material_a.opacity_material_key = material-a
+materials.material_b.species = material_b
+materials.material_b.opacity_table_file = material_b.h5
+materials.material_b.opacity_material_id = 1001
+materials.material_b.opacity_material_key = material-b
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+radiation_transport.energy_group_boundaries = 2.0e-16
+radiation_transport.group_photon_energies = 1.0e-16 4.0e-16
+radiation_transport.path_cell_fraction = 1.0
+radiation_transport.require_cell_interface_exact_streaming = 1
+radiation_transport.enable_lte_exchange = 0
+radiation_transport.enable_diffusion = 0
+radiation_transport.enable_particle_conversion = 0
+radiation_transport.enable_momentum_coupling = 0
+
+diagnostics.diags_names = diag
+diag.diag_type = Full
+diag.format = plotfile
+diag.intervals = 1
+diag.file_prefix = diags/diag
+diag.write_species = 0
+diag.fields_to_plot = radiation_material_energy
+
+warpx.reduced_diags_names = particle_energy radiation_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17

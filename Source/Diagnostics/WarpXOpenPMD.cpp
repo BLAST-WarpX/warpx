@@ -561,12 +561,11 @@ for (const auto & particle_diag : particle_diags) {
                                utils::parser::compileParser<ParticleDiag::m_nvars>
                                      (particle_diag.m_particle_filter_parser.get()),
                                  pc->getMass(), time);
-    parser_filter.m_units = InputUnits::SI;
+    parser_filter.m_units = InputUnits::WarpX;
     GeometryFilter const geometry_filter(particle_diag.m_do_geom_filter,
                                            particle_diag.m_diag_domain);
 
     if (isBTD || use_pinned_pc) {
-        particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
         using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
         tmp.copyParticles(*pinned_pc,
             [random_filter,uniform_filter,parser_filter,geometry_filter]
@@ -577,9 +576,7 @@ for (const auto & particle_diag : particle_diags) {
                 return random_filter(p, engine) * uniform_filter(p, engine)
                         * parser_filter(p, engine) * geometry_filter(p, engine);
             }, true);
-        particlesConvertUnits(ConvertDirection::SI_to_WarpX, pinned_pc, mass);
     } else {
-        particlesConvertUnits(ConvertDirection::WarpX_to_SI, pc, mass);
         using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
         tmp.copyParticles(*pc,
             [random_filter,uniform_filter,parser_filter,geometry_filter]
@@ -590,8 +587,10 @@ for (const auto & particle_diag : particle_diags) {
                 return random_filter(p, engine) * uniform_filter(p, engine)
                         * parser_filter(p, engine) * geometry_filter(p, engine);
             }, true);
-        particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
     }
+    // Diagnostics must not change the source or reusable BTD buffer by a
+    // rounded convert-to-SI/convert-back cycle.
+    particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
 
     // Gather the electrostatic potential (phi) on the macroparticles
     if ( particle_diag.m_plot_phi ) {

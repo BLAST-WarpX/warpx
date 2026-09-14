@@ -1,0 +1,6 @@
+# alpha_R=1.e5*(Te/1.e6)^2, exact trilinear log-log interpolation.
+2 2 2
+1.e24 1.e26
+5.e5 2.e6
+1.e-20 1.e-12
+25000 25000 400000 400000 25000 25000 400000 400000

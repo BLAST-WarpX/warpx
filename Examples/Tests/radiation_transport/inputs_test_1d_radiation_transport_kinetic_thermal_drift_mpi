@@ -1,0 +1,77 @@
+# Two-rank fully kinetic radiation heating of a drifting electron distribution.
+# Four cells split into two grids retain the serial cell size while exercising
+# rank-global kinetic realization and diagnostic reductions.
+
+max_step = 1
+amr.n_cell = 4
+amr.max_level = 0
+amr.blocking_factor = 1
+amr.max_grid_size = 2
+
+geometry.dims = 1
+geometry.prob_lo = 0.0
+geometry.prob_hi = 4.0e-6
+
+boundary.field_lo = periodic
+boundary.field_hi = periodic
+boundary.particle_lo = periodic
+boundary.particle_hi = periodic
+
+warpx.const_dt = 1.0e-15
+warpx.random_seed = 314159
+warpx.verbose = 1
+warpx.use_filter = 0
+
+algo.maxwell_solver = yee
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = electrons photons
+
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 32
+electrons.profile = constant
+electrons.density = 1.0e20
+electrons.momentum_distribution_type = gaussian
+electrons.ux_m = 0.03
+electrons.uy_m = -0.04
+electrons.uz_m = 0.20
+electrons.ux_th = 0.02
+electrons.uy_th = 0.015
+electrons.uz_th = 0.025
+electrons.do_not_deposit = 1
+electrons.do_not_gather = 1
+electrons.do_not_push = 1
+
+photons.species_type = photon
+photons.injection_style = SingleParticle
+photons.single_particle_pos = 0.0 0.0 5.0e-7
+photons.single_particle_u = 0.0 0.0 1.0
+photons.single_particle_weight = 1.0e12
+photons.do_not_deposit = 1
+photons.do_not_gather = 1
+photons.do_not_push = 1
+
+radiation_transport.enabled = 1
+radiation_transport.photon_species = photons
+radiation_transport.absorption_coefficient = 1.0e9
+radiation_transport.minimum_electron_density = 1.0e19
+radiation_transport.path_cell_fraction = 0.25
+radiation_transport.max_transport_substeps = 16
+radiation_transport.material_coupling = kinetic_electrons
+radiation_transport.electron_species = electrons
+
+warpx.reduced_diags_names = particle_energy particle_momentum radiation_energy
+particle_energy.type = ParticleEnergy
+particle_energy.intervals = 1
+particle_energy.path = diags/
+particle_energy.precision = 17
+particle_momentum.type = ParticleMomentum
+particle_momentum.intervals = 1
+particle_momentum.path = diags/
+particle_momentum.precision = 17
+radiation_energy.type = RadiationEnergy
+radiation_energy.intervals = 1
+radiation_energy.path = diags/
+radiation_energy.precision = 17
