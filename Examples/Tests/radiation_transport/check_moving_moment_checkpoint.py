@@ -98,6 +98,10 @@ def check(executable, checkpoint, missing, rz=False, angular=False):
                 # Use AMReX's MPI-aware abort path, not std::terminate during
                 # an uncaught assertion exception with OpenMP/MPI active.
                 "amrex.throw_exception=0",
+                # The assertion text is the oracle. Do not launch AMReX's
+                # external backtrace symbolizer for this intentional rejection;
+                # large sanitizer binaries can spend the deadline symbolizing.
+                "amrex.call_addr2line=0",
                 "amrex.the_arena_init_size=0",
                 "warpx.verbose=1",
             ],
