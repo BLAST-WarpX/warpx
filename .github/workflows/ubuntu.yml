@@ -57,19 +57,18 @@ jobs:
         du -hs ~/.cache/ccache
 
   build_1D_2D:
-    name: GCC 1D & 2D w/ MPI, QED tools
+    name: GCC 1D, 2D & RZ w/ MPI, QED tools
     runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     env:
-      CXXFLAGS: "-Werror"
       CXX: "g++-13"
       CC: "gcc-13"
     steps:
     - uses: actions/checkout@v7
     - name: install dependencies
       run: |
-        .github/workflows/dependencies/gcc.sh 13
+        .github/workflows/dependencies/gcc_blaspp_lapackpp.sh 13
         sudo apt-get install -y python3-venv
         python3 -m venv .venv-eos-tests
         .venv-eos-tests/bin/python -m pip install numpy scipy h5py yt
@@ -86,6 +85,10 @@ jobs:
         export CCACHE_COMPRESSLEVEL=10
         export CCACHE_MAXSIZE=100M
         ccache -z
+
+        # RZ with FFT needs BLAS++/LAPACK++; enable strict warnings only after
+        # building those dependencies, as in the existing RZ/3D job.
+        export CXXFLAGS="-Werror"
 
         cmake -S . -B build            \
           -GNinja                      \

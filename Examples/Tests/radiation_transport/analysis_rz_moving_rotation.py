@@ -130,7 +130,7 @@ def check(directory, reference_directory=None):
         history[:, columns[f"angular_{account}_z"]]
         for account in ("radiation", "represented_material", "pending_material")
     )
-    axes[1].set(xlabel="time (ns)", ylabel="angular transfer (kg m²/s)")
+    axes[1].set(xlabel="time (ns)", ylabel=r"angular transfer (kg m$^2$/s)")
     axes[2].plot(history[:, 1] * 1e9, (total - initial_l.sum()) / angular_bound)
     axes[2].axhline(1, color="gray", linestyle="--")
     axes[2].axhline(-1, color="gray", linestyle="--")
