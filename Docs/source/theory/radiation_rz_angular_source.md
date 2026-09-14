@@ -84,20 +84,21 @@ physical domain, reject before committing state.
 The current CPU source/operator/particle selection passes 21/21 checks;
 20 affected single-precision source translation-unit checks also pass.
 The six-case source/operator/particle ASAN/UBSAN selection passes in 229.69 s.
-CUDA qualification of this angular source increment is still pending.
+The subsequent CUDA source selection passes four of five checks; the stiff
+LTE case times out as documented below and remains unqualified on GPU.
 These angular particle-source tests hold positions fixed. Native meridional
 drift evidence belongs to the separately documented runtime and does not
 qualify this new angular assignment automatically.
 
-## Remaining integration obligations
+## Native integration: detected failures and repairs
 
-Native angular motion requires a distinct checkpoint/model contract, actual
+Native angular motion required a distinct checkpoint/model contract, actual
 angular inventory and transfer diagnostics, and independent drifting,
 reflection, decomposition and restart checks. In particular, during drift
 `r cross carry` changes by `v cross carry`; its representational contribution
 must be bounded or conservatively owned, not hidden in a fitted torque ledger.
 
-The private native probe now supplies a distinct angular model identifier and
+The initial native probe supplied a distinct angular model identifier and
 an optional `RadiationMomentum.include_angular_inventory` diagnostic containing
 radiation, represented-ion and particle-owned pending angular inventories.
 At 1.28 ns, independent plotfile inventories show about 0.127 radians mean
@@ -111,8 +112,8 @@ That run has about 0.251 radians mean rotation, 25.1 micrometres maximum radial
 motion, and total-energy error `-2.91e-10 J` against a `3.14e-6 J` bound.
 It nevertheless fails angular conservation at the wall: the independent error
 is `-9.47e-10 kg m^2/s`, versus a `1.49e-17` bound. The endpoint-radius reflection
-must be replaced with a collision-point path/momentum/carry reflection before
-this can be considered native angular qualification. Neither gate is loosened.
+had to be replaced with a collision-point path/momentum/carry reflection before
+native angular qualification. Neither gate was loosened.
 
 The subsequent collision-point repair follows actual circle/segment crossings
 and reflects the remaining displacement, represented momentum, and every carry
