@@ -106,7 +106,7 @@ main (int argc, char* argv[])
         auto const before = Read(species);
         std::vector<ParticleImpulseBoundaryTransfer> transfers{{"sentinel", {1, 2, 3}}};
         bool inspected = false;
-        auto const reject = [&] (auto const& proposed)
+        auto const reject = [&] (std::vector<ParticleImpulseBoundaryTransfer> const& proposed)
         {
             inspected = true;
             AMREX_ALWAYS_ASSERT(proposed.size() == 1 && proposed[0].path == "angular_wall");
