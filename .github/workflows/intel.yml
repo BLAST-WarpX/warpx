@@ -11,6 +11,13 @@ concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-intel
   cancel-in-progress: true
 
+# Configure and build through CTest, so that CDash records their timings as well
+# as compiler warnings and errors. Only merges to `development` are submitted;
+# PR runs produce the XML locally and drop it.
+env:
+  CDASH_SITE: GitHub-Actions
+  CDASH_SUBMIT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/development' && 'ON' || 'OFF' }}
+
 jobs:
 
   check_changes:
@@ -25,6 +32,8 @@ jobs:
     #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
       CXXFLAGS: "-Werror -Wno-deprecated -Wno-error=pass-failed -Wno-tautological-constant-compare"
+      CDASH_BUILD_NAME: Linux-ICX-3D-SP
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: check_changes
@@ -60,14 +69,13 @@ jobs:
         python3 -m pip install --upgrade pip
         python3 -m pip install --upgrade build packaging setuptools[core] wheel
 
-        cmake -S . -B build_sp         \
+        Tools/CI/ctest_dashboard.sh build_sp \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_EB=OFF               \
           -DWarpX_PYTHON=ON            \
           -DWarpX_MPI=OFF              \
           -DWarpX_OPENPMD=ON           \
           -DWarpX_PRECISION=SINGLE
-        cmake --build build_sp -j 4
         cmake --build build_sp --target pip_install
 
         ccache -s
@@ -89,6 +97,8 @@ jobs:
     #   https://github.com/BLAST-WarpX/warpx/issues/3442
     env:
       CXXFLAGS: "-Werror -Wno-deprecated -Wno-tautological-constant-compare"
+      CDASH_BUILD_NAME: Linux-SYCL-3D-MP
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
     # For oneAPI, Ninja is slower than the default:
     #  CMAKE_GENERATOR: Ninja
     needs: check_changes
@@ -122,7 +132,7 @@ jobs:
         export CC=$(which icx)
         export CXXFLAGS="-fsycl ${CXXFLAGS}"
 
-        cmake -S . -B build_dpsp       \
+        Tools/CI/ctest_dashboard.sh build_dpsp \
           -DBUILD_SHARED_LIBS=ON       \
           -DCMAKE_VERBOSE_MAKEFILE=ON  \
           -DWarpX_COMPUTE=SYCL         \
@@ -136,7 +146,6 @@ jobs:
           -DWarpX_OPENPMD=ON           \
           -DWarpX_PRECISION=DOUBLE     \
           -DWarpX_PARTICLE_PRECISION=SINGLE
-        cmake --build build_dpsp -j 4
 
         ccache -s
         du -hs ~/.cache/ccache

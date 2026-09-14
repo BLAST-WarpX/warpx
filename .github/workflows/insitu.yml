@@ -11,6 +11,13 @@ concurrency:
   group: ${{ github.ref }}-${{ github.head_ref }}-insituvis
   cancel-in-progress: true
 
+# Configure and build through CTest, so that CDash records their timings as well
+# as compiler warnings and errors. Only merges to `development` are submitted;
+# PR runs produce the XML locally and drop it.
+env:
+  CDASH_SITE: GitHub-Actions
+  CDASH_SUBMIT: ${{ github.event_name == 'push' && github.ref == 'refs/heads/development' && 'ON' || 'OFF' }}
+
 jobs:
 
   check_changes:
@@ -27,20 +34,18 @@ jobs:
       CC: gcc
       CMAKE_PREFIX_PATH: /ascent/install/lib/cmake/
       OMP_NUM_THREADS: 1
+      CDASH_BUILD_NAME: Linux-GCC-Ascent
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
     container:
       image: alpinedav/ascent:0.9.3
     steps:
     - uses: actions/checkout@v7
-    - name: Configure
+    - name: Configure & Build
       run: |
         . /ascent_docker_setup_env.sh
-        cmake -S . -B build   \
+        Tools/CI/ctest_dashboard.sh build \
             -DWarpX_ASCENT=ON \
             -DWarpX_COMPUTE=NOACC
-    - name: Build
-      run: |
-        . /ascent_docker_setup_env.sh
-        cmake --build build -j 4
     - name: Test
       run: |
         cp Examples/Physics_applications/laser_acceleration/inputs_base_3d .
@@ -70,6 +75,8 @@ jobs:
       CATALYST_DEBUG: 1
       CATALYST_IMPLEMENTATION_PATHS: /opt/paraview/lib/catalyst
       OMP_NUM_THREADS: 1
+      CDASH_BUILD_NAME: Linux-GCC-Catalyst-2D3D
+      CMAKE_BUILD_PARALLEL_LEVEL: 10
 
     # Container build scripts:
     # https://gitlab.kitware.com/christos.tsolakis/catalyst-amrex-docker-images
@@ -77,14 +84,11 @@ jobs:
       image: kitware/paraview:ci-catalyst-amrex-warpx-20240828
     steps:
     - uses: actions/checkout@v7
-    - name: Configure
+    - name: Configure & Build
       run: |
-        cmake -S . -B build   \
+        Tools/CI/ctest_dashboard.sh build \
             -DWarpX_DIMS="2;3" \
             -DWarpX_CATALYST=ON
-    - name: Build
-      run: |
-        cmake --build build -j 10
     - name: 2D Test
       run: |
         cp Examples/Tests/field_ionization/inputs_test_2d_ionization_lab .
