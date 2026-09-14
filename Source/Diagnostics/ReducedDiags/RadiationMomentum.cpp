@@ -39,12 +39,20 @@ RadiationMomentum::RadiationMomentum (std::string const& rd_name)
     pp_radiation.query("diffusion_solver", diffusion_solver);
     amrex::ParmParse(rd_name).query("include_moment_inventory", m_include_moment_inventory);
     amrex::ParmParse(rd_name).query("include_moment_transport", m_include_moment_transport);
+    amrex::ParmParse(rd_name).query("include_angular_inventory", m_include_angular_inventory);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_angular_inventory || m_include_moment_transport,
+        "RadiationMomentum.include_angular_inventory requires include_moment_transport=1.");
+#if !defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_angular_inventory,
+        "RadiationMomentum.include_angular_inventory requires RZ geometry.");
+#endif
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_moment_transport || m_include_moment_inventory,
         "RadiationMomentum.include_moment_transport requires include_moment_inventory=1.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_include_moment_inventory ||
         diffusion_solver == "coupled_moment",
         "RadiationMomentum.include_moment_inventory requires coupled_moment transport.");
-    m_data.resize(m_include_moment_transport ? 39 : (m_include_moment_inventory ? 27 : 24), 0.0_rt);
+    m_data.resize(m_include_angular_inventory ? 42 :
+        (m_include_moment_transport ? 39 : (m_include_moment_inventory ? 27 : 24)), 0.0_rt);
 
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RZ)
     std::array<std::string, 3> const labels{"r", "theta", "z"};
@@ -109,6 +117,11 @@ RadiationMomentum::RadiationMomentum (std::string const& rd_name)
                     output << m_sep << "[" << column++ << "]cumulative_moment_"
                            << account << '_' << label << "(kg*m/s)";
                 }
+            }
+        }
+        if (m_include_angular_inventory) {
+            for (char const* account : {"radiation", "represented_material", "pending_material"}) {
+                output << m_sep << "[" << column++ << "]angular_" << account << "_z(kg*m^2/s)";
             }
         }
         output << "\n";
@@ -222,6 +235,12 @@ void RadiationMomentum::ComputeDiags (int const step)
             offset += 4;
         }
     }
+    if (m_include_angular_inventory) {
+        auto const inventory = radiation.momentAngularInventory(warpx.GetPartContainer(), warpx.m_fields);
+        for (int component = 0; component < 3; ++component) {
+            m_data[39 + component] = inventory[component];
+        }
+    }
 }
 
 void RadiationMomentum::WriteCheckpointData (std::string const& dir)
@@ -245,8 +264,8 @@ void RadiationMomentum::WriteCheckpointData (std::string const& dir)
     }
     checkpoint << m_last_accumulated_step << "\n";
     if (m_include_moment_inventory) {
-        checkpoint << (m_include_moment_transport ? "moment_inventory_transport_v2\n"
-                                                 : "moment_inventory_v1\n");
+        checkpoint << (m_include_angular_inventory ? "moment_inventory_transport_angular_v3\n" :
+            (m_include_moment_transport ? "moment_inventory_transport_v2\n" : "moment_inventory_v1\n"));
     }
 }
 
@@ -277,12 +296,13 @@ void RadiationMomentum::ReadCheckpointData (std::string const& dir)
         "RadiationMomentum checkpoint state is truncated or invalid.");
     std::string schema, trailing;
     bool const has_inventory_schema = static_cast<bool>(checkpoint >> schema);
-    std::string const expected_schema = m_include_moment_transport
-        ? "moment_inventory_transport_v2" : "moment_inventory_v1";
+    std::string const expected_schema = m_include_angular_inventory
+        ? "moment_inventory_transport_angular_v3"
+        : (m_include_moment_transport ? "moment_inventory_transport_v2" : "moment_inventory_v1");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         has_inventory_schema == m_include_moment_inventory &&
             (!has_inventory_schema || (schema == expected_schema &&
                                        !(checkpoint >> trailing))),
         "RadiationMomentum restart must preserve include_moment_inventory, "
-        "include_moment_transport and their schema.");
+        "include_moment_transport, include_angular_inventory and their schema.");
 }

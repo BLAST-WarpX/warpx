@@ -10,6 +10,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "RadiationTransport.H"
+#include "RZSpecularTrajectory.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -57,6 +58,8 @@ namespace warpx::radiation
         struct Candidate {
             amrex::GpuArray<amrex::ParticleReal, 3> position{}, velocity{};
             amrex::GpuArray<bool, 3> reflected{};
+            amrex::GpuArray<amrex::Real, 4> transverse_reflection{1, 0, 0, 1};
+            bool angular_reflection = false;
             int valid = 0;
         };
         using CarryPointers = amrex::GpuArray<amrex::ParticleReal *, 4>;
@@ -71,6 +74,20 @@ namespace warpx::radiation
                       Candidate const& candidate, bool thermalized = false, bool lost = false)
         {
 #if defined(WARPX_DIM_RZ)
+            if (candidate.angular_reflection) {
+                auto result = EvaluateMaterialCarryReflection(values, {false, false, false},
+                                                              thermalized, lost);
+                if (!result.valid) { return result; }
+                auto const& matrix = candidate.transverse_reflection;
+                result.carry[0] = matrix[0] * values[0] + matrix[1] * values[1];
+                result.carry[1] = matrix[2] * values[0] + matrix[3] * values[1];
+                for (int d = 0; d < 2; ++d) {
+                    result.boundary_transfer[d] = values[d] - result.carry[d];
+                    if (!std::isfinite(result.carry[d]) ||
+                        !std::isfinite(result.boundary_transfer[d])) { return {}; }
+                }
+                return result;
+            }
             return EvaluateCylindricalMaterialCarryReflection(
                 values, candidate.reflected, candidate.position[1], thermalized, lost);
 #else
@@ -82,7 +99,8 @@ namespace warpx::radiation
     bool TryReflectParticleImpulseState (
         WarpXParticleContainer &species, ParticleBoundaries const &boundaries,
         std::vector<ParticleImpulseBoundaryTransfer> &transfers,
-        std::function<bool(std::vector<ParticleImpulseBoundaryTransfer> const &)> const &accept)
+        std::function<bool(std::vector<ParticleImpulseBoundaryTransfer> const &)> const &accept,
+        bool const angular_trajectory)
     {
         auto const paths = RegisteredParticleImpulsePaths(species);
         if (paths.empty() || WarpX::do_moving_window || species.finestLevel() != 0 ||
@@ -91,7 +109,7 @@ namespace warpx::radiation
             return false;
         }
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        amrex::ignore_unused(boundaries, transfers, accept);
+        amrex::ignore_unused(boundaries, transfers, accept, angular_trajectory);
         return false;
 #else
         auto const settings = boundaries.data;
@@ -100,7 +118,19 @@ namespace warpx::radiation
         amrex::GpuArray<ParticleBoundaryType, 3> const upper_type{
             settings.xmax_bc, settings.ymax_bc, settings.zmax_bc};
         auto const &geometry = species.Geom(0);
+#if !defined(WARPX_DIM_RZ)
+        if (angular_trajectory) { return false; }
+#endif
 #if defined(WARPX_DIM_RZ)
+        if (angular_trajectory && (!geometry.isPeriodic(1) || settings.reflect_all_velocities)) {
+            return false;
+        }
+        if (angular_trajectory) {
+            auto const& names = species.GetRealSoANames();
+            for (auto const* required : {"prev_x", "prev_y"}) {
+                if (std::find(names.begin(), names.end(), required) == names.end()) { return false; }
+            }
+        }
         // WarpX's compiled RZ geometry supplies the cylindrical interpretation;
         // its AMReX Geometry need not carry CoordType::RZ.
         if (geometry.ProbLo(0) != 0 || geometry.isPeriodic(0) ||
@@ -172,6 +202,13 @@ namespace warpx::radiation
                              trial->carries.begin());
             auto const data = iterator.GetParticleTile().getParticleTileData();
             auto const get_position = GetParticlePosition<PIdx>(iterator);
+#if defined(WARPX_DIM_RZ)
+            amrex::GpuArray<amrex::ParticleReal const*, 2> previous{};
+            if (angular_trajectory) {
+                previous = {iterator.GetAttribs("prev_x").dataPtr(),
+                            iterator.GetAttribs("prev_y").dataPtr()};
+            }
+#endif
             auto *output = trial->candidates.data();
             auto const *carry = trial->carries.data();
             amrex::ParallelForRNG(np, [=] AMREX_GPU_DEVICE(long ip,
@@ -193,6 +230,21 @@ namespace warpx::radiation
                 bool lost = false;
                 ApplyParticleBoundaries::BoundaryEvent event;
 #if defined(WARPX_DIM_RZ)
+                if (angular_trajectory && next.position[0] > upper[0]) {
+                    auto const theta = next.position[1];
+                    auto const path = ReflectRZTrajectory({previous[0][ip], previous[1][ip]},
+                        {next.position[0] * std::cos(theta), next.position[0] * std::sin(theta)},
+                        upper[0]);
+                    if (!path.valid) { next.valid = false; output[ip] = next; return; }
+                    next.angular_reflection = true;
+                    next.transverse_reflection = path.reflection;
+                    next.position[0] = static_cast<amrex::ParticleReal>(amrex::min(upper[0],
+                        std::hypot(path.position[0], path.position[1])));
+                    next.position[1] = static_cast<amrex::ParticleReal>(std::atan2(path.position[1], path.position[0]));
+                    auto const ux = next.velocity[0], uy = next.velocity[1];
+                    next.velocity[0] = static_cast<amrex::ParticleReal>(path.reflection[0] * ux + path.reflection[1] * uy);
+                    next.velocity[1] = static_cast<amrex::ParticleReal>(path.reflection[2] * ux + path.reflection[3] * uy);
+                }
                 bool const outside = next.position[0] < lower[0] || next.position[0] > upper[0]
                     || next.position[2] < lower[2] || next.position[2] > upper[2];
                 auto const cosine = std::cos(next.position[1]);
@@ -296,6 +348,9 @@ namespace warpx::radiation
                 p.pos(0) = candidate.position[2];
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                 p.pos(0) = candidate.position[0]; p.pos(1) = candidate.position[2];
+#if defined(WARPX_DIM_RZ)
+                data.m_rdata[PIdx::theta][ip] = candidate.position[1];
+#endif
 #else
                 for (int d = 0; d < 3; ++d) { p.pos(d) = candidate.position[d]; }
 #endif
@@ -361,7 +416,8 @@ bool RadiationTransport::ReflectParticleCarryBoundaries (WarpXParticleContainer 
         }
         return true;
     };
-    if (!warpx::radiation::TryReflectParticleImpulseState(species, boundaries, transfers, accept)) {
+    if (!warpx::radiation::TryReflectParticleImpulseState(
+            species, boundaries, transfers, accept, m_rz_angular_transport)) {
         return false;
     }
     m_particle_carry_wall_momentum.swap(candidate);

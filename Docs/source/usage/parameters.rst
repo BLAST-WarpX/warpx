@@ -7033,6 +7033,15 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         These accounts are owned by the transport runtime, independent of the
         diagnostic output cadence. The default is zero.
 
+        In RZ, ``<reduced_diags_name>.include_angular_inventory=1`` additionally
+        appends three instantaneous axial angular momenta (kg*m^2/s): radiation,
+        represented ions, and particle-owned pending momentum. This requires
+        ``include_moment_transport=1`` and must remain unchanged at restart.
+        The radiation measure is the annular volume-mean radius times its
+        theta momentum; the particle measure uses each particle's actual radius.
+        Ordinary summed theta momentum is not the angular invariant. These
+        columns do not relabel the existing physical material-impulse columns.
+
         For a diffusion vacuum face the outward normal impulse is
         :math:`\Delta E/c`; for the P1 Marshak condition it is
         :math:`2\Delta E/(3c)`. The RCYLINDER radial entry is an azimuthally

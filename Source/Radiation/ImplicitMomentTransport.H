@@ -27,6 +27,10 @@ namespace warpx::radiation
         // Experimental low-level fixed optical mirrors on all nonperiodic faces.
         // Mutually exclusive with prescribed boundary fluxes; no particle wall.
         bool reflecting_boundaries = false;
+        // Low-level RZ angular transport. A coupled source additionally needs
+        // the matched torque-conjugate particle assignment; this flag alone
+        // does not activate angular transport in the native evolution loop.
+        bool rz_angular_transport = false;
     };
 
     struct ImplicitMomentTransportResult {
@@ -35,9 +39,10 @@ namespace warpx::radiation
         amrex::Real equation_residual = 0;
         amrex::Real energy_residual = 0;
         amrex::Real momentum_residual = 0;
+        amrex::Real angular_momentum_residual = 0;
         // Accepted outward (energy,c*momentum); zero on rejected stages.
         FourVector boundary_exchange{};
-        // Direct cylindrical stress contribution to the radial-component
+        // Direct cylindrical stress contribution to the radial/theta-component
         // inventory. This is neither material impulse nor a boundary transfer.
         FourVector geometric_exchange{};
         bool valid = false;
@@ -46,8 +51,10 @@ namespace warpx::radiation
     /** Joint backward-Euler gray M1 transport/source stage with prescribed
      * beta, opacity and equilibrium energy. Radiation and material transfer are
      * cell-integrated (energy,c*momentum). Opacities are proper inverse lengths.
-     * Scope is Cartesian geometry and |beta| <= 0.01, or experimental meridional
-     * RZ with zero azimuthal state/velocity, an axis and fixed optical mirrors.
+     * Scope is Cartesian geometry and |beta| <= 0.01, or experimental RZ with
+     * an axis and fixed optical mirrors. RZ defaults to meridional states;
+     * rz_angular_transport enables the low-level angular-conservative theta
+     * row and prescribed azimuthal material velocity, not native particle torque.
      * RZ geometric stress is reported separately from material and wall exchange.
      * Nonperiodic directions
      * require either externally prescribed lab (E,q) face fluxes, fixed throughout
@@ -62,6 +69,8 @@ namespace warpx::radiation
      * establish production qualification for a moving-medium spatial scheme.
      * equation_residual is the maximum ratio to its physical/roundoff bound;
      * energy_residual and momentum_residual are raw relative global balances.
+     * In angular RZ mode, momentum_residual also bounds the separately reported
+     * mean-radius-weighted angular_momentum_residual.
      */
     ImplicitMomentTransportResult TryImplicitMomentTransport (
         amrex::MultiFab& radiation, amrex::MultiFab const& beta, amrex::MultiFab const& absorption,
@@ -85,6 +94,7 @@ namespace warpx::radiation
                                           amrex::MultiFab& increment,
                                           amrex::Geometry const& geometry, amrex::Real dt,
                                           bool reflecting_boundaries = false,
-                                          MomentTransportAccounting* accounting = nullptr);
+                                          MomentTransportAccounting* accounting = nullptr,
+                                          bool rz_angular_transport = false);
 } // namespace warpx::radiation
 #endif

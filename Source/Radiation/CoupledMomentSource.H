@@ -76,6 +76,11 @@ namespace warpx::radiation
         // RZ basis-rotation balance divided by its physical + arithmetic bound.
         // raw_momentum_residual remains the unadjusted relative diagnostic.
         amrex::Real momentum_balance_residual = 0;
+        // Closed RZ angular inventory uses annular mean radius times Qtheta.
+        // The acceptance ratio includes explicit transverse rotation operands,
+        // not a radiation-energy reservoir or an inferred torque correction.
+        amrex::Real raw_angular_momentum_residual = 0;
+        amrex::Real angular_balance_residual = 0;
         amrex::Real actual_kinetic_work = 0;
         amrex::Real carry_energy_change = 0;
         amrex::Real native_realization_residual = 0;
@@ -89,8 +94,11 @@ namespace warpx::radiation
      * no PIC drift or density advance is performed,
      * and no interval-wide subcycling/retry is implied by this single stage.
      * Boundary scope is periodic Cartesian geometry or experimental meridional
-     * RZ with opt-in fixed optical mirrors and nearest-cell particle assignment.
-     * Native RZ runtime activation and particle drift remain separate guards. */
+     * RZ with opt-in fixed optical mirrors and nearest-cell meridional assignment,
+     * or matched RZAngularConservative/rz_angular_transport options. Angular
+     * residuals use torque-conjugate impulses; exchange.momentum retains the
+     * actual physical particle impulse. Native angular runtime activation and
+     * particle drift remain separate guards. */
     CoupledMomentResult TryAdvanceCoupledMomentSource (
         MultiParticleContainer& particles, std::vector<std::string> const& momentum_species,
         std::string const& carry_path, amrex::MultiFab& radiation,

@@ -33,11 +33,14 @@ namespace warpx::radiation
      * Success does not redistribute particles or accumulate a persistent ledger.
      * The optional collective accept callback must stage external accounting
      * privately; it can reject the proposed transfers before particle commit.
+     * angular_trajectory additionally requires RZ saved Cartesian prev_x/y,
+     * a specular radial wall (not reflect-all) and periodic z. It continues the
+     * actual collision-point path and applies its matrix to momentum and carry.
      */
     bool TryReflectParticleImpulseState(
         WarpXParticleContainer &species, ParticleBoundaries const &boundaries,
         std::vector<ParticleImpulseBoundaryTransfer> &transfers,
         std::function<bool(std::vector<ParticleImpulseBoundaryTransfer> const &)> const &accept =
-            {});
+            {}, bool angular_trajectory = false);
 } // namespace warpx::radiation
 #endif

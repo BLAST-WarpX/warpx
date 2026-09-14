@@ -790,6 +790,21 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                     eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
                 }
 
+#if defined(WARPX_DIM_RZ)
+                amrex::GpuArray<amrex::ParticleReal const*, 3> previous_position{};
+                amrex::Real periodic_z_length = 0;
+                if (WarpX::GetInstance().GetRadiationTransport().usesRZAngularTransport()) {
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(relative_time == -0.5_rt * dt,
+                        "RZ angular auxiliary charge flux requires endpoint deposition.");
+                    previous_position = {pti.GetAttribs("prev_x").dataPtr() + offset,
+                                         pti.GetAttribs("prev_y").dataPtr() + offset,
+                                         pti.GetAttribs("prev_z").dataPtr() + offset};
+                    if (Geom(lev).isPeriodic(1)) { periodic_z_length = Geom(lev).ProbLength(1); }
+                }
+#else
+                amrex::GpuArray<amrex::ParticleReal const*, 3> const previous_position{};
+                amrex::Real const periodic_z_length = 0;
+#endif
                 if      (WarpX::nox == 1){
                     doEsirkepovDepositionShapeN<1>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
@@ -797,7 +812,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
                         jx_arr, jy_arr, jz_arr,
                         np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q,
                         WarpX::n_rz_azimuthal_modes,
-                        eb_reduce_particle_shape, EB::enabled(), stable_shape_integrals );
+                        eb_reduce_particle_shape, EB::enabled(), stable_shape_integrals,
+                        previous_position, periodic_z_length );
                 } else if (WarpX::nox == 2){
                     doEsirkepovDepositionShapeN<2>(
                         GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,

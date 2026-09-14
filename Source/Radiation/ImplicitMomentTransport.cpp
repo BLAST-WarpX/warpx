@@ -111,13 +111,14 @@ namespace warpx::radiation
                             amrex::MultiFab const& equilibrium, amrex::Geometry const& geometry,
                             amrex::Real step,
                             PrescribedMomentFaceFluxes const* boundary = nullptr,
-                            bool reflecting = false)
+                            bool reflecting = false, bool rz_angular_transport = false)
                 : m_geom(geometry), m_dt(step),
                   m_beta(state.boxArray(), state.DistributionMap(), 3, 1),
                   m_coefficients(state.boxArray(), state.DistributionMap(), 3, 1),
                   m_pressure_jacobian(state.boxArray(), state.DistributionMap(), 36, 1),
                   m_diagonal(state.boxArray(), state.DistributionMap(), 16, 0),
-                  m_boundary(boundary), m_reflecting(reflecting)
+                  m_boundary(boundary), m_reflecting(reflecting),
+                  m_rz_angular_transport(rz_angular_transport)
             {
                 amrex::MultiFab::Copy(m_beta, velocity, 0, 0, 3, 0);
                 amrex::MultiFab::Copy(m_coefficients, absorption, 0, 0, 1, 0);
@@ -172,6 +173,7 @@ namespace warpx::radiation
                 amrex::ReduceData<int> data(ops);
                 using Tuple = typename decltype(data)::Type;
                 auto const step = m_dt;
+                [[maybe_unused]] bool const angular = m_rz_angular_transport;
                 for (amrex::MFIter iterator(m_beta); iterator.isValid(); ++iterator) {
                     auto const b = m_beta.const_array(iterator);
                     auto const c = m_coefficients.const_array(iterator);
@@ -185,7 +187,7 @@ namespace warpx::radiation
                                      return {1};
                                  }
 #if defined(WARPX_DIM_RZ)
-                                 if (b(i, j, k, 1) != 0) { return {1}; }
+                                 if (!angular && b(i, j, k, 1) != 0) { return {1}; }
 #endif
                                  for (int d = 0; d < 3; ++d) {
                                      if (!(c(i, j, k, d) >= 0) ||
@@ -205,6 +207,7 @@ namespace warpx::radiation
             bool
             updateClosure (amrex::MultiFab const& state)
             {
+                [[maybe_unused]] bool const angular = m_rz_angular_transport;
                 amrex::ReduceOps<amrex::ReduceOpMax> ops;
                 amrex::ReduceData<int> data(ops);
                 using Tuple = typename decltype(data)::Type;
@@ -216,7 +219,7 @@ namespace warpx::radiation
                                  FourVector const values{u(i, j, k, 0), u(i, j, k, 1), u(i, j, k, 2),
                                                    u(i, j, k, 3)};
 #if defined(WARPX_DIM_RZ)
-                                 if (values[2] != 0) { return {1}; }
+                                 if (!angular && values[2] != 0) { return {1}; }
 #endif
                                  auto const closure = EvaluateM1Closure(values);
                                  if (!closure.valid) {
@@ -494,7 +497,8 @@ namespace warpx::radiation
             updateBoundaryExchange ()
             {
 #if defined(WARPX_DIM_RZ)
-                m_geometric_exchange = RZGeometricExchange(m_theta_pressure, m_geom, m_dt);
+                m_geometric_exchange = RZGeometricExchange(m_theta_pressure, m_geom, m_dt,
+                    m_rz_angular_transport ? m_flux.data() : nullptr);
 #endif
                 if (m_reflecting) {
                     PrescribedMomentFaceFluxes faces{};
@@ -538,6 +542,7 @@ namespace warpx::radiation
             apply (amrex::MultiFab& output, amrex::MultiFab const& state)
             {
                 buildFlux(state);
+                [[maybe_unused]] bool const angular = m_rz_angular_transport;
                 auto const step = m_dt;
                 [[maybe_unused]] auto const spacing = m_geom.CellSizeArray();
 #if defined(WARPX_DIM_RZ)
@@ -575,7 +580,7 @@ namespace warpx::radiation
                         auto const source = GreyFourForceFromComoving(rest, velocity, a, s, 0);
 #if defined(WARPX_DIM_RZ)
                         auto const transport = RZMomentDivergence(
-                            f, p, cell, velocity, metric, step, theta_pressure(cell, 0));
+                            f, p, cell, velocity, metric, step, theta_pressure(cell, 0), angular);
 #else
                         auto const transport = Divergence(f, p, cell, velocity, spacing, step);
 #endif
@@ -772,6 +777,7 @@ namespace warpx::radiation
             void
             writeTransportIncrement (amrex::MultiFab& output) const
             {
+                [[maybe_unused]] bool const angular = m_rz_angular_transport;
                 [[maybe_unused]] auto const spacing = m_geom.CellSizeArray();
                 auto const step = m_dt;
 #if defined(WARPX_DIM_RZ)
@@ -799,6 +805,13 @@ namespace warpx::radiation
                                 auto const high_area = metric.Area(d, upper[0]);
                                 auto const pressure_flux = d == 0 && n == 1
                                     ? PhysConst::c * theta_pressure(cell, 0) : 0;
+                                if (d == 0 && n == 2 && angular) {
+                                    auto const weights = metric.Angular(cell[0]);
+                                    value += weights.Divergence(f[d](cell, n), f[d](upper, n), step);
+                                    absolute += step * (weights.upper_weight * precision[d](upper, n)
+                                        + weights.lower_weight * precision[d](cell, n));
+                                    continue;
+                                }
                                 value += d == 0
                                     ? step * (high_area * (f[d](upper, n) - pressure_flux)
                                         - low_area * (f[d](cell, n) - pressure_flux))
@@ -828,6 +841,7 @@ namespace warpx::radiation
             std::array<amrex::MultiFab, AMREX_SPACEDIM> m_parameters, m_flux, m_flux_precision;
             PrescribedMomentFaceFluxes const* m_boundary;
             bool m_reflecting;
+            bool m_rz_angular_transport;
             std::array<amrex::MultiFab, AMREX_SPACEDIM> m_mirror_jacobian;
             FourVector m_boundary_exchange{};
             FourVector m_geometric_exchange{};
@@ -1017,6 +1031,7 @@ namespace warpx::radiation
             amrex::ReduceData<amrex::Real> data(ops);
             using Tuple = typename decltype(data)::Type;
             auto const step = op.m_dt;
+            [[maybe_unused]] bool const angular = op.m_rz_angular_transport;
             [[maybe_unused]] auto const spacing = op.m_geom.CellSizeArray();
 #if defined(WARPX_DIM_RZ)
             RZMomentMetric const metric(op.m_geom);
@@ -1061,7 +1076,7 @@ namespace warpx::radiation
                         }
 #if defined(WARPX_DIM_RZ)
                         auto const transport = RZMomentDivergence(
-                            f, p, cell, velocity, metric, step, theta_pressure(cell, 0));
+                            f, p, cell, velocity, metric, step, theta_pressure(cell, 0), angular);
 #else
                         auto const transport =
                             MomentOperator::Divergence(f, p, cell, velocity, spacing, step);
@@ -1105,8 +1120,19 @@ namespace warpx::radiation
                                     }
                                 }
 #if defined(WARPX_DIM_RZ)
+                                if (d == 0 && angular && component == 2) {
+                                    auto const weights = metric.Angular(cell[0]);
+                                    noise_scale += step * (weights.lower_weight * lo + weights.upper_weight * hi);
+                                    continue;
+                                }
                                 noise_scale += step * (metric.Area(d, cell[0]) * lo
                                     + metric.Area(d, upper[0]) * hi);
+                                if (d == 0 && angular && component == 0) {
+                                    auto const weights = metric.Angular(cell[0]);
+                                    noise_scale += step * std::abs(velocity[1]) *
+                                        (std::abs(weights.lower_geometric_weight) * precision[d](cell, 2)
+                                         + std::abs(weights.upper_geometric_weight) * precision[d](upper, 2));
+                                }
                                 if (d == 0 && (component == 0 || component == 1)) {
                                     noise_scale += step * PhysConst::c
                                         * (metric.Area(0, cell[0]) + metric.Area(0, upper[0]))
@@ -1131,7 +1157,8 @@ namespace warpx::radiation
             result.equation_residual = amrex::get<0>(data.value());
             amrex::ParallelDescriptor::ReduceRealMax(result.equation_residual);
             detail::UpdateMomentGlobalBalance(state, old, transfer, result, op.m_boundary_exchange,
-                                op.m_geometric_exchange);
+                                op.m_geometric_exchange,
+                                op.m_rz_angular_transport ? &op.m_geom : nullptr);
             return amrex::max(result.equation_residual,
                               amrex::max(result.energy_residual, result.momentum_residual) /
                                   tolerance);
@@ -1172,6 +1199,9 @@ namespace warpx::radiation
                 && !geometry.isPeriodic(0) && geometry.ProbLo(0) == 0
                 && geometry.CellSize(0) > 0 && geometry.CellSize(1) > 0,
             "Meridional RZ moment transport requires an axis domain and fixed optical mirrors.");
+#else
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!options.rz_angular_transport,
+            "Angular RZ moment transport requires an RZ build.");
 #endif
         for (auto const* field : {&beta, &absorption, &scattering, &equilibrium,
                                   static_cast<amrex::MultiFab const*>(&material_transfer)}) {
@@ -1204,7 +1234,8 @@ namespace warpx::radiation
             }
         }
         MomentOperator op(radiation, beta, absorption, scattering, equilibrium, geometry, dt,
-                          prescribed_boundary_fluxes, options.reflecting_boundaries);
+                          prescribed_boundary_fluxes, options.reflecting_boundaries,
+                          options.rz_angular_transport);
         op.m_boundary_exchange = boundary_exchange;
         if (!op.validCoefficients()) {
             return result;
@@ -1283,7 +1314,8 @@ namespace warpx::radiation
                                                  options.tolerance);
                 ImplicitMomentTransportResult checked = result;
                 detail::UpdateMomentGlobalBalance(current, radiation, stable_transfer, checked,
-                                    op.m_boundary_exchange, op.m_geometric_exchange);
+                                    op.m_boundary_exchange, op.m_geometric_exchange,
+                                    op.m_rz_angular_transport ? &op.m_geom : nullptr);
                 bool const keep_current = assigned <= 1 && std::isfinite(checked.energy_residual) &&
                                           std::isfinite(checked.momentum_residual);
                 MomentOperator::assign(candidate, trial);
@@ -1309,7 +1341,8 @@ namespace warpx::radiation
                 assigned = AssignedResidual(trial, radiation, stable_transfer, transport,
                                             options.tolerance);
                 detail::UpdateMomentGlobalBalance(trial, radiation, stable_transfer, checked,
-                                    op.m_boundary_exchange, op.m_geometric_exchange);
+                                    op.m_boundary_exchange, op.m_geometric_exchange,
+                                    op.m_rz_angular_transport ? &op.m_geom : nullptr);
                 if (keep_current &&
                     (!std::isfinite(checked_merit) || checked.equation_residual > 1 ||
                      assigned > 1 || checked.energy_residual > options.tolerance ||
@@ -1321,7 +1354,8 @@ namespace warpx::radiation
                     assigned = AssignedResidual(trial, radiation, stable_transfer, transport,
                                                 options.tolerance);
                     detail::UpdateMomentGlobalBalance(trial, radiation, stable_transfer, checked,
-                                        op.m_boundary_exchange, op.m_geometric_exchange);
+                                        op.m_boundary_exchange, op.m_geometric_exchange,
+                                        op.m_rz_angular_transport ? &op.m_geom : nullptr);
                 }
                 if (std::isfinite(checked_merit) && checked.equation_residual <= 1 &&
                     assigned <= 1 && checked.energy_residual <= options.tolerance &&
@@ -1337,6 +1371,7 @@ namespace warpx::radiation
                     result.equation_residual = amrex::max(checked.equation_residual, assigned);
                     result.energy_residual = checked.energy_residual;
                     result.momentum_residual = checked.momentum_residual;
+                    result.angular_momentum_residual = checked.angular_momentum_residual;
                     result.boundary_exchange = op.m_boundary_exchange;
                     result.geometric_exchange = op.m_geometric_exchange;
                     result.valid = true;
@@ -1345,6 +1380,7 @@ namespace warpx::radiation
                 result.equation_residual = checked.equation_residual;
                 result.energy_residual = checked.energy_residual;
                 result.momentum_residual = checked.momentum_residual;
+                result.angular_momentum_residual = checked.angular_momentum_residual;
                 MomentOperator::assign(current, trial);
                 continue;
             }
@@ -1415,7 +1451,7 @@ namespace warpx::radiation
                                      amrex::MultiFab const& equilibrium, amrex::MultiFab& increment,
                                      amrex::Geometry const& geometry, amrex::Real dt,
                                      bool reflecting_boundaries,
-                                     MomentTransportAccounting* accounting)
+                                     MomentTransportAccounting* accounting, bool rz_angular_transport)
     {
         if (std::numeric_limits<amrex::Real>::digits < 53 || radiation.nComp() != 4 ||
             !radiation.ixType().cellCentered() ||
@@ -1430,6 +1466,8 @@ namespace warpx::radiation
 #if defined(WARPX_DIM_RZ)
         if (!reflecting_boundaries || geometry.isPeriodic(0) || geometry.ProbLo(0) != 0
             || !(geometry.CellSize(0) > 0) || !(geometry.CellSize(1) > 0)) { return false; }
+#else
+        if (rz_angular_transport) { return false; }
 #endif
         for (auto const* field : {&beta, &absorption, &scattering, &equilibrium,
                                   static_cast<amrex::MultiFab const*>(&increment)}) {
@@ -1439,7 +1477,7 @@ namespace warpx::radiation
             }
         }
         MomentOperator op(radiation, beta, absorption, scattering, equilibrium, geometry, dt,
-                          nullptr, reflecting_boundaries);
+                          nullptr, reflecting_boundaries, rz_angular_transport);
         if (!op.validCoefficients()) {
             return false;
         }

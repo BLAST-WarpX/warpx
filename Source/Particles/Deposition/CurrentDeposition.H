@@ -698,6 +698,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
  * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
  * \param stable_shape_integrals Use two-sided shape integrals for RZ hybrid energy fluxes.
+ * \param previous_position Optional saved Cartesian endpoints for the opt-in m=0 RZ
+ * angular auxiliary flux. A reflected velocity cannot reconstruct the old endpoint.
+ * \param periodic_z_length Axial period for choosing the nearest old endpoint image.
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -719,7 +722,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   [[maybe_unused]] int n_rz_azimuthal_modes,
                                   const amrex::Array4<const int>& reduced_particle_shape_mask,
                                   bool enable_reduced_shape,
-                                  [[maybe_unused]] bool stable_shape_integrals = false
+                                  [[maybe_unused]] bool stable_shape_integrals = false,
+                                  [[maybe_unused]] amrex::GpuArray<amrex::ParticleReal const*, 3>
+                                      previous_position = {},
+                                  [[maybe_unused]] amrex::Real periodic_z_length = 0
                                   )
 {
     using namespace amrex;
@@ -772,8 +778,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
             Real const xp_mid = xp_new - 0.5_rt*dt*uxp[ip]*gaminv;
             Real const yp_mid = yp_new - 0.5_rt*dt*uyp[ip]*gaminv;
-            Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+            Real const xp_old = previous_position[0] != nullptr
+                ? previous_position[0][ip] : xp_new - dt*uxp[ip]*gaminv;
+            Real const yp_old = previous_position[1] != nullptr
+                ? previous_position[1][ip] : yp_new - dt*uyp[ip]*gaminv;
             Real const rp_new = std::sqrt(xp_new*xp_new + yp_new*yp_new);
             Real const rp_mid = std::sqrt(xp_mid*xp_mid + yp_mid*yp_mid);
             Real const rp_old = std::sqrt(xp_old*xp_old + yp_old*yp_old);
@@ -831,6 +839,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
             double const z_old =
 #if defined(WARPX_DIM_RZ)
+                previous_position[2] != nullptr
+                ? (previous_position[2][ip] - xyzmin.z
+                    - (periodic_z_length > 0 ? periodic_z_length * std::floor(
+                        (previous_position[2][ip] - zp) / periodic_z_length + 0.5_rt) : 0)) * dinv.z
+                :
                 stable_shape_integrals
                 // Match radial backtracking and the physical-coordinate charge
                 // deposition before converting to grid units. Subtracting the

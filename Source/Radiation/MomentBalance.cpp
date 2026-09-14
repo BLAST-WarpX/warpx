@@ -3,6 +3,8 @@
  */
 #include "MomentBalance.H"
 
+#include "RZMomentGeometry.H"
+
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Reduce.H>
 
@@ -14,12 +16,14 @@ namespace warpx::radiation::detail
 void
 UpdateMomentGlobalBalance (amrex::MultiFab const& state, amrex::MultiFab const& old,
                            amrex::MultiFab const& transfer, ImplicitMomentTransportResult& result,
-                           FourVector const& boundary, FourVector const& geometric)
+                           FourVector const& boundary, FourVector const& geometric,
+                           amrex::Geometry const* angular_geometry)
 {
 #if !defined(WARPX_DIM_RZ)
-    amrex::ignore_unused(geometric);
+    amrex::ignore_unused(geometric, angular_geometry);
 #endif
     result.momentum_residual = 0;
+    result.angular_momentum_residual = 0;
     for (int d = 0; d < 4; ++d)
     {
         amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum, amrex::ReduceOpSum,
@@ -68,5 +72,12 @@ UpdateMomentGlobalBalance (amrex::MultiFab const& state, amrex::MultiFab const& 
             result.momentum_residual = amrex::max(result.momentum_residual, error);
         }
     }
+#if defined(WARPX_DIM_RZ)
+    if (angular_geometry != nullptr) {
+        result.angular_momentum_residual = RZAngularBalance(state, old, transfer, *angular_geometry);
+        result.momentum_residual = amrex::max(result.momentum_residual,
+                                             result.angular_momentum_residual);
+    }
+#endif
 }
 } // namespace warpx::radiation::detail

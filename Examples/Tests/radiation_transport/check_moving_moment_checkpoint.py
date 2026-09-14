@@ -44,12 +44,14 @@ def run_rejection(command, log, timeout=60):
     return subprocess.CompletedProcess(command, process.returncode, text)
 
 
-def check(executable, checkpoint, missing, rz=False):
+def check(executable, checkpoint, missing, rz=False, angular=False):
+    rz = rz or angular
     checkpoint = checkpoint.resolve(strict=True)
     manifests = {
         "model": Path("RadiationMomentModel_data.txt"),
         "ledger": Path("RadiationMomentTransportLedger_data.txt"),
         "cartesian_model": Path("RadiationMomentModel_data.txt"),
+        "meridional_model": Path("RadiationMomentModel_data.txt"),
     }
     relative = manifests.get(
         missing, Path("Level_0") / f"radiation_moment_q{missing}[level=0]_H"
@@ -59,10 +61,13 @@ def check(executable, checkpoint, missing, rz=False):
     with tempfile.TemporaryDirectory(prefix="moving-checkpoint-", dir=".") as temporary:
         candidate = Path(temporary).resolve() / "checkpoint"
         shutil.copytree(checkpoint, candidate)
-        if missing == "cartesian_model":
+        if missing in ("cartesian_model", "meridional_model"):
             assert rz
+            assert missing != "meridional_model" or angular
             (candidate / relative).write_text(
-                "gray_m1_low_beta_nodal_shape_ledger_v3 1\n"
+                "gray_m1_meridional_rz_nearest_cell_ledger_v1 1\n"
+                if missing == "meridional_model"
+                else "gray_m1_low_beta_nodal_shape_ledger_v3 1\n"
             )
         else:
             (candidate / relative).unlink()
@@ -81,6 +86,8 @@ def check(executable, checkpoint, missing, rz=False):
                 "warpx.const_dt=8.333333333333333e-12",
             ]
         )
+        if angular:
+            configuration[0] = "inputs_base_rz_moving_moment_rotation"
         result = run_rejection(
             [
                 str(executable.resolve(strict=True)),
@@ -100,6 +107,7 @@ def check(executable, checkpoint, missing, rz=False):
         "model": "Restart must preserve the radiation moment model",
         "ledger": "Moving radiation checkpoint must preserve its declared transport",
         "cartesian_model": "RZ moment restart requires the meridional nearest-cell model",
+        "meridional_model": "RZ moment restart requires the angular inertia model",
     }.get(missing, "Checkpoint is missing the required MultiFab header")
     assert result.returncode != 0, result.stdout
     assert expected in result.stdout, result.stdout
@@ -114,8 +122,18 @@ if __name__ == "__main__":
     parser.add_argument("executable", type=Path)
     parser.add_argument("checkpoint", type=Path)
     parser.add_argument(
-        "missing", choices=("model", "ledger", "x", "y", "z", "cartesian_model")
+        "missing",
+        choices=(
+            "model",
+            "ledger",
+            "x",
+            "y",
+            "z",
+            "cartesian_model",
+            "meridional_model",
+        ),
     )
     parser.add_argument("--rz", action="store_true")
+    parser.add_argument("--angular", action="store_true")
     args = parser.parse_args()
-    check(args.executable, args.checkpoint, args.missing, args.rz)
+    check(args.executable, args.checkpoint, args.missing, args.rz, args.angular)

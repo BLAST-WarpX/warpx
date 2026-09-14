@@ -27,6 +27,52 @@ namespace warpx::radiation
 {
     namespace
     {
+#if defined(WARPX_DIM_RZ)
+        amrex::GpuArray<amrex::Real, 2>
+        NativeAngularBalance (amrex::MultiFab const& candidate, amrex::MultiFab const& old,
+                              amrex::MultiFab const& requested,
+                              ParticleImpulseTransaction const& particles,
+                              amrex::Geometry const& geometry, amrex::Real tolerance)
+        {
+            RZMomentMetric const metric(geometry);
+            amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum, amrex::ReduceOpSum> ops;
+            amrex::ReduceData<amrex::Real, amrex::Real, amrex::Real> data(ops);
+            using Tuple = typename decltype(data)::Type;
+            for (amrex::MFIter it(candidate); it.isValid(); ++it) {
+                auto const u = candidate.const_array(it), initial = old.const_array(it);
+                auto const want = requested.const_array(it);
+                auto const actual = particles.ConjugateImpulse().const_array(it);
+                auto const carry = particles.ConjugateMomentumCarryChange().const_array(it);
+                auto const physical = particles.ActualImpulse().const_array(it);
+                auto const physical_carry = particles.MomentumCarryChange().const_array(it);
+                ops.eval(it.validbox(), data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> Tuple {
+                    auto const radius = metric.Angular(i).mean_radius;
+                    auto const change = (u(i, j, k, 2) - initial(i, j, k, 2)) +
+                        PhysConst::c * (actual(i, j, k, 1) + carry(i, j, k, 1));
+                    auto const scale = std::abs(u(i, j, k, 2)) + std::abs(initial(i, j, k, 2)) +
+                        PhysConst::c * (std::abs(want(i, j, k, 1)) + std::abs(actual(i, j, k, 1)) +
+                                        std::abs(carry(i, j, k, 1)));
+                    amrex::Real operands = 0;
+                    for (int d = 0; d < 2; ++d) {
+                        operands += std::abs(want(i, j, k, d)) + std::abs(actual(i, j, k, d)) +
+                            std::abs(carry(i, j, k, d)) + std::abs(physical(i, j, k, d)) +
+                            std::abs(physical_carry(i, j, k, d));
+                    }
+                    return {radius * change, radius * scale, radius * PhysConst::c * operands};
+                });
+            }
+            auto const values = data.value();
+            amrex::Real sums[3]{amrex::get<0>(values), amrex::get<1>(values), amrex::get<2>(values)};
+            amrex::ParallelDescriptor::ReduceRealSum(sums, 3);
+            auto const bound = tolerance * sums[1] + 64 * std::numeric_limits<amrex::Real>::epsilon() * sums[2];
+            if (!std::isfinite(sums[0]) || !std::isfinite(bound)) {
+                return {std::numeric_limits<amrex::Real>::infinity(),
+                        std::numeric_limits<amrex::Real>::infinity()};
+            }
+            return {sums[1] > 0 ? std::abs(sums[0]) / sums[1] : std::abs(sums[0]),
+                    bound > 0 ? std::abs(sums[0]) / bound : std::abs(sums[0])};
+        }
+#endif
         AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE amrex::Real
         RelativeSourceError (amrex::Real error, amrex::Real scale, amrex::Real noise) noexcept
         {
@@ -156,11 +202,14 @@ namespace warpx::radiation
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             amrex::Abort("Coupled moment source is initially qualified only in Cartesian geometry.");
 #elif defined(WARPX_DIM_RZ)
+            bool const angular_material =
+                options.particle_assignment == ParticleImpulseAssignment::RZAngularConservative;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(options.transport.reflecting_boundaries
                 && !geometry.isPeriodic(0) && geometry.ProbLo(0) == 0
-                && options.particle_assignment == ParticleImpulseAssignment::NearestCell,
+                && (options.particle_assignment == ParticleImpulseAssignment::NearestCell || angular_material)
+                && angular_material == options.transport.rz_angular_transport,
                 "Experimental RZ coupled source requires an axis, optical mirrors "
-                "and nearest-cell assignment.");
+                "and matching meridional or angular-conservative assignment.");
 #else
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(geometry.isAllPeriodic(),
                 "Cartesian coupled moment source requires periodic geometry.");
@@ -224,7 +273,7 @@ namespace warpx::radiation
             }
             beta.mult(1 / PhysConst::c);
 #if defined(WARPX_DIM_RZ)
-            if (radiation.norm0(2) != 0 || !TryCanonicalizeRZMeridionalVelocity(beta)) {
+            if (!angular_material && (radiation.norm0(2) != 0 || !TryCanonicalizeRZMeridionalVelocity(beta))) {
                 return fail(CoupledMomentFailure::Radiation);
             }
 #endif
@@ -269,7 +318,8 @@ namespace warpx::radiation
                     if (!ComputeMomentTransportIncrement(trial_radiation, material_beta, absorption, scattering,
                                                          equilibrium, spatial_flux_precision, geometry,
                                                          dt,
-                                                         options.transport.reflecting_boundaries)) {
+                                                         options.transport.reflecting_boundaries, nullptr,
+                                                         options.transport.rz_angular_transport)) {
                         return false;
                     }
                 }
@@ -442,7 +492,7 @@ namespace warpx::radiation
                 amrex::MultiFab::Copy(next_beta, particle_candidate.WorkVelocity(), 0, 0, 3, 0);
                 next_beta.mult(1 / PhysConst::c);
 #if defined(WARPX_DIM_RZ)
-                if (!TryCanonicalizeRZMeridionalVelocity(next_beta)) {
+                if (!angular_material && !TryCanonicalizeRZMeridionalVelocity(next_beta)) {
                     return fail(CoupledMomentFailure::Particle);
                 }
 #endif
@@ -491,7 +541,8 @@ namespace warpx::radiation
                                                      scattering, equilibrium, transport_increment,
                                                      geometry, dt,
                                                      options.transport.reflecting_boundaries,
-                                                     &transport_accounting)) {
+                                                     &transport_accounting,
+                                                     options.transport.rz_angular_transport)) {
                     if (backtrack()) {
                         continue;
                     }
@@ -711,8 +762,8 @@ namespace warpx::radiation
                 amrex::Real rotation_scale = 0;
                 for (int d = 0; d < 2; ++d) {
                     rotation_scale += PhysConst::c * (impulse.norm1(d)
-                        + particle_candidate.ActualImpulse().norm1(d)
-                        + particle_candidate.MomentumCarryChange().norm1(d));
+                        + particle_candidate.ConjugateImpulse().norm1(d)
+                        + particle_candidate.ConjugateMomentumCarryChange().norm1(d));
                 }
                 auto const rotation_noise = 64 * std::numeric_limits<amrex::Real>::epsilon()
                     * rotation_scale;
@@ -720,12 +771,12 @@ namespace warpx::radiation
                 for (int d = 0; d < 3; ++d) {
                     auto imbalance =
                         candidate_radiation.sum(d + 1) - radiation.sum(d + 1) +
-                        PhysConst::c * (particle_candidate.ActualImpulse().sum(d) +
-                                        particle_candidate.MomentumCarryChange().sum(d));
+                        PhysConst::c * (particle_candidate.ConjugateImpulse().sum(d) +
+                                        particle_candidate.ConjugateMomentumCarryChange().sum(d));
                     auto momentum_scale =
                         candidate_radiation.norm1(d + 1) + radiation.norm1(d + 1) +
-                        PhysConst::c * (impulse.norm1(d) + particle_candidate.ActualImpulse().norm1(d) +
-                                        particle_candidate.MomentumCarryChange().norm1(d));
+                        PhysConst::c * (impulse.norm1(d) + particle_candidate.ConjugateImpulse().norm1(d) +
+                                        particle_candidate.ConjugateMomentumCarryChange().norm1(d));
 #if defined(WARPX_DIM_RZ)
                     imbalance += transport_accounting.boundary[d + 1]
                         - transport_accounting.geometric[d + 1];
@@ -753,6 +804,13 @@ namespace warpx::radiation
 #endif
                 }
 #if defined(WARPX_DIM_RZ)
+                if (angular_material) {
+                    auto const balance = NativeAngularBalance(candidate_radiation, radiation,
+                        impulse, particle_candidate, geometry, options.energy_tolerance);
+                    result.raw_angular_momentum_residual = balance[0];
+                    result.angular_balance_residual = balance[1];
+                    result.momentum_balance_residual = amrex::max(result.momentum_balance_residual, balance[1]);
+                }
                 bool const momentum_balanced = result.momentum_balance_residual <= 1;
 #else
                 bool const momentum_balanced =

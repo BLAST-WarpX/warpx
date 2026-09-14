@@ -2,6 +2,7 @@
  * License: BSD-3-Clause-LBNL
  */
 #include "Radiation/ImplicitMomentTransport.H"
+#include "Radiation/RZMomentGeometry.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX.H>
@@ -447,6 +448,190 @@ Run (bool radial, int nr, bool periodic_z)
     }
     Rejection(p);
 }
+amrex::Real
+RotatingRadiation (int nr)
+{
+    using namespace warpx::radiation;
+    Problem p(nr, 4, true);
+    auto const dx = p.geometry.CellSizeArray();
+    amrex::Gpu::HostVector<amrex::Real> profile(2 * nr);
+    constexpr std::array<long double, 4> nodes{
+        -0.8611363115940525752L, -0.3399810435848562648L,
+         0.3399810435848562648L,  0.8611363115940525752L};
+    constexpr std::array<long double, 4> weights{
+        0.3478548451374538574L, 0.6521451548625461426L,
+        0.6521451548625461426L, 0.3478548451374538574L};
+    for (int i = 0; i < nr; ++i) {
+        long double energy = 0, theta = 0;
+        for (int point = 0; point < 4; ++point) {
+            auto const r = (i + 0.5L + nodes[point] / 2) * dx[0];
+            auto const beta = 0.05L * r;
+            auto const denominator = (1 - beta * beta) * (1 - beta * beta) * (1 - beta * beta);
+            auto const volume = MathConst::pi * dx[0] * dx[1] * r * weights[point];
+            energy += volume * (1 + beta * beta / 3) / denominator;
+            theta += volume * (4 * beta / 3) / denominator;
+        }
+        profile[2 * i] = static_cast<amrex::Real>(energy);
+        profile[2 * i + 1] = static_cast<amrex::Real>(theta);
+    }
+    amrex::Gpu::DeviceVector<amrex::Real> device(profile.size());
+    amrex::Gpu::copy(amrex::Gpu::hostToDevice, profile.begin(), profile.end(), device.begin());
+    auto const* values = device.data();
+    for (amrex::MFIter it(p.radiation); it.isValid(); ++it) {
+        auto const out = p.radiation.array(it);
+        amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            out(i, j, k, 0) = values[2 * i];
+            out(i, j, k, 2) = values[2 * i + 1];
+        });
+    }
+    amrex::MultiFab initial(p.boxes, p.distribution, 4, 1);
+    amrex::MultiFab::Copy(initial, p.radiation, 0, 0, 4, 1);
+    auto const initial_energy = p.radiation.sum(0);
+    auto const initial_theta = p.radiation.norm1(2);
+    ImplicitMomentTransportOptions options;
+    options.reflecting_boundaries = true;
+    // Existing meridional default must still reject without touching outputs.
+    auto const rejected = TryImplicitMomentTransport(p.radiation, p.beta, p.absorption,
+        p.scattering, p.equilibrium, p.material, p.geometry, 0.01_rt / PhysConst::c, options);
+    AMREX_ALWAYS_ASSERT(!rejected.valid && p.radiation.sum(0) == initial_energy);
+    options.rz_angular_transport = true;
+    constexpr int steps = 64;
+    auto const dt = 0.5_rt / (steps * PhysConst::c);
+    for (int step = 0; step < steps; ++step) {
+        auto const result = TryImplicitMomentTransport(p.radiation, p.beta, p.absorption,
+            p.scattering, p.equilibrium, p.material, p.geometry, dt, options);
+        amrex::Print() << "Angular RZ step=" << step << " nr=" << nr << " valid=" << result.valid
+            << " equation=" << result.equation_residual
+            << " angular=" << result.angular_momentum_residual << '\n';
+        AMREX_ALWAYS_ASSERT(result.valid);
+        AMREX_ALWAYS_ASSERT(std::abs(p.radiation.sum(0) - initial_energy) < 1.e-10_rt * initial_energy);
+        AMREX_ALWAYS_ASSERT(RZAngularBalance(p.radiation, initial, p.material, p.geometry) < 1.e-10_rt);
+        AMREX_ALWAYS_ASSERT(p.material.norm0(0, 4, amrex::IntVect(0)) == 0);
+    }
+    amrex::MultiFab::Subtract(initial, p.radiation, 0, 0, 4, 0);
+    auto const error = initial.norm1(2) / initial_theta;
+    amrex::Print() << "Rotating radiation nr=" << nr << " theta profile error=" << error << '\n';
+    return error;
+}
+
+void
+RotatingMaterialSource (bool oblique)
+{
+    using namespace warpx::radiation;
+    Problem p(oblique ? 16 : 32, oblique ? 16 : 4, true);
+    p.Initialize(false);
+    p.scattering.setVal(3000);
+    RZMomentMetric const metric(p.geometry);
+    auto const dx = p.geometry.CellSizeArray();
+    for (amrex::MFIter it(p.beta); it.isValid(); ++it) {
+        auto const beta = p.beta.array(it);
+        amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            auto const r = metric.Angular(i).mean_radius;
+            auto const z = (j + 0.5_rt) * dx[1];
+            auto const modulation = oblique ? 1 + 0.1_rt * std::cos(2 * MathConst::pi * z) : 1;
+            beta(i, j, k, 1) = 0.003_rt * r * modulation;
+            if (oblique) {
+                beta(i, j, k, 0) = -0.001_rt * std::sin(MathConst::pi * r) * modulation;
+                beta(i, j, k, 2) = 0.001_rt * std::sin(2 * MathConst::pi * z) * (1 - r * r);
+            }
+        });
+    }
+    amrex::MultiFab initial(p.boxes, p.distribution, 4, 1);
+    amrex::MultiFab total_material(p.boxes, p.distribution, 4, 0);
+    amrex::MultiFab::Copy(initial, p.radiation, 0, 0, 4, 1);
+    total_material.setVal(0);
+    auto const energy = p.radiation.sum(0);
+    ImplicitMomentTransportOptions options;
+    options.reflecting_boundaries = true;
+    options.rz_angular_transport = true;
+    constexpr int steps = 64;
+    auto const dt = 0.5_rt / (steps * PhysConst::c);
+    {
+        auto limited = options;
+        limited.max_nonlinear_iterations = 1;
+        p.material.setVal(37);
+        p.heat.setVal(41);
+        auto const failed = TryImplicitMomentTransport(p.radiation, p.beta, p.absorption,
+            p.scattering, p.equilibrium, p.material, p.geometry, dt, limited, &p.heat);
+        AMREX_ALWAYS_ASSERT(!failed.valid);
+        amrex::MultiFab difference(p.boxes, p.distribution, 4, 1);
+        amrex::MultiFab::Copy(difference, initial, 0, 0, 4, 1);
+        amrex::MultiFab::Subtract(difference, p.radiation, 0, 0, 4, 1);
+        AMREX_ALWAYS_ASSERT(difference.norm0(0, 4, amrex::IntVect(1)) == 0);
+        for (int d = 0; d < 4; ++d) {
+            AMREX_ALWAYS_ASSERT(p.material.min(d, 1) == 37 && p.material.max(d, 1) == 37);
+            AMREX_ALWAYS_ASSERT(failed.boundary_exchange[d] == 0 && failed.geometric_exchange[d] == 0);
+        }
+        AMREX_ALWAYS_ASSERT(p.heat.min(0, 1) == 41 && p.heat.max(0, 1) == 41);
+        p.material.setVal(0);
+        p.heat.setVal(0);
+    }
+    for (int step = 0; step < steps; ++step) {
+        auto const result = TryImplicitMomentTransport(p.radiation, p.beta, p.absorption,
+            p.scattering, p.equilibrium, p.material, p.geometry, dt, options, &p.heat);
+        amrex::Print() << "Rotating material step=" << step << " oblique=" << oblique
+            << " valid=" << result.valid
+            << " equation=" << result.equation_residual
+            << " angular=" << result.angular_momentum_residual << '\n';
+        AMREX_ALWAYS_ASSERT(result.valid);
+        amrex::MultiFab::Add(total_material, p.material, 0, 0, 4, 0);
+        AMREX_ALWAYS_ASSERT(std::abs(p.radiation.sum(0) + total_material.sum(0) - energy) < 1.e-10_rt * energy);
+        AMREX_ALWAYS_ASSERT(RZAngularBalance(p.radiation, initial, total_material, p.geometry) < 1.e-10_rt);
+        // Elastic comoving scattering has no caloric source: lab energy is
+        // work from the prescribed rotating material, not artificial heating.
+        AMREX_ALWAYS_ASSERT(p.heat.norm1(0) < 1.e-12_rt * energy);
+    }
+    AMREX_ALWAYS_ASSERT(p.radiation.sum(2) > 1.e-3_rt * energy);
+    AMREX_ALWAYS_ASSERT(p.radiation.sum(0) - energy > 1.e-6_rt * energy);
+    AMREX_ALWAYS_ASSERT(total_material.sum(0) < -1.e-6_rt * energy);
+    amrex::Print() << "Rotating material oblique=" << oblique
+        << " radiation work=" << p.radiation.sum(0) - energy
+        << " photon theta inventory=" << p.radiation.sum(2) << '\n';
+}
+
+void
+ThinAngularFrame ()
+{
+    using namespace warpx::radiation;
+    Problem rest(16, 8, true), moving(16, 8, true);
+    auto const dx = rest.geometry.CellSizeArray();
+    RZMomentMetric const metric(rest.geometry);
+    for (amrex::MFIter it(rest.radiation); it.isValid(); ++it) {
+        auto const u = rest.radiation.array(it);
+        auto const b = moving.beta.array(it);
+        amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            auto const r = metric.Angular(i).mean_radius;
+            auto const z = (j + 0.5_rt) * dx[1];
+            auto const wave = std::sin(2 * MathConst::pi * z);
+            auto const energy = metric.Volume(i) * (1 + 0.1_rt * std::cos(2 * MathConst::pi * z));
+            u(i, j, k, 0) = energy;
+            u(i, j, k, 1) = 0.15_rt * r * energy;
+            u(i, j, k, 2) = 0.2_rt * r * energy;
+            u(i, j, k, 3) = 0.1_rt * wave * energy;
+            b(i, j, k, 0) = 0.002_rt * std::sin(MathConst::pi * r);
+            b(i, j, k, 1) = 0.005_rt * r;
+            b(i, j, k, 2) = 0.002_rt * wave;
+        });
+    }
+    amrex::MultiFab::Copy(moving.radiation, rest.radiation, 0, 0, 4, 1);
+    auto const energy = rest.radiation.sum(0);
+    ImplicitMomentTransportOptions options;
+    options.reflecting_boundaries = true;
+    options.rz_angular_transport = true;
+    for (int step = 0; step < 64; ++step) {
+        for (auto* p : {&rest, &moving}) {
+            auto const result = TryImplicitMomentTransport(p->radiation, p->beta, p->absorption,
+                p->scattering, p->equilibrium, p->material, p->geometry,
+                0.5_rt / (64 * PhysConst::c), options);
+            AMREX_ALWAYS_ASSERT(result.valid);
+        }
+    }
+    amrex::MultiFab::Subtract(moving.radiation, rest.radiation, 0, 0, 4, 0);
+    amrex::Real error = 0;
+    for (int d = 0; d < 4; ++d) { error += moving.radiation.norm1(d); }
+    amrex::Print() << "Vacuum angular transport frame error=" << error / energy << '\n';
+    AMREX_ALWAYS_ASSERT(error < 1.e-10_rt * energy);
+}
 } // namespace
 
 int
@@ -459,7 +644,19 @@ main (int argc, char* argv[])
         amrex::ParmParse pp("test");
         pp.query("case", kind);
         pp.query("nr", nr);
-        if (kind == "lte")
+        if (kind == "rotation")
+        {
+            auto const coarse = RotatingRadiation(32);
+            auto const fine = RotatingRadiation(64);
+            AMREX_ALWAYS_ASSERT(fine < 0.03_rt && fine < 0.7_rt * coarse);
+        }
+        else if (kind == "rotating_material")
+        {
+            RotatingMaterialSource(false);
+            RotatingMaterialSource(true);
+            ThinAngularFrame();
+        }
+        else if (kind == "lte")
         {
             ThermalBath(0);
             ThermalBath(3.e-3_rt);

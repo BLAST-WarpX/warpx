@@ -30,7 +30,7 @@ namespace
 // Independent native-particle inventories, not the source's deposited work
 // or impulse fields. Positions do not drift during this source transaction.
 std::array<long double, 8>
-ParticleInventory (WarpXParticleContainer& ions)
+ParticleInventory (WarpXParticleContainer& ions, bool angular = false)
 {
     std::array<long double, 8> total{};
     std::array<int, 9> components{PIdx::w,
@@ -44,13 +44,19 @@ ParticleInventory (WarpXParticleContainer& ions)
                                   ions.GetRealCompIndex("radiation_impulse_rz_coupled_work")};
     for (WarpXParIter it(ions, 0); it.isValid(); ++it)
     {
-        std::array<amrex::Gpu::HostVector<amrex::ParticleReal>, 9> host;
+        std::array<amrex::Gpu::HostVector<amrex::ParticleReal>, 10> host;
         for (int d = 0; d < 9; ++d)
         {
             auto const& values = it.GetStructOfArrays().GetRealData(components[d]);
             host[d].resize(it.numParticles());
             amrex::Gpu::copy(amrex::Gpu::deviceToHost, values.begin(),
                              values.begin() + it.numParticles(), host[d].begin());
+        }
+        if (angular) {
+            auto const& radius = it.GetStructOfArrays().GetRealData(PIdx::r);
+            host[9].resize(it.numParticles());
+            amrex::Gpu::copy(amrex::Gpu::deviceToHost, radius.begin(),
+                             radius.begin() + it.numParticles(), host[9].begin());
         }
         for (long p = 0; p < it.numParticles(); ++p)
         {
@@ -61,11 +67,12 @@ ParticleInventory (WarpXParticleContainer& ions)
             long double const cosine = std::cos(static_cast<long double>(host[4][p]));
             long double const sine = std::sin(static_cast<long double>(host[4][p]));
             total[1] += mass * (x * cosine + y * sine);
-            total[2] += mass * (-x * sine + y * cosine);
+            long double const lever = angular ? host[9][p] : 1;
+            total[2] += mass * lever * (-x * sine + y * cosine);
             total[3] += mass * z;
             total[4] += mass * host[8][p];
             total[5] += mass * (host[5][p] * cosine + host[6][p] * sine);
-            total[6] += mass * (-host[5][p] * sine + host[6][p] * cosine);
+            total[6] += mass * lever * (-host[5][p] * sine + host[6][p] * cosine);
             total[7] += mass * host[7][p];
         }
     }
@@ -74,6 +81,23 @@ ParticleInventory (WarpXParticleContainer& ions)
                   amrex::ParallelDescriptor::Communicator());
 #endif
     return total;
+}
+
+amrex::Real
+RadiationAngularInventory (amrex::MultiFab const& radiation, amrex::Geometry const& geometry)
+{
+    amrex::MultiFab weighted(radiation.boxArray(), radiation.DistributionMap(), 1, 0);
+    auto const dx = geometry.CellSizeArray();
+    for (amrex::MFIter it(weighted); it.isValid(); ++it) {
+        auto const u = radiation.const_array(it);
+        auto const out = weighted.array(it);
+        amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            auto const midpoint = (i + 0.5_rt) * dx[0];
+            auto const mean_radius = midpoint + dx[0] * dx[0] / (12 * midpoint);
+            out(i, j, k) = mean_radius * u(i, j, k, 2);
+        });
+    }
+    return weighted.sum(0);
 }
 
 amrex::Real
@@ -139,12 +163,25 @@ main (int argc, char* argv[])
         amrex::MultiFab heat(radiation.boxArray(), radiation.DistributionMap(), 1, 1);
         amrex::MultiFab::Copy(temperature, live, 0, 0, 1, live.nGrowVect());
         radiation.setVal(0);
-        bool thermal = false, spatial = false, rollback = false;
+        bool thermal = false, spatial = false, rollback = false, angular = false;
         int steps = 64;
         amrex::ParmParse pp("test");
         pp.query("thermal", thermal);
         pp.query("spatial", spatial);
         pp.query("rollback", rollback);
+        pp.query("angular", angular);
+        if (angular) {
+            for (WarpXParIter it(ions, 0); it.isValid(); ++it) {
+                auto const data = it.GetParticleTile().getParticleTileData();
+                amrex::ParallelFor(it.numParticles(), [=] AMREX_GPU_DEVICE(long p) {
+                    auto const theta = data.m_rdata[PIdx::theta][p];
+                    auto const speed = 1.e8_rt * data.m_rdata[PIdx::r][p];
+                    data.m_rdata[PIdx::ux][p] = -speed * std::sin(theta);
+                    data.m_rdata[PIdx::uy][p] = speed * std::cos(theta);
+                    data.m_rdata[PIdx::uz][p] = 0;
+                });
+            }
+        }
         pp.query("steps", steps);
         auto const density =
             thermal ? 100._rt : 0.01_rt * 1.e20_rt * ions.getMass() * PhysConst::c2;
@@ -157,7 +194,7 @@ main (int argc, char* argv[])
                                    auto const lo = i * dx[0], hi = (i + 1) * dx[0];
                                    auto const volume = MathConst::pi * (hi * hi - lo * lo) * dx[1];
                                    u(i, j, k, 0) = density * volume;
-                                   if (!thermal)
+                                   if (!thermal && !angular)
                                    {
                                        u(i, j, k, 1) = 1.e-3_rt * u(i, j, k, 0);
                                    }
@@ -209,7 +246,11 @@ main (int argc, char* argv[])
         options.transport.reflecting_boundaries = true;
         pp.query("verbose", options.verbose);
         pp.query("relaxation", options.relaxation);
-        auto const original = ParticleInventory(ions);
+        if (angular) {
+            options.particle_assignment = ParticleImpulseAssignment::RZAngularConservative;
+            options.transport.rz_angular_transport = true;
+        }
+        auto const original = ParticleInventory(ions, angular);
         auto const initial_electrons = ElectronEnergy(simulation, temperature);
         auto const initial_radiation = radiation.sum(0);
         {
@@ -236,6 +277,7 @@ main (int argc, char* argv[])
         MomentTransportAccounting total;
         if (rollback)
         {
+            auto const initial_angular = RadiationAngularInventory(radiation, geometry);
             amrex::MultiFab old_radiation(radiation.boxArray(), radiation.DistributionMap(), 4, 1);
             amrex::MultiFab old_temperature(temperature.boxArray(), temperature.DistributionMap(),
                                             1, temperature.nGrowVect());
@@ -259,7 +301,7 @@ main (int argc, char* argv[])
             guarded.coefficients = [&] (amrex::MultiFab const& t, amrex::MultiFab& a,
                                         amrex::MultiFab& s, amrex::MultiFab& bath, amrex::Real end)
             {
-                AMREX_ALWAYS_ASSERT(ParticleInventory(ions) == original);
+                AMREX_ALWAYS_ASSERT(ParticleInventory(ions, angular) == original);
                 AMREX_ALWAYS_ASSERT(radiation.sum(0) == initial_radiation);
                 callbacks.coefficients(t, a, s, bath, end);
                 if (!faulted && end > dt / 2)
@@ -279,7 +321,7 @@ main (int argc, char* argv[])
             std::ostringstream rejected_ledger;
             AMREX_ALWAYS_ASSERT(ledger.Write(rejected_ledger));
             AMREX_ALWAYS_ASSERT(rejected_ledger.str() == original_ledger.str());
-            AMREX_ALWAYS_ASSERT(ParticleInventory(ions) == original);
+            AMREX_ALWAYS_ASSERT(ParticleInventory(ions, angular) == original);
             AMREX_ALWAYS_ASSERT(heat.min(0, 1) == 79 && heat.max(0, 1) == 79);
             AMREX_ALWAYS_ASSERT(exchange.kinetic_work.min(0, 1) == 31 &&
                                 exchange.kinetic_work.max(0, 1) == 31);
@@ -329,7 +371,7 @@ main (int argc, char* argv[])
                     }
                 }
             }
-            AMREX_ALWAYS_ASSERT(ParticleInventory(ions) == original);
+            AMREX_ALWAYS_ASSERT(ParticleInventory(ions, angular) == original);
             faulted = false;
             interval.max_refinements = 1;
             auto const accepted = TryAdvanceCoupledMomentInterval(
@@ -356,10 +398,17 @@ main (int argc, char* argv[])
                                       temperature.nGrowVect());
             AMREX_ALWAYS_ASSERT(old_radiation.norm0(0, 4, amrex::IntVect(1)) <= 1.e-12_rt * scale);
             AMREX_ALWAYS_ASSERT(old_temperature.norm0(0, 1, temperature.nGrowVect()) == 0);
-            auto const current = ParticleInventory(ions);
+            auto const current = ParticleInventory(ions, angular);
             auto const final_energy = current[0] + current[4] +
                                       ElectronEnergy(simulation, temperature) + radiation.sum(0);
             AMREX_ALWAYS_ASSERT(std::abs(final_energy - initial_energy) < 1.e-10L * initial_energy);
+            if (angular) {
+                auto const change = RadiationAngularInventory(radiation, geometry) - initial_angular
+                    + PhysConst::c * ((current[2] - original[2]) + (current[6] - original[6]));
+                auto const angular_scale = std::abs(initial_angular)
+                    + PhysConst::c * (std::abs(original[2]) + std::abs(original[6]));
+                AMREX_ALWAYS_ASSERT(std::abs(change) <= 1.e-10L * angular_scale);
+            }
             amrex::Print() << "RZ source interval rollback and accepted-only exchange passed.\n";
         }
         if (!rollback)
@@ -382,7 +431,7 @@ main (int argc, char* argv[])
                     total.boundary[d] += exchange.transport.boundary[d];
                     total.geometric[d] += exchange.transport.geometric[d];
                 }
-                auto const current = ParticleInventory(ions);
+                auto const current = ParticleInventory(ions, angular);
                 auto const electron_energy = ElectronEnergy(simulation, temperature);
                 auto const energy = current[0] + current[4] + electron_energy + radiation.sum(0);
                 worst_energy = std::max(worst_energy, std::abs(energy-initial_energy)/initial_energy);
@@ -393,11 +442,13 @@ main (int argc, char* argv[])
                                     1.e-10L * (initial_electrons + std::abs(caloric)));
                 for (int d = 0; d < 3; ++d)
                 {
-                    auto const change = radiation.sum(d + 1) - initial_momentum[d] +
+                    auto const change = (angular && d == 1 ? RadiationAngularInventory(radiation, geometry)
+                                                           : radiation.sum(d + 1) - initial_momentum[d]) +
                                         PhysConst::c * (current[d + 1] - original[d + 1] +
                                                         current[d + 5] - original[d + 5]) +
-                                        total.boundary[d + 1] - total.geometric[d + 1];
-                    AMREX_ALWAYS_ASSERT(std::abs(change) < 1.e-10L * initial_radiation);
+                                        (angular && d == 1 ? 0 : total.boundary[d + 1] - total.geometric[d + 1]);
+                    auto const length = angular && d == 1 ? geometry.ProbHi(0) : 1;
+                    AMREX_ALWAYS_ASSERT(std::abs(change) < 1.e-10L * initial_radiation * length);
                 }
             }
             AMREX_ALWAYS_ASSERT(std::abs(work) > 1.e-8L * original[0]);

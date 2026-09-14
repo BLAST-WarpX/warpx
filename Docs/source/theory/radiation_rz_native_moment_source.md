@@ -8,6 +8,8 @@ temperature together. It may include spatial radiation transport.
 This page describes the low-level, opt-in meridional source adapter. The bounded
 native drifting integration is documented separately in
 [the RZ moving-runtime qualification](radiation_rz_moving_runtime.md).
+The separate [angular-conservative source building blocks](radiation_rz_angular_source.md)
+do not remove the native runtime's meridional guard.
 No particle drift, density
 advance, packet conversion, current-driven magnetic work or evolved charge
 state is performed by this source stage. The native integration tests freeze

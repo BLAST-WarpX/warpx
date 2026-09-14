@@ -18,7 +18,11 @@ namespace warpx::radiation
     enum class ParticleImpulseAssignment {
         NearestCell, LinearNodalCellAverage, NativeNodalCellAverage,
         /** Low-level 1D stationary PEC/reflecting adapter; not runtime boundary support. */
-        ReflectingNodalCellAverage
+        ReflectingNodalCellAverage,
+        /** Low-level RZ torque-conjugate cell assignment. Theta input is
+         * requested axial torque divided by the annular mean radius, not a
+         * request for the physical sum of theta momenta. */
+        RZAngularConservative
     };
     /** Private kinetic-material copy for a multi-stage radiation interval.
      * Substeps may change velocities and radiation carry only. Live particles
@@ -90,6 +94,11 @@ namespace warpx::radiation
         [[nodiscard]] amrex::MultiFab const& RequestedWork () const;
         [[nodiscard]] amrex::MultiFab const& ActualWork () const;
         [[nodiscard]] amrex::MultiFab const& ActualImpulse () const;
+        /** Actual impulse in the input's work-conjugate coordinates. In angular
+         * RZ mode theta is sum(r*dp_theta)/mean_radius; ActualImpulse still
+         * reports physical sum(dp_theta). Other assignments return the same field. */
+        [[nodiscard]] amrex::MultiFab const& ConjugateImpulse () const;
+        [[nodiscard]] amrex::MultiFab const& ConjugateMomentumCarryChange () const;
         [[nodiscard]] amrex::MultiFab const& EnergyCarryChange () const;
         [[nodiscard]] amrex::MultiFab const& MomentumCarryChange () const;
         [[nodiscard]] amrex::MultiFab const& NumericalEnergyResidual () const;

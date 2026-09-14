@@ -15,6 +15,7 @@ namespace warpx::radiation::detail
 void UpdateMomentGlobalBalance (amrex::MultiFab const& state, amrex::MultiFab const& old,
                                 amrex::MultiFab const& transfer,
                                 ImplicitMomentTransportResult& result, FourVector const& boundary,
-                                FourVector const& geometric);
+                                FourVector const& geometric,
+                                amrex::Geometry const* angular_geometry = nullptr);
 } // namespace warpx::radiation::detail
 #endif

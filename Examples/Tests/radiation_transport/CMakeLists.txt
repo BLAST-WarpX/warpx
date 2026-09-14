@@ -1094,19 +1094,28 @@ if(WarpX_LIB)
             target_compile_features(test_rz_coupled_moment_source PRIVATE cxx_std_20)
         endif()
         warpx_set_compile_warnings(test_rz_coupled_moment_source)
-        foreach(coupled_case IN ITEMS drag thermal spatial rollback)
+        foreach(coupled_case IN ITEMS drag thermal spatial rollback angular angular_lte angular_rollback)
             set(rz_coupled_args)
             if(coupled_case STREQUAL thermal)
                 list(APPEND rz_coupled_args test.thermal=1)
             elseif(coupled_case STREQUAL spatial OR coupled_case STREQUAL rollback)
                 list(APPEND rz_coupled_args test.spatial=1)
+            elseif(coupled_case STREQUAL angular OR coupled_case STREQUAL angular_lte
+                   OR coupled_case STREQUAL angular_rollback)
+                list(APPEND rz_coupled_args test.angular=1 test.spatial=1)
+                if(coupled_case STREQUAL angular_lte)
+                    # Strong LTE feedback retains the damped source solve.
+                    list(APPEND rz_coupled_args test.thermal=1)
+                else()
+                    list(APPEND rz_coupled_args test.relaxation=1)
+                endif()
             endif()
             if(coupled_case STREQUAL spatial)
                 # Qualified full-relaxation solve: identical physical gates,
                 # fewer outer fixed-point iterations on CPU and CUDA.
                 list(APPEND rz_coupled_args test.relaxation=1)
             endif()
-            if(coupled_case STREQUAL rollback)
+            if(coupled_case STREQUAL rollback OR coupled_case STREQUAL angular_rollback)
                 list(APPEND rz_coupled_args test.rollback=1 amr.max_grid_size=4)
             endif()
             set(rz_coupled_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_coupled_${coupled_case}")
@@ -1116,12 +1125,41 @@ if(WarpX_LIB)
             set_tests_properties(test_rz_coupled_moment_source_${coupled_case} PROPERTIES
                 WORKING_DIRECTORY ${rz_coupled_dir}
                 ENVIRONMENT "OMP_NUM_THREADS=2;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
-            if(WarpX_COMPUTE STREQUAL CUDA AND (coupled_case STREQUAL spatial OR coupled_case STREQUAL rollback))
+            if(WarpX_COMPUTE STREQUAL CUDA AND (coupled_case STREQUAL spatial OR coupled_case STREQUAL rollback
+               OR coupled_case STREQUAL angular OR coupled_case STREQUAL angular_lte
+               OR coupled_case STREQUAL angular_rollback))
                 set_tests_properties(test_rz_coupled_moment_source_${coupled_case} PROPERTIES
                     TIMEOUT 5400 LABELS slow)
             endif()
         endforeach()
         if(WarpX_MPI)
+            set(rz_angular_rollback_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_coupled_angular_rollback_mpi")
+            file(MAKE_DIRECTORY ${rz_angular_rollback_dir})
+            add_test(NAME test_rz_coupled_moment_source_angular_rollback_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_coupled_moment_source> ${MPIEXEC_POSTFLAGS}
+                    inputs_rz_coupled_moment_source test.angular=1 test.spatial=1
+                    test.rollback=1 test.relaxation=1 amr.max_grid_size=4)
+            set_tests_properties(test_rz_coupled_moment_source_angular_rollback_mpi PROPERTIES
+                PROCESSORS 2 RUN_SERIAL TRUE WORKING_DIRECTORY ${rz_angular_rollback_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+            if(WarpX_COMPUTE STREQUAL CUDA)
+                set_tests_properties(test_rz_coupled_moment_source_angular_rollback_mpi PROPERTIES
+                    TIMEOUT 5400 LABELS slow)
+            endif()
+            set(rz_angular_source_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_coupled_angular_mpi")
+            file(MAKE_DIRECTORY ${rz_angular_source_dir})
+            add_test(NAME test_rz_coupled_moment_source_angular_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_coupled_moment_source> ${MPIEXEC_POSTFLAGS}
+                    inputs_rz_coupled_moment_source test.angular=1 test.spatial=1
+                    test.relaxation=1 amr.max_grid_size=4)
+            set_tests_properties(test_rz_coupled_moment_source_angular_mpi PROPERTIES
+                PROCESSORS 2 RUN_SERIAL TRUE WORKING_DIRECTORY ${rz_angular_source_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+            if(WarpX_COMPUTE STREQUAL CUDA)
+                set_tests_properties(test_rz_coupled_moment_source_angular_mpi PROPERTIES TIMEOUT 5400 LABELS slow)
+            endif()
             set(rz_coupled_mpi_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_coupled_rollback_mpi")
             file(MAKE_DIRECTORY ${rz_coupled_mpi_dir})
             add_test(NAME test_rz_coupled_moment_source_rollback_mpi
@@ -1136,6 +1174,52 @@ if(WarpX_LIB)
                     TIMEOUT 5400 LABELS slow)
             endif()
         endif()
+        add_executable(test_rz_angular_wall test_rz_angular_wall.cpp)
+        target_link_libraries(test_rz_angular_wall PRIVATE lib_rz)
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(test_rz_angular_wall)
+            target_compile_features(test_rz_angular_wall PRIVATE cuda_std_20)
+        else()
+            target_compile_features(test_rz_angular_wall PRIVATE cxx_std_20)
+        endif()
+        warpx_set_compile_warnings(test_rz_angular_wall)
+        set(rz_angular_wall_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_angular_wall")
+        file(MAKE_DIRECTORY ${rz_angular_wall_dir})
+        add_test(NAME test_rz_angular_wall COMMAND test_rz_angular_wall inputs_base_rz_particle_impulse)
+        set_tests_properties(test_rz_angular_wall PROPERTIES WORKING_DIRECTORY ${rz_angular_wall_dir}
+            ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        if(WarpX_MPI)
+            add_test(NAME test_rz_angular_wall_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_angular_wall> ${MPIEXEC_POSTFLAGS} inputs_base_rz_particle_impulse)
+            set_tests_properties(test_rz_angular_wall_mpi PROPERTIES PROCESSORS 2 RUN_SERIAL TRUE
+                WORKING_DIRECTORY ${rz_angular_wall_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        endif()
+        add_executable(test_rz_specular_trajectory test_rz_specular_trajectory.cpp)
+        target_link_libraries(test_rz_specular_trajectory PRIVATE lib_rz)
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(test_rz_specular_trajectory)
+            target_compile_features(test_rz_specular_trajectory PRIVATE cuda_std_20)
+        else()
+            target_compile_features(test_rz_specular_trajectory PRIVATE cxx_std_20)
+        endif()
+        warpx_set_compile_warnings(test_rz_specular_trajectory)
+        add_test(NAME test_rz_specular_trajectory COMMAND test_rz_specular_trajectory
+            amrex.the_arena_init_size=0)
+        set_tests_properties(test_rz_specular_trajectory PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
+        add_executable(test_rz_angular_geometry test_rz_angular_geometry.cpp)
+        target_link_libraries(test_rz_angular_geometry PRIVATE lib_rz)
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            setup_target_for_cuda_compilation(test_rz_angular_geometry)
+            target_compile_features(test_rz_angular_geometry PRIVATE cuda_std_20)
+        else()
+            target_compile_features(test_rz_angular_geometry PRIVATE cxx_std_20)
+        endif()
+        warpx_set_compile_warnings(test_rz_angular_geometry)
+        add_test(NAME test_rz_angular_geometry COMMAND test_rz_angular_geometry
+            amrex.the_arena_init_size=0)
+        set_tests_properties(test_rz_angular_geometry PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         add_executable(test_rz_moment_transport test_rz_moment_transport.cpp)
         target_link_libraries(test_rz_moment_transport PRIVATE lib_rz)
         if(WarpX_COMPUTE STREQUAL CUDA)
@@ -1145,7 +1229,7 @@ if(WarpX_LIB)
             target_compile_features(test_rz_moment_transport PRIVATE cxx_std_20)
         endif()
         warpx_set_compile_warnings(test_rz_moment_transport)
-        foreach(moment_case IN ITEMS uniform radial axial lte)
+        foreach(moment_case IN ITEMS uniform radial axial lte rotation rotating_material)
             add_test(NAME test_rz_moment_transport_${moment_case}
                 COMMAND test_rz_moment_transport test.case=${moment_case}
                     amrex.the_arena_init_size=0)
@@ -1166,6 +1250,12 @@ if(WarpX_LIB)
                     test.case=radial amrex.the_arena_init_size=0)
             set_tests_properties(test_rz_moment_transport_radial_mpi PROPERTIES
                 PROCESSORS 2 ENVIRONMENT "OMP_NUM_THREADS=1" RUN_SERIAL TRUE)
+            add_test(NAME test_rz_moment_transport_angular_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_moment_transport> ${MPIEXEC_POSTFLAGS}
+                    test.case=rotating_material amrex.the_arena_init_size=0)
+            set_tests_properties(test_rz_moment_transport_angular_mpi PROPERTIES
+                PROCESSORS 2 ENVIRONMENT "OMP_NUM_THREADS=1" RUN_SERIAL TRUE)
         endif()
         add_executable(test_rz_particle_impulse test_rz_particle_impulse.cpp)
         target_link_libraries(test_rz_particle_impulse PRIVATE lib_rz)
@@ -1176,6 +1266,22 @@ if(WarpX_LIB)
             target_compile_features(test_rz_particle_impulse PRIVATE cxx_std_20)
         endif()
         warpx_set_compile_warnings(test_rz_particle_impulse)
+        set(rz_angular_particle_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_angular_particle")
+        file(MAKE_DIRECTORY ${rz_angular_particle_dir})
+        add_test(NAME test_rz_particle_angular_impulse COMMAND test_rz_particle_impulse
+            inputs_base_rz_particle_impulse test.angular_assignment=1 amrex.the_arena_init_size=0)
+        set_tests_properties(test_rz_particle_angular_impulse PROPERTIES
+            WORKING_DIRECTORY ${rz_angular_particle_dir}
+            ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        if(WarpX_MPI)
+            add_test(NAME test_rz_particle_angular_impulse_mpi
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+                    $<TARGET_FILE:test_rz_particle_impulse> ${MPIEXEC_POSTFLAGS}
+                    inputs_base_rz_particle_impulse test.angular_assignment=1 amrex.the_arena_init_size=0)
+            set_tests_properties(test_rz_particle_angular_impulse_mpi PROPERTIES
+                PROCESSORS 2 RUN_SERIAL TRUE WORKING_DIRECTORY ${rz_angular_particle_dir}
+                ENVIRONMENT "OMP_NUM_THREADS=1;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        endif()
         set(rz_moving_environment
             "OMP_NUM_THREADS=2;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
         add_test(NAME test_radiation_checkpoint_process COMMAND ${Python_EXECUTABLE}
@@ -1224,6 +1330,20 @@ if(WarpX_LIB)
             analysis_rz_moving_moment.py)
         add_rz_moving_runtime_case(rz_moving_compression inputs_base_rz_moving_moment_compression
             analysis_rz_moving_compression.py)
+        add_rz_moving_runtime_case(rz_moving_rotation inputs_base_rz_moving_moment_rotation
+            analysis_rz_moving_rotation.py)
+        foreach(corrupt IN ITEMS ledger meridional_model)
+            set(rz_angular_corrupt_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moving_rotation_${corrupt}")
+            file(MAKE_DIRECTORY ${rz_angular_corrupt_dir})
+            add_test(NAME test_rz_moving_rotation_rejects_${corrupt} COMMAND ${Python_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/check_moving_moment_checkpoint.py
+                $<TARGET_FILE:test_rz_particle_impulse>
+                ${CMAKE_CURRENT_BINARY_DIR}/rz_moving_rotation/diags/chk000128
+                ${corrupt} --angular)
+            set_tests_properties(test_rz_moving_rotation_rejects_${corrupt} PROPERTIES
+                WORKING_DIRECTORY ${rz_angular_corrupt_dir} ENVIRONMENT "${rz_moving_environment}"
+                FIXTURES_REQUIRED rz_moving_rotation_checkpoint TIMEOUT 90)
+        endforeach()
         set(rz_moving_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moving_moment")
         foreach(corrupt IN ITEMS ledger cartesian_model)
             set(rz_corrupt_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moving_moment_${corrupt}")

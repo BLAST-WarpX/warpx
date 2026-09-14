@@ -8,6 +8,7 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "RZMomentGeometry.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
@@ -317,6 +318,10 @@ namespace warpx::radiation
         amrex::MultiFab work_partition_residual;
         amrex::MultiFab mass;
         amrex::MultiFab work_velocity;
+        amrex::MultiFab angular_inertia;
+        amrex::MultiFab conjugate_impulse;
+        amrex::MultiFab conjugate_carry_change;
+        bool angular = false;
         bool has_work_velocity = false;
         bool valid = false;
         bool committed = false;
@@ -356,10 +361,18 @@ namespace warpx::radiation
 #endif
         // Re-staging explicitly discards the previous uncommitted candidate.
         m_impl = std::make_unique<Impl>();
-        bool const shaped = assignment != ParticleImpulseAssignment::NearestCell;
+        bool const angular = assignment == ParticleImpulseAssignment::RZAngularConservative;
+        bool const shaped = assignment != ParticleImpulseAssignment::NearestCell && !angular;
+        m_impl->angular = angular;
+#if !defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!angular, "Angular particle impulse assignment requires RZ.");
+#endif
         int const shape_order = WarpX::nox;
         int const shape_ghosts = shaped ? (shape_order + 2) / 2 : 0;
         auto const& geometry = WarpX::GetInstance().Geom(0);
+#if defined(WARPX_DIM_RZ)
+        RZMomentMetric const angular_metric(geometry);
+#endif
         bool const reflecting = assignment == ParticleImpulseAssignment::ReflectingNodalCellAverage;
         int const domain_lo = geometry.Domain().smallEnd(0);
         int const domain_hi = geometry.Domain().bigEnd(0);
@@ -405,6 +418,14 @@ namespace warpx::radiation
         m_impl->mass.define(ba, dm, 1, shape_ghosts);
         auto& cell_mass = m_impl->mass;
         cell_mass.setVal(0);
+        if (angular) {
+            m_impl->angular_inertia.define(ba, dm, 1, 0);
+            m_impl->conjugate_impulse.define(ba, dm, 3, 0);
+            m_impl->conjugate_carry_change.define(ba, dm, 3, 0);
+            m_impl->angular_inertia.setVal(0);
+            m_impl->conjugate_impulse.setVal(0);
+            m_impl->conjugate_carry_change.setVal(0);
+        }
         m_impl->has_work_velocity = need_work_velocity;
         if (need_work_velocity)
         {
@@ -442,9 +463,20 @@ namespace warpx::radiation
             {
                 auto const data = iterator.GetParticleTile().getParticleTileData();
                 auto const mass_field = cell_mass.array(iterator);
+                [[maybe_unused]] auto const inertia_field = angular ? m_impl->angular_inertia.array(iterator)
+                    : amrex::Array4<amrex::Real>{};
                 amrex::For(iterator.numParticles(), [=] AMREX_GPU_DEVICE (long ip)
                 {
                     auto const p = WarpXParticleContainer::ParticleType(data, ip);
+                    if (angular) {
+                        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                            if (!amrex::Math::isfinite(p.pos(d)) || p.pos(d) < plo[d] ||
+                                p.pos(d) >= phi[d]) {
+                                amrex::HostDevice::Atomic::Add(invalid_ptr, 1);
+                                return;
+                            }
+                        }
+                    }
                     if (reflecting && (!amrex::Math::isfinite(p.pos(0)) ||
                         p.pos(0) < plo[0] || p.pos(0) > phi[0])) {
                         amrex::HostDevice::Atomic::Add(invalid_ptr, 1);
@@ -473,10 +505,17 @@ namespace warpx::radiation
                     }
                     AddFieldReal(
                         &mass_field(i, j, k), data.m_rdata[PIdx::w][ip] * mass);
+#if defined(WARPX_DIM_RZ)
+                    if (angular) {
+                        auto const lever = data.m_rdata[PIdx::r][ip] / angular_metric.Angular(i).mean_radius;
+                        AddFieldReal(&inertia_field(i, j, k),
+                            data.m_rdata[PIdx::w][ip] * mass * lever * lever);
+                    }
+#endif
                 });
             }
         }
-        if (reflecting) {
+        if (reflecting || angular) {
             int invalid_positions = invalid.dataValue();
             amrex::ParallelDescriptor::ReduceIntMax(invalid_positions);
             if (invalid_positions != 0) { return false; }
@@ -490,6 +529,8 @@ namespace warpx::radiation
         {
             auto const mass = cell_mass.const_array(iterator);
             auto const impulse = cell_impulse.const_array(iterator);
+            auto const inertia = angular ? m_impl->angular_inertia.const_array(iterator)
+                : amrex::Array4<amrex::Real const>{};
             amrex::For(iterator.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
                 bool valid = mass(i, j, k) >= 0 && amrex::Math::isfinite(mass(i, j, k));
@@ -497,6 +538,10 @@ namespace warpx::radiation
                 {
                     valid = valid && amrex::Math::isfinite(impulse(i, j, k, d))
                         && (impulse(i, j, k, d) == 0 || mass(i, j, k) > 0);
+                }
+                if (angular) {
+                    valid = valid && inertia(i, j, k) >= 0 && amrex::Math::isfinite(inertia(i, j, k))
+                        && (impulse(i, j, k, 1) == 0 || inertia(i, j, k) > 0);
                 }
                 if (!valid) { amrex::HostDevice::Atomic::Add(invalid_ptr, 1); }
             });
@@ -529,6 +574,12 @@ namespace warpx::radiation
                 auto const actual_impulse = m_impl->actual_impulse.array(iterator);
                 auto const energy_change = m_impl->energy_carry_change.array(iterator);
                 auto const momentum_change = m_impl->momentum_carry_change.array(iterator);
+                auto const inertia = angular ? m_impl->angular_inertia.const_array(iterator)
+                    : amrex::Array4<amrex::Real const>{};
+                auto const conjugate = angular ? m_impl->conjugate_impulse.array(iterator)
+                    : amrex::Array4<amrex::Real>{};
+                auto const conjugate_carry = angular ? m_impl->conjugate_carry_change.array(iterator)
+                    : amrex::Array4<amrex::Real>{};
                 auto const residual = m_impl->numerical_energy_residual.array(iterator);
                 auto const partition_residual = m_impl->work_partition_residual.array(iterator);
                 amrex::Array4<amrex::Real> work_velocity;
@@ -557,6 +608,12 @@ namespace warpx::radiation
                     amrex::GpuArray<amrex::ParticleReal, 3> velocity{};
                     amrex::GpuArray<amrex::Real, 3> old_carry{};
                     amrex::GpuArray<amrex::Real, 3> increment{};
+#if defined(WARPX_DIM_RZ)
+                    amrex::Real const angular_lever = angular
+                        ? data.m_rdata[PIdx::r][ip] / angular_metric.Angular(i).mean_radius : 1;
+#else
+                    amrex::Real const angular_lever = 1;
+#endif
                     ParticleCellShape<AMREX_SPACEDIM> shape;
                     shape.center = {i, j, k};
                     for (int d = 0; d < AMREX_SPACEDIM; ++d)
@@ -569,6 +626,10 @@ namespace warpx::radiation
                         velocity[d] = data.m_rdata[PIdx::ux + d][ip];
                         old_carry[d] = carry[d][ip];
                         if (!shaped) { increment[d] = impulse(i, j, k, d) / mass(i, j, k); }
+                    }
+                    if (angular) {
+                        increment[1] = inertia(i, j, k) > 0
+                            ? angular_lever * impulse(i, j, k, 1) / inertia(i, j, k) : 0;
                     }
                     if (shaped)
                     {
@@ -709,8 +770,12 @@ namespace warpx::radiation
                         {
                             for (int d = 0; d < 3; ++d)
                             {
+                                auto const contribution = angular && d == 1
+                                    ? (inertia(i, j, k) > 0
+                                        ? weight_mass * angular_lever / inertia(i, j, k) * secant[d] : 0)
+                                    : weight_mass / mass(i, j, k) * secant[d];
                                 AddFieldReal(&work_velocity(i, j, k, d),
-                                    weight_mass / mass(i, j, k) * secant[d]);
+                                    contribution);
                             }
                         }
                     }
@@ -738,6 +803,11 @@ namespace warpx::radiation
                             &actual_impulse(i, j, k, d), weight_mass * applied[d]);
                         AddFieldReal(
                             &momentum_change(i, j, k, d), weight_mass * carry_change[d]);
+                        if (angular) {
+                            auto const lever = d == 1 ? angular_lever : 1;
+                            AddFieldReal(&conjugate(i, j, k, d), weight_mass * lever * applied[d]);
+                            AddFieldReal(&conjugate_carry(i, j, k, d), weight_mass * lever * carry_change[d]);
+                        }
                     }
                     if (!shaped)
                     {
@@ -783,6 +853,8 @@ namespace warpx::radiation
         }
         invalid_count = invalid.dataValue();
         if (need_work_velocity && !m_impl->work_velocity.is_finite()) { invalid_count = 1; }
+        if (angular && (!m_impl->conjugate_impulse.is_finite() ||
+                        !m_impl->conjugate_carry_change.is_finite())) { invalid_count = 1; }
         amrex::ParallelDescriptor::ReduceIntMax(invalid_count);
         m_impl->valid = invalid_count == 0;
         return m_impl->valid;
@@ -824,6 +896,10 @@ namespace warpx::radiation
     { return m_impl->actual_work; }
     amrex::MultiFab const& ParticleImpulseTransaction::ActualImpulse () const
     { return m_impl->actual_impulse; }
+    amrex::MultiFab const& ParticleImpulseTransaction::ConjugateImpulse () const
+    { return m_impl->angular ? m_impl->conjugate_impulse : m_impl->actual_impulse; }
+    amrex::MultiFab const& ParticleImpulseTransaction::ConjugateMomentumCarryChange () const
+    { return m_impl->angular ? m_impl->conjugate_carry_change : m_impl->momentum_carry_change; }
     amrex::MultiFab const& ParticleImpulseTransaction::EnergyCarryChange () const
     { return m_impl->energy_carry_change; }
     amrex::MultiFab const& ParticleImpulseTransaction::MomentumCarryChange () const

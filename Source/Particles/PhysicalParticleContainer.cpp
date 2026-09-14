@@ -372,13 +372,13 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 #if !defined(WARPX_DIM_1D_Z)
         AddRealComp("prev_x");
 #endif
-#if defined(WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         AddRealComp("prev_y");
 #endif
 #if defined(WARPX_ZINDEX)
         AddRealComp("prev_z");
 #endif
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
       amrex::Abort("Saving previous particle positions not yet implemented in RZ");
 #endif
     }
@@ -1587,7 +1587,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #if !defined(WARPX_DIM_1D_Z)
         x_old = pti.GetAttribs("prev_x").dataPtr() + offset;
 #endif
-#if defined(WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
         y_old = pti.GetAttribs("prev_y").dataPtr() + offset;
 #endif
 #if defined(WARPX_ZINDEX)
@@ -1638,7 +1638,7 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 #if !defined(WARPX_DIM_1D_Z)
             x_old[ip] = xp;
 #endif
-#if defined(WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ)
             y_old[ip] = yp;
 #endif
 #if defined(WARPX_ZINDEX)

@@ -6,6 +6,7 @@
 
 #include "CellVolume.H"
 #include "FrameTransform.H"
+#include "RZAngularGeometry.H"
 
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
@@ -39,6 +40,18 @@ struct RZMomentMetric
     }
 
     [[nodiscard]] AMREX_GPU_HOST_DEVICE amrex::Real
+    Radius (int face) const noexcept
+    {
+        return lower[0] + (face - domain_lo.x) * spacing[0];
+    }
+
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE RZAngularGeometry
+    Angular (int cell) const noexcept
+    {
+        return {Radius(cell), Radius(cell + 1), Area(0, cell), Area(0, cell + 1)};
+    }
+
+    [[nodiscard]] AMREX_GPU_HOST_DEVICE amrex::Real
     Area (int direction, int i) const noexcept
     {
         if (direction == 0)
@@ -66,18 +79,28 @@ void PrepareRZMomentFluxState (amrex::MultiFab& density, amrex::MultiFab& theta_
                                amrex::MultiFab const& pressure_jacobian,
                                amrex::Geometry const& geometry, bool physical);
 [[nodiscard]] FourVector RZGeometricExchange (amrex::MultiFab const& theta_pressure,
-                                              amrex::Geometry const& geometry, amrex::Real dt);
+                                              amrex::Geometry const& geometry, amrex::Real dt,
+                                              amrex::MultiFab const* radial_flux = nullptr);
+
+/** Closed-mirror angular balance, weighted by the annular mean radius.
+ * No external torque is supported by this low-level RZ boundary contract. */
+[[nodiscard]] amrex::Real RZAngularBalance (amrex::MultiFab const& state,
+                                          amrex::MultiFab const& old,
+                                          amrex::MultiFab const& transfer,
+                                          amrex::Geometry const& geometry);
 
 using RZMomentFaceArrays = amrex::GpuArray<amrex::Array4<amrex::Real const>, AMREX_SPACEDIM>;
 
 /** Metric transport of (E-beta.Q,Q), with P_theta_theta in energy-density
- * units. Azimuthal flux is outside this meridional adapter's contract.
+ * units. Optional angular transport preserves sum(mean_radius*Qtheta).
+ * This does not enable a native material torque/work assignment.
  * The radial stress difference is written in a well-balanced form.
  */
 [[nodiscard]] AMREX_GPU_HOST_DEVICE inline FourVector
 RZMomentDivergence (RZMomentFaceArrays const& flux, RZMomentFaceArrays const& parameters,
                     amrex::IntVect const& cell, amrex::GpuArray<amrex::Real, 3> const& beta,
-                    RZMomentMetric const& metric, amrex::Real dt, amrex::Real theta_pressure)
+                    RZMomentMetric const& metric, amrex::Real dt, amrex::Real theta_pressure,
+                    bool angular_transport = false)
 {
     FourVector result{};
     auto const pressure_flux = PhysConst::c * theta_pressure;
@@ -96,7 +119,15 @@ RZMomentDivergence (RZMomentFaceArrays const& flux, RZMomentFaceArrays const& pa
             high += (parameters[direction](upper, component) - beta[component]) *
                     flux[direction](upper, component + 1);
             auto const geometric = direction == 0 && component == 0 ? pressure_flux : 0;
-            if (direction == 0)
+            if (direction == 0 && component == 1 && angular_transport)
+            {
+                auto const angular = metric.Angular(cell[0]);
+                result[2] += angular.Divergence(flux[direction](cell, 2),
+                                               flux[direction](upper, 2), dt);
+                result[0] += beta[1] * angular.Geometric(flux[direction](cell, 2),
+                                                        flux[direction](upper, 2), dt);
+            }
+            else if (direction == 0)
             {
                 result[component + 1] +=
                     dt * (high_area * (flux[direction](upper, component + 1) - geometric) -

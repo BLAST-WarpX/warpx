@@ -4211,6 +4211,13 @@ RadiationTransport::RadiationTransport (
         "or coupled_moment.");
     m_use_coupled_implicit_diffusion = diffusion_solver == "coupled_implicit";
     m_use_coupled_moment_transport = diffusion_solver == "coupled_moment";
+    pp.query("rz_angular_transport", m_rz_angular_transport);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_rz_angular_transport || m_use_coupled_moment_transport,
+        "rz_angular_transport requires coupled_moment transport.");
+#if !defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_rz_angular_transport,
+        "rz_angular_transport requires RZ geometry.");
+#endif
     m_use_implicit_diffusion = diffusion_solver == "implicit" || m_use_coupled_implicit_diffusion;
 #if defined(WARPX_DIM_RZ)
     if (!m_require_cell_interface_exact_streaming && !m_use_coupled_moment_transport) {
@@ -4476,6 +4483,12 @@ RadiationTransport::RadiationTransport (
                 "radiation_transport.momentum_species entry '" + species_name
                     + "' must be a massive, positively charged ion species.");
             if (m_particle_momentum_carry) {
+                if (m_rz_angular_transport) {
+                    bool saved_positions = false;
+                    amrex::ParmParse(species_name).query("save_previous_position", saved_positions);
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(saved_positions && !species.doNotPush(),
+                        "RZ angular moving transport requires moving ions with save_previous_position=1.");
+                }
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     !species.DoResampling() && !species.DoFieldIonization(),
                     "Particle-owned radiation carry requires resampling and field ionization "
@@ -4593,7 +4606,7 @@ RadiationTransport::RadiationTransport (
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::isfinite(norm) && norm <= 1,
             "initial_moment_flux_ratio must be finite and realizable (norm <= 1).");
 #if defined(WARPX_DIM_RZ)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_initial_moment_flux_ratio[1] == 0,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_rz_angular_transport || m_initial_moment_flux_ratio[1] == 0,
             "Meridional RZ coupled_moment requires zero initial theta radiation moment.");
 #endif
         pp.query("coupled_max_subdivisions", m_coupled_max_subdivisions);
@@ -4709,6 +4722,66 @@ RadiationTransport::momentMomentumInventory (
     return result;
 }
 
+amrex::GpuArray<amrex::Real, 3>
+RadiationTransport::momentAngularInventory (
+    MultiParticleContainer& particles, ablastr::fields::MultiFabRegister const& fields) const
+{
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_use_coupled_moment_transport && m_particle_momentum_carry,
+        "Angular radiation inventory requires coupled_moment and particle-owned carry.");
+    amrex::GpuArray<amrex::Real, 3> result{};
+#if defined(WARPX_DIM_RZ)
+    auto const& moment = *fields.get(MomentFieldName(1), 0);
+    warpx::radiation::RZMomentMetric const metric(WarpX::GetInstance().Geom(0));
+    amrex::ReduceOps<amrex::ReduceOpSum> radiation_ops;
+    amrex::ReduceData<amrex::Real> radiation_data(radiation_ops);
+    for (amrex::MFIter it(moment); it.isValid(); ++it) {
+        auto const q = moment.const_array(it);
+        radiation_ops.eval(it.validbox(), radiation_data,
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) -> amrex::GpuTuple<amrex::Real> {
+                return {metric.Angular(i).mean_radius * q(i, j, k) / PhysConst::c};
+            });
+    }
+    result[0] = amrex::get<0>(radiation_data.value());
+    amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum> particle_ops;
+    amrex::ReduceData<amrex::Real, amrex::Real> particle_data(particle_ops);
+    for (auto const& name : m_momentum_species) {
+        auto& species = particles.GetParticleContainerFromName(name);
+        auto const mass = static_cast<amrex::Real>(species.getMass());
+        amrex::GpuArray<int, 4> const carry_components{
+            species.GetRealCompIndex("radiation_impulse_diffusion_0_ux"),
+            species.GetRealCompIndex("radiation_impulse_diffusion_0_uy"),
+            species.GetRealCompIndex("radiation_impulse_streaming_ux"),
+            species.GetRealCompIndex("radiation_impulse_streaming_uy")};
+        for (WarpXParIter it(species, 0); it.isValid(); ++it) {
+            auto const data = it.GetParticleTile().getParticleTileData();
+            amrex::GpuArray<amrex::ParticleReal const*, 4> carry{};
+            for (int d = 0; d < 4; ++d) {
+                carry[d] = it.GetStructOfArrays().GetRealData(carry_components[d]).dataPtr();
+            }
+            particle_ops.eval(it.numParticles(), particle_data,
+                [=] AMREX_GPU_DEVICE(long p) -> amrex::GpuTuple<amrex::Real, amrex::Real> {
+                    auto const angle = static_cast<amrex::Real>(data.m_rdata[PIdx::theta][p]);
+                    auto const cosine = std::cos(angle), sine = std::sin(angle);
+                    auto const lever = mass * data.m_rdata[PIdx::w][p] * data.m_rdata[PIdx::r][p];
+                    auto const represented = lever * (-sine * data.m_rdata[PIdx::ux][p]
+                                                       + cosine * data.m_rdata[PIdx::uy][p]);
+                    auto const pending = lever * (-sine * (carry[0][p] + carry[2][p])
+                                                  + cosine * (carry[1][p] + carry[3][p]));
+                    return {static_cast<amrex::Real>(represented), static_cast<amrex::Real>(pending)};
+                });
+        }
+    }
+    auto const values = particle_data.value();
+    result[1] = amrex::get<0>(values);
+    result[2] = amrex::get<1>(values);
+    amrex::ParallelDescriptor::ReduceRealSum(result.data(), 3);
+#else
+    amrex::ignore_unused(particles, fields);
+    WARPX_ABORT_WITH_MESSAGE("Angular radiation inventory requires RZ geometry.");
+#endif
+    return result;
+}
+
 void
 RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
                                          ablastr::fields::MultiFabRegister& fields,
@@ -4785,7 +4858,10 @@ RadiationTransport::AdvanceCoupledMoment (MultiParticleContainer& particles,
     warpx::radiation::CoupledMomentIntervalOptions options;
     options.source.spatial_transport = true;
 #if defined(WARPX_DIM_RZ)
-    options.source.particle_assignment = warpx::radiation::ParticleImpulseAssignment::NearestCell;
+    options.source.particle_assignment = m_rz_angular_transport
+        ? warpx::radiation::ParticleImpulseAssignment::RZAngularConservative
+        : warpx::radiation::ParticleImpulseAssignment::NearestCell;
+    options.source.transport.rz_angular_transport = m_rz_angular_transport;
     options.source.transport.reflecting_boundaries = true;
 #else
     options.source.particle_assignment =
@@ -4994,7 +5070,9 @@ RadiationTransport::WriteCheckpointData (std::string const& dir) const
     if (m_use_coupled_moment_transport) {
         std::ofstream model{dir + "/RadiationMomentModel_data.txt"};
 #if defined(WARPX_DIM_RZ)
-        model << "gray_m1_meridional_rz_nearest_cell_ledger_v1 " << WarpX::nox << '\n';
+        model << (m_rz_angular_transport ? "gray_m1_angular_rz_inertia_ledger_v1 "
+                                       : "gray_m1_meridional_rz_nearest_cell_ledger_v1 ")
+              << WarpX::nox << '\n';
 #else
         model << "gray_m1_low_beta_nodal_shape_ledger_v3 " << WarpX::nox << '\n';
 #endif
@@ -5060,9 +5138,12 @@ RadiationTransport::ReadCheckpointData (std::string const& dir)
             "Invalid moving radiation model checkpoint schema.");
         int order = 1;
 #if defined(WARPX_DIM_RZ)
-        bool const has_ledger = version == "gray_m1_meridional_rz_nearest_cell_ledger_v1";
+        bool const has_ledger = version == (m_rz_angular_transport
+            ? "gray_m1_angular_rz_inertia_ledger_v1" : "gray_m1_meridional_rz_nearest_cell_ledger_v1");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(has_ledger && static_cast<bool>(model >> order),
-            "RZ moment restart requires the meridional nearest-cell model and transport ledger.");
+            m_rz_angular_transport
+                ? "RZ moment restart requires the angular inertia model and transport ledger."
+                : "RZ moment restart requires the meridional nearest-cell model and transport ledger.");
 #else
         bool const has_ledger = version == "gray_m1_low_beta_nodal_shape_ledger_v3";
         if (version == "gray_m1_low_beta_nodal_shape_v2" || has_ledger) {

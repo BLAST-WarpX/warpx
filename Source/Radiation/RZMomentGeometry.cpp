@@ -137,25 +137,57 @@ PrepareRZMomentFluxState (amrex::MultiFab& density, amrex::MultiFab& theta_press
 
 FourVector
 RZGeometricExchange (amrex::MultiFab const& theta_pressure, amrex::Geometry const& geometry,
-                     amrex::Real dt)
+                     amrex::Real dt, amrex::MultiFab const* radial_flux)
 {
     RZMomentMetric const metric(geometry);
-    amrex::ReduceOps<amrex::ReduceOpSum> ops;
-    amrex::ReduceData<amrex::Real> data(ops);
+    amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum> ops;
+    amrex::ReduceData<amrex::Real, amrex::Real> data(ops);
     using Tuple = typename decltype(data)::Type;
     for (amrex::MFIter it(theta_pressure); it.isValid(); ++it)
     {
         auto const pressure = theta_pressure.const_array(it);
+        bool const angular = radial_flux != nullptr;
+        auto const flux = angular ? radial_flux->const_array(it) : amrex::Array4<amrex::Real const>{};
         ops.eval(it.validbox(), data,
                  [=] AMREX_GPU_DEVICE(int i, int j, int k) -> Tuple
                  {
                      return {dt * PhysConst::c * (metric.Area(0, i + 1) - metric.Area(0, i)) *
-                             pressure(i, j, k, 0)};
+                                 pressure(i, j, k, 0),
+                             angular ? metric.Angular(i).Geometric(flux(i, j, k, 2),
+                                                                   flux(i + 1, j, k, 2), dt) : 0};
                  });
     }
-    auto radial = amrex::get<0>(data.value());
-    amrex::ParallelDescriptor::ReduceRealSum(radial);
-    return {0, radial, 0, 0};
+    auto const values = data.value();
+    amrex::Real sum[2]{amrex::get<0>(values), amrex::get<1>(values)};
+    amrex::ParallelDescriptor::ReduceRealSum(sum, 2);
+    return {0, sum[0], sum[1], 0};
+}
+
+amrex::Real
+RZAngularBalance (amrex::MultiFab const& state, amrex::MultiFab const& old,
+                  amrex::MultiFab const& transfer, amrex::Geometry const& geometry)
+{
+    RZMomentMetric const metric(geometry);
+    amrex::ReduceOps<amrex::ReduceOpSum, amrex::ReduceOpSum> ops;
+    amrex::ReduceData<amrex::Real, amrex::Real> data(ops);
+    using Tuple = typename decltype(data)::Type;
+    for (amrex::MFIter it(state); it.isValid(); ++it) {
+        auto const current = state.const_array(it);
+        auto const initial = old.const_array(it);
+        auto const source = transfer.const_array(it);
+        ops.eval(it.validbox(), data, [=] AMREX_GPU_DEVICE(int i, int j, int k) -> Tuple {
+            auto const radius = metric.Angular(i).mean_radius;
+            auto const a = current(i, j, k, 2), b = initial(i, j, k, 2), c = source(i, j, k, 2);
+            return {radius * ((a - b) + c), radius * (std::abs(a) + std::abs(b) + std::abs(c))};
+        });
+    }
+    auto const values = data.value();
+    amrex::Real sum[2]{amrex::get<0>(values), amrex::get<1>(values)};
+    amrex::ParallelDescriptor::ReduceRealSum(sum, 2);
+    if (!std::isfinite(sum[0]) || !std::isfinite(sum[1])) {
+        return std::numeric_limits<amrex::Real>::infinity();
+    }
+    return sum[1] > 0 ? std::abs(sum[0]) / sum[1] : std::abs(sum[0]);
 }
 } // namespace warpx::radiation
 #endif

@@ -8,6 +8,7 @@
 #include "Radiation/ParticleImpulse.H"
 #include "Radiation/ParticleImpulseBoundary.H"
 #include "Radiation/RadiationTransport.H"
+#include "Radiation/RZMomentGeometry.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
@@ -282,6 +283,127 @@ CheckWalls (MultiParticleContainer& particles, WarpXParticleContainer& ions)
         AMREX_ALWAYS_ASSERT(restored_wall[d] == wall[d]);
     }
 }
+void
+CheckAngularAssignment (MultiParticleContainer& particles, WarpXParticleContainer& ions)
+{
+    using namespace warpx::radiation;
+    ParticleBoundaries boundaries;
+    boundaries.SetAll(ParticleBoundaryType::Periodic);
+    boundaries.SetBoundsX(ParticleBoundaryType::None, ParticleBoundaryType::Reflecting);
+    boundaries.BuildReflectionModelParsers();
+    std::vector<ParticleImpulseBoundaryTransfer> transfers{{"unchanged", {1, 2, 3}}};
+    auto const before_boundary = ReadParticles(ions);
+    // No saved endpoints in this low-level source fixture: reject, do not infer a path.
+    AMREX_ALWAYS_ASSERT(!TryReflectParticleImpulseState(ions, boundaries, transfers, {}, true));
+    AMREX_ALWAYS_ASSERT(ReadParticles(ions) == before_boundary && transfers.size() == 1
+        && transfers[0].path == "unchanged" && transfers[0].momentum[0] == 1);
+    amrex::MultiFab impulse(ions.ParticleBoxArray(0), ions.ParticleDistributionMap(0), 3, 0);
+    impulse.setVal(0);
+    ParticleImpulseTransaction probe;
+    AMREX_ALWAYS_ASSERT(probe.Stage(particles, {"ions"}, "rz_probe", impulse, true,
+                                   ParticleImpulseAssignment::RZAngularConservative));
+    auto const geometry = ions.Geom(0);
+    RZMomentMetric const metric(geometry);
+    long double accumulated_torque = 0;
+    for (int step = 0; step < 64; ++step) {
+        auto const old = ReadParticles(ions);
+        amrex::Real requested_torque = 0;
+        amrex::MultiFab torque(impulse.boxArray(), impulse.DistributionMap(), 1, 0);
+        auto const kick = step % 2 == 0 ? 5000._rt : -3000._rt;
+        for (amrex::MFIter it(impulse); it.isValid(); ++it) {
+            auto const mass = probe.MaterialMass().const_array(it);
+            auto const out = impulse.array(it);
+            auto const angular = torque.array(it);
+            amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                out(i, j, k, 1) = kick * mass(i, j, k);
+                angular(i, j, k) = metric.Angular(i).mean_radius * out(i, j, k, 1);
+            });
+        }
+        requested_torque = torque.sum(0);
+        ParticleImpulseTransaction staged;
+        AMREX_ALWAYS_ASSERT(staged.Stage(particles, {"ions"}, "rz_probe", impulse, true,
+                                        ParticleImpulseAssignment::RZAngularConservative));
+        AMREX_ALWAYS_ASSERT(ReadParticles(ions) == old);
+        amrex::MultiFab check(impulse.boxArray(), impulse.DistributionMap(), 3, 0);
+        amrex::MultiFab::Copy(check, staged.ConjugateImpulse(), 0, 0, 3, 0);
+        amrex::MultiFab::Add(check, staged.ConjugateMomentumCarryChange(), 0, 0, 3, 0);
+        amrex::MultiFab::Subtract(check, impulse, 0, 0, 3, 0);
+        AMREX_ALWAYS_ASSERT(check.norm1(1) < 1.e-10_rt * impulse.norm1(1));
+        auto const requested_work = staged.RequestedWork().sum(0);
+        auto const work_pair = amrex::MultiFab::Dot(impulse, 0, staged.WorkVelocity(), 0, 3, 0);
+        AMREX_ALWAYS_ASSERT(std::abs(requested_work - work_pair) < 1.e-10_rt * std::abs(requested_work));
+        // Finite sample radii do not generally have the annular mean radius.
+        // The generalized and physical theta impulses must remain distinct.
+        AMREX_ALWAYS_ASSERT(std::abs(staged.ActualImpulse().sum(1) - staged.ConjugateImpulse().sum(1))
+                            > 1.e-8_rt * impulse.norm1(1));
+        staged.Commit();
+        auto const current = ReadParticles(ions);
+        AMREX_ALWAYS_ASSERT(current.size() == old.size());
+        long double change[2]{0, 0};
+        for (std::size_t p = 0; p < old.size(); ++p) {
+            auto const& a = old[p];
+            auto const& b = current[p];
+            long double const mass = static_cast<long double>(a[0]) * ions.getMass();
+            long double const cosine = std::cos(static_cast<long double>(a[4]));
+            long double const sine = std::sin(static_cast<long double>(a[4]));
+            auto const dx = static_cast<long double>(b[1]) - a[1] + b[7] - a[7];
+            auto const dy = static_cast<long double>(b[2]) - a[2] + b[8] - a[8];
+            change[0] += mass * a[5] * (-dx * sine + dy * cosine);
+            long double square_a = 0, square_b = 0, numerator = 0;
+            for (int d = 1; d <= 3; ++d) {
+                square_a += static_cast<long double>(a[d]) * a[d];
+                square_b += static_cast<long double>(b[d]) * b[d];
+                numerator += (static_cast<long double>(b[d]) - a[d]) *
+                             (static_cast<long double>(b[d]) + a[d]);
+            }
+            change[1] += mass * (numerator / (std::sqrt(1 + square_a / PhysConst::c2) +
+                                              std::sqrt(1 + square_b / PhysConst::c2)) + b[10] - a[10]);
+        }
+#ifdef AMREX_USE_MPI
+        MPI_Allreduce(MPI_IN_PLACE, change, 2, MPI_LONG_DOUBLE, MPI_SUM,
+                      amrex::ParallelDescriptor::Communicator());
+#endif
+        AMREX_ALWAYS_ASSERT(std::abs(change[0] - requested_torque) < 1.e-10L * std::abs(requested_torque));
+        AMREX_ALWAYS_ASSERT(std::abs(change[1] - requested_work) < 1.e-10L * std::abs(requested_work));
+        accumulated_torque += change[0];
+    }
+    AMREX_ALWAYS_ASSERT(accumulated_torque > 0);
+    // A point-supported cell at the coordinate axis has mass but no angular
+    // inertia. A nonzero torque must reject, not create a singular kick.
+    for (WarpXParIter it(ions, 0); it.isValid(); ++it) {
+        auto const data = it.GetParticleTile().getParticleTileData();
+        amrex::ParallelFor(it.numParticles(), [=] AMREX_GPU_DEVICE(long p) {
+            data.m_rdata[PIdx::r][p] = 0;
+        });
+    }
+    ions.Redistribute();
+    impulse.setVal(0);
+    for (amrex::MFIter it(impulse); it.isValid(); ++it) {
+        auto const out = impulse.array(it);
+        amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            if (i == 0) { out(i, j, k, 1) = 1; }
+        });
+    }
+    auto const axis_state = ReadParticles(ions);
+    ParticleImpulseTransaction singular;
+    AMREX_ALWAYS_ASSERT(!singular.Stage(particles, {"ions"}, "rz_probe", impulse, true,
+                                       ParticleImpulseAssignment::RZAngularConservative));
+    AMREX_ALWAYS_ASSERT(ReadParticles(ions) == axis_state);
+    impulse.setVal(0);
+    AMREX_ALWAYS_ASSERT(singular.Stage(particles, {"ions"}, "rz_probe", impulse, true,
+                                      ParticleImpulseAssignment::RZAngularConservative));
+    for (WarpXParIter it(ions, 0); it.isValid(); ++it) {
+        auto const data = it.GetParticleTile().getParticleTileData();
+        amrex::ParallelFor(it.numParticles(), [=] AMREX_GPU_DEVICE(long p) {
+            data.m_rdata[PIdx::r][p] = -0.01_prt;
+        });
+    }
+    auto const outside = ReadParticles(ions);
+    AMREX_ALWAYS_ASSERT(!singular.Stage(particles, {"ions"}, "rz_probe", impulse, true,
+                                       ParticleImpulseAssignment::RZAngularConservative));
+    AMREX_ALWAYS_ASSERT(ReadParticles(ions) == outside);
+    amrex::Print() << "Native angular assignment: 64 finite torque/work stages passed.\n";
+}
 } // namespace
 
 int
@@ -335,6 +457,14 @@ main (int argc, char* argv[])
         }
         RegisterParticleImpulseState(ions, "rz_probe");
         simulation.InitData();
+        bool angular_assignment = false;
+        amrex::ParmParse("test").query("angular_assignment", angular_assignment);
+        if (angular_assignment) {
+            CheckAngularAssignment(particles, ions);
+            WarpX::Finalize();
+            warpx::initialization::finalize_external_libraries();
+            return 0;
+        }
         amrex::MultiFab impulse(ions.ParticleBoxArray(0), ions.ParticleDistributionMap(0), 3, 0);
         impulse.setVal(0);
         ParticleImpulseTransaction zero;

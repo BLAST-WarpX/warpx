@@ -134,6 +134,13 @@ public:
     /** Instantaneous lab-frame field momentum, sum(F/c)/c, not a force ledger. */
     [[nodiscard]] amrex::GpuArray<amrex::Real, 3> momentMomentumInventory (
         ablastr::fields::MultiFabRegister const& fields) const;
+    /** RZ axial angular inventories [kg m^2/s]: radiation, represented ions,
+     * and particle-owned pending impulse at current positions. Global sums. */
+    [[nodiscard]] amrex::GpuArray<amrex::Real, 3> momentAngularInventory (
+        MultiParticleContainer& particles,
+        ablastr::fields::MultiFabRegister const& fields) const;
+    [[nodiscard]] bool usesRZAngularTransport () const noexcept
+    { return m_rz_angular_transport; }
     [[nodiscard]] amrex::Real lastMaterialCarryEnergyChange () const noexcept
     { return m_last_material_carry_energy_change; }
     [[nodiscard]] amrex::GpuArray<amrex::Real, 4> pendingMaterialImpulse (
@@ -296,6 +303,7 @@ private:
     bool m_enable_momentum_coupling = false;
     bool m_particle_momentum_carry = false;
     bool m_use_coupled_moment_transport = false;
+    bool m_rz_angular_transport = false;
     amrex::Real m_moment_relaxation = 0.5;
     amrex::GpuArray<amrex::Real, 3> m_initial_moment_flux_ratio{};
     bool m_require_cell_interface_exact_streaming = false;
