@@ -214,7 +214,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
             // This produces a box that is node center in the face direction
             // and cell centered in the other directions
-            amrex::Box box = enclosedCells(mfi.nodaltilebox());
+            amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             box.surroundingNodes(face_dir);
 
             // Find the intersection with the boundary

@@ -181,7 +181,7 @@ void FieldMaximum::ComputeDiags (int step)
         {
             // Make the box cell centered in preparation for the interpolation (and to avoid
             // including ghost cells in the calculation)
-            const Box& box = enclosedCells(mfi.nodaltilebox());
+            const Box& box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const auto& arrEx = Ex[mfi].array();
             const auto& arrEy = Ey[mfi].array();
             const auto& arrEz = Ez[mfi].array();

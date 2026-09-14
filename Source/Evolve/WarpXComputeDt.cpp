@@ -174,7 +174,7 @@ WarpX::GlobalCyclotronFrequencyMax ()
         {
             // Make the box cell centered in preparation for the interpolation (and to avoid
             // including ghost cells in the calculation)
-            const amrex::Box & box = enclosedCells(mfi.nodaltilebox());
+            const amrex::Box & box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const auto& arrBx = Bx[mfi].array();
             const auto& arrBy = By[mfi].array();
             const auto& arrBz = Bz[mfi].array();
