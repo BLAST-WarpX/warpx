@@ -1,11 +1,11 @@
 # Angular-conservative RZ moment/source building blocks
 
-This is an opt-in **low-level source and transport capability**, not native
-drifting-swirl qualification. The default native RZ radiation adapter selects
-the [meridional runtime](radiation_rz_moving_runtime.md). The private experimental
-`rz_angular_transport` integration has passed its first full CPU reflected-motion
-case and changed-rank restart. Backend qualification is still in progress;
-it must not be advertised as a generally qualified runtime.
+This opt-in capability includes low-level source/transport and a bounded native
+angular runtime. The default adapter remains the
+[meridional runtime](radiation_rz_moving_runtime.md). The experimental
+`rz_angular_transport` integration passes full reflected-motion and changed-rank
+restart checks on CPU and CUDA, within the contract below. This does not finish
+the general RZ radiation module; the stiff GPU source limitation below remains.
 
 ## Which momentum is conserved?
 
@@ -137,7 +137,27 @@ checks represented angular momentum and kinetic energy, checks the actual
 pending-vector reflection/transfer, and rejects a staged callback without
 changing particles or the caller's accounts. The surrounding meridional
 runtime/restart/unsupported-path selection passes 13/13. These results do not
-substitute for the outstanding native CUDA and sanitizer qualification.
+substitute for broader material or transport qualification. The native angular
+CUDA selection subsequently passes 7/7 checks in 2249.94 s, and the native
+address/undefined-behavior sanitizer matrix passes 8/8 in 233.97 s. Deliberately
+nonzero carry/wall transactions pass on one and two GPU/MPI ranks as well.
+
+### Known stiff-source GPU limit
+
+The separate fixed-position angular LTE stress case reaches its 5400 s GPU
+deadline after 13 of 64 accepted stages. No physical assertion fails in those
+completed stages, but the case is incomplete and is not counted as a pass.
+Its full CPU run passes. A smaller fixed-point relaxation control increased
+the CPU work, so it was not adopted. The test's physics gates and deadline are
+unchanged. Small-grid, very-stiff GPU source performance needs further work;
+native moving-run success does not erase this limitation.
+
+A separate moving absorption/emission case retains all 256 native steps and
+wall encounters. On CPU, radiation loses 167.714 J, electrons gain 183.040 J,
+and ions lose 15.326 J. Independent energy error is `-5.34e-10 J` against
+`3.17e-8 J`; angular error is `-6.88e-21 kg m^2/s` against `4.57e-18`.
+Run/analysis and changed-rank restart checks pass 4/4 on CPU and 4/4 on CUDA
+(1570.82 s locally). This case does not replace the stiff-source stress gate.
 
 ### Experimental native contract
 
@@ -157,6 +177,10 @@ Reflect-all walls are unsupported in this angular contract; they can exchange
 tangential momentum and are not a smooth specular wall.
 
 Packet/moment conversion, pressure-driven magnetic induction and conservative
-magnetic work, calibrated high-Z material closures, and nonideal RZ conduction
+magnetic work, calibrated high-Z material closures, and moving nonideal EOS coupling
 remain separate unresolved production capabilities. This source increment
 does not qualify those paths.
+
+Nonideal RZ thermal conduction has a separate
+[qualification](radiation_nonlinear_electron_conduction.md); it does not remove
+the ideal-electron guard on this moving radiation/pressure-work model.

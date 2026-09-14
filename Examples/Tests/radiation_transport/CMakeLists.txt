@@ -1332,6 +1332,8 @@ if(WarpX_LIB)
             analysis_rz_moving_compression.py)
         add_rz_moving_runtime_case(rz_moving_rotation inputs_base_rz_moving_moment_rotation
             analysis_rz_moving_rotation.py)
+        add_rz_moving_runtime_case(rz_moving_rotation_lte inputs_base_rz_moving_moment_rotation_lte
+            analysis_rz_moving_rotation.py)
         foreach(corrupt IN ITEMS ledger meridional_model)
             set(rz_angular_corrupt_dir "${CMAKE_CURRENT_BINARY_DIR}/rz_moving_rotation_${corrupt}")
             file(MAKE_DIRECTORY ${rz_angular_corrupt_dir})
