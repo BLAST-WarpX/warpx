@@ -232,8 +232,13 @@ namespace warpx::radiation
 #if defined(WARPX_DIM_RZ)
                 if (angular_trajectory && next.position[0] > upper[0]) {
                     auto const theta = next.position[1];
-                    auto const path = ReflectRZTrajectory({previous[0][ip], previous[1][ip]},
-                        {next.position[0] * std::cos(theta), next.position[0] * std::sin(theta)},
+                    // The trajectory/ledger uses field precision. The native angular
+                    // contract requires DP fields; mixed SP/DP builds must still compile.
+                    auto const path = ReflectRZTrajectory(
+                        {static_cast<amrex::Real>(previous[0][ip]),
+                         static_cast<amrex::Real>(previous[1][ip])},
+                        {static_cast<amrex::Real>(next.position[0] * std::cos(theta)),
+                         static_cast<amrex::Real>(next.position[0] * std::sin(theta))},
                         upper[0]);
                     if (!path.valid) { next.valid = false; output[ip] = next; return; }
                     next.angular_reflection = true;
