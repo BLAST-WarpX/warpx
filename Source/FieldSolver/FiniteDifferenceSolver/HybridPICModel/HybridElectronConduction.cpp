@@ -11,6 +11,7 @@
 
 #include <AMReX_Print.H>
 
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -55,14 +56,32 @@ HybridPICModel::AdvanceElectronHeatConduction (int const lev, amrex::Real const 
         warpx::hybrid::computeElectronChargeMoments(*mean_charge, *effective_charge, charge,
                                                     species_densities);
     }
+    auto const eos = electronThermodynamicsExecutor();
+    std::unique_ptr<amrex::MultiFab> material_mass_density;
+    if (eos.isSingularitySpiner()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_electron_thermodynamics.numMaterials() == 1,
+            "Table-EOS conduction requires one native material.");
+        auto const& unit_charge = *simulation.m_fields.get("ni_charge_fp_"
+            + m_electron_thermodynamics.materialSpeciesName(0), lev);
+        material_mass_density = std::make_unique<amrex::MultiFab>(temperature.boxArray(),
+            temperature.DistributionMap(), 1, 0);
+        for (amrex::MFIter it(*material_mass_density); it.isValid(); ++it) {
+            auto const ni = unit_charge.const_array(it);
+            auto const rho = material_mass_density->array(it);
+            amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i,int j,int k) {
+                rho(i,j,k) = eos.materialMassDensityFromUnitIonChargeDensity(0, ni(i,j,k));
+            });
+        }
+    }
     auto const result = warpx::hybrid::advanceElectronHeatConduction(
         temperature, redistribution, charge, simulation.Geom(lev), m_gamma, m_electron_conductivity,
         m_electron_conduction_flux_limiter, dt, m_electron_conduction_max_substeps,
         simulation.verboncoeurAxisCorrection() ? 1.0_rt / 3.0_rt : 1.0_rt / 4.0_rt, mean_charge,
-        effective_charge, m_electron_composition_conductivity);
+        effective_charge, m_electron_composition_conductivity, &eos, material_mass_density.get());
     if (m_electron_conduction_verbosity > 0)
     {
         amrex::Print() << "Electron heat conduction: substeps=" << result.substeps
-                       << " graph_iterations=" << result.iterations << '\n';
+                       << " graph_iterations=" << result.iterations
+                       << " rejected_steps=" << result.rejected_steps << '\n';
     }
 }

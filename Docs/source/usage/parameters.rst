@@ -4534,11 +4534,13 @@ state model.
     :default: ``false``
     :optional:
 
-    Opt-in conservative isotropic heat conduction for ideal finite-volume
-    hybrid electrons. Requires the evolved electron-energy equation, explicit
-    selection of finite-volume electron transport, double field/particle
-    precision, no material EOS tables or EB, and one level. Cartesian
-    geometries and axis-containing RZ are supported. Thermal boundaries are
+    Opt-in conservative isotropic heat conduction for finite-volume hybrid
+    electrons. Requires the evolved electron-energy equation, finite-volume
+    electron transport, double field/particle precision, no EB, and one level.
+    Ideal electrons support Cartesian geometries and axis-containing RZ;
+    fixed-charge latent energy and a single Singularity-EOS material are
+    supported in Cartesian geometry. Table EOSs retain their host-only backend
+    restriction. Thermal boundaries are
     insulating on nonperiodic faces and periodic otherwise; existing material
     transport boundary restrictions remain. This does not replace kinetic ions
     with a fluid or include magnetically anisotropic conduction.
@@ -4548,9 +4550,17 @@ state model.
     conductance; the density floor does not create conducting material. An
     implicit positive graph solve advances temperature on private candidates,
     retaining the existing strict matrix-residual and global energy checks.
+    For a nonideal EOS, each graph update solves the actual monotone caloric
+    equation with safeguarded Newton/bisection, within the previous global
+    temperature range. It does not replace energy changes by frozen heat
+    capacity times temperature change. Negative table-energy reference zeros
+    are supported without energy clipping. Table material mass density comes
+    from the native unit-ion charge deposit, not the physical electron charge
+    divided by an assumed unit ionization. Multiple EOS materials and nonideal
+    RZ conduction remain guarded.
     Conductivity and its optional limiter are frozen on each adaptive substep.
-    This is a first-order, lagged-coefficient method, not a nonlinear converged
-    Spitzer solve. The limiter below limits the old-state flux used to form
+    This is a first-order, lagged-conductivity method, not a jointly converged
+    nonlinear Spitzer solve. The limiter below limits the old-state flux used to form
     conductances, not an independently enforced hard cap on the final flux.
 
     Exactly zero conductivity or zero face-temperature differences preserve
@@ -4616,7 +4626,9 @@ state model.
 
     Maximum adaptive conduction substeps in one PIC step. Each substep limits
     its diagonal conductive rate times dt to eight, keeping the positive
-    iteration within a useful conditioning range. Exhaustion aborts before
+    iteration within a useful conditioning range. Nonideal stages can halve
+    a rejected trial up to twenty times, without publishing its temperature.
+    Exhaustion aborts before
     committing live temperature. This bounded solver is not a multigrid
     replacement for arbitrarily stiff or very large heat-transport problems.
 
@@ -4625,7 +4637,8 @@ state model.
     :default: ``0``
     :optional:
 
-    A positive value reports accepted conduction substeps and graph iterations.
+    A positive value reports accepted conduction substeps, graph iterations
+    and rejected nonlinear trial steps.
 
 .. pp:param:: hybrid_pic_model.include_joule_heating
     :type: ``bool``

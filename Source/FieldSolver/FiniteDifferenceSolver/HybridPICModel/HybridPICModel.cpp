@@ -1412,17 +1412,24 @@ void HybridPICModel::ReadParameters (
         pp_hybrid.query("electron_conduction_max_substeps", m_electron_conduction_max_substeps);
         pp_hybrid.query("electron_conduction_verbosity", m_electron_conduction_verbosity);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_solve_electron_energy_equation
-            && m_fv_transport_internal_energy && m_electron_thermodynamics.executor().isIdealGas()
-            && m_electron_thermodynamics.numMaterials() == 0 && !EB::enabled()
+            && m_fv_transport_internal_energy
+            && m_electron_thermodynamics.numMaterials() <= 1 && !EB::enabled()
+            && std::numeric_limits<amrex::Real>::digits >= 53
+            && std::numeric_limits<amrex::ParticleReal>::digits >= 53
             && std::isfinite(m_gamma) && m_gamma > 1.0_rt
             && std::isfinite(m_electron_conduction_flux_limiter)
             && m_electron_conduction_flux_limiter >= 0.0_rt
             && m_electron_conduction_flux_limiter <= 1.0_rt
             && m_electron_conduction_max_substeps > 0 && m_electron_conduction_verbosity >= 0,
-            "Electron heat conduction requires ideal finite-volume electrons without tables/EB "
+            "Electron heat conduction requires double-precision finite-volume electrons "
+            "with at most one EOS table, no EB "
             "and finite nonnegative controls (flux limiter at most one).");
 #if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         WARPX_ABORT_WITH_MESSAGE("Electron heat conduction supports Cartesian and RZ only.");
+#endif
+#if defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_electron_thermodynamics.executor().isIdealGas(),
+            "Nonideal electron heat conduction is initially qualified only in Cartesian geometry.");
 #endif
     }
 

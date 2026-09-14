@@ -278,7 +278,7 @@ struct ElectronThermodynamicsExecutor
             }
 
             ElectronThermodynamicState state;
-            amrex::Real atomic_number_weight = amrex::Real(0.0);
+            auto atomic_number_weight = amrex::Real(0.0);
             for (int material = material_begin; material < material_end; ++material) {
                 amrex::Real const mass_density =
                     material_mass_density[material];
@@ -315,19 +315,21 @@ struct ElectronThermodynamicsExecutor
                 amrex::Real const density_cgs =
                     amrex::Real(1.0e-3) * evaluation_mass_density;
                 auto const& table = m_tables[material];
-                amrex::Real const specific_energy =
+                auto const specific_energy = static_cast<amrex::Real>(
                     table.InternalEnergyFromDensityTemperature(
-                        density_cgs, temperature);
-                state.pressure += amrex::Real(1.0e-1) * density_scale
+                        density_cgs, temperature));
+                state.pressure = static_cast<amrex::Real>(
+                    state.pressure + amrex::Real(1.0e-1) * density_scale
                     * table.PressureFromDensityTemperature(
-                        density_cgs, temperature);
+                        density_cgs, temperature));
                 state.internal_energy_density += mass_density
                     * amrex::Real(1.0e-4)
                     * specific_energy;
-                state.heat_capacity_density += mass_density
+                state.heat_capacity_density = static_cast<amrex::Real>(
+                    state.heat_capacity_density + mass_density
                     * amrex::Real(1.0e-4)
                     * table.SpecificHeatFromDensityTemperature(
-                        density_cgs, temperature);
+                        density_cgs, temperature));
                 amrex::Real const ion_density = mass_density
                     / (m_atomic_mass[material] * PhysConst::m_u);
                 amrex::Real const table_mean_atomic_number =
@@ -785,7 +787,7 @@ public:
             }
 
             m_tables.reserve(m_material_species.size());
-            amrex::Real common_temperature_floor = amrex::Real(0.0);
+            auto common_temperature_floor = amrex::Real(0.0);
             amrex::Real common_temperature_ceiling =
                 std::numeric_limits<amrex::Real>::max();
             for (std::size_t material = 0;
@@ -846,9 +848,11 @@ public:
                 host_table.Finalize();
 
                 auto const& table = m_tables.back();
-                m_executor.m_atomic_mass[material] =
+                // The material count was bounded by max_materials above.
+                auto const index = static_cast<int>(material);
+                m_executor.m_atomic_mass[index] =
                     static_cast<amrex::Real>(table.MeanAtomicMass());
-                m_executor.m_atomic_number[material] =
+                m_executor.m_atomic_number[index] =
                     static_cast<amrex::Real>(table.MeanAtomicNumber());
                 common_temperature_floor = amrex::max(
                     common_temperature_floor,
@@ -856,10 +860,10 @@ public:
                 common_temperature_ceiling = amrex::min(
                     common_temperature_ceiling,
                     static_cast<amrex::Real>(table.TMax()));
-                m_executor.m_minimum_mass_density[material] =
+                m_executor.m_minimum_mass_density[index] =
                     amrex::Real(1.0e3)
                     * static_cast<amrex::Real>(table.MinimumDensity());
-                m_executor.m_maximum_mass_density[material] =
+                m_executor.m_maximum_mass_density[index] =
                     amrex::Real(1.0e3)
                     * static_cast<amrex::Real>(table.MaximumDensity());
             }

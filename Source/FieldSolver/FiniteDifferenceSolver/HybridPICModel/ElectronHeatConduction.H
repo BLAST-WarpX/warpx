@@ -3,6 +3,8 @@
  */
 #pragma once
 
+#include "ElectronThermodynamics.H"
+
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_Parser.H>
@@ -16,6 +18,7 @@ struct HeatConductionResult
 {
     int substeps = 0;
     int iterations = 0;
+    int rejected_steps = 0;
 };
 
 /** Fixed-charge ion moments on matching physical nodal charge deposits.
@@ -28,13 +31,16 @@ void computeElectronChargeMoments (
     amrex::MultiFab const& charge,
     std::vector<std::pair<amrex::MultiFab const*, amrex::Real>> const& species);
 
-/** Ideal-electron, isotropic, insulating/periodic heat transport.
+/** Isotropic, insulating/periodic electron heat transport.
  * Conductivity receives physical charge density [C/m3] and Te [eV], and
  * returns W/(m K). Temperature is stored in K; realized_energy is the
  * accepted local redistribution [J/m3]. Live outputs are committed only
  * after the full interval succeeds. No vacuum density floor is inserted.
  * Optional charge moments select conductivity(rho,Te,Zbar,Zeff) instead of
  * the two-argument parser; both moment fields must be provided together.
+ * Nonideal EOSs use a nonlinear caloric graph solve in Cartesian geometry;
+ * a single table material requires explicit mass density [kg/m3]. Conductivity
+ * and its limiter remain lagged per substep. The ideal RZ path is unchanged.
  */
 HeatConductionResult advanceElectronHeatConduction (
     amrex::MultiFab& temperature, amrex::MultiFab& realized_energy, amrex::MultiFab const& charge,
@@ -42,5 +48,7 @@ HeatConductionResult advanceElectronHeatConduction (
     amrex::Real flux_limiter, amrex::Real dt, int maximum_substeps, amrex::Real axis_volume_factor,
     amrex::MultiFab const* mean_charge = nullptr,
     amrex::MultiFab const* effective_charge = nullptr,
-    amrex::ParserExecutor<4> composition_conductivity = {});
+    amrex::ParserExecutor<4> composition_conductivity = {},
+    ElectronThermodynamicsExecutor const* thermodynamics = nullptr,
+    amrex::MultiFab const* material_mass_density = nullptr);
 } // namespace warpx::hybrid

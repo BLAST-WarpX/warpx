@@ -14,7 +14,7 @@ still blocks the affected feature; no assertion is relaxed to move past it.
 | RZ particle/electron pressure work | Centered gradient paired with actual Boris gather/scatter work; native axis/wall volumes; restart | Ideal FV electrons, zero Ampere plasma current, supported PEC/periodic walls only |
 | Face-exact RZ packet transport | Radial and axial intersections, corners, axis traversal, escape and periodic axial ownership | No EB or coupled direct recoil with this policy; continuous opacity is midpoint-sampled inside a cell |
 | Packet/diffusion conversion on that path | Gray/multigroup conversion and reemission, zero-residence exclusion, CPU/GPU-safe shared scatter | Does not close momentum ownership during conversion or moving spectral transport |
-| Electron heat conduction | Conservative isotropic ideal-electron heat flux, lagged harmonic limiter, insulating/periodic faces | No nonlinear table-EOS/anisotropic/nonlocal conduction; bounded substep stiffness, not multigrid scalability |
+| Electron heat conduction | Conservative isotropic heat flux; ideal Cartesian/RZ and nonlinear latent/single-table Cartesian caloric solves; lagged harmonic limiter | Nonideal RZ, anisotropy and nonlocal conduction remain unsupported; bounded substep stiffness, not multigrid scalability |
 | Material-specific Qei rates | Named species overrides, global fallback, fixed-charge support, PICMI and restart manifest | User-supplied rates, not calibrated high-Z atomic/Coulomb-log physics |
 | Python input access | PICMI material-energy controls and constant-name mangling | The same C++ model/backend guards remain authoritative |
 | RZ particle-owned absorption recoil | Finite material work, local diagnostic projection, Cartesian carry ownership and elastic material-wall transfer | Absorption-only bounded-segment lab-frame model; no RZ moment transport, face-exact recoil or conversion momentum closure |
@@ -105,6 +105,7 @@ Detailed records:
 - [RZ pressure work](radiation_rz_pressure_work.md)
 - [RZ exact-face transport and conversion](radiation_rz_face_streaming.md)
 - [Electron conduction](radiation_electron_conduction.md)
+- [Nonideal electron conduction](radiation_nonlinear_electron_conduction.md)
 - [Species Qei rates](radiation_species_qei_rates.md)
 
 CI status belongs to the actual PR head and must be read there; local passes

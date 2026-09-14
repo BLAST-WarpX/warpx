@@ -1,5 +1,10 @@
 # Isotropic ideal-electron conduction increment
 
+This records the original ideal-electron increment. The subsequent
+[nonideal Cartesian conduction implementation](radiation_nonlinear_electron_conduction.md)
+adds nonlinear latent-energy and single-table EOS support without changing
+this ideal solver.
+
 Status, 13 September 2026: implemented; bounded Cartesian/RZ CPU and native
 RZ CUDA/restart checks pass. No hohlraum application is used as qualification.
 

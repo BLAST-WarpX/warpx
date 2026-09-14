@@ -3,6 +3,74 @@
 
 find_package(Python REQUIRED COMPONENTS Interpreter)
 
+if(WarpX_LIB AND 1 IN_LIST WarpX_DIMS AND WarpX_PRECISION STREQUAL DOUBLE)
+    add_executable(test_nonlinear_electron_conduction test_nonlinear_electron_conduction.cpp)
+    target_link_libraries(test_nonlinear_electron_conduction PRIVATE lib_1d)
+    if(WarpX_COMPUTE STREQUAL CUDA)
+        setup_target_for_cuda_compilation(test_nonlinear_electron_conduction)
+        target_compile_features(test_nonlinear_electron_conduction PRIVATE cuda_std_20)
+    else()
+        target_compile_features(test_nonlinear_electron_conduction PRIVATE cxx_std_20)
+    endif()
+    warpx_set_compile_warnings(test_nonlinear_electron_conduction)
+    add_test(NAME test_1d_nonlinear_conduction_budget
+        COMMAND test_nonlinear_electron_conduction test.reject_budget=1
+            amrex.throw_exception=1 amrex.the_arena_init_size=0)
+    set_tests_properties(test_1d_nonlinear_conduction_budget PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=2")
+    set(nonlinear_cases latent)
+    if(WarpX_SINGULARITY_EOS)
+        list(APPEND nonlinear_cases table table_negative)
+        set(nonlinear_fixture_dir "${CMAKE_CURRENT_BINARY_DIR}/nonlinear_conduction_fixture")
+        set(nonlinear_fixture "${nonlinear_fixture_dir}/electron_only_fixture.sp5")
+        add_test(NAME nonlinear_conduction_eos_fixture
+            COMMAND ${CMAKE_COMMAND} -E env
+                "WARPX_SPINER_FIXTURE_PATH=${nonlinear_fixture}"
+                "WARPX_SPINER_FIXTURE_NUM_T=512"
+                $<TARGET_FILE:test_hybrid_electron_thermodynamics_spiner>)
+        set_tests_properties(nonlinear_conduction_eos_fixture PROPERTIES
+            FIXTURES_SETUP nonlinear_conduction_eos_fixture ENVIRONMENT "OMP_NUM_THREADS=2")
+    endif()
+    foreach(nonlinear_case IN LISTS nonlinear_cases)
+        set(nonlinear_name test_1d_nonlinear_conduction_${nonlinear_case})
+        set(nonlinear_args)
+        if(nonlinear_case STREQUAL table)
+            list(APPEND nonlinear_args --table-file "${nonlinear_fixture}")
+        elseif(nonlinear_case STREQUAL table_negative)
+            list(APPEND nonlinear_args --table-file "${nonlinear_fixture_dir}/electron_only_fixture_negative_reference.sp5")
+        endif()
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${nonlinear_name}")
+        add_test(NAME ${nonlinear_name}
+            COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_nonlinear_electron_conduction.py
+                $<TARGET_FILE:test_nonlinear_electron_conduction> ${nonlinear_args})
+        set_tests_properties(${nonlinear_name} PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${nonlinear_name}"
+            ENVIRONMENT "OMP_NUM_THREADS=2")
+        if(nonlinear_case MATCHES "^table")
+            set_tests_properties(${nonlinear_name} PROPERTIES FIXTURES_REQUIRED nonlinear_conduction_eos_fixture)
+        endif()
+    endforeach()
+    if(WarpX_MPI)
+        set(nonlinear_mpi_dir "${CMAKE_CURRENT_BINARY_DIR}/nonlinear_conduction_latent_mpi")
+        file(MAKE_DIRECTORY ${nonlinear_mpi_dir})
+        add_test(NAME test_1d_nonlinear_conduction_latent_mpi
+            COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/analysis_nonlinear_electron_conduction.py
+                $<TARGET_FILE:test_nonlinear_electron_conduction> --mpi-exec "${MPIEXEC_EXECUTABLE}")
+        set_tests_properties(test_1d_nonlinear_conduction_latent_mpi PROPERTIES
+            PROCESSORS 2 WORKING_DIRECTORY ${nonlinear_mpi_dir} ENVIRONMENT "OMP_NUM_THREADS=1")
+    endif()
+    if(WarpX_SINGULARITY_EOS AND WarpX_APP)
+        add_warpx_test(
+            test_1d_nonlinear_conduction_native_table
+            1
+            1
+            "inputs_test_1d_nonlinear_conduction_native_table hybrid_pic_model.electron_eos_ions_table_file='${nonlinear_fixture}'"
+            "analysis_nonlinear_conduction_native_table.py diags/diag000000 diags/diag000064"
+            OFF OFF)
+        set_tests_properties(test_1d_nonlinear_conduction_native_table.run PROPERTIES
+            FIXTURES_REQUIRED nonlinear_conduction_eos_fixture)
+    endif()
+endif()
+
 if(WarpX_PYTHON)
     add_test(NAME test_species_qei_rates_picmi
         COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_species_rates_picmi.py)

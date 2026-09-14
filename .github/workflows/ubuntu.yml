@@ -70,6 +70,9 @@ jobs:
     - name: install dependencies
       run: |
         .github/workflows/dependencies/gcc.sh 13
+        sudo apt-get install -y python3-venv
+        python3 -m venv .venv-eos-tests
+        .venv-eos-tests/bin/python -m pip install numpy scipy h5py yt
     - name: CCache Cache
       uses: actions/cache@v6
       with:
@@ -91,6 +94,8 @@ jobs:
           -DWarpX_EB=OFF               \
           -DWarpX_FFT=ON               \
           -DWarpX_MATERIAL_OPACITY_HDF5=ON \
+          -DWarpX_SINGULARITY_EOS=ON  \
+          -DPython_EXECUTABLE="${PWD}/.venv-eos-tests/bin/python" \
           -DWarpX_QED_TABLE_GEN=ON     \
           -DWarpX_QED_TOOLS=ON
 
@@ -98,7 +103,7 @@ jobs:
         ./build/bin/warpx.1d Examples/Physics_applications/laser_acceleration/inputs_base_1d
         ./build/bin/warpx.2d Examples/Physics_applications/laser_acceleration/inputs_base_2d
         ctest --test-dir build \
-          -R '^(material_opacity_table|test_1d_material_metadata_consistency)$' \
+          -R '^(material_opacity_table|test_1d_material_metadata_consistency|test_hybrid_electron_thermodynamics.*|test_1d_nonlinear_conduction_.*)$' \
           --output-on-failure
 
         ccache -s

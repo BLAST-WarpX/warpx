@@ -5,6 +5,7 @@ foreach(D IN LISTS WarpX_DIMS)
       HybridPICModel.cpp
       HybridPICCheckpoint.cpp
       ElectronHeatConduction.cpp
+      NonlinearHeatConduction.cpp
       HybridElectronConduction.cpp
       ExternalVectorPotential.cpp
     )

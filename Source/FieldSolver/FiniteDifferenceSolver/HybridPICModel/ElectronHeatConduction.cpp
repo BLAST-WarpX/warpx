@@ -4,6 +4,7 @@
 #include "ElectronHeatConduction.H"
 
 #include "ImplicitChargeEnergyTransport.H"
+#include "NonlinearHeatConduction.H"
 #include "QdsmcMetricTransport.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
@@ -223,8 +224,22 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
                                int const maximum_substeps, amrex::Real const axis_volume_factor,
                                amrex::MultiFab const* const mean_charge,
                                amrex::MultiFab const* const effective_charge,
-                               amrex::ParserExecutor<4> const composition_conductivity)
+                               amrex::ParserExecutor<4> const composition_conductivity,
+                               ElectronThermodynamicsExecutor const* thermodynamics,
+                               amrex::MultiFab const* material_mass_density)
 {
+    auto const eos = thermodynamics ? *thermodynamics : ElectronThermodynamicsExecutor{};
+    bool const nonlinear = thermodynamics && !eos.isIdealGas();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!eos.isSingularitySpiner()
+        || (eos.m_num_materials == 1 && material_mass_density),
+        "Table-EOS conduction requires one explicit material mass-density field.");
+    if (material_mass_density) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(material_mass_density->nComp() == 1
+            && material_mass_density->boxArray() == temperature.boxArray()
+            && material_mass_density->DistributionMap() == temperature.DistributionMap()
+            && material_mass_density->is_finite() && material_mass_density->min(0) >= 0,
+            "Conduction material mass density must be finite, nonnegative and match temperature.");
+    }
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         std::isfinite(dt) && dt >= 0.0_rt && std::isfinite(gamma) && gamma > 1.0_rt &&
             std::isfinite(flux_limiter) && flux_limiter >= 0.0_rt && flux_limiter <= 1.0_rt &&
@@ -255,6 +270,8 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
     amrex::Abort("Electron heat conduction currently supports Cartesian and RZ geometries.");
 #endif
 #if defined(WARPX_DIM_RZ)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!nonlinear,
+        "Nonideal electron conduction is initially qualified only in Cartesian geometry.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         geometry.ProbLo(0) == 0.0_rt &&
             (axis_volume_factor == 1.0_rt / 3.0_rt || axis_volume_factor == 1.0_rt / 4.0_rt),
@@ -316,6 +333,30 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
     amrex::Real remaining = dt;
     while (remaining > 0.0_rt)
     {
+        if (nonlinear) {
+            for (amrex::MFIter it(capacity); it.isValid(); ++it) {
+                auto const t = candidate.const_array(it), rho = density.const_array(it);
+                auto const m = material_mass_density ? material_mass_density->const_array(it)
+                    : amrex::Array4<amrex::Real const>{};
+                auto const cv = capacity.array(it), u = old_energy.array(it);
+                amrex::ParallelFor(it.validbox(), [=] AMREX_GPU_DEVICE(int i,int j,int k) {
+                    ElectronThermodynamicsExecutor::MaterialMassDensities materials{};
+                    if (eos.isSingularitySpiner()) { materials[0] = m(i,j,k); }
+                    auto const state = eos.stateFromMaterialMassDensitiesTemperature(
+                        rho(i,j,k), materials, t(i,j,k));
+                    bool const valid = std::isfinite(state.internal_energy_density)
+                        && std::isfinite(state.heat_capacity_density)
+                        && (rho(i,j,k) == 0 ? state.heat_capacity_density == 0
+                                               && state.internal_energy_density == 0
+                                           : state.heat_capacity_density > 0);
+                    cv(i,j,k) = valid ? state.heat_capacity_density
+                        : std::numeric_limits<amrex::Real>::quiet_NaN();
+                    u(i,j,k) = state.internal_energy_density;
+                });
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(capacity.is_finite() && old_energy.is_finite(),
+                "Nonlinear conduction received an invalid EOS state or nonpositive heat capacity.");
+        }
         ablastr::utils::communication::FillBoundary(candidate, candidate.nGrowVect(), false,
                                                     geometry.periodicity(), true);
         for (amrex::MFIter mfi(kappa); mfi.isValid(); ++mfi)
@@ -389,7 +430,7 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
                         }
                     }
                     out(i, j, k) = sum;
-                    old(i, j, k) = c(i, j, k) * t(i, j, k);
+                    if (!nonlinear) { old(i, j, k) = c(i, j, k) * t(i, j, k); }
                     rate(i, j, k, 0) = c(i, j, k) > 0.0_rt ? sum / c(i, j, k) : 0.0_rt;
                     rate(i, j, k, 1) = flux;
                 });
@@ -402,7 +443,7 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
             break;
         } // Exact zero-gradient/conductivity identity.
         auto const maximum_rate = rates.norm0(0, 0);
-        auto const step = amrex::min(remaining, 8.0_rt / maximum_rate);
+        auto step = amrex::min(remaining, 8.0_rt / maximum_rate);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             result.substeps < maximum_substeps && std::isfinite(step) && step > 0.0_rt &&
                 remaining - step < remaining,
@@ -413,9 +454,26 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
         // Same audited M-matrix algebra as charge-energy remap, with Cv as
         // the capacity and T as the specific unknown. No change to that
         // solver's iteration, positivity, residual or energy-inventory gates.
-        result.iterations +=
-            implicitChargeEnergyRemap(energy, old_energy, capacity, outgoing, incoming, volume,
-                                      geometry, "Electron heat conduction");
+        if (nonlinear) {
+            bool accepted = false;
+            for (int refinement = 0; refinement <= 20; ++refinement) {
+                auto const solve = tryNonlinearHeatConduction(candidate, energy, old_energy,
+                    density, outgoing, incoming, volume, geometry, eos, material_mass_density);
+                result.iterations += solve.iterations;
+                if (solve.valid) { accepted = true; break; }
+                ++result.rejected_steps;
+                step *= 0.5_rt;
+                incoming.mult(0.5_rt, 0, incoming.nComp(), 0);
+                outgoing.mult(0.5_rt, 0, 1, 0);
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(accepted && remaining-step < remaining,
+                "Nonlinear conduction exhausted its retry budget; live temperature is unchanged.");
+        } else {
+            result.iterations +=
+                implicitChargeEnergyRemap(energy, old_energy, capacity, outgoing, incoming, volume,
+                                          geometry, "Electron heat conduction");
+        }
+        if (!nonlinear) {
         for (amrex::MFIter mfi(candidate); mfi.isValid(); ++mfi)
         {
             auto const t = candidate.array(mfi);
@@ -428,6 +486,7 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
                                        t(i, j, k) = u(i, j, k) / c(i, j, k);
                                    }
                                });
+        }
         }
         remaining = amrex::max(0.0_rt, remaining - step);
         ++result.substeps;
@@ -447,8 +506,23 @@ advanceElectronHeatConduction (amrex::MultiFab& temperature, amrex::MultiFab& re
         auto const delta = update.array(mfi);
         auto const before = temperature.const_array(mfi), after = candidate.const_array(mfi);
         auto const c = capacity.const_array(mfi);
+        auto const rho = density.const_array(mfi);
+        auto const mass = material_mass_density ? material_mass_density->const_array(mfi)
+            : amrex::Array4<amrex::Real const>{};
         amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE(int i, int j, int k)
-                           { delta(i, j, k) = c(i, j, k) * (after(i, j, k) - before(i, j, k)); });
+        {
+            if (nonlinear) {
+                ElectronThermodynamicsExecutor::MaterialMassDensities materials{};
+                if (eos.isSingularitySpiner()) { materials[0] = mass(i,j,k); }
+                auto const initial = eos.stateFromMaterialMassDensitiesTemperature(
+                    rho(i,j,k), materials, before(i,j,k));
+                auto const final = eos.stateFromMaterialMassDensitiesTemperature(
+                    rho(i,j,k), materials, after(i,j,k));
+                delta(i,j,k) = final.internal_energy_density-initial.internal_energy_density;
+            } else {
+                delta(i,j,k) = c(i,j,k)*(after(i,j,k)-before(i,j,k));
+            }
+        });
     }
     amrex::MultiFab::Copy(temperature, candidate, 0, 0, 1, 0);
     amrex::MultiFab::Copy(realized_energy, update, 0, 0, 1, 0);

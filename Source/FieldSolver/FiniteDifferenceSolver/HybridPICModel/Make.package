@@ -1,6 +1,7 @@
 CEXE_sources += HybridPICModel.cpp
 CEXE_sources += HybridPICCheckpoint.cpp
 CEXE_sources += ElectronHeatConduction.cpp
+CEXE_sources += NonlinearHeatConduction.cpp
 CEXE_sources += HybridElectronConduction.cpp
 CEXE_sources += ExternalVectorPotential.cpp
 
