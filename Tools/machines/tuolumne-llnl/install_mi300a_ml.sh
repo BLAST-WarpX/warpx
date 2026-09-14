@@ -27,6 +27,11 @@ SW_DIR="/p/lustre5/${USER}/tuolumne/warpx/mi300a"
 # remove common user mistakes in python, located in .local instead of a venv
 python3 -m pip uninstall -qqq -y torch 2>/dev/null || true
 
+# clean out caches, e.g., depending on old system modules
+# pip cache disabled system-wide
+#python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 
 # Python ML ###################################################################
 #

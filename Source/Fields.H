@@ -25,8 +25,8 @@ namespace warpx::fields
      */
     AMREX_ENUM(FieldType,
         None,
-        Efield_aux, /**< Field that the particles gather from. Obtained from Efield_fp (and Efield_cp when using MR); see UpdateAuxilaryData */
-        Bfield_aux, /**< Field that the particles gather from. Obtained from Bfield_fp (and Bfield_cp when using MR); see UpdateAuxilaryData */
+        Efield_aux, /**< Field that the particles gather from. Obtained from Efield_fp (and Efield_cp when using MR); see UpdateAuxiliaryData */
+        Bfield_aux, /**< Field that the particles gather from. Obtained from Bfield_fp (and Bfield_cp when using MR); see UpdateAuxiliaryData */
         Efield_fp,  /**< The field that is updated by the field solver at each timestep */
         Bfield_fp,  /**< The field that is updated by the field solver at each timestep */
         Efield_fp_external, /**< Stores grid particle fields provided by the user as  through an openPMD file */
@@ -46,6 +46,10 @@ namespace warpx::fields
         vector_potential_grad_buf_e_stag,
         vector_potential_grad_buf_b_stag,
         hybrid_electron_pressure_fp, /**< Used with Ohm's law solver. Stores the electron pressure */
+        hybrid_electron_temperature_fp, /**< Used with Ohm's law solver. Stores the electron temperature T_e (K): implied by the electron-pressure closure by default, or the QDSMC electron-energy-equation state variable (updated each step from the entropy K_e) when that equation is solved. */
+        hybrid_entropy_fp,           /**< Used with the QDSMC electron-energy equation. Stores the electron entropy K_e = T_e * n_e^(1-gamma) on the grid; the QDSMC fictitious particles read this at the start of each step and rewrite it after Lagrangian advection. */
+        hybrid_qdsmc_weights_fp,     /**< Used with the QDSMC electron-energy equation. Scratch field for the per-cell weight (N_e) deposited by QDSMC particles after their push, used to recover K_e^{n+1} as (deposited K*N) / (deposited N). */
+        hybrid_electron_velocity_fp, /**< Used with the QDSMC electron-energy equation. Stores the electron fluid velocity V_e = -(J_plasma - J_i) / (q_e * n_e) on a NODAL grid (3 components); read by QDSMC SetV at the start of each step to advect the entropy-carrying particles. */
         hybrid_rho_fp_temp,          /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated charge density */
         hybrid_current_fp_temp,      /**< Used with Ohm's law solver. Stores the time interpolated/extrapolated current density */
         hybrid_current_fp_plasma,    /**< Used with Ohm's law solver. Stores plasma current calculated as J_plasma = curl x B / mu0 - J_ext */
@@ -76,14 +80,14 @@ namespace warpx::fields
         pml_j_cp,
         pml_F_cp,
         pml_G_cp,
-        pml_edge_lengths,
         Efield_avg_fp,
         Bfield_avg_fp,
         Efield_avg_cp,
         Bfield_avg_cp,
-        B_old, /**< Stores the value of B at the beginning of the timestep, for the implicit solver */
+        B_old, // Stores the value of B at the beginning of the timestep, for the implicit solver
+        E_old, // Stores the value of E at the beginning of the timestep, for the implicit solver
         Efield_fp_save,  // E at start of Newton step used by the implicit solvers
-        current_fp_MM,   // J from particles included in the mass matrices at start of Newton step used by the implicit solvers
+        current_fp_non_suborbit, // J from non-suborbit particles used by the implicit solvers
         MassMatrices_X,  // Stores full mass matrix elements for Jx used by the implicit solvers
         MassMatrices_Y,  // Stores full mass matrix elements for Jy used by the implicit solvers
         MassMatrices_Z,  // Stores full mass matrix elements for Jz used by the implicit solvers
@@ -92,6 +96,7 @@ namespace warpx::fields
         ECTRhofield,
         Venl,
         global_debye_length,
+        dA_fp,   /**< Used by the Darwin solver; the change in vector potential over one step */
         effective_potential_sigma  /**< Only used with effective potential ES solver. Stores the Poisson equation dressing */
     );
 
@@ -133,15 +138,17 @@ namespace warpx::fields
         FieldType::Efield_avg_cp,
         FieldType::Bfield_avg_cp,
         FieldType::B_old,
+        FieldType::E_old,
         FieldType::Efield_fp_save,
-        FieldType::current_fp_MM,
+        FieldType::current_fp_non_suborbit,
         FieldType::MassMatrices_X,
         FieldType::MassMatrices_Y,
         FieldType::MassMatrices_Z,
         FieldType::MassMatrices_PC,
         FieldType::curl2_BC_mask,
         FieldType::ECTRhofield,
-        FieldType::Venl
+        FieldType::Venl,
+        FieldType::dA_fp,
     };
 
     /** Returns true if a FieldType represents a vector field */

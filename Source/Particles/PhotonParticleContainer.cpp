@@ -93,8 +93,13 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
                                  int lev, int gather_lev,
                                  amrex::Real dt, ScaleFields /*scaleFields*/, SubcyclingHalf subcycling_half,
                                  PositionPushType position_push_type,
-                                 MomentumPushType /*momentum_push_type*/)
+                                 MomentumPushType momentum_push_type)
 {
+    amrex::ignore_unused(momentum_push_type);
+    // Photons are massless and neutral (q=0), so the Lorentz force equation
+    // is not applicable. They are not advanced using a particle pusher.
+    // That's why this argument MomentumPushType /momentum_push_type/ is ignored.
+
     // Get inverse cell size on gather_lev
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(gather_lev,0));
 
@@ -121,6 +126,8 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
 #ifdef WARPX_QED
     BreitWheelerEvolveOpticalDepth evolve_opt;
     amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_BW = nullptr;
+    const amrex::Real qed_dt =
+        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
     const bool local_has_breit_wheeler = has_breit_wheeler();
     if (local_has_breit_wheeler) {
         evolve_opt = m_shr_p_bw_engine->build_evolve_functor();
@@ -222,20 +229,19 @@ PhotonParticleContainer::PushPX (WarpXParIter& pti,
             [[maybe_unused]] auto *uy_tmp = uy;
             [[maybe_unused]] auto *uz_tmp = uz;
             [[maybe_unused]] auto dt_tmp = dt;
+            [[maybe_unused]] auto qed_dt_tmp = qed_dt;
             if constexpr (qed_control == has_qed) {
                 evolve_opt(ux[i], uy[i], uz[i], Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                           dt, p_optical_depth_BW[i]);
+                           qed_dt, p_optical_depth_BW[i]);
             }
 #else
             amrex::ignore_unused(qed_control);
 #endif
 
-            amrex::Real position_dt = dt;
-            if (position_push_type == PositionPushType::FirstHalf || position_push_type == PositionPushType::SecondHalf) {
-                position_dt *= 0.5_rt;
+            if (position_push_type == PositionPushType::Full) {
+                UpdatePosition(x, y, z, ux[i], uy[i], uz[i], dt, mass);
+                SetPosition(i, x, y, z);
             }
-            UpdatePosition(x, y, z, ux[i], uy[i], uz[i], position_dt, mass);
-            SetPosition(i, x, y, z);
         }
     );
 }
@@ -247,15 +253,35 @@ PhotonParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                  Real t, Real dt, SubcyclingHalf subcycling_half, bool skip_deposition,
                                  PositionPushType position_push_type,
                                  MomentumPushType momentum_push_type,
-                                 ImplicitOptions const * /*implicit_options*/)
+                                 ImplicitOptions const * implicit_options)
 {
     // This does gather, push and deposit.
-    // Push and deposit have been re-written for photons
+    // Push and deposit have been re-written for photons.
+    // Photons do not participate in the implicit solver. When called
+    // from the implicit solver during the iteration, we skip the push entirely;
+    // photons are instead advanced once at the end of the step via
+    // FinishImplicitParticleUpdate below.
+    if (implicit_options) { return; }
     PhysicalParticleContainer::Evolve(fields,
                                       lev,
                                       current_fp_string,
                                       t, dt, subcycling_half, skip_deposition,
                                       position_push_type,
                                       momentum_push_type,
-                                      nullptr);
+                                      /*implicit_options=*/nullptr);
+}
+
+void
+PhotonParticleContainer::FinishImplicitParticleUpdate (
+    ablastr::fields::MultiFabRegister& fields,
+    int lev, amrex::Real t, amrex::Real dt)
+{
+    // We perform a single full explicit push over [t-dt, t] here.
+    // Deposition is skipped because photons carry no charge and
+    // therefore contribute no current. We pass implicit_options=nullptr
+    // so that the early-return guard in PhotonParticleContainer::Evolve()
+    // does not fire: we do want the push this time.
+    Evolve(fields, lev, /*current_fp_string=*/"current_fp", t, dt,
+           SubcyclingHalf::None, /*skip_deposition=*/true,
+           PositionPushType::Full, MomentumPushType::Full, /*implicit_options=*/nullptr);
 }

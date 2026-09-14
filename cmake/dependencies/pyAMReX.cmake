@@ -39,6 +39,12 @@ function(find_pyamrex)
     if(WarpX_pyamrex_internal OR WarpX_pyamrex_src)
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
+        # save compile time
+        set(pyAMReX_CODES "WarpX" CACHE INTERNAL "Fine-tune the pre-compiled particle containers for downstream codes")
+
+        # skip pyAMReX's own tests (e.g., pytest.AMReX) in the WarpX superbuild
+        set(pyAMReX_BUILD_TESTING OFF CACHE BOOL "Run the pyAMReX tests" FORCE)
+
         if(WarpX_pyamrex_src)
             add_subdirectory(${WarpX_pyamrex_src} _deps/localpyamrex-build/)
         else()
@@ -59,7 +65,7 @@ function(find_pyamrex)
         endif()
     elseif(NOT WarpX_pyamrex_internal)
         # TODO: MPI control
-        find_package(pyAMReX ${pyamrex_version} CONFIG REQUIRED)
+        find_package(pyAMReX ${pyamrex_version} CONFIG REQUIRED COMPONENTS CODES_WarpX)
         message(STATUS "pyAMReX: Found version '${pyAMReX_VERSION}'")
     endif()
 endfunction()

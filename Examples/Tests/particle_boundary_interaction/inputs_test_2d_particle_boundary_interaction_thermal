@@ -1,0 +1,69 @@
+# 2D embedded-boundary thermal (diffuse) re-emission test (boundary.particle_eb = thermal).
+#
+# Field-free, collisionless box of neutral D2 sitting above a solid embedded-boundary slab
+# (a flat wall). WarpX EB convention: FLUID where implicit_function < 0, SOLID where > 0, so
+# "0.005 - z" is solid below z = 5 mm with an inward-pointing (+z) wall normal. The domain is
+# periodic in x; the top particle boundary reflects and the bottom is absorbing (unreachable
+# unless the EB leaks). The wall is fully thermally accommodating at 600 K while the gas starts
+# at 300 K: each particle that strikes the wall is re-emitted from a half-Maxwellian at the wall
+# temperature, so the gas is heated toward the wall temperature. This isolates the thermal EB
+# re-emission functor: particle number is conserved (re-emission, not absorption), and the
+# mean kinetic temperature must rise from 300 K toward the 600 K wall.
+
+my_constants.mD2  = 6.689e-27
+my_constants.kB   = 1.380649e-23
+my_constants.Tgas = 300.0
+my_constants.Twall = 600.0
+my_constants.n0   = 1.0e20
+my_constants.uth_c = sqrt(kB*Tgas/mD2)/clight
+my_constants.uthw_c = sqrt(kB*Twall/mD2)/clight
+
+geometry.dims       = 2
+geometry.prob_lo    = -0.01 0.0
+geometry.prob_hi    =  0.01 0.02
+amr.n_cell          = 16 16
+amr.max_level       = 0
+amr.blocking_factor = 8
+amr.max_grid_size   = 16
+
+warpx.eb_implicit_function = "0.005 - z"
+
+algo.maxwell_solver = none
+algo.particle_shape = 1
+warpx.const_dt      = 2.0e-8
+max_step            = 4000
+warpx.verbose       = 1
+
+boundary.field_lo    = periodic pec
+boundary.field_hi    = periodic pec
+boundary.particle_lo = periodic absorbing
+boundary.particle_hi = periodic reflecting
+
+particles.species_names = D2
+D2.charge = 0.0
+D2.mass   = mD2
+D2.injection_style = NUniformPerCell
+D2.num_particles_per_cell_each_dim = 4 4
+D2.profile = constant
+D2.density = n0
+D2.zmin    = 0.005
+D2.momentum_distribution_type = gaussian
+D2.ux_th = uth_c
+D2.uy_th = uth_c
+D2.uz_th = uth_c
+
+# feature under test: thermal (fully diffuse) embedded-boundary re-emission,
+# applied uniformly to all species; wall Maxwellian at Twall = 600 K
+boundary.particle_eb = thermal
+boundary.D2.u_th     = uthw_c
+
+warpx.reduced_diags_names = npart pen
+npart.type      = ParticleNumber
+npart.intervals = 200
+pen.type        = ParticleEnergy
+pen.intervals   = 200
+
+diagnostics.diags_names = diag1
+diag1.intervals = 4000
+diag1.diag_type = Full
+diag1.fields_to_plot = none

@@ -101,7 +101,7 @@ We compiled with the Fujitsu Compiler (Clang) with the following build string:
       -DCMAKE_CXX_COMPILER=$(which mpiFCC)          \
       -DCMAKE_CXX_COMPILER_ID="Clang"               \
       -DCMAKE_CXX_COMPILER_VERSION=12.0             \
-      -DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT="14"    \
+      -DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT="20"    \
       -DCMAKE_CXX_FLAGS="-Nclang"                   \
       -DAMReX_DIFFERENT_COMPILER=ON                 \
       -DAMReX_MPI_THREAD_MULTIPLE=FALSE             \

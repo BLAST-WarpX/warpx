@@ -18,5 +18,5 @@ module load Python
 export GPUS_PER_SOCKET=2
 export GPUS_PER_NODE=4
 
-# optimize CUDA compilation for V100 (7.0) or for A100 (8.0)
-export AMREX_CUDA_ARCH=8.0
+# optimize CUDA compilation for V100 (70) or for A100 (80)
+export CUDAARCHS=80

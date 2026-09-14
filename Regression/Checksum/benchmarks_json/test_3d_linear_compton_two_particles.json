@@ -1,41 +1,41 @@
 {
-  "lev=0": {
-    "rho": 8203144366079999.0
-  },
   "electron1": {
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_position_z": 0.0,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 0.0,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
     "particle_weight": 0.0
   },
   "electron2": {
+    "particle_momentum_x": 2.6763896243574446e-22,
+    "particle_momentum_y": 6.83295273515175e-22,
+    "particle_momentum_z": 2.1489565353605063e-22,
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
     "particle_position_z": 0.0,
-    "particle_momentum_x": 2.469423477619197e-22,
-    "particle_momentum_y": 1.011348599792048e-21,
-    "particle_momentum_z": 1.120270607622408e-21,
     "particle_weight": 100000000000000.0
   },
+  "lev=0": {
+    "rho": 8203144366079999.0
+  },
   "photon1": {
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_position_z": 0.0,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 0.0,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
     "particle_weight": 0.0
   },
   "photon2": {
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_position_z": 0.0,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 0.0,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0,
     "particle_weight": 100000000000000.0
   }
 }

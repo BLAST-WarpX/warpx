@@ -3,6 +3,9 @@
 # --- This input is a simple case of reflection
 # --- of one electron on the surface of a sphere.
 
+import numpy as np
+import scipy.constants as scc
+
 from pywarpx import callbacks, particle_containers, picmi
 from pywarpx.LoadThirdParty import load_cupy
 
@@ -173,10 +176,16 @@ def mirror_reflection():
     uy_reflect = to_numpy(uy_reflect)
     uz_reflect = to_numpy(uz_reflect)
 
+    inv_c2 = 1.0 / (scc.c**2)
+    inv_gamma = 1.0 / np.sqrt(
+        1.0 + (ux_reflect**2 + uy_reflect**2 + uz_reflect**2) * inv_c2
+    )
+    dt_remaining = dt - delta_t
+
     electrons.add_particles(
-        x=x + (dt - delta_t) * ux_reflect,
-        y=y + (dt - delta_t) * uy_reflect,
-        z=z + (dt - delta_t) * uz_reflect,
+        x=x + dt_remaining * ux_reflect * inv_gamma,
+        y=y + dt_remaining * uy_reflect * inv_gamma,
+        z=z + dt_remaining * uz_reflect * inv_gamma,
         ux=ux_reflect,
         uy=uy_reflect,
         uz=uz_reflect,

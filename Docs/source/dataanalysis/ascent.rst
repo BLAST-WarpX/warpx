@@ -31,7 +31,7 @@ Inputs File Configuration
 
 Once WarpX has been compiled with Ascent support, it will need to be enabled and configured at runtime.
 This is done using our usual inputs file (read with ``amrex::ParmParse``).
-The supported parameters are part of the :ref:`FullDiagnostics <running-cpp-parameters-diagnostics>` with ``<diag_name>.format`` parameter set to ``ascent``.
+The supported parameters are part of the :ref:`FullDiagnostics <running-cpp-parameters-diagnostics>` with :pp:param:`<diag_name>.format` parameter set to ``ascent``.
 
 
 Visualization/Analysis Pipeline Configuration

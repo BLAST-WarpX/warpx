@@ -25,7 +25,8 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     MultiParticleContainer& mpc,
     MultiFluidContainer* mfl,
-    int max_level)
+    int max_level,
+    bool verbose_step)
 {
     using ablastr::fields::MultiLevelScalarField;
     using ablastr::fields::MultiLevelVectorField;
@@ -38,11 +39,13 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
     const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
 
+    ExecutePythonCallback("beforedeposition");
     mpc.DepositCharge(rho_fp, 0.0_rt);
     if (mfl) {
         const int lev = 0;
         mfl->DepositCharge(fields, *rho_fp[lev], lev);
     }
+    ExecutePythonCallback("afterdeposition");
 
     // Apply filter, perform MPI exchange, interpolate across levels
     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
@@ -72,12 +75,14 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
 
 #if defined(WARPX_DIM_1D_Z)
         // Use the tridiag solver with 1D
+        amrex::ignore_unused(verbose_step);
         computePhiTriDiagonal(rho_fp, phi_fp);
 #else
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
+        int const verbosity = verbose_step ? self_fields_verbosity : 0;
         computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
                    self_fields_absolute_tolerance, self_fields_max_iters,
-                   self_fields_verbosity, is_igf_2d_slices, Efield_fp);
+                   verbosity, is_igf_2d_slices, Efield_fp);
 #endif
 
     }
@@ -307,14 +312,14 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
 
         /* loop from 1 to nx - 2 inclusive */
         for (int ix = 1; ix + 1 < nx; ix++) {
-            const amrex::Real m = 1.00_rt / (2.0_rt - -1.0_rt * cmod(ix - 1,0,0));
+            const amrex::Real m = 1.0_rt / (2.0_rt - -1.0_rt * cmod(ix - 1,0,0));
             cmod(ix,0,0) = -1.0_rt * m;
             u(ix,0,0) = (0.0f  - -1.0_rt * u(ix - 1,0,0)) * m;
             x(ix,0,0) = (x(ix,0,0) - -1.0_rt * x(ix - 1,0,0)) * m;
         }
 
         /* handle nx - 1 */
-        const amrex::Real m = 1.00_rt / (2.0_rt - alpha * beta / gamma - -1.0_rt * cmod(nx - 2,0,0));
+        const amrex::Real m = 1.0_rt / (2.0_rt - alpha * beta / gamma - -1.0_rt * cmod(nx - 2,0,0));
         u(nx - 1,0,0) = (alpha    - -1.0_rt * u(nx - 2,0,0)) * m;
         x(nx - 1,0,0) = (x(nx - 1,0,0) - -1.0_rt * x(nx - 2,0,0)) * m;
 
@@ -324,11 +329,12 @@ void LabFrameExplicitES::computePhiTriDiagonal_periodic (
             x(ix,0,0) -= cmod(ix,0,0) * x(ix + 1,0,0);
         }
 
-        const amrex::Real fact = (x(0,0,0) + x(nx - 1,0,0) * alpha / gamma) / (1.00 + u(0,0,0) + u(nx - 1,0,0) * alpha / gamma);
+        const amrex::Real fact = (x(0,0,0) + x(nx - 1,0,0) * alpha / gamma) / (1.0_rt + u(0,0,0) + u(nx - 1,0,0) * alpha / gamma);
 
         /* loop from 0 to nx - 1 inclusive */
-        for (int ix = 0; ix < nx; ix++)
+        for (int ix = 0; ix < nx; ix++) {
             x(ix,0,0) -= fact * u(ix,0,0);
+        }
 
         }
 

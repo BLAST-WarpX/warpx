@@ -126,6 +126,7 @@ struct LatticeElementFinderDevice
     bool m_initialized = false;
 
     /* Size and location of the index lookup table */
+    int m_nz;
     amrex::Real m_zmin;
     amrex::Real m_dz;
     amrex::Real m_dt;
@@ -173,7 +174,11 @@ struct LatticeElementFinderDevice
         // (which is in the boosted frame)
         const int iz = static_cast<int>((z - m_zmin)/m_dz);
 
-        constexpr amrex::ParticleReal inv_c2 = 1._prt/(PhysConst::c*PhysConst::c);
+        // This check shouldn't be needed since the particle should always
+        // be within the grid, but it is added for safety.
+        if (iz < 0 || iz >= m_nz) { return; }
+
+        constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
         amrex::ParticleReal const gamma = std::sqrt(1._prt + (m_ux[i]*m_ux[i] + m_uy[i]*m_uy[i] + m_uz[i]*m_uz[i])*inv_c2);
         amrex::ParticleReal const vzp = m_uz[i]/gamma;
 

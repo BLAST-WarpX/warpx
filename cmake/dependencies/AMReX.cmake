@@ -120,12 +120,16 @@ macro(find_amrex)
         set(AMReX_LINEAR_SOLVERS_EM ON CACHE INTERNAL "")
         set(AMReX_LINEAR_SOLVERS_INCFLO ON CACHE INTERNAL "")
 
-        if(WarpX_ASCENT OR WarpX_SENSEI)
-            set(AMReX_GPU_RDC ON CACHE BOOL "")
+        # CUDA device LTO (AMReX_CUDA_LTO, set for WarpX_IPO below) only works
+        # with relocatable device code: without RDC every translation unit is
+        # already device linked on its own and AMReX errors out.
+        if(WarpX_ASCENT OR WarpX_SENSEI OR
+           (WarpX_IPO AND WarpX_COMPUTE STREQUAL CUDA))
+            set(AMReX_GPU_RDC ON CACHE BOOL "" FORCE)
         else()
             # we don't need RDC and disabling it simplifies the build
             # complexity and potentially improves code optimization
-            set(AMReX_GPU_RDC OFF CACHE BOOL "")
+            set(AMReX_GPU_RDC OFF CACHE BOOL "" FORCE)
         endif()
 
         # shared libs, i.e. for Python bindings, need relocatable code
@@ -145,10 +149,12 @@ macro(find_amrex)
         endif()
 
         # IPO/LTO
-        if(WarpX_IPO)
-            set(AMReX_IPO ON CACHE INTERNAL "")
-            if(WarpX_COMPUTE STREQUAL CUDA)
-                set(AMReX_CUDA_LTO ON CACHE BOOL "")
+        set(AMReX_IPO "${WarpX_IPO}" CACHE INTERNAL "")
+        if(WarpX_COMPUTE STREQUAL CUDA)
+            if(WarpX_IPO)
+                set(AMReX_CUDA_LTO ON CACHE BOOL "" FORCE)
+            else()
+                set(AMReX_CUDA_LTO OFF CACHE BOOL "" FORCE)
             endif()
         endif()
 
@@ -170,13 +176,11 @@ macro(find_amrex)
             list(APPEND CMAKE_MODULE_PATH "${WarpX_amrex_src}/Tools/CMake")
             if(WarpX_COMPUTE STREQUAL CUDA)
                 enable_language(CUDA)
-                # AMReX 21.06+ supports CUDA_ARCHITECTURES
             endif()
             add_subdirectory(${WarpX_amrex_src} _deps/localamrex-build/)
         else()
             if(WarpX_COMPUTE STREQUAL CUDA)
                 enable_language(CUDA)
-                # AMReX 21.06+ supports CUDA_ARCHITECTURES
             endif()
             FetchContent_Declare(fetchedamrex
                 GIT_REPOSITORY ${WarpX_amrex_repo}

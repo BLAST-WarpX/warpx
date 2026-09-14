@@ -3,12 +3,12 @@
     "Ex": 0.0,
     "Ey": 0.0,
     "Ez": 0.0,
-    "rho": 0.0003993381265611494
+    "rho": 0.0004053463686859217
   },
   "Hminus": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 2.5194227597732244,
+    "particle_position_z": 2.5573287370605264,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 2.02884887030345e-20,
@@ -17,11 +17,11 @@
   "Hneutral": {
     "particle_position_x": 0.0,
     "particle_position_y": 0.0,
-    "particle_position_z": 2532.3317907153,
+    "particle_position_z": 2529.5153988814272,
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
-    "particle_momentum_z": 6.29140550254057e-19,
-    "particle_weight": 1264968182300181.2
+    "particle_momentum_z": 6.286792659402252e-19,
+    "particle_weight": 1264040710720490.5
   },
   "electrons": {
     "particle_position_x": 0.0,

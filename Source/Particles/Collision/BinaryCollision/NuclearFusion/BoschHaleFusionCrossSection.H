@@ -37,8 +37,13 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
     constexpr amrex::ParticleReal joule_to_keV = 1.e-3_prt/PhysConst::q_e;
     const amrex::ParticleReal E_keV = E_kin_star*joule_to_keV;
 
-    // If kinetic energy is 0, return a 0 cross section and avoid later division by 0.
-    if (E_keV == 0._prt) {return 0._prt;}
+    // The Bosch-Hale fusion cross-section parameterization is only valid above a
+    // lower energy threshold: 0.3 keV for He3(d,p)He4 and 0.5 keV for all other
+    // reactions. Since the fusion cross section is negligible below these thresholds,
+    // return zero. See H.-S. Bosch and G.M. Hale 1992 Nucl. Fusion 32 611, Table IV.
+    const amrex::ParticleReal E_cutoff_keV =
+    (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) ? 0.3_prt : 0.5_prt;
+    if (E_keV < E_cutoff_keV) {return 0._prt;}
 
     // Compute the Gamow constant B_G (in keV^{1/2})
     // (See Eq. 3 in H.-S. Bosch and G.M. Hale 1992 Nucl. Fusion 32 611)
@@ -46,7 +51,7 @@ amrex::ParticleReal BoschHaleFusionCrossSection (
     // The formula for `B_G` below assumes that both reactants have Z=1
     // When one of the reactants is helium (Z=2), this formula is corrected further below.
     amrex::ParticleReal B_G = MathConst::pi * PhysConst::alpha
-         * std::sqrt( 2._prt*m_reduced*PhysConst::c*PhysConst::c * joule_to_keV );
+         * std::sqrt( 2._prt*m_reduced*PhysConst::c2 * joule_to_keV );
     if (fusion_type == NuclearFusionType::DeuteriumHeliumToProtonHelium) {
         // Take into account the fact that Z=2 for one of the reactant (helium) in this case
         B_G *= 2;

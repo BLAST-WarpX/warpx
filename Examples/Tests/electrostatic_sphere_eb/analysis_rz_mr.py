@@ -26,7 +26,7 @@ fn = sys.argv[1]
 def find_first_non_zero_from_bottom_left(matrix):
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
-            if (matrix[i][j] != 0) and (matrix[i][j] != np.nan):
+            if (matrix[i][j] != 0) and (not np.isnan(matrix[i][j])):
                 return (i, j)
     return i, j
 
@@ -34,7 +34,7 @@ def find_first_non_zero_from_bottom_left(matrix):
 def find_first_non_zero_from_upper_right(matrix):
     for i in range(matrix.shape[0] - 1, -1, -1):
         for j in range(matrix.shape[1] - 1, -1, -1):
-            if (matrix[i][j] != 0) and (matrix[i][j] != np.nan):
+            if (matrix[i][j] != 0) and (not np.isnan(matrix[i][j])):
                 return (i, j)
     return i, j
 

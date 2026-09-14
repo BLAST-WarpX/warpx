@@ -19,9 +19,9 @@
 #include "Fluids/WarpXFluidContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/Communication.H>
 
 #include <AMReX_Array.H>
@@ -84,7 +84,7 @@ namespace
         const bool PMLRZ_flag = false)
     {
         using namespace amrex::literals;
-        WARPX_PROFILE("warpx::shiftMF()");
+        ABLASTR_PROFILE("warpx::shiftMF()");
         const amrex::BoxArray& ba = mf.boxArray();
         const amrex::DistributionMapping& dm = mf.DistributionMap();
         const int nc = mf.nComp();
@@ -92,6 +92,10 @@ namespace
 
         AMREX_ALWAYS_ASSERT(ng[dir] >= std::abs(num_shift));
 
+        // The temporary copy is required for correctness (not just convenience):
+        // the shifted copy below reads from tmpmf while writing to mf, both under
+        // AMREX_PARALLEL_FOR_4D whose CPU SIMD pragma asserts iteration
+        // independence. An in-place shift of mf would violate that (see issue #7097).
         amrex::MultiFab tmpmf(ba, dm, nc, ng);
         amrex::MultiFab::Copy(tmpmf, mf, 0, 0, nc, ng);
 
@@ -356,7 +360,7 @@ namespace
 int
 WarpX::MoveWindow (const int step, bool move_j)
 {
-    WARPX_PROFILE("WarpX::MoveWindow");
+    ABLASTR_PROFILE("WarpX::MoveWindow");
 
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;

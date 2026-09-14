@@ -53,12 +53,12 @@ class Preconditioner
         /**
          * \brief Define the preconditioner
          */
-        virtual void Define (const T&, Ops* const) = 0;
+        virtual void Define (const T&, Ops*) = 0;
 
         /**
          * \brief Update the preconditioner
          */
-        virtual void Update ( const T& a_U ) = 0;
+        virtual void Update () = 0;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS

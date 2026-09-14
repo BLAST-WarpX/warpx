@@ -14,6 +14,16 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Bonatto A, Nunes B S, Apiñaniz-Aginako J I, Bandiera L, Bontoiu C, Cavoto G, Drebot I, Gatti G, Giner-Navarro J, Lei B, Martín-Luna P, Rago I, Rodríguez-Pérez J, Sytov A, Cirrone P, Alva-Sánchez M S, Samad R E, Vieira N D, Valagiannopoulos C, Welsch C P, Xia G, Zhang J and Resta-López J.
+   **Laser wakefield acceleration in nanostructured plasmas**.
+   Eur. Phys. J. Plus **141**, 1043, 2026.
+   `DOI:10.1140/epjp/s13360-026-08213-3 <https://doi.org/10.1140/epjp/s13360-026-08213-3>`__
+
+#. Wang J X, Han L Q, Zhao X Y, Ablimit A, Gong Z, Wen H and Yu J Q.
+   **Muon injection and acceleration via ultraintense electron beam-driven plasma wakefield**.
+   Phys. Rev. Accel. Beams **29**, 021302, 2026.
+   `DOI:10.1103/wq5g-mtjq <https://doi.org/10.1103/wq5g-mtjq>`__
+
 #. Gardner C and Dollar F.
    **Implementing Bayesian optimization to compare injection regimes and pulse propagation in two stage LWFA**.
    New Journal of Physics **27**, 124301, 2025.
@@ -248,6 +258,11 @@ Related works using WarpX:
 
 Nuclear Fusion and Plasma Confinement
 *************************************
+
+#. Groenewald R. E., Karbashewski S., Gupta S., Drobny J., Bondarenko A., Kamio S., Nations M., Titus J., Barnes D. C. and Dettrick S.
+   **Validation of hybrid-PIC simulations for advanced beam-driven FRC modeling**.
+   Nuclear Fusion, **66**, Number 9, 2026.
+   `DOI:10.1088/1741-4326/ae96c0 <https://doi.org/10.1088/1741-4326/ae96c0>`__
 
 #. Groenewald R. E., Gupta S., Veksler A., Tobin M., Galeotti L., Onofri M., Ceccherini F., Barnes D. C., Belova E. and Dettrick S. A.
    **Fast ion stabilization of tilt in large radius FRCs**.

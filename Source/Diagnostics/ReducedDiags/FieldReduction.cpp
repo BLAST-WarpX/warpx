@@ -60,7 +60,7 @@ FieldReduction::FieldReduction (const std::string& rd_name)
     parser_string = std::regex_replace(parser_string, std::regex("\n\\s*"), " ");
 
     // read reduction type
-    pp_rd_name.get_enum_sloppy("reduction_type", m_reduction_type, "-_");
+    pp_rd_name.get_enum_case_insensitive("reduction_type", m_reduction_type);
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {

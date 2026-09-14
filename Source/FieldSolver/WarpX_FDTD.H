@@ -45,7 +45,7 @@ void warpx_computedivb(
                 +        0.5_rt*(Bz(i  ,j+1,0) - Bz(i,j-1,0))*dzinv;
         amrex::ignore_unused(k, By, dyinv);
 #elif defined WARPX_DIM_1D_Z
-        divB(i,0,0,dcomp) = 0.5*(Bz(i+1,0  ,0) - Bz(i-1,0,0))*dzinv;
+        divB(i,0,0,dcomp) = 0.5_rt*(Bz(i+1,0  ,0) - Bz(i-1,0,0))*dzinv;
         amrex::ignore_unused(j, Bx, dxinv);
         amrex::ignore_unused(k, By, dyinv);
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)

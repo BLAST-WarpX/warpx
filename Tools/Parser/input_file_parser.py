@@ -38,3 +38,26 @@ def parse_input_file(input_file):
                         break
                 input_dict[key] = val
     return input_dict
+
+
+def input_has_value(input_dict, key, expected_value):
+    """
+    Check whether a key in an input dictionary has a given expected value.
+
+    Parameters
+    ----------
+    input_dict : dict
+        Dictionary returned by :func:`parse_input_file`.
+    key : str
+        Name of the input parameter to look up.
+    expected_value : str
+        The value to compare against the first token of the parameter.
+
+    Returns
+    -------
+    bool
+        ``True`` if *key* is present and its first token equals *expected_value*,
+        ``False`` otherwise.
+    """
+    value = input_dict.get(key)
+    return value is not None and value[0] == expected_value

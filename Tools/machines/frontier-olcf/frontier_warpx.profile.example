@@ -37,7 +37,7 @@ module load adios2/2.10.2-mpi
 module load hdf5/1.14.3-mpi
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.11.5
+module load cray-python/3.11.7
 
 if [ -d "${HOME}/sw/frontier/gpu/venvs/warpx-frontier" ]
 then

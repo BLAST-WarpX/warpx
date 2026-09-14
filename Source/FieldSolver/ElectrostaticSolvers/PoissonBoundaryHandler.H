@@ -125,7 +125,7 @@ class EBCalcEfromPhiPerLevel {
     > m_e_field;
 
     public:
-    EBCalcEfromPhiPerLevel(amrex::Vector<amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM> > e_field)
+    explicit EBCalcEfromPhiPerLevel(amrex::Vector<amrex::Array<amrex::MultiFab *, AMREX_SPACEDIM> > e_field)
             : m_e_field(std::move(e_field)) {}
 
     void operator()(amrex::MLMG & mlmg, int const lev) {

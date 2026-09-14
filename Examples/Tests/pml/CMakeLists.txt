@@ -41,7 +41,7 @@ if(WarpX_FFT)
         2  # dims
         2  # nprocs
         inputs_test_2d_pml_x_psatd_restart  # inputs
-        "analysis_default_restart.py diags/diag1000300"  # analysis
+        "analysis_default_restart.py --path diags/diag1000300"  # analysis
         "analysis_default_regression.py --path diags/diag1000300"  # checksum
         test_2d_pml_x_psatd  # dependency
     )
@@ -62,7 +62,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_pml_x_yee_restart  # inputs
-    "analysis_default_restart.py diags/diag1000300"  # analysis
+    "analysis_default_restart.py --path diags/diag1000300"  # analysis
     "analysis_default_regression.py --path diags/diag1000300"  # checksum
     test_2d_pml_x_yee  # dependency
 )

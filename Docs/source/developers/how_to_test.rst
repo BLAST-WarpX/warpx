@@ -114,10 +114,66 @@ For easier debugging, it can be convenient to run the tests on your local comput
 
        ctest --test-dir build -LE slow
 
+* Run only the Python unit tests (see the section below):
+
+  .. code-block:: sh
+
+       ctest --test-dir build -L pytest
+
 Once the execution of CTest is completed, you can find all files associated with each test in its corresponding directory under ``build/bin/``.
 For example, if you run the single test ``test_3d_laser_acceleration``, you can find all files associated with this test in the directory ``build/bin/test_3d_laser_acceleration/``.
 
 If you modify the code base locally and want to assess the effects of your code changes on the automated tests, you need to first rebuild WarpX including your code changes and then rerun CTest.
+
+Python unit tests
+-----------------
+
+Besides the simulation-level tests described above, WarpX has a `pytest <https://docs.pytest.org>`__-based
+unit test suite in `tests/unit <https://github.com/BLAST-WarpX/warpx/tree/development/tests/unit>`__.
+These tests run WarpX through its Python bindings and assert properties of individual
+routines, for example that charge and current deposition conserve the total charge
+and current of a species.
+They require a build with ``-DWarpX_PYTHON=ON`` and they need no checksum file.
+
+The tests are dimensionality-agnostic: the same files run in every dimensionality that
+was built.  CTest registers a separate test for each ``WarpX_DIMS``, because currently
+we cannot mix WarpX dimensions in the same Python process.
+
+.. code-block:: sh
+
+     # run the unit tests for all built dimensionalities
+     ctest --test-dir build -R pytest
+
+     # run the unit tests for a single dimensionality
+     ctest --test-dir build -R pytest.WarpX.3d
+
+     # equivalent, via the ctest label
+     ctest --test-dir build -L pytest
+
+You can also invoke ``pytest`` directly, which is usually more convenient while writing a
+test. This requires that the Python package has been installed first, with
+``cmake --build build --target pip_install``:
+
+.. code-block:: sh
+
+     # all unit tests, in one of the built dimensionalities
+     python3 -m pytest -s -vvvv tests/unit
+
+     # a single test (useful during debugging)
+     python3 -m pytest -s -vvvv tests/unit/test_charge_deposition.py::test_charge_deposition_is_negative_for_electrons
+
+The flags ``-s -vvvv`` are optional and ensure PyTest does not capture WarpX output like ``amrex::Print()``.
+
+``tests/unit/conftest.py`` contains always-used helpers and `PyTest Fixtures <https://docs.pytest.org/en/stable/explanation/fixtures.html>`__.
+It also pins the process to one dimensionality when it is imported,
+taking the first available dimension (priority order: 3D,2D,1D,RZ).
+If can also be controlled by the ``WARPX_TEST_DIMS`` environment variable.
+
+To add a unit test, put a ``test_*.py`` file in ``tests/unit``.
+A good example to start from is ``test_charge_deposition.py``.
+
+If you need a new Python package dependency for the unit tests, add it in
+`tests/unit/requirements.txt <https://github.com/BLAST-WarpX/warpx/blob/development/tests/unit/requirements.txt>`__.
 
 How to add automated tests
 --------------------------
@@ -195,39 +251,31 @@ Here is the help message of the default regression analysis script, including us
          --skip-fields     skip fields when comparing checksums
          --skip-particles  skip particles when comparing checksums
 
-How to reset checksums locally
-------------------------------
+How to reset checksums
+----------------------
 
-It is possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
+Your code changes may sometimes change the results that WarpX produces.
+This is automatically detected by the automated tests (which run every time a commit is pushed to the head branch of an open PR) through comparison of the WarpX results with the reference values stored in the checksum files.
+
+**If** the differences are expected, you can reset the checksum files automatically using the output
+of the automated tests. To do so, go to the directory
+`Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script
+`update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ with the ``--pr-number`` option:
+
+.. code:: bash
+
+     python update_benchmarks_from_azure_output.py --pr-number 1234
+
+This requires the `GitHub CLI <https://cli.github.com/>`__ (``gh``) to be installed and authenticated.
+The script will automatically find the failing Azure Pipelines jobs for the pull request, download their logs, and update all checksum benchmark files that did not pass the checksum analysis.
+
+Alternatively, it is also possible to reset a checksum file locally by running the corresponding test with ``ctest`` with the environment variable ``CHECKSUM_RESET=ON``. For example:
 
   .. code-block:: bash
 
-       CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
+     CHECKSUM_RESET=ON ctest --test-dir build -R laser_acceleration
 
-Alternatively, it is also possible to reset multiple checksum files using the output of our Azure pipelines, which can be useful for code changes that result in resetting a large numbers of checksum files.
-Here's how to do so:
-
-#. On the GitHub page of the pull request, find (one of) the pipeline(s) failing due to checksum regressions and click on "Details" (highlighted in blue).
-
-   .. figure:: https://gist.github.com/user-attachments/assets/09db91b9-5711-4250-8b36-c52a6049e38e
-
-#. In the new page that opens up, click on "View more details on Azure pipelines" (highlighted in blue).
-
-   .. figure:: https://gist.github.com/user-attachments/assets/ab0c9a24-5518-4da7-890f-d79fa1c8de4c
-
-#. In the new page that opens up, select the group of tests for which you want to reset the checksum files (e.g., ``cartesian_3d``) and click on "View raw log".
-
-   .. figure:: https://gist.github.com/user-attachments/assets/06c1fe27-2c13-4bd3-b6b8-8b8941b37889
-
-#. Save the raw log as a text file on your computer (e.g., with the ``curl`` command, ``curl https://dev.azure.com/ECP-WarpX/... > raw_log.txt``).
-
-#. Go to the directory `Tools/DevUtils <https://github.com/BLAST-WarpX/warpx/tree/development/Tools/DevUtils>`__ and run the Python script `update_benchmarks_from_azure_output.py <https://github.com/BLAST-WarpX/warpx/blob/development/Tools/DevUtils/update_benchmarks_from_azure_output.py>`__ passing the path of the raw log text file as a command line argument:
-
-   .. code:: bash
-
-        python update_benchmarks_from_azure_output.py path/to/raw_log.txt
-
-   This will update the checksum files for all the tests in the raw log that did not pass the checksum analysis.
+Note that it is possible that the checksum values generated locally on your computer architecture may differ from the ones generated remotely by the autometed tests on the architecture provided by the CI runners.
 
 .. _developers-testing-naming:
 

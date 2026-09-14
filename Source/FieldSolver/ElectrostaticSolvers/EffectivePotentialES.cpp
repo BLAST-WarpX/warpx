@@ -13,6 +13,7 @@
 #include "Fields.H"
 #include "Particles/MultiParticleContainer_fwd.H"
 #include "Utils/Parser/ParserUtils.H"
+#include "Python/callbacks.H"
 #include "WarpX.H"
 
 using namespace amrex;
@@ -24,9 +25,9 @@ void EffectivePotentialES::InitData() {
     // Initialize "sigma" MF which stores the dressing of the Poisson equation.
     // It is a cell-centered multifab.
     auto& fields = warpx.GetMultiFabRegister();
-    auto rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
+    auto* rho = fields.get(warpx::fields::FieldType::rho_fp, 0);
     fields.alloc_init(
-        warpx::fields::FieldType::effective_potential_sigma, /*lev=*/0,
+        warpx::fields::FieldType::effective_potential_sigma, /*level=*/ 0,
         convert(rho->boxArray(), IntVect(AMREX_D_DECL(0,0,0))),
         rho->DistributionMap(), 1, IntVect(AMREX_D_DECL(0,0,0)), 1.0_rt
     );
@@ -37,9 +38,10 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     [[maybe_unused]] MultiParticleContainer& mpc,
     [[maybe_unused]] MultiFluidContainer* mfl,
-    int max_level)
+    int max_level,
+    bool verbose_step)
 {
-    WARPX_PROFILE("EffectivePotentialES::ComputeSpaceChargeField");
+    ABLASTR_PROFILE("EffectivePotentialES::ComputeSpaceChargeField");
 
     using ablastr::fields::MultiLevelScalarField;
     using ablastr::fields::MultiLevelVectorField;
@@ -58,13 +60,16 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     // set the boundary potentials appropriately
     setPhiBC(phi_fp, warpx.gett_new(0));
 
+    ExecutePythonCallback("beforedeposition");
     // Calculate the mass enhancement factor - see  Appendix A of
     // Barnes, Journal of Comp. Phys., 424 (2021), 109852.
     // Also accumulate the total charge density.
     ComputeSigma(rho_fp);
+    ExecutePythonCallback("afterdeposition");
 
     // perform phi calculation
-    computePhi(rho_fp, phi_fp, Efield_fp);
+    int const verbosity = verbose_step ? self_fields_verbosity : 0;
+    computePhi(rho_fp, phi_fp, Efield_fp, verbosity);
 
     // Compute the electric field. Note that if an EB is used the electric
     // field will be calculated in the computePhi call.
@@ -77,12 +82,13 @@ void EffectivePotentialES::ComputeSpaceChargeField (
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
-    ablastr::fields::MultiLevelVectorField const& efield )
+    ablastr::fields::MultiLevelVectorField const& efield,
+    int const verbosity)
 {
     // Use the AMREX MLMG solver
     computePhi(rho, phi, efield, self_fields_required_precision,
-                self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity);
+               self_fields_absolute_tolerance, self_fields_max_iters,
+               verbosity);
 }
 
 void EffectivePotentialES::ComputeSigma (
@@ -144,7 +150,7 @@ void EffectivePotentialES::ComputeSigma (
     }
 
     // grab sigma from the multifab registry
-    auto sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, lev);
+    auto* sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, lev);
 
     // scale sigma down from current value for time filtering
     sigma->mult(1.0_rt - time_filter_param, 0);
@@ -163,8 +169,13 @@ void EffectivePotentialES::ComputeSigma (
         // Handle the parallel transfer of guard cells and apply filtering
         warpx.ApplyFilterandSumBoundaryRho(lev, lev, *rho, 0, rho->nComp());
 
-        // Add rho for this species to the total charge density MF
-        amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, rho_fp[lev]->nGrowVect());
+        // Add rho for this species to the total charge density MultiFab,
+        // but only over the guard region that exists in both MultiFabs
+        // to avoid triggering the AMReX guard-size assertion when the
+        // deposition MultiFab still uses the pre-filter guard width.
+        auto add_ng = rho_fp[lev]->nGrowVect();
+        add_ng.min(rho->nGrowVect());
+        amrex::MultiFab::Add(*rho_fp[lev], *rho, 0, 0, 1, add_ng);
 
         // get multiplication factor for this species
         auto const q = std::abs(pc->getCharge());
@@ -268,7 +279,7 @@ void EffectivePotentialES::computePhi (
     }
 
     // grab sigma from the multifab registry
-    auto sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, 0);
+    auto* sigma = warpx.GetMultiFabRegister().get(warpx::fields::FieldType::effective_potential_sigma, 0);
 
     ablastr::fields::computeEffectivePotentialPhi(
         sorted_rho,

@@ -4,3 +4,8 @@
     /* Copied from https://github.com/readthedocs/sphinx_rtd_theme/issues/301#issuecomment-1205755904 */
     float: right;
 }
+
+.rst-content code.xref.literal {
+    /* Use same color for cross refernces as regular literals */
+    color: #e74c3c
+}

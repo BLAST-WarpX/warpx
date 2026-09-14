@@ -51,7 +51,7 @@ grid = picmi.Cartesian2DGrid(
 solver = picmi.ElectrostaticSolver(
     grid=grid,
     method="Multigrid",
-    required_precision=1e-6,
+    required_precision=1e-8,
     warpx_self_fields_verbosity=0,
 )
 
@@ -108,6 +108,11 @@ sim.initialize_warpx()
 # below will be reproducible from run to run
 xp, _ = load_cupy()
 xp.random.seed(30025025)
+np.random.seed(30025025)
+
+step_number = sim.extension.warpx.getistep(lev=0)
+# Restore the random state because Python RNGs are not checkpointed.
+np.random.normal(loc=0, scale=1e3, size=30 * step_number)
 
 electrons = sim.particles.get("electrons")
 if not sim.amr_restart:
@@ -152,7 +157,6 @@ callbacks.installbeforestep(add_particles)
 # simulation run
 ##########################
 
-step_number = sim.extension.warpx.getistep(lev=0)
 sim.step(max_steps - 1 - step_number)
 
 #######################################

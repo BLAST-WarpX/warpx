@@ -12,6 +12,9 @@ import numpy as np
 import scipy.constants as scc
 import yt
 
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
+
 ## This script performs various checks for the fusion module. The simulation
 ## that we check is made of 2 different tests, each with different reactant and product species.
 ##
@@ -52,10 +55,8 @@ barn_to_square_meter = 1.0e-28
 ## Checks whether this is the 2D or the 3D test
 with open("./warpx_used_inputs", "r") as f:
     warpx_used_inputs = f.read()
-if re.search("geometry.dims = RZ", warpx_used_inputs):
-    is_RZ = True
-else:
-    is_RZ = False
+input_dict = parse_input_file("./warpx_used_inputs")
+is_RZ = input_has_value(input_dict, "geometry.dims", "RZ")
 
 ## Check which kind of test we are doing: D+T or D+D
 # Define reactants and products
@@ -64,22 +65,24 @@ if re.search("tritium", warpx_used_inputs):
     reaction_type = "DT"
     reactant_species = ["deuterium", "tritium"]
     product_species = ["helium4", "neutron"]
+    collision_names = ["DTF1", "DTF2"]
     ntests = 2
-    E_fusion = 17.5893 * MeV_to_Joule  # Energy released during the fusion reaction
+    E_fusion = 17.58929696 * MeV_to_Joule
 else:
     # else, this is the D+D test
     reaction_type = "DD"
     reactant_species = ["deuterium", "hydrogen2"]
     product_species = ["helium3", "neutron"]
+    collision_names = ["DDNHeF1"]
     ntests = 1
-    E_fusion = 3.268911e6 * MeV_to_Joule
+    E_fusion = 3.26891111e6 * MeV_to_Joule
 
 mass = {
-    "deuterium": 2.01410177812 * scc.m_u,
-    "hydrogen2": 2.01410177812 * scc.m_u,
-    "tritium": 3.0160492779 * scc.m_u,
-    "helium3": 3.016029 * scc.m_u,
-    "helium4": 4.00260325413 * scc.m_u,
+    "deuterium": 2.01410177812 * scc.m_u - scc.m_e,
+    "hydrogen2": 2.01410177812 * scc.m_u - scc.m_e,
+    "tritium": 3.0160492779 * scc.m_u - scc.m_e,
+    "helium3": 3.016029 * scc.m_u - 2 * scc.m_e,
+    "helium4": 4.00260325413 * scc.m_u - 2 * scc.m_e,
     "neutron": 1.0013784193052508 * scc.m_p,
 }
 m_reduced = np.prod([mass[s] for s in reactant_species]) / np.sum(
@@ -398,6 +401,19 @@ def check_macroparticle_number(
         atol=5.0 * std_macroparticle_number,
     )
 
+    if "particle_production" in data:
+        w_sum = data[product_species[0] + "_w_end"].sum()
+        n_sum = data["particle_production"].sum()
+        tolerance = 0.02
+        print(
+            f"Check particle production diagnostic for collision {data['collision_name']}:"
+        )
+        print(f"from particles  = {w_sum}")
+        print(f"from diagnostic = {n_sum}")
+        print(f"error = {np.abs(w_sum - n_sum) / w_sum}")
+        print(f"tolerance = {tolerance}")
+        assert is_close(w_sum, n_sum, rtol=tolerance)
+
     ## used in subsequent function
     return expected_fusion_number
 
@@ -543,6 +559,13 @@ def main():
 
         # General checks that are performed for all tests
         generic_check(data)
+
+        product_production_name = f"{collision_names[i - 1]}_particle_production"
+        if ("boxlib", product_production_name) in ds_end.field_list:
+            data["collision_name"] = collision_names[i - 1]
+            data["particle_production"] = field_data_end[
+                "boxlib", product_production_name
+            ].to_ndarray()
 
         # Checks that are specific to test number i
         eval("specific_check" + str(i) + "(data, dt)")

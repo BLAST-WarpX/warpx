@@ -1,8 +1,8 @@
 #include "FlushFormatInSitu.H"
 
 #include "Utils/TextMsg.H"
-#include "Utils/WarpXProfilerWrapper.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
@@ -20,7 +20,7 @@ using namespace amrex;
 void
 FlushFormatInSitu::WriteParticles(const amrex::Vector<ParticleDiag>& particle_diags, conduit::Node& a_bp_mesh) const
 {
-    WARPX_PROFILE("FlushFormatInSitu::WriteParticles()");
+    ABLASTR_PROFILE("FlushFormatInSitu::WriteParticles()");
 
     // wrap particle data for each species
     // we prefix the fields with "particle_{species_name}" b/c we

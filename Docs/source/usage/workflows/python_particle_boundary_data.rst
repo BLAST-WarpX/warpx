@@ -1,7 +1,7 @@
-Accessing the particles that hit the boundaries
------------------------------------------------
+Accessing the particles that are absorbed at the boundaries
+-----------------------------------------------------------
 
-WarpX can automatically save the particles that hit the boundaries
+WarpX can automatically save the particles that are absorbed at the boundaries
 (see ``save_particles_at_xlo/ylo/zlo``, ``save_particles_at_xhi/yhi/zhi``,
 and ``save_particles_at_eb`` in :ref:`running-cpp-parameters`).
 This data can be accessed in Python via the ``ParticleBoundaryBufferWrapper`` object,

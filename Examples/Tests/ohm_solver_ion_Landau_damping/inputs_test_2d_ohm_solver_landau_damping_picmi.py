@@ -54,7 +54,7 @@ class IonLandauDamping(object):
     # Plasma resistivity - used to dampen the mode excitation
     eta = 1e-7
     # Number of substeps used to update B
-    substeps = 10
+    substeps = 20
 
     def __init__(self, test, dim, m, T_ratio, verbose):
         """Get input parameters for the specific case desired."""
@@ -227,7 +227,21 @@ class IonLandauDamping(object):
                 name="diag1",
                 grid=self.grid,
                 period=100,
-                data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez", "Jx", "Jy", "Jz"],
+                # Te/Pe exercise the hybrid-PIC electron temperature/pressure
+                # diagnostics (Te is the closure-implied temperature).
+                data_list=[
+                    "Bx",
+                    "By",
+                    "Bz",
+                    "Ex",
+                    "Ey",
+                    "Ez",
+                    "Jx",
+                    "Jy",
+                    "Jz",
+                    "Te",
+                    "Pe",
+                ],
             )
             simulation.add_diagnostic(field_diag)
 

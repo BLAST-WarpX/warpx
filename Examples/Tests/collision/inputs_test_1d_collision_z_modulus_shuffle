@@ -1,0 +1,3 @@
+FILE = inputs_test_1d_collision_z
+
+collision1.shuffling_method = modulus

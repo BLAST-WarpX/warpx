@@ -20,9 +20,21 @@
 #SBATCH -o WarpX.o%j
 #SBATCH -e WarpX.e%j
 
-# executable & inputs file or python interpreter & PICMI script here
-EXE=./warpx
-INPUTS=inputs_small
+# python interpreter & script here
+EXE=python3
+INPUTS=run_script.py
+# or executable & inputs file
+#EXE=./warpx
+#INPUTS=inputs_small
+
+# environment setup
+if [[ -z "${MY_PROFILE}" ]]; then
+    echo "WARNING: FORGOT TO"
+    echo "   source $HOME/perlmutter_cpu_warpx.profile"
+    echo "before submission. Doing that now."
+
+    source $HOME/perlmutter_cpu_warpx.profile
+fi
 
 # each CPU node on Perlmutter (NERSC) has 64 hardware cores with
 # 2x Hyperthreading/SMP

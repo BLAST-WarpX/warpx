@@ -11,4 +11,4 @@ Before opening this issue, consider opening a [discussion](https://github.com/BL
 Issues are used to report bugs, installation problems or to request new features.
 Discussions are used to ask more open-ended questions, brainstorm, ask our feedback, etc.
 
-You can find more details on how to use issues and discussions [here](https://github.com/BLAST-WarpX/warpx/blob/development/CONTRIBUTING.rst).
+You can find more details on how to use issues and discussions [here](https://github.com/BLAST-WarpX/warpx/blob/development/CONTRIBUTING.md).

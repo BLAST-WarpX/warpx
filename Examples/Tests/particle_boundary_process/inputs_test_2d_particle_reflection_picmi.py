@@ -140,3 +140,6 @@ scraped_steps = buffer.get_particle_boundary_buffer(
 for arr in scraped_steps:
     # print(arr)
     assert all(arr == 8)
+
+# clean up
+del buffer

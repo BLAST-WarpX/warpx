@@ -96,6 +96,7 @@ newton_solver = picmi.NewtonNonlinearSolver(
     linear_solver=GMRES_solver,
     max_particle_iterations=21,
     particle_tolerance=1.0e-12,
+    use_mass_matrices_jacobian=False,
 )
 
 evolve_scheme = picmi.ThetaImplicitEMEvolveScheme(

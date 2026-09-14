@@ -1,0 +1,111 @@
+#################################
+########## CONSTANTS ############
+#################################
+
+my_constants.n0 = 2.2e17      # neutral density [1/m^3]
+my_constants.Tn0 = 0.1        # neutral temperature [eV]
+my_constants.Aneu = 160.0     # ion atomic number
+my_constants.Mneu = Aneu*m_u  # neutral mass [kg]
+my_constants.Vdrift = 430.0   # drift velocity [m/s]
+
+my_constants.Amp   = 5.975e7    # laser pulse amplitude
+my_constants.width = 20.0e-9    # laser pulse width
+my_constants.shift = 150.0e-9   # laser pulse shift
+
+my_constants.Nppc_x = 5   # particles per cell in x
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+stop_time = 250.0e-9
+max_step = 25000
+amr.n_cell =  4 4 4
+amr.max_level = 0
+warpx.numprocs = 1 1 2
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 1.0 1.0 1.0
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.serialize_initial_conditions = 1
+warpx.verbose = 1
+warpx.const_dt = 0.01e-9
+warpx.use_filter = 0
+
+amrex.fpe_trap_invalid = 1
+amrex.fpe_trap_overflow = 1
+amrex.fpe_trap_zero = 1
+
+algo.maxwell_solver = none
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+particles.species_names = electrons ions neutrals
+
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.do_not_push = 1
+electrons.do_not_deposit = 1
+
+ions.charge = q_e
+ions.mass = Mneu - m_e
+ions.do_not_push = 1
+ions.do_not_deposit = 1
+
+neutrals.charge = 0.0
+neutrals.mass = Mneu
+neutrals.do_not_push = 1
+neutrals.do_not_deposit = 1
+
+neutrals.injection_style = "NUniformPerCell"
+neutrals.num_particles_per_cell_each_dim = Nppc_x Nppc_x Nppc_x
+neutrals.profile = constant
+neutrals.density = n0
+neutrals.momentum_distribution_type = "maxwellian"
+neutrals.maxwellian_u_std_distribution_type= "parser"
+neutrals.ux_std_function(x,y,z) = "0.0"
+neutrals.uy_std_function(x,y,z) = "0.0"
+neutrals.uz_std_function(x,y,z) = "Vdrift/clight"
+neutrals.maxwellian_u_mean_distribution_type = "parser"
+neutrals.ux_mean_function(x,y,z) = "sqrt(q_e*Tn0/Mneu)/clight"
+neutrals.uy_mean_function(x,y,z) = "sqrt(q_e*Tn0/Mneu)/clight"
+neutrals.uz_mean_function(x,y,z)= "sqrt(q_e*Tn0/Mneu)/clight"
+
+###   Diagnostics
+diagnostics.diags_names = diag1
+diag1.intervals = 25000
+diag1.diag_type = Full
+diag1.fields_to_plot = none
+
+###   reduced diagnostics
+warpx.reduced_diags_names = particle_number
+
+particle_number.type = ParticleNumber
+particle_number.intervals = 100
+particle_number.precision = 18
+particle_number.path = diags/reduced_files/
+
+#################################
+############ COLLISION ##########
+#################################
+collisions.collision_names = laser_ionization
+
+laser_ionization.type = pulsed_decay
+laser_ionization.species = neutrals
+laser_ionization.product_species = electrons ions
+laser_ionization.decay_rate(x,y,z,t) = Amp*exp(-(t-shift)^2/(2*width^2))
+laser_ionization.productA_temperature_eV = 0.05 0.05 0.05
+laser_ionization.productB_temperature_eV = 0.0 0.0 0.0
+laser_ionization.fixed_product_weight = 1.6328e13 # target_density*dV/target_Nppc

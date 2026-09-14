@@ -23,7 +23,7 @@ class BackgroundMCCCollision final
     : public CollisionBase
 {
 public:
-    BackgroundMCCCollision (std::string const& collision_name);
+    explicit BackgroundMCCCollision (std::string const& collision_name);
 
     ~BackgroundMCCCollision () override = default;
 

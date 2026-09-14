@@ -37,7 +37,7 @@ public:
      *
      * @param[in] species_name the name of the resampled species
      */
-    LevelingThinning (const std::string& species_name);
+    explicit LevelingThinning (const std::string& species_name);
 
     /**
      * This function queries deprecated input parameters and aborts

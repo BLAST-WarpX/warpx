@@ -8,9 +8,9 @@
 
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/ParticleUtils.H"
-#include "Utils/WarpXProfilerWrapper.H"
 #include "WarpX.H"
 
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_REAL.H>
 
@@ -88,7 +88,7 @@ BackgroundStopping::BackgroundStopping (std::string const& collision_name)
 void
 BackgroundStopping::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleContainer* mypc)
 {
-    WARPX_PROFILE("BackgroundStopping::doCollisions()");
+    ABLASTR_PROFILE("BackgroundStopping::doCollisions()");
     using namespace amrex::literals;
 
     auto& species = mypc->GetParticleContainerFromName(m_species_names[0]);
@@ -165,8 +165,10 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
         [=] AMREX_GPU_HOST_DEVICE (long ip)
         {
 
+            // The background density and temperature parsers take Cartesian
+            // coordinates as arguments, in all geometries.
             amrex::ParticleReal x, y, z;
-            GetPosition.AsStored(ip, x, y, z);
+            GetPosition(ip, x, y, z);
             amrex::ParticleReal const n_e = n_e_func(x, y, z, t);
             amrex::ParticleReal const T_e = T_e_func(x, y, z, t)*PhysConst::kb;
 
@@ -240,8 +242,10 @@ void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti
         [=] AMREX_GPU_HOST_DEVICE (long ip)
         {
 
+            // The background density and temperature parsers take Cartesian
+            // coordinates as arguments, in all geometries.
             amrex::ParticleReal x, y, z;
-            GetPosition.AsStored(ip, x, y, z);
+            GetPosition(ip, x, y, z);
             amrex::ParticleReal const n_i = n_i_func(x, y, z, t);
             amrex::ParticleReal const T_i = T_i_func(x, y, z, t)*PhysConst::kb;
 

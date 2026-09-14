@@ -1,0 +1,262 @@
+# --- This example simulates the extraction of a high-energy ion beam from a plasma source.
+# --- The simulation box region at z<0 represents the plasma source, initially filled
+# --- with a plasma of positive Deuterium ions and electrons.
+# --- To maintain plasma density during extraction, ions and electrons are continuously
+# --- injected from the simulation boundaries in the region z<0.
+# --- Electrodes held at fixed electrostatic potentials extract and accelerate some of
+# --- the plasma ions, forming a continuous ion beam with a final energy of approximately 40 keV.
+#############################
+# User-defined constants for this problem
+
+my_constants.ion_mass = 2*m_p # [kg] Assuming deuterium
+
+my_constants.T_eV = 10 # [eV] Temperature of the source plasma
+my_constants.source_n = 1.22e18 # [m^-3] Source plasma density
+
+my_constants.num_particles_per_cell = 24 # [particles/cell] Number of particles per cell for the source plasma
+my_constants.nx = 16 # [cells] Number of cells in the x direction
+my_constants.nz = 32 # [cells] Number of cells in the z direction
+
+my_constants.beam_energy_ev = 40e3 # [eV] Beam energy, used to estimate the timestep
+my_constants.beam_beta = sqrt(2*beam_energy_ev*q_e/ion_mass)/clight # [-] Beam velocity
+my_constants.vth_i = sqrt(T_eV*q_e/ion_mass) # [m/s] Thermal velocity of the ions
+my_constants.vth_e = sqrt(T_eV*q_e/m_e) # [m/s] Thermal velocity of the electrons
+my_constants.device_length = 23e-3 # [m]
+my_constants.beamlet_spacing = 8e-3 # [m]
+my_constants.num_beamlets = 1 # set odd number of beamlets
+my_constants.device_width = num_beamlets * beamlet_spacing  # [m]
+my_constants.shift = (1-cos(num_beamlets*pi)) * 0.5 * beamlet_spacing # get shift depending on even/odd number of beamlets
+
+my_constants.wpe = sqrt(source_n*q_e*q_e/m_e/epsilon0)
+
+# The pressure of *molecular* deuterium is 5.2 mTorr
+# To get the density, we convert to Pascals, and use the ideal gas law with an assumed 300K
+#my_constants.gas_temperature = 300 # [K]
+#my_constants.gas_density = 5.2*0.133322/(1.380649e-23*gas_temperature) # m^-3
+
+warpx.self_fields_absolute_tolerance = 1e-1
+warpx.self_fields_required_precision = 1e-1
+
+#############################
+# Simulation time
+max_step = 1000
+stop_time = 2.8*device_length/beam_beta/clight # 9*device_length/beam_beta/clight
+# For numerical stability, the timestep needs to resolve the electron plasma frequency
+# (more specifically, dt < 2/wpe)
+my_constants.dt = 1.95/wpe
+warpx.const_dt = dt
+
+#############################
+# Grid
+amr.n_cell = nx nx nz
+amr.max_level = 0
+amr.max_grid_size = 256
+geometry.dims = 3
+
+geometry.prob_lo = -device_width/2 -device_width/2 -2e-3
+geometry.prob_hi =  device_width/2  device_width/2 device_length
+
+boundary.particle_lo = absorbing absorbing absorbing
+boundary.particle_hi = absorbing absorbing absorbing
+
+#############################
+# Algorithms:
+algo.particle_shape = 3
+
+# - Without space charge
+#algo.maxwell_solver = none
+#boundary.field_lo = pec pec pec
+#boundary.field_hi = pec pec pec
+
+# - With space charge
+warpx.do_electrostatic = labframe
+boundary.field_lo = neumann neumann pec
+boundary.field_hi = neumann neumann neumann
+boundary.potential_lo_z = 0
+warpx.eb_implicit_function = "r = sqrt((abs(fmod(abs(x) + 0.5 * shift, beamlet_spacing) - 0.5 * beamlet_spacing))**2 + (abs(fmod(abs(y) + 0.5 * shift, beamlet_spacing) - 0.5 * beamlet_spacing))**2);
+if(((z>17e-3) and (r>2.5e-3)) or ((z<2e-3) and (z>0) and (r>3e-3)) or ((z>9.5e-3) and (z<15.5e-3) and (r>2e-3) and (r>2e-3+0.125*(z-11.5e-3))),
+1, -1 )"
+warpx.eb_potential(x,y,z,t) = "-40e3*(z>16e-3) - 41e3*(z>9e-3)*(z<16e-3)"
+
+#############################
+# Create species
+
+# Some calculation to properly inject particles
+my_constants.dx = device_width/nx
+my_constants.dz = (device_length + 2e-3)/nz
+my_constants.particle_weight = source_n * dx * dx * dz / num_particles_per_cell
+my_constants.flux_i = source_n * vth_i / sqrt(2*pi) # Flux of a thermal plasma through a wall
+my_constants.flux_e = source_n * vth_e / sqrt(2*pi) # Flux of a thermal plasma through a wall
+
+particles.species_names = Dplus electrons
+Dplus.injection_sources = initial_Dplus injected_Dplus_xm injected_Dplus_xp injected_Dplus_ym injected_Dplus_yp injected_Dplus_zm
+Dplus.mass = ion_mass
+Dplus.charge = q_e
+# Initial fill
+Dplus.initial_Dplus.injection_style = NRandomPerCell
+Dplus.initial_Dplus.num_particles_per_cell = num_particles_per_cell
+Dplus.initial_Dplus.zmax = 0
+Dplus.initial_Dplus.profile = constant
+Dplus.initial_Dplus.density = source_n
+Dplus.initial_Dplus.momentum_distribution_type = gaussian
+Dplus.initial_Dplus.ux_th = vth_i/clight
+Dplus.initial_Dplus.uy_th = vth_i/clight
+Dplus.initial_Dplus.uz_th = vth_i/clight
+# Injection from -z
+Dplus.injected_Dplus_zm.injection_style = = NFluxPerCell
+Dplus.injected_Dplus_zm.surface_flux_pos = -2e-3
+Dplus.injected_Dplus_zm.flux_normal_axis = z
+Dplus.injected_Dplus_zm.flux_direction = 1
+Dplus.injected_Dplus_zm.num_particles_per_cell = flux_i*dx*dx*dt/particle_weight # Number of particles injected per timestep, per cell
+Dplus.injected_Dplus_zm.flux_profile = constant
+Dplus.injected_Dplus_zm.flux = flux_i
+Dplus.injected_Dplus_zm.momentum_distribution_type = gaussianflux
+Dplus.injected_Dplus_zm.ux_th = vth_i/clight
+Dplus.injected_Dplus_zm.uy_th = vth_i/clight
+Dplus.injected_Dplus_zm.uz_th = vth_i/clight
+# Injection from -x
+Dplus.injected_Dplus_xm.injection_style = = NFluxPerCell
+Dplus.injected_Dplus_xm.surface_flux_pos = -device_width/2
+Dplus.injected_Dplus_xm.flux_normal_axis = x
+Dplus.injected_Dplus_xm.flux_direction = 1
+Dplus.injected_Dplus_xm.zmax = 0
+Dplus.injected_Dplus_xm.num_particles_per_cell = flux_i*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+Dplus.injected_Dplus_xm.flux_profile = constant
+Dplus.injected_Dplus_xm.flux = flux_i
+Dplus.injected_Dplus_xm.momentum_distribution_type = gaussianflux
+Dplus.injected_Dplus_xm.ux_th = vth_i/clight
+Dplus.injected_Dplus_xm.uy_th = vth_i/clight
+Dplus.injected_Dplus_xm.uz_th = vth_i/clight
+# Injection from +x
+Dplus.injected_Dplus_xp.injection_style = = NFluxPerCell
+Dplus.injected_Dplus_xp.surface_flux_pos = device_width/2
+Dplus.injected_Dplus_xp.flux_normal_axis = x
+Dplus.injected_Dplus_xp.flux_direction = -1
+Dplus.injected_Dplus_xp.zmax = 0
+Dplus.injected_Dplus_xp.num_particles_per_cell = flux_i*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+Dplus.injected_Dplus_xp.flux_profile = constant
+Dplus.injected_Dplus_xp.flux = flux_i
+Dplus.injected_Dplus_xp.momentum_distribution_type = gaussianflux
+Dplus.injected_Dplus_xp.ux_th = vth_i/clight
+Dplus.injected_Dplus_xp.uy_th = vth_i/clight
+Dplus.injected_Dplus_xp.uz_th = vth_i/clight
+# Injection from -y
+Dplus.injected_Dplus_ym.injection_style = = NFluxPerCell
+Dplus.injected_Dplus_ym.surface_flux_pos = -device_width/2
+Dplus.injected_Dplus_ym.flux_normal_axis = y
+Dplus.injected_Dplus_ym.flux_direction = 1
+Dplus.injected_Dplus_ym.num_particles_per_cell = flux_i*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+Dplus.injected_Dplus_ym.zmax = 0
+Dplus.injected_Dplus_ym.flux_profile = constant
+Dplus.injected_Dplus_ym.flux = flux_i
+Dplus.injected_Dplus_ym.momentum_distribution_type = gaussianflux
+Dplus.injected_Dplus_ym.ux_th = vth_i/clight
+Dplus.injected_Dplus_ym.uy_th = vth_i/clight
+Dplus.injected_Dplus_ym.uz_th = vth_i/clight
+# Injection from +y
+Dplus.injected_Dplus_yp.injection_style = = NFluxPerCell
+Dplus.injected_Dplus_yp.surface_flux_pos = device_width/2
+Dplus.injected_Dplus_yp.flux_normal_axis = y
+Dplus.injected_Dplus_yp.flux_direction = -1
+Dplus.injected_Dplus_yp.zmax = 0
+Dplus.injected_Dplus_yp.num_particles_per_cell = flux_i*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+Dplus.injected_Dplus_yp.flux_profile = constant
+Dplus.injected_Dplus_yp.flux = flux_i
+Dplus.injected_Dplus_yp.momentum_distribution_type = gaussianflux
+Dplus.injected_Dplus_yp.ux_th = vth_i/clight
+Dplus.injected_Dplus_yp.uy_th = vth_i/clight
+Dplus.injected_Dplus_yp.uz_th = vth_i/clight
+
+electrons.injection_sources = initial_electrons injected_electrons_xm injected_electrons_xp injected_electrons_ym injected_electrons_yp injected_electrons_zm
+electrons.mass = m_e
+electrons.charge = -q_e
+# Initial fill
+electrons.initial_electrons.injection_style = NRandomPerCell
+electrons.initial_electrons.num_particles_per_cell = num_particles_per_cell
+electrons.initial_electrons.zmax = 0
+electrons.initial_electrons.profile = constant
+electrons.initial_electrons.density = source_n
+electrons.initial_electrons.momentum_distribution_type = gaussian
+electrons.initial_electrons.ux_th = vth_e/clight
+electrons.initial_electrons.uy_th = vth_e/clight
+electrons.initial_electrons.uz_th = vth_e/clight
+# Injection from -z
+electrons.injected_electrons_zm.injection_style = = NFluxPerCell
+electrons.injected_electrons_zm.surface_flux_pos = -2e-3
+electrons.injected_electrons_zm.flux_normal_axis = z
+electrons.injected_electrons_zm.flux_direction = 1
+electrons.injected_electrons_zm.num_particles_per_cell = flux_e*dx*dx*dt/particle_weight # Number of particles injected per timestep, per cell
+electrons.injected_electrons_zm.flux_profile = constant
+electrons.injected_electrons_zm.flux = flux_e
+electrons.injected_electrons_zm.momentum_distribution_type = gaussianflux
+electrons.injected_electrons_zm.ux_th = vth_e/clight
+electrons.injected_electrons_zm.uy_th = vth_e/clight
+electrons.injected_electrons_zm.uz_th = vth_e/clight
+# Injection from -x
+electrons.injected_electrons_xm.injection_style = = NFluxPerCell
+electrons.injected_electrons_xm.surface_flux_pos = -device_width/2
+electrons.injected_electrons_xm.flux_normal_axis = x
+electrons.injected_electrons_xm.flux_direction = 1
+electrons.injected_electrons_xm.zmax = 0
+electrons.injected_electrons_xm.num_particles_per_cell = flux_e*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+electrons.injected_electrons_xm.flux_profile = constant
+electrons.injected_electrons_xm.flux = flux_e
+electrons.injected_electrons_xm.momentum_distribution_type = gaussianflux
+electrons.injected_electrons_xm.ux_th = vth_e/clight
+electrons.injected_electrons_xm.uy_th = vth_e/clight
+electrons.injected_electrons_xm.uz_th = vth_e/clight
+# Injection from +x
+electrons.injected_electrons_xp.injection_style = = NFluxPerCell
+electrons.injected_electrons_xp.surface_flux_pos = device_width/2
+electrons.injected_electrons_xp.flux_normal_axis = x
+electrons.injected_electrons_xp.flux_direction = -1
+electrons.injected_electrons_xp.zmax = 0
+electrons.injected_electrons_xp.num_particles_per_cell = flux_e*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+electrons.injected_electrons_xp.flux_profile = constant
+electrons.injected_electrons_xp.flux = flux_e
+electrons.injected_electrons_xp.momentum_distribution_type = gaussianflux
+electrons.injected_electrons_xp.ux_th = vth_e/clight
+electrons.injected_electrons_xp.uy_th = vth_e/clight
+electrons.injected_electrons_xp.uz_th = vth_e/clight
+# Injection from -y
+electrons.injected_electrons_ym.injection_style = = NFluxPerCell
+electrons.injected_electrons_ym.surface_flux_pos = -device_width/2
+electrons.injected_electrons_ym.flux_normal_axis = y
+electrons.injected_electrons_ym.flux_direction = 1
+electrons.injected_electrons_ym.zmax = 0
+electrons.injected_electrons_ym.num_particles_per_cell = flux_e*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+electrons.injected_electrons_ym.flux_profile = constant
+electrons.injected_electrons_ym.flux = flux_e
+electrons.injected_electrons_ym.momentum_distribution_type = gaussianflux
+electrons.injected_electrons_ym.ux_th = vth_e/clight
+electrons.injected_electrons_ym.uy_th = vth_e/clight
+electrons.injected_electrons_ym.uz_th = vth_e/clight
+# Injection from +y
+electrons.injected_electrons_yp.injection_style = = NFluxPerCell
+electrons.injected_electrons_yp.surface_flux_pos = device_width/2
+electrons.injected_electrons_yp.flux_normal_axis = y
+electrons.injected_electrons_yp.flux_direction = -1
+electrons.injected_electrons_yp.zmax = 0
+electrons.injected_electrons_yp.num_particles_per_cell = flux_e*dx*dz*dt/particle_weight # Number of particles injected per timestep, per cell
+electrons.injected_electrons_yp.flux_profile = constant
+electrons.injected_electrons_yp.flux = flux_e
+electrons.injected_electrons_yp.momentum_distribution_type = gaussianflux
+electrons.injected_electrons_yp.ux_th = vth_e/clight
+electrons.injected_electrons_yp.uy_th = vth_e/clight
+electrons.injected_electrons_yp.uz_th = vth_e/clight
+
+#############################
+# Add diagnostics
+diagnostics.diags_names = diag1 bound
+diag1.intervals = 1000
+diag1.fields_to_plot = rho Ex Ey Ez phi eb_covered rho_electrons rho_Dplus
+diag1.diag_type = Full
+diag1.format = openpmd
+
+bound.diag_type = BoundaryScraping
+bound.format = openpmd
+bound.intervals = -1
+Dplus.save_particles_at_zhi = 1
+bound.dump_last_timestep = 1
+
+#############################

@@ -34,9 +34,10 @@ void RelativisticExplicitES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     MultiParticleContainer& mpc,
     [[maybe_unused]] MultiFluidContainer* mfl,
-    int max_level)
+    int max_level,
+    bool verbose_step)
 {
-    WARPX_PROFILE("RelativisticExplicitES::ComputeSpaceChargeField");
+    ABLASTR_PROFILE("RelativisticExplicitES::ComputeSpaceChargeField");
 
     using ablastr::fields::MultiLevelVectorField;
     using warpx::fields::FieldType;
@@ -51,7 +52,8 @@ void RelativisticExplicitES::ComputeSpaceChargeField (
     // due to simulation boundary potentials
     for (auto const& species : mpc) {
         if (always_run_solve || (species->initialize_self_fields)) {
-            AddSpaceChargeField(*species, Efield_fp, Bfield_fp);
+            int const verbosity = verbose_step ? species->self_fields_verbosity : 0;
+            AddSpaceChargeField(*species, Efield_fp, Bfield_fp, verbosity);
         }
     }
 
@@ -65,9 +67,10 @@ void RelativisticExplicitES::ComputeSpaceChargeField (
 void RelativisticExplicitES::AddSpaceChargeField (
     WarpXParticleContainer& pc,
     ablastr::fields::MultiLevelVectorField& Efield_fp,
-    ablastr::fields::MultiLevelVectorField& Bfield_fp)
+    ablastr::fields::MultiLevelVectorField& Bfield_fp,
+    int const verbosity)
 {
-    WARPX_PROFILE("RelativisticExplicitES::AddSpaceChargeField");
+    ABLASTR_PROFILE("RelativisticExplicitES::AddSpaceChargeField");
 
     if (pc.getCharge() == 0) { return; }
 
@@ -130,7 +133,7 @@ void RelativisticExplicitES::AddSpaceChargeField (
     computePhi( amrex::GetVecOfPtrs(rho), amrex::GetVecOfPtrs(phi),
                 beta, pc.self_fields_required_precision,
                 pc.self_fields_absolute_tolerance, pc.self_fields_max_iters,
-                pc.self_fields_verbosity, is_igf_2d_slices);
+                verbosity, is_igf_2d_slices);
 
     // Compute the corresponding electric and magnetic field, from the potential phi
     computeE( Efield_fp, amrex::GetVecOfPtrs(phi), beta );
@@ -140,7 +143,7 @@ void RelativisticExplicitES::AddSpaceChargeField (
 
 void RelativisticExplicitES::AddBoundaryField (ablastr::fields::MultiLevelVectorField& Efield_fp)
 {
-    WARPX_PROFILE("RelativisticExplicitES::AddBoundaryField");
+    ABLASTR_PROFILE("RelativisticExplicitES::AddBoundaryField");
 
     auto & warpx = WarpX::GetInstance();
 

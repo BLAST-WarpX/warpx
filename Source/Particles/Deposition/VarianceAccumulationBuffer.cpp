@@ -63,7 +63,7 @@ VarianceAccumulationBuffer::reset ()
 }
 
 amrex::MultiFab*
-VarianceAccumulationBuffer::get(std::string arr, ablastr::fields::Direction dir, int lev)
+VarianceAccumulationBuffer::get(const std::string& arr, ablastr::fields::Direction dir, int lev)
 {
     auto &warpx = WarpX::GetInstance();
     return warpx.m_fields.get("variance_buffer_" + arr + "_" + m_species_name, dir, lev);

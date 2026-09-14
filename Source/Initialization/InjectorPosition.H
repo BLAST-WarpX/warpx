@@ -32,7 +32,7 @@ struct InjectorPositionRandom
 // random distribution on a plane inside a unit cell.
 struct InjectorPositionRandomPlane
 {
-    InjectorPositionRandomPlane (int const& a_dir) noexcept : dir(a_dir) {}
+    explicit InjectorPositionRandomPlane (int const& a_dir) noexcept : dir(a_dir) {}
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -67,7 +67,7 @@ private:
 // regular distribution inside a unit cell.
 struct InjectorPositionRegular
 {
-    InjectorPositionRegular (amrex::Dim3 const& a_ppc) noexcept : ppc(a_ppc) {}
+    explicit InjectorPositionRegular (amrex::Dim3 const& a_ppc) noexcept : ppc(a_ppc) {}
 
     // i_part: particle number within the cell, required to evenly space
     // particles within the cell.
@@ -248,6 +248,7 @@ private:
     // An instance of union Object constructs and stores any one of
     // the objects declared (random or regular).
     union Object {
+        explicit
         Object (InjectorPositionRandom*) noexcept : random() {}
         Object (InjectorPositionRandomPlane*, int const& a_dir) noexcept
             : randomplane(a_dir) {}

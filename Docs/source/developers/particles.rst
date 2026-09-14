@@ -36,7 +36,9 @@ A typical loop over particles reads:
       }
   }
 
-The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` to perform operations on all particles in a portable way. The innermost loop in the code snippet above could look like:
+The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` or ``amrex::For`` to perform operations on all particles in a portable way.
+``amrex::ParallelFor`` may only be used when the loop iterations are independent of each other. Kernels in which particles scatter-add into shared grid cells (e.g., deposition, histogram bins, etc.) must use ``amrex::For`` instead (see :ref:`Developers: Portability <developers-portability>`).
+The innermost loop in the code snippet above could look like:
 
 .. code-block:: cpp
 
@@ -83,7 +85,7 @@ Main functions
 
 .. doxygenfunction:: PhysicalParticleContainer::PushPX
 
-.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time)
+.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time, PushType push_type)
 
 .. note::
    The current deposition is used both by ``PhysicalParticleContainer`` and ``LaserParticleContainer``, so it is in the parent class ``WarpXParticleContainer``.
@@ -127,6 +129,11 @@ Attribute name        ``int``/``real``  Description                         Wher
                                         ``stepScraped`` and the exact time             particle-boundary
                                         when the particle hits the                     interaction.
                                         boundary.                                      Saved in the boundary
+                                                                                       buffers.
+``timeScraped``        ``real``         The exact time when the particle    SoA   RT   Added when there is
+                                        hits the boundary.                             particle-boundary
+                                                                                       interaction.
+                                                                                       Saved in the boundary
                                                                                        buffers.
 ``n_x/y/z``            ``real``         Normal components to the boundary   SoA   RT   Added when there is
                                         on the position where the particle             particle-boundary

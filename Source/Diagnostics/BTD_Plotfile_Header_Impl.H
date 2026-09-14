@@ -30,7 +30,7 @@ public:
     /** Constructor.
      * \param[in] Headerfile_path string containing path of Headerfile
      */
-    BTDPlotfileHeaderImpl (std::string const& Headerfile_path);
+    explicit BTDPlotfileHeaderImpl (std::string const& Headerfile_path);
 
     /** Returns the Header file version for plotfile */
     [[nodiscard]] std::string fileVersion () const noexcept {return m_file_version; }
@@ -163,7 +163,7 @@ class BTDMultiFabHeaderImpl
     /** Constructor.
      * \param[in] Headerfile_path string containing path of Headerfile
      */
-    BTDMultiFabHeaderImpl (std::string const& Headerfile_path);
+    explicit BTDMultiFabHeaderImpl (std::string const& Headerfile_path);
 
     /** Reads the Multifab Header file and stores its data. */
     void ReadMultiFabHeader ();
@@ -311,7 +311,7 @@ public:
     /** Constructor.
      * \param[in] Headerfile_path containing path of Headerfile
      */
-    BTDParticleDataHeaderImpl (std::string const& Headerfile_path);
+    explicit BTDParticleDataHeaderImpl (std::string const& Headerfile_path);
 
     /** Reads the particle header file at m_Header_path and stores its data*/
     void ReadHeader ();

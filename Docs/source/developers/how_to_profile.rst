@@ -195,7 +195,7 @@ In these examples, the individual lines for recording a trace profile are:
 * ``-t``: select a couple of APIs to trace
 * ``--mpi--impl``: optional, hint the MPI flavor
 * ``./warpx...``: select the WarpX executable and a good inputs file
-* ``warpx.numprocs=...``: make the run short, reasonably small, and run only a few steps
+* :pp:param:`warpx.numprocs = ...`: make the run short, reasonably small, and run only a few steps
 
 Now open the created trace files (per rank) in the Nsight-Systems GUI.
 This can be done on another system than the one that recorded the traces.
@@ -247,7 +247,7 @@ node, or without a workload management system.
 .. note::
 
    Note the trailing ``/`` at the end of the ``--nvtx-include`` filter (`reference <https://docs.nvidia.com/nsight-compute/NsightComputeCli/index.html?highlight=nvtx%2520include#nvtx-filtering>`__).
-   The names are annotations that we add to WarpX via ``WARPX_PROFILE(...)``.
+   The names are annotations that we add to WarpX via ``ABLASTR_PROFILE(...)``.
 
 .. note::
 

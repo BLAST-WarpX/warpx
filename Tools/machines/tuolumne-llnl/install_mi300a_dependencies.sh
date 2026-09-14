@@ -31,6 +31,11 @@ python3 -m pip uninstall -qq -y pywarpx
 python3 -m pip uninstall -qq -y warpx
 python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 
+# clean out caches, e.g., depending on old system modules
+# pip cache disabled system-wide
+#python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 
 # General extra dependencies ##################################################
 #
@@ -137,7 +142,7 @@ cmake \
     -Duse_openmp=OFF                          \
     -Dgpu_backend=hip                         \
     -DBUILD_SHARED_LIBS=OFF                   \
-    -DCMAKE_CXX_STANDARD=17                   \
+    -DCMAKE_CXX_STANDARD=20                   \
     -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake \
     --build ${build_dir}/blaspp-tuolumne-mi300a-build \
@@ -159,7 +164,7 @@ cmake \
     --fresh                                     \
     -S ${SRC_DIR}/lapackpp                      \
     -B ${build_dir}/lapackpp-tuolumne-mi300a-build \
-    -DCMAKE_CXX_STANDARD=17                     \
+    -DCMAKE_CXX_STANDARD=20                     \
     -Dgpu_backend=hip                           \
     -Dbuild_tests=OFF                           \
     -DBUILD_SHARED_LIBS=OFF                     \
@@ -214,7 +219,6 @@ cd -
 export PIP_EXTRA_INDEX_URL="https://pypi.org/simple"
 
 python3 -m pip install --upgrade pip
-# python3 -m pip cache purge || true  # Cache disabled on system
 rm -rf ${SW_DIR}/venvs/warpx-tuolumne-mi300a
 python3 -m venv ${SW_DIR}/venvs/warpx-tuolumne-mi300a
 source ${SW_DIR}/venvs/warpx-tuolumne-mi300a/bin/activate

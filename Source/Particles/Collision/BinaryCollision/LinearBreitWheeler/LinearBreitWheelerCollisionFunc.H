@@ -10,6 +10,7 @@
 
 #include "SingleLinearBreitWheelerCollisionEvent.H"
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/MultiParticleContainer.H"
@@ -33,6 +34,7 @@
  *  This functor also reads and stores the event multiplier.
  */
 class LinearBreitWheelerCollisionFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -55,10 +57,10 @@ public:
      * @param[in] isSameSpecies whether the two colliding species are the same
      */
     LinearBreitWheelerCollisionFunc (
-            const std::string collision_name,
+            const std::string& collision_name,
             MultiParticleContainer const * const /*mypc*/,
             const bool isSameSpecies) :
-        m_isSameSpecies(isSameSpecies)
+        m_isSameSpecies{isSameSpecies}
     {
         using namespace amrex::literals;
 
@@ -66,19 +68,18 @@ public:
         WARPX_ABORT_WITH_MESSAGE("Linear Breit-Wheeler collision module does not currently work with single precision");
 #endif
 
-        amrex::ParmParse pp_collision_name(collision_name);
+        const amrex::ParmParse pp_collision_name(collision_name);
 
-        // default event multiplier
-        m_event_multiplier = 1.0_prt;
+        constexpr auto default_event_multiplier = 1.0_prt;
+        m_event_multiplier = default_event_multiplier;
         utils::parser::queryWithParser(
             pp_collision_name, "event_multiplier", m_event_multiplier);
 
-        // default probability threshold
-        m_probability_threshold = 0.02_prt;
+        constexpr auto default_probability_threshold = 0.02_prt;
+        m_probability_threshold = default_probability_threshold;
         utils::parser::queryWithParser(
             pp_collision_name, "probability_threshold", m_probability_threshold);
 
-        // default probability target_value
         constexpr auto default_probability_target_value = 0.002_prt;
         m_probability_target_value = default_probability_target_value;
         utils::parser::queryWithParser(
@@ -147,7 +148,8 @@ public:
             amrex::ParticleReal const  /*q1*/, amrex::ParticleReal const  /*q2*/,
             amrex::ParticleReal const  /*m1*/, amrex::ParticleReal const  /*m2*/,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const cell_start_pair, index_type* AMREX_RESTRICT p_mask,
+            index_type const cell_start_pair, amrex::IntVect const /*global_index*/,
+            index_type* AMREX_RESTRICT p_mask,
             index_type* AMREX_RESTRICT p_pair_indices_1, index_type* AMREX_RESTRICT p_pair_indices_2,
             amrex::ParticleReal* AMREX_RESTRICT p_pair_reaction_weight,
             amrex::ParticleReal* /*p_product_data*/,
@@ -177,10 +179,6 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
-#if (defined WARPX_DIM_RZ)
-            amrex::ParticleReal * const AMREX_RESTRICT theta1 = soa_1.m_rdata[PIdx::theta];
-            amrex::ParticleReal * const AMREX_RESTRICT theta2 = soa_2.m_rdata[PIdx::theta];
-#endif
             index_type i1 = I1s + coll_idx;
             index_type i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
@@ -194,20 +192,6 @@ public:
                     p_mask[pair_index] = false;
                 }
                 else {
-#if (defined WARPX_DIM_RZ)
-                    /* In RZ geometry, macroparticles can collide with other macroparticles
-                     * in the same *cylindrical* cell. For this reason, collisions between macroparticles
-                     * are actually not local in space. In this case, the underlying assumption is that
-                     * particles within the same cylindrical cell represent a cylindrically-symmetry
-                     * momentum distribution function. Therefore, here, we temporarily rotate the
-                     * momentum of one of the macroparticles in agreement with this cylindrical symmetry.
-                     * (This is technically only valid if we use only the m=0 azimuthal mode in the simulation;
-                     * there is a corresponding assert statement at initialization.) */
-                    amrex::ParticleReal const theta = theta2[I2[i2]]-theta1[I1[i1]];
-                    amrex::ParticleReal const u1xbuf = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf*std::cos(theta) - u1y[I1[i1]]*std::sin(theta);
-                    u1y[I1[i1]] = u1xbuf*std::sin(theta) + u1y[I1[i1]]*std::cos(theta);
-#endif
                     SingleLinearBreitWheelerCollisionEvent(
                         u1x[ I1[i1] ], u1y[ I1[i1] ], u1z[ I1[i1] ],
                         u2x[ I2[i2] ], u2y[ I2[i2] ], u2z[ I2[i2] ],
@@ -217,11 +201,6 @@ public:
                         m_probability_threshold,
                         m_probability_target_value,
                         engine);
-#if (defined WARPX_DIM_RZ)
-                    amrex::ParticleReal const u1xbuf_new = u1x[I1[i1]];
-                    u1x[I1[i1]] = u1xbuf_new*std::cos(-theta) - u1y[I1[i1]]*std::sin(-theta);
-                    u1y[I1[i1]] = u1xbuf_new*std::sin(-theta) + u1y[I1[i1]]*std::cos(-theta);
-#endif
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {
                         BinaryCollisionUtils::remove_weight_from_colliding_particle(
@@ -248,7 +227,7 @@ public:
         bool m_need_product_data = false;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
     bool use_global_debye_length() { return false; }
 

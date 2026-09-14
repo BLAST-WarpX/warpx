@@ -214,19 +214,19 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     auto iseries = series.iterations.begin()->second;
     auto F = iseries.meshes[m_name];
 
-    bool c_order = F.getAttribute("dataOrder").get<std::string>() == "C";
+    const bool c_order = F.getAttribute("dataOrder").get<std::string>() == "C";
     amrex::ignore_unused(c_order);
 
     auto axisLabels = F.getAttribute("axisLabels").get<std::vector<std::string>>();
     auto fileGeom = F.getAttribute("geometry").get<std::string>();
 
-    bool xyz_order = true;
+    bool xyz_order = true; //NOLINT (misc-const-correctness)
 
 #if defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "3D can only read from files with cartesian geometry");
     if (axisLabels.at(0) == "x" && axisLabels.at(1) == "y" && axisLabels.at(2) == "z") {
         xyz_order = true;
-    } else if (axisLabels.at(2) == "x" && axisLabels.at(1) == "y" && axisLabels.at(1) == "z") {
+    } else if (axisLabels.at(2) == "x" && axisLabels.at(1) == "y" && axisLabels.at(0) == "z") {
         xyz_order = false;
     } else {
         WARPX_ABORT_WITH_MESSAGE("3D expects axisLabels {x, y, z} or {z, y, x}");
@@ -288,11 +288,11 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == 3 && extent[0] == 1,
                                      "External field reading is not implemented for more than one RZ mode (see #3829)");
     if (xyz_order) {
-        m_size[0] = extent[1];
-        m_size[1] = extent[2];
+        m_size[0] = static_cast<int>(extent[1]);
+        m_size[1] = static_cast<int>(extent[2]);
     } else {
-        m_size[0] = extent[2];
-        m_size[1] = extent[1];
+        m_size[0] = static_cast<int>(extent[2]);
+        m_size[1] = static_cast<int>(extent[1]);
     }
 #else
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(extent.size() == AMREX_SPACEDIM,
@@ -390,12 +390,17 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #endif
 
     if (has_load) {
-        m_FC_data_cpu = FC.loadChunk<double>(chunk_offset,chunk_extent);
+        const auto num_cells = std::accumulate(chunk_extent.begin(), chunk_extent.end(),
+                                               1, std::multiplies<>());
+        m_FC_data_cpu.reset(
+            reinterpret_cast<double*>(amrex::The_Pinned_Arena()->alloc(num_cells*sizeof(double))),
+            [](double *p){ amrex::The_Pinned_Arena()->free(reinterpret_cast<void*>(p)); });
+        FC.loadChunk<double>(m_FC_data_cpu, chunk_offset, chunk_extent);
     }
     series.flush();
 
     if (has_load) {
-        Box box(lo,hi);
+        const Box box(lo,hi);
 #ifdef AMREX_USE_GPU
         m_fab.resize(box, 1);
         Gpu::htod_memcpy_async(m_fab.dataPtr(), m_FC_data_cpu.get(), m_fab.nBytes());
@@ -482,7 +487,7 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
             }
             bl.push_back(box);
         }
-        BoxArray ba(std::move(bl));
+        const BoxArray ba(std::move(bl));
         FabArray<BaseFab<double>> tmpmf(ba,dmap,1,0);
         tmpmf.ParallelCopy(m_mf);
         m_mf = std::move(tmpmf);
@@ -494,13 +499,13 @@ void ExternalFieldReader::prepare (amrex::BoxArray const& grids,
 void ExternalFieldReader::make_cache_box (amrex::RealBox const& pbox, int moving_dir, int moving_sign)
 {
     m_cache_domain = pbox;
-    int dir = std::abs(moving_dir);
-    amrex::Real factor = 10.0;
+    const int dir = std::abs(moving_dir);
+    const amrex::Real factor = 10.0;
     if (moving_sign > 0) {
-        amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
+        const amrex::Real newhi = m_cache_domain.hi(dir) + factor*m_cache_domain.length(dir);
         m_cache_domain.setHi(dir, newhi);
     } else {
-        amrex::Real newlo = m_cache_domain.lo(dir) - factor*m_cache_domain.length(dir);
+        const amrex::Real newlo = m_cache_domain.lo(dir) - factor*m_cache_domain.length(dir);
         m_cache_domain.setLo(dir, newlo);
     }
     // Grow the box a little bit so that m_cache_domain.contains(pbox) is true.
@@ -547,19 +552,19 @@ ExternalFieldView ExternalFieldReader::getView (int li) const
     }
 }
 
-ExternalFieldView ExternalFieldReader::getView () const
+ExternalFieldView ExternalFieldReader::getView () const noexcept
 {
     return make_view(m_fab);
 }
 
-ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& fab) const
+ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& fab) const noexcept
 {
     ExternalFieldView view;
     view.dx = m_dx;
     view.offset = m_offset;
     view.global_size = m_size;
 
-    auto* p = fab.dataPtr();
+    const auto* p = fab.dataPtr();
     if (p) {
         auto const& b = fab.box();
         view.table = decltype(view.table)(const_cast<double*>(p),
@@ -577,3 +582,22 @@ ExternalFieldView ExternalFieldReader::make_view (amrex::BaseFab<double> const& 
     }
     return view;
 }
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+ExternalFieldVectorView::ExternalFieldVectorView (
+    ExternalFieldReader const* x_reader,
+    ExternalFieldReader const* y_reader,
+    ExternalFieldReader const* z_reader) noexcept
+{
+    if (x_reader) {
+        m_x_view = x_reader->getView();
+    }
+    if (y_reader) {
+        m_y_view = y_reader->getView();
+    }
+    if (z_reader) {
+        m_z_view = z_reader->getView();
+    }
+}
+#endif

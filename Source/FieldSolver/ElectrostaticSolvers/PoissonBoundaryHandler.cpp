@@ -177,8 +177,7 @@ void PoissonBoundaryHandler::BuildParsersEB ()
 
     // check if the EB potential is a function of space or only of time
     const std::set<std::string> eb_symbols = potential_eb_parser.symbols();
-    if ((eb_symbols.count("x") != 0) || (eb_symbols.count("y") != 0)
-            || (eb_symbols.count("z") != 0)) {
+    if (eb_symbols.contains("x")  || eb_symbols.contains("y") || eb_symbols.contains("z")) {
         potential_eb = potential_eb_parser.compile<4>();
         phi_EB_only_t = false;
     }

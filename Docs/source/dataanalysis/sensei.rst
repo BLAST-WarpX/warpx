@@ -120,7 +120,7 @@ run of the desired simulation.
 .. figure:: https://data.kitware.com/api/v1/item/5c06b4b18d777f2179d4784c/download
 
    Rendering of 10 3D iso-surfaces of j using VisIt libsim. The upper left
-   quadrant has been clipped away to reveal innner structure.
+   quadrant has been clipped away to reveal inner structure.
 
 The same run and visualization was repeated using ParaView Catalyst, shown in
 :numref:`lpa_pv`, by providing the following XML configuration.

@@ -30,14 +30,14 @@ The electric field amplitude is calculated in the particle's frame of reference.
 .. math::
 
     \begin{aligned}
-        \vec{E}_\mathrm{dc} &= \sqrt{ - \frac{1}{\mathrm{c}^2} \left( \vec{u} \cdot \vec{E} \right)^2
-                          + \left( \gamma \vec{E} + \vec{u} \times \vec{B} \right)^2 }
+        \boldsymbol{E}_\mathrm{dc} &= \sqrt{ - \frac{1}{\mathrm{c}^2} \left( \boldsymbol{u} \cdot \boldsymbol{E} \right)^2
+                          + \left( \gamma \boldsymbol{E} + \boldsymbol{u} \times \boldsymbol{B} \right)^2 }
         \\
-        \gamma &= \sqrt{1 + \frac{\vec{u}^2}{\mathrm{c}^2}}
+        \gamma &= \sqrt{1 + \frac{\boldsymbol{u}^2}{\mathrm{c}^2}}
     \end{aligned}
 
-Here, :math:`\vec{u} = (u_x, u_y, u_z)` is the momentum normalized to the particle mass, :math:`u_i = (\beta \gamma)_i \mathrm{c}`.
-:math:`E_\mathrm{dc} = |\vec{E}_\mathrm{dc}|` is the DC-field in the frame of the particle.
+Here, :math:`\boldsymbol{u} = (u_x, u_y, u_z)` is the momentum normalized to the particle mass, :math:`u_i = (\beta \gamma)_i \mathrm{c}`.
+:math:`E_\mathrm{dc} = |\boldsymbol{E}_\mathrm{dc}|` is the DC-field in the frame of the particle.
 
 .. math::
 

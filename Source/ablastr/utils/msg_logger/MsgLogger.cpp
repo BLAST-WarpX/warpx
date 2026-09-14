@@ -423,7 +423,7 @@ Logger::compute_msgs_with_counter_and_ranks(
             #pragma omp critical
 #endif
             {
-                if (tmap.find(msg_with_counter.msg) == tmap.end()){
+                if (!tmap.contains(msg_with_counter.msg)){
                     const auto msg_with_counter_and_ranks =
                         MsgWithCounterAndRanks{
                             msg_with_counter,

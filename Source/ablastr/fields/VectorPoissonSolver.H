@@ -51,11 +51,11 @@ namespace ablastr::fields {
 /** Compute the vector potential `A` by solving the Poisson equation
  *
  * Uses `J` as a source, assuming that the source moves at a
- * constant speed \f$\vec{\beta}\f$. This uses the AMReX solver.
+ * constant speed \f$\boldsymbol{\beta}\f$. This uses the AMReX solver.
  *
  * More specifically, this solves the equation
  * \f[
- *   \vec{\nabla}^2 r \vec{A} - (\vec{\beta}\cdot\vec{\nabla})^2 r \vec{A} = - r \mu_0 \vec{J}
+ *   \nabla^2 r \boldsymbol{A} - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2 r \boldsymbol{A} = - r \mu_0 \boldsymbol{J}
  * \f]
  *
  * \tparam T_BoundaryHandler handler for boundary conditions, for example @see MagnetostaticSolver::MultiPoissonBoundaryHandler
@@ -99,7 +99,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
                             std::optional<amrex::Vector<amrex::IntVect> > rel_ref_ratio = std::nullopt,
                             [[maybe_unused]] T_PostACalculationFunctor post_A_calculation = std::nullopt,
                             [[maybe_unused]] std::optional<amrex::Real const> current_time = std::nullopt, // only used for EB
-                            [[maybe_unused]] std::optional<amrex::Vector<T_FArrayBoxFactory const *> > eb_farray_box_factory = std::nullopt // only used for EB
+                            [[maybe_unused]] const std::optional<amrex::Vector<T_FArrayBoxFactory const *> >& eb_farray_box_factory = std::nullopt // only used for EB
 )
 {
     using namespace amrex::literals;
@@ -197,6 +197,12 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
 
 #ifdef WARPX_DIM_RZ
             linop[adim]->setRZ(true);
+            if (adim < 2) {
+                // In cylindrical coordinates (with azimuthal symmetry), the vector Laplacian
+                // along r and theta has an extra `-1/r^2` term (not present for Az).
+                // The alpha term below adds the 1/r^2 part.
+                linop[adim]->setAlpha(1._rt);
+            }
 #endif
 
             linop[adim]->setDomainBC( boundary_handler.lobc[adim], boundary_handler.hibc[adim] );
@@ -206,6 +212,7 @@ computeVectorPotential   (  amrex::Vector<amrex::Array<amrex::MultiFab*, 3> > co
             mlmg[adim]->setVerbose(verbosity);
             mlmg[adim]->setMaxIter(max_iters);
             mlmg[adim]->setConvergenceNormType(always_use_bnorm ? amrex::MLMGNormType::bnorm : amrex::MLMGNormType::greater);
+            mlmg[adim]->setNoGpuSync(true);
 
             // Solve Poisson equation at lev
             mlmg[adim]->solve( {A[lev][adim]}, {curr[lev][adim]},

@@ -24,6 +24,7 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 yt.funcs.mylog.setLevel(50)
 
 import numpy as np
+from analysis_utils import check_charge_conservation
 from scipy.constants import c, e, epsilon_0, m_e
 
 # test name
@@ -31,12 +32,6 @@ test_name = os.path.split(os.getcwd())[1]
 
 # this will be the name of the plot file
 fn = sys.argv[1]
-
-# Parse test name and check if current correction (psatd.current_correction=1) is applied
-current_correction = True if re.search("current_correction", test_name) else False
-
-# Parse test name and check if Vay current deposition (algo.current_deposition=vay) is used
-vay_deposition = True if re.search("vay_deposition", test_name) else False
 
 # Parse test name and check if particle_shape = 4 is used
 particle_shape_4 = True if re.search("particle_shape_4", test_name) else False
@@ -143,19 +138,6 @@ print("tolerance_rel: " + str(tolerance_rel))
 
 assert error_rel < tolerance_rel
 
-# Check relative L-infinity spatial norm of rho/epsilon_0 - div(E)
-# with current correction (and periodic single box option) or with Vay current deposition
-if current_correction:
-    tolerance = 1e-9
-elif vay_deposition:
-    tolerance = 1e-3
-if current_correction or vay_deposition:
-    rho = data[("boxlib", "rho")].to_ndarray()
-    divE = data[("boxlib", "divE")].to_ndarray()
-    error_rel = np.amax(np.abs(divE - rho / epsilon_0)) / np.amax(
-        np.abs(rho / epsilon_0)
-    )
-    print("Check charge conservation:")
-    print("error_rel = {}".format(error_rel))
-    print("tolerance = {}".format(tolerance))
-    assert error_rel < tolerance
+# Additional check on charge conservation for certain cases
+# (e.g., Esirkepov or Vay deposition, current correction)
+check_charge_conservation(data)

@@ -13,35 +13,30 @@ In both cases, the reference energy corresponds to unstable results due to NCI
 (suppressed by the Galilean PSATD method, without or with averaging, respectively).
 """
 
-import re
 import sys
 
 import numpy as np
 import scipy.constants as scc
 import yt
 
+sys.path.append("../../../Tools/Parser/")
+from input_file_parser import input_has_value, parse_input_file
+
 yt.funcs.mylog.setLevel(0)
 
 filename = sys.argv[1]
 
 # Parse some input arguments from output file 'warpx_used_inputs'
-current_correction = False
-time_averaging = False
-periodic_single_box = False
-with open("./warpx_used_inputs", "r") as f:
-    warpx_used_inputs = f.read()
-if re.search("geometry.dims\s*=\s*2", warpx_used_inputs):
+input_dict = parse_input_file("./warpx_used_inputs")
+if input_has_value(input_dict, "geometry.dims", "2"):
     dims = "2D"
-elif re.search("geometry.dims\s*=\s*RZ", warpx_used_inputs):
+elif input_has_value(input_dict, "geometry.dims", "RZ"):
     dims = "RZ"
-elif re.search("geometry.dims\s*=\s*3", warpx_used_inputs):
+elif input_has_value(input_dict, "geometry.dims", "3"):
     dims = "3D"
-if re.search("psatd.current_correction\s*=\s*1", warpx_used_inputs):
-    current_correction = True
-if re.search("psatd.do_time_averaging\s*=\s*1", warpx_used_inputs):
-    time_averaging = True
-if re.search("psatd.periodic_single_box_fft\s*=\s*1", warpx_used_inputs):
-    periodic_single_box = True
+current_correction = input_has_value(input_dict, "psatd.current_correction", "1")
+time_averaging = input_has_value(input_dict, "psatd.do_time_averaging", "1")
+periodic_single_box = input_has_value(input_dict, "psatd.periodic_single_box_fft", "1")
 
 ds = yt.load(filename)
 
