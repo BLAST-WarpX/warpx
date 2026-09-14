@@ -4,10 +4,44 @@
 """Reject incomplete moving-model checkpoints without modifying the producer."""
 
 import argparse
+import os
 import shutil
+import signal
 import subprocess
 import tempfile
 from pathlib import Path
+
+
+def run_rejection(command, log, timeout=60):
+    """Wait for the actual child, not pipe EOF inherited by MPI helpers.
+
+    Keep output even on timeout and clean up only the process group created for
+    this invocation. A timeout remains a failure, never an accepted rejection.
+    """
+    timed_out = False
+    with log.open("w") as output:
+        process = subprocess.Popen(
+            command,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            start_new_session=os.name == "posix",
+        )
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+        finally:
+            if os.name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            elif process.poll() is None:
+                process.kill()
+            process.wait(timeout=10)
+    text = log.read_text()
+    assert not timed_out, f"Checkpoint rejection exceeded {timeout} seconds:\n{text}"
+    return subprocess.CompletedProcess(command, process.returncode, text)
 
 
 def check(executable, checkpoint, missing, rz=False):
@@ -47,23 +81,21 @@ def check(executable, checkpoint, missing, rz=False):
                 "warpx.const_dt=8.333333333333333e-12",
             ]
         )
-        result = subprocess.run(
+        result = run_rejection(
             [
                 str(executable.resolve(strict=True)),
                 *configuration,
                 f"max_step={next_step}",
                 f"amr.restart={candidate}",
-                "amrex.throw_exception=1",
+                # These standalone C++ drivers have no exception handler.
+                # Use AMReX's MPI-aware abort path, not std::terminate during
+                # an uncaught assertion exception with OpenMP/MPI active.
+                "amrex.throw_exception=0",
                 "amrex.the_arena_init_size=0",
                 "warpx.verbose=1",
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            check=False,
-            timeout=60,
+            Path(f"missing_{missing}.log"),
         )
-    Path(f"missing_{missing}.log").write_text(result.stdout)
     expected = {
         "model": "Restart must preserve the radiation moment model",
         "ledger": "Moving radiation checkpoint must preserve its declared transport",

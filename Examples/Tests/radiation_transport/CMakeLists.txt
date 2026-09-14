@@ -1178,6 +1178,8 @@ if(WarpX_LIB)
         warpx_set_compile_warnings(test_rz_particle_impulse)
         set(rz_moving_environment
             "OMP_NUM_THREADS=2;AMREX_INPUTS_FILE_PREFIX=${CMAKE_CURRENT_SOURCE_DIR}/")
+        add_test(NAME test_radiation_checkpoint_process COMMAND ${Python_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_process.py)
         function(add_rz_moving_runtime_case case_name input_file analysis_file)
             set(case_dir "${CMAKE_CURRENT_BINARY_DIR}/${case_name}")
             set(restart_dir "${CMAKE_CURRENT_BINARY_DIR}/${case_name}_restart")
