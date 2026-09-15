@@ -193,7 +193,6 @@ Brew can be used to install dependencies on Linux and macOS.
 .. code-block:: bash
 
    brew update
-   brew tap openpmd/openpmd
    brew install adios2      # for openPMD
    brew install ccache
    brew install cmake
@@ -206,7 +205,7 @@ Brew can be used to install dependencies on Linux and macOS.
    brew install pkg-config  # for fftw
    brew install open-mpi
    brew install openblas    # for PSATD in RZ
-   brew install openpmd-api # for openPMD
+   brew install openpmd/openpmd/openpmd-api # for openPMD
 
 If you also want to compile with PSATD in RZ, you need to manually install BLAS++ and LAPACK++:
 
