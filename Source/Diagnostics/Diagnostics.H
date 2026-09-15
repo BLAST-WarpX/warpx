@@ -319,6 +319,8 @@ protected:
     amrex::Vector< amrex::Real> m_lo;
     /** Higher corner of the diagnostics output, in physical coordinates */
     amrex::Vector< amrex::Real> m_hi;
+    /** Simulation domain lower bound along the moving window before loading a checkpoint. */
+    amrex::Real m_moving_window_initial_lo = 0.0;
     /** Number of output buffers. The value is set to 1 for all FullDiagnostics */
     int m_num_buffers;
     /** Array of species indices that dump rho per species */

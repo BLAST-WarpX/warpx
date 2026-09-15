@@ -50,6 +50,11 @@ Diagnostics::BaseReadParameters ()
 {
     auto & warpx = WarpX::GetInstance();
 
+    // Diagnostics are constructed before the checkpoint geometry is restored.
+    if (WarpX::do_moving_window) {
+        m_moving_window_initial_lo = warpx.Geom(0).ProbLo(WarpX::moving_window_dir);
+    }
+
     const amrex::ParmParse pp_diag_name(m_diag_name);
     m_file_prefix = "diags/" + m_diag_name;
     pp_diag_name.query("file_prefix", m_file_prefix);
@@ -521,17 +526,15 @@ Diagnostics::InitBaseData ()
     nmax_lev = warpx.maxLevel() + 1;
     m_all_field_functors.resize( nmax_lev );
 
-    // For restart, move the m_lo and m_hi of the diag consistent with the
-    // current moving_window location. Account for start_moving_window_step and
-    // end_moving_window_step to only shift based on steps where the window was active.
+    // The checkpoint geometry contains the shifts actually applied to the grid.
+    // Reconstructing them from the step count and dt can round differently at cell
+    // boundaries. Preserve each diagnostic's offset from the original simulation domain.
     if (WarpX::do_moving_window && warpx.getistep(0) > 0) {
         const int moving_dir = WarpX::moving_window_dir;
-        const amrex::Real cell_size = warpx.Geom(0).CellSize(moving_dir);
-        const amrex::Real total_shift =
-            WarpX::MovingWindowShiftAtStep(warpx.getistep(0), warpx.getdt(0));
-        const int shift_num_base = WarpX::NumCellsShifted(total_shift, cell_size);
-        m_lo[moving_dir] += shift_num_base * cell_size;
-        m_hi[moving_dir] += shift_num_base * cell_size;
+        const amrex::Real displacement =
+            warpx.Geom(0).ProbLo(moving_dir) - m_moving_window_initial_lo;
+        m_lo[moving_dir] += displacement;
+        m_hi[moving_dir] += displacement;
     }
     // Construct Flush class.
     if        (m_format == "plotfile"){

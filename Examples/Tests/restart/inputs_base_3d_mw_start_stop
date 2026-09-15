@@ -30,8 +30,8 @@ warpx.cfl = .99
 # i.e. it has already stopped by the time the checkpoint at step 5 is
 # written. This is the case that exposed the restart bug: with the window
 # stopped, the diagnostics never get a chance to re-sync their lo/hi with
-# the moving-window position from a later step, so InitBaseData() must get
-# the shift right from the checkpointed step count alone.
+# the moving-window position from a later step, so InitBaseData() must
+# restore the diagnostic bounds correctly even while the window is stopped.
 warpx.do_moving_window = 1
 warpx.moving_window_dir = z
 warpx.moving_window_v = 1. # in units of the speed of light

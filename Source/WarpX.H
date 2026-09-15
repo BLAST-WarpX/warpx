@@ -781,22 +781,11 @@ public:
     }
     /** Physical distance the moving window travels in a single step of size dt
      *
-     * This is the same formula used every step in MoveWindow() to advance
-     * moving_window_x, factored out so restart logic can reconstruct the
-     * same displacement without re-deriving it.
-     */
-    static amrex::Real MovingWindowShiftPerStep (amrex::Real dt);
-    /** Total physical shift of the moving window accumulated over steps 1, ..., current_step
+     * Used every step in MoveWindow() to advance moving_window_x.
      *
-     * Mirrors the 1-indexed step numbers passed to moving_window_active() from the
-     * evolve loop (i.e. getistep(0)+1), so that a restart can recompute the
-     * shift caused by steps already replayed before the checkpoint without
-     * having independently tracked moving_window_x over those steps.
-     *
-     * @param current_step number of steps already completed, e.g. from getistep(0)
      * @param dt time step size
      */
-    static amrex::Real MovingWindowShiftAtStep (int current_step, amrex::Real dt);
+    static amrex::Real MovingWindowShiftPerStep (amrex::Real dt);
     /** Number of cells by which the moving window has shifted past domain_lo
      *
      * The moving window position is continuous, but the domain and fields can
