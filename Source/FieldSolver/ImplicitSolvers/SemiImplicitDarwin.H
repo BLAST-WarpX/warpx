@@ -48,7 +48,8 @@ public:
 
     int OneStep ( amrex::Real  start_time,
                   amrex::Real  a_dt,
-                  int          a_step ) override;
+                  int          a_step,
+                  bool verbose_step) override;
 
     /**
      * \brief Not implemented for this solver.
@@ -78,6 +79,28 @@ public:
      */
     void ApplyScaledMassMatrices ( ablastr::fields::MultiLevelVectorField& rhs,
                                    const ablastr::fields::MultiLevelVectorField& dA);
+
+    /**
+     * \brief Fill a cell-centered MultiFab with the scalar susceptibility
+     *  chi(x): the (2 mu0/dt)-scaled row-sum of the diagonal mass-matrix
+     *  bands, averaged over the three diagonal blocks and interpolated from
+     *  their native (E-type) staggering to cell centers. This is the local
+     *  chi scale the curl(chi curl Z) operator term applies to a uniform dA,
+     *  used by the pc_darwin_mlmg preconditioner's Helmholtz factor. Must be
+     *  called after the mass matrices have been deposited and synced for the
+     *  current step.
+     *
+     *  The full mass matrix is a 3x3 block tensor (one block per Jx/Jy/Jz
+     *  row/column pair) at every point of each block's native E-type
+     *  staggering, and each block is itself stored sparsely as several
+     *  components representing the deposition-stencil bands rather than as
+     *  a dense matrix. a_chi_cc collapses all of that to a single scalar per
+     *  cell: it keeps only the 3 diagonal blocks (xx, yy, zz), sums each
+     *  block's stencil-band components into a per-point row-sum, averages
+     *  that row-sum over the 3 diagonal blocks, and interpolates the result
+     *  from the staggered points onto the cell center.
+     */
+    void ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const;
 
     void PrepareVelocitiesForCurrentDeposition ();
     void AccumulateCurrentAndMassMatrices ();
@@ -133,6 +156,13 @@ private:
     int m_linsol_restart_length = 30;
     amrex::Real m_linsol_atol = 0.;
     amrex::Real m_linsol_rtol = 1.0e-4;
+
+    /**
+     * \brief Preconditioner for the GMRES solve (amrex_gmres.pc_type; off by
+     *  default). Only PreconditionerType::pc_darwin_mlmg is supported: the
+     *  factored-Laplacian MLMG preconditioner (see DarwinMLMGPC.H).
+     */
+    PreconditionerType m_pc_type = PreconditionerType::none;
 };
 
 #endif

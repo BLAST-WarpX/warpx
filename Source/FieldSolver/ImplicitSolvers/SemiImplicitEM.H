@@ -59,7 +59,8 @@ public:
 
     int OneStep (amrex::Real  start_time,
                  amrex::Real  a_dt,
-                 int          a_step) override;
+                 int          a_step,
+                 bool verbose_step) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,

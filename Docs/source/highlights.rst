@@ -14,6 +14,11 @@ Plasma-Based Acceleration
 
 Scientific works in laser-plasma and beam-plasma acceleration.
 
+#. Bonatto A, Nunes B S, Apiñaniz-Aginako J I, Bandiera L, Bontoiu C, Cavoto G, Drebot I, Gatti G, Giner-Navarro J, Lei B, Martín-Luna P, Rago I, Rodríguez-Pérez J, Sytov A, Cirrone P, Alva-Sánchez M S, Samad R E, Vieira N D, Valagiannopoulos C, Welsch C P, Xia G, Zhang J and Resta-López J.
+   **Laser wakefield acceleration in nanostructured plasmas**.
+   Eur. Phys. J. Plus **141**, 1043, 2026.
+   `DOI:10.1140/epjp/s13360-026-08213-3 <https://doi.org/10.1140/epjp/s13360-026-08213-3>`__
+
 #. Wang J X, Han L Q, Zhao X Y, Ablimit A, Gong Z, Wen H and Yu J Q.
    **Muon injection and acceleration via ultraintense electron beam-driven plasma wakefield**.
    Phys. Rev. Accel. Beams **29**, 021302, 2026.

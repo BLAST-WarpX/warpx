@@ -38,7 +38,8 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     [[maybe_unused]] MultiParticleContainer& mpc,
     [[maybe_unused]] MultiFluidContainer* mfl,
-    int max_level)
+    int max_level,
+    bool verbose_step)
 {
     ABLASTR_PROFILE("EffectivePotentialES::ComputeSpaceChargeField");
 
@@ -67,7 +68,8 @@ void EffectivePotentialES::ComputeSpaceChargeField (
     ExecutePythonCallback("afterdeposition");
 
     // perform phi calculation
-    computePhi(rho_fp, phi_fp, Efield_fp);
+    int const verbosity = verbose_step ? self_fields_verbosity : 0;
+    computePhi(rho_fp, phi_fp, Efield_fp, verbosity);
 
     // Compute the electric field. Note that if an EB is used the electric
     // field will be calculated in the computePhi call.
@@ -80,12 +82,13 @@ void EffectivePotentialES::ComputeSpaceChargeField (
 void EffectivePotentialES::computePhi (
     ablastr::fields::MultiLevelScalarField const& rho,
     ablastr::fields::MultiLevelScalarField const& phi,
-    ablastr::fields::MultiLevelVectorField const& efield )
+    ablastr::fields::MultiLevelVectorField const& efield,
+    int const verbosity)
 {
     // Use the AMREX MLMG solver
     computePhi(rho, phi, efield, self_fields_required_precision,
-                self_fields_absolute_tolerance, self_fields_max_iters,
-                self_fields_verbosity);
+               self_fields_absolute_tolerance, self_fields_max_iters,
+               verbosity);
 }
 
 void EffectivePotentialES::ComputeSigma (

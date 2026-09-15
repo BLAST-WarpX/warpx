@@ -67,7 +67,8 @@ public:
      */
     virtual int OneStep (amrex::Real  a_time,
                          amrex::Real  a_dt,
-                         int          a_step) = 0;
+                         int          a_step,
+                         bool verbose_step) = 0;
 
     //
     // the following routines are called by the linear and nonlinear solvers

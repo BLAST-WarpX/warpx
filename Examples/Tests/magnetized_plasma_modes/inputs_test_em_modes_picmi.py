@@ -95,6 +95,7 @@ class EMModes(object):
         verbose,
         include_es_solver=False,
         use_rkf45=False,
+        use_preconditioner=False,
     ):
         """Get input parameters for the specific case desired."""
         self.solver = solver
@@ -104,6 +105,7 @@ class EMModes(object):
         self.verbose = verbose or self.test
         self.include_es_solver = include_es_solver
         self.use_rkf45 = use_rkf45
+        self.use_preconditioner = use_preconditioner
 
         # sanity check
         assert dim > 0 and dim < 4, f"{dim}-dimensions not a valid input"
@@ -305,6 +307,11 @@ class EMModes(object):
                     relative_tolerance=5e-5,
                     max_iterations=2048,
                     verbose_int=(2 if self.test else 0),
+                    pc_type=(
+                        picmi.DarwinMLMGPreconditioner()
+                        if self.use_preconditioner
+                        else None
+                    ),
                 ),
             )
             if self.include_es_solver:
@@ -542,6 +549,12 @@ parser.add_argument(
     action="store_true",
 )
 parser.add_argument(
+    "--use_preconditioner",
+    help="Darwin only: precondition the GMRES solve with the factored-Laplacian "
+    "multigrid preconditioner",
+    action="store_true",
+)
+parser.add_argument(
     "-v",
     "--verbose",
     help="Verbose output",
@@ -558,5 +571,6 @@ run = EMModes(
     verbose=args.verbose,
     include_es_solver=args.include_es_solver,
     use_rkf45=args.use_rkf45,
+    use_preconditioner=args.use_preconditioner,
 )
 simulation.step()

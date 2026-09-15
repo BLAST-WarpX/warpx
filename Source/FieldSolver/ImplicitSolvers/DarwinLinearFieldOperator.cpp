@@ -13,6 +13,8 @@
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
+#include "NonlinearSolvers/DarwinMLMGPC.H"
+
 #include <AMReX_MultiFab.H>
 
 using warpx::fields::FieldType;
@@ -24,11 +26,19 @@ void DarwinLinearFieldOperator::define ( const WarpXSolverVec& a_U,
     BL_PROFILE("DarwinLinearFieldOperator::define()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        a_pc_type == PreconditionerType::none,
-        "DarwinLinearFieldOperator::define(): preconditioners are not supported");
+        a_pc_type == PreconditionerType::none ||
+        a_pc_type == PreconditionerType::pc_darwin_mlmg,
+        "DarwinLinearFieldOperator::define(): the only preconditioner supported "
+        "by the Darwin solver is pc_darwin_mlmg (or none for no preconditioning)");
 
     m_R.Define(a_U);
     m_ops = a_ops;
+
+    m_pc_type = a_pc_type;
+    if (m_pc_type == PreconditionerType::pc_darwin_mlmg) {
+        m_preCond = std::make_unique<DarwinMLMGPC<WarpXSolverVec,SemiImplicitDarwin>>();
+        m_preCond->Define(a_U, a_ops);
+    }
 
     // Allocate the scratch space used by apply() once here (every iterate of
     // Z shares this same layout) rather than on every GMRES iteration.

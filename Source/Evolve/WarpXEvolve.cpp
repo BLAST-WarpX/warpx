@@ -234,7 +234,7 @@ WarpX::Evolve (int numsteps)
         ExecutePythonCallback("particleinjection");
 
         // perform collisions and advance fields and particles by one time step
-        OneStep(cur_time, dt[0], step);
+        OneStep(cur_time, dt[0], step, verbose_step);
 
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
@@ -304,7 +304,7 @@ WarpX::Evolve (int numsteps)
             // loop (i.e. immediately after a `Redistribute` and before particle
             // positions are next pushed) so that the particles do not deposit out of bounds
             // and so that the fields are at the correct time in the output.
-            ComputeSpaceChargeField( reset_E_field, reset_B_field );
+            ComputeSpaceChargeField(reset_E_field, reset_B_field, verbose_step);
             if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
                 // Call Magnetostatic Solver to solve for the vector potential A and compute the
                 // B field.  Time varying A contribution to E field is neglected.
@@ -405,7 +405,8 @@ WarpX::Evolve (int numsteps)
 void WarpX::OneStep (
     amrex::Real a_cur_time,
     amrex::Real a_dt,
-    int a_step
+    int a_step,
+    bool verbose_step
 )
 {
     ABLASTR_PROFILE("WarpX::OneStep()");
@@ -413,7 +414,7 @@ void WarpX::OneStep (
     // implicit solver
     if (m_implicit_solver) {
         // advance fields and particles by one time step
-        const int exit_status = m_implicit_solver->OneStep(a_cur_time, a_dt, a_step);
+        const int exit_status = m_implicit_solver->OneStep(a_cur_time, a_dt, a_step, verbose_step);
         if (exit_status < 0) {
             std::stringstream solverMsg;
             solverMsg << "ImplicitSolver::OneStep() failed at step = " << a_step

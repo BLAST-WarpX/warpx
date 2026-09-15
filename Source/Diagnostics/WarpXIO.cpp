@@ -404,8 +404,10 @@ WarpX::InitFromCheckpoint ()
             }
         }
 
+        // Read any fields flagged checkpoint_restart in the field register
+        // (mirrors FlushFormatCheckpoint's write_checkpoints call). Flagged
+        // fields absent from an older checkpoint are skipped, not errors.
         m_fields.read_restarts(lev, amrex::MultiFabFileFullPrefix(lev, restart_chkfile, level_prefix, ""));
-
     }
 
     InitPML();

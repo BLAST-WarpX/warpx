@@ -341,6 +341,12 @@ namespace ablastr::fields
                 // only owning MultiFabs are read in
                 amrex::MultiFab & mf = mf_owner.m_mf;
                 const std::string & name = element.first;
+                if (!amrex::VisMF::Exist(dir + name)) {
+                    // The checkpoint predates this field being flagged (or was
+                    // written by a run that did not flag it): keep the runtime
+                    // initialization instead of failing the whole restart.
+                    continue;
+                }
                 amrex::VisMF::Read(mf, dir + name);
             }
         }

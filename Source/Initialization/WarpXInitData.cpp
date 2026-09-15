@@ -907,7 +907,8 @@ WarpX::InitData ()
         {
             bool const reset_E_field = false; // Do not erase previous user-specified values on the grid
             bool const reset_B_field = false; // Do not erase previous user-specified values on the grid
-            ComputeSpaceChargeField(reset_E_field, reset_B_field);
+            bool const verbose_step = true; // Always be verbose during initialization
+            ComputeSpaceChargeField(reset_E_field, reset_B_field, verbose_step);
             if (electrostatic_solver_id == ElectrostaticSolverAlgo::LabFrameElectroMagnetostatic) {
                 ComputeMagnetostaticField();
             }

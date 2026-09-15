@@ -10,6 +10,12 @@ transport requires, at every cell and time,
 Low-density cells (below the n_floor used by the solver) are masked, since
 T_e is gated there.
 
+The reference state (Te0, n0) is taken from the first post-step dump. The
+iteration-0 dump is skipped: it is written before the first field solve, when
+T_e still holds its zero allocation value (T_e is filled from the closure at
+the first step). The adiabat relation holds from any point on the adiabat, so
+the check itself is unchanged.
+
 Produces:
   * left  : T_e(x) measured (solid) vs Te0 (n/n0)^(gamma-1) (dashed) at
             several times;
@@ -61,10 +67,11 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     ts = OpenPMDTimeSeries(args.diag_dir)
-    its = list(ts.iterations)
-    times = np.asarray(ts.t, dtype=float)
+    # Skip the iteration-0 dump (T_e = 0 there, see the module docstring).
+    its = [it for it in ts.iterations if it > 0]
+    times = np.asarray(ts.t, dtype=float)[-len(its) :]
     if len(its) < 2:
-        raise SystemExit(f"Need >=2 dumps in {args.diag_dir}")
+        raise SystemExit(f"Need >=2 post-step dumps in {args.diag_dir}")
     g1 = args.gamma - 1.0
 
     def zavg(name, it):
@@ -85,7 +92,9 @@ def main(argv=None):
     Te_x = np.array(Te_x)  # (nt, nx)
     n_x = np.array(n_x)
 
-    # Reference state = median of the first dump (uniform initial fill).
+    # Reference state = median of the first post-step dump. The median
+    # commutes with the monotonic map T_e(n), so (Te0, n0) lies on the adiabat
+    # whenever the pointwise relation holds.
     Te0 = float(np.median(Te_x[0]))
     n0 = float(np.median(n_x[0]))
     Te_pred = Te0 * (n_x / n0) ** g1
