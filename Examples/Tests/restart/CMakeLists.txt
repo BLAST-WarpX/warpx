@@ -52,6 +52,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_acceleration_mw_cell_boundary  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_cell_boundary  # inputs
+    OFF  # analysis
+    OFF  # checksum: compared directly with the restarted run
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_acceleration_mw_cell_boundary_restart  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_acceleration_mw_cell_boundary_restart  # inputs
+    "analysis_restart_mw_start_stop.py --path diags/diag1000310"  # analysis
+    OFF  # checksum: analysis compares fields, particles, and domain bounds
+    test_3d_acceleration_mw_cell_boundary  # dependency
+)
+
+add_warpx_test(
     test_3d_acceleration_mw_start_stop  # name
     3  # dims
     2  # nprocs

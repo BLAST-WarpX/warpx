@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
 """
-Check that restarting a simulation with a moving window that has already
-stopped (i.e. current_step > end_moving_window_step at the time of the
-checkpoint) does not corrupt the diagnostic domain bounds.
+Check that moving-window restarts preserve diagnostic data and domain bounds.
 
-This complements analysis_default_restart.py: the bug this guards against
-does not change the number of cells written to the plotfile, only the
-domain_left_edge/domain_right_edge (and therefore the cell size) recorded
-in its header, so a purely value-based comparison of the two datasets is
-not sufficient to catch it.
+This complements analysis_default_restart.py by comparing both the number of
+cells and the physical extent. Incorrect bounds can change the recorded cell
+size even when the number of cells and field values are unchanged.
 """
 
 import argparse
@@ -37,6 +33,10 @@ def check_restart_domain(filename, tolerance=1e-12):
 
     benchmark = os.path.join(os.getcwd().replace("_restart", ""), filename)
     ds_benchmark = yt.load(benchmark)
+
+    np.testing.assert_array_equal(
+        ds_restart.domain_dimensions, ds_benchmark.domain_dimensions
+    )
 
     left_restart = ds_restart.domain_left_edge.v
     right_restart = ds_restart.domain_right_edge.v
@@ -76,5 +76,5 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    check_restart(filename=args.path, tolerance=args.rtol)
     check_restart_domain(filename=args.path, tolerance=args.rtol)
+    check_restart(filename=args.path, tolerance=args.rtol)

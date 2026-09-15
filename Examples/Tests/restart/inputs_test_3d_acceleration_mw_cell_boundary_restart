@@ -1,0 +1,3 @@
+FILE = inputs_test_3d_acceleration_mw_cell_boundary
+
+amr.restart = "../test_3d_acceleration_mw_cell_boundary/diags/chk000305"
