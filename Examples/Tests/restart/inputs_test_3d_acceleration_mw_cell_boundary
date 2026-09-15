@@ -1,4 +1,4 @@
-FILE = inputs_base_3d_mw_start_stop
+FILE = inputs_base_3d_mw
 
 # With CFL = 0.99, 300 active steps put the window at a cell boundary.
 # Accumulating the position step by step and recomputing 300*v*dt can round

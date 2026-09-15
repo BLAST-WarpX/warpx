@@ -1,2 +1,10 @@
-# base input parameters
-FILE = inputs_base_3d_mw_start_stop
+FILE = inputs_base_3d_mw
+
+# The window is only active for steps 2-3 (start=2, end=4 is exclusive),
+# i.e. it has already stopped by the time the checkpoint at step 5 is
+# written. This is the case that exposed the restart bug: with the window
+# stopped, the diagnostics never get a chance to re-sync their lo/hi with
+# the moving-window position from a later step, so InitBaseData() must
+# restore the diagnostic bounds correctly even while the window is stopped.
+warpx.start_moving_window_step = 2
+warpx.end_moving_window_step = 4
