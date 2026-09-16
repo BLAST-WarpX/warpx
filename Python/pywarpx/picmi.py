@@ -4759,7 +4759,13 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
             or data.get("plot_filter_function")
             or ""
         )
-        user_defined_kw = dict(data.get("user_defined_kw", {}))
+        # the field may be given by name or by its warpx_ alias (e.g., when loading a dump)
+        user_defined_kw_key = (
+            "warpx_user_defined_kw"
+            if "warpx_user_defined_kw" in data
+            else "user_defined_kw"
+        )
+        user_defined_kw = dict(data.get(user_defined_kw_key, {}))
         if plot_filter_function:
             known = set()
             for fname, finfo in cls.model_fields.items():
@@ -4773,7 +4779,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
                     r"\b%s\b" % k, plot_filter_function
                 ):
                     user_defined_kw[k] = data.pop(k)
-        data["user_defined_kw"] = user_defined_kw
+        data[user_defined_kw_key] = user_defined_kw
         return data
 
     def diagnostic_initialize_inputs(self):

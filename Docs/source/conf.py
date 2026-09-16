@@ -84,7 +84,13 @@ extensions = [
 # (from each Field(description=...)) is rendered for every documented class.
 # ``undoc-members`` is required because pydantic fields carry no __doc__ (their text
 # lives in Field(description=...)); without it autodoc skips them as "undocumented".
-autodoc_default_options = {"members": True, "undoc-members": True}
+# ``model_post_init`` is an internal initialization hook (pydantic generates it for models
+# with private attributes), not a user-facing method.
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "exclude-members": "model_post_init",
+}
 
 # -- autodoc-pydantic ---------------------------------------------------------
 # The PICMI bindings are pydantic models; render their (and the warpx_ extension)
