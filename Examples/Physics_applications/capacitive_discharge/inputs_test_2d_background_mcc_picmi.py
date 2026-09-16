@@ -88,6 +88,11 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
     method: Literal["FFT", "Multigrid"] | None = "Multigrid"
     required_precision: float | None = 1.0
 
+    @property
+    def phi(self):
+        """The electrostatic potential (available once the solver is initialized)"""
+        return self._phi
+
     def solver_initialize_inputs(self):
         """Grab geometrical quantities from the grid."""
         self._right_voltage = self.grid.potential_xmax
@@ -357,4 +362,4 @@ sim.add_diagnostic(field_diag)
 sim.step(max_steps)
 
 # confirm that the external solver was run
-assert hasattr(solver, "phi")
+assert solver.phi is not None
