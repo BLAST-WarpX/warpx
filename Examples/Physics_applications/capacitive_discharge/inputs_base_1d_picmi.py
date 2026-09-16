@@ -40,6 +40,11 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
     method: Literal["FFT", "Multigrid"] | None = "Multigrid"
     required_precision: float | None = 1.0
 
+    @property
+    def phi(self):
+        """The electrostatic potential (available once the solver is initialized)"""
+        return self._phi
+
     @field_validator("grid")
     @classmethod
     def _check_grid(cls, grid):
@@ -463,7 +468,7 @@ class CapacitiveDischargeExample(object):
 
         if self.pythonsolver:
             # confirm that the external solver was run
-            assert hasattr(self.solver, "phi")
+            assert self.solver.phi is not None
 
         if libwarpx.amr.ParallelDescriptor.MyProc() == 0:
             np.save(f"ion_density_case_{self.n + 1}.npy", self.ion_density_array)
