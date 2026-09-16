@@ -4076,6 +4076,18 @@ Maxwell solver: kinetic-fluid hybrid
     piecewise-constant-per-cell decision for all three components. Both are
     vacuum-favoring. Only supported in 3D and 2D (XZ) Cartesian geometry.
 
+.. pp:param:: hybrid_pic_model.use_conformal_eb
+    :type: ``0`` or ``1``
+    :default: ``0``
+
+    Use the conformal (enlarged-cell technique) embedded-boundary wall for the
+    hybrid-PIC B push instead of the stair-step approximation, with a
+    constitutive perfect-conductor closure: the Ohm's-law E and the Ampere
+    current are zeroed on every covered and cut edge, and cut faces evolve
+    through their fully-open edges. Second-order at curved walls where the
+    stair-step degrades to first order. Requires embedded boundaries, a
+    staggered (Yee) grid, and 3D or 2D (XZ) Cartesian geometry.
+
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
     :default: ``false``

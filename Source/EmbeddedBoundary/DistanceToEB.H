@@ -26,16 +26,17 @@ amrex::Real dot_product (const amrex::RealVect& a, const amrex::RealVect& b) noe
     return AMREX_D_TERM(a[0]*b[0], + a[1]*b[1], + a[2]*b[2]);
 }
 
-// This function calculates the unit normal vector to the embedded boundary at
-// the particle position (xp, yp, zp), by interpolating the signed distance
-// function distance_to_eb. plo/dxi are the geometry data. The normal is
-// always returned in 3D Cartesian coordinates.
+// This function calculates the (unnormalized) gradient of the signed distance
+// function distance_to_eb at the position (xp, yp, zp), in the grid's own
+// coordinates (AMREX_SPACEDIM components). plo/dxi are the geometry data.
+// Callers that need a unit normal should test the gradient for a vanishing or
+// non-finite magnitude before normalizing it (see interp_normal).
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
-amrex::GpuArray<amrex::ParticleReal, 3>
-interp_normal (amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
-                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
-                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi,
-                               amrex::Array4<const amrex::Real> const& distance_to_eb) noexcept
+amrex::RealVect
+interp_gradient (amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+                                 amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                                 amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi,
+                                 amrex::Array4<const amrex::Real> const& distance_to_eb) noexcept
 {
     using namespace amrex::literals;
 
@@ -134,6 +135,24 @@ interp_normal (amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleRe
     ))
 
 #endif
+
+    return normal;
+}
+
+// This function calculates the unit normal vector to the embedded boundary at
+// the particle position (xp, yp, zp), by interpolating the signed distance
+// function distance_to_eb. plo/dxi are the geometry data. The normal is
+// always returned in 3D Cartesian coordinates.
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+amrex::GpuArray<amrex::ParticleReal, 3>
+interp_normal (amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleReal zp,
+                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& plo,
+                               amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> const& dxi,
+                               amrex::Array4<const amrex::Real> const& distance_to_eb) noexcept
+{
+    using namespace amrex::literals;
+
+    amrex::RealVect normal = interp_gradient(xp, yp, zp, plo, dxi, distance_to_eb);
 
     // Normalize to unit length
     amrex::Real const inv_norm = 1.0_rt / std::sqrt(dot_product(normal, normal));
