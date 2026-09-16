@@ -10,16 +10,18 @@
 
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal, Self
 
 import numpy as np
 import periodictable
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 import picmistandard
 import pywarpx
 import pywarpx.callbacks
+from picmistandard import Expression
 
 codename = "warpx"
 picmistandard.register_codename(codename)
@@ -68,6 +70,25 @@ def _set_refined_region_inputs(refined_regions):
             pywarpx.amr.ref_ratio_vect = refined_regions[0][3]
     else:
         pywarpx.amr.max_level = 0
+
+
+def _potential_not_in_geometry(name, geometry):
+    """The potential on a boundary that the geometry does not have: always None.
+
+    Assigning None is accepted, so that scripts can reset all potentials independently of the
+    geometry.
+    """
+
+    def getter(self):
+        return None
+
+    def setter(self, value):
+        if value is not None:
+            raise AttributeError(f"{name} is not defined in {geometry} geometry")
+
+    return property(
+        getter, setter, doc=f"Not defined in {geometry} geometry (always None)"
+    )
 
 
 def warpx_options(picmi_base):
@@ -227,7 +248,7 @@ class Species(picmistandard.PICMI_Species):
         default=None,
         description="Cells with fewer particles than this number will be skipped during resampling.",
     )
-    resampling_trigger_intervals: Any | None = Field(
+    resampling_trigger_intervals: int | str | None = Field(
         default=None, description="Timesteps at which to resample"
     )
     # option name (warpx_resampling_trigger_max_avg_ppc) differs from the field name:
@@ -266,12 +287,12 @@ class Species(picmistandard.PICMI_Species):
     )
 
     # extra particle attributes (option names differ from the field names):
-    extra_int_attributes: dict | None = Field(
+    extra_int_attributes: dict[str, str] | None = Field(
         default=None,
         alias="warpx_add_int_attributes",
         description="Dictionary of extra integer particle attributes initialized from an expression that is a function of the variables (x, y, z, ux, uy, uz, t).",
     )
-    extra_real_attributes: dict | None = Field(
+    extra_real_attributes: dict[str, str] | None = Field(
         default=None,
         alias="warpx_add_real_attributes",
         description="Dictionary of extra real particle attributes initialized from an expression that is a function of the variables (x, y, z, ux, uy, uz, t).",
@@ -282,16 +303,21 @@ class Species(picmistandard.PICMI_Species):
         description="This flag is set per species to do another pass to deposit temperature on each timestep if required. Currently only works with Ohm's Law Hybrid Solver.",
     )
 
-    # --- Computed state (not user inputs; populated during/after initialization).
-    species_type: Any = Field(default=None, init=False, exclude=True)
-    element: Any = Field(default=None, init=False, exclude=True)
-    species_number: int | None = Field(default=None, init=False, exclude=True)
-    species: Any = Field(default=None, init=False, exclude=True)
+    # --- Runtime state (not user inputs; populated during/after initialization).
+    _species_type: str | None = PrivateAttr(default=None)
+    _element: periodictable.core.Element | None = PrivateAttr(default=None)
+    _species_number: int | None = PrivateAttr(default=None)
+    _species: pywarpx.Bucket.Bucket | None = PrivateAttr(default=None)
+
+    @property
+    def species(self):
+        """The WarpX inputs of this species (available after the inputs are initialized)"""
+        return self._species
 
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
 
-        self.species_type = None
+        self._species_type = None
         if self.particle_type in [
             "unspecified",
             "electron",
@@ -304,7 +330,7 @@ class Species(picmistandard.PICMI_Species):
             "antiproton",
             "alpha",
         ]:
-            self.species_type = self.particle_type
+            self._species_type = self.particle_type
         else:
             if self.charge is None and self.charge_state is not None:
                 self.charge = f"{self.charge_state}*q_e"
@@ -325,7 +351,7 @@ class Species(picmistandard.PICMI_Species):
                             # Note that not all valid charge states are defined in elements,
                             # so this value error can be ignored.
                             pass
-                    self.element = element
+                    self._element = element
                     if self.mass is None:
                         self.mass = (
                             element.mass * periodictable.constants.atomic_mass_constant
@@ -346,19 +372,19 @@ class Species(picmistandard.PICMI_Species):
         injection_plane_position=None,
         injection_plane_normal_vector=None,
     ):
-        self.species_number = len(pywarpx.particles.species_names)
+        self._species_number = len(pywarpx.particles.species_names)
 
         if self.name is None:
-            self.name = "species{}".format(self.species_number)
+            self.name = "species{}".format(self._species_number)
 
         pywarpx.particles.species_names.append(self.name)
 
         if initialize_self_fields is None:
             initialize_self_fields = False
 
-        self.species = pywarpx.Bucket.Bucket(
+        self._species = pywarpx.Bucket.Bucket(
             self.name,
-            species_type=self.species_type,
+            species_type=self._species_type,
             mass=self.mass,
             charge=self.charge,
             injection_style=None,
@@ -397,29 +423,29 @@ class Species(picmistandard.PICMI_Species):
         )
 
         # add reflection models
-        self.species.add_new_attr("reflection_model_xlo(E)", self.reflection_model_xlo)
-        self.species.add_new_attr("reflection_model_xhi(E)", self.reflection_model_xhi)
-        self.species.add_new_attr("reflection_model_ylo(E)", self.reflection_model_ylo)
-        self.species.add_new_attr("reflection_model_yhi(E)", self.reflection_model_yhi)
-        self.species.add_new_attr("reflection_model_zlo(E)", self.reflection_model_zlo)
-        self.species.add_new_attr("reflection_model_zhi(E)", self.reflection_model_zhi)
-        # self.species.add_new_attr("reflection_model_eb(E)", self.reflection_model_eb)
+        self._species.add_new_attr("reflection_model_xlo(E)", self.reflection_model_xlo)
+        self._species.add_new_attr("reflection_model_xhi(E)", self.reflection_model_xhi)
+        self._species.add_new_attr("reflection_model_ylo(E)", self.reflection_model_ylo)
+        self._species.add_new_attr("reflection_model_yhi(E)", self.reflection_model_yhi)
+        self._species.add_new_attr("reflection_model_zlo(E)", self.reflection_model_zlo)
+        self._species.add_new_attr("reflection_model_zhi(E)", self.reflection_model_zhi)
+        # self._species.add_new_attr("reflection_model_eb(E)", self.reflection_model_eb)
 
         # extra particle attributes
         if self.extra_int_attributes is not None:
-            self.species.addIntegerAttributes = self.extra_int_attributes.keys()
+            self._species.addIntegerAttributes = self.extra_int_attributes.keys()
             for attr, function in self.extra_int_attributes.items():
-                self.species.add_new_attr(
+                self._species.add_new_attr(
                     "attribute." + attr + "(x,y,z,ux,uy,uz,t)", function
                 )
         if self.extra_real_attributes is not None:
-            self.species.addRealAttributes = self.extra_real_attributes.keys()
+            self._species.addRealAttributes = self.extra_real_attributes.keys()
             for attr, function in self.extra_real_attributes.items():
-                self.species.add_new_attr(
+                self._species.add_new_attr(
                     "attribute." + attr + "(x,y,z,ux,uy,uz,t)", function
                 )
 
-        pywarpx.Particles.particles_list.append(self.species)
+        pywarpx.Particles.particles_list.append(self._species)
 
         if self.initial_distribution is not None:
             # Note: PICMI objects are pydantic models, which are themselves iterable, so
@@ -428,7 +454,7 @@ class Species(picmistandard.PICMI_Species):
             layout_is_list = isinstance(layout, (list, tuple))
             if not distributions_is_list and not layout_is_list:
                 self.initial_distribution.distribution_initialize_inputs(
-                    self.species_number, layout, self.species, self.density_scale, ""
+                    self._species_number, layout, self._species, self.density_scale, ""
                 )
             elif distributions_is_list and (layout_is_list or layout is None):
                 assert layout is None or (
@@ -439,13 +465,13 @@ class Species(picmistandard.PICMI_Species):
                 source_names = [
                     f"dist{i}" for i in range(len(self.initial_distribution))
                 ]
-                self.species.injection_sources = source_names
+                self._species.injection_sources = source_names
                 for i, dist in enumerate(self.initial_distribution):
                     layout_i = layout[i] if layout is not None else None
                     dist.distribution_initialize_inputs(
-                        self.species_number,
+                        self._species_number,
                         layout_i,
-                        self.species,
+                        self._species,
                         self.density_scale,
                         source_names[i],
                     )
@@ -461,8 +487,8 @@ class Species(picmistandard.PICMI_Species):
                     and injection_plane_normal_vector[1] == 0.0
                 ), Exception("Rigid injection can only be done along z")
             pywarpx.particles.rigid_injected_species.append(self.name)
-            self.species.rigid_advance = 1
-            self.species.zinject_plane = injection_plane_position
+            self._species.rigid_advance = 1
+            self._species.zinject_plane = injection_plane_position
 
 
 picmistandard.PICMI_MultiSpecies.Species_class = Species
@@ -486,9 +512,16 @@ class MultiSpecies(picmistandard.PICMI_MultiSpecies):
 
 
 class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
-    def init(self, kw):
-        self.do_symmetrize = kw.pop("warpx_do_symmetrize", None)
-        self.symmetrization_order = kw.pop("warpx_symmetrization_order", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_GaussianBunchDistribution)
+    )
+
+    do_symmetrize: bool | None = Field(
+        default=None, description="Whether to symmetrize the bunch"
+    )
+    symmetrization_order: int | None = Field(
+        default=None, description="The order of the symmetrization (4 or 8)"
+    )
 
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
@@ -583,13 +616,11 @@ class DensityDistributionBase(object):
     captures universal initialization logic."""
 
     def set_mangle_dict(self):
-        if not hasattr(self, "mangle_dict"):
-            self.mangle_dict = None
-
-        if hasattr(self, "user_defined_kw") and self.mangle_dict is None:
+        # The classes using this mixin declare the ``_mangle_dict`` private attribute.
+        if hasattr(self, "user_defined_kw") and self._mangle_dict is None:
             # Only do this once so that the same variables can be used multiple
             # times
-            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+            self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
     def set_species_attributes(self, species, layout, source_name):
         if isinstance(layout, GriddedLayout):
@@ -622,7 +653,8 @@ class DensityDistributionBase(object):
         species.add_new_group_attr(source_name, "zmin", self.lower_bound[2])
         species.add_new_group_attr(source_name, "zmax", self.upper_bound[2])
 
-        if self.fill_in:
+        # the flux distributions are always injected continuously and have no fill_in
+        if getattr(self, "fill_in", None):
             species.add_new_group_attr(source_name, "do_continuous_injection", 1)
 
         if hasattr(self, "momentum_spread_expressions") and np.any(
@@ -720,7 +752,7 @@ class DensityDistributionBase(object):
         for sdir, idir in zip(["x", "y", "z"], [0, 1, 2]):
             if expressions[idir] is not None:
                 expression = pywarpx.my_constants.mangle_expression(
-                    expressions[idir], self.mangle_dict
+                    expressions[idir], self._mangle_dict
                 )
             else:
                 expression = f"{defaults[idir]}"
@@ -735,7 +767,7 @@ class UniformDistribution(
     picmistandard.PICMI_UniformDistribution, DensityDistributionBase
 ):
     # Runtime state populated by the DensityDistributionBase mixin.
-    mangle_dict: Any = Field(default=None, init=False, exclude=True)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
@@ -753,11 +785,6 @@ class UniformDistribution(
 class FluxDistributionBase(object):
     """This is a base class for both uniform and analytic flux distributions."""
 
-    def init(self, kw):
-        self.inject_from_embedded_boundary = kw.pop(
-            "warpx_inject_from_embedded_boundary", False
-        )
-
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         """Initialize the flux profile and flux function."""
         pass
@@ -765,7 +792,6 @@ class FluxDistributionBase(object):
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
-        self.fill_in = False
         self.set_mangle_dict()
         self.set_species_attributes(species, layout, source_name)
 
@@ -805,23 +831,25 @@ class AnalyticFluxDistribution(
     FluxDistributionBase,
     DensityDistributionBase,
 ):
-    """
-    Parameters
-    ----------
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_AnalyticFluxDistribution)
+    )
 
-    warpx_inject_from_embedded_boundary: bool
-        When true, the flux is injected from the embedded boundaries instead
-        of a plane.
-    """
+    inject_from_embedded_boundary: bool = Field(
+        default=False,
+        description="When true, the flux is injected from the embedded boundaries instead of a plane.",
+    )
 
-    def init(self, kw):
-        FluxDistributionBase.init(self, kw)
+    # Runtime state populated by the DensityDistributionBase mixin.
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
         if density_scale is not None:
             species.add_new_group_attr(source_name, "flux", density_scale)
-        expression = pywarpx.my_constants.mangle_expression(self.flux, self.mangle_dict)
+        expression = pywarpx.my_constants.mangle_expression(
+            self.flux, self._mangle_dict
+        )
         if density_scale is None:
             species.add_new_group_attr(
                 source_name, "flux_function(x,y,z,t)", expression
@@ -839,17 +867,17 @@ class UniformFluxDistribution(
     FluxDistributionBase,
     DensityDistributionBase,
 ):
-    """
-    Parameters
-    ----------
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_UniformFluxDistribution)
+    )
 
-    warpx_inject_from_embedded_boundary: bool
-        When true, the flux is injected from the embedded boundaries instead
-        of a plane.
-    """
+    inject_from_embedded_boundary: bool = Field(
+        default=False,
+        description="When true, the flux is injected from the embedded boundaries instead of a plane.",
+    )
 
-    def init(self, kw):
-        FluxDistributionBase.init(self, kw)
+    # Runtime state populated by the DensityDistributionBase mixin.
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "constant")
@@ -861,8 +889,6 @@ class UniformFluxDistribution(
 class AnalyticDistribution(
     picmistandard.PICMI_AnalyticDistribution, DensityDistributionBase
 ):
-    """ """
-
     model_config = ConfigDict(
         alias_generator=warpx_options(picmistandard.PICMI_AnalyticDistribution)
     )
@@ -877,14 +903,14 @@ class AnalyticDistribution(
     )
     # Re-declare the standard ``momentum_spread_expressions`` under the WarpX alias to
     # preserve the historical ``warpx_`` spelling (both spellings are accepted).
-    momentum_spread_expressions: list[str | None] = Field(
+    momentum_spread_expressions: list[Expression | None] = Field(
         default_factory=lambda: [None, None, None],
         alias="warpx_momentum_spread_expressions",
         description="Analytic expressions describing the gamma*velocity spread for each axis [m/s]. Expressions should be in terms of the position, written as 'x', 'y', and 'z'. Parameters can be used in the expression with the values given as keyword arguments. For any axis not supplied (set to None), zero will be used.",
     )
 
     # Runtime state populated by the DensityDistributionBase mixin.
-    mangle_dict: Any = Field(default=None, init=False, exclude=True)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
@@ -894,7 +920,7 @@ class AnalyticDistribution(
 
         species.add_new_group_attr(source_name, "profile", "parse_density_function")
         expression = pywarpx.my_constants.mangle_expression(
-            self.density_expression, self.mangle_dict
+            self.density_expression, self._mangle_dict
         )
         if density_scale is None:
             species.add_new_group_attr(
@@ -909,9 +935,6 @@ class AnalyticDistribution(
 
 
 class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
-    def init(self, kw):
-        pass
-
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -933,14 +956,13 @@ class ParticleListDistribution(picmistandard.PICMI_ParticleListDistribution):
         )
         if density_scale is not None:
             species.add_new_group_attr(
-                source_name, "multiple_particles_weight", self.weight * density_scale
+                source_name,
+                "multiple_particles_weight",
+                np.asarray(self.weight) * density_scale,
             )
 
 
 class FromFileDistribution(picmistandard.PICMI_FromFileDistribution):
-    def init(self, kw):
-        pass
-
     def distribution_initialize_inputs(
         self, species_number, layout, species, density_scale, source_name
     ):
@@ -1046,14 +1068,14 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
         default=None,
         description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
     )
-    thermal_boundary_u_th: dict | None = Field(
+    thermal_boundary_u_th: dict[str, float] | None = Field(
         default=None,
         alias="warpx_boundary_u_th",
         description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
     )
-    # RZ geometry has no second Cartesian axis; these stay None.
-    potential_ymin: float | str | None = Field(default=None, init=False, exclude=True)
-    potential_ymax: float | str | None = Field(default=None, init=False, exclude=True)
+    # RZ geometry has no second Cartesian axis.
+    potential_ymin = _potential_not_in_geometry("potential_ymin", "RZ")
+    potential_ymax = _potential_not_in_geometry("potential_ymax", "RZ")
 
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
@@ -1162,16 +1184,16 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
         default=None,
         description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
     )
-    thermal_boundary_u_th: dict | None = Field(
+    thermal_boundary_u_th: dict[str, float] | None = Field(
         default=None,
         alias="warpx_boundary_u_th",
         description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
     )
-    # 1D geometry has only the longitudinal (z) axis; these stay None.
-    potential_xmin: float | str | None = Field(default=None, init=False, exclude=True)
-    potential_xmax: float | str | None = Field(default=None, init=False, exclude=True)
-    potential_ymin: float | str | None = Field(default=None, init=False, exclude=True)
-    potential_ymax: float | str | None = Field(default=None, init=False, exclude=True)
+    # 1D geometry has only the longitudinal (z) axis.
+    potential_xmin = _potential_not_in_geometry("potential_xmin", "1D")
+    potential_xmax = _potential_not_in_geometry("potential_xmax", "1D")
+    potential_ymin = _potential_not_in_geometry("potential_ymin", "1D")
+    potential_ymax = _potential_not_in_geometry("potential_ymax", "1D")
 
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
@@ -1279,14 +1301,14 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
         default=None,
         description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
     )
-    thermal_boundary_u_th: dict | None = Field(
+    thermal_boundary_u_th: dict[str, float] | None = Field(
         default=None,
         alias="warpx_boundary_u_th",
         description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
     )
     # 2D geometry is the x-z plane; there is no second (y) axis.
-    potential_ymin: float | str | None = Field(default=None, init=False, exclude=True)
-    potential_ymax: float | str | None = Field(default=None, init=False, exclude=True)
+    potential_ymin = _potential_not_in_geometry("potential_ymin", "2D")
+    potential_ymax = _potential_not_in_geometry("potential_ymax", "2D")
 
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
@@ -1417,7 +1439,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         default=None,
         description="The timestep at which the moving window ends. If -1, the moving window will continue until the end of the simulation.",
     )
-    thermal_boundary_u_th: dict | None = Field(
+    thermal_boundary_u_th: dict[str, float] | None = Field(
         default=None,
         alias="warpx_boundary_u_th",
         description="If a thermal boundary is used for particles, this dictionary should specify the thermal speed for each species in the form {`<species>`: u_th}. Note: u_th = sqrt(T*q_e/mass)/clight with T in eV.",
@@ -1612,7 +1634,14 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         pywarpx.warpx.do_pml_j_damping = self.do_pml_j_damping
 
 
-class ExplicitEvolveScheme(picmistandard.base._ClassWithInit):
+class EvolveSchemeBase(picmistandard.PICMI_Extension):
+    """Base class of the evolve schemes, accepted as ``Simulation.warpx_evolve_scheme``"""
+
+    def solver_scheme_initialize_inputs(self):
+        raise NotImplementedError
+
+
+class ExplicitEvolveScheme(EvolveSchemeBase):
     """
     Sets up the explicit evolve scheme
     """
@@ -1621,61 +1650,67 @@ class ExplicitEvolveScheme(picmistandard.base._ClassWithInit):
         pywarpx.algo.evolve_scheme = "explicit"
 
 
-class LinearSolverBase(picmistandard.base._ClassWithInit):
-    pass
+class LinearSolverBase(picmistandard.PICMI_Extension):
+    """Base class of the linear solvers"""
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        raise NotImplementedError
+
+
+class PreconditionerBase(picmistandard.PICMI_Extension):
+    """Base class of the preconditioners"""
+
+    # Name of the WarpX preconditioner type, set by subclasses.
+    name: ClassVar[str | None] = None
+
+    # Whether this preconditioner can be selected directly on a linear
+    # solver (rather than only via a nonlinear solver's Jacobian).
+    supports_direct_gmres: ClassVar[bool] = False
+
+    def preconditioner_type_initialize_inputs(self, jacobian=None):
+        if jacobian is not None:
+            jacobian.pc_type = self.name
+        bucket = pywarpx.warpx.get_bucket(self.name)
+        for attr in type(self).model_fields:
+            setattr(bucket, attr, getattr(self, attr))
 
 
 class GMRESLinearSolver(LinearSolverBase):
     """
     Sets up the iterative GMRES linear solver for the implicit Newton nonlinear solver
-
-    Parameters
-    ----------
-    verbose_int: integer, default=2
-        Level of verbosity of output
-
-    restart_length: integer, default=30
-       How often to restart the GMRES iterations
-
-    max_iterations: integer, default=1000
-        Maximum number of iterations
-
-    relative_tolerance: float, default=1.e-4
-        Relative tolerance of the convergence
-
-    absolute_tolerance: float, default=0.
-        Absoluate tolerence of the convergence
-
-    pc_type: preconditioner instance, optional
-        The preconditioner applied inside the GMRES iterations. This is only
-        used by solvers that drive GMRES directly rather than through a
-        nonlinear solver (currently the semi-implicit Darwin solver, which
-        supports an instance of DarwinMLMGPreconditioner); with a nonlinear
-        solver, pass the preconditioner to that solver instead.
     """
 
-    def __init__(
-        self,
-        verbose_int=None,
-        restart_length=None,
-        absolute_tolerance=None,
-        relative_tolerance=None,
-        max_iterations=None,
-        pc_type=None,
-    ):
-        self.verbose_int = verbose_int
-        self.restart_length = restart_length
-        self.absolute_tolerance = absolute_tolerance
-        self.relative_tolerance = relative_tolerance
-        self.max_iterations = max_iterations
-        self.pc_type = pc_type
+    verbose_int: int | None = Field(
+        default=None, description="Level of verbosity of output (default 2)"
+    )
+    restart_length: int | None = Field(
+        default=None,
+        description="How often to restart the GMRES iterations (default 30)",
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence (default 0.)"
+    )
+    relative_tolerance: float | None = Field(
+        default=None,
+        description="Relative tolerance of the convergence (default 1.e-4)",
+    )
+    max_iterations: int | None = Field(
+        default=None, description="Maximum number of iterations (default 1000)"
+    )
+    pc_type: PreconditionerBase | None = Field(
+        default=None,
+        description="The preconditioner applied inside the GMRES iterations. This is only used by solvers that drive GMRES directly rather than through a nonlinear solver (currently the semi-implicit Darwin solver, which supports an instance of DarwinMLMGPreconditioner); with a nonlinear solver, pass the preconditioner to that solver instead.",
+    )
 
-        if pc_type is not None:
-            assert isinstance(pc_type, PreconditionerBase)
-            assert pc_type.supports_direct_gmres, (
+    @field_validator("pc_type")
+    @classmethod
+    def _check_direct_gmres_support(cls, pc_type):
+        if pc_type is not None and not pc_type.supports_direct_gmres:
+            raise ValueError(
                 f"{type(pc_type).__name__} cannot be selected directly on the "
                 "GMRES solver; pass it to the nonlinear solver instead"
             )
+        return pc_type
 
     def linear_solver_initialize_inputs(self, nonlinear_solver=None):
         if nonlinear_solver is not None:
@@ -1695,9 +1730,6 @@ class GMRESLinearSolver(LinearSolverBase):
 class PETScKSPLinearSolver(LinearSolverBase):
     """
     Sets up the petsc_ksp linear solver for the implicit Newton nonlinear solver
-
-    Parameters
-    ----------
     """
 
     def linear_solver_initialize_inputs(self, nonlinear_solver=None):
@@ -1705,72 +1737,38 @@ class PETScKSPLinearSolver(LinearSolverBase):
             nonlinear_solver.linear_solver = "petsc_ksp"
 
 
-class PreconditionerBase(picmistandard.base._ClassWithInit):
-    # Name of the WarpX preconditioner type, set by subclasses.
-    name = None
-
-    # Whether this preconditioner can be selected directly on a linear
-    # solver (rather than only via a nonlinear solver's Jacobian).
-    supports_direct_gmres = False
-
-    def preconditioner_type_initialize_inputs(self, jacobian=None):
-        if jacobian is not None:
-            jacobian.pc_type = self.name
-        bucket = pywarpx.warpx.get_bucket(self.name)
-        for attr, value in vars(self).items():
-            setattr(bucket, attr, value)
-
-
 class CurlCurlMLMGPreconditioner(PreconditionerBase):
     """
     Sets up the curl-curl multigrid preconditioner used during the nonlinear solver
-
-    Parameters
-    ----------
-    verbose: bool, optional
-        Whether there is verbose output from the solver
-
-    bottom_verbose: bool, optional
-        Whether there is verbose output from the bottom solver
-
-    agglomeration: bool, optional
-
-    consolidation: bool, optional
-
-    max_iter: int, optional
-        Maximum number of iterations
-
-    max_coarsening_level: int, optional
-        Maximum coarsening level
-
-    relative_tolerance: float, optional
-        Relative tolerance of the convergence
-
-    absolute_tolerance: float, optional
-        Absoluate tolerence of the convergence
     """
 
-    name = "pc_curl_curl_mlmg"
+    name: ClassVar[str | None] = "pc_curl_curl_mlmg"
 
-    def __init__(
-        self,
-        verbose=None,
-        bottom_verbose=None,
-        agglomeration=None,
-        consolidation=None,
-        max_iter=None,
-        max_coarsening_level=None,
-        relative_tolerance=None,
-        absolute_tolerance=None,
-    ):
-        self.verbose = verbose
-        self.bottom_verbose = bottom_verbose
-        self.agglomeration = agglomeration
-        self.consolidation = consolidation
-        self.max_iter = max_iter
-        self.max_coarsening_level = max_coarsening_level
-        self.relative_tolerance = relative_tolerance
-        self.absolute_tolerance = absolute_tolerance
+    verbose: bool | None = Field(
+        default=None, description="Whether there is verbose output from the solver"
+    )
+    bottom_verbose: bool | None = Field(
+        default=None,
+        description="Whether there is verbose output from the bottom solver",
+    )
+    agglomeration: bool | None = Field(
+        default=None, description="Whether to use agglomeration"
+    )
+    consolidation: bool | None = Field(
+        default=None, description="Whether to use consolidation"
+    )
+    max_iter: int | None = Field(
+        default=None, description="Maximum number of iterations"
+    )
+    max_coarsening_level: int | None = Field(
+        default=None, description="Maximum coarsening level"
+    )
+    relative_tolerance: float | None = Field(
+        default=None, description="Relative tolerance of the convergence"
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence"
+    )
 
 
 class DarwinMLMGPreconditioner(PreconditionerBase):
@@ -1781,240 +1779,163 @@ class DarwinMLMGPreconditioner(PreconditionerBase):
     (-nabla^2)(-nabla^2 + chi) and applies it as two successive scalar
     multigrid solves (Poisson then Helmholtz with the spatially varying
     susceptibility) per vector component.
-
-    Parameters
-    ----------
-    verbose: bool, default=False
-        Whether there is verbose output from the solver
-
-    bottom_verbose: bool, optional
-        Whether there is verbose output from the bottom solver
-
-    agglomeration: bool, optional
-
-    consolidation: bool, optional
-
-    max_iter: int, default=2
-        The fixed number of V-cycles used for each of the two multigrid
-        solves per component (fixed so the preconditioner is a fixed linear
-        operator across a GMRES solve)
-
-    max_coarsening_level: int, optional
-        Maximum coarsening level
-
-    relative_tolerance: float, optional
-        Relative tolerance of the convergence
-
-    absolute_tolerance: float, optional
-        Absolute tolerance of the convergence
     """
 
-    name = "pc_darwin_mlmg"
-    supports_direct_gmres = True
+    name: ClassVar[str | None] = "pc_darwin_mlmg"
+    supports_direct_gmres: ClassVar[bool] = True
 
-    def __init__(
-        self,
-        verbose=None,
-        bottom_verbose=None,
-        agglomeration=None,
-        consolidation=None,
-        max_iter=None,
-        max_coarsening_level=None,
-        relative_tolerance=None,
-        absolute_tolerance=None,
-    ):
-        self.verbose = verbose
-        self.bottom_verbose = bottom_verbose
-        self.agglomeration = agglomeration
-        self.consolidation = consolidation
-        self.max_iter = max_iter
-        self.max_coarsening_level = max_coarsening_level
-        self.relative_tolerance = relative_tolerance
-        self.absolute_tolerance = absolute_tolerance
+    verbose: bool | None = Field(
+        default=None,
+        description="Whether there is verbose output from the solver (default False)",
+    )
+    bottom_verbose: bool | None = Field(
+        default=None,
+        description="Whether there is verbose output from the bottom solver",
+    )
+    agglomeration: bool | None = Field(
+        default=None, description="Whether to use agglomeration"
+    )
+    consolidation: bool | None = Field(
+        default=None, description="Whether to use consolidation"
+    )
+    max_iter: int | None = Field(
+        default=None,
+        description="The fixed number of V-cycles used for each of the two multigrid solves per component (fixed so the preconditioner is a fixed linear operator across a GMRES solve) (default 2)",
+    )
+    max_coarsening_level: int | None = Field(
+        default=None, description="Maximum coarsening level"
+    )
+    relative_tolerance: float | None = Field(
+        default=None, description="Relative tolerance of the convergence"
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence"
+    )
 
 
 class JacobiPreconditioner(PreconditionerBase):
     """
     Sets up the point Jacobi preconditioner used during the nonlinear solver
-
-    Parameters
-    ----------
-    verbose: bool, optional
-        Whether there is verbose output from the solver
-
-    max_iter: int, optional
-        Maximum number of iterations
-
-    relative_tolerance: float, optional
-        Relative tolerance of the convergence
-
-    absolute_tolerance: float, optional
-        Absoluate tolerence of the convergence
     """
 
-    name = "pc_jacobi"
+    name: ClassVar[str | None] = "pc_jacobi"
 
-    def __init__(
-        self,
-        verbose=None,
-        max_iter=None,
-        relative_tolerance=None,
-        absolute_tolerance=None,
-    ):
-        self.verbose = verbose
-        self.max_iter = max_iter
-        self.relative_tolerance = relative_tolerance
-        self.absolute_tolerance = absolute_tolerance
+    verbose: bool | None = Field(
+        default=None, description="Whether there is verbose output from the solver"
+    )
+    max_iter: int | None = Field(
+        default=None, description="Maximum number of iterations"
+    )
+    relative_tolerance: float | None = Field(
+        default=None, description="Relative tolerance of the convergence"
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence"
+    )
 
 
 class PETScPreconditioner(PreconditionerBase):
     """
     Sets up the PETSc preconditioner used during the nonlinear solver
-
-    Parameters
-    ----------
-    type: string, optional
-        PETSc solver type, one of "lu", "asm", or "hypre"
-
-    asm_overlap: int, optional
-        Parameter for type is "asm"
-
-    sub_type: string, optional
-        When type is "asm", one of "ilu" or "lu", defailt "ilu"
-
-    ilu_factor_levels: int, optional
-        When type is "asm", and sub_type is "ilu"
-
-    hypre_type: string, optional
-        When type is "hypre", default "euclid"
-
-    euclid_factor_levels: string, optional
-        When type is "hypre" and hypre_type is "euclid"
     """
 
-    name = "pc_petsc"
+    name: ClassVar[str | None] = "pc_petsc"
 
-    def __init__(
-        self,
-        type=None,
-        asm_overlap=None,
-        sub_type=None,
-        ilu_factor_levels=None,
-        hypre_type=None,
-        euclid_factor_levels=None,
-    ):
-        self.type = type
-        self.asm_overlap = asm_overlap
-        self.sub_type = sub_type
-        self.ilu_factor_levels = ilu_factor_levels
-        self.hypre_type = hypre_type
-        self.euclid_factor_levels = euclid_factor_levels
+    type: Literal["lu", "asm", "hypre"] | None = Field(
+        default=None, description='PETSc solver type, one of "lu", "asm", or "hypre"'
+    )
+    asm_overlap: int | None = Field(
+        default=None, description='Parameter for type is "asm"'
+    )
+    sub_type: Literal["ilu", "lu"] | None = Field(
+        default=None,
+        description='When type is "asm", one of "ilu" or "lu", default "ilu"',
+    )
+    ilu_factor_levels: int | None = Field(
+        default=None, description='When type is "asm", and sub_type is "ilu"'
+    )
+    hypre_type: str | None = Field(
+        default=None, description='When type is "hypre", default "euclid"'
+    )
+    euclid_factor_levels: int | None = Field(
+        default=None, description='When type is "hypre" and hypre_type is "euclid"'
+    )
 
 
-class NonlinearSolverBase(picmistandard.base._ClassWithInit):
-    pass
+class NonlinearSolverBase(picmistandard.PICMI_Extension):
+    """Base class of the nonlinear solvers"""
+
+    def nonlinear_solver_initialize_inputs(self):
+        raise NotImplementedError
 
 
 class NewtonNonlinearSolver(NonlinearSolverBase):
     """
     Sets up the iterative Newton nonlinear solver for the implicit evolve scheme
-
-    Parameters
-    ----------
-    verbose: bool, default=True
-        Whether there is verbose output from the solver
-
-    linear_solver: linear solver instance, optional
-        Specifies input arguments to the linear solver
-
-    require_convergence: bool, default True
-        Whether convergence is required. If True and convergence is not obtained, the code will exit.
-
-    max_iterations: integer, default=100
-        Maximum number of iterations
-
-    relative_tolerance: float, default=1.e-6
-        Relative tolerance of the convergence
-
-    absolute_tolerance: float, default=0.
-        Absoluate tolerence of the convergence
-
-    diagnostic_file: string, optional
-        File name where solver diagnostics are written
-
-    diagnostic_interval: string, optional
-        The intervals for writing out solver diagnostics to the diagnostic file
-
-    max_particle_iterations: integer, optional
-        The maximum number of particle iterations
-
-    particle_tolerance: float, optional
-        The tolerance of parrticle quantities for convergence
-
-    particle_suborbits: bool, optional
-        Whether to use particle suborbits during the solve
-
-    print_unconverged_particle_detail: bool, optional
-        Whether to print the details of unconverged particles during suborbits
-
-    use_mass_matrices_jacobian: bool, optional
-        Whether to use mass-matrices during the linear stage of PS-JFNK
-
-    skip_particle_picard_init: bool, optional
-        When use_mass_matrices_jacobian is True, whether to skip the particle picard iteration on the initial Newton step
-
-    use_mass_matrices_pc: bool, optional
-        Whether to capture the plasma response in the preconditioner
-
-    mass_matrices_pc_width: int, optional
-        When use_mass_matrices_pc is True, the width of the preconditioner mass matrices
-
-    pc_type: preconditioner instance, optional
-        The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, or PETScPreconditioner
     """
 
-    def __init__(
-        self,
-        verbose=None,
-        linear_solver=None,
-        require_convergence=None,
-        max_iterations=None,
-        relative_tolerance=None,
-        absolute_tolerance=None,
-        diagnostic_file=None,
-        diagnostic_interval=None,
-        max_particle_iterations=None,
-        particle_tolerance=None,
-        particle_suborbits=None,
-        print_unconverged_particle_detail=None,
-        use_mass_matrices_jacobian=None,
-        skip_particle_picard_init=None,
-        use_mass_matrices_pc=None,
-        mass_matrices_pc_width=None,
-        pc_type=None,
-    ):
-        self.verbose = verbose
-        self.linear_solver = linear_solver
-        self.max_iterations = max_iterations
-        self.relative_tolerance = relative_tolerance
-        self.absolute_tolerance = absolute_tolerance
-        self.require_convergence = require_convergence
-        self.diagnostic_file = diagnostic_file
-        self.diagnostic_interval = diagnostic_interval
-        self.max_particle_iterations = max_particle_iterations
-        self.particle_tolerance = particle_tolerance
-        self.particle_suborbits = particle_suborbits
-        self.print_unconverged_particle_detail = print_unconverged_particle_detail
-        self.use_mass_matrices_jacobian = use_mass_matrices_jacobian
-        self.skip_particle_picard_init = skip_particle_picard_init
-        self.use_mass_matrices_pc = use_mass_matrices_pc
-        self.mass_matrices_pc_width = mass_matrices_pc_width
-        self.pc_type = pc_type
-
-        if linear_solver is not None:
-            assert isinstance(linear_solver, LinearSolverBase)
-        if pc_type is not None:
-            assert isinstance(pc_type, PreconditionerBase)
+    verbose: bool | None = Field(
+        default=None,
+        description="Whether there is verbose output from the solver (default True)",
+    )
+    linear_solver: LinearSolverBase | None = Field(
+        default=None, description="Specifies input arguments to the linear solver"
+    )
+    require_convergence: bool | None = Field(
+        default=None,
+        description="Whether convergence is required. If True and convergence is not obtained, the code will exit. (default True)",
+    )
+    max_iterations: int | None = Field(
+        default=None, description="Maximum number of iterations (default 100)"
+    )
+    relative_tolerance: float | None = Field(
+        default=None,
+        description="Relative tolerance of the convergence (default 1.e-6)",
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence (default 0.)"
+    )
+    diagnostic_file: str | None = Field(
+        default=None, description="File name where solver diagnostics are written"
+    )
+    diagnostic_interval: int | str | None = Field(
+        default=None,
+        description="The intervals for writing out solver diagnostics to the diagnostic file",
+    )
+    max_particle_iterations: int | None = Field(
+        default=None, description="The maximum number of particle iterations"
+    )
+    particle_tolerance: float | None = Field(
+        default=None,
+        description="The tolerance of particle quantities for convergence",
+    )
+    particle_suborbits: bool | None = Field(
+        default=None, description="Whether to use particle suborbits during the solve"
+    )
+    print_unconverged_particle_detail: bool | None = Field(
+        default=None,
+        description="Whether to print the details of unconverged particles during suborbits",
+    )
+    use_mass_matrices_jacobian: bool | None = Field(
+        default=None,
+        description="Whether to use mass-matrices during the linear stage of PS-JFNK",
+    )
+    skip_particle_picard_init: bool | None = Field(
+        default=None,
+        description="When use_mass_matrices_jacobian is True, whether to skip the particle picard iteration on the initial Newton step",
+    )
+    use_mass_matrices_pc: bool | None = Field(
+        default=None,
+        description="Whether to capture the plasma response in the preconditioner",
+    )
+    mass_matrices_pc_width: int | None = Field(
+        default=None,
+        description="When use_mass_matrices_pc is True, the width of the preconditioner mass matrices",
+    )
+    pc_type: PreconditionerBase | None = Field(
+        default=None,
+        description="The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, or PETScPreconditioner",
+    )
 
     def nonlinear_solver_initialize_inputs(self):
         implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
@@ -2050,48 +1971,33 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
 class PicardNonlinearSolver(NonlinearSolverBase):
     """
     Sets up the iterative Picard nonlinear solver for the implicit evolve scheme
-
-    Parameters
-    ----------
-    verbose: bool, default=True
-        Whether there is verbose output from the solver
-
-    require_convergence: bool, default True
-        Whether convergence is required. If True and convergence is not obtained, the code will exit.
-
-    max_iterations: integer, default=100
-        Maximum number of iterations
-
-    relative_tolerance: float, default=1.e-6
-        Relative tolerance of the convergence
-
-    absolute_tolerance: float, default=0.
-        Absoluate tolerence of the convergence
-
-    diagnostic_file: string, optional
-        File name where solver diagnostics are written
-
-    diagnostic_interval: string, optional
-        The intervals for writing out solver diagnostics to the diagnostic file
     """
 
-    def __init__(
-        self,
-        verbose=None,
-        require_convergence=None,
-        max_iterations=None,
-        relative_tolerance=None,
-        absolute_tolerance=None,
-        diagnostic_file=None,
-        diagnostic_interval=None,
-    ):
-        self.verbose = verbose
-        self.require_convergence = require_convergence
-        self.max_iterations = max_iterations
-        self.relative_tolerance = relative_tolerance
-        self.absolute_tolerance = absolute_tolerance
-        self.diagnostic_file = diagnostic_file
-        self.diagnostic_interval = diagnostic_interval
+    verbose: bool | None = Field(
+        default=None,
+        description="Whether there is verbose output from the solver (default True)",
+    )
+    require_convergence: bool | None = Field(
+        default=None,
+        description="Whether convergence is required. If True and convergence is not obtained, the code will exit. (default True)",
+    )
+    max_iterations: int | None = Field(
+        default=None, description="Maximum number of iterations (default 100)"
+    )
+    relative_tolerance: float | None = Field(
+        default=None,
+        description="Relative tolerance of the convergence (default 1.e-6)",
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence (default 0.)"
+    )
+    diagnostic_file: str | None = Field(
+        default=None, description="File name where solver diagnostics are written"
+    )
+    diagnostic_interval: int | str | None = Field(
+        default=None,
+        description="The intervals for writing out solver diagnostics to the diagnostic file",
+    )
 
     def nonlinear_solver_initialize_inputs(self):
         implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
@@ -2107,24 +2013,18 @@ class PicardNonlinearSolver(NonlinearSolverBase):
         picard.diagnostic_interval = self.diagnostic_interval
 
 
-class ThetaImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
+class ThetaImplicitEMEvolveScheme(EvolveSchemeBase):
     """
     Sets up the "theta implicit" electromagnetic evolve scheme
-
-    Parameters
-    ----------
-    nonlinear_solver: nonlinear solver instance
-        The nonlinear solver to use for the iterations
-
-    theta: float, optional
-        The "theta" parameter, determining the level of implicitness
     """
 
-    def __init__(self, nonlinear_solver, theta=None):
-        self.nonlinear_solver = nonlinear_solver
-        self.theta = theta
-
-        assert isinstance(nonlinear_solver, NonlinearSolverBase)
+    nonlinear_solver: NonlinearSolverBase = Field(
+        description="The nonlinear solver to use for the iterations"
+    )
+    theta: float | None = Field(
+        default=None,
+        description='The "theta" parameter, determining the level of implicitness',
+    )
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "theta_implicit_em"
@@ -2134,20 +2034,14 @@ class ThetaImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
-class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
+class SemiImplicitEMEvolveScheme(EvolveSchemeBase):
     """
     Sets up the "semi-implicit" electromagnetic evolve scheme
-
-    Parameters
-    ----------
-    nonlinear_solver: nonlinear solver instance
-        The nonlinear solver to use for the iterations
     """
 
-    def __init__(self, nonlinear_solver):
-        self.nonlinear_solver = nonlinear_solver
-
-        assert isinstance(nonlinear_solver, NonlinearSolverBase)
+    nonlinear_solver: NonlinearSolverBase = Field(
+        description="The nonlinear solver to use for the iterations"
+    )
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_em"
@@ -2155,180 +2049,28 @@ class SemiImplicitEMEvolveScheme(picmistandard.base._ClassWithInit):
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
 
-class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
+class SemiImplicitDarwinEvolveScheme(EvolveSchemeBase):
     """
     Sets up the semi-implicit Darwin evolve scheme.
-
-    linear_solver:
-        GMRESLinearSolver instance.
     """
 
-    def __init__(
-        self,
-        linear_solver,
-    ):
-        if not isinstance(linear_solver, GMRESLinearSolver):
-            raise TypeError(
-                "SemiImplicitDarwinEvolveScheme only supports GMRESLinearSolver "
-                "as its linear_solver (there is no nonlinear solver for the "
-                "linear solver to attach to, which PETScKSPLinearSolver requires)"
-            )
-        self.linear_solver = linear_solver
+    # There is no nonlinear solver for the linear solver to attach to, which
+    # PETScKSPLinearSolver requires.
+    linear_solver: GMRESLinearSolver = Field(description="The GMRES linear solver")
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
         self.linear_solver.linear_solver_initialize_inputs()
 
 
-class HybridPICSolver(picmistandard.base._ClassWithInit):
+class HybridPICSolver(
+    picmistandard.PICMI_SolverExtension, picmistandard.PICMI_ExpressionParameters
+):
     """
     Hybrid-PIC solver based on Ohm's law.
     See `Theory Section <https://warpx.readthedocs.io/en/latest/theory/kinetic_fluid_hybrid_model.html>`_ for more information.
 
-    Parameters
-    ----------
-    Te: float
-        Electron temperature in eV.
-
-    n0: float
-        Reference plasma density in m^-3.
-
-    gamma: float, default=5/3
-        Exponent in calculation of electron pressure.
-
-    n_floor: float, optional
-        Minimum density used in Ohm's law calculation.
-
-    plasma_resistivity: float or str
-        Value or expression to use for the plasma resistivity in Ohm*m.
-        Can be a constant value or an expression depending on ``rho`` (charge density),
-        ``J`` (current density magnitude), and ``t`` (simulation time).
-
-    plasma_hyper_resistivity: float or str
-        Value or expression to use for the plasma hyper-resistivity in Ohm*m^3.
-        Can be a constant value or an expression depending on ``rho`` (charge density)
-        and ``B`` (magnetic field magnitude).
-
-    plasma_resistivity_species: dict, optional
-        Per-species resistivity overlays added on top of ``plasma_resistivity``,
-        as a dictionary mapping a charged species name to a value or expression
-        in Ohm*m. The expression may depend on ``rho_s`` (the species charge
-        density), ``rho`` (total charge density which, by quasineutrality,
-        equals the electron charge density), ``Te`` (electron temperature
-        in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the
-        species current density magnitude), ``B`` (magnetic field magnitude)
-        and ``t`` (time). The effective resistivity applied to species ``s``
-        in Ohm's law, the Joule heating source and the resistive drag is
-        ``plasma_resistivity + plasma_resistivity_species[s]``.
-
-    solve_electron_energy_equation: bool, default=False
-        Solve the electron energy equation instead of the algebraic adiabatic
-        pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is
-        transported each step by QDSMC markers advected with the electron
-        fluid velocity, the source terms below are applied per cell, and
-        ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve.
-
-    include_joule_heating: bool, default=False
-        Add the resistive (Joule) heating source to the electron temperature.
-        Reduces to ``eta * J**2`` for a single ion species. Only used when
-        ``solve_electron_energy_equation`` is True.
-
-    joule_redirect_Te_threshold: float, optional
-        Electron temperature threshold in eV above which the Joule heating of
-        a cell is routed to the ions (as an energy-conserving stochastic kick)
-        instead of the electrons, allowing ``Ti > Te`` to develop. Specifying
-        a value >= 0 enables the redirect (off by default). Requires
-        ``include_joule_heating``.
-
-    electron_ion_relaxation_rate: float or str, optional
-        Value or expression for the electron-ion energy-equilibration rate
-        ``nu_ei`` in 1/s. Specifying it enables the electron-ion thermal
-        equilibration ``Q_ei`` on the electron temperature, with the conjugate
-        ion heating applied as an energy-conserving drag-diffusion kick on
-        each ion (the required shape-aware ion temperature deposition is
-        enabled automatically on every charged species). The expression may
-        depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti``
-        (temperatures in eV) and ``t`` (time). Only used when
-        ``solve_electron_energy_equation`` is True.
-
-    substeps: int, default=10
-        Total number of substeps used to advance the B-field over one full
-        timestep (split evenly between the two half-steps, so ``substeps/2``
-        RK4 steps are taken per half-step, each of duration
-        ``dt / substeps``). Must be divisible by 2; if not, the value is
-        automatically rounded up to the next even number.
-        When ``use_rkf45`` is active (True or a non-empty interval string),
-        this is instead used only as the initial substep count estimate for
-        the adaptive solver. After each timestep on which ``use_rkf45`` is
-        active, this value is updated based on ``n_attempts``, the total number
-        of RKF45 sub-step attempts (accepted and rejected) taken in the most
-        recent half-step: if the current value is less than ``2 * n_attempts``,
-        it jumps immediately to ``2 * n_attempts``; otherwise it decays slowly
-        toward that target via exponential smoothing (95% old, 5% of
-        ``2 * n_attempts``). This warm-start guess also carries over to
-        RK4 steps on timesteps where ``use_rkf45`` is not active.
-
-    use_rkf45: bool or str, default=False
-        If True (or the WarpX time-interval string ``"::"``), use the
-        adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) integrator (Fehlberg
-        1969, NASA Technical Report R-315,
-        https://ntrs.nasa.gov/citations/19690021375) for the B-field substep
-        advance, with step-size control governed by ``substep_rtol`` and
-        ``substep_atol``. If False, use the fixed-step classical RK4
-        integrator with ``substeps`` total substeps per timestep.
-        A WarpX time-interval string (e.g. ``"1::5"`` to enable from step
-        every 5 steps starting from step 1) may also be passed to activate
-        RKF45 only on specific timesteps.
-
-    substep_rtol: float, default=1e-4
-        Relative tolerance for the RKF45 adaptive step-size control.
-        Only used when ``use_rkf45`` is active.
-
-    substep_atol: float, default=1e-8
-        Absolute tolerance for the RKF45 adaptive step-size control.
-        Only used when ``use_rkf45`` is active.
-
-    substep_safety: float, default=0.9
-        Safety factor applied to the step-size adjustment formula.
-        Only used when ``use_rkf45`` is active.
-
-    substep_max_growth: float, default=5.0
-        Maximum factor by which the substep size may grow after an accepted
-        step. Only used when ``use_rkf45`` is active.
-
-    max_substep_attempts: int, default=250
-        Maximum number of substep attempts (accepted + rejected combined) per
-        half-step before the simulation aborts. Only used when
-        ``use_rkf45`` is active.
-
-    holmstrom_vacuum_region: bool, default=False
-        Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_.
-        This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor.
-
-    vacuum_seam_switch_mode: str, default="edge"
-        Sampling of the density that decides the vacuum-seam treatment --
-        the Holmstrom vacuum branch when holmstrom_vacuum_region is True and
-        the density-floor selection of the guarded Hall term otherwise:
-        "edge" (legacy per-component edge average), "node" (endpoint
-        minimum), or "cell" (adjacent-cell minimum -- one decision for all
-        three E components of an index, removing the per-component half-cell
-        decision offsets at the plasma/vacuum seam). Cartesian only.
-
-    Jx/y/z_external_function: str
-        Function of space and time specifying external (non-plasma) currents.
-
-    A_external: dict
-        Function of space and time specifying external (non-plasma) vector potential fields.
-        It is expected that a nested dictionary will be passed in for each separate vector potential that may have
-        different spatial configuration or time dependence. Each field entry should contain either implicit functions
-        with (x,y,z) dependence for 'Ax_external_function', 'Ay_external_function',
-        'Az_external_function', plus 'A_time_external_function' with (t) dependence, or
-        alternatively 'load_from_file': True with a 'path' to an OpenPMD file along with
-        'A_time_external_function'.
-
-    do_external_diva_cleaning: bool (default=True)
-        This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic
-        external A with periodic field boundary conditions.
+    Parameters used in the expressions can be given as additional keyword arguments.
 
     Notes
     -----
@@ -2352,84 +2094,126 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
     For complete parameter documentation, see the `Input Parameters section <https://warpx.readthedocs.io/en/latest/usage/parameters.html#maxwell-solver-kinetic-fluid-hybrid>`_.
     """
 
-    def __init__(
-        self,
-        grid,
-        Te=None,
-        n0=None,
-        gamma=None,
-        n_floor=None,
-        plasma_resistivity=None,
-        plasma_hyper_resistivity=None,
-        plasma_resistivity_species=None,
-        solve_electron_energy_equation=None,
-        include_joule_heating=None,
-        joule_redirect_Te_threshold=None,
-        electron_ion_relaxation_rate=None,
-        substeps=None,
-        use_rkf45=None,
-        substep_rtol=None,
-        substep_atol=None,
-        substep_safety=None,
-        substep_max_growth=None,
-        max_substep_attempts=None,
-        holmstrom_vacuum_region=None,
-        vacuum_seam_switch_mode=None,
-        Jx_external_function=None,
-        Jy_external_function=None,
-        Jz_external_function=None,
-        A_external=None,
-        do_external_diva_cleaning=None,
-        **kw,
-    ):
-        self.grid = grid
-        self.method = "hybrid"
+    method: ClassVar[str] = "hybrid"
+    _expression_fields: ClassVar[tuple[str, ...]] = (
+        "plasma_resistivity",
+        "plasma_hyper_resistivity",
+        "plasma_resistivity_species",
+        "electron_ion_relaxation_rate",
+        "Jx_external_function",
+        "Jy_external_function",
+        "Jz_external_function",
+        "A_external",
+    )
 
-        self.Te = Te
-        self.n0 = n0
-        self.gamma = gamma
-        self.n_floor = n_floor
-        self.plasma_resistivity = plasma_resistivity
-        self.plasma_hyper_resistivity = plasma_hyper_resistivity
-        self.plasma_resistivity_species = plasma_resistivity_species
+    grid: picmistandard.PICMI_AnyGrid = Field(description="Grid object for the solver")
+    Te: float | None = Field(default=None, description="Electron temperature in eV.")
+    n0: float | None = Field(
+        default=None, description="Reference plasma density in m^-3."
+    )
+    gamma: float | None = Field(
+        default=None,
+        description="Exponent in calculation of electron pressure (default 5/3).",
+    )
+    n_floor: float | None = Field(
+        default=None, description="Minimum density used in Ohm's law calculation."
+    )
+    plasma_resistivity: float | str | None = Field(
+        default=None,
+        description="Value or expression to use for the plasma resistivity in Ohm*m. Can be a constant value or an expression depending on ``rho`` (charge density), ``J`` (current density magnitude), and ``t`` (simulation time).",
+    )
+    plasma_hyper_resistivity: float | str | None = Field(
+        default=None,
+        description="Value or expression to use for the plasma hyper-resistivity in Ohm*m^3. Can be a constant value or an expression depending on ``rho`` (charge density) and ``B`` (magnetic field magnitude).",
+    )
+    plasma_resistivity_species: dict[str, float | str] | None = Field(
+        default=None,
+        description="Per-species resistivity overlays added on top of ``plasma_resistivity``, as a dictionary mapping a charged species name to a value or expression in Ohm*m. The expression may depend on ``rho_s`` (the species charge density), ``rho`` (total charge density which, by quasineutrality, equals the electron charge density), ``Te`` (electron temperature in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the species current density magnitude), ``B`` (magnetic field magnitude) and ``t`` (time). The effective resistivity applied to species ``s`` in Ohm's law, the Joule heating source and the resistive drag is ``plasma_resistivity + plasma_resistivity_species[s]``.",
+    )
+    solve_electron_energy_equation: bool | None = Field(
+        default=None,
+        description="Solve the electron energy equation instead of the algebraic adiabatic pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is transported each step by QDSMC markers advected with the electron fluid velocity, the source terms below are applied per cell, and ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve. (default False)",
+    )
+    include_joule_heating: bool | None = Field(
+        default=None,
+        description="Add the resistive (Joule) heating source to the electron temperature. Reduces to ``eta * J**2`` for a single ion species. Only used when ``solve_electron_energy_equation`` is True. (default False)",
+    )
+    joule_redirect_Te_threshold: float | None = Field(
+        default=None,
+        description="Electron temperature threshold in eV above which the Joule heating of a cell is routed to the ions (as an energy-conserving stochastic kick) instead of the electrons, allowing ``Ti > Te`` to develop. Specifying a value >= 0 enables the redirect (off by default). Requires ``include_joule_heating``.",
+    )
+    electron_ion_relaxation_rate: float | str | None = Field(
+        default=None,
+        description="Value or expression for the electron-ion energy-equilibration rate ``nu_ei`` in 1/s. Specifying it enables the electron-ion thermal equilibration ``Q_ei`` on the electron temperature, with the conjugate ion heating applied as an energy-conserving drag-diffusion kick on each ion (the required shape-aware ion temperature deposition is enabled automatically on every charged species). The expression may depend on ``rho`` (charge density in C/m^3), ``Te`` and ``Ti`` (temperatures in eV) and ``t`` (time). Only used when ``solve_electron_energy_equation`` is True.",
+    )
+    substeps: int | None = Field(
+        default=None,
+        description="Total number of substeps used to advance the B-field over one full timestep (split evenly between the two half-steps, so ``substeps/2`` RK4 steps are taken per half-step, each of duration ``dt / substeps``). Must be divisible by 2; if not, the value is automatically rounded up to the next even number. When ``use_rkf45`` is active (True or a non-empty interval string), this is instead used only as the initial substep count estimate for the adaptive solver. After each timestep on which ``use_rkf45`` is active, this value is updated based on ``n_attempts``, the total number of RKF45 sub-step attempts (accepted and rejected) taken in the most recent half-step: if the current value is less than ``2 * n_attempts``, it jumps immediately to ``2 * n_attempts``; otherwise it decays slowly toward that target via exponential smoothing (95% old, 5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where ``use_rkf45`` is not active. (default 10)",
+    )
+    use_rkf45: bool | str | None = Field(
+        default=None,
+        description='If True (or the WarpX time-interval string ``"::"``), use the adaptive Runge-Kutta-Fehlberg 4(5) (RKF45) integrator (Fehlberg 1969, NASA Technical Report R-315, https://ntrs.nasa.gov/citations/19690021375) for the B-field substep advance, with step-size control governed by ``substep_rtol`` and ``substep_atol``. If False, use the fixed-step classical RK4 integrator with ``substeps`` total substeps per timestep. A WarpX time-interval string (e.g. ``"1::5"`` to enable from step every 5 steps starting from step 1) may also be passed to activate RKF45 only on specific timesteps. (default False)',
+    )
+    substep_rtol: float | None = Field(
+        default=None,
+        description="Relative tolerance for the RKF45 adaptive step-size control. Only used when ``use_rkf45`` is active. (default 1e-4)",
+    )
+    substep_atol: float | None = Field(
+        default=None,
+        description="Absolute tolerance for the RKF45 adaptive step-size control. Only used when ``use_rkf45`` is active. (default 1e-8)",
+    )
+    substep_safety: float | None = Field(
+        default=None,
+        description="Safety factor applied to the step-size adjustment formula. Only used when ``use_rkf45`` is active. (default 0.9)",
+    )
+    substep_max_growth: float | None = Field(
+        default=None,
+        description="Maximum factor by which the substep size may grow after an accepted step. Only used when ``use_rkf45`` is active. (default 5.0)",
+    )
+    max_substep_attempts: int | None = Field(
+        default=None,
+        description="Maximum number of substep attempts (accepted + rejected combined) per half-step before the simulation aborts. Only used when ``use_rkf45`` is active. (default 250)",
+    )
+    holmstrom_vacuum_region: bool | None = Field(
+        default=None,
+        description="Flag to determine handling of vacuum region (where rho < n_floor*q_e). Setting to True will solve the simplified Generalized Ohm's Law dropping the Hall and pressure terms in the vacuum region. See `Holmstrom (2013) <https://arxiv.org/abs/1301.0272v1>`_. This flag is useful for suppressing vacuum region fluctuations. A large resistivity value must be used when rho <= rho_floor. (default False)",
+    )
+    vacuum_seam_switch_mode: Literal["edge", "node", "cell"] | None = Field(
+        default=None,
+        description='Sampling of the density that decides the vacuum-seam treatment -- the Holmstrom vacuum branch when holmstrom_vacuum_region is True and the density-floor selection of the guarded Hall term otherwise: "edge" (legacy per-component edge average), "node" (endpoint minimum), or "cell" (adjacent-cell minimum -- one decision for all three E components of an index, removing the per-component half-cell decision offsets at the plasma/vacuum seam). Cartesian only. (default "edge")',
+    )
+    Jx_external_function: float | str | None = Field(
+        default=None,
+        description="Function of space and time specifying external (non-plasma) currents.",
+    )
+    Jy_external_function: float | str | None = Field(
+        default=None,
+        description="Function of space and time specifying external (non-plasma) currents.",
+    )
+    Jz_external_function: float | str | None = Field(
+        default=None,
+        description="Function of space and time specifying external (non-plasma) currents.",
+    )
+    A_external: dict[str, dict[str, float | str | bool]] | None = Field(
+        default=None,
+        description="Function of space and time specifying external (non-plasma) vector potential fields. It is expected that a nested dictionary will be passed in for each separate vector potential that may have different spatial configuration or time dependence. Each field entry should contain either implicit functions with (x,y,z) dependence for 'Ax_external_function', 'Ay_external_function', 'Az_external_function', plus 'A_time_external_function' with (t) dependence, or alternatively 'load_from_file': True with a 'path' to an OpenPMD file along with 'A_time_external_function'.",
+    )
+    do_external_diva_cleaning: bool | None = Field(
+        default=None,
+        description="This flag can be used to disable divA cleaning. This may be necessary when using a non-periodic external A with periodic field boundary conditions. (default True)",
+    )
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the expressions, collected from otherwise-unrecognized keyword arguments.",
+    )
 
-        self.solve_electron_energy_equation = solve_electron_energy_equation
-        self.include_joule_heating = include_joule_heating
-        self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
-        self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
-
-        self.substeps = substeps
-        self.use_rkf45 = use_rkf45
-        self.substep_rtol = substep_rtol
-        self.substep_atol = substep_atol
-        self.substep_safety = substep_safety
-        self.substep_max_growth = substep_max_growth
-        self.max_substep_attempts = max_substep_attempts
-
-        self.holmstrom_vacuum_region = holmstrom_vacuum_region
-        self.vacuum_seam_switch_mode = vacuum_seam_switch_mode
-
-        self.Jx_external_function = Jx_external_function
-        self.Jy_external_function = Jy_external_function
-        self.Jz_external_function = Jz_external_function
-
-        self.A_external = A_external
-
-        self.do_external_diva_cleaning = do_external_diva_cleaning
-
-        # Handle keyword arguments used in expressions
-        self.user_defined_kw = {}
-        for k in list(kw.keys()):
-            self.user_defined_kw[k] = kw[k]
-            del kw[k]
-
-        self.handle_init(kw)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def solver_initialize_inputs(self):
         # Add the user defined keywords to my_constants
         # The keywords are mangled if there is a conflicting variable already
         # defined in my_constants with the same name but different value.
-        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
         self.grid.grid_initialize_inputs()
 
@@ -2442,20 +2226,20 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.__setattr__(
             "plasma_resistivity(rho,J,t)",
             pywarpx.my_constants.mangle_expression(
-                self.plasma_resistivity, self.mangle_dict
+                self.plasma_resistivity, self._mangle_dict
             ),
         )
         pywarpx.hybridpicmodel.__setattr__(
             "plasma_hyper_resistivity(rho,B)",
             pywarpx.my_constants.mangle_expression(
-                self.plasma_hyper_resistivity, self.mangle_dict
+                self.plasma_hyper_resistivity, self._mangle_dict
             ),
         )
         if self.plasma_resistivity_species is not None:
             for name, expr in self.plasma_resistivity_species.items():
                 pywarpx.hybridpicmodel.__setattr__(
                     f"plasma_resistivity_{name}(rho_s,rho,Te,J,J_s,B,t)",
-                    pywarpx.my_constants.mangle_expression(expr, self.mangle_dict),
+                    pywarpx.my_constants.mangle_expression(expr, self._mangle_dict),
                 )
         # Only emit the electron-energy-equation attributes that were
         # explicitly set, so the generated input deck contains only
@@ -2474,7 +2258,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             pywarpx.hybridpicmodel.__setattr__(
                 "electron_ion_relaxation_rate(rho,Te,Ti,t)",
                 pywarpx.my_constants.mangle_expression(
-                    self.electron_ion_relaxation_rate, self.mangle_dict
+                    self.electron_ion_relaxation_rate, self._mangle_dict
                 ),
             )
         pywarpx.hybridpicmodel.substeps = self.substeps
@@ -2489,19 +2273,19 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
-                self.Jx_external_function, self.mangle_dict
+                self.Jx_external_function, self._mangle_dict
             ),
         )
         pywarpx.hybridpicmodel.__setattr__(
             "Jy_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
-                self.Jy_external_function, self.mangle_dict
+                self.Jy_external_function, self._mangle_dict
             ),
         )
         pywarpx.hybridpicmodel.__setattr__(
             "Jz_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
-                self.Jz_external_function, self.mangle_dict
+                self.Jz_external_function, self._mangle_dict
             ),
         )
         if self.A_external is not None:
@@ -2509,7 +2293,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             pywarpx.external_vector_potential.__setattr__(
                 "fields",
                 pywarpx.my_constants.mangle_expression(
-                    list(self.A_external.keys()), self.mangle_dict
+                    list(self.A_external.keys()), self._mangle_dict
                 ),
             )
             pywarpx.external_vector_potential.do_diva_cleaning = (
@@ -2527,25 +2311,25 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
                     pywarpx.external_vector_potential.__setattr__(
                         f"{field_name}.Ax_external_grid_function(x,y,z)",
                         pywarpx.my_constants.mangle_expression(
-                            field_dict["Ax_external_function"], self.mangle_dict
+                            field_dict["Ax_external_function"], self._mangle_dict
                         ),
                     )
                     pywarpx.external_vector_potential.__setattr__(
                         f"{field_name}.Ay_external_grid_function(x,y,z)",
                         pywarpx.my_constants.mangle_expression(
-                            field_dict["Ay_external_function"], self.mangle_dict
+                            field_dict["Ay_external_function"], self._mangle_dict
                         ),
                     )
                     pywarpx.external_vector_potential.__setattr__(
                         f"{field_name}.Az_external_grid_function(x,y,z)",
                         pywarpx.my_constants.mangle_expression(
-                            field_dict["Az_external_function"], self.mangle_dict
+                            field_dict["Az_external_function"], self._mangle_dict
                         ),
                     )
                 pywarpx.external_vector_potential.__setattr__(
                     f"{field_name}.A_time_external_function(t)",
                     pywarpx.my_constants.mangle_expression(
-                        field_dict["A_time_external_function"], self.mangle_dict
+                        field_dict["A_time_external_function"], self._mangle_dict
                     ),
                 )
 
@@ -2558,91 +2342,73 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
     MLMG Poisson solver convergence for the labframe electrostatic solvers. When `warpx_magnetostatic=True`,
     these parameters are used as defaults for the magnetostatic solver but can be overridden
     with the explicit `warpx_magnetostatic_*` parameters.
-
-    Parameters
-    ----------
-    warpx_relativistic: bool, default=False
-        Whether to use the relativistic solver or lab frame solver
-
-    warpx_absolute_tolerance: float, default=0.
-        Absolute tolerance on the labframe electrostatic solver
-
-    warpx_self_fields_verbosity: integer, default=2
-        Level of verbosity for the labframe electrostatic solver
-
-    warpx_magnetostatic: bool, default=False
-        Whether to also solve for self-consistent magnetic fields from currents.
-
-    warpx_magnetostatic_required_precision: float, optional
-        Relative precision for the magnetostatic solver. If not specified,
-        defaults to the value of `required_precision`.
-
-    warpx_magnetostatic_absolute_tolerance: float, optional
-        Absolute tolerance for the magnetostatic solver. If not specified,
-        defaults to the value of `warpx_absolute_tolerance`.
-
-    warpx_magnetostatic_max_iters: integer, optional
-        Maximum iterations for the magnetostatic solver. If not specified,
-        defaults to the value of `maximum_iterations`.
-
-    warpx_magnetostatic_verbosity: integer, optional
-        Verbosity level for the magnetostatic solver. If not specified,
-        defaults to the value of `warpx_self_fields_verbosity`.
-
-    warpx_effective_potential: bool, default=False
-        Whether to use the effective potential Poisson solver (EP-PIC)
-
-    warpx_effective_potential_factor: float, default=4
-        If the effective potential Poisson solver is used, this sets the value
-        of C_EP (the method is marginally stable at C_EP = 1)
-
-    warpx_effective_potential_time_filter_param: float, default=0.1
-        Time filtering parameter used to filter sigma in the effective
-        potential scheme. sigma is updated using:
-        sigma^n = warpx_effective_potential_time_filter_param * sigma^n + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1
-
-    warpx_effective_potential_density_floor: float, default=0
-        If given, this value will be used as the minimum density during the
-        local calculation of sigma.
-
-    warpx_dt_update_interval: integer, optional (default = -1)
-        How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0.
-
-    warpx_cfl: float, optional
-        Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.
-
-    warpx_max_dt: float, optional
-        The maximum allowable timestep when `warpx_dt_update_interval > 0`.
-
     """
 
-    def init(self, kw):
-        self.relativistic = kw.pop("warpx_relativistic", False)
-        self.absolute_tolerance = kw.pop("warpx_absolute_tolerance", None)
-        self.self_fields_verbosity = kw.pop("warpx_self_fields_verbosity", None)
-        self.magnetostatic = kw.pop("warpx_magnetostatic", False)
-        # Explicit magnetostatic solver parameters (override self_fields_* defaults)
-        self.magnetostatic_required_precision = kw.pop(
-            "warpx_magnetostatic_required_precision", None
-        )
-        self.magnetostatic_absolute_tolerance = kw.pop(
-            "warpx_magnetostatic_absolute_tolerance", None
-        )
-        self.magnetostatic_max_iters = kw.pop("warpx_magnetostatic_max_iters", None)
-        self.magnetostatic_verbosity = kw.pop("warpx_magnetostatic_verbosity", None)
-        self.effective_potential = kw.pop("warpx_effective_potential", False)
-        self.effective_potential_factor = kw.pop(
-            "warpx_effective_potential_factor", None
-        )
-        self.effective_potential_time_filter_param = kw.pop(
-            "warpx_effective_potential_time_filter_param", None
-        )
-        self.effective_potential_density_floor = kw.pop(
-            "warpx_effective_potential_density_floor", None
-        )
-        self.cfl = kw.pop("warpx_cfl", None)
-        self.dt_update_interval = kw.pop("warpx_dt_update_interval", None)
-        self.max_dt = kw.pop("warpx_max_dt", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_ElectrostaticSolver)
+    )
+
+    relativistic: bool = Field(
+        default=False,
+        description="Whether to use the relativistic solver or lab frame solver",
+    )
+    absolute_tolerance: float | None = Field(
+        default=None,
+        description="Absolute tolerance on the labframe electrostatic solver (default 0.)",
+    )
+    self_fields_verbosity: int | None = Field(
+        default=None,
+        description="Level of verbosity for the labframe electrostatic solver (default 2)",
+    )
+    magnetostatic: bool = Field(
+        default=False,
+        description="Whether to also solve for self-consistent magnetic fields from currents.",
+    )
+    # Explicit magnetostatic solver parameters (override self_fields_* defaults)
+    magnetostatic_required_precision: float | None = Field(
+        default=None,
+        description="Relative precision for the magnetostatic solver. If not specified, defaults to the value of `required_precision`.",
+    )
+    magnetostatic_absolute_tolerance: float | None = Field(
+        default=None,
+        description="Absolute tolerance for the magnetostatic solver. If not specified, defaults to the value of `warpx_absolute_tolerance`.",
+    )
+    magnetostatic_max_iters: int | None = Field(
+        default=None,
+        description="Maximum iterations for the magnetostatic solver. If not specified, defaults to the value of `maximum_iterations`.",
+    )
+    magnetostatic_verbosity: int | None = Field(
+        default=None,
+        description="Verbosity level for the magnetostatic solver. If not specified, defaults to the value of `warpx_self_fields_verbosity`.",
+    )
+    effective_potential: bool = Field(
+        default=False,
+        description="Whether to use the effective potential Poisson solver (EP-PIC)",
+    )
+    effective_potential_factor: float | None = Field(
+        default=None,
+        description="If the effective potential Poisson solver is used, this sets the value of C_EP (the method is marginally stable at C_EP = 1) (default 4)",
+    )
+    effective_potential_time_filter_param: float | None = Field(
+        default=None,
+        description="Time filtering parameter used to filter sigma in the effective potential scheme. sigma is updated using: sigma^n = warpx_effective_potential_time_filter_param * sigma^n + (1 - warpx_effective_potential_time_filter_param) * sigma^n-1 (default 0.1)",
+    )
+    effective_potential_density_floor: float | None = Field(
+        default=None,
+        description="If given, this value will be used as the minimum density during the local calculation of sigma. (default 0)",
+    )
+    dt_update_interval: int | str | None = Field(
+        default=None,
+        description="How frequently the timestep is updated. Adaptive timestepping is disabled when this is <= 0. (default -1)",
+    )
+    cfl: float | None = Field(
+        default=None,
+        description="Fraction of the CFL condition for particle velocity vs grid size, used to set the timestep when `warpx_dt_update_interval > 0`.",
+    )
+    max_dt: float | None = Field(
+        default=None,
+        description="The maximum allowable timestep when `warpx_dt_update_interval > 0`.",
+    )
 
     def solver_initialize_inputs(self):
         # Open BC means FieldBoundaryType::Open for electrostatic sims, rather than perfectly-matched layer
@@ -2697,120 +2463,130 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
 
 class GaussianLaser(picmistandard.PICMI_GaussianLaser):
-    # Computed state populated during laser_initialize_inputs.
-    laser: Any = Field(default=None, init=False, exclude=True)
-    laser_number: int | None = Field(default=None, init=False, exclude=True)
+    # Runtime state populated during laser_initialize_inputs.
+    _laser: pywarpx.Bucket.Bucket | None = PrivateAttr(default=None)
+    _laser_number: int | None = PrivateAttr(default=None)
+
+    @property
+    def laser(self):
+        """The WarpX inputs of this laser (available after the inputs are initialized)"""
+        return self._laser
 
     def laser_initialize_inputs(self):
-        self.laser_number = len(pywarpx.lasers.names) + 1
+        self._laser_number = len(pywarpx.lasers.names) + 1
         if self.name is None:
-            self.name = "laser{}".format(self.laser_number)
+            self.name = "laser{}".format(self._laser_number)
 
-        self.laser = pywarpx.Lasers.newlaser(self.name)
+        self._laser = pywarpx.Lasers.newlaser(self.name)
 
-        self.laser.profile = "Gaussian"
-        self.laser.wavelength = (
+        self._laser.profile = "Gaussian"
+        self._laser.wavelength = (
             self.wavelength
         )  # The wavelength of the laser (in meters)
-        self.laser.e_max = self.E0  # Maximum amplitude of the laser field (in V/m)
-        self.laser.polarization = (
+        self._laser.e_max = self.E0  # Maximum amplitude of the laser field (in V/m)
+        self._laser.polarization = (
             self.polarization_direction
         )  # The main polarization vector
-        self.laser.profile_waist = self.waist  # The waist of the laser (in meters)
-        self.laser.profile_duration = (
+        self._laser.profile_waist = self.waist  # The waist of the laser (in meters)
+        self._laser.profile_duration = (
             self.duration
         )  # The duration of the laser (in seconds)
-        self.laser.direction = self.propagation_direction
-        self.laser.zeta = self.zeta
-        self.laser.beta = self.beta
-        self.laser.phi2 = self.phi2
-        self.laser.phi0 = self.phi0
+        self._laser.direction = self.propagation_direction
+        self._laser.zeta = self.zeta
+        self._laser.beta = self.beta
+        self._laser.phi2 = self.phi2
+        self._laser.phi0 = self.phi0
 
-        self.laser.do_continuous_injection = self.fill_in
+        self._laser.do_continuous_injection = self.fill_in
 
 
 class AnalyticLaser(picmistandard.PICMI_AnalyticLaser):
-    def init(self, kw):
-        self.mangle_dict = None
+    # Runtime state populated during laser_initialize_inputs.
+    _laser: pywarpx.Bucket.Bucket | None = PrivateAttr(default=None)
+    _laser_number: int | None = PrivateAttr(default=None)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
+
+    @property
+    def laser(self):
+        """The WarpX inputs of this laser (available after the inputs are initialized)"""
+        return self._laser
 
     def laser_initialize_inputs(self):
-        self.laser_number = len(pywarpx.lasers.names) + 1
+        self._laser_number = len(pywarpx.lasers.names) + 1
         if self.name is None:
-            self.name = "laser{}".format(self.laser_number)
+            self.name = "laser{}".format(self._laser_number)
 
-        self.laser = pywarpx.Lasers.newlaser(self.name)
+        self._laser = pywarpx.Lasers.newlaser(self.name)
 
-        self.laser.profile = "parse_field_function"
-        self.laser.wavelength = (
+        self._laser.profile = "parse_field_function"
+        self._laser.wavelength = (
             self.wavelength
         )  # The wavelength of the laser (in meters)
-        self.laser.e_max = self.Emax  # Maximum amplitude of the laser field (in V/m)
-        self.laser.polarization = (
+        self._laser.e_max = self.Emax  # Maximum amplitude of the laser field (in V/m)
+        self._laser.polarization = (
             self.polarization_direction
         )  # The main polarization vector
-        self.laser.direction = self.propagation_direction
-        self.laser.do_continuous_injection = self.fill_in
+        self._laser.direction = self.propagation_direction
+        self._laser.do_continuous_injection = self.fill_in
 
-        if self.mangle_dict is None:
+        if self._mangle_dict is None:
             # Only do this once so that the same variables are used in this distribution
             # is used multiple times
-            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+            self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
         expression = pywarpx.my_constants.mangle_expression(
-            self.field_expression, self.mangle_dict
+            self.field_expression, self._mangle_dict
         )
-        self.laser.__setattr__("field_function(X,Y,t)", expression)
+        self._laser.__setattr__("field_function(X,Y,t)", expression)
 
 
 class LaserAntenna(picmistandard.PICMI_LaserAntenna):
     def laser_antenna_initialize_inputs(self, laser):
-        laser.laser.position = self.position  # This point is on the laser plane
+        laser._laser.position = self.position  # This point is on the laser plane
         if self.normal_vector is not None and not np.allclose(
-            laser.laser.direction, self.normal_vector
+            laser._laser.direction, self.normal_vector
         ):
             raise AttributeError(
                 "The specified laser direction does not match the "
                 "specified antenna normal."
             )
-        self.normal_vector = laser.laser.direction  # The plane normal direction
-        # Ensure the normal vector is a unit vector
-        self.normal_vector /= np.linalg.norm(self.normal_vector)
+        # The plane normal direction, as a unit vector
+        normal_vector = np.asarray(laser._laser.direction, dtype=float)
+        normal_vector /= np.linalg.norm(normal_vector)
         if isinstance(laser, GaussianLaser):
             # Focal displacement from the antenna (in meters)
-            laser.laser.profile_focal_distance = (
-                (laser.focal_position[0] - self.position[0]) * self.normal_vector[0]
-                + (laser.focal_position[1] - self.position[1]) * self.normal_vector[1]
-                + (laser.focal_position[2] - self.position[2]) * self.normal_vector[2]
+            laser._laser.profile_focal_distance = (
+                (laser.focal_position[0] - self.position[0]) * normal_vector[0]
+                + (laser.focal_position[1] - self.position[1]) * normal_vector[1]
+                + (laser.focal_position[2] - self.position[2]) * normal_vector[2]
             )
             # The time at which the laser reaches its peak (in seconds)
-            laser.laser.profile_t_peak = (
-                (self.position[0] - laser.centroid_position[0]) * self.normal_vector[0]
-                + (self.position[1] - laser.centroid_position[1])
-                * self.normal_vector[1]
-                + (self.position[2] - laser.centroid_position[2])
-                * self.normal_vector[2]
+            laser._laser.profile_t_peak = (
+                (self.position[0] - laser.centroid_position[0]) * normal_vector[0]
+                + (self.position[1] - laser.centroid_position[1]) * normal_vector[1]
+                + (self.position[2] - laser.centroid_position[2]) * normal_vector[2]
             ) / constants.c
 
 
 class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
     """
     Field Initializer that loads the initial field from a file.
-
-    Parameters
-    ----------
-    warpx_do_initial_div_cleaning: bool, default=True
-        Flag that controls whether or not to execute the Projection based B-field divergence cleaner.
-
-    warpx_projection_div_cleaner_atol: float
-        Controls the absolute tolerance used in the divergence cleaner solve.
-
-    warpx_projection_div_cleaner_rtol: float
-        Controls the relative tolerance used in the divergence cleaner solve.
     """
 
-    def init(self, kw):
-        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
-        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
-        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
+    do_initial_div_cleaning: bool | None = Field(
+        default=None,
+        alias="warpx_do_initial_div_cleaning",
+        description="Flag that controls whether or not to execute the Projection based B-field divergence cleaner. (default True)",
+    )
+    div_cleaner_atol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_atol",
+        description="Controls the absolute tolerance used in the divergence cleaner solve.",
+    )
+    div_cleaner_rtol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_rtol",
+        description="Controls the relative tolerance used in the divergence cleaner solve.",
+    )
 
     def applied_field_initialize_inputs(self):
         pywarpx.warpx.read_fields_from_path = self.read_fields_from_path
@@ -2827,41 +2603,41 @@ class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
             )
 
 
-class LoadInitialFieldFromPython:
+class LoadInitialFieldFromPython(picmistandard.PICMI_AppliedFieldExtension):
     """
     Field Initializer that takes a function handle to be registered as a callback.
     The function is expected to write the E and/or B fields into the
     fields.Bx/y/zFPExternalWrapper() multifab. The callback is installed
     in the beforeInitEsolve hook. This should operate identically to loading from
     a file.
-
-    Parameters
-    ----------
-    warpx_do_initial_div_cleaning: bool, default=True
-        Flag that controls whether or not to execute the Projection based B-field divergence cleaner.
-
-    warpx_projection_div_cleaner_atol: float
-        Controls the absolute tolerance used in the divergence cleaner solve.
-
-    warpx_projection_div_cleaner_rtol: float
-        Controls the relative tolerance used in the divergence cleaner solve.
-
-    load_E: bool, default=True
-        E field is expected to be loaded in the registered callback.
-
-    load_B: bool, default=True
-        B field is expected to be loaded in the registered callback.
     """
 
-    def __init__(self, **kw):
-        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
-        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
-        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
-
-        # If using load_from_python, a function handle is expected for callback
-        self.load_from_python = kw.pop("load_from_python")
-        self.load_E = kw.pop("load_E", True)
-        self.load_B = kw.pop("load_B", True)
+    load_from_python: Callable[[], Any] = Field(
+        description="Function that is called to write the E and/or B fields"
+    )
+    load_E: bool = Field(
+        default=True,
+        description="E field is expected to be loaded in the registered callback.",
+    )
+    load_B: bool = Field(
+        default=True,
+        description="B field is expected to be loaded in the registered callback.",
+    )
+    do_initial_div_cleaning: bool | None = Field(
+        default=None,
+        alias="warpx_do_initial_div_cleaning",
+        description="Flag that controls whether or not to execute the Projection based B-field divergence cleaner. (default True)",
+    )
+    div_cleaner_atol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_atol",
+        description="Controls the absolute tolerance used in the divergence cleaner solve.",
+    )
+    div_cleaner_rtol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_rtol",
+        description="Controls the relative tolerance used in the divergence cleaner solve.",
+    )
 
     def applied_field_initialize_inputs(self):
         if self.load_E:
@@ -2882,37 +2658,42 @@ class LoadInitialFieldFromPython:
 class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
     """
     Field Initializer that takes an implicit function to be loaded as an initial E/B field.
-
-    Parameters
-    ----------
-    warpx_do_initial_div_cleaning: bool, default=True
-        Flag that controls whether or not to execute the Projection based B-field divergence cleaner.
-
-    warpx_projection_div_cleaner_atol: float
-        Controls the absolute tolerance used in the divergence cleaner solve.
-
-    warpx_projection_div_cleaner_rtol: float
-        Controls the relative tolerance used in the divergence cleaner solve.
     """
 
-    def __init__(self, **kw):
-        self.mangle_dict = None
-        self.maxlevel_extEMfield_init = kw.pop("warpx_maxlevel_extEMfield_init", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_AnalyticAppliedField)
+    )
 
-        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
-        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
-        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
+    maxlevel_extEMfield_init: int | None = Field(
+        default=None,
+        description="Maximum mesh-refinement level up to which the external fields are loaded",
+    )
+    do_initial_div_cleaning: bool | None = Field(
+        default=None,
+        alias="warpx_do_initial_div_cleaning",
+        description="Flag that controls whether or not to execute the Projection based B-field divergence cleaner. (default True)",
+    )
+    div_cleaner_atol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_atol",
+        description="Controls the absolute tolerance used in the divergence cleaner solve.",
+    )
+    div_cleaner_rtol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_rtol",
+        description="Controls the relative tolerance used in the divergence cleaner solve.",
+    )
 
-        super().__init__(**kw)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def applied_field_initialize_inputs(self):
         # Note that lower and upper_bound are not used by WarpX
         pywarpx.warpx.maxlevel_extEMfield_init = self.maxlevel_extEMfield_init
 
-        if self.mangle_dict is None:
+        if self._mangle_dict is None:
             # Only do this once so that the same variables are used in this distribution
             # is used multiple times
-            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+            self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
         if (
             self.Ex_expression is not None
@@ -2925,7 +2706,7 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                 [self.Ex_expression, self.Ey_expression, self.Ez_expression],
             ):
                 expression = pywarpx.my_constants.mangle_expression(
-                    expression, self.mangle_dict
+                    expression, self._mangle_dict
                 )
                 pywarpx.warpx.__setattr__(
                     f"E{sdir}_external_grid_function(x,y,z)", expression
@@ -2942,7 +2723,7 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
                 [self.Bx_expression, self.By_expression, self.Bz_expression],
             ):
                 expression = pywarpx.my_constants.mangle_expression(
-                    expression, self.mangle_dict
+                    expression, self._mangle_dict
                 )
                 pywarpx.warpx.__setattr__(
                     f"B{sdir}_external_grid_function(x,y,z)", expression
@@ -2956,7 +2737,9 @@ class AnalyticInitialField(picmistandard.PICMI_AnalyticAppliedField):
             )
 
 
-class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
+class LoadAppliedField(
+    picmistandard.PICMI_LoadAppliedField, picmistandard.PICMI_ExpressionParameters
+):
     """
     Load external electromagnetic fields (E and/or B) from an openPMD file and
     optionally apply a time-dependent scaling.
@@ -2988,45 +2771,45 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
     Internally, each object registers a uniquely named external field entry
     (``particles.<name>.*``), ensuring that multiple applied fields compose
     without overwriting each other.
-
-    Parameters
-    ----------
-    read_fields_from_path : str, optional
-        Path to diagnostics containing the external field data to load.
-
-    load_E : bool, default=True
-        If True, load the external E field from file.
-
-    load_B : bool, default=True
-        If True, load the external B field from file.
-
-    warpx_E_time_function : str, optional
-        AMReX parser expression in variable ``t`` (seconds) scaling the
-        file-loaded electric field uniformly in space and per level.
-        Defaults to ``"1.0"`` if not given.
-
-    warpx_B_time_function : str, optional
-        AMReX parser expression in variable ``t`` (seconds) scaling the
-        file-loaded magnetic field uniformly in space and per level.
-        Defaults to ``"1.0"`` if not given.
-
-    warpx_do_initial_div_cleaning : bool, optional
-        If True, run the projection-based divergence cleaner on the loaded B field
-        after loading, scrubbing any spurious divergence from the applied-field map(s).
-        This is opt-in (it is not enabled automatically for applied particle fields) and
-        is supported for the electromagnetic, electrostatic (labframe) and magnetostatic
-        (labframe-electromagnetostatic, with the multigrid Poisson solver) solvers.
-        When several applied B-field maps are stacked, each map is cleaned independently.
-        (global setting; last value wins).
-
-    warpx_projection_div_cleaner_atol : float, optional
-        Absolute tolerance for the divergence cleaner solve.
-
-    warpx_projection_div_cleaner_rtol : float, optional
-        Relative tolerance for the divergence cleaner solve.
     """
 
-    _auto_field_counter = 0
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_LoadAppliedField)
+    )
+    _expression_fields: ClassVar[tuple[str, ...]] = (
+        "E_time_function",
+        "B_time_function",
+    )
+
+    E_time_function: Expression | None = Field(
+        default=None,
+        description='AMReX parser expression in variable ``t`` (seconds) scaling the file-loaded electric field uniformly in space and per level. Defaults to ``"1.0"`` if not given.',
+    )
+    B_time_function: Expression | None = Field(
+        default=None,
+        description='AMReX parser expression in variable ``t`` (seconds) scaling the file-loaded magnetic field uniformly in space and per level. Defaults to ``"1.0"`` if not given.',
+    )
+    do_initial_div_cleaning: bool | None = Field(
+        default=None,
+        alias="warpx_do_initial_div_cleaning",
+        description="Flag that controls whether or not to execute the Projection based B-field divergence cleaner. (default True)",
+    )
+    div_cleaner_atol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_atol",
+        description="Controls the absolute tolerance used in the divergence cleaner solve.",
+    )
+    div_cleaner_rtol: float | None = Field(
+        default=None,
+        alias="warpx_projection_div_cleaner_rtol",
+        description="Controls the relative tolerance used in the divergence cleaner solve.",
+    )
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the time functions, collected from otherwise-unrecognized keyword arguments.",
+    )
+
+    _auto_field_counter: ClassVar[int] = 0
 
     def _next_auto_name(self):
         LoadAppliedField._auto_field_counter += 1
@@ -3053,31 +2836,6 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
                 existing.append(n)
         pywarpx.particles.__setattr__(list_key, existing)
 
-    def __init__(self, **kw):
-        self.do_initial_div_cleaning = kw.pop("warpx_do_initial_div_cleaning", None)
-        self.div_cleaner_atol = kw.pop("warpx_projection_div_cleaner_atol", None)
-        self.div_cleaner_rtol = kw.pop("warpx_projection_div_cleaner_rtol", None)
-
-        self.warpx_E_time_function = kw.pop("warpx_E_time_function", None)
-        self.warpx_B_time_function = kw.pop("warpx_B_time_function", None)
-
-        # Collect user constants for mangle_expression (but keep kw intact)
-        # Exclude base-class params so they don't end up in my_constants.
-        base_keys = {"read_fields_from_path", "load_E", "load_B"}
-        self.user_defined_kw = {k: v for k, v in kw.items() if k not in base_keys}
-
-        # Base class requires read_fields_from_path -> enforce it
-        if "read_fields_from_path" not in kw:
-            raise ValueError("LoadAppliedField requires 'read_fields_from_path'.")
-
-        super().__init__(**kw)
-
-        # hard-disable unwanted loaders set by the base ctor
-        if not self.load_E:
-            pywarpx.particles.E_ext_particle_init_style = "none"
-        if not self.load_B:
-            pywarpx.particles.B_ext_particle_init_style = "none"
-
     def applied_field_initialize_inputs(self):
         mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
@@ -3101,7 +2859,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
             pywarpx.particles.E_ext_particle_init_style = "read_from_file"
             self._append_names("E_ext_particle_fields", [fname])
 
-            dep_raw = self.warpx_E_time_function or "1.0"
+            dep_raw = self.E_time_function or "1.0"
             dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
             pywarpx.particles.__setattr__(f"{fname}.read_fields_E_dependency(t)", dep)
         else:
@@ -3120,7 +2878,7 @@ class LoadAppliedField(picmistandard.PICMI_LoadAppliedField):
                 "projection_div_cleaner", "rtol", self.div_cleaner_rtol
             )
 
-            dep_raw = self.warpx_B_time_function or "1.0"
+            dep_raw = self.B_time_function or "1.0"
             dep = pywarpx.my_constants.mangle_expression(dep_raw, mangle_dict)
             pywarpx.particles.__setattr__(f"{fname}.read_fields_B_dependency(t)", dep)
         else:
@@ -3149,16 +2907,15 @@ class ConstantAppliedField(picmistandard.PICMI_ConstantAppliedField):
 
 
 class AnalyticAppliedField(picmistandard.PICMI_AnalyticAppliedField):
-    def init(self, kw):
-        self.mangle_dict = None
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     def applied_field_initialize_inputs(self):
         # Note that lower and upper_bound are not used by WarpX
 
-        if self.mangle_dict is None:
+        if self._mangle_dict is None:
             # Only do this once so that the same variables are used in this distribution
             # is used multiple times
-            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+            self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
         if (
             self.Ex_expression is not None
@@ -3173,7 +2930,7 @@ class AnalyticAppliedField(picmistandard.PICMI_AnalyticAppliedField):
                 [self.Ex_expression, self.Ey_expression, self.Ez_expression],
             ):
                 expression = pywarpx.my_constants.mangle_expression(
-                    expression, self.mangle_dict
+                    expression, self._mangle_dict
                 )
                 pywarpx.particles.__setattr__(
                     f"E{sdir}_external_particle_function(x,y,z,t)", expression
@@ -3192,7 +2949,7 @@ class AnalyticAppliedField(picmistandard.PICMI_AnalyticAppliedField):
                 [self.Bx_expression, self.By_expression, self.Bz_expression],
             ):
                 expression = pywarpx.my_constants.mangle_expression(
-                    expression, self.mangle_dict
+                    expression, self._mangle_dict
                 )
                 pywarpx.particles.__setattr__(
                     f"B{sdir}_external_particle_function(x,y,z,t)", expression
@@ -3222,70 +2979,64 @@ class FieldIonization(picmistandard.PICMI_FieldIonization):
 
     def interaction_initialize_inputs(self):
         assert self.model == "ADK", "WarpX only has ADK ionization model implemented"
-        self.ionized_species.species.do_field_ionization = 1
-        self.ionized_species.species.physical_element = (
+        self.ionized_species._species.do_field_ionization = 1
+        self.ionized_species._species.physical_element = (
             self.ionized_species.particle_type
         )
-        self.ionized_species.species.ionization_product_species = (
+        self.ionized_species._species.ionization_product_species = (
             self.product_species.name
         )
-        self.ionized_species.species.ionization_initial_level = (
+        self.ionized_species._species.ionization_initial_level = (
             self.ionized_species.charge_state
         )
-        self.ionized_species.species.charge = "q_e"
+        self.ionized_species._species.charge = "q_e"
 
 
-class CoulombCollisions(picmistandard.base._ClassWithInit):
-    """
-    Custom class to handle setup of binary Coulomb collisions in WarpX. If
-    collision initialization is added to picmistandard this can be changed to
-    inherit that functionality.
+class CollisionBase(picmistandard.PICMI_Extension):
+    """Base class of the collisions, accepted by ``Simulation.warpx_collisions``"""
 
-    Parameters
-    ----------
-    name: string
-        Name of instance (used in the inputs file)
+    name: str = Field(description="Name of instance (used in the inputs file)")
 
-    species: list of species instances
-        The species involved in the collision. Must be of length 2.
-
-    CoulombLog: float, optional
-        Value of the Coulomb log to use in the collision cross section.
-        If not supplied, it is calculated from the local conditions.
-
-    ndt_supercycle: integer, optional
-        Run collision once every ndt_supercycle PIC time steps
-        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
-        Mutually exclusive with ndt_subcycle. Default is 1.
-
-    ndt_subcycle: integer, optional
-        Run collision ndt_subcycle times per PIC time step
-        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
-        Mutually exclusive with ndt_supercycle.
-    """
-
-    def __init__(
-        self,
-        name,
-        species,
-        CoulombLog=None,
-        ndt_supercycle=None,
-        ndt_subcycle=None,
-        **kw,
-    ):
-        self.name = name
-        self.species = species
-        self.CoulombLog = CoulombLog
-        self.ndt_supercycle = ndt_supercycle
-        self.ndt_subcycle = ndt_subcycle
-
-        if "ndt" in kw:
+    @model_validator(mode="before")
+    @classmethod
+    def _removed_ndt(cls, data):
+        if isinstance(data, dict) and "ndt" in data:
             raise ValueError(
                 "`ndt` is no longer a valid option for collisions."
                 "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
             )
+        return data
 
-        self.handle_init(kw)
+    def collision_initialize_inputs(self):
+        raise NotImplementedError
+
+
+class CoulombCollisions(CollisionBase):
+    """
+    Custom class to handle setup of binary Coulomb collisions in WarpX. If
+    collision initialization is added to picmistandard this can be changed to
+    inherit that functionality.
+    """
+
+    species: list[Species] = Field(
+        min_length=2,
+        max_length=2,
+        description="The species involved in the collision. Must be of length 2.",
+    )
+    CoulombLog: float | None = Field(
+        default=None,
+        description="Value of the Coulomb log to use in the collision cross section. If not supplied, it is calculated from the local conditions.",
+    )
+    ndt_supercycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision once every ndt_supercycle PIC time steps (dt_collision = ndt_supercycle * dt_PIC). Mutually exclusive with ndt_subcycle. Default is 1.",
+    )
+    ndt_subcycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision ndt_subcycle times per PIC time step (dt_collision = dt_PIC / ndt_subcycle). Mutually exclusive with ndt_supercycle.",
+    )
 
     def collision_initialize_inputs(self):
         collision = pywarpx.Collisions.newcollision(self.name)
@@ -3296,78 +3047,41 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         collision.ndt_subcycle = self.ndt_subcycle
 
 
-class MCCCollisions(picmistandard.base._ClassWithInit):
+class MCCCollisions(CollisionBase):
     """
     Custom class to handle setup of MCC collisions in WarpX. If collision
     initialization is added to picmistandard this can be changed to inherit
     that functionality.
-
-    Parameters
-    ----------
-    name: string
-        Name of instance (used in the inputs file)
-
-    species: species instance
-        The species involved in the collision
-
-    background_density: float or string
-        The density of the background. An string expression as a function of (x, y, z, t) can be used.
-
-    background_temperature: float or string
-        The temperature of the background. An string expression as a function of (x, y, z, t) can be used.
-
-    scattering_processes: dictionary
-        The scattering process to use and any needed information
-
-    background_mass: float, optional
-        The mass of the background particle. If not supplied, the default depends
-        on the type of scattering process.
-
-    max_background_density: float
-        The maximum background density. When the background_density is an expression, this must also
-        be specified.
-
-    ndt_supercycle: integer, optional
-        Run collision once every ndt_supercycle PIC time steps
-        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
-        Mutually exclusive with ndt_subcycle. Default is 1.
-
-    ndt_subcycle: integer, optional
-        Run collision ndt_subcycle times per PIC time step
-        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
-        Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(
-        self,
-        name,
-        species,
-        background_density,
-        background_temperature,
-        scattering_processes,
-        background_mass=None,
-        max_background_density=None,
-        ndt_supercycle=None,
-        ndt_subcycle=None,
-        **kw,
-    ):
-        self.name = name
-        self.species = species
-        self.background_density = background_density
-        self.background_temperature = background_temperature
-        self.background_mass = background_mass
-        self.scattering_processes = scattering_processes
-        self.max_background_density = max_background_density
-        self.ndt_supercycle = ndt_supercycle
-        self.ndt_subcycle = ndt_subcycle
-
-        if "ndt" in kw:
-            raise ValueError(
-                "`ndt` is no longer a valid option for collisions."
-                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
-            )
-
-        self.handle_init(kw)
+    species: Species = Field(description="The species involved in the collision")
+    background_density: float | str = Field(
+        description="The density of the background. An string expression as a function of (x, y, z, t) can be used."
+    )
+    background_temperature: float | str = Field(
+        description="The temperature of the background. An string expression as a function of (x, y, z, t) can be used."
+    )
+    scattering_processes: dict[str, dict[str, Species | int | float | str]] = Field(
+        description="The scattering process to use and any needed information"
+    )
+    background_mass: float | None = Field(
+        default=None,
+        description="The mass of the background particle. If not supplied, the default depends on the type of scattering process.",
+    )
+    max_background_density: float | None = Field(
+        default=None,
+        description="The maximum background density. When the background_density is an expression, this must also be specified.",
+    )
+    ndt_supercycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision once every ndt_supercycle PIC time steps (dt_collision = ndt_supercycle * dt_PIC). Mutually exclusive with ndt_subcycle. Default is 1.",
+    )
+    ndt_subcycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision ndt_subcycle times per PIC time step (dt_collision = dt_PIC / ndt_subcycle). Mutually exclusive with ndt_supercycle.",
+    )
 
     def collision_initialize_inputs(self):
         collision = pywarpx.Collisions.newcollision(self.name)
@@ -3398,62 +3112,31 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
                 collision.add_new_attr(process + "_" + key, val)
 
 
-class DSMCCollisions(picmistandard.base._ClassWithInit):
+class DSMCCollisions(CollisionBase):
     """
     Custom class to handle setup of DSMC collisions in WarpX. If collision
     initialization is added to picmistandard this can be changed to inherit
     that functionality.
-
-    Parameters
-    ----------
-    name: string
-        Name of instance (used in the inputs file)
-
-    species: species instance
-        The species involved in the collision
-
-    scattering_processes: dictionary
-        The scattering process to use and any needed information
-
-    product_species: list
-        The species produced by collision processes (currently both
-        ionization and charge-exchange require defining the product species).
-
-    ndt_supercycle: integer, optional
-        Run collision once every ndt_supercycle PIC time steps
-        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
-        Mutually exclusive with ndt_subcycle. Default is 1.
-
-    ndt_subcycle: integer, optional
-        Run collision ndt_subcycle times per PIC time step
-        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
-        Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(
-        self,
-        name,
-        species,
-        scattering_processes,
-        product_species=None,
-        ndt_supercycle=None,
-        ndt_subcycle=None,
-        **kw,
-    ):
-        self.name = name
-        self.species = species
-        self.scattering_processes = scattering_processes
-        self.product_species = product_species
-        self.ndt_supercycle = ndt_supercycle
-        self.ndt_subcycle = ndt_subcycle
-
-        if "ndt" in kw:
-            raise ValueError(
-                "`ndt` is no longer a valid option for collisions."
-                "Please use `ndt_supercycle` instead (run collision every N PIC steps)."
-            )
-
-        self.handle_init(kw)
+    species: list[Species] = Field(description="The species involved in the collision")
+    scattering_processes: dict[str, dict[str, Species | int | float | str]] = Field(
+        description="The scattering process to use and any needed information"
+    )
+    product_species: list[Species] | None = Field(
+        default=None,
+        description="The species produced by collision processes (currently both ionization and charge-exchange require defining the product species).",
+    )
+    ndt_supercycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision once every ndt_supercycle PIC time steps (dt_collision = ndt_supercycle * dt_PIC). Mutually exclusive with ndt_subcycle. Default is 1.",
+    )
+    ndt_subcycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision ndt_subcycle times per PIC time step (dt_collision = dt_PIC / ndt_subcycle). Mutually exclusive with ndt_supercycle.",
+    )
 
     def collision_initialize_inputs(self):
         collision = pywarpx.Collisions.newcollision(self.name)
@@ -3474,7 +3157,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
                 collision.add_new_attr(process + "_" + key, val)
 
 
-class HybridResistiveDragCollisions(picmistandard.base._ClassWithInit):
+class HybridResistiveDragCollisions(CollisionBase):
     """
     Custom class to handle setup of the hybrid-PIC resistive drag collision in
     WarpX. If collision initialization is added to picmistandard this can be
@@ -3489,21 +3172,11 @@ class HybridResistiveDragCollisions(picmistandard.base._ClassWithInit):
     included in the particle-push E-field, so when used the drag must be
     registered on every charged species (WarpX asserts this at
     initialization).
-
-    Parameters
-    ----------
-    name: string
-        Name of instance (used in the inputs file)
-
-    species: species instance
-        The (positive, current-depositing) ion species the drag acts on
     """
 
-    def __init__(self, name, species, **kw):
-        self.name = name
-        self.species = species
-
-        self.handle_init(kw)
+    species: Species = Field(
+        description="The (positive, current-depositing) ion species the drag acts on"
+    )
 
     def collision_initialize_inputs(self):
         collision = pywarpx.Collisions.newcollision(self.name)
@@ -3511,52 +3184,32 @@ class HybridResistiveDragCollisions(picmistandard.base._ClassWithInit):
         collision.species = [self.species.name]
 
 
-class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
+class InverseBremsstrahlungCollisions(CollisionBase):
     """
     Custom class to handle setup of inverse Bremsstrahlung collisions in WarpX. If
     collision initialization is added to picmistandard this can be changed to
     inherit that functionality.
-
-    Parameters
-    ----------
-    name: string
-        Name of instance (used in the inputs file)
-
-    species: list of species instances
-        The species involved in the collision. Must be of length 2.
-        The photon species must be given first, followed by the electron species.
-
-    energy_fraction: float
-        The fraction of the relative energy in the collision COM frame that is used in the distribution
-        of the absorbed photon energy.
-
-    ndt_supercycle: integer, optional
-        Run collision once every ndt_supercycle PIC time steps
-        (dt_collision = ndt_supercycle * dt_PIC). Must be >= 1.
-        Mutually exclusive with ndt_subcycle. Default is 1.
-
-    ndt_subcycle: integer, optional
-        Run collision ndt_subcycle times per PIC time step
-        (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
-        Mutually exclusive with ndt_supercycle.
     """
 
-    def __init__(
-        self,
-        name,
-        species,
-        energy_fraction=None,
-        ndt_supercycle=None,
-        ndt_subcycle=None,
-        **kw,
-    ):
-        self.name = name
-        self.species = species
-        self.energy_fraction = energy_fraction
-        self.ndt_supercycle = ndt_supercycle
-        self.ndt_subcycle = ndt_subcycle
-
-        self.handle_init(kw)
+    species: list[Species] = Field(
+        min_length=2,
+        max_length=2,
+        description="The species involved in the collision. Must be of length 2. The photon species must be given first, followed by the electron species.",
+    )
+    energy_fraction: float | None = Field(
+        default=None,
+        description="The fraction of the relative energy in the collision COM frame that is used in the distribution of the absorbed photon energy.",
+    )
+    ndt_supercycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision once every ndt_supercycle PIC time steps (dt_collision = ndt_supercycle * dt_PIC). Mutually exclusive with ndt_subcycle. Default is 1.",
+    )
+    ndt_subcycle: int | None = Field(
+        default=None,
+        ge=1,
+        description="Run collision ndt_subcycle times per PIC time step (dt_collision = dt_PIC / ndt_subcycle). Mutually exclusive with ndt_supercycle.",
+    )
 
     def collision_initialize_inputs(self):
         collision = pywarpx.Collisions.newcollision(self.name)
@@ -3567,7 +3220,9 @@ class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
         collision.ndt_subcycle = self.ndt_subcycle
 
 
-class EmbeddedBoundary(picmistandard.base._ClassWithInit):
+class EmbeddedBoundary(
+    picmistandard.PICMI_Extension, picmistandard.PICMI_ExpressionParameters
+):
     """
     Custom class to handle set up of embedded boundaries specific to WarpX.
     If embedded boundary initialization is added to picmistandard this can be
@@ -3575,94 +3230,69 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
     an implicit function or as an STL file (ASCII or binary). In the latter case the
     geometry specified in the STL file can be scaled, translated and inverted.
 
-    Parameters
-    ----------
-    implicit_function: string
-        Analytic expression describing the embedded boundary
-
-    stl_file: string
-        STL file path (string), file contains the embedded boundary geometry
-
-    stl_scale: float
-        Factor by which the STL geometry is scaled
-
-    stl_center: vector of floats
-        Vector by which the STL geometry is translated (in meters)
-
-    stl_reverse_normal: bool
-        If True inverts the orientation of the STL geometry
-
-    potential: string, default=0.
-        Analytic expression defining the potential. Can only be specified
-        when the solver is electrostatic.
-
-    cover_multiple_cuts: bool, default=None
-        Whether to cover cells with multiple cuts.
-        (If False, this will raise an error if some cells have multiple cuts)
-
     Parameters used in the analytic expressions should be given as additional keyword arguments.
-
     """
 
-    def __init__(
-        self,
-        implicit_function=None,
-        stl_file=None,
-        stl_scale=None,
-        stl_center=None,
-        stl_reverse_normal=False,
-        potential=None,
-        cover_multiple_cuts=None,
-        **kw,
-    ):
-        assert stl_file is None or implicit_function is None, Exception(
+    _expression_fields: ClassVar[tuple[str, ...]] = ("implicit_function", "potential")
+
+    implicit_function: Expression | None = Field(
+        default=None, description="Analytic expression describing the embedded boundary"
+    )
+    stl_file: str | None = Field(
+        default=None,
+        description="STL file path (string), file contains the embedded boundary geometry",
+    )
+    stl_scale: float | None = Field(
+        default=None, description="Factor by which the STL geometry is scaled"
+    )
+    stl_center: list[float] | None = Field(
+        default=None,
+        description="Vector by which the STL geometry is translated (in meters)",
+    )
+    stl_reverse_normal: bool = Field(
+        default=False, description="If True inverts the orientation of the STL geometry"
+    )
+    potential: Expression | None = Field(
+        default=None,
+        description="Analytic expression defining the potential. Can only be specified when the solver is electrostatic. (default 0.)",
+    )
+    cover_multiple_cuts: bool | None = Field(
+        default=None,
+        description="Whether to cover cells with multiple cuts. (If False, this will raise an error if some cells have multiple cuts)",
+    )
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the expressions, collected from otherwise-unrecognized keyword arguments.",
+    )
+
+    _mangle_dict: dict | None = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def _check_geometry(self) -> Self:
+        assert self.stl_file is None or self.implicit_function is None, (
             "Only one between implicit_function and stl_file can be specified"
         )
-
-        self.implicit_function = implicit_function
-        self.stl_file = stl_file
-
-        if stl_file is None:
-            assert stl_scale is None, Exception(
+        if self.stl_file is None:
+            assert self.stl_scale is None, (
                 "EB can only be scaled only when using an stl file"
             )
-            assert stl_center is None, Exception(
+            assert self.stl_center is None, (
                 "EB can only be translated only when using an stl file"
             )
-            assert stl_reverse_normal is False, Exception(
+            assert self.stl_reverse_normal is False, (
                 "EB can only be reversed only when using an stl file"
             )
-
-        self.stl_scale = stl_scale
-        self.stl_center = stl_center
-        self.stl_reverse_normal = stl_reverse_normal
-
-        self.potential = potential
-
-        self.cover_multiple_cuts = cover_multiple_cuts
-
-        # Handle keyword arguments used in expressions
-        self.user_defined_kw = {}
-        for k in list(kw.keys()):
-            if (
-                implicit_function is not None
-                and re.search(r"\b%s\b" % k, implicit_function)
-                or (potential is not None and re.search(r"\b%s\b" % k, potential))
-            ):
-                self.user_defined_kw[k] = kw[k]
-                del kw[k]
-
-        self.handle_init(kw)
+        return self
 
     def embedded_boundary_initialize_inputs(self, solver):
         # Add the user defined keywords to my_constants
         # The keywords are mangled if there is a conflicting variable already
         # defined in my_constants with the same name but different value.
-        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
         if self.implicit_function is not None:
             expression = pywarpx.my_constants.mangle_expression(
-                self.implicit_function, self.mangle_dict
+                self.implicit_function, self._mangle_dict
             )
             pywarpx.warpx.eb_implicit_function = expression
 
@@ -3677,12 +3307,14 @@ class EmbeddedBoundary(picmistandard.base._ClassWithInit):
 
         if self.potential is not None:
             expression = pywarpx.my_constants.mangle_expression(
-                self.potential, self.mangle_dict
+                self.potential, self._mangle_dict
             )
             pywarpx.warpx.__setattr__("eb_potential(x,y,z,t)", expression)
 
 
-class MacroscopicProperty(picmistandard.base._ClassWithInit):
+class MacroscopicProperty(
+    picmistandard.PICMI_Extension, picmistandard.PICMI_ExpressionParameters
+):
     """
     Custom class to handle set up of material property specific to WarpX.
     If macroscopic properties initialization is added to picmistandard this can be
@@ -3693,109 +3325,88 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
 
     This can be used for both Electromagnetic and electrostatic solvers.
 
-    Parameters
-    ----------
-    name: string
-        the macroscopic property name to set. One of "sigma", "epsilon", or "mu"
-
-    implicit_function: string
-        Analytic expression f(x,y,z) describing the sigma, epsilon, or mu
-
-    value: float
-        Value of sigma, epsilon, or mu if it is a constant
-
-    method: string
-        The algorithm for updating electric field when algo.em_solver_medium is macroscopic.
-        Available options for name = sigma are: backwardeuler and laxwendroff
-
     Parameters used in the analytic expressions should be given as additional keyword arguments.
 
-    Unimplemented Parameters
-    ------------------------
-    stl_file: string
-        STL file path (string),  file contains the embedded boundary geometry
-
-    stl_scale: float
-        Factor by which the STL geometry is scaled
-
-    stl_center: vector of floats
-        Vector by which the STL geometry is translated (in meters)
-
-    stl_reverse_normal: bool
-        If True inverts the orientation of the STL geometry
-
+    The parameters ``stl_file``, ``stl_scale``, ``stl_center``, and ``stl_reverse_normal``
+    are not implemented yet.
     """
 
-    def __init__(
-        self,
-        name="epsilon",
-        implicit_function=None,
-        value=None,
-        method=None,
-        stl_file=None,
-        stl_scale=None,
-        stl_center=None,
-        stl_reverse_normal=False,
-        **kw,
-    ):
+    _expression_fields: ClassVar[tuple[str, ...]] = ("implicit_function",)
+
+    name: Literal["sigma", "epsilon", "mu"] = Field(
+        default="epsilon",
+        description='the macroscopic property name to set. One of "sigma", "epsilon", or "mu"',
+    )
+    implicit_function: Expression | None = Field(
+        default=None,
+        description="Analytic expression f(x,y,z) describing the sigma, epsilon, or mu",
+    )
+    value: float | None = Field(
+        default=None, description="Value of sigma, epsilon, or mu if it is a constant"
+    )
+    method: Literal["backwardeuler", "laxwendroff"] | None = Field(
+        default=None,
+        description="The algorithm for updating electric field when algo.em_solver_medium is macroscopic. Available options for name = sigma are: backwardeuler and laxwendroff",
+    )
+    stl_file: str | None = Field(
+        default=None,
+        description="(not implemented) STL file path (string), file contains the embedded boundary geometry",
+    )
+    stl_scale: float | None = Field(
+        default=None,
+        description="(not implemented) Factor by which the STL geometry is scaled",
+    )
+    stl_center: list[float] | None = Field(
+        default=None,
+        description="(not implemented) Vector by which the STL geometry is translated (in meters)",
+    )
+    stl_reverse_normal: bool = Field(
+        default=False,
+        description="(not implemented) If True inverts the orientation of the STL geometry",
+    )
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the implicit function, collected from otherwise-unrecognized keyword arguments.",
+    )
+
+    _mangle_dict: dict | None = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def _check_parameters(self) -> Self:
         assert (
             sum(
-                [stl_file is not None, implicit_function is not None, value is not None]
+                [
+                    self.stl_file is not None,
+                    self.implicit_function is not None,
+                    self.value is not None,
+                ]
             )
             == 1
-        ), Exception(
-            "Exactly one one of implicit_function, stl_file, and value must be specified"
-        )
-        self.name = name
-        self.implicit_function = implicit_function
-        self.stl_file = stl_file
-        self.value = value
-        if stl_file is None:
-            assert stl_scale is None, Exception(
+        ), "Exactly one one of implicit_function, stl_file, and value must be specified"
+        if self.stl_file is None:
+            assert self.stl_scale is None, (
                 "Material property can only be scaled only when using an stl file"
             )
-            assert stl_center is None, Exception(
+            assert self.stl_center is None, (
                 "Material property  can only be translated only when using an stl file"
             )
-            assert stl_reverse_normal is False, Exception(
+            assert self.stl_reverse_normal is False, (
                 "Material property  can only be reversed only when using an stl file"
             )
-
-        self.stl_scale = stl_scale
-        self.stl_center = stl_center
-        self.stl_reverse_normal = stl_reverse_normal
-
         # Validate method for conductivity (sigma)
-        if method is not None:
-            if self.name != "sigma":
-                raise ValueError("Input 'method' can only be used with 'sigma'")
-            if method not in ["backwardeuler", "laxwendroff"]:
-                raise ValueError(
-                    "Input 'method' must be one of 'backwardeuler' or 'laxwendroff'"
-                )
-
-        self.method = method
-
-        # Handle keyword arguments used in expressions
-        self.user_defined_kw = {}
-        for k in list(kw.keys()):
-            if implicit_function is not None and re.search(
-                r"\b%s\b" % k, implicit_function
-            ):
-                self.user_defined_kw[k] = kw[k]
-                del kw[k]
-
-        self.handle_init(kw)
+        if self.method is not None and self.name != "sigma":
+            raise ValueError("Input 'method' can only be used with 'sigma'")
+        return self
 
     def material_property_initialize_inputs(self, solver):
         # Add the user defined keywords to my_constants
         # The keywords are mangled if there is a conflicting variable already
         # defined in my_constants with the same name but different value.
-        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
         macroscopic = pywarpx.warpx.get_bucket("macroscopic")
         if self.implicit_function is not None:
             expression = pywarpx.my_constants.mangle_expression(
-                self.implicit_function, self.mangle_dict
+                self.implicit_function, self._mangle_dict
             )
             setattr(macroscopic, self.name + "_function(x,y,z)", expression)
 
@@ -3815,28 +3426,10 @@ class MacroscopicProperty(picmistandard.base._ClassWithInit):
             )
 
 
-class PlasmaLens(picmistandard.base._ClassWithInit):
+class PlasmaLens(picmistandard.PICMI_AppliedFieldExtension):
     """
     Custom class to setup a plasma lens lattice.
     The applied fields are dependent only on the transverse position.
-
-    Parameters
-    ----------
-    period: float
-        Periodicity of the lattice (in lab frame, in meters)
-
-    starts: list of floats
-        The start of each lens relative to the periodic repeat
-
-    lengths: list of floats
-        The length of each lens
-
-    strengths_E=None: list of floats, default = 0.
-        The electric field strength of each lens
-
-    strengths_B=None: list of floats, default = 0.
-        The magnetic field strength of each lens
-
 
     The field that is applied depends on the transverse position of the particle, (x,y)
 
@@ -3847,23 +3440,30 @@ class PlasmaLens(picmistandard.base._ClassWithInit):
     - Bx = +y*strengths_B
 
     - By = -x*strengths_B
-
     """
 
-    def __init__(
-        self, period, starts, lengths, strengths_E=None, strengths_B=None, **kw
-    ):
-        self.period = period
-        self.starts = starts
-        self.lengths = lengths
-        self.strengths_E = strengths_E
-        self.strengths_B = strengths_B
+    period: float = Field(
+        description="Periodicity of the lattice (in lab frame, in meters)"
+    )
+    starts: list[float] = Field(
+        description="The start of each lens relative to the periodic repeat"
+    )
+    lengths: list[float] = Field(description="The length of each lens")
+    strengths_E: list[float] | None = Field(
+        default=None,
+        description="The electric field strength of each lens (default 0.)",
+    )
+    strengths_B: list[float] | None = Field(
+        default=None,
+        description="The magnetic field strength of each lens (default 0.)",
+    )
 
+    @model_validator(mode="after")
+    def _check_strengths(self) -> Self:
         assert (self.strengths_E is not None) or (self.strengths_B is not None), (
-            Exception("One of strengths_E or strengths_B must be supplied")
+            "One of strengths_E or strengths_B must be supplied"
         )
-
-        self.handle_init(kw)
+        return self
 
     def applied_field_initialize_inputs(self):
         pywarpx.particles.E_ext_particle_init_style = "repeated_plasma_lens"
@@ -3912,7 +3512,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     # --- WarpX-specific extension inputs (typed, exposed under the ``warpx_`` alias).
     # --- See the class docstring above for a description of each.
-    evolve_scheme: Any | None = Field(
+    evolve_scheme: EvolveSchemeBase | None = Field(
         default=None, description="Which evolve scheme to use"
     )
     current_deposition_algo: str | None = Field(
@@ -3941,11 +3541,11 @@ class Simulation(picmistandard.PICMI_Simulation):
         default=None,
         description="If true, the current is deposited on a nodal grid and then centered to a staggered grid (Yee grid), using finite-order interpolation. Default: warpx.do_current_centering=0 with collocated or staggered grids, warpx.do_current_centering=1 with hybrid grids.",
     )
-    field_centering_order: list | None = Field(
+    field_centering_order: list[int] | None = Field(
         default=None,
         description="The order of interpolation used with staggered or hybrid grids (``warpx_grid_type=staggered`` or ``warpx_grid_type=hybrid``) and momentum-conserving field gathering (``warpx_field_gathering_algo=momentum-conserving``) to interpolate the electric and magnetic fields from the cell centers to the cell nodes, before gathering the fields from the cell nodes to the particle positions. Default: ``warpx_field_centering_no<x,y,z>=2`` with staggered grids, ``warpx_field_centering_no<x,y,z>=8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).",
     )
-    current_centering_order: list | None = Field(
+    current_centering_order: list[int] | None = Field(
         default=None,
         description="The order of interpolation used with hybrid grids (``warpx_grid_type=hybrid``) to interpolate the currents from the cell nodes to the cell centers when ``warpx_do_current_centering=1``, before pushing the Maxwell fields on staggered grids. Default: ``warpx_current_centering_no<x,y,z>=8`` with hybrid grids (typically necessary to ensure stability in boosted-frame simulations of relativistic plasmas and beams).",
     )
@@ -4025,7 +3625,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         default=None,
         description="This option controls the type of sorting used if particle sorting is turned on, i.e. if sort_intervals is not <=0. If `true`, particles will be sorted by cell to optimize deposition with many particles per cell, in the order `x` -> `y` -> `z` -> `ppc`. If `false`, particles will be sorted by bin, using the sort_bin_size parameter below, in the order `ppc` -> `x` -> `y` -> `z`. `true` is recommended for best performance on NVIDIA GPUs, especially if there are many particles per cell.",
     )
-    sort_idx_type: list | None = Field(
+    sort_idx_type: list[int] | None = Field(
         default=None,
         description=(
             "This controls the type of grid used to sort the particles when sort_particles_for_deposition is true.\n"
@@ -4038,7 +3638,7 @@ class Simulation(picmistandard.PICMI_Simulation):
             "In 2D (XZ and RZ), only the first two elements are read. In 1D, only the first element is read."
         ),
     )
-    sort_bin_size: list | None = Field(
+    sort_bin_size: list[int] | None = Field(
         default=None,
         description="If `sort_intervals` is activated and `sort_particles_for_deposition` is false, particles are sorted in bins of `sort_bin_size` cells. In 2D, only the first two elements are read.",
     )
@@ -4046,7 +3646,7 @@ class Simulation(picmistandard.PICMI_Simulation):
         default=None,
         description="The name of the text file that the used input parameters is written to,",
     )
-    collisions: Any | None = Field(
+    collisions: list[CollisionBase] | None = Field(
         default=None,
         description="The collision instance specifying the particle collisions",
     )
@@ -4054,14 +3654,16 @@ class Simulation(picmistandard.PICMI_Simulation):
         default=None,
         description="If true, collisions are performed in the middle of the momentum push, which is split into two substeps. This improves energy conservation, as demonstrated in (Vay et al., Phys. Rev. E 111, 2025). This is only implemented for the explicit evolve scheme and is not available for the implicit evolve schemes.",
     )
-    embedded_boundary: Any | None = Field(default=None, alias="warpx_embedded_boundary")
-    break_signals: list | None = Field(
+    embedded_boundary: EmbeddedBoundary | None = Field(
+        default=None, description="The embedded boundary of the simulation"
+    )
+    break_signals: list[str | int] | None = Field(
         default=None, description="Signals on which to break"
     )
-    checkpoint_signals: list | None = Field(
+    checkpoint_signals: list[str | int] | None = Field(
         default=None, description="Signals on which to write out a checkpoint"
     )
-    numprocs: list | None = Field(
+    numprocs: list[int] | None = Field(
         default=None,
         description="Domain decomposition on the coarsest level. The domain will be chopped into the exact number of pieces in each dimension as specified by this parameter. https://warpx.readthedocs.io/en/latest/usage/parameters.html#distribution-across-mpi-ranks-and-parallelization https://warpx.readthedocs.io/en/latest/usage/domain_decomposition.html#simple-method",
     )
@@ -4102,15 +3704,18 @@ class Simulation(picmistandard.PICMI_Simulation):
         default=None, alias="warpx_self_fields_verbosity"
     )
 
-    # --- Computed state (not user inputs).
-    inputs_initialized: bool = Field(default=False, init=False, exclude=True)
-    warpx_initialized: bool = Field(default=False, init=False, exclude=True)
-    finalized: bool = Field(default=False, init=False, exclude=True)
-    # populated through add_macroscopic_property
-    macroscopic_properties: list = Field(default_factory=list, init=False, exclude=True)
+    macroscopic_properties: list[MacroscopicProperty] = Field(
+        default_factory=list,
+        description="Macroscopic material properties added with add_macroscopic_property",
+    )
+
+    # --- Runtime state (not user inputs).
+    _inputs_initialized: bool = PrivateAttr(default=False)
+    _warpx_initialized: bool = PrivateAttr(default=False)
+    _finalized: bool = PrivateAttr(default=False)
 
     def _check_not_finalized(self):
-        if self.finalized:
+        if self._finalized:
             raise RuntimeError(
                 "This Simulation was finalized. Create new PICMI objects to "
                 "set up another simulation."
@@ -4118,10 +3723,10 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def initialize_inputs(self):
         self._check_not_finalized()
-        if self.inputs_initialized:
+        if self._inputs_initialized:
             return
 
-        self.inputs_initialized = True
+        self._inputs_initialized = True
 
         pywarpx.warpx.verbose = self.verbose
         if self.time_step_size is not None:
@@ -4292,10 +3897,10 @@ class Simulation(picmistandard.PICMI_Simulation):
 
     def initialize_warpx(self, mpi_comm=None):
         self._check_not_finalized()
-        if self.warpx_initialized:
+        if self._warpx_initialized:
             return
 
-        self.warpx_initialized = True
+        self._warpx_initialized = True
         pywarpx.warpx.init(mpi_comm, max_step=self.max_steps, stop_time=self.max_time)
 
     def write_input_file(self, file_name="inputs"):
@@ -4317,17 +3922,13 @@ class Simulation(picmistandard.PICMI_Simulation):
     def finalize(self):
         # unconditional: tearing down WarpX is a no-op if it was never
         # initialized, but the input state still needs to be cleared
-        self.warpx_initialized = False
-        self.finalized = True
+        self._warpx_initialized = False
+        self._finalized = True
         pywarpx.warpx.finalize()
 
     def add_macroscopic_property(self, macroscopic_property):
-        if isinstance(macroscopic_property, MacroscopicProperty):
-            self.macroscopic_properties.append(macroscopic_property)
-        else:
-            raise TypeError(
-                "Expected a MacroscopicProperty instance, got f {type(macroscopic_property)}"
-            )
+        """Add a macroscopic material property (an instance of MacroscopicProperty)"""
+        self._append(macroscopic_properties=macroscopic_property)
 
     @property
     def fields(self):
@@ -4351,11 +3952,53 @@ class Simulation(picmistandard.PICMI_Simulation):
 # ----------------------------
 
 
+def _collect_warpx_constants(cls, data, expression_field):
+    """Collect the constants referenced in an expression of a particle diagnostic.
+
+    This allows variables to be used in the expression, but in order not to break other codes,
+    the variables must begin with "warpx_".
+    """
+    if not isinstance(data, dict):
+        return data
+    data = dict(data)
+    field = cls.model_fields[expression_field]
+    expression = (
+        data.get(field.alias or expression_field) or data.get(expression_field) or ""
+    )
+    # the field may be given by name or by its warpx_ alias (e.g., when loading a dump)
+    user_defined_kw_key = (
+        "warpx_user_defined_kw"
+        if "warpx_user_defined_kw" in data
+        else "user_defined_kw"
+    )
+    user_defined_kw = dict(data.get(user_defined_kw_key, {}))
+    if expression:
+        known = set()
+        for fname, finfo in cls.model_fields.items():
+            known.add(fname)
+            if finfo.alias:
+                known.add(finfo.alias)
+        for k in list(data.keys()):
+            if k in known:
+                continue
+            if k.startswith("warpx_") and re.search(r"\b%s\b" % k, expression):
+                user_defined_kw[k] = data.pop(k)
+    data[user_defined_kw_key] = user_defined_kw
+    return data
+
+
 class WarpXDiagnosticBase(object):
     """
     Base class for all WarpX diagnostic containing functionality shared by
     all WarpX diagnostic installations.
+
+    The classes using this mixin declare the ``_diagnostic`` private attribute.
     """
+
+    @property
+    def diagnostic(self):
+        """The WarpX inputs of this diagnostic (available after the inputs are initialized)"""
+        return self._diagnostic
 
     def add_diagnostic(self):
         # reduced diagnostics go in a different bucket than regular diagnostics
@@ -4372,18 +4015,18 @@ class WarpXDiagnosticBase(object):
             self.name = f"{name_template}{diagnostics_number}"
 
         try:
-            self.diagnostic = bucket._diagnostics_dict[self.name]
+            self._diagnostic = bucket._diagnostics_dict[self.name]
         except KeyError:
-            self.diagnostic = pywarpx.Diagnostics.Diagnostic(
+            self._diagnostic = pywarpx.Diagnostics.Diagnostic(
                 self.name, _species_dict={}
             )
-            bucket._diagnostics_dict[self.name] = self.diagnostic
+            bucket._diagnostics_dict[self.name] = self._diagnostic
 
     def set_write_dir(self):
         if self.write_dir is not None or self.file_prefix is not None:
             write_dir = self.write_dir or "diags"
             file_prefix = self.file_prefix or self.name
-            self.diagnostic.file_prefix = os.path.join(write_dir, file_prefix)
+            self._diagnostic.file_prefix = os.path.join(write_dir, file_prefix)
 
 
 @dataclass(frozen=True)
@@ -4413,7 +4056,7 @@ class ParticleFieldDiagnostic:
     name: str
     func: str
     do_average: int = 1
-    filter: str = None
+    filter: str | None = None
 
 
 class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
@@ -4460,11 +4103,11 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         default=None,
         description="If true, the last timestep is dumped regardless of the diagnostic period/intervals.",
     )
-    particle_fields_to_plot: list = Field(
+    particle_fields_to_plot: list[ParticleFieldDiagnostic] = Field(
         default_factory=list,
         description="List of ParticleFieldDiagnostic classes to install in the simulation. Error checking is handled in the class itself.",
     )
-    particle_fields_species: list | None = Field(
+    particle_fields_species: list[str] | None = Field(
         default=None,
         description="Species for which to calculate particle_fields_to_plot functions. Fields will be calculated separately for each specified species. If not passed, default is all of the available particle species.",
     )
@@ -4473,25 +4116,25 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         description="Verbosity level to use for printing diagnostic output information.",
     )
 
-    # Computed state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
-    diagnostic: Any = Field(default=None, init=False, exclude=True)
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.diagnostic.diag_type = "Full"
-        self.diagnostic.format = self.format
-        self.diagnostic.openpmd_backend = self.openpmd_backend
-        self.diagnostic.openpmd_encoding = self.openpmd_encoding
-        self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.dump_rz_modes = self.dump_rz_modes
-        self.diagnostic.dump_last_timestep = self.dump_last_timestep
-        self.diagnostic.intervals = self.period
-        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
-        self.diagnostic.diag_lo = self.lower_bound
-        self.diagnostic.diag_hi = self.upper_bound
+        self._diagnostic.diag_type = "Full"
+        self._diagnostic.format = self.format
+        self._diagnostic.openpmd_backend = self.openpmd_backend
+        self._diagnostic.openpmd_encoding = self.openpmd_encoding
+        self._diagnostic.file_min_digits = self.file_min_digits
+        self._diagnostic.dump_rz_modes = self.dump_rz_modes
+        self._diagnostic.dump_last_timestep = self.dump_last_timestep
+        self._diagnostic.intervals = self.period
+        self._diagnostic.set_or_replace_attr("verbose", self.verbose)
+        self._diagnostic.diag_lo = self.lower_bound
+        self._diagnostic.diag_hi = self.upper_bound
         if self.number_of_cells is not None:
-            self.diagnostic.coarsening_ratio = (
+            self._diagnostic.coarsening_ratio = (
                 np.array(self.grid.number_of_cells) / np.array(self.number_of_cells)
             ).astype(int)
 
@@ -4564,34 +4207,34 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
             # --- is the same on all processors.
             fields_to_plot = list(fields_to_plot)
             fields_to_plot.sort()
-            self.diagnostic.set_or_replace_attr("fields_to_plot", fields_to_plot)
+            self._diagnostic.set_or_replace_attr("fields_to_plot", fields_to_plot)
 
         particle_fields_to_plot_names = list()
         for pfd in self.particle_fields_to_plot:
             if pfd.name in particle_fields_to_plot_names:
                 raise Exception("A particle fields name can not be repeated.")
             particle_fields_to_plot_names.append(pfd.name)
-            self.diagnostic.__setattr__(
+            self._diagnostic.__setattr__(
                 f"particle_fields.{pfd.name}(x,y,z,ux,uy,uz)", pfd.func
             )
-            self.diagnostic.__setattr__(
+            self._diagnostic.__setattr__(
                 f"particle_fields.{pfd.name}.do_average", pfd.do_average
             )
-            self.diagnostic.__setattr__(
+            self._diagnostic.__setattr__(
                 f"particle_fields.{pfd.name}.filter(x,y,z,ux,uy,uz)", pfd.filter
             )
 
         # --- Convert to a sorted list so that the order
         # --- is the same on all processors.
         particle_fields_to_plot_names.sort()
-        self.diagnostic.particle_fields_to_plot = particle_fields_to_plot_names
-        self.diagnostic.particle_fields_species = self.particle_fields_species
-        self.diagnostic.plot_raw_fields = self.plot_raw_fields
-        self.diagnostic.plot_raw_fields_guards = self.plot_raw_fields_guards
-        self.diagnostic.plot_finepatch = self.plot_finepatch
-        self.diagnostic.plot_crsepatch = self.plot_crsepatch
-        if "write_species" not in self.diagnostic.argvattrs:
-            self.diagnostic.write_species = False
+        self._diagnostic.particle_fields_to_plot = particle_fields_to_plot_names
+        self._diagnostic.particle_fields_species = self.particle_fields_species
+        self._diagnostic.plot_raw_fields = self.plot_raw_fields
+        self._diagnostic.plot_raw_fields_guards = self.plot_raw_fields_guards
+        self._diagnostic.plot_finepatch = self.plot_finepatch
+        self._diagnostic.plot_crsepatch = self.plot_crsepatch
+        if "write_species" not in self._diagnostic.argvattrs:
+            self._diagnostic.write_species = False
         self.set_write_dir()
 
 
@@ -4634,58 +4277,61 @@ class TimeAveragedFieldDiagnostic(FieldDiagnostic):
     def diagnostic_initialize_inputs(self):
         super().diagnostic_initialize_inputs()
 
-        self.diagnostic.set_or_replace_attr("diag_type", "TimeAveraged")
+        self._diagnostic.set_or_replace_attr("diag_type", "TimeAveraged")
 
-        if "write_species" not in self.diagnostic.argvattrs:
-            self.diagnostic.write_species = False
+        if "write_species" not in self._diagnostic.argvattrs:
+            self._diagnostic.write_species = False
 
-        self.diagnostic.time_average_mode = self.time_average_mode
-        self.diagnostic.average_period_steps = self.average_period_steps
-        self.diagnostic.average_period_time = self.average_period_time
-        self.diagnostic.average_start_step = self.average_start_step
+        self._diagnostic.time_average_mode = self.time_average_mode
+        self._diagnostic.average_period_steps = self.average_period_steps
+        self._diagnostic.average_period_time = self.average_period_time
+        self._diagnostic.average_start_step = self.average_start_step
 
 
-class Checkpoint(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
+class Checkpoint(picmistandard.PICMI_DiagnosticExtension, WarpXDiagnosticBase):
     """
     Sets up checkpointing of the simulation, allowing for later restarts
 
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_file_prefix: string
-        The prefix to the checkpoint directory names
-
-    warpx_file_min_digits: integer
-        Minimum number of digits for the time step number in the checkpoint
-        directory name.
-
-    warpx_verbose: int, optional
-        Verbosity level to use for printing diagnostic output information.
     """
 
-    def __init__(self, period=1, write_dir=None, name=None, **kw):
-        self.period = period
-        self.write_dir = write_dir
-        self.file_prefix = kw.pop("warpx_file_prefix", None)
-        self.file_min_digits = kw.pop("warpx_file_min_digits", None)
-        self.name = name
+    period: int | str = Field(
+        default=1,
+        description="Period of time steps at which the checkpoint is written; WarpX also accepts the Intervals parser string syntax (e.g. '::10').",
+    )
+    write_dir: str | None = Field(
+        default=None, description="Directory where the checkpoints are written"
+    )
+    name: str = Field(
+        default="chkpoint", description="Name of the checkpoint diagnostic"
+    )
+    file_prefix: str | None = Field(
+        default=None,
+        alias="warpx_file_prefix",
+        description="The prefix to the checkpoint directory names",
+    )
+    file_min_digits: int | None = Field(
+        default=None,
+        alias="warpx_file_min_digits",
+        description="Minimum number of digits for the time step number in the checkpoint directory name.",
+    )
+    verbose: int | None = Field(
+        default=None,
+        alias="warpx_verbose",
+        description="Verbosity level to use for printing diagnostic output information.",
+    )
 
-        if self.name is None:
-            self.name = "chkpoint"
-
-        self.verbose = kw.pop("warpx_verbose", None)
-
-        self.handle_init(kw)
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.diagnostic.intervals = self.period
-        self.diagnostic.diag_type = "Full"
-        self.diagnostic.format = "checkpoint"
-        self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
+        self._diagnostic.intervals = self.period
+        self._diagnostic.diag_type = "Full"
+        self._diagnostic.format = "checkpoint"
+        self._diagnostic.file_min_digits = self.file_min_digits
+        self._diagnostic.set_or_replace_attr("verbose", self.verbose)
 
         self.set_write_dir()
 
@@ -4717,11 +4363,11 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
     period: int | str = Field(
         description="Period of time steps at which the diagnostic is performed; WarpX also accepts the Intervals parser string syntax (e.g. '::10')."
     )
-    random_fraction: float | dict | None = Field(
+    random_fraction: float | dict[Species, float] | None = Field(
         default=None,
         description="Random fraction of particles to include in the diagnostic. If a float is given the same fraction will be used for all species, if a dictionary is given the keys should be species with the value specifying the random fraction for that species.",
     )
-    uniform_stride: int | dict | None = Field(
+    uniform_stride: int | dict[Species, int] | None = Field(
         default=None,
         description="Stride to down select to the particles to include in the diagnostic. If an integer is given the same stride will be used for all species, if a dictionary is given the keys should be species with the value specifying the stride for that species.",
     )
@@ -4742,60 +4388,29 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
     # otherwise-unrecognized keyword arguments.
     user_defined_kw: dict = Field(default_factory=dict)
 
-    # Computed state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
-    diagnostic: Any = Field(default=None, init=False, exclude=True)
-    mangle_dict: Any = Field(default=None, init=False, exclude=True)
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
 
     @model_validator(mode="before")
     @classmethod
     def _collect_plot_filter_kw(cls, data):
-        # This allows variables to be used in the plot_filter_function, but in order not to
-        # break other codes, the variables must begin with "warpx_".
-        if not isinstance(data, dict):
-            return data
-        data = dict(data)
-        plot_filter_function = (
-            data.get("warpx_plot_filter_function")
-            or data.get("plot_filter_function")
-            or ""
-        )
-        # the field may be given by name or by its warpx_ alias (e.g., when loading a dump)
-        user_defined_kw_key = (
-            "warpx_user_defined_kw"
-            if "warpx_user_defined_kw" in data
-            else "user_defined_kw"
-        )
-        user_defined_kw = dict(data.get(user_defined_kw_key, {}))
-        if plot_filter_function:
-            known = set()
-            for fname, finfo in cls.model_fields.items():
-                known.add(fname)
-                if finfo.alias:
-                    known.add(finfo.alias)
-            for k in list(data.keys()):
-                if k in known:
-                    continue
-                if k.startswith("warpx_") and re.search(
-                    r"\b%s\b" % k, plot_filter_function
-                ):
-                    user_defined_kw[k] = data.pop(k)
-        data[user_defined_kw_key] = user_defined_kw
-        return data
+        return _collect_warpx_constants(cls, data, "plot_filter_function")
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.diagnostic.diag_type = "Full"
-        self.diagnostic.format = self.format
-        self.diagnostic.openpmd_backend = self.openpmd_backend
-        self.diagnostic.openpmd_encoding = self.openpmd_encoding
-        self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.dump_last_timestep = self.dump_last_timestep
-        self.diagnostic.intervals = self.period
-        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
-        self.diagnostic.set_or_replace_attr("write_species", True)
-        if "fields_to_plot" not in self.diagnostic.argvattrs:
-            self.diagnostic.fields_to_plot = "none"
+        self._diagnostic.diag_type = "Full"
+        self._diagnostic.format = self.format
+        self._diagnostic.openpmd_backend = self.openpmd_backend
+        self._diagnostic.openpmd_encoding = self.openpmd_encoding
+        self._diagnostic.file_min_digits = self.file_min_digits
+        self._diagnostic.dump_last_timestep = self.dump_last_timestep
+        self._diagnostic.intervals = self.period
+        self._diagnostic.set_or_replace_attr("verbose", self.verbose)
+        self._diagnostic.set_or_replace_attr("write_species", True)
+        if "fields_to_plot" not in self._diagnostic.argvattrs:
+            self._diagnostic.fields_to_plot = "none"
         self.set_write_dir()
 
         # --- Use a set to ensure that fields don't get repeated.
@@ -4895,10 +4510,10 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
             for key, val in self.uniform_stride.items():
                 uniform_stride[key.name] = val
 
-        if self.mangle_dict is None:
+        if self._mangle_dict is None:
             # Only do this once so that the same variables are used in this distribution
             # is used multiple times
-            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+            self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
         for name in species_names:
             diag = pywarpx.Bucket.Bucket(
@@ -4908,10 +4523,10 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
                 uniform_stride=uniform_stride.get(name, uniform_stride_default),
             )
             expression = pywarpx.my_constants.mangle_expression(
-                self.plot_filter_function, self.mangle_dict
+                self.plot_filter_function, self._mangle_dict
             )
             diag.__setattr__("plot_filter_function(t,x,y,z,ux,uy,uz)", expression)
-            self.diagnostic._species_dict[name] = diag
+            self._diagnostic._species_dict[name] = diag
 
 
 # ----------------------------
@@ -4925,78 +4540,70 @@ class LabFrameFieldDiagnostic(
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html#backtransformed-diagnostics>`__
     for more information.
-
-    Parameters
-    ----------
-    warpx_format: string, optional
-        Passed to <diagnostic name>.format
-
-    warpx_openpmd_backend: string, optional
-        Passed to <diagnostic name>.openpmd_backend
-
-    warpx_openpmd_encoding: 'f' (file based) or 'g' (group based), optional
-        Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding.
-        File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-        Default: `'f'`.
-
-    warpx_file_prefix: string, optional
-        Passed to <diagnostic name>.file_prefix
-
-    warpx_intervals: integer or string
-        Selects the snapshots to be made, instead of using "num_snapshots" which
-        makes all snapshots. "num_snapshots" is ignored.
-
-    warpx_file_min_digits: integer, optional
-        Passed to <diagnostic name>.file_min_digits
-
-    warpx_buffer_size: integer, optional
-        Passed to <diagnostic name>.buffer_size
-
-    warpx_lower_bound: vector of floats, optional
-        Passed to <diagnostic name>.lower_bound
-
-    warpx_upper_bound: vector of floats, optional
-        Passed to <diagnostic name>.upper_bound
-
-    warpx_verbose: int, optional
-        Verbosity level to use for printing diagnostic output information.
     """
 
-    def init(self, kw):
-        """The user is using the new BTD"""
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_LabFrameFieldDiagnostic)
+    )
 
-        self.format = kw.pop("warpx_format", None)
-        self.openpmd_backend = kw.pop("warpx_openpmd_backend", None)
-        self.openpmd_encoding = kw.pop("warpx_openpmd_encoding", None)
-        self.file_prefix = kw.pop("warpx_file_prefix", None)
-        self.intervals = kw.pop("warpx_intervals", None)
-        self.file_min_digits = kw.pop("warpx_file_min_digits", None)
-        self.buffer_size = kw.pop("warpx_buffer_size", None)
-        self.lower_bound = kw.pop("warpx_lower_bound", None)
-        self.upper_bound = kw.pop("warpx_upper_bound", None)
-        self.verbose = kw.pop("warpx_verbose", None)
+    format: str | None = Field(
+        default=None, description="Passed to <diagnostic name>.format"
+    )
+    openpmd_backend: str | None = Field(
+        default=None, description="Passed to <diagnostic name>.openpmd_backend"
+    )
+    openpmd_encoding: Literal["f", "g"] | None = Field(
+        default=None,
+        description="Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding: 'f' (file based) or 'g' (group based). File based: one file per timestep (slower), group/variable based: one file for all steps (faster)). Default: `'f'`.",
+    )
+    file_prefix: str | None = Field(
+        default=None, description="Passed to <diagnostic name>.file_prefix"
+    )
+    intervals: int | str | None = Field(
+        default=None,
+        description='Selects the snapshots to be made, instead of using "num_snapshots" which makes all snapshots. "num_snapshots" is ignored.',
+    )
+    file_min_digits: int | None = Field(
+        default=None, description="Passed to <diagnostic name>.file_min_digits"
+    )
+    buffer_size: int | None = Field(
+        default=None, description="Passed to <diagnostic name>.buffer_size"
+    )
+    lower_bound: list[float] | None = Field(
+        default=None, description="Passed to <diagnostic name>.lower_bound"
+    )
+    upper_bound: list[float] | None = Field(
+        default=None, description="Passed to <diagnostic name>.upper_bound"
+    )
+    verbose: int | None = Field(
+        default=None,
+        description="Verbosity level to use for printing diagnostic output information.",
+    )
+
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.diagnostic.diag_type = "BackTransformed"
-        self.diagnostic.format = self.format
-        self.diagnostic.openpmd_backend = self.openpmd_backend
-        self.diagnostic.openpmd_encoding = self.openpmd_encoding
-        self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.diag_lo = self.lower_bound
-        self.diagnostic.diag_hi = self.upper_bound
-        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
+        self._diagnostic.diag_type = "BackTransformed"
+        self._diagnostic.format = self.format
+        self._diagnostic.openpmd_backend = self.openpmd_backend
+        self._diagnostic.openpmd_encoding = self.openpmd_encoding
+        self._diagnostic.file_min_digits = self.file_min_digits
+        self._diagnostic.diag_lo = self.lower_bound
+        self._diagnostic.diag_hi = self.upper_bound
+        self._diagnostic.set_or_replace_attr("verbose", self.verbose)
 
-        self.diagnostic.do_back_transformed_fields = True
-        self.diagnostic.dt_snapshots_lab = self.dt_snapshots
-        self.diagnostic.buffer_size = self.buffer_size
+        self._diagnostic.do_back_transformed_fields = True
+        self._diagnostic.dt_snapshots_lab = self.dt_snapshots
+        self._diagnostic.buffer_size = self.buffer_size
 
         # intervals and num_snapshots_lab cannot both be set
         if self.intervals is not None:
-            self.diagnostic.intervals = self.intervals
+            self._diagnostic.intervals = self.intervals
         else:
-            self.diagnostic.num_snapshots_lab = self.num_snapshots
+            self._diagnostic.num_snapshots_lab = self.num_snapshots
 
         # --- Use a set to ensure that fields don't get repeated.
         fields_to_plot = set()
@@ -5034,10 +4641,10 @@ class LabFrameFieldDiagnostic(
             # --- is the same on all processors.
             fields_to_plot = list(fields_to_plot)
             fields_to_plot.sort()
-            self.diagnostic.set_or_replace_attr("fields_to_plot", fields_to_plot)
+            self._diagnostic.set_or_replace_attr("fields_to_plot", fields_to_plot)
 
-        if "write_species" not in self.diagnostic.argvattrs:
-            self.diagnostic.write_species = False
+        if "write_species" not in self._diagnostic.argvattrs:
+            self._diagnostic.write_species = False
         self.set_write_dir()
 
 
@@ -5047,72 +4654,68 @@ class LabFrameParticleDiagnostic(
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html#backtransformed-diagnostics>`__
     for more information.
-
-    Parameters
-    ----------
-    warpx_format: string, optional
-        Passed to <diagnostic name>.format
-
-    warpx_openpmd_backend: string, optional
-        Passed to <diagnostic name>.openpmd_backend
-
-    warpx_openpmd_encoding: 'f' (file based) or 'g' (group based), optional
-        Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding.
-        File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-        Default: `'f'`.
-
-    warpx_file_prefix: string, optional
-        Passed to <diagnostic name>.file_prefix
-
-    warpx_intervals: integer or string
-        Selects the snapshots to be made, instead of using "num_snapshots" which
-        makes all snapshots. "num_snapshots" is ignored.
-
-    warpx_file_min_digits: integer, optional
-        Passed to <diagnostic name>.file_min_digits
-
-    warpx_buffer_size: integer, optional
-        Passed to <diagnostic name>.buffer_size
-
-    warpx_verbose: int, optional
-        Verbosity level to use for printing diagnostic output information.
     """
 
-    def init(self, kw):
-        self.format = kw.pop("warpx_format", None)
-        self.openpmd_backend = kw.pop("warpx_openpmd_backend", None)
-        self.openpmd_encoding = kw.pop("warpx_openpmd_encoding", None)
-        self.file_prefix = kw.pop("warpx_file_prefix", None)
-        self.intervals = kw.pop("warpx_intervals", None)
-        self.file_min_digits = kw.pop("warpx_file_min_digits", None)
-        self.buffer_size = kw.pop("warpx_buffer_size", None)
-        self.verbose = kw.pop("warpx_verbose", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(picmistandard.PICMI_LabFrameParticleDiagnostic)
+    )
+
+    format: str | None = Field(
+        default=None, description="Passed to <diagnostic name>.format"
+    )
+    openpmd_backend: str | None = Field(
+        default=None, description="Passed to <diagnostic name>.openpmd_backend"
+    )
+    openpmd_encoding: Literal["f", "g"] | None = Field(
+        default=None,
+        description="Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding: 'f' (file based) or 'g' (group based). File based: one file per timestep (slower), group/variable based: one file for all steps (faster)). Default: `'f'`.",
+    )
+    file_prefix: str | None = Field(
+        default=None, description="Passed to <diagnostic name>.file_prefix"
+    )
+    intervals: int | str | None = Field(
+        default=None,
+        description='Selects the snapshots to be made, instead of using "num_snapshots" which makes all snapshots. "num_snapshots" is ignored.',
+    )
+    file_min_digits: int | None = Field(
+        default=None, description="Passed to <diagnostic name>.file_min_digits"
+    )
+    buffer_size: int | None = Field(
+        default=None, description="Passed to <diagnostic name>.buffer_size"
+    )
+    verbose: int | None = Field(
+        default=None,
+        description="Verbosity level to use for printing diagnostic output information.",
+    )
+
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.diagnostic.diag_type = "BackTransformed"
-        self.diagnostic.format = self.format
-        self.diagnostic.openpmd_backend = self.openpmd_backend
-        self.diagnostic.openpmd_encoding = self.openpmd_encoding
-        self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.set_or_replace_attr("verbose", self.verbose)
+        self._diagnostic.diag_type = "BackTransformed"
+        self._diagnostic.format = self.format
+        self._diagnostic.openpmd_backend = self.openpmd_backend
+        self._diagnostic.openpmd_encoding = self.openpmd_encoding
+        self._diagnostic.file_min_digits = self.file_min_digits
+        self._diagnostic.set_or_replace_attr("verbose", self.verbose)
 
-        self.diagnostic.do_back_transformed_particles = True
-        self.diagnostic.dt_snapshots_lab = self.dt_snapshots
-        self.diagnostic.buffer_size = self.buffer_size
+        self._diagnostic.do_back_transformed_particles = True
+        self._diagnostic.dt_snapshots_lab = self.dt_snapshots
+        self._diagnostic.buffer_size = self.buffer_size
 
         # intervals and num_snapshots_lab cannot both be set
         if self.intervals is not None:
-            self.diagnostic.intervals = self.intervals
+            self._diagnostic.intervals = self.intervals
         else:
-            self.diagnostic.num_snapshots_lab = self.num_snapshots
+            self._diagnostic.num_snapshots_lab = self.num_snapshots
 
-        self.diagnostic.do_back_transformed_fields = False
+        self._diagnostic.do_back_transformed_fields = False
 
-        self.diagnostic.set_or_replace_attr("write_species", True)
-        if "fields_to_plot" not in self.diagnostic.argvattrs:
-            self.diagnostic.fields_to_plot = "none"
+        self._diagnostic.set_or_replace_attr("write_species", True)
+        if "fields_to_plot" not in self._diagnostic.argvattrs:
+            self._diagnostic.fields_to_plot = "none"
 
         self.set_write_dir()
 
@@ -5196,340 +4799,399 @@ class LabFrameParticleDiagnostic(
 
         for name in species_names:
             diag = pywarpx.Bucket.Bucket(self.name + "." + name, variables=variables)
-            self.diagnostic._species_dict[name] = diag
+            self._diagnostic._species_dict[name] = diag
 
 
-class ReducedDiagnostic(picmistandard.base._ClassWithInit, WarpXDiagnosticBase):
+class ReducedDiagnostic(
+    picmistandard.PICMI_DiagnosticExtension,
+    picmistandard.PICMI_ExpressionParameters,
+    WarpXDiagnosticBase,
+):
     """
     Sets up a reduced diagnostic in the simulation.
 
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html#reduced-diagnostics>`__
     for more information.
 
-    Parameters
-    ----------
-    diag_type: string
-        The type of reduced diagnostic. See the link above for all the different
-        types of reduced diagnostics available.
-
-    name: string
-        The name of this diagnostic which will also be the name of the data
-        file written to disk.
-
-    period: integer
-        The simulation step interval at which to output this diagnostic.
-
-    path: string
-        The file path in which the diagnostic file should be written.
-
-    extension: string
-        The file extension used for the diagnostic output.
-
-    separator: string
-        The separator between row values in the output file.
-
-    species: species instance
-        The name of the species for which to calculate the diagnostic, required for
-        diagnostic types 'BeamRelevant', 'ParticleHistogram', 'ParticleHistogram2D', and 'ParticleExtrema'
-
-    bin_number: integer
-        For diagnostic type 'ParticleHistogram', the number of bins used for the histogram
-
-    bin_max: float
-        For diagnostic type 'ParticleHistogram', the maximum value of the bins
-
-    bin_min: float
-        For diagnostic type 'ParticleHistogram', the minimum value of the bins
-
-    normalization: {'unity_particle_weight', 'max_to_unity', 'area_to_unity'}, optional
-        For diagnostic type 'ParticleHistogram', normalization method of the histogram.
-
-    histogram_function: string
-        For diagnostic type 'ParticleHistogram', the function evaluated to produce the histogram data
-
-    filter_function: string, optional
-        For diagnostic types 'ParticleHistogram' and 'ParticleHistogram2D', the function to filter whether particles are included in the histogram
-
-    bin_max_abs: float
-        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the abscissa axis.
-
-    bin_max_ord: float
-        For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the ordinate axis.
-
-    bin_min_abs: float
-        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the abscissa axis.
-
-    bin_min_ord: float
-        For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the ordinate axis.
-
-    bin_number_abs: integer
-        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the abscissa axis.
-
-    bin_number_ord: integer
-        For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the ordinate axis.
-
-    histogram_function_abs: string
-        For diagnostic type 'ParticleHistogram2D', the histogram function for the abscissa axis.
-
-    histogram_function_ord: string
-        For diagnostic type 'ParticleHistogram2D', the histogram function for the ordinate axis.
-
-    value_function: string, optional
-        For diagnostic type 'ParticleHistogram2D', the expression for the weight used to calculate the histogram.
-
-    reduced_function: string
-        For diagnostic type 'FieldReduction', the function of the fields to evaluate
-
-    weighting_function: string, optional
-        For diagnostic type 'ChargeOnEB', the function to weight contributions to the total charge
-
-    reduction_type: {'Maximum', 'Minimum', or 'Integral'}
-        For diagnostic type 'FieldReduction', the type of reduction
-
-    probe_geometry: {'Point', 'Line', 'Plane'}, default='Point'
-        For diagnostic type 'FieldProbe', the geometry of the probe
-
-    integrate: bool, default=false
-        For diagnostic type 'FieldProbe', whether the field is integrated
-
-    do_moving_window_FP: bool, default=False
-        For diagnostic type 'FieldProbe', whether the moving window is followed
-
-    x_probe, y_probe, z_probe: floats
-        For diagnostic type 'FieldProbe', a probe location. For 'Point', the location of the point. For 'Line', the start of the
-        line. For 'Plane', the center of the square detector.
-
-    interp_order: integer
-        For diagnostic type 'FieldProbe', the interpolation order for 'Line' and 'Plane'
-
-    resolution: integer
-        For diagnostic type 'FieldProbe', the number of points along the 'Line' or along each edge of the square 'Plane'
-
-    x1_probe, y1_probe, z1_probe: floats
-        For diagnostic type 'FieldProbe', the end point for 'Line'
-
-    detector_radius: float
-        For diagnostic type 'FieldProbe', the detector "radius" (half edge length) of the 'Plane'
-
-    target_normal_x, target_normal_y, target_normal_z: floats
-        For diagnostic type 'FieldProbe', the normal vector to the 'Plane'. Only applicable in 3D
-
-    target_up_x, target_up_y, target_up_z: floats
-        For diagnostic type 'FieldProbe', the vector specifying up in the 'Plane'
+    Which parameters are used depends on the type of the diagnostic. Parameters used in the
+    expressions can be given as additional keyword arguments.
     """
 
-    def __init__(
-        self,
-        diag_type,
-        name=None,
-        period=None,
-        path=None,
-        extension=None,
-        separator=None,
-        **kw,
-    ):
-        self.name = name
-        self.type = diag_type
-        self.intervals = period
-        self.path = path
-        self.extension = extension
-        self.separator = separator
+    _simple_reduced_diagnostics: ClassVar[tuple[str, ...]] = (
+        "ParticleEnergy",
+        "ParticleMomentum",
+        "FieldEnergy",
+        "FieldMomentum",
+        "FieldMaximum",
+        "FieldPoyntingFlux",
+        "RhoMaximum",
+        "ParticleNumber",
+        "LoadBalanceCosts",
+        "LoadBalanceEfficiency",
+        "Timestep",
+    )
+    # these diagnostics require a species
+    _species_reduced_diagnostics: ClassVar[tuple[str, ...]] = (
+        "BeamRelevant",
+        "ParticleHistogram",
+        "ParticleHistogram2D",
+        "ParticleExtrema",
+    )
+    # per type: the parameters and their input names, with the arguments of expressions
+    _type_inputs: ClassVar[dict[str, dict[str, str]]] = {
+        "FieldProbe": {
+            name: name
+            for name in (
+                "probe_geometry",
+                "x_probe",
+                "y_probe",
+                "z_probe",
+                "interp_order",
+                "integrate",
+                "do_moving_window_FP",
+                "resolution",
+                "x1_probe",
+                "y1_probe",
+                "z1_probe",
+                "detector_radius",
+                "target_normal_x",
+                "target_normal_y",
+                "target_normal_z",
+                "target_up_x",
+                "target_up_y",
+                "target_up_z",
+            )
+        },
+        "ParticleHistogram": {
+            "bin_number": "bin_number",
+            "bin_max": "bin_max",
+            "bin_min": "bin_min",
+            "normalization": "normalization",
+            "histogram_function": "histogram_function(t,x,y,z,ux,uy,uz)",
+            "filter_function": "filter_function(t,x,y,z,ux,uy,uz)",
+        },
+        "ParticleHistogram2D": {
+            "bin_number_abs": "bin_number_abs",
+            "bin_number_ord": "bin_number_ord",
+            "bin_min_abs": "bin_min_abs",
+            "bin_max_abs": "bin_max_abs",
+            "bin_min_ord": "bin_min_ord",
+            "bin_max_ord": "bin_max_ord",
+            "histogram_function_abs": "histogram_function_abs(t,x,y,z,ux,uy,uz,w)",
+            "histogram_function_ord": "histogram_function_ord(t,x,y,z,ux,uy,uz,w)",
+            "filter_function": "filter_function(t,x,y,z,ux,uy,uz,w)",
+            "value_function": "value_function(t,x,y,z,ux,uy,uz,w)",
+        },
+        "FieldReduction": {
+            "reduction_type": "reduction_type",
+            "reduced_function": "reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz,jx,jy,jz)",
+        },
+        "ChargeOnEB": {
+            "weighting_function": "weighting_function(x,y,z)",
+        },
+    }
+    _expression_fields: ClassVar[tuple[str, ...]] = (
+        "histogram_function",
+        "filter_function",
+        "histogram_function_abs",
+        "histogram_function_ord",
+        "value_function",
+        "reduced_function",
+        "weighting_function",
+    )
 
-        self.user_defined_kw = {}
+    diag_type: Literal[
+        "ParticleEnergy",
+        "ParticleMomentum",
+        "FieldEnergy",
+        "FieldMomentum",
+        "FieldMaximum",
+        "FieldPoyntingFlux",
+        "RhoMaximum",
+        "ParticleNumber",
+        "LoadBalanceCosts",
+        "LoadBalanceEfficiency",
+        "Timestep",
+        "BeamRelevant",
+        "ParticleHistogram",
+        "ParticleHistogram2D",
+        "ParticleExtrema",
+        "FieldProbe",
+        "FieldReduction",
+        "ChargeOnEB",
+    ] = Field(
+        description="The type of reduced diagnostic. See the link above for all the different types of reduced diagnostics available."
+    )
+    name: str | None = Field(
+        default=None,
+        description="The name of this diagnostic which will also be the name of the data file written to disk.",
+    )
+    period: int | str | None = Field(
+        default=None,
+        description="The simulation step interval at which to output this diagnostic.",
+    )
+    path: str | None = Field(
+        default=None,
+        description="The file path in which the diagnostic file should be written.",
+    )
+    extension: str | None = Field(
+        default=None, description="The file extension used for the diagnostic output."
+    )
+    separator: str | None = Field(
+        default=None, description="The separator between row values in the output file."
+    )
+    species: Species | None = Field(
+        default=None,
+        description="The species for which to calculate the diagnostic, required for diagnostic types 'BeamRelevant', 'ParticleHistogram', 'ParticleHistogram2D', and 'ParticleExtrema'",
+    )
 
-        # Now we need to handle all the specific inputs required for the
-        # different reduced diagnostic types.
+    # ParticleHistogram
+    bin_number: int | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram', the number of bins used for the histogram",
+    )
+    bin_max: float | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram', the maximum value of the bins",
+    )
+    bin_min: float | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram', the minimum value of the bins",
+    )
+    normalization: (
+        Literal["unity_particle_weight", "max_to_unity", "area_to_unity"] | None
+    ) = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram', normalization method of the histogram.",
+    )
+    histogram_function: Expression | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram', the function evaluated to produce the histogram data",
+    )
+    filter_function: Expression | None = Field(
+        default=None,
+        description="For diagnostic types 'ParticleHistogram' and 'ParticleHistogram2D', the function to filter whether particles are included in the histogram",
+    )
 
-        # The simple diagnostics do not require any additional arguments
-        self._simple_reduced_diagnostics = [
-            "ParticleEnergy",
-            "ParticleMomentum",
-            "FieldEnergy",
-            "FieldMomentum",
-            "FieldMaximum",
-            "FieldPoyntingFlux",
-            "RhoMaximum",
-            "ParticleNumber",
-            "LoadBalanceCosts",
-            "LoadBalanceEfficiency",
-            "Timestep",
-        ]
-        # The species diagnostics require a species to be provided
-        self._species_reduced_diagnostics = [
-            "BeamRelevant",
-            "ParticleHistogram",
-            "ParticleHistogram2D",
-            "ParticleExtrema",
-        ]
+    # ParticleHistogram2D
+    bin_max_abs: float | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the abscissa axis.",
+    )
+    bin_max_ord: float | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the maximum value of the bins for the ordinate axis.",
+    )
+    bin_min_abs: float | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the abscissa axis.",
+    )
+    bin_min_ord: float | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the minimum value of the bins for the ordinate axis.",
+    )
+    bin_number_abs: int | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the abscissa axis.",
+    )
+    bin_number_ord: int | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the number of bins used for the histogram for the ordinate axis.",
+    )
+    histogram_function_abs: Expression | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the histogram function for the abscissa axis.",
+    )
+    histogram_function_ord: Expression | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the histogram function for the ordinate axis.",
+    )
+    value_function: Expression | None = Field(
+        default=None,
+        description="For diagnostic type 'ParticleHistogram2D', the expression for the weight used to calculate the histogram.",
+    )
 
-        if self.type in self._simple_reduced_diagnostics:
-            pass
-        elif self.type in self._species_reduced_diagnostics:
-            species = kw.pop("species")
-            self.species = species.name
-            if self.type == "ParticleHistogram":
-                kw = self._handle_particle_histogram(**kw)
-            elif self.type == "ParticleHistogram2D":
-                kw = self._handle_particle_histogram2d(**kw)
-        elif self.type == "FieldProbe":
-            kw = self._handle_field_probe(**kw)
-        elif self.type == "FieldReduction":
-            kw = self._handle_field_reduction(**kw)
-        elif self.type == "ChargeOnEB":
-            kw = self._handle_charge_on_eb(**kw)
-        else:
-            raise RuntimeError(
-                f"{self.type} reduced diagnostic is not yet supported in pywarpx."
+    # FieldReduction
+    reduced_function: Expression | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldReduction', the function of the fields to evaluate",
+    )
+    reduction_type: Literal["Maximum", "Minimum", "Integral"] | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldReduction', the type of reduction",
+    )
+
+    # ChargeOnEB
+    weighting_function: Expression | None = Field(
+        default=None,
+        description="For diagnostic type 'ChargeOnEB', the function to weight contributions to the total charge",
+    )
+
+    # FieldProbe
+    probe_geometry: str | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the geometry of the probe: 'Point', 'Line', or 'Plane'",
+    )
+    integrate: bool | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', whether the field is integrated (default False)",
+    )
+    do_moving_window_FP: bool | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', whether the moving window is followed (default False)",
+    )
+    x_probe: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', a probe location. For 'Point', the location of the point. For 'Line', the start of the line. For 'Plane', the center of the square detector.",
+    )
+    y_probe: float | None = Field(
+        default=None, description="For diagnostic type 'FieldProbe', see ``x_probe``"
+    )
+    z_probe: float | None = Field(
+        default=None, description="For diagnostic type 'FieldProbe', see ``x_probe``"
+    )
+    interp_order: int | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the interpolation order for 'Line' and 'Plane'",
+    )
+    resolution: int | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the number of points along the 'Line' or along each edge of the square 'Plane'",
+    )
+    x1_probe: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the end point for 'Line'",
+    )
+    y1_probe: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the end point for 'Line'",
+    )
+    z1_probe: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the end point for 'Line'",
+    )
+    detector_radius: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the detector \"radius\" (half edge length) of the 'Plane'",
+    )
+    target_normal_x: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the normal vector to the 'Plane'. Only applicable in 3D",
+    )
+    target_normal_y: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the normal vector to the 'Plane'. Only applicable in 3D",
+    )
+    target_normal_z: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the normal vector to the 'Plane'. Only applicable in 3D",
+    )
+    target_up_x: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the vector specifying up in the 'Plane'",
+    )
+    target_up_y: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the vector specifying up in the 'Plane'",
+    )
+    target_up_z: float | None = Field(
+        default=None,
+        description="For diagnostic type 'FieldProbe', the vector specifying up in the 'Plane'",
+    )
+
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the expressions, collected from otherwise-unrecognized keyword arguments.",
+    )
+
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
+
+    @model_validator(mode="after")
+    def _check_parameters_of_type(self) -> Self:
+        required = []
+        if self.diag_type in self._species_reduced_diagnostics:
+            required.append("species")
+        elif self.species is not None:
+            raise ValueError(
+                f"species is not used by the {self.diag_type} reduced diagnostic"
             )
 
-        self.handle_init(kw)
+        used = set(self._type_inputs.get(self.diag_type, {}))
+        if self.diag_type == "ParticleHistogram":
+            required += ["bin_number", "bin_max", "bin_min", "histogram_function"]
+        elif self.diag_type == "ParticleHistogram2D":
+            required += [
+                "bin_number_abs",
+                "bin_number_ord",
+                "bin_min_abs",
+                "bin_max_abs",
+                "bin_min_ord",
+                "bin_max_ord",
+                "histogram_function_abs",
+                "histogram_function_ord",
+            ]
+        elif self.diag_type == "FieldReduction":
+            required += ["reduction_type", "reduced_function"]
+        elif self.diag_type == "FieldProbe":
+            required += ["probe_geometry", "z_probe"]
+            geometry = (self.probe_geometry or "").lower()
+            if geometry != "point":
+                required.append("resolution")
+            if geometry != "line":
+                used -= {"x1_probe", "y1_probe", "z1_probe"}
+            else:
+                required.append("z1_probe")
+            if geometry != "plane":
+                used -= {
+                    "detector_radius",
+                    "target_normal_x",
+                    "target_normal_y",
+                    "target_normal_z",
+                    "target_up_x",
+                    "target_up_y",
+                    "target_up_z",
+                }
+            else:
+                required.append("detector_radius")
 
-    def _handle_field_probe(self, **kw):
-        """Utility function to grab required inputs for a field probe from kw"""
-        self.probe_geometry = kw.pop("probe_geometry")
-        self.x_probe = kw.pop("x_probe", None)
-        self.y_probe = kw.pop("y_probe", None)
-        self.z_probe = kw.pop("z_probe")
-
-        self.interp_order = kw.pop("interp_order", None)
-        self.integrate = kw.pop("integrate", None)
-        self.do_moving_window_FP = kw.pop("do_moving_window_FP", None)
-
-        if self.probe_geometry.lower() != "point":
-            self.resolution = kw.pop("resolution")
-
-        if self.probe_geometry.lower() == "line":
-            self.x1_probe = kw.pop("x1_probe", None)
-            self.y1_probe = kw.pop("y1_probe", None)
-            self.z1_probe = kw.pop("z1_probe")
-
-        if self.probe_geometry.lower() == "plane":
-            self.detector_radius = kw.pop("detector_radius")
-
-            self.target_normal_x = kw.pop("target_normal_x", None)
-            self.target_normal_y = kw.pop("target_normal_y", None)
-            self.target_normal_z = kw.pop("target_normal_z", None)
-
-            self.target_up_x = kw.pop("target_up_x", None)
-            self.target_up_y = kw.pop("target_up_y", None)
-            self.target_up_z = kw.pop("target_up_z", None)
-
-        return kw
-
-    def _handle_particle_histogram(self, **kw):
-        self.bin_number = kw.pop("bin_number")
-        self.bin_max = kw.pop("bin_max")
-        self.bin_min = kw.pop("bin_min")
-        self.normalization = kw.pop("normalization", None)
-        if self.normalization not in [
-            None,
-            "unity_particle_weight",
-            "max_to_unity",
-            "area_to_unity",
-        ]:
-            raise AttributeError(
-                "The ParticleHistogram normalization must be one of 'unity_particle_weight', 'max_to_unity', or 'area_to_unity'"
+        missing = [name for name in required if getattr(self, name) is None]
+        if missing:
+            raise ValueError(
+                f"The {self.diag_type} reduced diagnostic requires: {', '.join(missing)}"
             )
-
-        histogram_function = kw.pop("histogram_function")
-        filter_function = kw.pop("filter_function", None)
-
-        self.__setattr__("histogram_function(t,x,y,z,ux,uy,uz)", histogram_function)
-        self.__setattr__("filter_function(t,x,y,z,ux,uy,uz)", filter_function)
-
-        # Check the reduced function expressions for constants
-        for k in list(kw.keys()):
-            if re.search(r"\b%s\b" % k, histogram_function) or (
-                filter_function is not None
-                and re.search(r"\b%s\b" % k, filter_function)
-            ):
-                self.user_defined_kw[k] = kw[k]
-                del kw[k]
-
-        return kw
-
-    def _handle_particle_histogram2d(self, **kw):
-        self.bin_number_abs = kw.pop("bin_number_abs")
-        self.bin_number_ord = kw.pop("bin_number_ord")
-        self.bin_min_abs = kw.pop("bin_min_abs")
-        self.bin_max_abs = kw.pop("bin_max_abs")
-        self.bin_min_ord = kw.pop("bin_min_ord")
-        self.bin_max_ord = kw.pop("bin_max_ord")
-        histogram_function_abs = kw.pop("histogram_function_abs")
-        histogram_function_ord = kw.pop("histogram_function_ord")
-        self.__setattr__(
-            "histogram_function_abs(t,x,y,z,ux,uy,uz,w)", histogram_function_abs
+        type_specific = {
+            name for inputs in self._type_inputs.values() for name in inputs
+        }
+        unused = sorted(
+            name for name in type_specific - used if getattr(self, name) is not None
         )
-        self.__setattr__(
-            "histogram_function_ord(t,x,y,z,ux,uy,uz,w)", histogram_function_ord
-        )
-
-        filter_function = kw.pop("filter_function", None)
-        value_function = kw.pop("value_function", None)
-
-        self.__setattr__("filter_function(t,x,y,z,ux,uy,uz,w)", filter_function)
-        self.__setattr__("value_function(t,x,y,z,ux,uy,uz,w)", value_function)
-
-        # Check the function expressions for constants
-        for k in list(kw.keys()):
-            if any(
-                re.search(r"\b%s\b" % k, expr)
-                for expr in [
-                    histogram_function_abs,
-                    histogram_function_ord,
-                    filter_function,
-                    value_function,
-                ]
-                if expr is not None
-            ):
-                self.user_defined_kw[k] = kw.pop(k)
-
-        return kw
-
-    def _handle_field_reduction(self, **kw):
-        self.reduction_type = kw.pop("reduction_type")
-        reduced_function = kw.pop("reduced_function")
-
-        self.__setattr__(
-            "reduced_function(x,y,z,Ex,Ey,Ez,Bx,By,Bz,jx,jy,jz)", reduced_function
-        )
-
-        # Check the reduced function expression for constants
-        for k in list(kw.keys()):
-            if re.search(r"\b%s\b" % k, reduced_function):
-                self.user_defined_kw[k] = kw[k]
-                del kw[k]
-
-        return kw
-
-    def _handle_charge_on_eb(self, **kw):
-        weighting_function = kw.pop("weighting_function", None)
-
-        self.__setattr__("weighting_function(x,y,z)", weighting_function)
-
-        # Check the reduced function expression for constants
-        for k in list(kw.keys()):
-            if re.search(r"\b%s\b" % k, weighting_function):
-                self.user_defined_kw[k] = kw[k]
-                del kw[k]
-
-        return kw
+        if unused:
+            raise ValueError(
+                f"Not used by the {self.diag_type} reduced diagnostic: {', '.join(unused)}"
+            )
+        return self
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+        self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
-        for key, value in self.__dict__.items():
-            if not key.startswith("_") and key not in ["name", "diagnostic"]:
-                if key.endswith(")"):
-                    # Analytic expressions require processing to deal with constants
-                    expression = pywarpx.my_constants.mangle_expression(
-                        value, self.mangle_dict
-                    )
-                    self.diagnostic.__setattr__(key, expression)
-                else:
-                    self.diagnostic.__setattr__(key, value)
+        self._diagnostic.type = self.diag_type
+        self._diagnostic.intervals = self.period
+        self._diagnostic.path = self.path
+        self._diagnostic.extension = self.extension
+        self._diagnostic.separator = self.separator
+        if self.species is not None:
+            self._diagnostic.species = self.species.name
+
+        for field_name, input_name in self._type_inputs.get(self.diag_type, {}).items():
+            value = getattr(self, field_name)
+            if input_name.endswith(")"):
+                # Analytic expressions require processing to deal with constants
+                value = pywarpx.my_constants.mangle_expression(value, self._mangle_dict)
+            self._diagnostic.__setattr__(input_name, value)
 
 
 class ParticleBoundaryScrapingDiagnostic(
@@ -5537,82 +5199,72 @@ class ParticleBoundaryScrapingDiagnostic(
 ):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
-
-    Parameters
-    ----------
-    warpx_format: openpmd
-        Diagnostic file format
-
-    warpx_openpmd_backend: {bp, h5, json}, optional
-        Openpmd backend file format
-
-    warpx_openpmd_encoding: 'v' (variable based), 'f' (file based) or 'g' (group based), optional
-        Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding.
-        File based: one file per timestep (slower), group/variable based: one file for all steps (faster)).
-        Variable based is an experimental feature with ADIOS2. Default: `'f'`.
-
-    warpx_file_prefix: string, optional
-        Prefix on the diagnostic file name
-
-    warpx_file_min_digits: integer, optional
-        Minimum number of digits for the time step number in the file name
-
-    warpx_random_fraction: float or dict, optional
-        Random fraction of particles to include in the diagnostic. If a float
-        is given the same fraction will be used for all species, if a dictionary
-        is given the keys should be species with the value specifying the random
-        fraction for that species.
-
-    warpx_uniform_stride: integer or dict, optional
-        Stride to down select to the particles to include in the diagnostic.
-        If an integer is given the same stride will be used for all species, if
-        a dictionary is given the keys should be species with the value
-        specifying the stride for that species.
-
-    warpx_dump_last_timestep: bool, optional
-        If true, the last timestep is dumped regardless of the diagnostic period/intervals.
-
-    warpx_plot_filter_function: string, optional
-        Analytic expression to down select the particles to in the diagnostic
     """
 
-    def init(self, kw):
-        self.format = kw.pop("warpx_format", "openpmd")
-        self.openpmd_backend = kw.pop("warpx_openpmd_backend", None)
-        self.openpmd_encoding = kw.pop("warpx_openpmd_encoding", None)
-        self.file_prefix = kw.pop("warpx_file_prefix", None)
-        self.file_min_digits = kw.pop("warpx_file_min_digits", None)
-        self.random_fraction = kw.pop("warpx_random_fraction", None)
-        self.uniform_stride = kw.pop("warpx_uniform_stride", None)
-        self.plot_filter_function = kw.pop("warpx_plot_filter_function", None)
-        self.dump_last_timestep = kw.pop("warpx_dump_last_timestep", None)
+    model_config = ConfigDict(
+        alias_generator=warpx_options(
+            picmistandard.PICMI_ParticleBoundaryScrapingDiagnostic
+        )
+    )
 
-        self.user_defined_kw = {}
-        if self.plot_filter_function is not None:
-            # This allows variables to be used in the plot_filter_function, but
-            # in order not to break other codes, the variables must begin with "warpx_"
-            for k in list(kw.keys()):
-                if k.startswith("warpx_") and re.search(
-                    r"\b%s\b" % k, self.plot_filter_function
-                ):
-                    self.user_defined_kw[k] = kw[k]
-                    del kw[k]
+    format: str = Field(default="openpmd", description="Diagnostic file format")
+    openpmd_backend: Literal["bp", "h5", "json"] | None = Field(
+        default=None, description="Openpmd backend file format"
+    )
+    openpmd_encoding: Literal["v", "f", "g"] | None = Field(
+        default=None,
+        description="Only read if ``<diag_name>.format = openpmd``. openPMD file output encoding: 'v' (variable based), 'f' (file based) or 'g' (group based). File based: one file per timestep (slower), group/variable based: one file for all steps (faster)). Variable based is an experimental feature with ADIOS2. Default: `'f'`.",
+    )
+    file_prefix: str | None = Field(
+        default=None, description="Prefix on the diagnostic file name"
+    )
+    file_min_digits: int | None = Field(
+        default=None,
+        description="Minimum number of digits for the time step number in the file name",
+    )
+    random_fraction: float | dict[Species, float] | None = Field(
+        default=None,
+        description="Random fraction of particles to include in the diagnostic. If a float is given the same fraction will be used for all species, if a dictionary is given the keys should be species with the value specifying the random fraction for that species.",
+    )
+    uniform_stride: int | dict[Species, int] | None = Field(
+        default=None,
+        description="Stride to down select to the particles to include in the diagnostic. If an integer is given the same stride will be used for all species, if a dictionary is given the keys should be species with the value specifying the stride for that species.",
+    )
+    plot_filter_function: str | None = Field(
+        default=None,
+        description="Analytic expression to down select the particles to in the diagnostic",
+    )
+    dump_last_timestep: bool | None = Field(
+        default=None,
+        description="If true, the last timestep is dumped regardless of the diagnostic period/intervals.",
+    )
 
-        self.mangle_dict = None
+    # ``warpx_``-prefixed constants referenced in plot_filter_function, collected from the
+    # otherwise-unrecognized keyword arguments.
+    user_defined_kw: dict = Field(default_factory=dict)
+
+    # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
+    _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
+    _mangle_dict: dict | None = PrivateAttr(default=None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _collect_plot_filter_kw(cls, data):
+        return _collect_warpx_constants(cls, data, "plot_filter_function")
 
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
-        self.diagnostic.diag_type = "BoundaryScraping"
-        self.diagnostic.format = self.format
-        self.diagnostic.openpmd_backend = self.openpmd_backend
-        self.diagnostic.openpmd_encoding = self.openpmd_encoding
-        self.diagnostic.file_min_digits = self.file_min_digits
-        self.diagnostic.dump_last_timestep = self.dump_last_timestep
-        self.diagnostic.intervals = self.period
-        self.diagnostic.set_or_replace_attr("write_species", True)
-        if "fields_to_plot" not in self.diagnostic.argvattrs:
-            self.diagnostic.fields_to_plot = "none"
+        self._diagnostic.diag_type = "BoundaryScraping"
+        self._diagnostic.format = self.format
+        self._diagnostic.openpmd_backend = self.openpmd_backend
+        self._diagnostic.openpmd_encoding = self.openpmd_encoding
+        self._diagnostic.file_min_digits = self.file_min_digits
+        self._diagnostic.dump_last_timestep = self.dump_last_timestep
+        self._diagnostic.intervals = self.period
+        self._diagnostic.set_or_replace_attr("write_species", True)
+        if "fields_to_plot" not in self._diagnostic.argvattrs:
+            self._diagnostic.fields_to_plot = "none"
 
         self.set_write_dir()
 
@@ -5688,10 +5340,10 @@ class ParticleBoundaryScrapingDiagnostic(
             for key, val in self.uniform_stride.items():
                 uniform_stride[key.name] = val
 
-        if self.mangle_dict is None:
+        if self._mangle_dict is None:
             # Only do this once so that the same variables are used in this distribution
             # is used multiple times
-            self.mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
+            self._mangle_dict = pywarpx.my_constants.add_keywords(self.user_defined_kw)
 
         for name in species_names:
             diag = pywarpx.Bucket.Bucket(
@@ -5701,7 +5353,7 @@ class ParticleBoundaryScrapingDiagnostic(
                 uniform_stride=uniform_stride.get(name, uniform_stride_default),
             )
             expression = pywarpx.my_constants.mangle_expression(
-                self.plot_filter_function, self.mangle_dict
+                self.plot_filter_function, self._mangle_dict
             )
             diag.__setattr__("plot_filter_function(t,x,y,z,ux,uy,uz)", expression)
-            self.diagnostic._species_dict[name] = diag
+            self._diagnostic._species_dict[name] = diag
