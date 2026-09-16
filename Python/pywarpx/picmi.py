@@ -990,19 +990,19 @@ class PseudoRandomLayout(picmistandard.PICMI_PseudoRandomLayout):
 
 
 class BinomialSmoother(picmistandard.PICMI_BinomialSmoother):
+    n_pass: int | list[int] | None = Field(
+        default=None,
+        description="Number of passes along each axis. A single integer applies to all axes. If not specified, one pass is done along each axis.",
+    )
+
     def smoother_initialize_inputs(self, solver):
         pywarpx.warpx.use_filter = 1
         pywarpx.warpx.use_filter_compensation = bool(np.all(self.compensation))
-        if self.n_pass is None:
-            # If not specified, do at least one pass in each direction.
-            self.n_pass = 1
-        try:
-            # Check if n_pass is a vector
-            len(self.n_pass)
-        except TypeError:
-            # If not, make it a vector
-            self.n_pass = solver.grid.number_of_dimensions * [self.n_pass]
-        pywarpx.warpx.filter_npass_each_dir = self.n_pass
+        # If not specified, do at least one pass in each direction.
+        n_pass = 1 if self.n_pass is None else self.n_pass
+        if isinstance(n_pass, int):
+            n_pass = solver.grid.number_of_dimensions * [n_pass]
+        pywarpx.warpx.filter_npass_each_dir = n_pass
 
 
 class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
@@ -1080,13 +1080,16 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
         # Geometry
-        # Set these as soon as the information is available
-        # (since these are needed to determine which shared object to load)
+        # Set this as soon as the information is available
+        # (since it is needed to determine which shared object to load)
         pywarpx.geometry.dims = "RZ"
-        pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
-        pywarpx.geometry.prob_hi = self.upper_bound
 
     def grid_initialize_inputs(self):
+        # The physical domain is only complete after the validation, which fills the bounds
+        # from the per-axis parameters (e.g., xmin), and can change later on.
+        pywarpx.geometry.prob_lo = self.lower_bound
+        pywarpx.geometry.prob_hi = self.upper_bound
+
         pywarpx.amr.n_cell = self.number_of_cells
 
         # Maximum allowable size of each subdomain in the problem domain;
@@ -1198,13 +1201,16 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
         # Geometry
-        # Set these as soon as the information is available
-        # (since these are needed to determine which shared object to load)
+        # Set this as soon as the information is available
+        # (since it is needed to determine which shared object to load)
         pywarpx.geometry.dims = "1"
-        pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
-        pywarpx.geometry.prob_hi = self.upper_bound
 
     def grid_initialize_inputs(self):
+        # The physical domain is only complete after the validation, which fills the bounds
+        # from the per-axis parameters (e.g., xmin), and can change later on.
+        pywarpx.geometry.prob_lo = self.lower_bound
+        pywarpx.geometry.prob_hi = self.upper_bound
+
         pywarpx.amr.n_cell = self.number_of_cells
 
         # Maximum allowable size of each subdomain in the problem domain;
@@ -1313,13 +1319,16 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
         # Geometry
-        # Set these as soon as the information is available
-        # (since these are needed to determine which shared object to load)
+        # Set this as soon as the information is available
+        # (since it is needed to determine which shared object to load)
         pywarpx.geometry.dims = "2"
-        pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
-        pywarpx.geometry.prob_hi = self.upper_bound
 
     def grid_initialize_inputs(self):
+        # The physical domain is only complete after the validation, which fills the bounds
+        # from the per-axis parameters (e.g., xmin), and can change later on.
+        pywarpx.geometry.prob_lo = self.lower_bound
+        pywarpx.geometry.prob_hi = self.upper_bound
+
         pywarpx.amr.n_cell = self.number_of_cells
 
         # Maximum allowable size of each subdomain in the problem domain;
@@ -1448,13 +1457,16 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
     def model_post_init(self, context) -> None:
         super().model_post_init(context)
         # Geometry
-        # Set these as soon as the information is available
-        # (since these are needed to determine which shared object to load)
+        # Set this as soon as the information is available
+        # (since it is needed to determine which shared object to load)
         pywarpx.geometry.dims = "3"
-        pywarpx.geometry.prob_lo = self.lower_bound  # physical domain
-        pywarpx.geometry.prob_hi = self.upper_bound
 
     def grid_initialize_inputs(self):
+        # The physical domain is only complete after the validation, which fills the bounds
+        # from the per-axis parameters (e.g., xmin), and can change later on.
+        pywarpx.geometry.prob_lo = self.lower_bound
+        pywarpx.geometry.prob_hi = self.upper_bound
+
         pywarpx.amr.n_cell = self.number_of_cells
 
         # Maximum allowable size of each subdomain in the problem domain;
