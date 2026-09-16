@@ -1763,14 +1763,14 @@ class CurlCurlMLMGPreconditioner(PreconditionerBase):
 
     def __init__(
         self,
-        verbose,
-        bottom_verbose,
-        agglomeration,
-        consolidation,
-        max_iter,
-        max_coarsening_level,
-        relative_tolerance,
-        absolute_tolerance,
+        verbose=None,
+        bottom_verbose=None,
+        agglomeration=None,
+        consolidation=None,
+        max_iter=None,
+        max_coarsening_level=None,
+        relative_tolerance=None,
+        absolute_tolerance=None,
     ):
         self.verbose = verbose
         self.bottom_verbose = bottom_verbose
@@ -1865,10 +1865,10 @@ class JacobiPreconditioner(PreconditionerBase):
 
     def __init__(
         self,
-        verbose,
-        max_iter,
-        relative_tolerance,
-        absolute_tolerance,
+        verbose=None,
+        max_iter=None,
+        relative_tolerance=None,
+        absolute_tolerance=None,
     ):
         self.verbose = verbose
         self.max_iter = max_iter
@@ -1905,12 +1905,12 @@ class PETScPreconditioner(PreconditionerBase):
 
     def __init__(
         self,
-        type,
-        asm_overlap,
-        sub_type,
-        ilu_factor_levels,
-        hypre_type,
-        euclid_factor_levels,
+        type=None,
+        asm_overlap=None,
+        sub_type=None,
+        ilu_factor_levels=None,
+        hypre_type=None,
+        euclid_factor_levels=None,
     ):
         self.type = type
         self.asm_overlap = asm_overlap
