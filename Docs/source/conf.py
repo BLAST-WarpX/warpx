@@ -330,12 +330,18 @@ def setup(app):
     2. Strip the ``:type:`` / ``:value:`` of class attributes whose value is just an
        object repr (e.g. the ``extension`` handle), so they render as a bare name instead
        of ``extension: ClassVar[Any] = <... object>``.
+
+    Parameters are shown with their user-facing name, i.e., their alias (e.g.,
+    ``warpx_break_signals``) instead of their field name (``break_signals``). Also use
+    that name to sort the parameters and in the table of contents.
     """
     import re
 
     from sphinxcontrib.autodoc_pydantic.directives.autodocumenters import (
+        PydanticFieldDocumenter,
         PydanticModelDocumenter,
     )
+    from sphinxcontrib.autodoc_pydantic.directives.directives import PydanticField
 
     # Directive emitted for each member type -> rubric label (groupwise order).
     group_labels = [
@@ -347,6 +353,29 @@ def setup(app):
     object_repr = re.compile(r":value:\s*<.* object.*>")
 
     class GroupedPydanticModelDocumenter(PydanticModelDocumenter):
+        def sort_members(self, documenters, order):
+            documenters = super().sort_members(documenters, order)
+            if (
+                order == "groupwise"
+                and self.config.autodoc_pydantic_field_swap_name_and_alias
+            ):
+                fields = self.object.model_fields
+
+                def user_facing_name(documenter):
+                    name = documenter.name.rsplit(".", 1)[-1]
+                    field = fields.get(name)
+                    if isinstance(documenter, PydanticFieldDocumenter) and field:
+                        return field.alias or name
+                    return name
+
+                documenters.sort(
+                    key=lambda entry: (
+                        entry[0].member_order,
+                        user_facing_name(entry[0]),
+                    )
+                )
+            return documenters
+
         def document_members(self, all_members: bool = False) -> None:
             result = self.directive.result
             start = len(result.data)
@@ -391,5 +420,23 @@ def setup(app):
                 result.insert(i, f"{indent}.. rubric:: {label}", src, offset)
                 result.insert(i, "", src, offset)
 
+    class UserFacingNamePydanticField(PydanticField):
+        def _toc_entry_name(self, sig_node):
+            # autodoc-pydantic swaps the field name with the alias only in the signature
+            entry = super()._toc_entry_name(sig_node)
+            alias = self.options.get("alias")
+            if (
+                entry
+                and alias
+                and self.pyautodoc.get_value("field-swap-name-and-alias")
+            ):
+                name = sig_node["_toc_parts"][-1]
+                if entry.endswith(name):
+                    entry = entry[: -len(name)] + alias
+            return entry
+
     app.setup_extension("sphinxcontrib.autodoc_pydantic")
     app.add_autodocumenter(GroupedPydanticModelDocumenter, override=True)
+    app.add_directive_to_domain(
+        "py", "pydantic_field", UserFacingNamePydanticField, override=True
+    )
