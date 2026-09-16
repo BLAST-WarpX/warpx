@@ -52,16 +52,19 @@ Simulation and Grid Setup
 .. autopydantic_model:: pywarpx.picmi.CylindricalGrid
     :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.EmbeddedBoundary
+.. autopydantic_model:: pywarpx.picmi.EmbeddedBoundary
+    :inherited-members: BaseModel
 
 Field solvers define the updates of electric and magnetic fields.
 
 .. autopydantic_model:: pywarpx.picmi.ElectromagneticSolver
     :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.ElectrostaticSolver
+.. autopydantic_model:: pywarpx.picmi.ElectrostaticSolver
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.HybridPICSolver
+.. autopydantic_model:: pywarpx.picmi.HybridPICSolver
+    :inherited-members: BaseModel
 
 Object that allows smoothing of fields.
 
@@ -74,27 +77,37 @@ Evolve Schemes
 These define the scheme use to evolve the fields and particles.
 An instance of one of these would be passed as the `evolve_scheme` into the `Simulation`.
 
-.. autoclass:: pywarpx.picmi.ExplicitEvolveScheme
+.. autopydantic_model:: pywarpx.picmi.ExplicitEvolveScheme
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.ThetaImplicitEMEvolveScheme
+.. autopydantic_model:: pywarpx.picmi.ThetaImplicitEMEvolveScheme
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.SemiImplicitEMEvolveScheme
+.. autopydantic_model:: pywarpx.picmi.SemiImplicitEMEvolveScheme
+    :inherited-members: BaseModel
 
 There are several support classes use to specify components of the evolve schemes
 
-.. autoclass:: pywarpx.picmi.PicardNonlinearSolver
+.. autopydantic_model:: pywarpx.picmi.PicardNonlinearSolver
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.NewtonNonlinearSolver
+.. autopydantic_model:: pywarpx.picmi.NewtonNonlinearSolver
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.GMRESLinearSolver
+.. autopydantic_model:: pywarpx.picmi.GMRESLinearSolver
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.PETScKSPLinearSolver
+.. autopydantic_model:: pywarpx.picmi.PETScKSPLinearSolver
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.CurlCurlMLMGPreconditioner
+.. autopydantic_model:: pywarpx.picmi.CurlCurlMLMGPreconditioner
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.JacobiPreconditioner
+.. autopydantic_model:: pywarpx.picmi.JacobiPreconditioner
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.PETScPreconditioner
+.. autopydantic_model:: pywarpx.picmi.PETScPreconditioner
+    :inherited-members: BaseModel
 
 Constants
 ---------
@@ -114,17 +127,23 @@ Applied fields
 
 Instances of the classes below need to be passed to the method `add_applied_field` of the `Simulation` class.
 
-.. autoclass:: pywarpx.picmi.AnalyticInitialField
+.. autopydantic_model:: pywarpx.picmi.AnalyticInitialField
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.ConstantAppliedField
+.. autopydantic_model:: pywarpx.picmi.ConstantAppliedField
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.AnalyticAppliedField
+.. autopydantic_model:: pywarpx.picmi.AnalyticAppliedField
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.LoadInitialField
+.. autopydantic_model:: pywarpx.picmi.LoadInitialField
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.PlasmaLens
+.. autopydantic_model:: pywarpx.picmi.PlasmaLens
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.Mirror
+.. autopydantic_model:: pywarpx.picmi.Mirror
+    :inherited-members: BaseModel
 
 Diagnostics
 -----------
@@ -141,15 +160,19 @@ Diagnostics
 .. autopydantic_model:: pywarpx.picmi.ElectrostaticFieldDiagnostic
     :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.Checkpoint
+.. autopydantic_model:: pywarpx.picmi.Checkpoint
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.ReducedDiagnostic
+.. autopydantic_model:: pywarpx.picmi.ReducedDiagnostic
+    :inherited-members: BaseModel
 
 Lab-frame diagnostics diagnostics are used when running boosted-frame simulations.
 
-.. autoclass:: pywarpx.picmi.LabFrameParticleDiagnostic
+.. autopydantic_model:: pywarpx.picmi.LabFrameParticleDiagnostic
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.LabFrameFieldDiagnostic
+.. autopydantic_model:: pywarpx.picmi.LabFrameFieldDiagnostic
+    :inherited-members: BaseModel
 
 Particles
 ---------
@@ -160,11 +183,13 @@ For instance, background plasma electrons, background plasma ions and an externa
 .. autopydantic_model:: pywarpx.picmi.Species
     :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.MultiSpecies
+.. autopydantic_model:: pywarpx.picmi.MultiSpecies
+    :inherited-members: BaseModel
 
 Particle distributions can be used for to initialize particles in a particle species.
 
-.. autoclass:: pywarpx.picmi.GaussianBunchDistribution
+.. autopydantic_model:: pywarpx.picmi.GaussianBunchDistribution
+    :inherited-members: BaseModel
 
 .. autopydantic_model:: pywarpx.picmi.UniformDistribution
     :inherited-members: BaseModel
@@ -172,13 +197,17 @@ Particle distributions can be used for to initialize particles in a particle spe
 .. autopydantic_model:: pywarpx.picmi.AnalyticDistribution
     :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.UniformFluxDistribution
+.. autopydantic_model:: pywarpx.picmi.UniformFluxDistribution
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.AnalyticFluxDistribution
+.. autopydantic_model:: pywarpx.picmi.AnalyticFluxDistribution
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.ParticleListDistribution
+.. autopydantic_model:: pywarpx.picmi.ParticleListDistribution
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.FromFileDistribution
+.. autopydantic_model:: pywarpx.picmi.FromFileDistribution
+    :inherited-members: BaseModel
 
 Particle layouts determine how to microscopically place macro particles in a grid cell.
 
@@ -190,13 +219,17 @@ Particle layouts determine how to microscopically place macro particles in a gri
 
 Other operations related to particles:
 
-.. autoclass:: pywarpx.picmi.CoulombCollisions
+.. autopydantic_model:: pywarpx.picmi.CoulombCollisions
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.DSMCCollisions
+.. autopydantic_model:: pywarpx.picmi.DSMCCollisions
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.MCCCollisions
+.. autopydantic_model:: pywarpx.picmi.MCCCollisions
+    :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.FieldIonization
+.. autopydantic_model:: pywarpx.picmi.FieldIonization
+    :inherited-members: BaseModel
 
 Laser Pulses
 ------------
@@ -206,8 +239,10 @@ Laser profiles can be used to initialize laser pulses in the simulation.
 .. autopydantic_model:: pywarpx.picmi.GaussianLaser
     :inherited-members: BaseModel
 
-.. autoclass:: pywarpx.picmi.AnalyticLaser
+.. autopydantic_model:: pywarpx.picmi.AnalyticLaser
+    :inherited-members: BaseModel
 
 Laser injectors control where to initialize laser pulses on the simulation grid.
 
-.. autoclass:: pywarpx.picmi.LaserAntenna
+.. autopydantic_model:: pywarpx.picmi.LaserAntenna
+    :inherited-members: BaseModel
