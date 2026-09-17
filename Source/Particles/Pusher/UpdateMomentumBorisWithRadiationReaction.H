@@ -11,18 +11,34 @@
 
 #include <AMReX_REAL.H>
 
+#include <limits>
+
 /**
- * Push the particle's positions over one timestep,
+ * Push the particle's momenta over one timestep,
  * given the value of its momenta `ux`, `uy`, `uz`.
  * Includes Radiation Reaction according to
  * https://doi.org/10.1088/1367-2630/12/12/123005
+ *
+ * \param ux, uy, uz            Particle momentum, updated in place
+ * \param Ex, Ey, Ez            Electric field on the particle
+ * \param Bx, By, Bz            Magnetic field on the particle
+ * \param q                     Charge of the particle
+ * \param m                     Mass of the particle
+ * \param dt                    Time step size
+ * \param momentum_push_type    Type of momentum push: FirstHalf, SecondHalf, Full, None
+ * \param chi_max_coeff         Cutoff on the quantum parameter chi, given as `(chi_max*E_s)^2`
+ *                              with `E_s` the Schwinger field. Above it the classical
+ *                              radiation reaction is skipped, since the quantum synchrotron
+ *                              module then accounts for the radiated energy. Defaults to
+ *                              no cutoff.
  */
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void UpdateMomentumBorisWithRadiationReaction(
     amrex::ParticleReal& ux, amrex::ParticleReal& uy, amrex::ParticleReal& uz,
     const amrex::ParticleReal Ex, const amrex::ParticleReal Ey, const amrex::ParticleReal Ez,
     const amrex::ParticleReal Bx, const amrex::ParticleReal By, const amrex::ParticleReal Bz,
-    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type)
+    const amrex::ParticleReal q, const amrex::ParticleReal m, const amrex::Real dt, MomentumPushType momentum_push_type,
+    const amrex::ParticleReal chi_max_coeff = std::numeric_limits<amrex::ParticleReal>::max())
 
 {
     using namespace amrex::literals;
@@ -70,6 +86,11 @@ void UpdateMomentumBorisWithRadiationReaction(
     const amrex::ParticleReal bdotE = (bx_n*Ex + by_n*Ey + bz_n*Ez);
     const amrex::ParticleReal bdotE2 = bdotE*bdotE;
     const amrex::ParticleReal coeff = gamma_n*gamma_n*(fl_q2-bdotE2);
+
+    // `coeff` is the squared quantum parameter scaled by the Schwinger field,
+    // chi = sqrt(coeff)/E_s, so the cutoff can be applied without a square root.
+    // Above the cutoff, keep the plain Boris result.
+    if (coeff >= chi_max_coeff) { return; }
 
     //Radiation reaction constant
     const amrex::ParticleReal q_over_mc = q/(m*PhysConst::c);

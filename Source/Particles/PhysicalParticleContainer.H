@@ -341,6 +341,16 @@ public:
     void resample (
         const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose=true) final;
 
+    /**
+     * \brief Cutoff on the quantum parameter above which the classical radiation
+     * reaction is skipped, in the form `(chi_max*E_s)^2` expected by
+     * UpdateMomentumBorisWithRadiationReaction.
+     *
+     * @return the cutoff, or the largest representable value (no cutoff) if quantum
+     *         synchrotron is not enabled for this species or WarpX is built without QED
+     */
+    [[nodiscard]] amrex::ParticleReal getQedChiMaxCoeff () const;
+
 #ifdef WARPX_QED
     //Functions decleared in WarpXParticleContainer.H
     //containers for which QED processes could be relevant

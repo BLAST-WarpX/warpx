@@ -1473,41 +1473,25 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
-#ifdef WARPX_QED
-    const auto do_sync = m_do_qed_quantum_sync;
-    amrex::Real t_chi_max = 0.0;
-    if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
-    const amrex::Real qed_dt =
-        (momentum_push_type == MomentumPushType::Full) ? dt : amrex::Real(0.5) * dt;
 
-    QuantumSynchrotronEvolveOpticalDepth evolve_opt;
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_QSR = nullptr;
-    const bool local_has_quantum_sync = has_quantum_sync();
-    if (local_has_quantum_sync) {
-        evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr()  + offset;
-    }
-#endif
+    // Quantum-parameter cutoff for the classical radiation reaction term. The quantum
+    // synchrotron optical depth is not evolved here: see
+    // MultiParticleContainer::doQedQuantumSyncEvolveOpticalDepth().
+    const auto chi_max_coeff = getQedChiMaxCoeff();
 
     enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
-    const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
-#else
-    int qed_runtime_flag = no_qed;
-#endif
 
     // Loop over the particles and update their momentum.
     // Using this version of ParallelFor with compile time options
-    // improves performance when qed or external EB are not used by reducing
+    // improves performance when the external EB is not used by reducing
     // register pressure.
     amrex::ParallelFor(
-        TypeList<CompileTimeOptions<no_exteb,has_exteb>, CompileTimeOptions<no_qed  ,has_qed>>{},
-        {exteb_runtime_flag, qed_runtime_flag},
+        TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
+        {exteb_runtime_flag},
         np_to_push,
-        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control, auto qed_control)
+        [=] AMREX_GPU_DEVICE (long ip, auto exteb_control)
     {
         amrex::ParticleReal xp, yp, zp;
         getPosition(ip, xp, yp, zp);
@@ -1552,52 +1536,16 @@ PhysicalParticleContainer::PushPX (WarpXParIter& pti,
             copyAttribs(ip);
         }
 
-#ifdef WARPX_QED
-        if (!do_sync) {
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
-                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                          ion_lev ? ion_lev[ip] : 1,
-                                          mass, q, pusher_algo, do_crr,
-                                          t_chi_max,
-                                          dt, momentum_push_type);
-        } else {
-            if constexpr (qed_control == has_qed) {
-                doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
-                                              Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                              ion_lev ? ion_lev[ip] : 1,
-                                              mass, q, pusher_algo, do_crr,
-                                              t_chi_max,
-                                              dt, momentum_push_type);
-            }
-        }
-#else
-        doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+        doParticleMomentumPush(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      dt, momentum_push_type);
-#endif
+                                      dt, momentum_push_type, chi_max_coeff);
 
         if (position_push_type == PositionPushType::Full) {
             UpdatePosition(xp, yp, zp, ux[ip], uy[ip], uz[ip], dt, mass);
             setPosition(ip, xp, yp, zp);
         }
-
-#ifdef WARPX_QED
-        [[maybe_unused]] auto foo_local_has_quantum_sync = local_has_quantum_sync;
-        [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
-        [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
-        [[maybe_unused]] auto foo_qed_dt = qed_dt;
-        if constexpr (qed_control == has_qed) {
-            if (local_has_quantum_sync) {
-                evolve_opt(ux[ip], uy[ip], uz[ip],
-                           Exp, Eyp, Ezp,Bxp, Byp, Bzp,
-                           qed_dt, p_optical_depth_QSR[ip]);
-            }
-        }
-#else
-            amrex::ignore_unused(qed_control);
-#endif
     });
 }
 
@@ -1781,6 +1729,22 @@ PhysicalParticleContainer::findRefinedInjectionBox (amrex::Box& a_fine_injection
     a_fine_injection_box = fine_injection_box;
     a_rrfac = rrfac;
     return refine_injection;
+}
+
+amrex::ParticleReal PhysicalParticleContainer::getQedChiMaxCoeff () const
+{
+    // No cutoff: the classical radiation reaction term always applies.
+    auto chi_max_coeff = std::numeric_limits<amrex::ParticleReal>::max();
+#ifdef WARPX_QED
+    if (m_do_qed_quantum_sync) {
+        const auto chi_max = static_cast<amrex::ParticleReal>(
+            m_shr_p_qs_engine->get_minimum_chi_part());
+        const auto e_s = static_cast<amrex::ParticleReal>(
+            picsar::multi_physics::phys::schwinger_field<double>);
+        chi_max_coeff = (chi_max*e_s)*(chi_max*e_s);
+    }
+#endif
+    return chi_max_coeff;
 }
 
 #ifdef WARPX_QED

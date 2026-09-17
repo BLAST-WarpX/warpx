@@ -6,10 +6,6 @@
  */
 #include "Particles/PhysicalParticleContainer.H"
 
-#ifdef WARPX_QED
-#   include "Particles/ElementaryProcess/QEDInternals/BreitWheelerEngineWrapper.H"
-#   include "Particles/ElementaryProcess/QEDInternals/QuantumSyncEngineWrapper.H"
-#endif
 #include "CopyParticleAttribs.H"
 #include "GetAndSetPosition.H"
 #include "PushSelector.H"
@@ -54,11 +50,10 @@ using namespace amrex::literals;
 namespace {
 
     enum exteb_flags : int { no_exteb, has_exteb };
-    enum qed_flags : int { no_qed, has_qed };
     enum depos_order_flags : int { order_one = 1, order_two, order_three, order_four };
     enum class PushXPStatus : int { converged, unconverged, out_of_bounds };
 
-    template<int exteb_control, int qed_control>
+    template<int exteb_control>
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     PushXPStatus PushXPSingleStep (
         int const & ip,
@@ -118,13 +113,8 @@ namespace {
         amrex::ParticleReal const & mass,
         amrex::ParticleReal const & q,
         ParticlePusherAlgo const & pusher_algo,
-        bool const & do_crr
-#ifdef WARPX_QED
-        , bool const & do_sync,
-        amrex::Real t_chi_max,
-        amrex::ParticleReal * p_optical_depth_QSR,
-        QuantumSynchrotronEvolveOpticalDepth const & evolve_opt
-#endif
+        bool const & do_crr,
+        amrex::ParticleReal const & chi_max_coeff
     )
     {
 
@@ -198,45 +188,15 @@ namespace {
             uy[ip] = uyp_n;
             uz[ip] = uzp_n;
 
-#ifdef WARPX_QED
-            if (!do_sync) {
-                doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
-                                          Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                          ion_lev ? ion_lev[ip] : 1,
-                                          mass, q, pusher_algo, do_crr,
-                                          t_chi_max,
-                                          dt, MomentumPushType::Full);
-            } else {
-                if constexpr (qed_control == has_qed) {
-                    doParticleMomentumPush<1>(ux[ip], uy[ip], uz[ip],
-                                              Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                              ion_lev ? ion_lev[ip] : 1,
-                                              mass, q, pusher_algo, do_crr,
-                                              t_chi_max,
-                                              dt, MomentumPushType::Full);
-                }
-            }
-#else
-            doParticleMomentumPush<0>(ux[ip], uy[ip], uz[ip],
+            // The quantum synchrotron optical depth is deliberately not evolved here, as a
+            // Monte-Carlo quantity has no place in the nonlinear iteration (it would have to
+            // be rolled back on every non-converged iteration). It is advanced once per step
+            // in MultiParticleContainer::doQedQuantumSyncEvolveOpticalDepth() instead.
+            doParticleMomentumPush(ux[ip], uy[ip], uz[ip],
                                       Exp, Eyp, Ezp, Bxp, Byp, Bzp,
                                       ion_lev ? ion_lev[ip] : 1,
                                       mass, q, pusher_algo, do_crr,
-                                      dt, MomentumPushType::Full);
-#endif
-
-#ifdef WARPX_QED
-            [[maybe_unused]] auto *foo_podq = p_optical_depth_QSR;
-            [[maybe_unused]] const auto& foo_evolve_opt = evolve_opt; // have to do all these for nvcc
-            if constexpr (qed_control == has_qed) {
-                if (p_optical_depth_QSR) {
-                    evolve_opt(ux[ip], uy[ip], uz[ip],
-                               Exp, Eyp, Ezp,Bxp, Byp, Bzp,
-                               dt, p_optical_depth_QSR[ip]);
-                }
-            }
-#else
-            amrex::ignore_unused(qed_control);
-#endif
+                                      dt, MomentumPushType::Full, chi_max_coeff);
 
             // Take average to get the time-centered value
             ux[ip] = 0.5_prt*(ux[ip] + uxp_n);
@@ -552,28 +512,11 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
-#ifdef WARPX_QED
-    const auto do_sync = m_do_qed_quantum_sync;
-    amrex::Real t_chi_max = 0.0;
-    if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
-
-    QuantumSynchrotronEvolveOpticalDepth evolve_opt;
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_QSR = nullptr;
-    const bool local_has_quantum_sync = has_quantum_sync();
-    if (local_has_quantum_sync) {
-        evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr() + offset;
-    }
-#endif
+    const auto chi_max_coeff = getQedChiMaxCoeff();
 
     const auto do_gather = !do_not_gather;
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
-    const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
-#else
-    const int qed_runtime_flag = no_qed;
-#endif
 
     const int max_iterations = implicit_options->max_particle_iterations;
     const amrex::ParticleReal particle_tolerance = implicit_options->particle_tolerance;
@@ -586,15 +529,13 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
     int *nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset: nullptr);
 
     // Using this version of For with compile time options
-    // improves performance when qed or external EB are not used by reducing
+    // improves performance when the external EB is not used by reducing
     // register pressure.
     // amrex::For: iterations share the unconverged-particles counter
     // (no SIMD pragma, see issue #7097)
-    amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
-                               amrex::CompileTimeOptions<no_qed  ,has_qed>>{},
-               {exteb_runtime_flag, qed_runtime_flag},
-               np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
-                                                 auto qed_control)
+    amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>>{},
+               {exteb_runtime_flag},
+               np_to_push, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control)
     {
 
         // Skip any particles that require suborbits
@@ -626,20 +567,13 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
         const amrex::ParticleReal zp_n = 0._prt;
 #endif
 
-#ifdef WARPX_QED
-        amrex::ParticleReal p_optical_depth_QSR0 = 0.0_prt;
-        if (p_optical_depth_QSR) {
-            p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
-        }
-#endif
-
         amrex::ParticleReal Bxp = 0.0_prt;
         amrex::ParticleReal Byp = 0.0_prt;
         amrex::ParticleReal Bzp = 0.0_prt;
         amrex::ParticleReal step_norm = 1._prt;
 
         const PushXPStatus push_status =
-            PushXPSingleStep<exteb_control, qed_control>(
+            PushXPSingleStep<exteb_control>(
                 ip, dt, setPosition, false,
                 xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, ux_n[ip], uy_n[ip], uz_n[ip],
                 step_norm, particle_tolerance, max_iterations,
@@ -651,10 +585,7 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                 dinv, xyzmin, domain_double, do_cropping, lo, nodal_lo, nodal_hi,
                 position_error_count_ptr,
                 n_rz_azimuthal_modes, depos_order, depos_type,
-                getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
-#ifdef WARPX_QED
-                , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
-#endif
+                getExternalEB, ion_lev, mass, q, pusher_algo, do_crr, chi_max_coeff
             );
 
         if (push_status == PushXPStatus::out_of_bounds) { return; }
@@ -679,13 +610,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
                 convergenceMsg << " ux = " << ux[ip] << ", uy = " << uy[ip] << ", uz = " << uz[ip] << "\n";
                 convergenceMsg << " xp = " << xp << ", yp = " << yp << ", zp = " << zp;
                 ablastr::warn_manager::WMRecordWarning("ImplicitPushXP", convergenceMsg.str());
-            }
-#endif
-
-#ifdef WARPX_QED
-            // Reset the QED parameter to what is was at the start of the step
-            if (p_optical_depth_QSR) {
-                p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
             }
 #endif
 
@@ -926,28 +850,11 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
     const auto pusher_algo = WarpX::particle_pusher_algo;
     const auto do_crr = do_classical_radiation_reaction;
-#ifdef WARPX_QED
-    const auto do_sync = m_do_qed_quantum_sync;
-    amrex::Real t_chi_max = 0.0;
-    if (do_sync) { t_chi_max = m_shr_p_qs_engine->get_minimum_chi_part(); }
-
-    QuantumSynchrotronEvolveOpticalDepth evolve_opt;
-    amrex::ParticleReal* AMREX_RESTRICT p_optical_depth_QSR = nullptr;
-    const bool local_has_quantum_sync = has_quantum_sync();
-    if (local_has_quantum_sync) {
-        evolve_opt = m_shr_p_qs_engine->build_evolve_functor();
-        p_optical_depth_QSR = pti.GetAttribs("opticalDepthQSR").dataPtr();
-    }
-#endif
+    const auto chi_max_coeff = getQedChiMaxCoeff();
 
     const auto do_gather = !do_not_gather;
 
     const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
-#ifdef WARPX_QED
-    const int qed_runtime_flag = (local_has_quantum_sync || do_sync) ? has_qed : no_qed;
-#else
-    const int qed_runtime_flag = no_qed;
-#endif
     const int depos_order_flag = depos_order;
 
     // The number of suborbits are not permitted to change during the linear stage of jfnk.
@@ -969,16 +876,15 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     int* position_error_count_ptr = position_error_count.data();
 
     // Using this version of For with compile time options
-    // improves performance when qed or external EB are not used by reducing
+    // improves performance when the external EB is not used by reducing
     // register pressure.
     // amrex::For: iterations scatter-add into shared J/Sigma nodes
     // (no SIMD pragma, see issue #7097)
     amrex::For(amrex::TypeList<amrex::CompileTimeOptions<no_exteb,has_exteb>,
-                               amrex::CompileTimeOptions<no_qed  ,has_qed>,
                                amrex::CompileTimeOptions<order_one, order_two, order_three, order_four >>{},
-               {exteb_runtime_flag, qed_runtime_flag, depos_order_flag},
+               {exteb_runtime_flag, depos_order_flag},
                num_unconverged_particles, [=] AMREX_GPU_DEVICE (long i,
-                                                                 auto exteb_control, auto qed_control, auto depos_order_control)
+                                                                 auto exteb_control, auto depos_order_control)
     {
 
         const long ip = unconverged_i[i];
@@ -1010,13 +916,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         amrex::ParticleReal const zp_n0 = z_n[ip];
 #else
         amrex::ParticleReal const zp_n0 = 0.0_prt;
-#endif
-
-#if WARPX_QED
-        amrex::ParticleReal p_optical_depth_QSR0 = 0.0_prt;
-        if (p_optical_depth_QSR) {
-            p_optical_depth_QSR0 = p_optical_depth_QSR[ip];
-        }
 #endif
 
         amrex::ParticleReal const uxp_n0 = ux_n[ip];
@@ -1063,7 +962,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
             amrex::ParticleReal step_norm = 1._prt;
 
             // Try advancing the particle one suborbit step
-            const PushXPStatus push_status = PushXPSingleStep<exteb_control, qed_control>(
+            const PushXPStatus push_status = PushXPSingleStep<exteb_control>(
                                  ip, dt_suborbit, setPosition, this_suborbit_out_of_bounds,
                                  xp, yp, zp, ux, uy, uz, xp_n, yp_n, zp_n, uxp_n, uyp_n, uzp_n,
                                  step_norm, particle_tolerance, max_iterations,
@@ -1075,11 +974,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                  dinv, xyzmin, domain_double, do_cropping, lo, nodal_lo, nodal_hi,
                                  position_error_count_ptr,
                                  n_rz_azimuthal_modes, depos_order, depos_type,
-                                 getExternalEB, ion_lev, mass, q, pusher_algo, do_crr
-#ifdef WARPX_QED
-                                 , do_sync, t_chi_max, p_optical_depth_QSR, evolve_opt
-#endif
-                                 );
+                                 getExternalEB, ion_lev, mass, q, pusher_algo, do_crr,
+                                 chi_max_coeff);
 
             if (push_status == PushXPStatus::out_of_bounds) { return; }
             bool convergence = push_status == PushXPStatus::converged;
@@ -1264,12 +1160,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                 ux[ip] = uxp_n0;
                 uy[ip] = uyp_n0;
                 uz[ip] = uzp_n0;
-
-#ifdef WARPX_QED
-                if (p_optical_depth_QSR) {
-                    p_optical_depth_QSR[ip] = p_optical_depth_QSR0;
-                }
-#endif
 
             } else {
 

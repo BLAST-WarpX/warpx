@@ -651,6 +651,10 @@ public:
 #ifdef WARPX_QED
     /** Run the QED module on all species */
     void doQEDEvents ();
+
+    /** Advance the quantum synchrotron optical depth by one time step.
+     *  Called after the particle push, see MultiParticleContainer for why. */
+    void doQEDEvolveOpticalDepth ();
 #endif
 
     void PushParticlesandDeposit (int lev, amrex::Real cur_time, SubcyclingHalf subcycling_half=SubcyclingHalf::None, bool skip_deposition=false,
