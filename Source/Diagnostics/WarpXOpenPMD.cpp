@@ -371,6 +371,10 @@ namespace detail
                                           {openPMD::UnitDimension::I,  1},
                                           {openPMD::UnitDimension::T,  1},
                                   });
+        } else if (field_name.substr(0,2) == "T_"){ // temperature in eV
+            mesh.setUnitDimension({
+                                          {openPMD::UnitDimension::theta,  1},
+                                  });
         }
     }
 #endif // WARPX_USE_OPENPMD
@@ -1537,6 +1541,9 @@ WarpXOpenPMDPlot::WriteOpenPMDFieldsAll ( //const std::string& filename,
                                         field_name,
                                         mf[lev],
                                         var_in_theta_mode );
+                        if (field_name.substr(0,2) == "T_") {
+                            mesh.setUnitSI(11604.5);  // temperature in eV -> K
+                        }
                     }
                 } else {
                     auto mesh = meshes[field_name];
