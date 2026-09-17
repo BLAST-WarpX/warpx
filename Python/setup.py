@@ -79,6 +79,6 @@ setup(
     description="""Wrapper of WarpX""",
     package_data=package_data,
     install_requires=["numpy", "periodictable"],
-    python_requires=">=3.8",  # left for CI, truly ">=3.9"
+    python_requires=">=3.11",
     zip_safe=False,
 )

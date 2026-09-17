@@ -16,7 +16,14 @@ from typing import Any, ClassVar, Literal, Self
 
 import numpy as np
 import periodictable
-from pydantic import ConfigDict, Field, PrivateAttr, field_validator, model_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 import picmistandard
 import pywarpx
@@ -287,12 +294,12 @@ class Species(picmistandard.PICMI_Species):
     )
 
     # extra particle attributes (option names differ from the field names):
-    extra_int_attributes: dict[str, str] | None = Field(
+    extra_int_attributes: dict[str, Expression] | None = Field(
         default=None,
         alias="warpx_add_int_attributes",
         description="Dictionary of extra integer particle attributes initialized from an expression that is a function of the variables (x, y, z, ux, uy, uz, t).",
     )
-    extra_real_attributes: dict[str, str] | None = Field(
+    extra_real_attributes: dict[str, Expression] | None = Field(
         default=None,
         alias="warpx_add_real_attributes",
         description="Dictionary of extra real particle attributes initialized from an expression that is a function of the variables (x, y, z, ux, uy, uz, t).",
@@ -993,6 +1000,10 @@ class BinomialSmoother(picmistandard.PICMI_BinomialSmoother):
     n_pass: int | list[int] | None = Field(
         default=None,
         description="Number of passes along each axis. A single integer applies to all axes. If not specified, one pass is done along each axis.",
+    )
+    compensation: bool | list[bool] | None = Field(
+        default=None,
+        description="Flags whether to apply compensation along each axis. A single flag applies to all axes. WarpX applies compensation if all flags are true.",
     )
 
     def smoother_initialize_inputs(self, solver):
@@ -3669,11 +3680,12 @@ class Simulation(picmistandard.PICMI_Simulation):
     embedded_boundary: EmbeddedBoundary | None = Field(
         default=None, description="The embedded boundary of the simulation"
     )
-    break_signals: list[str | int] | None = Field(
-        default=None, description="Signals on which to break"
+    break_signals: str | int | list[str | int] | None = Field(
+        default=None, description="Signal or list of signals on which to break"
     )
-    checkpoint_signals: list[str | int] | None = Field(
-        default=None, description="Signals on which to write out a checkpoint"
+    checkpoint_signals: str | int | list[str | int] | None = Field(
+        default=None,
+        description="Signal or list of signals on which to write out a checkpoint",
     )
     numprocs: list[int] | None = Field(
         default=None,
@@ -3962,6 +3974,37 @@ class Simulation(picmistandard.PICMI_Simulation):
 # ----------------------------
 # Simulation frame diagnostics
 # ----------------------------
+
+
+def _species_names(species):
+    """The names of the given species (a species, a MultiSpecies or a list of them), or of all species if None"""
+    if species is None:
+        return pywarpx.particles.species_names
+    if not isinstance(species, (list, tuple)):
+        species = [species]
+    names = []
+    for item in species:
+        if isinstance(item, picmistandard.PICMI_MultiSpecies):
+            names += [instance.name for instance in item.species_instances_list]
+        else:
+            names.append(item.name)
+    return names
+
+
+def _per_species_as_pairs(value):
+    """Values given per species (a dictionary keyed by species) as [species, value] pairs, which can be serialized"""
+    if isinstance(value, dict):
+        return [[species, species_value] for species, species_value in value.items()]
+    return value
+
+
+def _per_species_as_dict(value):
+    """Values given per species as [species, value] pairs (e.g., from a dump) as a dictionary"""
+    if isinstance(value, (list, tuple)) and all(
+        isinstance(pair, (list, tuple)) and len(pair) == 2 for pair in value
+    ):
+        return {species: species_value for species, species_value in value}
+    return value
 
 
 def _collect_warpx_constants(cls, data, expression_field):
@@ -4409,6 +4452,16 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
     def _collect_plot_filter_kw(cls, data):
         return _collect_warpx_constants(cls, data, "plot_filter_function")
 
+    # JSON has no object keys: values per species are dumped as [species, value] pairs
+    @field_validator("random_fraction", "uniform_stride", mode="before")
+    @classmethod
+    def _load_values_per_species(cls, value):
+        return _per_species_as_dict(value)
+
+    @field_serializer("random_fraction", "uniform_stride")
+    def _dump_values_per_species(self, value):
+        return _per_species_as_pairs(value)
+
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
@@ -4499,12 +4552,7 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
             variables.sort()
 
         # species list
-        if self.species is None:
-            species_names = pywarpx.particles.species_names
-        elif isinstance(self.species, (list, tuple)):
-            species_names = [species.name for species in self.species]
-        else:
-            species_names = [self.species.name]
+        species_names = _species_names(self.species)
 
         # check if random fraction is specified and whether a value is given per species
         random_fraction = {}
@@ -4802,12 +4850,7 @@ class LabFrameParticleDiagnostic(
             variables.sort()
 
         # species list
-        if self.species is None:
-            species_names = pywarpx.particles.species_names
-        elif isinstance(self.species, (list, tuple)):
-            species_names = [species.name for species in self.species]
-        else:
-            species_names = [self.species.name]
+        species_names = _species_names(self.species)
 
         for name in species_names:
             diag = pywarpx.Bucket.Bucket(self.name + "." + name, variables=variables)
@@ -5120,6 +5163,18 @@ class ReducedDiagnostic(
     _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
     _mangle_dict: dict | None = PrivateAttr(default=None)
 
+    @classmethod
+    def _parameter_names(cls, data):
+        # The parameters of the other types of reduced diagnostics are not used by this one, so
+        # that expressions can use their names, too, e.g., ``resolution`` of the FieldProbe.
+        used = set(cls._type_inputs.get(data.get("diag_type"), {}))
+        not_used = {
+            name for inputs in cls._type_inputs.values() for name in inputs
+        } - used
+        return super()._parameter_names(data) - {
+            name for name in not_used if data.get(name) is not None
+        }
+
     @model_validator(mode="after")
     def _check_parameters_of_type(self) -> Self:
         required = []
@@ -5264,6 +5319,16 @@ class ParticleBoundaryScrapingDiagnostic(
     def _collect_plot_filter_kw(cls, data):
         return _collect_warpx_constants(cls, data, "plot_filter_function")
 
+    # JSON has no object keys: values per species are dumped as [species, value] pairs
+    @field_validator("random_fraction", "uniform_stride", mode="before")
+    @classmethod
+    def _load_values_per_species(cls, value):
+        return _per_species_as_dict(value)
+
+    @field_serializer("random_fraction", "uniform_stride")
+    def _dump_values_per_species(self, value):
+        return _per_species_as_pairs(value)
+
     def diagnostic_initialize_inputs(self):
         self.add_diagnostic()
 
@@ -5329,12 +5394,7 @@ class ParticleBoundaryScrapingDiagnostic(
             variables.sort()
 
         # species list
-        if self.species is None:
-            species_names = pywarpx.particles.species_names
-        elif isinstance(self.species, (list, tuple)):
-            species_names = [species.name for species in self.species]
-        else:
-            species_names = [self.species.name]
+        species_names = _species_names(self.species)
 
         # check if random fraction is specified and whether a value is given per species
         random_fraction = {}
