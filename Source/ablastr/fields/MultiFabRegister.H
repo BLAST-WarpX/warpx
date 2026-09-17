@@ -22,6 +22,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -124,34 +125,28 @@ namespace ablastr::fields
             return std::to_string(dir);
         }
 
-        Direction (std::string const & s) : // NOLINT(google-explicit-constructor)
+        Direction (const std::string_view sv) : // NOLINT(google-explicit-constructor)
             dir{-1}
         {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            if (s == r_string) { dir = r; }
-            if (s == theta_string) { dir = theta; }
+            if (sv == r_string) { dir = r; }
+            if (sv == theta_string) { dir = theta; }
 #endif
 #if defined(WARPX_DIM_RSPHERE)
-            if (s == phi_string) { dir = phi; }
+            if (sv == phi_string) { dir = phi; }
 #endif
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
-            if (s == x_string) { dir = x; }
-            if (s == y_string) { dir = y; }
+            if (sv == x_string) { dir = x; }
+            if (sv == y_string) { dir = y; }
 #endif
 #if !defined(WARPX_DIM_RSPHERE)
-            if (s == z_string) { dir = z; }
+            if (sv == z_string) { dir = z; }
 #endif
 
             if (dir == -1) {
-                throw std::runtime_error("invalid direction: " + s);
+                throw std::runtime_error("invalid direction: " + std::string{sv});
             }
         }
-
-        // e.g., "x"
-        Direction (char const * c) : dir{Direction{c}} {} // NOLINT(google-explicit-constructor)
-
-        // e.g., 'x'
-        Direction (char const c) : dir{Direction{c}} {} // NOLINT(google-explicit-constructor)
 
         // rule of five: define default constructors and the destructor
         //   because we defined a special one above for char
