@@ -222,6 +222,19 @@ struct InjectorMomentumMaxwellian
         if (u_std.x < 0.0_rt || u_std.y < 0.0_rt || u_std.z < 0.0_rt) {
             amrex::Abort("The standard deviation of normalized momentum must be non-negative.");
         }
+#if defined(WARPX_USE_OPENPMD) && defined(WARPX_DIM_RZ)
+        if (temperature.m_type == TempFromFileVector) {
+            // In RZ, the thermal spread read from file is expressed in the local
+            // cylindrical basis (r, theta, z), so that an anisotropic spread stays
+            // correctly oriented. Draw the momentum offset in that basis, rotate it
+            // into the Cartesian basis, and add it to the (Cartesian) mean momentum.
+            const amrex::XDim3 du_cyl{amrex::RandomNormal(0.0_rt, u_std.x, engine),
+                                      amrex::RandomNormal(0.0_rt, u_std.y, engine),
+                                      amrex::RandomNormal(0.0_rt, u_std.z, engine)};
+            const amrex::XDim3 du = CylindricalToCartesian(du_cyl, x, y);
+            return amrex::XDim3{u_mean.x + du.x, u_mean.y + du.y, u_mean.z + du.z};
+        }
+#endif
         const amrex::Real ux_std = amrex::RandomNormal(u_mean.x, u_std.x, engine);
         const amrex::Real uy_std = amrex::RandomNormal(u_mean.y, u_std.y, engine);
         const amrex::Real uz_std = amrex::RandomNormal(u_mean.z, u_std.z, engine);

@@ -9,8 +9,8 @@
 
 GetVelocityVector::GetVelocityVector (VelocityProperties const& vel) noexcept
     : m_type{vel.m_type}
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     , m_from_file{vel.m_u_mean_x_reader.get(), vel.m_u_mean_y_reader.get(),
                   vel.m_u_mean_z_reader.get()}
 #endif
