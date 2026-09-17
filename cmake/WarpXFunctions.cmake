@@ -49,19 +49,13 @@ endmacro()
 #
 macro(set_default_build_dirs)
     if(NOT CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-                CACHE PATH "Build directory for archives")
-        mark_as_advanced(CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
     endif()
     if(NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
-        set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-                CACHE PATH "Build directory for libraries")
-        mark_as_advanced(CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+        set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
     endif()
     if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
-        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-                CACHE PATH "Build directory for binaries")
-        mark_as_advanced(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
     endif()
     if(NOT CMAKE_PYTHON_OUTPUT_DIRECTORY)
         set(CMAKE_PYTHON_OUTPUT_DIRECTORY
@@ -80,14 +74,12 @@ macro(set_default_install_dirs)
     if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
         include(GNUInstallDirs)
         if(NOT CMAKE_INSTALL_CMAKEDIR)
-            set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake"
-                    CACHE PATH "CMake config package location for installed targets")
             if(WIN32)
-                set(CMAKE_INSTALL_LIBDIR Lib
-                        CACHE PATH "Object code libraries")
-                set_property(CACHE CMAKE_INSTALL_CMAKEDIR PROPERTY VALUE "cmake")
+                set(CMAKE_INSTALL_LIBDIR Lib)
+                set(CMAKE_INSTALL_CMAKEDIR "cmake")
+            else()
+                set(CMAKE_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake")
             endif()
-            mark_as_advanced(CMAKE_INSTALL_CMAKEDIR)
         endif()
     endif()
 
