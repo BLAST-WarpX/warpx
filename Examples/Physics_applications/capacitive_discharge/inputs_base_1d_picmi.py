@@ -379,7 +379,9 @@ class CapacitiveDischargeExample(object):
             warpx_collisions_split_momentum_push=0,
             verbose=self.test,
         )
-        self.solver.sim = self.sim
+        if self.pythonsolver:
+            # the Python solver reads the fields of the simulation on every step
+            self.solver.sim = self.sim
 
         self.sim.add_species(
             self.electrons,
