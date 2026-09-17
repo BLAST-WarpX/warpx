@@ -1,0 +1,130 @@
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 400
+amr.n_cell = 64 64 672
+amr.max_grid_size = 32   # maximum size of each AMReX box, used to decompose the domain
+amr.blocking_factor = 32 # minimum size of each AMReX box, used to decompose the domain
+geometry.coord_sys   = 0                  # 0: Cartesian
+geometry.is_periodic = 1     1     0      # Is periodic?
+geometry.prob_lo = -1.21e-05 -1.21e-05 -1.6100000000000002e-05
+geometry.prob_hi = 1.21e-05 1.21e-05 1e-07
+amr.max_level = 0 # Maximum level in hierarchy (1 might be unstable, >1 is not supported)
+algo.current_deposition = esirkepov
+algo.maxwell_solver = CKC
+# warpx.fine_tag_lo = -5.e-6   -5.e-6   -50.e-6
+# warpx.fine_tag_hi =  5.e-6    5.e-6   -30.e-6
+
+#################################
+############ NUMERICS ###########
+#################################
+interpolation.nox = 3 # Particle interpolation order. Must be the same in x, y, and z
+interpolation.noy = 3
+interpolation.noz = 3
+warpx.verbose = 1
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 1
+warpx.filter_npass_each_dir = 1 1 1
+warpx.cfl = 1. # if 1., the time step is set to its CFL limit
+warpx.do_pml = 0 # use Perfectly Matched Layer as boundary condition
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z # Only z is supported for the moment
+warpx.moving_window_v = 1.0 # units of speed of light
+warpx.gamma_boost = 6.9
+warpx.boost_direction = z
+particles.use_fdtd_nci_corr = 1
+
+####################################
+############ Particles #############
+####################################
+particles.species_names = electrons protons beam
+particles.rigid_injected_species = beam
+
+############ PLASMA #############
+electrons.charge = -q_e
+electrons.mass = m_e
+electrons.injection_style = "NUniformPerCell"
+electrons.num_particles_per_cell_each_dim = 1 1 1
+electrons.xmin = -10.e-6
+electrons.xmax =  10.e-6
+electrons.ymin = -10.e-6
+electrons.ymax =  10.e-6
+electrons.zmin = 0.
+electrons.zmax = 0.00032
+electrons.profile = constant
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = (1.7e+25 + 4.424903889343173e+35*(x*x+y*y)) * ( (abs(z-0.-0.5*2e-05) < 0.5*2e-05) * 0.5*(1.-cos(3.141592653589793*(z-0.)/2e-05)) + ( abs(z-0.-2e-05-0.5*0.000295) < 0.5*0.000295 ) + (abs(z-0.-2e-05-0.000295-0.5*5e-06) < 0.5*5e-06) * 0.5*(1.+cos(3.141592653589793 * ((z-0.)-2e-05-0.000295)/5e-06)) ) 
+electrons.momentum_distribution_type = "constant"
+electrons.do_continuous_injection = 1
+
+protons.charge = q_e
+protons.mass = 1.6728125249001627e-27
+protons.injection_style = "NUniformPerCell"
+protons.num_particles_per_cell_each_dim = 1 1 1
+protons.xmin = -10.e-6
+protons.xmax =  10.e-6
+protons.ymin = -10.e-6
+protons.ymax =  10.e-6
+protons.zmin = 0.
+protons.zmax = 0.00032
+protons.profile = constant
+protons.profile = parse_density_function
+protons.density_function(x,y,z) = (1.7e+25 + 4.424903889343173e+35*(x*x+y*y)) * ( (abs(z-0.-0.5*2e-05) < 0.5*2e-05) * 0.5*(1.-cos(3.141592653589793*(z-0.)/2e-05)) + ( abs(z-0.-2e-05-0.5*0.000295) < 0.5*0.000295 ) + (abs(z-0.-2e-05-0.000295-0.5*5e-06) < 0.5*5e-06) * 0.5*(1.+cos(3.141592653589793 * ((z-0.)-2e-05-0.000295)/5e-06)) ) 
+protons.momentum_distribution_type = "constant"
+protons.do_continuous_injection = 1
+
+############ e- beam  #############
+beam.mass = m_e
+beam.charge = -q_e
+beam.injection_style = gaussian_beam
+beam.initialize_self_fields = 0
+beam.x_m = 0.0
+beam.y_m = 0.0
+beam.z_m = -1.09e-05
+beam.x_rms = 6e-08
+beam.y_rms = 6e-08
+beam.z_rms = 3e-07
+beam.npart = 50000
+beam.q_tot = -1.5000000000000003e-12
+beam.profile = constant
+beam.density = 1
+beam.momentum_distribution_type = gaussian
+beam.ux_m = 0.0
+beam.uy_m = 0.0
+beam.uz_m = 195.69469069265978
+beam.ux_th = 0.04166666666666667
+beam.uy_th = 0.04166666666666667
+beam.uz_th = 3.9138943248532287
+beam.rigid_advance = 1
+beam.zinject_plane = 0.0 0.0 0.0
+
+#################################
+############ LASER  #############
+#################################
+lasers.nlasers      = 1
+lasers.names        = laser1
+laser1.profile      = Gaussian
+laser1.position     = 0. 0. -1e-12        # This point is on the laser plane
+laser1.direction    = 0. 0. 1.           # The plane normal direction
+laser1.polarization = 0. 1. 0.           # The main polarization vector
+laser1.e_max        = 6.823e12             # Maximum amplitude of the laser field (in V/m)
+laser1.profile_waist = 5.e-6             # The waist of the laser (in m)
+laser1.profile_duration = 7.34e-15        # The duration of the laser (in s)
+laser1.profile_t_peak = 1.467e-14          # Time at which the laser reaches its peak (in s)
+laser1.profile_focal_distance = 8.75e-06  # Focal distance from the antenna (in m)
+laser1.wavelength = 0.8e-6               # The wavelength of the laser (in m)
+laser1.do_continuous_injection = 1
+
+# Diagnostics
+diagnostics.diags_names = diag_ascent diag_plotfile
+diag_ascent.period = 20,20:2000:20
+diag_ascent.diag_type = Full
+diag_ascent.format = ascent
+diag_ascent.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho
+
+diag_plotfile.diag_type = Full
+diag_plotfile.format = plotfile
+diag_plotfile.period = 50
+diag_plotfile.fields_to_plot = Bx By Bz Ex Ey Ez jx jy jz rho
+diag_plotfile.file_prefix = diags/diag
+
