@@ -1101,6 +1101,10 @@ WarpX::ReadParameters ()
             utils::parser::queryWithParser(pp_warpx, "particle_io_nfiles", particle_io_nfiles);
             ParmParse pp_particles("particles");
             pp_particles.add("particles_nfiles", particle_io_nfiles);
+
+            std::vector<std::string> tiny_profiler_flush_interval_vec = {"-1"};
+            pp_warpx.queryarr("tiny_profiler_flush_interval", tiny_profiler_flush_interval_vec);
+            m_tiny_profiler_flush_interval = ablastr::utils::text::IntervalsParser(tiny_profiler_flush_interval_vec);
         }
 
         if (maxLevel() > 0) {
