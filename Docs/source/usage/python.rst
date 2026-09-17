@@ -151,6 +151,9 @@ Diagnostics
 .. autopydantic_model:: pywarpx.picmi.ParticleDiagnostic
     :inherited-members: BaseModel
 
+.. autopydantic_model:: pywarpx.picmi.ParticleBoundaryScrapingDiagnostic
+    :inherited-members: BaseModel
+
 .. autopydantic_model:: pywarpx.picmi.FieldDiagnostic
     :inherited-members: BaseModel
 
