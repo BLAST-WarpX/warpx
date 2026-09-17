@@ -9,7 +9,7 @@ import sys
 from typing import Literal
 
 import numpy as np
-from pydantic import PrivateAttr, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
@@ -24,26 +24,24 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
     However, it is not necessarily needed since the 1D code has the direct tridiagonal
     solver implemented."""
 
-    # Runtime state of the solver
-    _sim: picmi.Simulation | None = PrivateAttr(default=None)
-    _right_voltage: float | str | None = PrivateAttr(default=None)
-    _nz: int | None = PrivateAttr(default=None)
-    _dz: float | None = PrivateAttr(default=None)
-    _nxguardphi: int | None = PrivateAttr(default=None)
-    _nzguardphi: int | None = PrivateAttr(default=None)
-    _phi: np.ndarray | None = PrivateAttr(default=None)
-    _nsolve: int | None = PrivateAttr(default=None)
-    _lu: sla.SuperLU | None = PrivateAttr(default=None)
-    _rho_data: np.ndarray | None = PrivateAttr(default=None)
+    # NumPy and SciPy types in the runtime state of the solver
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     # Different defaults than the WarpX solver
     method: Literal["FFT", "Multigrid"] | None = "Multigrid"
     required_precision: float | None = 1.0
 
-    @property
-    def phi(self):
-        """The electrostatic potential (available once the solver is initialized)"""
-        return self._phi
+    # Runtime state of the solver
+    sim: picmi.Simulation | None = Field(default=None, exclude=True)
+    right_voltage: float | str | None = None
+    nz: int | None = None
+    dz: float | None = None
+    nxguardphi: int | None = None
+    nzguardphi: int | None = None
+    phi: np.ndarray | None = None
+    nsolve: int | None = None
+    lu: sla.SuperLU | None = None
+    rho_data: np.ndarray | None = None
 
     @field_validator("grid")
     @classmethod
@@ -63,7 +61,7 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
         WarpX parser.
         """
         # grab the boundary potentials from the grid object
-        self._right_voltage = self.grid.potential_zmax
+        self.right_voltage = self.grid.potential_zmax
 
         # set WarpX boundary potentials to None since we will handle it
         # ourselves in this solver
@@ -76,13 +74,13 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
 
         super(PoissonSolver1D, self).solver_initialize_inputs()
 
-        self._nz = self.grid.number_of_cells[0]
-        self._dz = (self.grid.upper_bound[0] - self.grid.lower_bound[0]) / self._nz
+        self.nz = self.grid.number_of_cells[0]
+        self.dz = (self.grid.upper_bound[0] - self.grid.lower_bound[0]) / self.nz
 
-        self._nxguardphi = 1
-        self._nzguardphi = 1
+        self.nxguardphi = 1
+        self.nzguardphi = 1
 
-        self._phi = np.zeros(self._nz + 1 + 2 * self._nzguardphi)
+        self.phi = np.zeros(self.nz + 1 + 2 * self.nzguardphi)
 
         self.decompose_matrix()
 
@@ -91,11 +89,11 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
     def decompose_matrix(self):
         """Function to build the superLU object used to solve the linear
         system."""
-        self._nsolve = self._nz + 1
+        self.nsolve = self.nz + 1
 
         # Set up the computation matrix in order to solve A*phi = rho
-        A = np.zeros((self._nsolve, self._nsolve))
-        idx = np.arange(self._nsolve)
+        A = np.zeros((self.nsolve, self.nsolve))
+        idx = np.arange(self.nsolve)
         A[idx, idx] = -2.0
         A[idx[1:], idx[:-1]] = 1.0
         A[idx[:-1], idx[1:]] = 1.0
@@ -106,17 +104,17 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
         A[-1, -1] = 1.0
 
         A = csc_matrix(A, dtype=np.float64)
-        self._lu = sla.splu(A)
+        self.lu = sla.splu(A)
 
     def _run_solve(self):
         """Function run on every step to perform the required steps to solve
         Poisson's equation."""
         # get rho from WarpX
-        self._rho_data = self._sim.fields.get("rho_fp", level=0)[...]
+        self.rho_data = self.sim.fields.get("rho_fp", level=0)[...]
         # run superLU solver to get phi
         self.solve()
         # write phi to WarpX
-        self._sim.fields.get("phi_fp", level=0)[()] = self._phi[:]
+        self.sim.fields.get("phi_fp", level=0)[()] = self.phi[:]
 
     def solve(self):
         """The solution step. Includes getting the boundary potentials and
@@ -124,24 +122,24 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
 
         left_voltage = 0.0
         right_voltage = eval(
-            self._right_voltage,
-            {"t": self._sim.extension.warpx.gett_new(0), "sin": np.sin, "pi": np.pi},
+            self.right_voltage,
+            {"t": self.sim.extension.warpx.gett_new(0), "sin": np.sin, "pi": np.pi},
         )
 
         # Construct b vector
-        rho = -self._rho_data / constants.ep0
+        rho = -self.rho_data / constants.ep0
         b = np.zeros(rho.shape[0], dtype=np.float64)
-        b[:] = rho * self._dz**2
+        b[:] = rho * self.dz**2
 
         b[0] = left_voltage
         b[-1] = right_voltage
 
-        phi = self._lu.solve(b)
+        phi = self.lu.solve(b)
 
-        self._phi[self._nzguardphi : -self._nzguardphi] = phi
+        self.phi[self.nzguardphi : -self.nzguardphi] = phi
 
-        self._phi[: self._nzguardphi] = left_voltage
-        self._phi[-self._nzguardphi :] = right_voltage
+        self.phi[: self.nzguardphi] = left_voltage
+        self.phi[-self.nzguardphi :] = right_voltage
 
 
 class CapacitiveDischargeExample(object):
@@ -381,7 +379,7 @@ class CapacitiveDischargeExample(object):
             warpx_collisions_split_momentum_push=0,
             verbose=self.test,
         )
-        self.solver._sim = self.sim
+        self.solver.sim = self.sim
 
         self.sim.add_species(
             self.electrons,
