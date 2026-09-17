@@ -1277,7 +1277,8 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
         default=None, description="Maximum block size in x direction"
     )
     max_grid_size_y: int | None = Field(
-        default=None, description="Maximum block size in z direction"
+        default=None,
+        description="Maximum block size in z direction (the second axis of the grid, y in PICMI)",
     )
     blocking_factor: int | list[int] | None = Field(
         default=None, description="Blocking factor (which controls the block size)"
@@ -1288,7 +1289,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
     )
     blocking_factor_y: int | None = Field(
         default=None,
-        description="Blocking factor (which controls the block size) in the z direction",
+        description="Blocking factor (which controls the block size) in the z direction (the second axis of the grid, y in PICMI)",
     )
     # option names (warpx_potential_lo/hi_x/z) differ from the field names:
     potential_xmin: float | str | None = Field(
@@ -1402,7 +1403,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
         default=None, description="Maximum block size in x direction"
     )
     max_grid_size_y: int | None = Field(
-        default=None, description="Maximum block size in z direction"
+        default=None, description="Maximum block size in y direction"
     )
     max_grid_size_z: int | None = Field(
         default=None, description="Maximum block size in z direction"
@@ -1416,7 +1417,7 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
     )
     blocking_factor_y: int | None = Field(
         default=None,
-        description="Blocking factor (which controls the block size) in the z direction",
+        description="Blocking factor (which controls the block size) in the y direction",
     )
     blocking_factor_z: int | None = Field(
         default=None,
@@ -1435,12 +1436,12 @@ class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
     potential_ymin: float | str | None = Field(
         default=None,
         alias="warpx_potential_lo_y",
-        description="Electrostatic potential on the lower z boundary",
+        description="Electrostatic potential on the lower y boundary",
     )
     potential_ymax: float | str | None = Field(
         default=None,
         alias="warpx_potential_hi_y",
-        description="Electrostatic potential on the upper z boundary",
+        description="Electrostatic potential on the upper y boundary",
     )
     potential_zmin: float | str | None = Field(
         default=None,
@@ -4441,9 +4442,10 @@ class ParticleDiagnostic(picmistandard.PICMI_ParticleDiagnostic, WarpXDiagnostic
         description="Verbosity level to use for printing diagnostic output information.",
     )
 
-    # ``warpx_``-prefixed constants referenced in plot_filter_function, collected from the
-    # otherwise-unrecognized keyword arguments.
-    user_defined_kw: dict = Field(default_factory=dict)
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the plot filter function, collected from otherwise-unrecognized keyword arguments that start with ``warpx_``.",
+    )
 
     # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
     _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
@@ -5308,9 +5310,10 @@ class ParticleBoundaryScrapingDiagnostic(
         description="If true, the last timestep is dumped regardless of the diagnostic period/intervals.",
     )
 
-    # ``warpx_``-prefixed constants referenced in plot_filter_function, collected from the
-    # otherwise-unrecognized keyword arguments.
-    user_defined_kw: dict = Field(default_factory=dict)
+    user_defined_kw: dict = Field(
+        default_factory=dict,
+        description="Constants referenced in the plot filter function, collected from otherwise-unrecognized keyword arguments that start with ``warpx_``.",
+    )
 
     # Runtime state populated during diagnostic_initialize_inputs / WarpXDiagnosticBase.
     _diagnostic: pywarpx.Diagnostics.Diagnostic | None = PrivateAttr(default=None)
