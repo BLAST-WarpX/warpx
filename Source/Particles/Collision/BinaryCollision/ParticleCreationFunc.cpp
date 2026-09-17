@@ -36,7 +36,8 @@ ParticleCreationFunc::ParticleCreationFunc (const std::string& collision_name,
     }
     else if ((BinaryCollisionUtils::is_two_product_fusion_type(m_collision_type))
         || (m_collision_type == CollisionType::LinearBreitWheeler)
-        || (m_collision_type == CollisionType::LinearCompton))
+        || (m_collision_type == CollisionType::LinearCompton)
+        || (m_collision_type == CollisionType::ElasticBhabhaMoller))
     {
         m_num_product_species = 2;
         m_num_products_host.push_back(1);
