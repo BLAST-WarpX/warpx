@@ -23,6 +23,7 @@
 #include <AMReX.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
+#include <AMReX_buildInfo.H>
 #include <AMReX_Config.H>
 #include <AMReX_DataAllocator.H>
 #include <AMReX_FArrayBox.H>
@@ -47,6 +48,7 @@
 #include <memory>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -526,6 +528,55 @@ WarpXOpenPMDPlot::Init (openPMD::Access access, bool isBTD)
     m_Series->setOpenPMDextension( openPMD_ED_PIC );
     // meta info
     m_Series->setSoftware( "WarpX", WarpX::Version() );
+
+    WriteJobInfo();
+}
+
+void
+WarpXOpenPMDPlot::WriteJobInfo()
+{
+    auto & warpx = WarpX::GetInstance();
+
+    m_Series->setAttribute("MPI nprocs", amrex::ParallelDescriptor::NProcs());
+    m_Series->setAttribute("nthreads", amrex::OpenMP::get_max_threads());
+    m_Series->setAttribute("build date", amrex::buildInfoGetBuildDate());
+    m_Series->setAttribute("build machine", amrex::buildInfoGetBuildMachine());
+    m_Series->setAttribute("build dir", amrex::buildInfoGetBuildDir());
+    m_Series->setAttribute("AMReX dir", amrex::buildInfoGetAMReXDir());
+    m_Series->setAttribute("compiler", amrex::buildInfoGetComp());
+    m_Series->setAttribute("compiler version", amrex::buildInfoGetCompVersion());
+    m_Series->setAttribute("C++ compiler", amrex::buildInfoGetCXXName());
+    m_Series->setAttribute("C++ flags", amrex::buildInfoGetCXXFlags());
+    m_Series->setAttribute("Link flags", amrex::buildInfoGetLinkFlags());
+    m_Series->setAttribute("Libraries", amrex::buildInfoGetLibraries());
+
+    const char* githash1 = amrex::buildInfoGetGitHash(1);
+    const char* githash2 = amrex::buildInfoGetGitHash(2);
+    const char* githash3 = amrex::buildInfoGetGitHash(3);
+    if (strlen(githash1) > 0) {
+        m_Series->setAttribute("WarpX git describe", githash1);
+    }
+    if (strlen(githash2) > 0) {
+        m_Series->setAttribute("AMReX git describe", githash2);
+    }
+    if (strlen(githash3) > 0) {
+        m_Series->setAttribute("PICSAR git describe", githash3);
+    }
+
+    for (int i = 0; i <= warpx.finestLevel(); i++)
+    {
+        std::stringstream levelnum;
+        levelnum << "level " << i;
+        m_Series->setAttribute(levelnum.str() + " number of boxes", warpx.boxArray(i).size());
+        std::stringstream maxzones;
+        maxzones << warpx.Geom(i).Domain().length(0);
+        for (int n = 1; n < AMREX_SPACEDIM; n++)
+        {
+            maxzones << " " << warpx.Geom(i).Domain().length(n);
+        }
+        m_Series->setAttribute(levelnum.str() + " maximum zones", maxzones.str());
+    }
+
 }
 
 void
