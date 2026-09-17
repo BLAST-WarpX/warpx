@@ -1,0 +1,76 @@
+# Regression test for internal-DOF runtime components under flux injection + resampling.
+#
+# Neutral D2 with rotational internal DOF (E_rot) is injected as a flux through the z_lo face of a
+# multi-box domain (max_grid_size < n_cell, so the domain is split into several boxes). Freshly
+# injected particles are created in a temporary container and redistributed onto the owning boxes,
+# and the drifting flux carries them across box boundaries -- both trigger the Redistribute that
+# used to DROP the E_rot runtime component (leaving NaN internal energy). Leveling-thinning
+# resampling is also enabled, which used to be blocked outright for internal-DOF species.
+#
+# The analysis asserts that every E_rot value is finite and that the population retains the 300 K
+# injection temperature -- i.e. the runtime component survives injection, migration, and resampling.
+
+my_constants.mD2  = 6.689e-27
+my_constants.kB   = 1.380649e-23
+my_constants.Tgas = 300.0
+my_constants.uth_c = sqrt(kB*Tgas/mD2)/clight
+my_constants.udrift_c = 3.0*uth_c   # supersonic +z drift so particles cross the box split
+
+geometry.dims       = 2
+geometry.prob_lo    = -0.01 0.0
+geometry.prob_hi    =  0.01 0.02
+amr.n_cell          = 32 32
+amr.max_level       = 0
+amr.blocking_factor = 16
+amr.max_grid_size   = 16          # -> 2x2 boxes; injected particles migrate across box boundaries
+
+algo.maxwell_solver = none
+algo.particle_shape = 1
+warpx.const_dt      = 1.0e-8
+max_step            = 200
+warpx.verbose       = 1
+
+boundary.field_lo    = periodic pec
+boundary.field_hi    = periodic pec
+boundary.particle_lo = periodic absorbing
+boundary.particle_hi = periodic absorbing
+
+particles.species_names = D2
+D2.charge = 0.0
+D2.mass   = mD2
+
+# flux injection of D2 through the z_lo face
+D2.injection_style        = NFluxPerCell
+D2.num_particles_per_cell = 8
+D2.surface_flux_pos       = 0.0
+D2.flux_normal_axis       = z
+D2.flux_direction         = +1
+D2.flux_profile           = constant
+D2.flux                   = 1.0e24
+D2.momentum_distribution_type = gaussianflux
+D2.ux_th = uth_c
+D2.uy_th = uth_c
+D2.uz_th = uth_c
+D2.uz_m  = udrift_c
+
+# rotational internal DOF: injected molecules carry a 300 K rotational energy
+D2.internal_dof         = rotational
+D2.theta_rot            = 43.0
+D2.Z_rot                = 5.0
+D2.rotational_dof       = 2
+D2.rot_init_temperature = Tgas
+
+# leveling-thinning resampling (used to be blocked for internal-DOF species)
+D2.do_resampling                   = 1
+D2.resampling_algorithm            = leveling_thinning
+D2.resampling_trigger_intervals    = 50
+D2.resampling_trigger_max_avg_ppc  = 12
+
+diagnostics.diags_names = diag1
+diag1.diag_type     = Full
+diag1.format        = openpmd
+diag1.intervals     = 200
+diag1.fields_to_plot = none
+diag1.write_species = 1
+diag1.species       = D2
+diag1.D2.variables  = w ux uy uz E_rot

@@ -180,3 +180,34 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_3d_dsmc_rotational_relaxation  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_dsmc_rotational_relaxation  # inputs
+    "analysis_dsmc_rotational_relaxation.py"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_dsmc_rovibrational_relaxation  # name
+    3  # dims
+    1  # nprocs
+    inputs_test_3d_dsmc_rovibrational_relaxation  # inputs
+    "analysis_dsmc_rovibrational_relaxation.py"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+label_warpx_test(test_3d_dsmc_rovibrational_relaxation slow)
+
+add_warpx_test(
+    test_2d_dsmc_rotational_flux  # name
+    2  # dims
+    1  # nprocs
+    inputs_test_2d_dsmc_rotational_flux  # inputs
+    "analysis_dsmc_rotational_flux.py"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)

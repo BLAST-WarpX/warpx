@@ -1916,6 +1916,71 @@ Particle initialization
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
       which give the distribution of each component of the momentum as a function of space.
 
+.. pp:param:: <species_name>.internal_dof
+    :type: ``none``, ``rotational``, or ``rovibrational``
+    :default: ``none``
+    :optional:
+
+    Enables molecular internal degrees of freedom for this species, exchanged with translational
+    energy during DSMC elastic collisions via the Borgnakke-Larsen model (see the
+    :ref:`DSMC section <multiphysics-collisions-dsmc>`). ``rotational`` adds a per-particle runtime
+    attribute ``E_rot``; ``rovibrational`` additionally adds ``E_vib`` (both stored in eV). Rotation
+    is treated as a classical continuous mode and vibration as a quantum harmonic oscillator (so it
+    stays effectively frozen at low temperature and activates when the gas is hot). Requires a finite
+    species mass.
+
+.. pp:param:: <species_name>.theta_rot
+    :type: ``float`` (in K)
+
+    Rotational characteristic temperature :math:`\theta_\mathrm{rot}` of the molecule (e.g. 87.6 K
+    for H2, 43 K for D2). Required when :pp:param:`<species_name>.internal_dof` is ``rotational`` or
+    ``rovibrational``.
+
+.. pp:param:: <species_name>.Z_rot
+    :type: ``float``
+    :default: ``5``
+    :optional:
+
+    Rotational relaxation collision number: the mean number of collisions over which the rotational
+    and translational temperatures equilibrate. Each colliding pair exchanges rotational energy with
+    probability ``1/Z_rot``.
+
+.. pp:param:: <species_name>.rotational_dof
+    :type: ``int``
+    :default: ``2``
+    :optional:
+
+    Number of rotational degrees of freedom :math:`\zeta_\mathrm{rot}` (2 for a linear/diatomic
+    molecule).
+
+.. pp:param:: <species_name>.theta_vib
+    :type: ``float`` (in K)
+
+    Vibrational characteristic temperature :math:`\theta_\mathrm{vib}` of the molecule (e.g. 6330 K
+    for H2, 4400 K for D2). Required when :pp:param:`<species_name>.internal_dof` is
+    ``rovibrational``.
+
+.. pp:param:: <species_name>.Z_vib
+    :type: ``float``
+
+    Vibrational relaxation collision number (analogous to :pp:param:`<species_name>.Z_rot`).
+    Required when :pp:param:`<species_name>.internal_dof` is ``rovibrational``.
+
+.. pp:param:: <species_name>.rot_init_temperature
+    :type: ``float`` (in K)
+    :default: the species initialization temperature
+    :optional:
+
+    Initial rotational temperature used to populate ``E_rot`` at particle creation (including flux
+    injection).
+
+.. pp:param:: <species_name>.vib_init_temperature
+    :type: ``float`` (in K)
+    :default: the species initialization temperature
+    :optional:
+
+    Initial vibrational temperature used to populate ``E_vib`` at particle creation.
+
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``
 

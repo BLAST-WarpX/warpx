@@ -1,0 +1,74 @@
+# 0-D DSMC rotational-relaxation test (Borgnakke-Larsen internal degrees of freedom).
+#
+# A homogeneous, field-free box of neutral molecular gas (D2) with only D2-D2 elastic
+# hard-sphere collisions. The gas starts translationally hot (T_trans = 1000 K) and
+# rotationally cold (T_rot = 0). The Borgnakke-Larsen model exchanges energy between the
+# relative translational mode and the classical rotational mode (zeta_rot = 2) each
+# collision with probability 1/Z_rot. Energy conservation fixes the equilibrium at
+#     T_eq = (3/2 * T_trans0) / (3/2 + zeta_rot/2) = (3/5) * 1000 K = 600 K.
+# This fast variant runs only partway to equilibrium; the analysis checks that
+#   (i) rotational energy has activated (T_rot rises well above 0),
+#   (ii) the translational temperature has dropped, and
+#   (iii) total (translational + rotational) energy is conserved.
+
+my_constants.mD2  = 6.689e-27
+my_constants.kB   = 1.380649e-23
+my_constants.Ttr0 = 1000.0
+my_constants.n0   = 1.0e22
+my_constants.uth_c = sqrt(kB*Ttr0/mD2)/clight   # thermal spread as fraction of c
+
+# grid / time (field-free, homogeneous periodic box)
+geometry.dims       = 3
+geometry.prob_lo    = 0.0 0.0 0.0
+geometry.prob_hi    = 1.0e-3 1.0e-3 1.0e-3
+amr.n_cell          = 4 4 4
+amr.max_level       = 0
+amr.blocking_factor = 4
+amr.max_grid_size   = 4
+
+algo.maxwell_solver = none
+algo.particle_shape = 1
+warpx.const_dt      = 5.0e-9
+max_step            = 300
+warpx.verbose       = 1
+
+boundary.field_lo    = periodic periodic periodic
+boundary.field_hi    = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+
+# neutral D2 with rotational internal DOF, started rotationally cold
+particles.species_names = D2
+D2.charge = 0.0
+D2.mass   = mD2
+D2.injection_style = NUniformPerCell
+D2.num_particles_per_cell_each_dim = 6 6 6
+D2.profile = constant
+D2.density = n0
+D2.momentum_distribution_type = gaussian
+D2.ux_th = uth_c
+D2.uy_th = uth_c
+D2.uz_th = uth_c
+
+D2.internal_dof         = rotational
+D2.theta_rot            = 43.0   # D2 rotational characteristic temperature [K]
+D2.Z_rot                = 5.0    # rotational collision number
+D2.rotational_dof       = 2
+D2.rot_init_temperature = 0.0    # start rotationally cold to observe relaxation
+
+# D2-D2 elastic hard-sphere collisions
+collisions.collision_names = d2el
+d2el.type                  = dsmc
+d2el.scattering_processes  = elastic
+d2el.species               = D2 D2
+d2el.elastic_cross_section = ../../../Examples/Tests/collision/D2_hard_sphere_elastic.dat
+
+# diagnostics: dump the first and last state for the energy/temperature checks
+diagnostics.diags_names = diag1
+diag1.diag_type     = Full
+diag1.format        = openpmd
+diag1.intervals     = 300
+diag1.fields_to_plot = none
+diag1.write_species = 1
+diag1.species       = D2
+diag1.D2.variables  = w ux uy uz E_rot

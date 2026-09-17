@@ -52,6 +52,11 @@ namespace
 #ifdef WARPX_DIM_RZ
         {"theta", InitializationPolicy::Zero},
 #endif
+        // Molecular internal-DOF energies (eV). Zero is only a fallback for products that do not share
+        // the component; for same-species (e.g. D2->D2) collisions SmartCopy copies the parent value,
+        // and the Borgnakke-Larsen kernel then sets the post-collision value.
+        {"E_rot", InitializationPolicy::Zero},
+        {"E_vib", InitializationPolicy::Zero},
 
 #ifdef WARPX_QED
         {"opticalDepthBW",   InitializationPolicy::RandomExp},

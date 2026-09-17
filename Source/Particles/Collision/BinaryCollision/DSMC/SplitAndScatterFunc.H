@@ -11,11 +11,13 @@
 
 #include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
+#include "Particles/Collision/BinaryCollision/DSMC/InternalDOF.H"
 #include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
 
 #include <array>
 
@@ -34,6 +36,19 @@ class SplitAndScatterFunc
     using SoaData_type = WarpXParticleContainer::ParticleTileType::ParticleTileDataType;
 
 public:
+    // Per-reactant-slot molecular internal-DOF (Borgnakke-Larsen) parameters, resolved host-side in the
+    // constructor. Public + trivially copyable so it can be captured by value into the GPU collision kernel.
+    struct BLSlot {
+        bool has_rot = false;
+        bool has_vib = false;
+        int  Erot_idx = -1;                              // runtime real-comp index of "E_rot" (or -1)
+        int  Evib_idx = -1;                              // runtime real-comp index of "E_vib" (or -1)
+        amrex::ParticleReal zeta_rot  = amrex::ParticleReal(2.0);
+        amrex::ParticleReal inv_Zrot  = amrex::ParticleReal(0.0);   // 1/Z_rot
+        amrex::ParticleReal theta_vib = amrex::ParticleReal(0.0);
+        amrex::ParticleReal inv_Zvib  = amrex::ParticleReal(0.0);   // 1/Z_vib
+    };
+
     /**
      * \brief Default constructor of the SplitAndScatterFunc class.
      */
@@ -232,6 +247,12 @@ public:
 
         const int num_product_species = m_num_product_species;
 
+        // Molecular internal-DOF (Borgnakke-Larsen) parameters, captured by value into the kernel.
+        const bool do_internal_dof = m_do_internal_dof;
+        const auto a_tr = m_a_tr;
+        const auto bl0 = m_bl0;
+        const auto bl1 = m_bl1;
+
         // Grab the masses of the true product species (slots 2 and 3)
         amrex::ParticleReal mass_slot2 = 0;
         amrex::ParticleReal mass_slot3 = 0;
@@ -276,6 +297,57 @@ public:
                 const auto src0_idx = static_cast<int>(p_pair_indices_0[i]);
                 const auto src1_idx = static_cast<int>(p_pair_indices_1[i]);
 
+                // Energy released to the relative translational motion [J]. For excitation this
+                // is (minus) the energy penalty, converted from eV to Joules; for elastic
+                // collisions the penalty is zero.
+                amrex::ParticleReal E_released = -scattering_process.m_energy_penalty*PhysConst::q_e;
+
+                // Borgnakke-Larsen: exchange energy between relative translation and the molecular
+                // internal modes of either partner. Internal energies (eV) were copied parent->child
+                // by SmartCopy; we read them from the product slot, redistribute, and write them back.
+                // The net energy moved out of the internal modes is folded into E_released so that
+                // TwoProductComputeProductMomenta assigns the post-exchange translational energy.
+                if (do_internal_dof && process_type == ScatteringProcessType::ELASTIC) {
+                    // Relative translational energy of the pair (non-relativistic) [eV]
+                    const amrex::ParticleReal mu = m0 * m1 / (m0 + m1);
+                    const amrex::ParticleReal gx = soa_0.m_rdata[PIdx::ux][src0_idx] - soa_1.m_rdata[PIdx::ux][src1_idx];
+                    const amrex::ParticleReal gy = soa_0.m_rdata[PIdx::uy][src0_idx] - soa_1.m_rdata[PIdx::uy][src1_idx];
+                    const amrex::ParticleReal gz = soa_0.m_rdata[PIdx::uz][src0_idx] - soa_1.m_rdata[PIdx::uz][src1_idx];
+                    amrex::ParticleReal E_t = 0.5_prt * mu * (gx*gx + gy*gy + gz*gz) / PhysConst::q_e;
+                    const amrex::ParticleReal E_t_initial = E_t;
+                    amrex::ParticleReal Er0 = (bl0.has_rot) ? soa_products_data[0].m_runtime_rdata[bl0.Erot_idx][slot0_idx] : 0._prt;
+                    amrex::ParticleReal Er1 = (bl1.has_rot) ? soa_products_data[1].m_runtime_rdata[bl1.Erot_idx][slot1_idx] : 0._prt;
+                    amrex::ParticleReal Ev0 = (bl0.has_vib) ? soa_products_data[0].m_runtime_rdata[bl0.Evib_idx][slot0_idx] : 0._prt;
+                    amrex::ParticleReal Ev1 = (bl1.has_vib) ? soa_products_data[1].m_runtime_rdata[bl1.Evib_idx][slot1_idx] : 0._prt;
+                    // Rotational exchange (classical), each partner relaxes with probability 1/Z_rot.
+                    if (bl0.has_rot && amrex::Random(engine) < bl0.inv_Zrot) {
+                        const amrex::ParticleReal Ec = E_t + Er0;
+                        Er0 = InternalDOF::sampleLB_continuous(Ec, bl0.zeta_rot, a_tr, engine);
+                        E_t = Ec - Er0;
+                    }
+                    if (bl1.has_rot && amrex::Random(engine) < bl1.inv_Zrot) {
+                        const amrex::ParticleReal Ec = E_t + Er1;
+                        Er1 = InternalDOF::sampleLB_continuous(Ec, bl1.zeta_rot, a_tr, engine);
+                        E_t = Ec - Er1;
+                    }
+                    // Vibrational exchange (quantum harmonic), each partner relaxes with prob 1/Z_vib.
+                    if (bl0.has_vib && amrex::Random(engine) < bl0.inv_Zvib) {
+                        const amrex::ParticleReal Ec = E_t + Ev0;
+                        Ev0 = InternalDOF::sampleLB_harmonic(Ec, bl0.theta_vib, a_tr, engine);
+                        E_t = Ec - Ev0;
+                    }
+                    if (bl1.has_vib && amrex::Random(engine) < bl1.inv_Zvib) {
+                        const amrex::ParticleReal Ec = E_t + Ev1;
+                        Ev1 = InternalDOF::sampleLB_harmonic(Ec, bl1.theta_vib, a_tr, engine);
+                        E_t = Ec - Ev1;
+                    }
+                    if (bl0.has_rot) { soa_products_data[0].m_runtime_rdata[bl0.Erot_idx][slot0_idx] = Er0; }
+                    if (bl1.has_rot) { soa_products_data[1].m_runtime_rdata[bl1.Erot_idx][slot1_idx] = Er1; }
+                    if (bl0.has_vib) { soa_products_data[0].m_runtime_rdata[bl0.Evib_idx][slot0_idx] = Ev0; }
+                    if (bl1.has_vib) { soa_products_data[1].m_runtime_rdata[bl1.Evib_idx][slot1_idx] = Ev1; }
+                    E_released += (E_t - E_t_initial) * PhysConst::q_e;
+                }
+
                 TwoProductComputeProductMomenta(
                     soa_0.m_rdata[PIdx::ux][src0_idx],
                     soa_0.m_rdata[PIdx::uy][src0_idx],
@@ -289,9 +361,7 @@ public:
                     soa_products_data[1].m_rdata[PIdx::ux][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uy][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uz][slot1_idx], m1,
-                    -scattering_process.m_energy_penalty*PhysConst::q_e,
-                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the
-                    // negative sign; the energy penalty is also converted from eV to Joules.
+                    E_released,
                     scattering_process.m_scattering_angle_model,
                     engine);
             }
@@ -584,6 +654,12 @@ public:
     }
 
 private:
+    bool m_do_internal_dof = false;
+    // Translational Larsen-Borgnakke exponent a_tr = 3/2 - omega (omega = VHS viscosity index; 0.5 for
+    // hard spheres => a_tr = 1). Constant for the current hard-sphere cross sections.
+    amrex::ParticleReal m_a_tr = amrex::ParticleReal(1.0);
+    BLSlot m_bl0, m_bl1;
+
     // How many different type of species the collision produces
     int m_num_product_species;
     // The scattering processes, in the same order as the input list (and as the indices encoded

@@ -8,6 +8,7 @@
 
 #include "AddPlasmaUtilities.H"
 #include "DefaultInitialization.H"
+#include "Particles/Collision/BinaryCollision/DSMC/InternalDOF.H"
 #include "Initialization/InjectorDensity.H"
 #include "Initialization/InjectorMomentum.H"
 #include "Initialization/InjectorPosition.H"
@@ -1204,6 +1205,26 @@ PhysicalParticleContainer::AddPlasma (PlasmaInjector& plasma_injector, int lev, 
 
         amrex::Gpu::synchronize();
 
+        // Initialize molecular internal-DOF energies (eV) for the newly created particles: equilibrium
+        // rotational (and, if enabled, quantum-harmonic vibrational) energy at the configured initial
+        // temperatures. Runs only at particle creation (not on collision products, which use SmartCopy).
+        if (this->getInternalDOF() > 0) {
+            amrex::ParticleReal* AMREX_RESTRICT p_Erot =
+                soa.GetRealData(this->GetRealCompIndex("E_rot")).data() + old_size;
+            const bool idof_has_vib = this->hasVibrationalDOF();
+            amrex::ParticleReal* AMREX_RESTRICT p_Evib = idof_has_vib ?
+                soa.GetRealData(this->GetRealCompIndex("E_vib")).data() + old_size : nullptr;
+            const amrex::ParticleReal rotT = (this->getRotInitT() >= amrex::ParticleReal(0.0)) ? this->getRotInitT() : amrex::ParticleReal(0.0);
+            const amrex::ParticleReal vibT = (this->getVibInitT() >= amrex::ParticleReal(0.0)) ? this->getVibInitT() : amrex::ParticleReal(0.0);
+            const amrex::ParticleReal theta_vib_loc = this->getThetaVib();
+            amrex::ParallelForRNG(static_cast<int>(max_new_particles),
+            [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& engine) noexcept {
+                p_Erot[ii] = InternalDOF::sampleBoltzmannRotEnergy(rotT, engine);
+                if (idof_has_vib) { p_Evib[ii] = InternalDOF::sampleHarmonicVibEnergy(theta_vib_loc, vibT, engine); }
+            });
+            amrex::Gpu::synchronize();
+        }
+
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
             wt = static_cast<amrex::Real>(amrex::second()) - wt;
@@ -1261,7 +1282,15 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     // we will then call Redistribute on this new container and finally
     // add the new particles to the original container.
     PhysicalParticleContainer tmp_pc(&WarpX::GetInstance());
-    for (int ic = 0; ic < NumRuntimeRealComps(); ++ic) { tmp_pc.AddRealComp(GetRealSoANames()[ic + NArrayReal], false); }
+    const auto real_soa_names = GetRealSoANames();
+    for (int ic = 0; ic < NumRuntimeRealComps(); ++ic) {
+        // Molecular internal-DOF energies are set on the injected particles (below, before Redistribute),
+        // so they must be COMMUNICATED through tmp_pc.Redistribute() (otherwise migrating particles lose
+        // them and get NaN). Other runtime comps keep the original non-communicated behavior.
+        const std::string& comp_name = real_soa_names[ic + NArrayReal];
+        const bool communicate = (comp_name == "E_rot" || comp_name == "E_vib");
+        tmp_pc.AddRealComp(comp_name, communicate);
+    }
     for (int ic = 0; ic < NumRuntimeIntComps(); ++ic) { tmp_pc.AddIntComp(GetIntSoANames()[ic + NArrayInt], false); }
     tmp_pc.defineAllParticleTiles();
 
@@ -1722,6 +1751,24 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         });
 
         amrex::Gpu::synchronize(); // If this is removed, we need to make sure inj_rho is async safe.
+
+        // Initialize molecular internal-DOF energies (eV) for the newly injected particles (see AddPlasma).
+        if (this->getInternalDOF() > 0) {
+            amrex::ParticleReal* AMREX_RESTRICT p_Erot =
+                soa.GetRealData(this->GetRealCompIndex("E_rot")).data() + old_size;
+            const bool idof_has_vib = this->hasVibrationalDOF();
+            amrex::ParticleReal* AMREX_RESTRICT p_Evib = idof_has_vib ?
+                soa.GetRealData(this->GetRealCompIndex("E_vib")).data() + old_size : nullptr;
+            const amrex::ParticleReal rotT = (this->getRotInitT() >= amrex::ParticleReal(0.0)) ? this->getRotInitT() : amrex::ParticleReal(0.0);
+            const amrex::ParticleReal vibT = (this->getVibInitT() >= amrex::ParticleReal(0.0)) ? this->getVibInitT() : amrex::ParticleReal(0.0);
+            const amrex::ParticleReal theta_vib_loc = this->getThetaVib();
+            amrex::ParallelForRNG(static_cast<int>(max_new_particles),
+            [=] AMREX_GPU_DEVICE (int ii, amrex::RandomEngine const& engine) noexcept {
+                p_Erot[ii] = InternalDOF::sampleBoltzmannRotEnergy(rotT, engine);
+                if (idof_has_vib) { p_Evib[ii] = InternalDOF::sampleHarmonicVibEnergy(theta_vib_loc, vibT, engine); }
+            });
+            amrex::Gpu::synchronize();
+        }
 
         if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
         {
