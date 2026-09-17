@@ -103,13 +103,26 @@ def make_sim(
 
 
 def add_uniform_particles(
-    sim, species_name, n_per_dim=4, weight=1.0e6, ux=0.0, uy=0.0, uz=0.0
+    sim,
+    species_name,
+    n_per_dim=4,
+    weight=1.0e6,
+    ux=0.0,
+    uy=0.0,
+    uz=0.0,
+    unique_particles=False,
+    **extra_attribs,
 ):
     """Add a uniform lattice of macro particles to an existing species.
 
     ``n_per_dim`` positions per grid axis, so this yields ``n_per_dim``
     particles in 1D and ``n_per_dim**3`` in 3D. The particles are appended, so
     calling this several times for one species mixes the batches.
+
+    ``unique_particles`` selects how the arrays are read across ranks: ``True``
+    adds them once per rank, ``False`` splits them over the ranks. Each keyword
+    in ``extra_attribs`` sets a runtime component of the same name, which the
+    species must already carry, to one constant value for every particle.
 
     Call this after ``sim.initialize_warpx()``, once the particle container
     exists.
@@ -144,5 +157,6 @@ def add_uniform_particles(
         uy=np.full(n_part, uy),
         uz=np.full(n_part, uz),
         w=np.full(n_part, weight),
-        unique_particles=False,
+        unique_particles=unique_particles,
+        **{name: np.full(n_part, value) for name, value in extra_attribs.items()},
     )
