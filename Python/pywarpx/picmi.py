@@ -3398,7 +3398,7 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
             for key, val in kw.items():
-                if key == "species":
+                if "species" in key:
                     val = val.name
                 collision.add_new_attr(process + "_" + key, val)
 
