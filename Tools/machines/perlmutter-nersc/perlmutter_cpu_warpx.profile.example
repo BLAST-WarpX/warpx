@@ -18,7 +18,7 @@ export CMAKE_PREFIX_PATH=${SW_DIR}/boost-1.82.0:${CMAKE_PREFIX_PATH}
 export LD_LIBRARY_PATH=${SW_DIR}/boost-1.82.0/lib:${LD_LIBRARY_PATH}
 
 # optional: for openPMD and PSATD+RZ support
-module load cray-hdf5-parallel/1.12.2.9
+module load cray-hdf5-parallel/1.14.3.9
 export CMAKE_PREFIX_PATH=${SW_DIR}/c-blosc-1.21.1:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${SW_DIR}/adios2-2.10.2:${CMAKE_PREFIX_PATH}
 export CMAKE_PREFIX_PATH=${SW_DIR}/blaspp-2024.05.31:${CMAKE_PREFIX_PATH}
@@ -35,7 +35,7 @@ export PATH=${SW_DIR}/adios2-2.10.2/bin:${PATH}
 export PATH=${SW_DIR}/ccache-4.10.2:$PATH
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.11.5
+module load cray-python/3.12.12
 
 if [ -d "${SW_DIR}/venvs/warpx-cpu" ]
 then
