@@ -595,7 +595,9 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
     }
 }
 
-void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc ) const
+void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
+                                                     amrex::MultiFab& a_chi_yy_cc,
+                                                     amrex::MultiFab& a_chi_zz_cc ) const
 {
     BL_PROFILE("SemiImplicitDarwin::ComputeScaledMassMatrixCC()");
 
@@ -606,48 +608,38 @@ void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_cc )
         m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
         m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
         m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    amrex::MultiFab* chi_cc[3] = {&a_chi_xx_cc, &a_chi_yy_cc, &a_chi_zz_cc};
 
-    a_chi_cc.setVal(0.0);
-
-    // Average over the three diagonal blocks and scale by the same 2 mu0/dt
-    // prefactor the operator applies to the mass-matrix product.
-    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / (3.0_rt * m_dt);
+    // Scale by the same 2 mu0/dt prefactor the operator applies to the
+    // mass-matrix product.
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
 
     for (int d = 0; d < 3; ++d) {
         const int nc = Sdiag[d]->nComp();
-        const amrex::IntVect et = Sdiag[d]->ixType().toIntVect();
-        const int e0 = et[0];
-        const int e1 = (AMREX_SPACEDIM >= 2) ? et[1] : 0;
-        const int e2 = (AMREX_SPACEDIM >= 3) ? et[2] : 0;
-        // Each staggered point contributes with equal weight to the average
-        // onto the cell center (2 points per nodal dimension of the block).
-        const amrex::Real wt =
-            fac / static_cast<amrex::Real>((e0 + 1)*(e1 + 1)*(e2 + 1));
 
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for (amrex::MFIter mfi(a_chi_cc, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        for (amrex::MFIter mfi(*chi_cc[d], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
             const amrex::Box& tbx = mfi.tilebox();
-            amrex::Array4<amrex::Real> const& chi = a_chi_cc.array(mfi);
+            amrex::Array4<amrex::Real> const& chi = chi_cc[d]->array(mfi);
             amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
             amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
+                // Row-sum this block's stencil-band components at (i,j,k),
+                // then collocate onto the cell center by index identification
+                // (same convention DarwinMLMGPC uses for Z): a plain (i,j,k)
+                // fetch already reads the point at S's own native staggering
+                // that shares (i,j,k) with the target cell-centered array.
+                // This keeps chi_dd collocated with where curl(Z)_d itself
+                // would land under the same convention, and avoids zeroing the
+                // nodal-dimension Nyquist mode the way pair-averaging would.
                 amrex::Real s = 0.0;
-                // Perform row-sum of mass matrix elements
                 for (int c = 0; c < nc; ++c) {
-                    // Perform interpolation from `S`'s
-                    // original staggering to the desired staggering
-                    for (int kk = 0; kk <= e2; ++kk) {
-                        for (int jj = 0; jj <= e1; ++jj) {
-                            for (int ii = 0; ii <= e0; ++ii) {
-                                s += S(i+ii,j+jj,k+kk,c);
-                            }
-                        }
-                    }
+                    s += S(i,j,k,c);
                 }
-                chi(i,j,k) += wt*s;
+                chi(i,j,k) = fac*s;
             });
         }
     }
