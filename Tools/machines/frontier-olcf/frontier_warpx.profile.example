@@ -8,9 +8,9 @@ if [ -z ${proj-} ]; then echo "WARNING: The 'proj' variable is not yet set in yo
 # required dependencies
 module load cmake/3.30.5
 module load craype-accel-amd-gfx90a
-module load rocm/6.2.4
-module load cray-mpich/8.1.31
-module load cce/18.0.1  # must be loaded after rocm
+module load rocm/7.13.0
+module load cce/21.0.0  # must be loaded after rocm
+module load cray-mpich/9.1.0
 # https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#compatible-compiler-rocm-toolchain-versions
 
 # Fix for OpenMP Runtime (OLCFHELP-21543)
@@ -30,14 +30,14 @@ export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/blaspp-2024.05.31/lib64:$LD_LIBRA
 export LD_LIBRARY_PATH=${HOME}/sw/frontier/gpu/lapackpp-2024.05.31/lib64:$LD_LIBRARY_PATH
 
 # optional: for QED lookup table generation support
-module load boost/1.85.0
+module load boost/1.90.0
 
 # optional: for openPMD support
-module load adios2/2.10.2-mpi
-module load hdf5/1.14.3-mpi
+module load adios2/2.11.0-mpi
+module load hdf5/1.14.6-mpi
 
 # optional: for Python bindings or libEnsemble
-module load cray-python/3.11.7
+module load cray-python/3.12.12
 
 if [ -d "${HOME}/sw/frontier/gpu/venvs/warpx-frontier" ]
 then
