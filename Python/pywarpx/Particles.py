@@ -8,6 +8,8 @@ from .Bucket import Bucket
 
 particles = Bucket("particles", species_names=[], rigid_injected_species=[])
 particles_list = []
+particle_sinks = Bucket("particle_sinks", names=[])
+particle_sink_list = []
 
 
 def new_species(name):
@@ -36,3 +38,10 @@ class Species(Bucket):
             new = Bucket(f"{self.instancename}.{name}")
             self.argvattrs[name] = new
             return new
+
+
+def new_particle_sink(name):
+    result = Bucket(name)
+    particle_sink_list.append(result)
+    particle_sinks.names.append(name)
+    return result

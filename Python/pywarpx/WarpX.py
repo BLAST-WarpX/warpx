@@ -22,7 +22,7 @@ from .Geometry import geometry
 from .HybridPICModel import external_vector_potential, hybridpicmodel
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
-from .Particles import particles, particles_list
+from .Particles import particle_sink_list, particle_sinks, particles, particles_list
 from .PSATD import psatd
 
 
@@ -67,6 +67,10 @@ class WarpX(Bucket):
         argv += lasers.attrlist()
         for laser in lasers_list:
             argv += laser.attrlist()
+
+        argv += particle_sinks.attrlist()
+        for sink in particle_sink_list:
+            argv += sink.attrlist()
 
         diagnostics.diags_names = diagnostics._diagnostics_dict.keys()
         argv += diagnostics.attrlist()
