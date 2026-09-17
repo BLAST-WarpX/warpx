@@ -101,6 +101,11 @@ public:
      */
     void InitializeCurlCurlBCMasks ();
 
+    /**
+     * \brief Enforce zero value for WarpXSolverVec on non-zero dirichlet boundaries
+     */
+    void ZeroSolverVecOnNonzeroDirichletBC (WarpXSolverVec& a_E) const;
+
 private:
 
     /**
