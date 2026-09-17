@@ -1,0 +1,51 @@
+# The purpose of this test is to verify behavor when FieldProbe particles cross armex cell boundaries.
+# Every 10 steps, the points will move 26e-7 meters, eah cell is 1e-7 meters, so ~26 cells will be crossed every 10 steps.
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 50           # for production, run for longer time, e.g. max_step = 1000
+amr.n_cell = 32 32 256   # for production, run with finer mesh, e.g. amr.n_cell = 64 64 512
+amr.max_grid_size = 64   # maximum size of each AMReX box, used to decompose the domain
+amr.blocking_factor = 32 # minimum size of each AMReX box, used to decompose the domain
+geometry.dims = 3
+geometry.prob_lo     = -30.e-6   -30.e-6    0    # physical domain
+geometry.prob_hi     =  30.e-6    30.e-6    25.6e-6
+amr.max_level = 0 # Maximum level in hierarchy (1 might be unstable, >1 is not supported)
+warpx.do_moving_window = 1
+warpx.moving_window_dir = z
+warpx.moving_window_v = 1.0 # units of speed of light
+
+#################################
+####### Boundary condition ######
+#################################
+boundary.field_lo = periodic periodic pec
+boundary.field_hi = periodic periodic pec
+
+#################################
+############ NUMERICS ###########
+#################################
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 1
+warpx.cfl = 1. # if 1., the time step is set to its CFL limit
+warpx.do_dynamic_scheduling = 0 # for production, set this to 1 (default)
+warpx.serialize_initial_conditions = 1         # for production, set this to 0 (default)
+
+# Order of particle shape factors
+algo.particle_shape = 3
+
+# Reduced Diagnostics
+warpx.reduced_diags_names               = FP
+
+FP.type = FieldProbe
+FP.intervals = 10
+FP.integrate = 0
+FP.probe_geometry = Line
+FP.x_probe = 0
+FP.y_probe = 0
+FP.z_probe = 0
+FP.x1_probe = 0
+FP.y1_probe = 0
+FP.z1_probe = 25.6e-6
+FP.resolution = 256
+FP.do_moving_window_FP = 1

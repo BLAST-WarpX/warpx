@@ -1,0 +1,26 @@
+max_step = 0
+
+amr.n_cell = 8 8 64
+amr.max_grid_size = 32
+amr.blocking_factor = 8
+amr.max_level = 0
+
+geometry.dims = 3
+geometry.prob_lo = -30.e-6 -30.e-6 -56.e-6
+geometry.prob_hi =  30.e-6  30.e-6  12.e-6
+
+boundary.field_lo = periodic periodic pec
+boundary.field_hi = periodic periodic pec
+
+warpx.do_dive_cleaning = 0
+warpx.use_filter = 0
+warpx.cfl = 1.0
+warpx.serialize_initial_conditions = 1
+
+algo.particle_shape = 3
+
+warpx.reduced_diags_names = FP
+
+FP.type = FieldProbe
+FP.intervals = 1
+FP.integrate = 0

@@ -36,6 +36,7 @@ struct FieldProbePIdx
         Ex, Ey, Ez,
         Bx, By, Bz,
         S, //!< the Poynting vector
+        probe_x, probe_y, probe_z, //!< immutable input position (can be outside the domain)
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         theta,      ///< Cylindrical and spherical needs the angle
 
@@ -50,7 +51,7 @@ struct FieldProbePIdx
 /**
  * This class defines the FieldProbeParticleContainer
  * which is branched from the amrex::ParticleContainer.
- * nattribs tells the particle container to allot 7 SOA values.
+ * nattribs tells the particle container how many SoA values to allocate.
  */
 class FieldProbeParticleContainer
     : public amrex::ParticleContainerPureSoA<FieldProbePIdx::nattribs, 0>
@@ -75,7 +76,13 @@ public:
     using const_iterator = amrex::ParConstIterSoA<FieldProbePIdx::nattribs, 0>;
 
     //! similar to WarpXParticleContainer::AddNParticles but does not include u(x,y,z)
-    void AddNParticles (int lev, amrex::Vector<amrex::ParticleReal> const & x, amrex::Vector<amrex::ParticleReal> const & y, amrex::Vector<amrex::ParticleReal> const & z);
+    void AddNParticles (int lev,
+                        amrex::Vector<amrex::ParticleReal> const& probe_x,
+                        amrex::Vector<amrex::ParticleReal> const& probe_y,
+                        amrex::Vector<amrex::ParticleReal> const& probe_z,
+                        amrex::Vector<amrex::ParticleReal> const& storage_x,
+                        amrex::Vector<amrex::ParticleReal> const& storage_y,
+                        amrex::Vector<amrex::ParticleReal> const& storage_z);
 };
 
 #endif // WARPX_FieldProbeParticleContainer_H_
