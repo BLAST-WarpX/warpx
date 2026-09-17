@@ -4038,7 +4038,9 @@ def _collect_warpx_constants(cls, data, expression_field):
                 continue
             if k.startswith("warpx_") and re.search(r"\b%s\b" % k, expression):
                 user_defined_kw[k] = data.pop(k)
-    data[user_defined_kw_key] = user_defined_kw
+    # only set it if given or collected, so that the field is not marked as set otherwise
+    if user_defined_kw or user_defined_kw_key in data:
+        data[user_defined_kw_key] = user_defined_kw
     return data
 
 
