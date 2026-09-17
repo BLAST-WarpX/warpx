@@ -8,6 +8,9 @@ normalized momentum components with which WarpX particles should be initialized
 
 import numpy as np
 import openpmd_api as io
+from scipy.constants import c as clight
+from scipy.constants import electron_mass as m_e
+from scipy.constants import elementary_charge as q_e
 
 # Define u_mean and u_std as functions of x, y, z, using numpy syntax
 # - Define the grid
@@ -16,7 +19,7 @@ y_1d = np.linspace(-1.0, 1.0, 8)
 z_1d = np.linspace(-1.0, 1.0, 8)
 x, y, z = np.meshgrid(x_1d, y_1d, z_1d, indexing="ij")
 
-# - Define the normalized momentum data, u = gamma * v / c
+# Define the normalized momentum data, u = gamma * v / c
 ux_std_data = 0.2 * abs(z)
 uy_std_data = 0.21 * abs(z)
 uz_std_data = 0.22 * abs(z)
@@ -24,6 +27,12 @@ uz_std_data = 0.22 * abs(z)
 ux_mean_data = 0.1 * z
 uy_mean_data = 0.12 * z
 uz_mean_data = 0.14 * z
+
+# Define temperature in eV to correspond above isotropic thermal spread u_std = 0.2 * |z|
+# temperature [eV] = u_std^2 * m_e * c^2 / q_e
+temperature_in_eV_data = 20439.95 * z**2
+
+temperature_in_eV_data_MJ = (1.0 + np.heaviside(x, 0)) * m_e * clight**2 / q_e
 
 grid_spacing = np.array(
     [
@@ -58,6 +67,25 @@ def write_vector_mesh_file(filename, mesh_name, components):
     series.flush()
 
 
+def write_scalar_mesh_file(filename, mesh_name, data):
+    series = io.Series(filename, io.Access.create)
+    it = series.iterations[1]
+
+    mesh = it.meshes[mesh_name]
+    mesh.grid_spacing = grid_spacing
+    mesh.grid_global_offset = grid_offset
+    mesh.axis_labels = ["x", "y", "z"]
+    mesh.geometry = io.Geometry.cartesian
+    mesh.unit_dimension = {}
+
+    component = mesh[io.Mesh_Record_Component.SCALAR]
+    component.position = [0.0, 0.0, 0.0]
+    component.reset_dataset(io.Dataset(data.dtype, data.shape))
+    component.store_chunk(data)
+
+    series.flush()
+
+
 write_vector_mesh_file(
     "example-u-std.h5",
     "u_std",
@@ -76,4 +104,16 @@ write_vector_mesh_file(
         "y": uy_mean_data,
         "z": uz_mean_data,
     },
+)
+
+write_scalar_mesh_file(
+    "example-temperature-in-eV.h5",
+    "temperature_in_eV",
+    temperature_in_eV_data,
+)
+
+write_scalar_mesh_file(
+    "example-temperature-in-eV-MJ.h5",
+    "temperature_in_eV",
+    temperature_in_eV_data_MJ,
 )
