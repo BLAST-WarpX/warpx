@@ -15,6 +15,14 @@
 #include "Fields.H"
 #include "Filter/BilinearFilter.H"
 #include "Utils/TextMsg.H"
+#include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#ifdef WARPX_USE_FFT
+#   ifdef WARPX_DIM_RZ
+#       include "FieldSolver/SpectralSolver/SpectralSolverRZ.H"
+#   else
+#       include "FieldSolver/SpectralSolver/SpectralSolver.H"
+#   endif
+#endif
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpXComm_K.H"
 #include "WarpXSumGuardCells.H"
@@ -626,6 +634,181 @@ WarpX::UpdateAuxiliaryDataStagToNodal ()
             FieldType::Efield_cax, lev, cnba, dm, cperiod, refinement_ratio, ng_src,
             electromagnetic_solver_id);
     }
+}
+
+void
+WarpX::ComputeDivBAux (amrex::MultiFab& divB_out, const int dcomp,
+                       const int lev, amrex::IntVect const ngrow)
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // divB_aux(0) = divB_fp(0);
+    // divB_aux(l) = divB_fp(l) + I[ divB_aux(l-1) - divB_cp(l) ]
+    // (see declaration). The l > 0 correction only exists for MR runs,
+    // which are Cartesian single-component (no RZ modes), so the
+    // single-component interpolation kernel below is sufficient.
+    amrex::Vector<std::unique_ptr<amrex::MultiFab>> divb_aux(lev+1);
+    for (int l = 0; l <= lev; ++l)
+    {
+        const amrex::IntVect ng = (l == lev) ? ngrow : amrex::IntVect(1);
+        divb_aux[l] = std::make_unique<amrex::MultiFab>(
+            boxArray(l), DistributionMap(l), ncomps, ng);
+        // The stencil fills valid cells only; zero the ghosts so no
+        // uninitialized values reach the diagnostic copy (or trip
+        // FPE trapping in CI).
+        divb_aux[l]->setVal(0.0);
+        ComputeDivB(*divb_aux[l], 0,
+                    m_fields.get_alldirs(FieldType::Bfield_fp, l),
+                    CellSize(l), ng);
+
+        // Coarse-patch correction only where the aux fields carry one:
+        // with the electrostatic/None solver the aux update is a plain
+        // copy per level (no cp contribution), and cp fields/solvers
+        // may not exist at all.
+        if (l > 0
+            && electromagnetic_solver_id != ElectromagneticSolverAlgo::None
+            && m_fields.has_vector(FieldType::Bfield_cp, l))
+        {
+            const amrex::MultiFab& Bx_cp =
+                *m_fields.get(FieldType::Bfield_cp, Direction{0}, l);
+            const amrex::BoxArray cba =
+                amrex::coarsen(boxArray(l), refRatio(l-1));
+            const amrex::DistributionMapping& cdm = Bx_cp.DistributionMap();
+            const amrex::IntVect ngc(1);
+
+            // coarse-level reconstructed divergence on the cp layout
+            amrex::MultiFab dD(cba, cdm, ncomps, ngc);
+            dD.setVal(0.0);
+            ablastr::utils::communication::ParallelCopy(
+                dD, *divb_aux[l-1], 0, 0, ncomps, amrex::IntVect(1), ngc,
+                WarpX::do_single_precision_comms, Geom(l-1).periodicity());
+
+            // minus the coarse-patch solver divergence (coarse spacing)
+            amrex::MultiFab divb_cp(cba, cdm, ncomps, ngc);
+            divb_cp.setVal(0.0);
+            ComputeDivB(divb_cp, 0,
+                        m_fields.get_alldirs(FieldType::Bfield_cp, l),
+                        CellSize(l-1), ngc);
+            amrex::MultiFab::Subtract(dD, divb_cp, 0, 0, ncomps, ngc);
+
+            const amrex::IntVect stag = divb_aux[l]->ixType().toIntVect();
+            const amrex::IntVect rr = refRatio(l-1);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(*divb_aux[l], TilingIfNotGPU());
+                 mfi.isValid(); ++mfi)
+            {
+                const amrex::Box bx = mfi.tilebox();
+                amrex::Array4<amrex::Real> const& dst =
+                    divb_aux[l]->array(mfi);
+                amrex::Array4<amrex::Real const> const& crse =
+                    dD.const_array(mfi);
+                // arr_fine is read only at (j,k,m): in-place update is safe
+                amrex::ParallelFor(bx,
+                [=] AMREX_GPU_DEVICE (int j, int k, int m) noexcept
+                {
+                    warpx_interp(j, k, m, dst, dst, crse, stag, rr);
+                });
+            }
+        }
+    }
+    amrex::MultiFab::Copy(divB_out, *divb_aux[lev], 0, dcomp, ncomps,
+                          amrex::min(divB_out.nGrowVect(), ngrow));
+}
+
+void
+WarpX::ComputeDivEAux (amrex::MultiFab& divE_out, const int lev)
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
+    // Same reconstruction as ComputeDivBAux; divE lands nodal for
+    // staggered/collocated FD grids and cell-centered for RZ PSATD.
+    const amrex::IntVect divE_type = divE_out.ixType().toIntVect();
+
+    auto compute_dive_fp = [&](amrex::MultiFab& divE, const int l)
+    {
+        const ablastr::fields::VectorField E_fp =
+            m_fields.get_alldirs(FieldType::Efield_fp, l);
+        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
+#ifdef WARPX_USE_FFT
+            spectral_solver_fp[l]->ComputeSpectralDivE(l, E_fp, divE);
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "ComputeDivEAux: PSATD requested but not compiled");
+#endif
+        } else {
+            m_fdtd_solver_fp[l]->ComputeDivE(E_fp, divE);
+        }
+    };
+
+    amrex::Vector<std::unique_ptr<amrex::MultiFab>> dive_aux(lev+1);
+    for (int l = 0; l <= lev; ++l)
+    {
+        const amrex::BoxArray ba =
+            amrex::convert(boxArray(l), divE_type);
+        dive_aux[l] = std::make_unique<amrex::MultiFab>(
+            ba, DistributionMap(l), ncomps, amrex::IntVect(1));
+        dive_aux[l]->setVal(0.0);
+        compute_dive_fp(*dive_aux[l], l);
+
+        if (l > 0
+            && electromagnetic_solver_id != ElectromagneticSolverAlgo::None
+            && m_fields.has_vector(FieldType::Efield_cp, l)
+            && (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD
+                || m_fdtd_solver_cp[l] != nullptr))
+        {
+            const amrex::MultiFab& Ex_cp =
+                *m_fields.get(FieldType::Efield_cp, Direction{0}, l);
+            const amrex::BoxArray cba = amrex::convert(
+                amrex::coarsen(boxArray(l), refRatio(l-1)), divE_type);
+            const amrex::DistributionMapping& cdm = Ex_cp.DistributionMap();
+            const amrex::IntVect ngc(1);
+
+            amrex::MultiFab dD(cba, cdm, ncomps, ngc);
+            dD.setVal(0.0);
+            ablastr::utils::communication::ParallelCopy(
+                dD, *dive_aux[l-1], 0, 0, ncomps, amrex::IntVect(1), ngc,
+                WarpX::do_single_precision_comms, Geom(l-1).periodicity());
+
+            amrex::MultiFab dive_cp(cba, cdm, ncomps, ngc);
+            dive_cp.setVal(0.0);
+            const ablastr::fields::VectorField E_cp =
+                m_fields.get_alldirs(FieldType::Efield_cp, l);
+            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
+#ifdef WARPX_USE_FFT
+                spectral_solver_cp[l]->ComputeSpectralDivE(l, E_cp, dive_cp);
+#endif
+            } else {
+                m_fdtd_solver_cp[l]->ComputeDivE(E_cp, dive_cp);
+            }
+            amrex::MultiFab::Subtract(dD, dive_cp, 0, 0, ncomps, ngc);
+
+            const amrex::IntVect rr = refRatio(l-1);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(*dive_aux[l], TilingIfNotGPU());
+                 mfi.isValid(); ++mfi)
+            {
+                const amrex::Box bx = mfi.tilebox();
+                amrex::Array4<amrex::Real> const& dst =
+                    dive_aux[l]->array(mfi);
+                amrex::Array4<amrex::Real const> const& crse =
+                    dD.const_array(mfi);
+                amrex::ParallelFor(bx,
+                [=] AMREX_GPU_DEVICE (int j, int k, int m) noexcept
+                {
+                    warpx_interp(j, k, m, dst, dst, crse, divE_type, rr);
+                });
+            }
+        }
+    }
+    amrex::MultiFab::Copy(divE_out, *dive_aux[lev], 0, 0, ncomps,
+                          amrex::min(divE_out.nGrowVect(),
+                                     dive_aux[lev]->nGrowVect()));
 }
 
 void
