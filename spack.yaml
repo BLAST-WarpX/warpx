@@ -1,0 +1,44 @@
+# This is a Spack environment file.
+#
+# Activating and installing this environment will provide all dependencies
+# that are needed for full-feature development.
+#   https//spack.readthedocs.io/en/latest/environments.html#anonymous-environments
+#
+spack:
+  definitions:
+
+  # OpenMP support on macOS
+  - extras: []
+  - extras: [llvm-openmp]
+    when: platform == "darwin"
+
+  # basic Python dependencies for WarpX Python PICMI bindings
+  - python: []
+  - python: [python, py-pip, py-mpi4py, py-numpy, py-periodictable, py-picmistandard]
+    when: env.get("SPACK_STACK_USE_PYTHON", "") == "1"
+
+  #   Python: extended dependencies for tests
+  - python_tests: []
+  - python_tests: [openpmd-api +python, py-matplotlib, py-scipy, py-scipy, py-periodictable,
+      py-yt]
+    when: env.get("SPACK_STACK_USE_PYTHON", "") == "1"
+
+  # CUDA
+  - cuda: []
+  - cuda: [cuda, blaspp +cuda]
+    when: env.get("SPACK_STACK_USE_CUDA", "") == "1"
+  specs:
+  - adios2        # for openPMD
+  - blaspp        # for PSATD in RZ
+  - ccache
+  - cmake
+  - fftw          # for PSATD
+  - hdf5          # for openPMD
+  - lapackpp      # for PSATD in RZ
+  - mpi
+  - openpmd-api   # for openPMD
+  - pkgconfig     # for fftw
+  - $cuda
+  - $python
+  - $python_tests
+  - $extras
