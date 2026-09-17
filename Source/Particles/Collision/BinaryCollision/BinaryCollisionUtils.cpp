@@ -31,7 +31,7 @@ namespace BinaryCollisionUtils{
         const amrex::ParmParse pp_collision_name(collision_name);
         // For legacy, pairwisecoulomb is the default
         std::string type = "pairwisecoulomb";
-        pp_collision_name.query("type", type);
+        utils::parser::queryWithParser(pp_collision_name, "type", type);
         if (type == "pairwisecoulomb") {
             return CollisionType::PairwiseCoulomb;
         }
@@ -48,7 +48,7 @@ namespace BinaryCollisionUtils{
         else if (type == "linear_breit_wheeler") {
             amrex::Vector<std::string> species_name;
             // Check that incoming species are photons
-            pp_collision_name.getarr("species", species_name);
+            utils::parser::getArrWithParser(pp_collision_name, "species", species_name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 species_name.size() == 2u,
                 "Linear Breit-Wheeler collisions must involve exactly two species");
@@ -59,7 +59,7 @@ namespace BinaryCollisionUtils{
                 "Species involved in linear Breit-Wheeler collisions must be of type photon.");
             // Check that product species are electron and positron
             amrex::Vector<std::string> product_species_name;
-            pp_collision_name.getarr("product_species", product_species_name);
+            utils::parser::getArrWithParser(pp_collision_name, "product_species", product_species_name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 product_species_name.size() == 2u,
                 "Linear Breit-Wheeler collisions must contain exactly two product species");
@@ -75,7 +75,7 @@ namespace BinaryCollisionUtils{
         else if (type == "linear_compton") {
             amrex::Vector<std::string> species_name;
             // Check that the first incoming species is a photon and the second is an electron/positron
-            pp_collision_name.getarr("species", species_name);
+            utils::parser::getArrWithParser(pp_collision_name, "species", species_name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 species_name.size() == 2u,
                 "Linear Compton collisions must involve exactly two species");
@@ -87,7 +87,7 @@ namespace BinaryCollisionUtils{
                 "The second species in linear Compton collisions must be an electron or positron");
             // Check that first product species is photon and second is electron/positron
             amrex::Vector<std::string> product_species_name;
-            pp_collision_name.getarr("product_species", product_species_name);
+            utils::parser::getArrWithParser(pp_collision_name, "product_species", product_species_name);
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 product_species_name.size() == 2u,
                 "Linear Compton collisions must contain exactly two product species");
@@ -112,15 +112,15 @@ namespace BinaryCollisionUtils{
         const amrex::ParmParse pp_collision_name(collision_name);
 
         amrex::Vector<std::string> scattering_process_names;
-        pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+        utils::parser::queryArrWithParser(pp_collision_name, "scattering_processes", scattering_process_names);
 
         // create a vector of ScatteringProcess objects from each scattering
         // process name
         amrex::Vector<ScatteringProcess> scattering_processes;
         for (const auto& scattering_process : scattering_process_names) {
-            const std::string kw_cross_section = scattering_process + "_cross_section";
+            std::string const kw_cross_section = scattering_process + "_cross_section";
             std::string cross_section_file;
-            pp_collision_name.query(kw_cross_section, cross_section_file);
+            utils::parser::queryWithParser(pp_collision_name, kw_cross_section, cross_section_file);
 
             const auto process_type = ScatteringProcess::parseProcessType(scattering_process);
 
@@ -131,11 +131,9 @@ namespace BinaryCollisionUtils{
             const std::string kw_energy = scattering_process + "_energy";
             if (process_type == ScatteringProcessType::EXCITATION ||
                 process_type == ScatteringProcessType::IONIZATION) {
-                utils::parser::getWithParser(
-                    pp_collision_name, kw_energy.c_str(), energy);
+                utils::parser::getWithParser(pp_collision_name, kw_energy, energy);
             } else if (process_type != ScatteringProcessType::ELASTIC) {
-                utils::parser::queryWithParser(
-                    pp_collision_name, kw_energy.c_str(), energy);
+                utils::parser::queryWithParser(pp_collision_name, kw_energy, energy);
             }
 
             // The angular behavior of a process is controlled by the per-process
@@ -164,7 +162,7 @@ namespace BinaryCollisionUtils{
 
         const amrex::ParmParse pp_collision_name(collision_name);
         amrex::Vector<std::string> species_names;
-        pp_collision_name.getarr("species", species_names);
+        utils::parser::getArrWithParser(pp_collision_name, "species", species_names);
         auto& species1 = mypc->GetParticleContainerFromName(species_names[0]);
         auto& species2 = mypc->GetParticleContainerFromName(species_names[1]);
 
@@ -173,7 +171,7 @@ namespace BinaryCollisionUtils{
         amrex::ParticleReal mass_after = 0.0_prt;
 
         amrex::Vector<std::string> product_species_name;
-        pp_collision_name.getarr("product_species", product_species_name);
+        utils::parser::getArrWithParser(pp_collision_name, "product_species", product_species_name);
 
         NuclearFusionType fusion_type = NuclearFusionType::Undefined;
         if ((species1.AmIA<PhysicalSpecies::hydrogen2>() && species2.AmIA<PhysicalSpecies::hydrogen3>())

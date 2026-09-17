@@ -75,12 +75,12 @@ void WarpXFluidContainer::ReadParameters()
     // default values of E_external and B_external
     // are used to set the E and B field when "constant" or "parser"
     // is not explicitly used in the input
-    pp_species_name.query("B_ext_init_style", m_B_ext_s);
+    utils::parser::queryWithParser(pp_species_name, "B_ext_init_style", m_B_ext_s);
     std::transform(m_B_ext_s.begin(),
                     m_B_ext_s.end(),
                     m_B_ext_s.begin(),
                     ::tolower);
-    pp_species_name.query("E_ext_init_style", m_E_ext_s);
+    utils::parser::queryWithParser(pp_species_name, "E_ext_init_style", m_E_ext_s);
     std::transform(m_E_ext_s.begin(),
                     m_E_ext_s.end(),
                     m_E_ext_s.begin(),

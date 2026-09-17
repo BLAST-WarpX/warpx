@@ -124,7 +124,7 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     utils::parser::queryWithParser(pp_species, source_name, "density_max", density_max);
 
     std::string injection_style = "none";
-    utils::parser::query(pp_species, source_name, "injection_style", injection_style);
+    utils::parser::queryWithParser(pp_species, source_name, "injection_style", injection_style);
     std::transform(injection_style.begin(),
                    injection_style.end(),
                    injection_style.begin(),
@@ -359,7 +359,7 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
 
         utils::parser::getWithParser(pp_species, source_name, "surface_flux_pos", surface_flux_pos);
         std::string flux_normal_axis_string;
-        utils::parser::get(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
+        utils::parser::getWithParser(pp_species, source_name, "flux_normal_axis", flux_normal_axis_string);
         flux_normal_axis = -1;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         if      (flux_normal_axis_string == "r" || flux_normal_axis_string == "R") {
@@ -488,7 +488,7 @@ void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)
 #endif
     external_file = true;
     std::string str_injection_file;
-    utils::parser::get(pp_species, source_name, "injection_file", str_injection_file);
+    utils::parser::getWithParser(pp_species, source_name, "injection_file", str_injection_file);
     // optional parameters
     utils::parser::queryWithParser(pp_species, source_name, "q_tot", q_tot);
     utils::parser::queryWithParser(pp_species, source_name, "z_shift",z_shift);
@@ -589,7 +589,7 @@ void PlasmaInjector::parseFlux (amrex::ParmParse const& pp_species)
 {
     // parse flux information
     std::string flux_prof_s;
-    utils::parser::get(pp_species, source_name, "flux_profile", flux_prof_s);
+    utils::parser::getWithParser(pp_species, source_name, "flux_profile", flux_prof_s);
     std::transform(flux_prof_s.begin(), flux_prof_s.end(),
                    flux_prof_s.begin(), ::tolower);
     if (flux_prof_s == "constant") {

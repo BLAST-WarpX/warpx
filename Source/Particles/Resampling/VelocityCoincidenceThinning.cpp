@@ -33,7 +33,7 @@ VelocityCoincidenceThinning::VelocityCoincidenceThinning (const std::string& spe
     }
 
     std::string velocity_grid_type_str = "spherical";
-    pp_species_name.query(
+    utils::parser::queryWithParser(pp_species_name,
         "resampling_algorithm_velocity_grid_type", velocity_grid_type_str
     );
     if (velocity_grid_type_str == "spherical") {

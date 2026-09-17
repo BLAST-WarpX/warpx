@@ -57,15 +57,15 @@ Diagnostics::BaseReadParameters ()
 
     const amrex::ParmParse pp_diag_name(m_diag_name);
     m_file_prefix = "diags/" + m_diag_name;
-    pp_diag_name.query("file_prefix", m_file_prefix);
+    utils::parser::queryWithParser(pp_diag_name, "file_prefix", m_file_prefix);
     utils::parser::queryWithParser(
         pp_diag_name, "file_min_digits", m_file_min_digits);
-    pp_diag_name.query("format", m_format);
+    utils::parser::queryWithParser(pp_diag_name, "format", m_format);
     pp_diag_name.query("dump_last_timestep", m_dump_last_timestep);
 
     const amrex::ParmParse pp_geometry("geometry");
     std::string dims;
-    pp_geometry.get("dims", dims);
+    utils::parser::getWithParser(pp_geometry, "dims", dims);
 
     // use warpx.verbose as global diagnostic verbosity level
     const amrex::ParmParse pp_warpx("warpx");
@@ -74,7 +74,7 @@ Diagnostics::BaseReadParameters ()
     pp_diag_name.query("verbose", m_verbose);
 
     // Query list of grid fields to write to output
-    const bool varnames_specified = pp_diag_name.queryarr("fields_to_plot", m_varnames_fields);
+    const bool varnames_specified = utils::parser::queryArrWithParser(pp_diag_name, "fields_to_plot", m_varnames_fields);
     if (!varnames_specified){
         if( dims == "RZ" || dims == "RCYLINDER") {
             m_varnames_fields = {"Er", "Et", "Ez", "Br", "Bt", "Bz", "jr", "jt", "jz"};
@@ -88,7 +88,7 @@ Diagnostics::BaseReadParameters ()
     }
 
     amrex::Vector< std::string > additional_varnames_fields;
-    pp_diag_name.queryarr("additional_fields_to_plot", additional_varnames_fields);
+    utils::parser::queryArrWithParser(pp_diag_name, "additional_fields_to_plot", additional_varnames_fields);
     m_varnames_fields.insert(m_varnames_fields.end(), additional_varnames_fields.begin(), additional_varnames_fields.end());
 
     // Sanity check if user requests to plot phi
@@ -136,7 +136,7 @@ Diagnostics::BaseReadParameters ()
     }
 
     // Get names of particle field diagnostic quantities to calculate at each grid point
-    const bool pfield_varnames_specified = pp_diag_name.queryarr("particle_fields_to_plot", m_pfield_varnames);
+    const bool pfield_varnames_specified = utils::parser::queryArrWithParser(pp_diag_name, "particle_fields_to_plot", m_pfield_varnames);
     if (!pfield_varnames_specified){
         m_pfield_varnames = {};
     }
@@ -181,7 +181,7 @@ Diagnostics::BaseReadParameters ()
     m_all_species_names = warpx.GetPartContainer().GetSpeciesNames();
 
     // Get names of species to average at each grid point
-    const bool pfield_species_specified = pp_diag_name.queryarr("particle_fields_species", m_pfield_species);
+    const bool pfield_species_specified = utils::parser::queryArrWithParser(pp_diag_name, "particle_fields_species", m_pfield_species);
     if (!pfield_species_specified){
         m_pfield_species = m_all_species_names;
     }
@@ -275,7 +275,7 @@ Diagnostics::BaseReadParameters ()
 
     // Names of species to write to output
     const bool species_specified =
-        pp_diag_name.queryarr("species", m_output_species_names);
+        utils::parser::queryArrWithParser(pp_diag_name, "species", m_output_species_names);
 
 
     // Loop over all fields stored in m_varnames

@@ -237,7 +237,7 @@ BTDiagnostics::ReadParameters ()
     const amrex::ParmParse pp_diag_name(m_diag_name);
 
     m_file_prefix = "diags/" + m_diag_name;
-    pp_diag_name.query("file_prefix", m_file_prefix);
+    utils::parser::queryWithParser(pp_diag_name, "file_prefix", m_file_prefix);
     pp_diag_name.query("do_back_transformed_fields", m_do_back_transformed_fields);
     pp_diag_name.query("do_back_transformed_particles", m_do_back_transformed_particles);
     AMREX_ALWAYS_ASSERT(m_do_back_transformed_fields or m_do_back_transformed_particles);
@@ -247,7 +247,7 @@ BTDiagnostics::ReadParameters ()
     std::vector<std::string> intervals_string_vec = {"0"};
     bool const num_snapshots_specified = utils::parser::queryWithParser(
         pp_diag_name, "num_snapshots_lab", m_num_snapshots_lab);
-    bool const intervals_specified = pp_diag_name.queryarr("intervals", intervals_string_vec);
+    bool const intervals_specified = utils::parser::queryArrWithParser(pp_diag_name, "intervals", intervals_string_vec);
     if (num_snapshots_specified)
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!intervals_specified,
@@ -288,7 +288,7 @@ BTDiagnostics::ReadParameters ()
             + "Er, Et, Ez, Br, Bt, Bz, jr, jt, jz, and rho in cylindrical (RZ coordinates)");
     }
 
-    const bool particle_fields_to_plot_specified = pp_diag_name.queryarr("particle_fields_to_plot", m_pfield_varnames);
+    const bool particle_fields_to_plot_specified = utils::parser::queryArrWithParser(pp_diag_name, "particle_fields_to_plot", m_pfield_varnames);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!particle_fields_to_plot_specified, "particle_fields_to_plot is currently not supported for BackTransformed Diagnostics");
     if (m_varnames.empty()) {
         m_do_back_transformed_fields = false;

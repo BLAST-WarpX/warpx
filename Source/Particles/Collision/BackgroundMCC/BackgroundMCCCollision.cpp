@@ -108,7 +108,7 @@ BackgroundMCCCollision::BackgroundMCCCollision (std::string const& collision_nam
             ionization_flag = true;
 
             std::string secondary_species;
-            pp_collision_name.get("ionization_species", secondary_species);
+            utils::parser::getWithParser(pp_collision_name, "ionization_species", secondary_species);
             m_species_names.push_back(secondary_species);
 
             m_ionization_processes.push_back(std::move(process));

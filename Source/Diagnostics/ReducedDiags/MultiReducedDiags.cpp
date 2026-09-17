@@ -28,6 +28,7 @@
 #include "RhoMaximum.H"
 #include "Timestep.H"
 #include "Utils/TextMsg.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
@@ -47,7 +48,7 @@ MultiReducedDiags::MultiReducedDiags ()
 {
     // read reduced diags names
     const ParmParse pp_warpx("warpx");
-    m_plot_rd = pp_warpx.queryarr("reduced_diags_names", m_rd_names);
+    m_plot_rd = utils::parser::queryArrWithParser(pp_warpx, "reduced_diags_names", m_rd_names);
 
     // if names are not given, reduced diags will not be done
     if ( m_plot_rd == 0 ) { return; }
@@ -84,7 +85,7 @@ MultiReducedDiags::MultiReducedDiags ()
 
             // read reduced diags type
             std::string rd_type;
-            pp_rd_name.get("type", rd_type);
+            utils::parser::getWithParser(pp_rd_name, "type", rd_type);
 
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 reduced_diags_dictionary.contains(rd_type),

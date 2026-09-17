@@ -25,7 +25,7 @@ BremsstrahlungFunc::BremsstrahlungFunc (std::string const& collision_name, Multi
     pp_collision_name.get("Z", Z);
 
     std::string product_species_name;
-    pp_collision_name.get("product_species", product_species_name);
+    utils::parser::getWithParser(pp_collision_name, "product_species", product_species_name);
     auto& product_species = mypc->GetParticleContainerFromName(product_species_name);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(product_species.AmIA<PhysicalSpecies::photon>(),

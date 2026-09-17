@@ -14,7 +14,7 @@ FlushFormatSensei::FlushFormatSensei (amrex::AmrMesh *amr_mesh,
 #else
     amrex::ParmParse pp_diag_name(diag_name);
 
-    pp_diag_name.query("sensei_config", m_insitu_config);
+    utils::parser::queryWithParser(pp_diag_name, "sensei_config", m_insitu_config);
     pp_diag_name.query("sensei_pin_mesh", m_insitu_pin_mesh);
 
     m_insitu_bridge = new amrex::AmrMeshParticleInSituBridge;

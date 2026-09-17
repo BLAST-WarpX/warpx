@@ -18,6 +18,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
@@ -66,7 +67,7 @@ ColliderRelevant::ColliderRelevant (const std::string& rd_name)
 {
     // read colliding species names - must be 2
     const amrex::ParmParse pp_rd_name(m_rd_name);
-    pp_rd_name.getarr("species", m_beam_name);
+    utils::parser::getArrWithParser(pp_rd_name, "species", m_beam_name);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_beam_name.size() == 2u,

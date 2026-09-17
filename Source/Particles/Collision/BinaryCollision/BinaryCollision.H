@@ -107,7 +107,7 @@ public:
 
         const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
-        pp_collision_name.queryarr("product_species", m_product_species);
+        utils::parser::queryArrWithParser(pp_collision_name, "product_species", m_product_species);
 
         m_shuffling_method = ParticleShufflingMethod::Default;
         pp_collisions.query_enum_sloppy("shuffling_method", m_shuffling_method, "-_");
@@ -145,7 +145,7 @@ public:
             // operation, an outgoing particle of the first species type will
             // be created.
             std::string target_species;
-            pp_collision_name.query("ionization_target_species", target_species);
+            utils::parser::queryWithParser(pp_collision_name, "ionization_target_species", target_species);
             if (!target_species.empty()) {
                 if (m_species_names[0] == target_species) {
                     std::swap(m_species_names[0], m_species_names[1]);

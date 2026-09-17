@@ -26,7 +26,7 @@ namespace SpeciesUtils {
     {
         const amrex::ParmParse pp_species_name(species_name);
         std::string physical_species_s;
-        const bool species_is_specified = pp_species_name.query("species_type", physical_species_s);
+        const bool species_is_specified = utils::parser::queryWithParser(pp_species_name, "species_type", physical_species_s);
         if (species_is_specified){
             const auto physical_species_from_string = species::from_string( physical_species_s );
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(physical_species_from_string,
@@ -86,7 +86,7 @@ namespace SpeciesUtils {
 
         // parse density information
         std::string rho_prof_s;
-        utils::parser::get(pp_species, source_name, "profile", rho_prof_s);
+        utils::parser::getWithParser(pp_species, source_name, "profile", rho_prof_s);
         std::transform(rho_prof_s.begin(), rho_prof_s.end(),
                     rho_prof_s.begin(), ::tolower);
         if (rho_prof_s == "constant") {
@@ -106,8 +106,8 @@ namespace SpeciesUtils {
             std::string density_file;
             std::string field_name = "density";
             bool distributed = true;
-            utils::parser::get(pp_species, source_name, "read_density_from_path", density_file);
-            utils::parser::query(pp_species, source_name, "density_mesh_name", field_name);
+            utils::parser::getWithParser(pp_species, source_name, "read_density_from_path", density_file);
+            utils::parser::queryWithParser(pp_species, source_name, "density_mesh_name", field_name);
             pp_species.query("read_density_distributed", distributed);
             h_inj_rho.reset(new InjectorDensity((InjectorDensityFromFile*)nullptr,
                 density_file, field_name, geom, distributed));
@@ -132,7 +132,7 @@ namespace SpeciesUtils {
 
         // parse momentum information
         std::string mom_dist_s;
-        utils::parser::get(pp_species, source_name, "momentum_distribution_type", mom_dist_s);
+        utils::parser::getWithParser(pp_species, source_name, "momentum_distribution_type", mom_dist_s);
         std::transform(mom_dist_s.begin(),
                        mom_dist_s.end(),
                        mom_dist_s.begin(),

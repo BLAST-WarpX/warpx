@@ -10,6 +10,7 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/WarpXConst.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 #include <AMReX_GpuQualifiers.H>
@@ -37,7 +38,7 @@ BeamRelevant::BeamRelevant (const std::string& rd_name)
 {
     // read beam name
     const ParmParse pp_rd_name(rd_name);
-    pp_rd_name.get("species",m_beam_name);
+    utils::parser::getWithParser(pp_rd_name, "species",m_beam_name);
 
     // resize data array
 #if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RSPHERE)

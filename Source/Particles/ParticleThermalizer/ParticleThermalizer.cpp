@@ -31,7 +31,7 @@ ParticleThermalizer::ParticleThermalizer():
 
   // Read normal as a string (x, y, or z)
   std::string normal_str;
-  const bool thermalizer_present = pp.query("normal", normal_str);
+  const bool thermalizer_present = utils::parser::queryWithParser(pp, "normal", normal_str);
   if (!thermalizer_present) {
     // If no normal is specified, the thermalizer is not defined
     return;
@@ -101,7 +101,7 @@ ParticleThermalizer::ParticleThermalizer():
       m_theta >= 0._rt,
       "particle_thermalizer: 'theta' must be non-negative");
 
-  pp.queryarr("species", m_species_names);
+  utils::parser::queryArrWithParser(pp, "species", m_species_names);
 
   m_defined = true;
 }
