@@ -722,9 +722,10 @@ void ImplicitSolver::InitializeMassMatrices ()
     if (m_use_mass_matrices_jacobian) {
 
         for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngE[dir]>=ngJ[dir],
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ngE[dir]>=ngJ[dir]+1,
                 "Mass Matrices for Jacobian requires guard cells for E "
-                "to be at least as many as those for J.");
+                "to be at least one more than those for J, since the stencil of "
+                "the mass matrices reaches one cell beyond the ghost region of J.");
         }
 
         if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Direct) {

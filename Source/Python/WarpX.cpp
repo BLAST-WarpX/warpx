@@ -15,6 +15,7 @@
 #include <FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H>
 #include <FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H>
 #include <FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H>
+#include <FieldSolver/ImplicitSolvers/ImplicitSolver.H>
 #ifdef WARPX_USE_FFT
 #   include <FieldSolver/SpectralSolver/SpectralKSpace.H>
 #   ifdef WARPX_DIM_RZ
@@ -187,6 +188,25 @@ void init_WarpX (py::module& m)
         .def("get_particle_boundary_buffer",
             [](WarpX& wx){ return &wx.GetParticleBoundaryBuffer(); },
             py::return_value_policy::reference_internal
+        )
+
+        // Expose the implicit solver and the mass matrices deposition
+        .def("implicit_solver",
+            [](WarpX& wx){ return wx.get_pointer_ImplicitSolver(); },
+            py::return_value_policy::reference_internal,
+            R"pbdoc(Return the implicit solver, or None when the evolve scheme is explicit)pbdoc"
+        )
+        .def("save_particles_at_implicit_step_start",
+            [](WarpX& wx){ wx.SaveParticlesAtImplicitStepStart(); },
+            R"pbdoc(Save the particle positions and velocities at the start of the step)pbdoc"
+        )
+        .def("deposit_mass_matrices",
+            [](WarpX& wx){ wx.DepositMassMatrices(); },
+            R"pbdoc(Zero and deposit the mass matrices from all species)pbdoc"
+        )
+        .def("sync_mass_matrices",
+            [](WarpX& wx){ wx.SyncMassMatrices(); },
+            R"pbdoc(Sum the guard cells of the mass matrices into the valid cells)pbdoc"
         )
 
         // Expose functions used to sync the charge density multifab

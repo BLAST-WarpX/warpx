@@ -386,8 +386,13 @@ guardCellManager::Init (
         evolve_scheme == EvolveScheme::Strang_Implicit_Spectral_EM) {
         // For these implicit schemes, the number of ghost cells
         // for EB gather must be consistent with those for J.
-        ng_alloc_EB.max( ng_alloc_J );
         ng_FieldGather.max( ng_alloc_J );
+        // The mass matrices couple a component of J to a component of E that can be
+        // staggered by half a cell, in which case their stencil is one cell wider and
+        // reaches one cell beyond the ghost region of J. E thus needs one more ghost
+        // cell than J, otherwise ImplicitSolver::ApplyMassMatrices truncates the
+        // stencil at the ghost cells of E and silently drops its outermost terms.
+        ng_alloc_EB.max( ng_alloc_J + 1 );
     }
 
 }
