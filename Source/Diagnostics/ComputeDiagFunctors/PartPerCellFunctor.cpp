@@ -13,8 +13,12 @@
 
 using namespace amrex::literals;
 
-PartPerCellFunctor::PartPerCellFunctor(const amrex::MultiFab* mf_src, const int lev, amrex::IntVect crse_ratio, const int ncomp)
-    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev)
+PartPerCellFunctor::PartPerCellFunctor(const amrex::MultiFab* mf_src,
+                                       const int lev,
+                                       amrex::IntVect crse_ratio,
+                                       const int species_index,
+                                       const int ncomp)
+    : ComputeDiagFunctor(ncomp, crse_ratio), m_lev(lev), m_species_index(species_index)
 {
     // mf_src will not be used, let's make sure it's null.
     AMREX_ALWAYS_ASSERT(mf_src == nullptr);
@@ -34,8 +38,14 @@ PartPerCellFunctor::operator()(amrex::MultiFab& mf_dst, const int dcomp, const i
     amrex::MultiFab ppc_mf(warpx.boxArray(m_lev), warpx.DistributionMap(m_lev), 1, ng);
     // Set value to 0, and increment the value in each cell with ppc.
     ppc_mf.setVal(0._rt);
-    // Compute ppc which includes a summation over all species.
-    warpx.GetPartContainer().Increment(ppc_mf, m_lev);
+    if (m_species_index == -1) {
+        // Compute ppc which includes a summation over all species.
+        warpx.GetPartContainer().Increment(ppc_mf, m_lev);
+    } else {
+        // Compute ppc for the specified species
+        auto& mypc = warpx.GetPartContainer().GetParticleContainer(m_species_index);
+        mypc.Increment(ppc_mf, m_lev);
+    }
     // Coarsen and interpolate from ppc_mf to the output diagnostic MultiFab, mf_dst.
     ablastr::coarsen::sample::Coarsen(mf_dst, ppc_mf, dcomp, 0, nComp(), 0, m_crse_ratio);
 }

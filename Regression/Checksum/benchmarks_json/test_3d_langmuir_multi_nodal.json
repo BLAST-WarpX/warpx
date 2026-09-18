@@ -11,6 +11,8 @@
     "jy": 5.8033818589873256e+16,
     "jz": 5.8033818589873256e+16,
     "part_per_cell": 524288.0,
+    "part_per_cell_electrons": 262144.0,
+    "part_per_cell_positrons": 262144.0,
     "rho": 720713356.5083634
   },
   "positrons": {
