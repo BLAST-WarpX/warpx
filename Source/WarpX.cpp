@@ -51,6 +51,7 @@
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
+#include <ablastr/fields/MLMGTuningCache.H>
 #include <ablastr/math/FiniteDifference.H>
 #include <ablastr/math/RandomSeed.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
@@ -755,6 +756,12 @@ WarpX::ReadParameters ()
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(electrostatic_solver_id != ElectrostaticSolverAlgo::None,
                 "The Darwin solver requires an electrostatic solver to also be set, "
                 "e.g. warpx.do_electrostatic = labframe");
+        }
+
+        {
+            bool tune_mlmg = false;
+            pp_warpx.query("tune_mlmg", tune_mlmg);
+            ablastr::fields::MLMGTuningCache::setTuning(tune_mlmg);
         }
 
         // Sub-cycling is only implemented for the finite-difference electromagnetic

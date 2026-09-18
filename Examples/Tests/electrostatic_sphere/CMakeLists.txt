@@ -52,6 +52,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_electrostatic_sphere_tune_mlmg  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_electrostatic_sphere_tune_mlmg  # inputs
+    "analysis_electrostatic_sphere.py diags/diag1000030"  # analysis
+    "analysis_default_regression.py --path diags/diag1000030"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_rz_electrostatic_sphere  # name
     RZ  # dims
     2  # nprocs

@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_test_3d_electrostatic_sphere_eb
+
+# test input parameters
+# Tune MLMG (also tries a single-Box solve, hence several boxes)
+amr.max_grid_size = 32
+warpx.tune_mlmg = 1

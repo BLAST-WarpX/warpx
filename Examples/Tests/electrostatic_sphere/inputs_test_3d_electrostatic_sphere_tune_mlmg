@@ -1,0 +1,9 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# test input parameters
+warpx.abort_on_warning_threshold = medium
+
+# Tune MLMG (also tries a single-Box solve, hence several boxes)
+amr.max_grid_size = 32
+warpx.tune_mlmg = 1
