@@ -21,6 +21,7 @@
 #   include "Particles/ElementaryProcess/QEDPhotonEmission.H"
 #endif
 #include "Particles/LaserParticleContainer.H"
+#include "Particles/PrescribedCurrentParticleContainer.H"
 #include "Particles/ParticleCreation/FilterCopyTransform.H"
 #ifdef WARPX_QED
 #   include "Particles/ParticleCreation/FilterCreateTransformFromFAB.H"
@@ -101,7 +102,13 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
     auto const nspecies = static_cast<int>(species_names.size());
     auto const nlasers = static_cast<int>(lasers_names.size());
 
-    allcontainers.resize(nspecies + nlasers);
+    // Optional artificial species that injects a prescribed current waveform
+    // (warpx.current_injection = 1), deposited through the standard particle
+    // current-deposition path.
+    auto const ninjectors =
+        PrescribedCurrentParticleContainer::is_enabled() ? 1 : 0;
+
+    allcontainers.resize(nspecies + nlasers + ninjectors);
     for (int i = 0; i < nspecies; ++i) {
         if (species_types[i] == PCTypes::Physical) {
             allcontainers[i] = std::make_unique<PhysicalParticleContainer>(amr_core, i, species_names[i]);
@@ -119,6 +126,11 @@ MultiParticleContainer::MultiParticleContainer (AmrCore* amr_core)
     for (int i = nspecies; i < nspecies+nlasers; ++i) {
         allcontainers[i] = std::make_unique<LaserParticleContainer>(amr_core, i, lasers_names[i-nspecies]);
         allcontainers[i]->m_deposit_on_main_grid = m_laser_deposit_on_main_grid[i-nspecies];
+    }
+
+    if (ninjectors > 0) {
+        const int i = nspecies + nlasers;
+        allcontainers[i] = std::make_unique<PrescribedCurrentParticleContainer>(amr_core, i);
     }
 
     // Setup particle collisions
