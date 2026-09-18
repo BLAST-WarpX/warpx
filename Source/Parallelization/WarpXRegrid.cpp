@@ -13,6 +13,7 @@
 #include "EmbeddedBoundary/Enabled.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox.H"
 #include "Fields.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Initialization/ExternalField.H"
 #include "Particles/MultiParticleContainer.H"
@@ -192,6 +193,9 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         if (ParallelDescriptor::NProcs() == 1) { return; }
 
         m_fields.remake_level(lev, dm);
+        if (HasDielectricMaterials()) {
+            m_dielectric_materials->RemakeLevelData(*this, lev, ba, dm);
+        }
 
         // Fine patch
         ablastr::fields::MultiLevelVectorField const& Bfield_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level);
@@ -220,6 +224,10 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
             InitializeEBGridData(lev);
         } else {
             m_field_factory[lev] = std::make_unique<FArrayBoxFactory>();
+        }
+
+        if (HasDielectricMaterials()) {
+            m_dielectric_materials->InitLevelData(*this, lev);
         }
 
 #ifdef WARPX_USE_FFT

@@ -18,6 +18,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox.H"
+#include "FieldSolver/ElectrostaticSolvers/DielectricMaterials.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/ElectrostaticSolvers/LabFrameExplicitES.H"
 #include "FieldSolver/ElectrostaticSolvers/RelativisticExplicitES.H"
@@ -334,6 +335,12 @@ WarpX::Finalize()
     ablastr::warn_manager::WMClear();
 }
 
+bool
+WarpX::HasDielectricMaterials () const
+{
+    return m_dielectric_materials && m_dielectric_materials->hasDielectrics();
+}
+
 WarpX::WarpX ()
 {
     m_instance = this; // This guarantees that GetInstance() can be
@@ -446,6 +453,9 @@ WarpX::WarpX ()
     load_balance_efficiency.resize(nlevs_max);
 
     m_field_factory.resize(nlevs_max);
+
+    m_dielectric_materials = std::make_unique<DielectricMaterials>(nlevs_max);
+    m_dielectric_materials->ReadParameters();
 
     if (m_em_solver_medium == MediumForEM::Macroscopic) {
         // create object for macroscopic solver
@@ -2034,6 +2044,12 @@ WarpX::BackwardCompatibility ()
     );
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_warpx.query("epsilon_function(x,y,z)", backward_str),
+        "warpx.epsilon_function(x,y,z) has been replaced by the dielectric "
+        "material interface. Use dielectrics.names and the per-material "
+        "permittivity inputs.");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !pp_warpx.query("plot_finepatch", backward_int),
         "warpx.plot_finepatch is not supported anymore. "
         "Please use the new syntax for diagnostics, see documentation."
@@ -2323,6 +2339,9 @@ void
 WarpX::ClearLevel (int lev)
 {
     m_fields.clear_level(lev);
+    if (m_dielectric_materials) {
+        m_dielectric_materials->ClearLevel(lev);
+    }
 
     for (int i = 0; i < 3; ++i) {
         Efield_dotMask [lev][i].reset();
@@ -2782,6 +2801,10 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         const IntVect ngPhi = IntVect( AMREX_D_DECL(1,1,1) );
         m_fields.alloc_init(FieldType::phi_fp, lev, amrex::convert(ba, phi_nodal_flag), dm,
                              ncomps, ngPhi, 0.0_rt );
+    }
+
+    if (HasDielectricMaterials()) {
+        m_dielectric_materials->AllocLevelData(*this, lev, ba, dm);
     }
 
     if (m_do_subcycling && lev == 0)
