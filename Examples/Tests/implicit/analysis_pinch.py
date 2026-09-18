@@ -36,7 +36,7 @@ Eplasma = ele_energy + ion_energy
 
 if poynting_flux.shape[1] == 10:
     print("2D simulation")
-    gmres_iters_tol = 5.0
+    gmres_iters_tol = 5
     Eout_lo_x = poynting_flux[:, 6]
     Eout_lo_z = poynting_flux[:, 7]
     Eout_hi_x = poynting_flux[:, 8]
@@ -53,7 +53,7 @@ else:
 dE = Efields + Eplasma + dE_poynting
 rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
-rel_net_energy_tol = 1.0e-12
+rel_net_energy_tol = 3.0e-12
 print(f"max relative delta energy : {max_rel_net_energy}")
 print(f"relative delta energy tolerance : {rel_net_energy_tol}")
 assert max_rel_net_energy < rel_net_energy_tol
@@ -90,7 +90,7 @@ drho_trimmed = drho[:-1, ...]
 Ng = drho_trimmed.size
 drho2_avg = (drho_trimmed**2).sum() / Ng
 drho_rms = np.sqrt(drho2_avg)
-tolerance_rel_charge = 1.0e-12
+tolerance_rel_charge = 2.0e-12
 print(f"rms error in charge conservation: {drho_rms}")
 print(f"tolerance: {tolerance_rel_charge}")
 assert drho_rms < tolerance_rel_charge

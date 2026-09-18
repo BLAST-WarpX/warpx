@@ -93,7 +93,7 @@ void ReducedDiags::LoadBalance ()
     // load balancing operations
 }
 
-void ReducedDiags::ComputeDiagsMidStep (int /*step*/)
+void ReducedDiags::ComputeDiagsMidStep (int /*step*/, amrex::Real /*dt*/)
 {
     // Defines an empty function ComputeDiagsMidStep() to be overwritten if needed.
     // Function used to calculate the diagnostic at the mid step time leve
