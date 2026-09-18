@@ -1,0 +1,25 @@
+FILE = inputs_base_2d
+amr.n_cell = 64 32
+amr.max_grid_size = 32
+# Initialization splits the occupied region using particle counts. Runtime
+# balancing uses cell costs, so those smaller boxes should merge again.
+electrons.profile = parse_density_function
+electrons.density_function(x,y,z) = if(x < 2.5e-5, 1., 0.)
+warpx.split_high_density_boxes_threshold = 1.1
+
+# Compare spatially varying fields against a run without runtime load balancing.
+warpx.B_ext_grid_init_style = parse_B_ext_grid_function
+warpx.Bx_external_grid_function(x,y,z) = 0.
+warpx.By_external_grid_function(x,y,z) = 1.e-3*(1 + x/1.e-4 + 2*z/1.e-4)
+warpx.Bz_external_grid_function(x,y,z) = 0.
+# By(x,z) is already divergence-free in 2D.
+warpx.do_initial_div_cleaning = 0
+warpx.reduced_diags_names = FE LBE LBC PN FP
+FP.type = FieldProbe
+FP.intervals = 1
+FP.probe_geometry = Line
+FP.x_probe = 1.e-6
+FP.z_probe = 9.9e-5
+FP.x1_probe = 9.9e-5
+FP.z1_probe = 9.9e-5
+FP.resolution = 65

@@ -1,0 +1,13 @@
+FILE = inputs_base_2d_refined
+amr.max_grid_size = 32
+warpx.fine_tag_lo = 0. 0.
+warpx.fine_tag_hi = 1.e-4 1.e-4
+algo.particle_shape = 4
+warpx.do_subcycling = 1
+warpx.use_filter = 1
+warpx.filter_npass_each_dir = 1 0
+warpx.do_dive_cleaning = 1
+# Allocate rho but retain zero fields while checking layout constraints.
+electrons.do_not_deposit = 1
+# E/B have (6,6), J (7,6), and rho (8,7) guard cells on both patches.
+# Runtime children must be at least (9,8) cells on level 0 and (18,16) on level 1.

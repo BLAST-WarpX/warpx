@@ -537,6 +537,13 @@ public:
      */
     void LoadBalance ();
 
+    /** \brief Make new load-balanced Layout
+     *  \param lev level to load balance
+     *  \param[out] efficiency efficiency of the new layout, or -1 if unchanged
+     */
+    std::pair<amrex::BoxArray,amrex::DistributionMapping>
+    LoadBalanceMakeNewLayout (int lev, amrex::Real& efficiency);
+
     /** \brief resets costs to zero
      */
     void ResetCosts ();

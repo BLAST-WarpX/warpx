@@ -253,6 +253,7 @@ namespace ablastr::fields
     void
     MultiFabRegister::remake_level (
         int level,
+        amrex::BoxArray const & new_ba,
         amrex::DistributionMapping const & new_dm
     )
     {
@@ -261,22 +262,35 @@ namespace ablastr::fields
         {
             MultiFabOwner & mf_owner = element.second;
 
-            // keep distribution map as it is?
+            // keep boxarray and distribution map as it is?
             if (!mf_owner.m_remake) {
                 continue;
             }
 
             // remake MultiFab with new distribution map
             if (mf_owner.m_level == level && !mf_owner.is_alias()) {
-                const amrex::MultiFab & mf = mf_owner.m_mf;
+                amrex::MultiFab & mf = mf_owner.m_mf;
                 amrex::IntVect const & ng = mf.nGrowVect();
                 const auto tag = amrex::MFInfo().SetTag(mf.tags()[0]);
-                amrex::MultiFab new_mf(mf.boxArray(), new_dm, mf.nComp(), ng, tag);
+                auto const& current_mf_ba = mf.boxArray();
+                auto new_mf_ba = new_ba;
+                new_mf_ba.convert(current_mf_ba.ixType()).coarsen(current_mf_ba.crseRatio());
+                amrex::MultiFab new_mf(new_mf_ba, new_dm, mf.nComp(), ng, tag);
 
                 // copy data to new MultiFab: Only done for persistent data like E and B field, not for
                 // temporary things like currents, etc.
                 if (mf_owner.m_redistribute_on_remake) {
-                    new_mf.Redistribute(mf, 0, 0, mf.nComp(), ng);
+                    if (new_mf_ba == current_mf_ba) {
+                        new_mf.Redistribute(mf, 0, 0, mf.nComp(), ng);
+                    } else {
+                        // Refresh interior ghosts and overlapping exterior ghosts before
+                        // they can overwrite current boundary values during the copy.
+                        // Multi-ghost exchanges require at least two ghosts in every direction.
+                        mf.setMultiGhost(ng.allGE(2));
+                        mf.FillBoundary();
+                        // Preserve exterior ghosts, which ordinary FillBoundary cannot rebuild.
+                        new_mf.ParallelCopy(mf, 0, 0, mf.nComp(), ng, ng);
+                    }
                 }
 
                 // replace old MultiFab with new one, deallocate old one

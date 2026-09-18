@@ -1,0 +1,5 @@
+FILE = inputs_base_2d_refined
+amr.n_cell = 48 48
+amr.max_grid_size = 24
+amr.ref_ratio = 4
+# Runtime splitting may split 24-cell sides into 12, but not 12 into 6 on level 1.
