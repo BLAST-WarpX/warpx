@@ -15,6 +15,7 @@
 #include "Particles/ParticleCreation/SmartCopy.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/ScatteringUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
 #include <array>
@@ -289,10 +290,10 @@ public:
                     soa_products_data[1].m_rdata[PIdx::ux][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uy][slot1_idx],
                     soa_products_data[1].m_rdata[PIdx::uz][slot1_idx], m1,
-                    -scattering_process.m_energy_penalty*PhysConst::q_e,
-                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the
-                    // negative sign; the energy penalty is also converted from eV to Joules.
-                    scattering_process.m_scattering_angle_model,
+                    -scattering_process.m_energy_penalty*PhysConst::q_e, // *released* energy (negative sign) converted from eV to Joules
+                    scattering_process.m_scattering_angle_model, // angular distribution of the products in the center-of-mass frame
+                    ScatteringUtils::AnisotropicCoefficientTable{}, // pass empty table because Legendre-based anisotropic scattering is unsupported for DSMC
+                    /*energy_range_status=*/nullptr,
                     engine);
             }
 
@@ -355,12 +356,10 @@ public:
                     soa_products_data[3].m_rdata[PIdx::ux][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uy][slot3_idx],
                     soa_products_data[3].m_rdata[PIdx::uz][slot3_idx], mass_slot3,
-                    -scattering_process.m_energy_penalty*PhysConst::q_e,
-                    // TwoProductComputeProductMomenta expects the *released* energy here, hence the negative sign
-                    // We also convert from eV to Joules
-                    scattering_process.m_scattering_angle_model,
-                    // The angular distribution of the products in the center-of-mass frame is set by
-                    // the process's scattering angle model.
+                    -scattering_process.m_energy_penalty*PhysConst::q_e, // *released* energy (negative sign) converted from eV to Joules
+                    scattering_process.m_scattering_angle_model, // angular distribution of the products in the center-of-mass frame
+                    ScatteringUtils::AnisotropicCoefficientTable{}, // pass empty table because Legendre-based anisotropic scattering is unsupported for DSMC
+                    /*energy_range_status=*/nullptr,
                     engine);
             }
             else if (process_type == ScatteringProcessType::IONIZATION)

@@ -11,6 +11,7 @@
 #include "Particles/Collision/BinaryCollision/TwoProductUtil.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/ScatteringUtils.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
@@ -56,6 +57,8 @@ namespace {
      * @param[in] m1 mass of first colliding species
      * @param[in] m2 mass of second colliding species
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
+     * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -66,6 +69,8 @@ namespace {
                             const index_type& idx_alpha_start,
                             const amrex::ParticleReal& m1, const amrex::ParticleReal& m2,
                             ScatteringAngleModel const scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+                            int* const energy_range_status,
                             const amrex::RandomEngine& engine)
     {
         // General notations in this function:
@@ -110,6 +115,8 @@ namespace {
             ux_Be, uy_Be, uz_Be, static_cast<amrex::ParticleReal>(m_beryllium),
             E_fusion,
             scattering_angle_model,
+            anisotropic_coefficients,
+            energy_range_status,
             engine);
 
         // Compute momentum of beryllium in lab frame

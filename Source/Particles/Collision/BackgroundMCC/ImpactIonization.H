@@ -11,6 +11,7 @@
 
 #include "Particles/Algorithms/KineticEnergy.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Random.H>

@@ -9,6 +9,7 @@
 #define WARPX_TWO_PRODUCT_UTIL_H
 
 #include "Utils/ParticleUtils.H"
+#include "Utils/ScatteringUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
@@ -47,6 +48,8 @@ namespace {
      * @param[in] m2_out mass of the second product macroparticles
      * @param[in] E_reaction energy liberated during the reaction
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
+     * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
      * @param[in] engine the random engine (used to calculate the angle of emission of the products)
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -69,6 +72,8 @@ namespace {
                             const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_reaction,
                             ScatteringAngleModel scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+                            int* const energy_range_status,
                             const amrex::RandomEngine& engine )
     {
         using namespace amrex::literals;
@@ -130,6 +135,13 @@ namespace {
         const double E_rest_in_d = (m1_in_d + m2_in_d)*c2_d;
         const double E_rest_out_d = (m1_out_d + m2_out_d)*c2_d;
         const double E_star_f_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d + E_rest_out_d + E_reaction_d, 0.0);
+        // Total kinetic energy in the COM frame and converted to eV to look up
+        // the energy-dependent coefficients when anisotropic scattering is used.
+        // The kinetic energy is clamped to zero to avoid small negative numbers
+        // due to machine precision errors, for low-energy particles.
+        const double E_kin_star_d = amrex::max(std::sqrt(E_star_sq_pos_d) - E_rest_in_d, 0.0);
+        constexpr double joule_to_eV_d = 1.0 / static_cast<double>(PhysConst::q_e);
+        const auto E_kin_star_eV = static_cast<amrex::ParticleReal>(E_kin_star_d * joule_to_eV_d);
 
         // Square of the norm of the momentum of the products in the center of mass frame
         // Formula obtained by inverting E^2 = p^2*c^2 + m^2*c^4 in the COM frame for each particle
@@ -168,7 +180,8 @@ namespace {
         const double one_minus_beta_sq_d = amrex::max(1.0 - vc_sq_d*inv_c2_d, std::numeric_limits<double>::epsilon());
         const double gc_d = 1.0 / std::sqrt(one_minus_beta_sq_d);
 
-        // Compute the momentum of the first incident particle in the center-of-momentum (COM) frame.
+        // Compute the momentum of the first incident particle in the center-of-momentum frame.
+        // For a reaction ordered A + B -> C + D, cos(theta) is defined between A and C.
         double p1x_star_in_d = p1x_in_d;
         double p1y_star_in_d = p1y_in_d;
         double p1z_star_in_d = p1z_in_d;
@@ -200,16 +213,10 @@ namespace {
         }
 
         // Choose the polar deflection and azimuthal angle in the COM frame.
+        // If the incident direction is undefined, fall back to isotropic scattering.
+        const auto local_scattering_angle_model = has_incident_direction ? scattering_angle_model : ScatteringAngleModel::Isotropic;
         const amrex::ParticleReal phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        amrex::ParticleReal costh = 1.0_prt; // default is Forward scattering
-        if (scattering_angle_model == ScatteringAngleModel::Isotropic || !has_incident_direction)
-        {
-            costh = 2.0_prt * amrex::Random(engine) - 1.0_prt;
-        }
-        else if (scattering_angle_model == ScatteringAngleModel::Backward)
-        {
-            costh = -1.0_prt;
-        }
+        const amrex::ParticleReal costh = ParticleUtils::getRandomCosTheta(engine, local_scattering_angle_model, anisotropic_coefficients, E_kin_star_eV, energy_range_status);
         ParticleUtils::rotateVector(n1x_star_out, n1y_star_out, n1z_star_out, phi, costh);
 
         // Scale the scattered direction to the outgoing COM momentum magnitude.

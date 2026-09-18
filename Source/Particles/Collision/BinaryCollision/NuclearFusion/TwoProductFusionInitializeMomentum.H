@@ -12,6 +12,7 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/ParticleUtils.H"
+#include "Utils/ScatteringUtils.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
@@ -51,6 +52,8 @@ namespace {
      * @param[in] m2_out mass of second product species
      * @param[in] E_fusion energy released in the fusion reaction
      * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of energy-dependent anisotropic coefficients
+     * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
      * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -63,6 +66,8 @@ namespace {
                             const amrex::ParticleReal& m1_out, const amrex::ParticleReal& m2_out,
                             const amrex::ParticleReal& E_fusion,
                             ScatteringAngleModel const scattering_angle_model,
+                            ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+                            int* const energy_range_status,
                             const amrex::RandomEngine& engine)
     {
         using namespace amrex::literals;
@@ -81,6 +86,8 @@ namespace {
             ux2_out, uy2_out, uz2_out, m2_out,
             E_fusion,
             scattering_angle_model,
+            anisotropic_coefficients,
+            energy_range_status,
             engine);
 
         // Fill momentum of product species (note that we actually

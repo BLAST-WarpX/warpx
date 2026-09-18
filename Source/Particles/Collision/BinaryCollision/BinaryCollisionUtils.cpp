@@ -150,6 +150,13 @@ namespace BinaryCollisionUtils{
             pp_collision_name.query_enum_case_insensitive(
                 scattering_process + "_scattering_angle_model", scattering_angle_model);
 
+            // DSMC/MCC collisions do not support an angular-distribution coefficient
+            // table (unlike nuclear fusion), so anisotropic scattering cannot be honored here.
+            std::string scattering_angle_error_msg = collision_name;
+            scattering_angle_error_msg += ".";
+            scattering_angle_error_msg += scattering_process;
+            scattering_angle_error_msg += "_scattering_angle_model = legendre is not supported for DSMC/MCC collisions.";
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(scattering_angle_model != ScatteringAngleModel::Legendre, scattering_angle_error_msg);
             scattering_processes.push_back(ScatteringProcess(
                 scattering_process, cross_section_file, energy, scattering_angle_model));
         }
