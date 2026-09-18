@@ -19,8 +19,8 @@
  *  algorithm where both the fields and particles are treated implicitly.
  *
  *  The time stencil is
- *  Eg^{n+1} = Eg^n + c^2*dt*( curlBg^{n+theta} - mu0*Jg^{n+1/2} )
- *  Bg^{n+1} = Bg^n - dt*curlEg^{n+theta}
+ *  E^{n+1} = E^n + c^2*dt*( curlB^{n+theta} - mu0*J^{n+1/2} )
+ *  B^{n+1} = B^n - dt*curlE^{n+theta}
  *  xp^{n+1} = xp^n + dt*up^{n+1/2}/(0.5*(gammap^n + gammap^{n+1}))
  *  up^{n+1} = up^n + dt*qp/mp*(Ep^{n+theta} + up^{n+1/2}/gammap^{n+1/2} x Bp^{n+theta})
  *  where f^{n+theta} = (1.0-theta)*f^{n} + theta*f^{n+1} with 0.5 <= theta <= 1.0
@@ -110,6 +110,13 @@ private:
      * centering of the data as the variable being solved for, which is E here.
      * For example, if using a Yee grid then a container for curlB could be a
      * WarpXSovlerVec, but magnetic field B should not be.
+     *
+     * For a step from n to n+1, m_E holds the iterate for E^{n+theta}.
+     * Its initial guess is E^{n-1+theta} from the previous solve (E^0 on a
+     * fresh start). After the solve, E^{n+theta} is retained for the next guess.
+     * m_Eold holds E^n throughout the step as the nonlinear solver's reference
+     * state. The separate E_old MultiFab also holds E^n for field finishing,
+     * diagnostics, and checkpointing alongside Efield_fp at E^{n+1}.
      */
     WarpXSolverVec m_E, m_Eold;
 
@@ -120,8 +127,9 @@ private:
                              amrex::Real            start_time );
 
     /**
-     * \brief Nonlinear solver is for the time-centered values of E. After
-     * the solver, need to use m_E and m_Eold to compute E^{n+1}
+     * \brief Advance the WarpX-owned E and B fields from n+theta to n+1
+     * using the step-start fields in E_old and B_old. Preserve m_E at
+     * E^{n+theta} as the initial guess for the next nonlinear solve.
      */
     void FinishFieldUpdate ( amrex::Real end_time );
 

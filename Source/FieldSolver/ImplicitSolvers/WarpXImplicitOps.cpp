@@ -78,12 +78,23 @@ WarpX::UpdateMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField co
 }
 
 void
-WarpX::FinishMagneticFieldAndApplyBCs( ablastr::fields::MultiLevelVectorField const& a_Bn,
-                                       amrex::Real a_theta, amrex::Real a_time )
+WarpX::FinishElectricFieldAndApplyBCs(amrex::Real a_theta, amrex::Real a_time)
 {
     using warpx::fields::FieldType;
 
-    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), a_Bn, a_theta);
+    ablastr::fields::MultiLevelVectorField const & En = m_fields.get_mr_levels_alldirs(FieldType::E_old, 0);
+    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, 0), En, a_theta);
+    ApplyEfieldBoundary(0, PatchType::fine, a_time);
+    FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+}
+
+void
+WarpX::FinishMagneticFieldAndApplyBCs(amrex::Real a_theta, amrex::Real a_time)
+{
+    using warpx::fields::FieldType;
+
+    ablastr::fields::MultiLevelVectorField const & Bn = m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
+    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), Bn, a_theta);
     ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }

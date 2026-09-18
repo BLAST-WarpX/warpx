@@ -20,12 +20,12 @@
  *  algorithm where both the fields and particles are treated implicitly.
  *
  *  The time stencil is
- *    Advance (Eg^n, Bg^n) -> (Eg^{n+1/2}, Bg^{n+1/2}) source free // E transverse
+ *    Advance (E^n, B^n) -> (E^{n+1/2}, B^{n+1/2}) source free // E transverse
  *    Iterate:
- *      Eg^{n+1} = Eg^n + c^2*dt*( - mu0*Jg^{n+1/2} ) // E longitudinal
+ *      E^{n+1}  = E^n  + c^2*dt*( - mu0*J^{n+1/2} ) // E longitudinal
  *      xp^{n+1} = xp^n + dt*up^{n+1/2}/(0.5*(gammap^n + gammap^{n+1}))
  *      up^{n+1} = up^n + dt*qp/mp*(Ep^{n+1/2} + up^{n+1/2}/gammap^{n+1/2} x Bp^{n+1/2})
- *    Advance (Eg^n+1/2, Bg^n+1/2) -> (Eg^{n+1}, Bg^{n+1}) source free // E transverse
+ *    Advance (E^{n+1/2}, B^{n+1/2}) -> (E^{n+1}, B^{n+1}) source free // E transverse
  *
  *  The algorithm is exactly energy conserving only with a single box, periodic fft (psatd.periodic_single_box_fft = 1).
  *  With multiple boxes, energy is not conserved since the ffts in each box assumes periodic in the box which
@@ -83,6 +83,14 @@ private:
      * centering of the data as the variable being solved for, which is E here.
      * For example, if using a Yee grid then a container for curlB could be a
      * WarpXSovlerVec, but magnetic field B should not be.
+     *
+     * m_E holds the midpoint iterate for the implicit substep. After the solve,
+     * it is retained as the initial guess for the next nonlinear solve.
+     * m_Eold holds the field after the first source-free half step, which is
+     * the reference state for the implicit solve. The separate E_old MultiFab
+     * holds the same field for field finishing, diagnostics, and checkpointing.
+     * Efield_fp reaches the full-step field E^{n+1} only after the second
+     * source-free half step; E_old is not the full-step field E^n.
      */
     WarpXSolverVec m_E, m_Eold;
 
@@ -95,16 +103,17 @@ private:
     amrex::Vector<std::array< std::unique_ptr<amrex::MultiFab>, 3 > > m_Bold;
 
     /**
-     * \brief Update the E and B fields owned by WarpX
+     * \brief Copy the implicit midpoint E into the WarpX-owned electric field and apply BCs
      */
     void UpdateWarpXFields ( WarpXSolverVec const&  a_E,
                              amrex::Real            half_time );
 
     /**
-     * \brief Nonlinear solver is for the time-centered values of E. After
-     * the solver, need to use m_E and m_Eold to compute E^{n+1}
+     * \brief Finish the implicit electric-field update using Efield_fp and E_old.
+     * Preserve m_E as the initial guess for the next nonlinear solve. The second
+     * source-free half step must still be applied to obtain the full-step fields.
      */
-    void FinishFieldUpdate ( amrex::Real  a_new_time );
+    void FinishFieldUpdate (amrex::Real end_time);
 
 };
 

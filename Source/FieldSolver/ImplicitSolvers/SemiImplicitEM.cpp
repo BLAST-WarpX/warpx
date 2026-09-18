@@ -31,6 +31,10 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
     m_E.Copy(FieldType::Efield_fp);
     m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
+    // Reconstruct the initial guess E^{n-1/2} from checkpoint fields E^{n-1} and E^n.
+    // On a fresh start, both copies contain E^0, giving initial guess E^0.
+    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
+
     // Parse implicit solver parameters
     const amrex::ParmParse pp("implicit_evolve");
     parseNonlinearSolverParams(pp);
@@ -67,19 +71,15 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     // Set the member time step
     m_dt = a_dt;
 
-    // Fields have Eg^{n}, Bg^{n}
+    // Fields have E^{n}, B^{n}
     // Particles have up^{n} and xp^{n}.
 
     // Save up and xp at the start of the time step
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
-    // Initial guess for Eg^{n+theta} is Eg^{n-1+theta}
-    // (i.e., Eg used to advance the system from step n-1 to step n)
-    m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
-
-    // Save Eg at start of time step
-    SaveEoldMultifab();
-    m_Eold.Copy(FieldType::E_old, FieldType::None, true);
+    // Save E at start of time step
+    SaveEoldMultifab(); // Copy Efield_fp into E_old
+    m_Eold.Copy(FieldType::Efield_fp); // Copy Efield_fp into m_Eold
 
     // Advance WarpX owned Bfield_fp from t_{n} to t_{n+1/2}
     m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::FirstHalf, start_time);
@@ -87,7 +87,7 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
 
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;
 
-    // Solve nonlinear system for Eg at t_{n+1/2}
+    // Solve nonlinear system for E at t_{n+1/2}
     // Particles will be advanced to t_{n+1/2}
     m_nlsolver->Solve(m_E, m_Eold, start_time, m_dt, a_step, verbose_step);
 
@@ -98,15 +98,16 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     m_WarpX->SetElectricFieldAndApplyBCs(m_E, half_time);
     m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
 
-    const amrex::Real new_time = start_time + m_dt;
+    const amrex::Real end_time = start_time + m_dt;
 
     // Advance particles from time n+1/2 to time n+1
-    FinishImplicitParticleUpdate(new_time, a_step);
+    FinishImplicitParticleUpdate(end_time, a_step);
 
-    // Advance Eg from time n+1/2 to time n+1
-    // Eg^{n+1} = 2.0*Eg^{n+1/2} - Eg^n
-    m_E.linComb(2._rt, m_E, -1._rt, m_Eold);
-    m_WarpX->SetElectricFieldAndApplyBCs( m_E, new_time );
+    // Update the WarpX-owned Efield_fp, preserving m_E at E^{n+1/2}
+    // as the initial guess for the next nonlinear solve. E_old retains E^n
+    // for checkpointing alongside Efield_fp at E^{n+1}.
+    // E^{n+1} = 2*E^{n+1/2} - E^n
+    m_WarpX->FinishElectricFieldAndApplyBCs(m_theta, end_time);
 
     // Advance WarpX owned Bfield_fp from t_{n+1/2} to t_{n+1}
     m_WarpX->EvolveB(0.5_rt*m_dt, SubcyclingHalf::SecondHalf, half_time);
@@ -123,15 +124,15 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 {
     BL_PROFILE("SemiImplicitEM::ComputeRHS()");
 
-    // Update WarpX-owned Efield_fp using current state of Eg from
-    // the nonlinear solver at time n+theta
+    // Update WarpX-owned Efield_fp using current state of E from
+    // the nonlinear solver at time n+1/2
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;
     m_WarpX->SetElectricFieldAndApplyBCs( a_E, half_time );
 
     // Update particle positions and velocities using the current state
-    // of Eg and Bg. Deposit current density at time n+1/2
+    // of E and B. Deposit current density at time n+1/2
     PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
 
-    // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
+    // RHS = cvac^2*0.5*dt*(curl(B^{n+1/2}) - mu0*J^{n+1/2})
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);
 }
