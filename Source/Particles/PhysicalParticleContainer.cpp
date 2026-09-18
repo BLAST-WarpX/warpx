@@ -1734,13 +1734,14 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
                          blp_resample_actual);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_synchronization);
-    const amrex::Real global_numparts = TotalNumberOfParticles();
+    amrex::Real global_numparts = TotalNumberOfParticles();
     ABLASTR_PROFILE_VAR_STOP(blp_resample_synchronization);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_actual);
     if (m_resampler.triggered(timestep, global_numparts))
     {
         Redistribute();
+        global_numparts = TotalNumberOfParticles();
         for (int lev = 0; lev <= maxLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
@@ -1750,10 +1751,15 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
         }
         deleteInvalidParticles();
         if (verbose) {
+            const amrex::Long new_global_numparts = TotalNumberOfParticles();
             amrex::Print() << Utils::TextMsg::Info(
                 "Resampled " + species_name + " at step " + std::to_string(timestep)
                 + ": macroparticle count decreased by "
-                + std::to_string(static_cast<int>(global_numparts - TotalNumberOfParticles()))
+                + std::to_string(static_cast<int>(global_numparts - new_global_numparts))
+                + " from "
+                + std::to_string(static_cast<int>(global_numparts))
+                + " to "
+                + std::to_string(new_global_numparts)
             );
         }
     }
