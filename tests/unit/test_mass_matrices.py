@@ -27,10 +27,9 @@ constants = picmi.constants
 
 # RZ deposits with an inverse volume scaling and rotates the mass matrices
 # into cylindrical components; make_sim does not build that geometry yet.
-# In 3D, the mass matrix deposition is not yet implemented.
 pytestmark = pytest.mark.skipif(
-    pywarpx.libwarpx.geometry_dim not in ("1d", "2d"),
-    reason="full mass matrices are only implemented in Cartesian 1D and 2D",
+    pywarpx.libwarpx.geometry_dim not in ("1d", "2d", "3d"),
+    reason="full mass matrices are only implemented in Cartesian geometry",
 )
 
 

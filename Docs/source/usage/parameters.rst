@@ -296,6 +296,7 @@ Overall simulation parameters
 
         - ``implicit_evolve.use_mass_matrices_jacobian`` (``bool``, default: false).
           When ``true``, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
+          In 3D, this option is currently only implemented for ``algo.current_deposition = direct``.
 
           - ``implicit_evolve.skip_particle_picard_init`` (``bool``, default: false).
             When ``true`` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
