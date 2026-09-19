@@ -270,6 +270,9 @@ void ImplicitSolver::ApplyMassMatrices (
         const amrex::IntVect outx_nodal = a_out[lev][0]->ixType().toIntVect();
         const amrex::IntVect outy_nodal = a_out[lev][1]->ixType().toIntVect();
         const amrex::IntVect outz_nodal = a_out[lev][2]->ixType().toIntVect();
+        const amrex::IntVect inx_nodal = a_in[lev][0]->ixType().toIntVect();
+        const amrex::IntVect iny_nodal = a_in[lev][1]->ixType().toIntVect();
+        const amrex::IntVect inz_nodal = a_in[lev][2]->ixType().toIntVect();
 
         // Compute the component offset in each direction (careful with staggering)
         amrex::IntVect offset_xx, offset_xy, offset_xz;
@@ -277,19 +280,19 @@ void ImplicitSolver::ApplyMassMatrices (
         amrex::IntVect offset_zx, offset_zy, offset_zz;
         for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
             offset_xx[dir] = (m_ncomp_xx[dir]-1)/2;
-            offset_xy[dir] = (outx_nodal[dir] > outy_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
-                                                                 : ((m_ncomp_xy[dir]-1)/2);
-            offset_xz[dir] = (outx_nodal[dir] > outz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
-                                                                 : ((m_ncomp_xz[dir]-1)/2);
-            offset_yx[dir] = (outy_nodal[dir] > outx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
-                                                                 : ((m_ncomp_yx[dir]-1)/2);
+            offset_xy[dir] = (outx_nodal[dir] > iny_nodal[dir]) ?  (m_ncomp_xy[dir]/2)
+                                                                : ((m_ncomp_xy[dir]-1)/2);
+            offset_xz[dir] = (outx_nodal[dir] > inz_nodal[dir]) ?  (m_ncomp_xz[dir]/2)
+                                                                : ((m_ncomp_xz[dir]-1)/2);
+            offset_yx[dir] = (outy_nodal[dir] > inx_nodal[dir]) ?  (m_ncomp_yx[dir]/2)
+                                                                : ((m_ncomp_yx[dir]-1)/2);
             offset_yy[dir] = (m_ncomp_yy[dir]-1)/2;
-            offset_yz[dir] = (outy_nodal[dir] > outz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
-                                                                 : ((m_ncomp_yz[dir]-1)/2);
-            offset_zx[dir] = (outz_nodal[dir] > outx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
-                                                                 : ((m_ncomp_zx[dir]-1)/2);
-            offset_zy[dir] = (outz_nodal[dir] > outy_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
-                                                                 : ((m_ncomp_zy[dir]-1)/2);
+            offset_yz[dir] = (outy_nodal[dir] > inz_nodal[dir]) ?  (m_ncomp_yz[dir]/2)
+                                                                : ((m_ncomp_yz[dir]-1)/2);
+            offset_zx[dir] = (outz_nodal[dir] > inx_nodal[dir]) ?  (m_ncomp_zx[dir]/2)
+                                                                : ((m_ncomp_zx[dir]-1)/2);
+            offset_zy[dir] = (outz_nodal[dir] > iny_nodal[dir]) ?  (m_ncomp_zy[dir]/2)
+                                                                : ((m_ncomp_zy[dir]-1)/2);
             offset_zz[dir] = (m_ncomp_zz[dir]-1)/2;
         }
 
