@@ -21,6 +21,7 @@
 #include <AMReX_ccse-mpi.H>
 #include <AMReX_Vector.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_Print.H>
 #include <AMReX_REAL.H>
 
 #include <algorithm>
@@ -60,23 +61,74 @@ namespace {
         pp_amrex.queryAdd("omp_threads", omp_threads);
     }
 
-    void set_device_synchronization ()
+    /** Do not synchronize the device around profiler regions by default
+     *
+     * Synchronizing the device around every profiler region is what makes the
+     * TinyProfiler timers meaningful on GPU, but it also serializes the
+     * otherwise asynchronous kernel launches and copies. The measured overheads
+     * are in excess of 25% of the runtime, which is too expensive for a default.
+     * See https://github.com/BLAST-WarpX/warpx/pull/6593
+     *
+     * @return true if profiler regions synchronize the device
+     */
+    bool set_device_synchronization ()
     {
-        //See https://github.com/AMReX-Codes/amrex/pull/3763
-        auto warpx_do_device_synchronize = amrex_use_gpu;
+        bool do_device_synchronize = false; // AMReX's default: false
 
         auto pp_warpx = amrex::ParmParse{"warpx"};
-        pp_warpx.query("do_device_synchronize", warpx_do_device_synchronize);
-        bool do_device_synchronize = warpx_do_device_synchronize;
+        const bool set_by_warpx =
+            pp_warpx.query("do_device_synchronize", do_device_synchronize);
+
+        bool amrex_device_synchronize = do_device_synchronize;
+        auto pp_tiny_profiler = amrex::ParmParse{"tiny_profiler"};
+        const bool set_by_amrex = pp_tiny_profiler.queryAdd(
+            "device_synchronize_around_region", amrex_device_synchronize);
+
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !(set_by_warpx && set_by_amrex) ||
+                (amrex_device_synchronize == do_device_synchronize),
+            "warpx.do_device_synchronize and "
+            "tiny_profiler.device_synchronize_around_region are set to conflicting values.");
+
+        return amrex_device_synchronize;
+    }
+
+    /** Suppress the imprecise TinyProfiler report of unsynchronized GPU runs
+     *
+     * Unless profiler regions synchronize the device, the TinyProfiler timers
+     * measure asynchronously executing GPU kernels and copies from the host
+     * side, which is misleading. Instead of printing a table of numbers that
+     * cannot be trusted, we explain how to get a precise one.
+     * The region annotations for external profilers (NVTX, rocTX) are not
+     * affected by this and stay active.
+     *
+     * @param do_device_synchronize if profiler regions synchronize the device
+     */
+    void suppress_imprecise_tiny_profiler_report ([[maybe_unused]] const bool do_device_synchronize)
+    {
+#ifdef AMREX_TINY_PROFILING
+        // on CPU, the timers are precise; on GPU, the user might have opted in
+        if (!amrex_use_gpu || do_device_synchronize) { return; }
 
         auto pp_tiny_profiler = amrex::ParmParse{"tiny_profiler"};
-        if (pp_tiny_profiler.queryAdd("device_synchronize_around_region", do_device_synchronize) )
-        {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                do_device_synchronize == warpx_do_device_synchronize,
-                "tiny_profiler.device_synchronize_around_region overrides warpx.do_device_synchronize.");
-        }
 
+        // nothing to suppress if the profiler is off, and do not interfere with
+        // a report that the user explicitly redirected
+        bool tiny_profiler_enabled = true; // AMReX's default: true
+        pp_tiny_profiler.query("enabled", tiny_profiler_enabled);
+        if (!tiny_profiler_enabled || pp_tiny_profiler.contains("output_file")) { return; }
+
+        // for this special file name, AMReX writes no report at all
+        pp_tiny_profiler.add("output_file", std::string{"/dev/null"});
+
+        amrex::ExecOnFinalize([](){
+            amrex::Print() << "\n\nTinyProfiler report skipped: on GPU, its timers are imprecise unless\n"
+                              "profiler regions synchronize the device, which costs runtime and is\n"
+                              "therefore disabled by default.\n"
+                              "Set tiny_profiler.device_synchronize_around_region = 1 to synchronize\n"
+                              "and print the report.\n";
+        });
+#endif
     }
 
     void apply_workaround_for_warpx_numprocs ()
@@ -182,7 +234,8 @@ namespace {
         override_default_the_arena_is_managed();
         override_default_omp_threads();
         apply_workaround_for_warpx_numprocs();
-        set_device_synchronization();
+        const bool do_device_synchronize = set_device_synchronization();
+        suppress_imprecise_tiny_profiler_report(do_device_synchronize);
         override_default_tiling_option_for_particles();
         set_periodicity_according_to_boundary_types();
     }
