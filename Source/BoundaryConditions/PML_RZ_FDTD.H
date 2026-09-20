@@ -44,7 +44,7 @@ class PML_RZ_FDTD
     void UpdateConstitutive (Storage& field, Storage& auxiliary,
                              Storage const& increment, amrex::Real dt);
 
-    amrex::Geometry const& m_geom;
+    amrex::Geometry m_geom;
     int m_delta;
     Storage m_E, m_B;
     // r/theta components store displacement; z stores the first filtered field.
