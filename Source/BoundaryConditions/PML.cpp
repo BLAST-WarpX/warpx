@@ -1140,18 +1140,18 @@ PML::ApplyImplicitSigma (ablastr::fields::VectorField dst,
                          ablastr::fields::VectorField src,
                          amrex::Real dt, bool inverse) const
 {
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
     // Component 0 is xy/yz/zx, component 1 is xz/yx/zy.
     for (int n = 0; n < 3; ++n) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(src[n]->nComp() == 2,
             "Implicit PML requires two transverse split field components.");
         for (int comp = 0; comp < 2; ++comp) {
-            int dir = (n + comp + 1) % 3;
+            const int cartesian_dir = (n + comp + 1) % 3;
 #if defined(WARPX_DIM_XZ)
-            if (dir == 1) { continue; }
-            if (dir == 2) { dir = 1; }
-#elif !defined(WARPX_DIM_3D)
-            WARPX_ABORT_WITH_MESSAGE("Implicit PML requires 2D or 3D Cartesian geometry.");
-            return;
+            if (cartesian_dir == 1) { continue; }
+            const int dir = cartesian_dir == 2 ? 1 : 0;
+#else
+            const int dir = cartesian_dir;
 #endif
             const bool nodal = src[n]->ixType().nodeCentered(dir);
 #ifdef AMREX_USE_OMP
@@ -1176,6 +1176,10 @@ PML::ApplyImplicitSigma (ablastr::fields::VectorField dst,
             }
         }
     }
+#else
+    amrex::ignore_unused(dst, src, dt, inverse);
+    WARPX_ABORT_WITH_MESSAGE("Implicit PML requires 2D or 3D Cartesian geometry.");
+#endif
 }
 
 void
