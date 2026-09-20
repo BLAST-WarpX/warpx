@@ -182,10 +182,10 @@ PML_RZ_FDTD::CheckPoint (std::string const& prefix) const
 {
     for (int n = 0; n < 3; ++n) {
         const auto suffix = std::to_string(n);
-        amrex::VisMF::Write(*m_E[n], prefix + "_E" + suffix);
-        amrex::VisMF::Write(*m_B[n], prefix + "_B" + suffix);
-        amrex::VisMF::Write(*m_aux_E[n], prefix + "_aux_E" + suffix);
-        amrex::VisMF::Write(*m_aux_B[n], prefix + "_aux_B" + suffix);
+        amrex::VisMF::Write(*m_E[n], std::string(prefix).append("_E").append(suffix));
+        amrex::VisMF::Write(*m_B[n], std::string(prefix).append("_B").append(suffix));
+        amrex::VisMF::Write(*m_aux_E[n], std::string(prefix).append("_aux_E").append(suffix));
+        amrex::VisMF::Write(*m_aux_B[n], std::string(prefix).append("_aux_B").append(suffix));
     }
 }
 
@@ -194,9 +194,9 @@ PML_RZ_FDTD::Restart (std::string const& prefix)
 {
     for (int n = 0; n < 3; ++n) {
         const auto suffix = std::to_string(n);
-        amrex::VisMF::Read(*m_E[n], prefix + "_E" + suffix);
-        amrex::VisMF::Read(*m_B[n], prefix + "_B" + suffix);
-        amrex::VisMF::Read(*m_aux_E[n], prefix + "_aux_E" + suffix);
-        amrex::VisMF::Read(*m_aux_B[n], prefix + "_aux_B" + suffix);
+        amrex::VisMF::Read(*m_E[n], std::string(prefix).append("_E").append(suffix));
+        amrex::VisMF::Read(*m_B[n], std::string(prefix).append("_B").append(suffix));
+        amrex::VisMF::Read(*m_aux_E[n], std::string(prefix).append("_aux_E").append(suffix));
+        amrex::VisMF::Read(*m_aux_B[n], std::string(prefix).append("_aux_B").append(suffix));
     }
 }
