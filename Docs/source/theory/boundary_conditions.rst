@@ -270,7 +270,7 @@ as expected.
 .. _theory-bc-rz-yee-pml:
 
 Radial PML for the RZ Yee solver
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The explicit cylindrical Yee solver uses a uniaxial PML outside the outer
 radial boundary, with periodic z boundaries. Let :math:`p` denote the time
