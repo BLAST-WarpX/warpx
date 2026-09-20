@@ -1009,6 +1009,10 @@ WarpX::InitFromScratch ()
 
     AmrCore::InitFromScratch(time);  // This will call MakeNewLevelFromScratch
 
+    // Theta-implicit solver vectors include exterior PML fields when present.
+    const bool implicit_pml = evolve_scheme == EvolveScheme::Theta_Implicit_EM;
+    if (implicit_pml) { InitPML(); }
+
     if (m_implicit_solver) {
 
         m_implicit_solver->Define(this,/*from_restart=*/false);
@@ -1018,7 +1022,7 @@ WarpX::InitFromScratch ()
     mypc->AllocData();
     mypc->InitData();
 
-    InitPML();
+    if (!implicit_pml) { InitPML(); }
 
     ExecutePythonCallback("allocdata");
 }
@@ -1037,6 +1041,33 @@ WarpX::InitPML ()
         }
     }
     if (max_level > 0) { do_pml = 1; }
+    if (do_pml && evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
+#if !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_3D)
+        WARPX_ABORT_WITH_MESSAGE("Theta-implicit PML requires 2D or 3D Cartesian geometry.");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
+            grid_type == ablastr::utils::enums::GridType::Staggered,
+            "Theta-implicit PML requires the staggered Yee solver.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            max_level == 0 && !EB::enabled() && !do_moving_window &&
+            !load_balance_intervals.isActivated(),
+            "Theta-implicit PML does not support AMR, embedded boundaries, moving windows, "
+            "or load balancing.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_pml_in_domain && !pml_has_particles &&
+            !do_pml_dive_cleaning && !do_pml_divb_cleaning &&
+            !do_dive_cleaning && !do_divb_cleaning,
+            "Theta-implicit PML requires exterior vacuum layers without divergence cleaning.");
+        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+            for (auto bc : {field_boundary_lo[dir], field_boundary_hi[dir]}) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    bc == FieldBoundaryType::PML || bc == FieldBoundaryType::Periodic,
+                    "Theta-implicit PML currently supports only PML and periodic "
+                    "field boundaries.");
+            }
+        }
+    }
     if (do_pml)
     {
         bool const eb_enabled = EB::enabled();
