@@ -11,6 +11,9 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
+#ifdef WARPX_DIM_RZ
+#   include "BoundaryConditions/PML_RZ_FDTD.H"
+#endif
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
@@ -1037,6 +1040,30 @@ WarpX::InitPML ()
         }
     }
     if (max_level > 0) { do_pml = 1; }
+#ifdef WARPX_DIM_RZ
+    if (do_pml && electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            evolve_scheme == EvolveScheme::Explicit && max_level == 0 &&
+            grid_type == ablastr::utils::enums::GridType::Staggered && !EB::enabled() &&
+            m_em_solver_medium == MediumForEM::Vacuum && !do_moving_window &&
+            !load_balance_intervals.isActivated(),
+            "RZ Yee PML requires explicit evolution, a single staggered vacuum grid, "
+            "no embedded boundaries, moving window, or load balancing.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            field_boundary_lo[0] == FieldBoundaryType::None &&
+            field_boundary_hi[0] == FieldBoundaryType::PML &&
+            Geom(0).isPeriodic(1) && !do_pml_in_domain && !pml_has_particles &&
+            !do_pml_dive_cleaning && !do_pml_divb_cleaning &&
+            !do_dive_cleaning && !do_divb_cleaning && pml_ncell > 0 && pml_delta > 0,
+            "RZ Yee PML requires exterior vacuum layers at the outer radius, a periodic "
+            "z boundary, positive pml_ncell/pml_delta, and no divergence cleaning.");
+        m_pml_rz_fdtd = std::make_unique<PML_RZ_FDTD>(
+            boxArray(0), DistributionMap(0), Geom(0),
+            m_fields.get_alldirs(warpx::fields::FieldType::Efield_fp, 0),
+            m_fields.get_alldirs(warpx::fields::FieldType::Bfield_fp, 0), pml_ncell, pml_delta);
+        return;
+    }
+#endif
     if (do_pml)
     {
         bool const eb_enabled = EB::enabled();

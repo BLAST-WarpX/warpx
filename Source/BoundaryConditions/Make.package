@@ -4,7 +4,7 @@ CEXE_sources += PML.cpp WarpXEvolvePML.cpp
 CEXE_sources += WarpXFieldBoundaries.cpp WarpX_PEC.cpp
 
 ifeq ($(USE_RZ),TRUE)
-    CEXE_sources += PML_RZ.cpp
+    CEXE_sources += PML_RZ.cpp PML_RZ_FDTD.cpp
 endif
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/BoundaryConditions

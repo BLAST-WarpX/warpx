@@ -14,6 +14,9 @@
 
 #include "BoundaryConditions/PEC_Insulator_fwd.H"
 #include "BoundaryConditions/PML_fwd.H"
+#ifdef WARPX_DIM_RZ
+#   include "BoundaryConditions/PML_RZ_FDTD_fwd.H"
+#endif
 #include "Diagnostics/MultiDiagnostics_fwd.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags_fwd.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox_fwd.H"
@@ -643,6 +646,9 @@ public:
     static bool isAnyParticleBoundaryThermal();
 
     PML* GetPML (int lev);
+#ifdef WARPX_DIM_RZ
+    [[nodiscard]] PML_RZ_FDTD* GetPML_RZ_FDTD () { return m_pml_rz_fdtd.get(); }
+#endif
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     PML_RZ* GetPML_RZ (int lev);
 #endif
@@ -1341,6 +1347,9 @@ private:
     amrex::Vector<std::unique_ptr<PML> > pml;
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     amrex::Vector<std::unique_ptr<PML_RZ> > pml_rz;
+#endif
+#ifdef WARPX_DIM_RZ
+    std::unique_ptr<PML_RZ_FDTD> m_pml_rz_fdtd;
 #endif
     amrex::Real v_particle_pml;
 
