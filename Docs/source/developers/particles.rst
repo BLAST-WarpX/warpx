@@ -114,8 +114,8 @@ The data structures for those are either pre-described at compile-time (CT) or r
 Attribute name        ``int``/``real``  Description                         Where When Notes
 ====================  ================  ==================================  ===== ==== ======================
 ``position_x/y/z``    ``real``          Particle position.                  SoA   CT
-``weight``            ``real``          Particle position.                  SoA   CT
-``momentum_x/y/z``    ``real``          Particle position.                  SoA   CT
+``weight``            ``real``          Particle weight.                    SoA   CT
+``momentum_x/y/z``    ``real``          Particle momentum.                  SoA   CT
 ``id``                ``amrex::Long``   CPU-local particle index            SoA   CT   First 40 bytes of
                                         where the particle was created.                idcpu
 ``cpu``               ``int``           CPU index where the particle        SoA   CT   Last 24 bytes of idcpu
