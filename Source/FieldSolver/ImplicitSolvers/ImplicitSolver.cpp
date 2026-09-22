@@ -1118,8 +1118,9 @@ namespace
      * \brief Fill the upper half of the stencil of a diagonal mass matrix at cell (i,j,k)
      *        from its deposited lower half.
      *
-     * The diagonal mass matrices are symmetric: S(iv, d) = S(iv + d, -d), where d = (ii,jj,kk)
-     * is the stencil offset, stored as component
+     * The diagonal mass matrices (i.e. Sxx, Syy, Szz) are symmetric: 
+     * S(iv, d) = S(iv + d, -d), where d = (ii,jj,kk)
+     * is the stencil offset of the E node from the J node, stored as component of S
      * c = (ii + width[0]) + ncomp[0]*((jj + width[1]) + ncomp[1]*(kk + width[2])).
      * The deposition kernels in MassMatricesDeposition.H only deposit the lower half of the
      * stencil (ii + jj + kk < 0, or ii + jj + kk == 0 with jj <= 0); the upper half is copied
