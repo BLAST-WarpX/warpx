@@ -43,7 +43,7 @@ Follow the how-to guide:
 - next to related fields of the class.
 
 Check that the class has `model_config = ConfigDict(alias_generator=warpx_options(picmistandard.PICMI_<Class>))` if it derives from a PICMI standard class, and add it if not.
-Give `alias=` explicitly only if the user-facing name is not `warpx_<field name>`.
+Name the field like the input parameter, so that users give it as `warpx_<field name>`. An explicit `alias=` is only needed for a field whose keyword differs from its name (see the guide).
 
 ## Step 4 — Write the input parameter
 

@@ -143,10 +143,19 @@ The prefix is added to all fields that a WarpX class adds to the PICMI standard 
 in the class.
 If the class does not have this line yet, add it (with the PICMI standard class that it derives from).
 
-There are two exceptions:
+Classes that only exist in WarpX, which derive from an extension class of the standard (``picmistandard.PICMI_Extension``, ``PICMI_SolverExtension``, ``PICMI_DiagnosticExtension``, ...), e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
 
-* Classes that only exist in WarpX, which derive from an extension class of the standard (``picmistandard.PICMI_Extension``, ``PICMI_SolverExtension``, ``PICMI_DiagnosticExtension``, ...), e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
-* If the name that users give is not ``warpx_`` followed by the name of the field, give it explicitly, e.g., ``Field(default=None, alias="warpx_potential_lo_x", ...)``.
+Name the field like the input parameter, so that users give it as ``warpx_`` followed by that name.
+A few existing fields have a different name than their keyword, which then is given as the ``alias`` of the field.
+For example, the grids name the field ``potential_xmin``, following the names of the grid bounds in PICMI (``xmin``), while users give it as ``warpx_potential_lo_x``, following the input parameter ``boundary.potential_lo_x``:
+
+.. code-block:: python
+
+   potential_xmin: float | str | None = Field(
+       default=None,
+       alias="warpx_potential_lo_x",
+       description="Electrostatic potential on the lower x boundary",
+   )
 
 
 3. Write the input parameter
