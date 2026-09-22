@@ -23,6 +23,7 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_GpuAtomic.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_MultiFab.H>
@@ -35,10 +36,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <iomanip>
 
 /**
  * \brief Physics-based EMHD preconditioner for the theta-implicit hybrid-PIC
- *  solver, after L. Chacon, JCP 530 (2025) 113910.
+ *  solver, after L. Chacon, JCP 526 (2025) 113789.
  *
  *  With particles, density and electron pressure frozen, the only dependence
  *  of E_Ohm on the Newton iterate E is through Faraday's law,
@@ -105,8 +107,10 @@
  *
  *  Physical boundaries: PEC(_Insulator) faces are modeled exactly (identity
  *  tangential-E rows with dead columns and parity-mirrored delta-B/delta-J
- *  ghosts, matching the residual's boundary application; see ClosureClass);
- *  other non-periodic BCs fall back to a homogeneous zero-extension closure.
+ *  ghosts, matching the residual's boundary application; see ClosureClass),
+ *  and PMC (Neumann) faces likewise with the dual parities (identity
+ *  normal-E rows, tangential B zeroed on the wall); other non-periodic BCs
+ *  fall back to a homogeneous zero-extension closure.
  *  With embedded boundaries, EB-covered nodes are masked off the same nodal
  *  eb_update_E flag the residual's Ohm solves consume and act as identity
  *  rows.
@@ -226,7 +230,8 @@ namespace hybridpcrz {
     /** Component-wise hyper-resistive Laplacian of a J-like field, the
      *  residual's RZ forms (r-row at the cell-centered radius including the
      *  -1/r^2 curvature term; theta-row zero on axis; z-row switching to
-     *  the plain second difference on axis). */
+     *  the control-volume axis limit 4 (a(dr) - a(0))/dr^2, which reads no
+     *  r < 0 guard: the residual's guard J_z there is not the even mirror). */
     AMREX_GPU_DEVICE AMREX_FORCE_INLINE
     void LapJ (amrex::Array4<amrex::Real const> const& a,
                amrex::Real& lr, amrex::Real& lt, amrex::Real& lz,
@@ -252,7 +257,7 @@ namespace hybridpcrz {
         if (rn > 0.5_rt*g.dr) {
             lz += dr_rdr_over_r(rn, 2);
         } else {
-            lz += inv_dr2*(a(i-1,j,0,2) - 2.0_rt*a(i,j,0,2) + a(i+1,j,0,2));
+            lz += 4.0_rt*inv_dr2*(a(i+1,j,0,2) - a(i,j,0,2));
         }
     }
 
@@ -372,9 +377,12 @@ void HybridPICPCPairTcKk (amrex::Array4<const amrex::Real> const& coef,
     kkz = 0.0_rt;
 #endif
     // U(aW)/sW - w x F, then the pointwise ion rotation
-    tcx = (cw*(ay*bhz - az*bhy) + ae*ax - ah*lx)/sW;
-    tcy = (cw*(az*bhx - ax*bhz) + ae*ay - ah*ly)/sW;
-    tcz = (cw*(ax*bhy - ay*bhx) + ae*az - ah*lz)/sW;
+    const amrex::Real udx = (ae*ax - ah*lx)/sW;   // dissipative part U_diss W
+    const amrex::Real udy = (ae*ay - ah*ly)/sW;
+    const amrex::Real udz = (ae*az - ah*lz)/sW;
+    tcx = cw*(ay*bhz - az*bhy)/sW + udx;
+    tcy = cw*(az*bhx - ax*bhz)/sW + udy;
+    tcz = cw*(ax*bhy - ay*bhx)/sW + udz;
     const amrex::Real ex = coef(i,j,k,11);
     const amrex::Real ey = coef(i,j,k,12);
     const amrex::Real ez = coef(i,j,k,13);
@@ -382,10 +390,26 @@ void HybridPICPCPairTcKk (amrex::Array4<const amrex::Real> const& coef,
     tcy -= ez*F(i,j,k,0) - ex*F(i,j,k,2);
     tcz -= ex*F(i,j,k,1) - ey*F(i,j,k,0);
     if (ion) {
+        // The ions are pushed with E* = E - D, D = eta J_p - eta_H del2 J_p
+        // recomputed from the iterate's B in every residual evaluation, so
+        // the mass-matrix response is Sigma dE* = Sigma (dE + U_diss W):
+        // the Hall-folded ion leg acts on the dissipative coupling as well,
+        // S (U_diss W) = (Sigma .* U_diss W) x bhat (eta_H-scaled; large in
+        // a boosted-eta_H band at the plasma edge where Sigma is not small).
+        const amrex::Real swx = coef(i,j,k,6)*udx;
+        const amrex::Real swy = coef(i,j,k,7)*udy;
+        const amrex::Real swz = coef(i,j,k,8)*udz;
+        tcx += swy*bhz - swz*bhy;
+        tcy += swz*bhx - swx*bhz;
+        tcz += swx*bhy - swy*bhx;
         HybridPICPCInvIpS(bhx, bhy, bhz,
                           coef(i,j,k,6), coef(i,j,k,7), coef(i,j,k,8),
                           tcx, tcy, tcz);
     }
+    // EB-covered rows are identity rows (coef comp 15 = 0 there)
+    const amrex::Real mk = coef(i,j,k,15);
+    tcx *= mk; tcy *= mk; tcz *= mk;
+    kkx *= mk; kky *= mk; kkz *= mk;
 }
 
 /** Staggered (Yee) rotation legs of U at container index (i,j,k), mirroring
@@ -607,9 +631,12 @@ void HybridPICPCPairTcKkStag (amrex::Array4<const amrex::Real> const& coef,
     const amrex::Real cvz = 0.5_rt*(ncrossF(i,j,k,2) + ncrossF(i+1,j,k,2));
 #endif
 
-    tcx = ux/sW - cvx;
-    tcy = uy/sW - cvy;
-    tcz = uz/sW - cvz;
+    tcx = (ux/sW - cvx)*coef(i,j,k,15);
+    tcy = (uy/sW - cvy)*coef(i,j,k,15);
+    tcz = (uz/sW - cvz)*coef(i,j,k,15);
+    kkx *= coef(i,j,k,15);
+    kky *= coef(i,j,k,15);
+    kkz *= coef(i,j,k,15);
     if (ion) {
         HybridPICPCInvIpS(coef(i,j,k,0), coef(i,j,k,1), coef(i,j,k,2),
                           coef(i,j,k,6), coef(i,j,k,7), coef(i,j,k,8),
@@ -647,7 +674,7 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *  so periodic exchanges never wrap more than one period. */
         static constexpr int kNGrow = 3;
         /** Number of frozen coefficient components (see m_coef). */
-        static constexpr int kNCoef = 15;
+        static constexpr int kNCoef = 16;
 
         HybridPICPC () = default;
         ~HybridPICPC () override = default;
@@ -771,14 +798,21 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *            B parities, no wall write -- the copied field already
          *            satisfies its BCs);
          *   Coef   : the frozen coefficients (comps 0-2 = bhat with B-parity
-         *            signs, the rest even; mirror ghosts, no wall write). */
+         *            signs, the rest even; mirror ghosts, no wall write).
+         *  At a PMC (Neumann) face the residual applies the dual rules
+         *  (ApplyEfieldBoundary uses the B-parity kernel on E and
+         *  ApplyBfieldBoundary the E-parity kernel on B): the roles of the
+         *  normal and tangential components swap in every class above
+         *  (normal E zeroed on the wall and odd, tangential E even;
+         *  tangential B zeroed on the wall and odd, normal B even). */
         enum class ClosureClass { EField, BField, JField, BCoef, Coef };
 
         /** Apply the physical-boundary closure of class a_cls to a on level
-         *  a_lev (PEC/PEC_Insulator faces only; other non-periodic BCs keep
-         *  the zero-extension), then zero EB-covered nodes on the fine level
-         *  when an EB mask is present. The closure indexes components
-         *  RELATIVE to a_scomp (a_ncomp < 0: all remaining components). */
+         *  a_lev (PEC/PEC_Insulator and PMC/Neumann faces; other non-periodic
+         *  BCs keep the zero-extension), then zero EB-covered nodes on the
+         *  fine level when an EB mask is present. The closure indexes
+         *  components RELATIVE to a_scomp (a_ncomp < 0: all remaining
+         *  components). */
         void ApplyDomainClosure (MF& a, int a_lev, ClosureClass a_cls,
                                  int a_scomp = 0, int a_ncomp = -1) const;
 
@@ -801,6 +835,13 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *  EB-covered nodes get a_out = a_in (the PC acts as the identity
          *  there; the covered residual rows are structurally zero). */
         void OverrideIdentityRows (T& a_out, const T& a_in) const;
+
+        /** verbose >= 2 diagnostic after an inner GMRES solve: prints where the
+         *  un-reduced inner residual r = b - M x lives (8 x 8 block shares of
+         *  ||r_E||^2 and ||b_E||^2 over the nodal domain, W/E split, boundary
+         *  planes). Public only because CUDA extended lambdas cannot live in
+         *  private member functions. */
+        void PrintInnerResidualMap ();
 
     private:
 
@@ -854,8 +895,8 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *  Ohm gradient coupling dF_E/dpe the identity leg left entirely to
          *  GMRES). |ue| is clamped like the residual's pe advance, ue_c =
          *  c tanh(|ue|/c), c = implicit_evolve.pe_ue_cap_fac * dx_min /
-         *  (theta dt). Collocated Cartesian, in-loop pe closure only;
-         *  inert for E-only vectors. */
+         *  (theta dt). Collocated grids (Cartesian and RZ m = 0), in-loop pe
+         *  closure only; inert for E-only vectors. */
         bool m_pe_row_active = false;
         std::unique_ptr<MF> m_pe_row_scr;   //!< ghosted dpe scratch (1 comp)
         amrex::Real m_pe_ue_cap_fac = 1.0;
@@ -865,7 +906,8 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *  conduction diffusion stencil -c_k del2(.) (c_k sized so its
          *  Nyquist diagonal equals the conduction part of D_p): the
          *  off-diagonal content the pointwise diagonal drops for both legs,
-         *  damped by the same D_p. Collocated Cartesian only. */
+         *  damped by the same D_p. Collocated grids (RZ: area-weighted radial
+         *  Laplacian, even parity across the axis). */
         int m_pe_row_sweeps = 0;
         std::unique_ptr<MF> m_pe_row_scr2;  //!< sweep iterate scratch (1 comp)
 
@@ -885,7 +927,7 @@ class HybridPICPC : public Preconditioner<T,Ops>
 
         bool m_is_defined = false;
         int m_mg_floor = 4;
-        bool m_verbose = false;
+        int m_verbose = 0;
         /** Per level: single-kernel ghost fill eligible (see FillGhosts). */
         std::vector<bool> m_fastfill_ok;
         /** True when the level solves need no pre-zeroed x: the collocated
@@ -923,7 +965,16 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *  comp 10   : pe-row diagonal D_p - 1 (level 0 only),
          *  comp 11-13: theta*dt ue0 = theta*dt (J_i - J_plasma)/rho_e
          *              (pair convection),
-         *  comp 14   : local W-hat scale s_W = max(c_w, 1/l2) (pair). */
+         *  comp 14   : local W-hat scale s_W = max(c_w, 1/l2) (pair),
+         *  comp 15   : row mask, 1 at solved nodes and 0 at EB-covered nodes
+         *              (set to 1 in Update, zeroed with the other
+         *              coefficients by the EB closure, injected to the coarse
+         *              levels): the pair couplings tc/kk and the iterates are
+         *              multiplied by it so covered rows are identity rows on
+         *              every level while the first-curl F stays live there
+         *              (the residual's Faraday update is not EB-masked, so
+         *              the wall-adjacent delta-J does read the covered
+         *              delta-B). */
         std::vector<std::unique_ptr<MF>> m_coef;
 
         /** Per level (all 3-component): scaled W-half iterate (kNGrow
@@ -958,10 +1009,11 @@ class HybridPICPC : public Preconditioner<T,Ops>
         int m_dot_nblocks_total = 0;
 
         /** Physical-BC closure state: per index dimension and side, whether
-         *  the face is a PEC(_Insulator) wall the closure must model; the
-         *  index-dim -> vector-component map; and the EB mask (the nodal
-         *  eb_update_E flag on the collocated grid; nullptr without EB). */
-        bool m_has_pec_wall = false;
+         *  the face is a PEC(_Insulator) or PMC (Neumann) wall the closure
+         *  must model; the index-dim -> vector-component map; and the EB mask
+         *  (the nodal eb_update_E flag on the collocated grid; nullptr
+         *  without EB). */
+        bool m_has_wall = false;
         /** RZ: the r-lo face is the symmetry axis (rmin == 0). */
         bool m_has_axis = false;
         /** Staggered (Yee) grid: solver-vector components carry their
@@ -971,6 +1023,17 @@ class HybridPICPC : public Preconditioner<T,Ops>
          *  that maps to component c (m_dim2comp) and nodal elsewhere. */
         bool m_staggered = false;
         bool m_wall_pec[AMREX_SPACEDIM][2] = {};
+        /** hybrid_pic_model.pec_normal_E_from_interior on the collocated grid: the
+         *  residual takes the wall-normal E at a PEC wall node from the first interior
+         *  node, so that row is an identity row (dead column) in the preconditioner as
+         *  well, like the tangential rows. */
+        bool m_pec_normal_from_interior = false;
+        /** PMC (Neumann) faces: modeled with the dual parities (collocated
+         *  grid; the staggered path requires periodic BCs). */
+        bool m_wall_pmc[AMREX_SPACEDIM][2] = {};
+        /** pc_hybrid_pic.pmc_closure (default true): model PMC faces; false
+         *  keeps the zero-extension fallback there (attribution A/B). */
+        bool m_pmc_closure = true;
         /** Non-periodic faces under the zero-extension fallback: on the
          *  staggered grid the hi-side wall plane of components nodal along
          *  the face normal lives in the container's ghost region and is not
@@ -1030,6 +1093,11 @@ void HybridPICPC<T,Ops>::Define ( const T& a_U, Ops* a_ops )
     m_has_axis = true;
 #endif
     {
+        // read before the face classification below uses it
+        const amrex::ParmParse pp_bc("pc_hybrid_pic");
+        pp_bc.query("pmc_closure", m_pmc_closure);
+        m_pec_normal_from_interior =
+            warpx.get_pointer_HybridPICModel()->m_pec_normal_E_from_interior && !m_staggered;
         const auto& fbc_lo = a_ops->GetFieldBoundaryLo();
         const auto& fbc_hi = a_ops->GetFieldBoundaryHi();
         for (int d = 0; d < AMREX_SPACEDIM; d++) {
@@ -1040,7 +1108,12 @@ void HybridPICPC<T,Ops>::Define ( const T& a_U, Ops* a_ops )
                 if (bt == FieldBoundaryType::PEC
                     || bt == FieldBoundaryType::PEC_Insulator) {
                     m_wall_pec[d][side] = true;
-                    m_has_pec_wall = true;
+                    m_has_wall = true;
+                } else if (bt == FieldBoundaryType::PMC && !m_staggered
+                           && m_pmc_closure) {
+                    // Neumann is an alias of PMC
+                    m_wall_pmc[d][side] = true;
+                    m_has_wall = true;
                 } else {
                     m_wall_open[d][side] = true;
                     ablastr::warn_manager::WMRecordWarning("HybridPICPC",
@@ -1342,9 +1415,10 @@ void HybridPICPC<T,Ops>::printParameters () const
                 ? "true" : "false")
             << "\n";
     Print() << "  boundary closure: "
-            << (m_has_pec_wall
-                ? "PEC wall model (identity tangential-E rows, dead "
-                  "columns, parity-mirrored delta-B/delta-J ghosts)"
+            << (m_has_wall
+                ? "PEC/PMC wall model (identity tangential-E rows at PEC, "
+                  "normal-E rows at PMC; dead columns, parity-mirrored "
+                  "delta-B/delta-J ghosts)"
                 : "periodic/zero-extension")
             << (EB::enabled() ? " + EB staircase mask (eb_update_E)" : "")
             << "\n";
@@ -1392,11 +1466,10 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
     // solver vector carries the scalar row, so activate on the model gates
     // only; Apply() additionally gates on the scalar's presence, making
     // this inert for E-only vectors.
-#if defined(WARPX_DIM_RZ)
-    m_pe_row_active = false;
-#else
+    // collocated grids only (Cartesian and RZ m = 0: the leg is a pointwise
+    // diagonal plus a central gradient of a scalar, which carries no metric
+    // factor in RZ; the r-gradient is zeroed on the axis by symmetry)
     m_pe_row_active = !m_staggered && !hybrid->m_implicit_use_algebraic_closure;
-#endif
     const bool pe_row_on = m_pe_row_active;
     // the frozen electron velocity of the convection term
     const ablastr::fields::VectorField Ji_fp =
@@ -1415,6 +1488,11 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
     const auto eta = hybrid->m_eta;
     const auto eta_h = hybrid->m_eta_h;
     const bool include_hyper = hybrid->m_include_hyper_resistivity_term;
+    const bool holmstrom = hybrid->m_holmstrom_vacuum_region;
+    const Real vac_rref = static_cast<Real>(hybrid->m_vacuum_weight_r_ref);
+    const Real vac_maxf = static_cast<Real>(hybrid->m_vacuum_weight_max_factor);
+    const HybridPICPCGrid g0 = m_grid[0];
+    amrex::ignore_unused(vac_rref, vac_maxf, g0);
 
     // J0 = curl(B_tot)/mu0 at the linearization state, for freezing the
     // (possibly J-dependent) resistivity at |J0| rather than |J| = 0
@@ -1458,9 +1536,6 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
     }
     const bool stag = m_staggered;
     const auto dxi_pc = m_geom[0].InvCellSizeArray();
-#if defined(WARPX_DIM_RZ)
-    amrex::ignore_unused(dxi_pc);   // the pe-row leg is Cartesian only
-#endif
     const RT l2_pc = m_l2[0];
     // marker-CFL clamp of |ue| for the pe-row diagonal (see m_pe_row_active):
     // c = pe_ue_cap_fac * dx_min / (theta dt), the residual's cap; <= 0 = none
@@ -1557,6 +1632,22 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                 const Real Bmag = std::sqrt(bx_v*bx_v + by_v*by_v + bz_v*bz_v);
                 const Real rho_raw = r(i,j,k,0);
                 const Real rho_e = HybridSmoothFloor(rho_raw, rho_floor, floor_w);
+                // Holmstrom vacuum region: the residual weights the Hall and
+                // pressure terms by HybridExtSubWeight(rho) (0 below the floor),
+                // so the whistler, the convection and the Hall-folded ion
+                // response carry the same weight; only the resistive and
+                // hyper-resistive legs survive in vacuum cells
+                Real wvac = 1.0_rt;
+                if (holmstrom) {
+#if defined(WARPX_DIM_RZ)
+                    // statistics-aware floor near the axis (HybridVacuumFloor)
+                    const Real rf = HybridVacuumFloor(rho_floor, g0.rmin + i*g0.dr,
+                                                      vac_rref, vac_maxf, g0.dr);
+#else
+                    const Real rf = static_cast<Real>(rho_floor);
+#endif
+                    wvac = HybridExtSubWeight(rho_raw, rf, floor_w*(rf/rho_floor));
+                }
                 if (Bmag > 0.0_rt) {
                     coef(i,j,k,0) = bx_v / Bmag;
                     coef(i,j,k,1) = by_v / Bmag;
@@ -1566,7 +1657,7 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                     coef(i,j,k,1) = 0.0_rt;
                     coef(i,j,k,2) = 0.0_rt;
                 }
-                coef(i,j,k,3) = theta_dt * Bmag * one_over_mu0 / rho_e;
+                coef(i,j,k,3) = wvac * theta_dt * Bmag * one_over_mu0 / rho_e;
                 // Resistivity frozen at the linearization state |J0|
                 // (|J| = 0 would underestimate anomalous eta(J) in current
                 // sheets). The parsers see the raw (unfloored) rho, matching
@@ -1584,7 +1675,7 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                 // implicit velocity integration, so w ~ Omega_ci theta*dt)
                 Real w6 = 0.0_rt, w7 = 0.0_rt, w8 = 0.0_rt;
                 if (have_mm) {
-                    const Real bfac = Bmag / rho_e;
+                    const Real bfac = wvac * Bmag / rho_e;
                     w6 = Sxx(i,j,k,cxx) * bfac;
                     w7 = Syy(i,j,k,cyy) * bfac;
                     w8 = Szz(i,j,k,czz) * bfac;
@@ -1607,7 +1698,7 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                     Real adv = 0.0_rt;
 #if defined(WARPX_DIM_1D_Z)
                     adv = uec(std::abs(Jiz(i,j,k) - Jpz(i,j,k)) * irho) * dxi_pc[0];
-#elif defined(WARPX_DIM_XZ)
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
                     adv = uec(std::abs(Jix(i,j,k) - Jpx(i,j,k)) * irho) * dxi_pc[0]
                         + uec(std::abs(Jiz(i,j,k) - Jpz(i,j,k)) * irho) * dxi_pc[1];
 #elif defined(WARPX_DIM_3D)
@@ -1631,7 +1722,7 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                 // ghost-filled J provides the lo-side reads), matching the
                 // B down-averages above
                 {
-                    const Real irho = theta_dt / rho_e;
+                    const Real irho = wvac * theta_dt / rho_e;
                     if (stag) {
                         auto jn = [&] (Array4<const Real> const& Ja,
                                        Array4<const Real> const& Jb,
@@ -1681,7 +1772,44 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                 // weight both the vacuum, beta ~ 1/rho_floor, and the plasma
                 // of a strong density-contrast profile)
                 coef(i,j,k,14) = amrex::max(coef(i,j,k,3), Real(1.0)/Real(l2_pc));
+                // row mask: 1 here, 0 at EB-covered nodes after the closure
+                coef(i,j,k,15) = 1.0_rt;
             });
+    }
+
+    if (m_verbose) {
+        // coefficient-field summary of the linearization state (level 0,
+        // valid region): the whistler, resistive and hyper-resistive scales
+        // in units of the Laplacian symbol l2, the floored density, the
+        // convection speed and the W-hat scale, plus the field magnitudes
+        // they were built from
+        const RT l2v = m_l2[0];
+        amrex::Real bfp = 0.0_rt, bext = 0.0_rt;
+        for (int n = 0; n < 3; ++n) {
+            bfp = amrex::max(bfp, B_fp[n]->norminf(0, 0));
+            if (add_external) { bext = amrex::max(bext, B_ext[n]->norminf(0, 0)); }
+        }
+        amrex::Real ue = 0.0_rt;
+        for (int c = 11; c <= 13; ++c) {
+            ue = amrex::max(ue, m_coef[0]->norminf(c, 0));
+        }
+        amrex::Print() << "  pc_hybrid_pic coefficients: |B_fp| " << bfp
+                       << ", |B_ext| " << bext
+                       << "; c_w l2 [" << m_coef[0]->min(3, 0)*l2v << ", "
+                       << m_coef[0]->max(3, 0)*l2v << "]"
+                       << ", c_eta l2 [" << m_coef[0]->min(4, 0)*l2v << ", "
+                       << m_coef[0]->max(4, 0)*l2v << "]"
+                       << ", c_h l2^2 [" << m_coef[0]->min(5, 0)*l2v*l2v << ", "
+                       << m_coef[0]->max(5, 0)*l2v*l2v << "]"
+                       << ", rho_e [" << m_coef[0]->min(9, 0) << ", "
+                       << m_coef[0]->max(9, 0) << "]"
+                       << ", |theta dt ue| max " << ue
+                       << " (" << ue*std::sqrt(l2v) << " cells)"
+                       << ", s_W [" << m_coef[0]->min(14, 0) << ", "
+                       << m_coef[0]->max(14, 0) << "]"
+                       << (m_coef[0]->contains_nan(0, m_coef[0]->nComp(), 0)
+                           || m_coef[0]->contains_inf(0, m_coef[0]->nComp(), 0)
+                           ? "  NON-FINITE" : "") << "\n";
     }
 
     // optional floor of the local W-hat scale at pair_sw_min x the global
@@ -1889,6 +2017,25 @@ void HybridPICPC<T,Ops>::SmoothLevel ( int a_lev, int a_nsweeps, bool a_x_is_zer
     const Real wdl2 = static_cast<Real>(m_pair_wdf*l2);
     const bool ionp = m_have_mm;
     const HybridPICPCGrid g = m_grid[a_lev];
+#if defined(WARPX_DIM_RZ)
+    // RZ collocated block symbols. The RZ curl-curl is the compact down/up
+    // composition with max symbol m_l2 = sum_d 4/h_d^2, whereas the Cartesian
+    // collocated l2 = sum_d 2/h_d^2 is TWICE the max symbol (sum_d 1/h_d^2) of
+    // its wide central composition: the block defect wdf*l2 that is stable
+    // under sigma = 1.3 in Cartesian geometry (0.8 x max symbol at wdf 0.4)
+    // was only 0.4 x max symbol here and the damped Jacobi over-relaxed the
+    // whistler band (RZ pair diverged for c_w l2 >~ 10: the formation coil
+    // field, the stiff mirror em-modes reproduction, 2026-09-14). The block
+    // is therefore sized on 2 m_l2 (Cartesian semantics) and the
+    // hyper-resistive Nyquist on the exact compact Laplacian symbol m_l2.
+    // Axis rows: the (1/r) d_r (r .) compositions carry the radial symbol
+    // 8/dr^2 instead of 4/dr^2 (curl-curl z-row through the J_z
+    // regularization 4 F_theta/dr, hyper-Laplacian r-row through the -1/r^2
+    // curvature term at r = dr/2): both symbols are raised accordingly there.
+    const bool has_axis = m_has_axis;
+    const int iax = m_geom[a_lev].Domain().smallEnd(0);
+    const Real wdf = static_cast<Real>(m_pair_wdf);
+#endif
 
     for (int sweep = 0; sweep < a_nsweeps; sweep++) {
 
@@ -2117,8 +2264,15 @@ void HybridPICPC<T,Ops>::SmoothLevel ( int a_lev, int a_nsweeps, bool a_x_is_zer
                     const Real bhx = coef(i,j,k,0);
                     const Real bhy = coef(i,j,k,1);
                     const Real bhz = coef(i,j,k,2);
-                    const Real cw = coef(i,j,k,3);
                     const Real aU = coef(i,j,k,4) + coef(i,j,k,5)*l2;
+                    // rotation coefficient of the block: the whistler plus the
+                    // Hall-folded ion response to the dissipative push-field
+                    // coupling, S (U_diss W) ~ w_iso aU (W x bhat) (isotropic
+                    // average of the deposited diagonal; the residuals carry
+                    // the exact anisotropic form)
+                    const Real cw = coef(i,j,k,3)
+                        + (coef(i,j,k,6) + coef(i,j,k,7) + coef(i,j,k,8))
+                          * (1.0_rt/3.0_rt) * aU;
                     // local W-hat scale (coef comp 14)
                     const Real swl = coef(i,j,k,14);
                     const Real isW = 1.0_rt/swl;
@@ -2133,9 +2287,27 @@ void HybridPICPC<T,Ops>::SmoothLevel ( int a_lev, int a_nsweeps, bool a_x_is_zer
                         coef(i,j,k,11)*coef(i,j,k,11)
                       + coef(i,j,k,12)*coef(i,j,k,12)
                       + coef(i,j,k,13)*coef(i,j,k,13));
-                    const Real aUb = coef(i,j,k,4) + coef(i,j,k,5)*(2.0_rt*l2);
-                    const Real alpha = 1.0_rt + l1p*uem + l2*aUb;
-                    const Real beta = wdl2*cw;
+#if defined(WARPX_DIM_RZ)
+                    const bool on_axis = has_axis && (i == iax);
+                    const Real l2n = 2.0_rt*static_cast<Real>(l2)
+                                   + (on_axis ? 8.0_rt*g.invdx2[0] : 0.0_rt);
+                    const Real l2h = static_cast<Real>(l2)
+                                   + (on_axis ? 4.0_rt*g.invdx2[0] : 0.0_rt);
+                    const Real wdl2n = wdf*l2n;
+                    amrex::ignore_unused(wdl2);
+#else
+                    const Real l2n = static_cast<Real>(l2);
+                    const Real l2h = 2.0_rt*static_cast<Real>(l2);
+                    const Real wdl2n = wdl2;
+#endif
+                    // Hyper-resistive part of the block diagonal: the node's own
+                    // coefficient times the Nyquist row sum of the (non-conservative)
+                    // c_i del2 stencil, which is exactly c_i l2h whatever the
+                    // neighbours' coefficients (a banded eta_H changes the block
+                    // elsewhere, not here); the RZ axis z-row carries 8/dr^2.
+                    const Real aUb = coef(i,j,k,4) + coef(i,j,k,5)*l2h;
+                    const Real alpha = 1.0_rt + l1p*uem + l2n*aUb;
+                    const Real beta = wdl2n*cw;
                     const Real sxb_x = sy*bhz - sz*bhy;
                     const Real sxb_y = sz*bhx - sx*bhz;
                     const Real sxb_z = sx*bhy - sy*bhx;
@@ -2145,16 +2317,18 @@ void HybridPICPC<T,Ops>::SmoothLevel ( int a_lev, int a_nsweeps, bool a_x_is_zer
                     const Real dEx = inv_a2b2*(alpha*sx - beta*sxb_x + b2oa*sdb*bhx);
                     const Real dEy = inv_a2b2*(alpha*sy - beta*sxb_y + b2oa*sdb*bhy);
                     const Real dEz = inv_a2b2*(alpha*sz - beta*sxb_z + b2oa*sdb*bhz);
-                    xEo(i,j,k,0) = xEx + sigma*dEx;
-                    xEo(i,j,k,1) = xEy + sigma*dEy;
-                    xEo(i,j,k,2) = xEz + sigma*dEz;
+                    // EB-covered nodes (row mask 0) hold zero on every level
+                    const Real mk = coef(i,j,k,15);
+                    xEo(i,j,k,0) = mk*(xEx + sigma*dEx);
+                    xEo(i,j,k,1) = mk*(xEy + sigma*dEy);
+                    xEo(i,j,k,2) = mk*(xEz + sigma*dEz);
                     // perp-b part of dE couples through the whistler
                     // defect, the par-b part through the full l2
                     const Real dEb = dEx*bhx + dEy*bhy + dEz*bhz;
-                    const Real dl = static_cast<Real>(l2) - wdl2;
-                    xWo(i,j,k,0) = xWx + sigmaw*(rWx + swl*(wdl2*dEx + dl*dEb*bhx));
-                    xWo(i,j,k,1) = xWy + sigmaw*(rWy + swl*(wdl2*dEy + dl*dEb*bhy));
-                    xWo(i,j,k,2) = xWz + sigmaw*(rWz + swl*(wdl2*dEz + dl*dEb*bhz));
+                    const Real dl = l2n - wdl2n;
+                    xWo(i,j,k,0) = mk*(xWx + sigmaw*(rWx + swl*(wdl2n*dEx + dl*dEb*bhx)));
+                    xWo(i,j,k,1) = mk*(xWy + sigmaw*(rWy + swl*(wdl2n*dEy + dl*dEb*bhy)));
+                    xWo(i,j,k,2) = mk*(xWz + sigmaw*(rWz + swl*(wdl2n*dEz + dl*dEb*bhz)));
                 });
         }
         // the partner now holds the new iterate (valid region); its
@@ -2291,6 +2465,9 @@ void HybridPICPC<T,Ops>::ProlongLevel ( int a_lev )
             const Box& bx = mfi.tilebox();
             Array4<const Real> const& xc = a_coarse.const_array(mfi);
             Array4<Real> const& xf = a_fine.array(mfi);
+            // fine-level row mask (coef comp 15): no correction lands on
+            // EB-covered nodes
+            Array4<const Real> const& mk = m_coef[a_lev]->const_array(mfi);
             amrex::ParallelFor(bx, 3,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
                 {
@@ -2304,7 +2481,7 @@ void HybridPICPC<T,Ops>::ProlongLevel ( int a_lev )
                     for (int a = 0; a <= fx; a++) {
                         acc += xc(ic+a, jc+b, kc+c, n);
                     }}}
-                    xf(i,j,k,n) += acc * (fx ? 0.5_rt : 1.0_rt)
+                    xf(i,j,k,n) += mk(i,j,k,15) * acc * (fx ? 0.5_rt : 1.0_rt)
                                        * (fy ? 0.5_rt : 1.0_rt)
                                        * (fz ? 0.5_rt : 1.0_rt);
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
@@ -2315,13 +2492,13 @@ void HybridPICPC<T,Ops>::ProlongLevel ( int a_lev )
                     for (int a = 0; a <= fx; a++) {
                         acc += xc(ic+a, jc+b, k, n);
                     }}
-                    xf(i,j,k,n) += acc * (fx ? 0.5_rt : 1.0_rt)
+                    xf(i,j,k,n) += mk(i,j,k,15) * acc * (fx ? 0.5_rt : 1.0_rt)
                                        * (fy ? 0.5_rt : 1.0_rt);
 #else // WARPX_DIM_1D_Z
                     const int ic = i/2; const int fx = i - 2*ic;
                     Real acc = 0.0_rt;
                     for (int a = 0; a <= fx; a++) { acc += xc(ic+a, j, k, n); }
-                    xf(i,j,k,n) += acc * (fx ? 0.5_rt : 1.0_rt);
+                    xf(i,j,k,n) += mk(i,j,k,15) * acc * (fx ? 0.5_rt : 1.0_rt);
 #endif
                 });
         }
@@ -2779,12 +2956,12 @@ void HybridPICPC<T,Ops>::ApplyDomainClosure ( MF& a, int a_lev,
     const int ncl = (a_ncomp < 0) ? a.nComp() : a_ncomp;
     const int sc = a_scomp;
 
-    if (m_has_pec_wall) {
+    if (m_has_wall) {
         const Box dom = amrex::convert(m_geom[a_lev].Domain(),
                                        a.boxArray().ixType());
         for (int d = 0; d < AMREX_SPACEDIM; d++) {
             for (int side = 0; side < 2; side++) {
-                if (!m_wall_pec[d][side]) { continue; }
+                if (!m_wall_pec[d][side] && !m_wall_pmc[d][side]) { continue; }
                 // wall NODE index: the staggered containers are
                 // cell-indexed, so the hi-side wall plane sits one past
                 // the cell bigEnd
@@ -2796,6 +2973,12 @@ void HybridPICPC<T,Ops>::ApplyDomainClosure ( MF& a, int a_lev,
                 const int cls = static_cast<int>(a_cls);
                 const int dd = d;
                 const bool stag = m_staggered;
+                // PMC (Neumann): the residual applies the dual parity rules,
+                // so the normal/tangential roles swap for every vector class
+                const bool pmc = m_wall_pmc[d][side];
+                // PEC wall node whose normal E the residual takes from the interior:
+                // its column is dead in the preconditioner too
+                const bool pec_normal_dead = m_pec_normal_from_interior && m_wall_pec[d][side];
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2813,7 +2996,8 @@ void HybridPICPC<T,Ops>::ApplyDomainClosure ( MF& a, int a_lev,
                             // are scalars
                             const bool scalar =
                                 (cls == 4/*Coef*/) && (n >= 3);
-                            const bool is_norm = !scalar && (n == nc);
+                            // effective "normal" role: swapped at PMC faces
+                            const bool is_norm = !scalar && ((n == nc) != pmc);
                             if (stag) {
                                 // Yee: components NODAL along dd (wall-
                                 // tangential E/J, wall-normal B) carry a
@@ -2865,7 +3049,7 @@ void HybridPICPC<T,Ops>::ApplyDomainClosure ( MF& a, int a_lev,
                                 // (identity rows / dead columns), BField
                                 // zeroes the normal component
                                 if (cls == 0/*EField*/ && !scalar
-                                    && !is_norm) { v(i,j,k,n) = 0.0_rt; }
+                                    && (!is_norm || pec_normal_dead)) { v(i,j,k,n) = 0.0_rt; }
                                 if (cls == 1/*BField*/ && is_norm) {
                                     v(i,j,k,n) = 0.0_rt;
                                 }
@@ -2924,7 +3108,10 @@ void HybridPICPC<T,Ops>::ApplyDomainClosure ( MF& a, int a_lev,
                                                         : (n != 0);
                     }
                     if (i == w) {
-                        if (cls == 0/*EField*/ && n == 1) {
+                        // the Ohm solve zeroes E_theta on the axis on both
+                        // grids and E_r there on the collocated grid (odd
+                        // component with an axis DOF)
+                        if (cls == 0/*EField*/ && (n == 1 || (n == 0 && !stag))) {
                             v(i,j,k,n) = 0.0_rt;
                         }
                         return;
@@ -2938,14 +3125,19 @@ void HybridPICPC<T,Ops>::ApplyDomainClosure ( MF& a, int a_lev,
     }
 #endif
 
-    // EB (staircase): zero covered/frozen nodes so no stencil emits or
-    // receives contributions there (the residual's masked Ohm solves skip
-    // those locations). Fine level only; masked up to the flag's guards.
-    // Exception: the pair's local W-hat scale (Coef comp 14) is a strictly
-    // positive SCALING, divided by in the joint block -- zeroing it at
-    // covered nodes makes 1/sW = inf there (NaN poisoning that the
-    // level-0-only closure cannot clean off the coarse levels).
-    if (a_lev == 0 && m_eb_flag != nullptr) {
+    // EB (staircase): zero covered/frozen nodes of the E-, J- and
+    // coefficient-like objects (the residual's masked Ohm and Ampere kernels
+    // skip those locations; the coefficient row mask comp 15 becomes 0 there
+    // and makes the covered rows identity on every level). The first-curl
+    // delta-B (BField) is NOT zeroed: the residual's Faraday update is not
+    // EB-masked, so the covered delta-B, built from the uncovered E
+    // neighbours, is read by the wall-adjacent Ampere stencils. Fine level
+    // only; masked up to the flag's guards. Exception: the pair's local
+    // W-hat scale (Coef comp 14) is a strictly positive SCALING, divided by
+    // in the joint block -- zeroing it at covered nodes makes 1/sW = inf
+    // there (NaN poisoning that the level-0-only closure cannot clean off
+    // the coarse levels).
+    if (a_lev == 0 && m_eb_flag != nullptr && a_cls != ClosureClass::BField) {
         amrex::IntVect ngm = a.nGrowVect();
         ngm.min(m_eb_flag->nGrowVect());
         const bool is_coef = (a_cls == ClosureClass::Coef);
@@ -2973,17 +3165,27 @@ void HybridPICPC<T,Ops>::OverrideIdentityRows ( T& a_out, const T& a_in ) const
 
     for (int d = 0; d < AMREX_SPACEDIM; d++) {
         for (int side = 0; side < 2; side++) {
-            // PEC faces: exact identity tangential rows (both grids).
-            // Staggered hi-side zero-extension faces: the nodal wall
-            // plane is an unmodeled ghost plane of the cell-indexed
-            // container -- the preconditioner would return zero there
-            // (a singular preconditioner); make those rows identity.
+            // PEC faces: exact identity tangential rows (both grids); PMC
+            // faces: exact identity normal row (the residual zeroes the
+            // normal E on the wall). Staggered hi-side zero-extension
+            // faces: the nodal wall plane is an unmodeled ghost plane of
+            // the cell-indexed container -- the preconditioner would
+            // return zero there (a singular preconditioner); make those
+            // rows identity.
             const bool open_stag = m_staggered && (side == 1)
                 && m_wall_open[d][side];
-            if (!m_wall_pec[d][side] && !open_stag) { continue; }
+            const bool pmc = m_wall_pmc[d][side];
+            if (!m_wall_pec[d][side] && !pmc && !open_stag) { continue; }
             const int nc = m_dim2comp[d];
+            // PEC wall node whose normal E the residual takes from the interior
+            // (hybrid_pic_model.pec_normal_E_from_interior): identity row as well
+            const bool pec_normal_identity = m_pec_normal_from_interior && m_wall_pec[d][side];
             for (int n = 0; n < 3; n++) {
-                if (n == nc) { continue; }  // tangential rows only
+                // tangential rows at PEC / open faces, the normal row at PMC (and at
+                // PEC with the interior normal-E closure)
+                const bool normal_row = (n == nc);
+                const bool take = pmc ? normal_row : (!normal_row || pec_normal_identity);
+                if (!take) { continue; }
                 MF& o = *a_out.getArrayVec()[0][n];
                 const MF& s = *a_in.getArrayVec()[0][n];
                 // wall plane in this component's own staggering (the
@@ -3011,25 +3213,29 @@ void HybridPICPC<T,Ops>::OverrideIdentityRows ( T& a_out, const T& a_in ) const
     }
 
 #if defined(WARPX_DIM_RZ)
-    // E_theta on the axis is fixed to zero by the Ohm solve: identity row
+    // E_theta on the axis (both grids) and E_r on the axis (collocated grid,
+    // where E_r has an axis DOF) are fixed to zero by the Ohm solve: identity rows
     if (m_has_axis) {
-        const Box adom = amrex::convert(m_geom[0].Domain(),
-            a_out.getArrayVec()[0][1]->boxArray().ixType());
-        Box plane = adom;
-        plane.setBig(0, adom.smallEnd(0));
-        MF& o = *a_out.getArrayVec()[0][1];
-        const MF& si = *a_in.getArrayVec()[0][1];
+        for (int c = 0; c < 2; ++c) {
+            if (c == 0 && m_staggered) { continue; }
+            const Box adom = amrex::convert(m_geom[0].Domain(),
+                a_out.getArrayVec()[0][c]->boxArray().ixType());
+            Box plane = adom;
+            plane.setBig(0, adom.smallEnd(0));
+            MF& o = *a_out.getArrayVec()[0][c];
+            const MF& si = *a_in.getArrayVec()[0][c];
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
-        for (MFIter mfi(o, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            const Box bx = mfi.tilebox() & plane;
-            if (bx.isEmpty()) { continue; }
-            Array4<Real> const& ov = o.array(mfi);
-            Array4<const Real> const& sv = si.const_array(mfi);
-            amrex::ParallelFor(bx,
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-                { ov(i,j,k) = sv(i,j,k); });
+            for (MFIter mfi(o, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                const Box bx = mfi.tilebox() & plane;
+                if (bx.isEmpty()) { continue; }
+                Array4<Real> const& ov = o.array(mfi);
+                Array4<const Real> const& sv = si.const_array(mfi);
+                amrex::ParallelFor(bx,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                    { ov(i,j,k) = sv(i,j,k); });
+            }
         }
     }
 #endif
@@ -3175,6 +3381,97 @@ void HybridPICPC<T,Ops>::InnerGMRES ()
         amrex::Print() << "  pc_hybrid_pic inner GMRES: " << its << " its, rel res "
                        << std::abs(g[its])/beta << "\n";
     }
+    if (m_verbose > 1) { PrintInnerResidualMap(); }
+}
+
+template <class T, class Ops>
+void HybridPICPC<T,Ops>::PrintInnerResidualMap ()
+{
+    using namespace amrex;
+    constexpr int nkb = kNKB;
+    // Diagnostic (verbose >= 2): where the un-reduced inner residual
+    // r = b - M x lives. Share of ||r_E||^2 and of the RHS ||b_E||^2 per
+    // block of an 8 x 8 partition of the nodal domain (rows: dim-1 blocks
+    // lo -> hi, cols: dim-0 blocks lo -> hi), the W/E split, and the share
+    // of ||r_E||^2 on the four domain-boundary planes.
+    MergeBlock(*m_zB);
+    FillGhosts(*m_zB, 0);
+    ApplyDomainClosure(*m_zB, 0, ClosureClass::JField, 0, 3);
+    ApplyDomainClosure(*m_zB, 0, ClosureClass::EField, 3, 3);
+    ApplyReducedOp(*m_zB, *m_wB);
+    amrex::MultiFab::Xpay(*m_wB, -1.0_rt, *m_bKB, 0, 0, nkb, 0);   // r = b - M x
+    const Box ndom = amrex::convert(m_geom[0].Domain(), amrex::IntVect::TheNodeVector());
+    const auto dlo = ndom.smallEnd();
+    const auto dhi = ndom.bigEnd();
+    constexpr int NB = 8;
+    constexpr int NACC = 2*NB*NB + 7;
+    amrex::Gpu::DeviceVector<amrex::Real> acc(NACC, 0.0_rt);
+    amrex::Real* pa = acc.data();
+    const int n0 = dhi[0] - dlo[0] + 1;
+#if (AMREX_SPACEDIM > 1)
+    const int n1 = dhi[1] - dlo[1] + 1;
+#endif
+    for (MFIter mfi(*m_wB, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const Box& bx = mfi.tilebox();
+        Array4<const Real> const& r = m_wB->const_array(mfi);
+        Array4<const Real> const& b = m_bKB->const_array(mfi);
+        amrex::ParallelFor(bx,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                const Real rE = r(i,j,k,3)*r(i,j,k,3) + r(i,j,k,4)*r(i,j,k,4)
+                              + r(i,j,k,5)*r(i,j,k,5);
+                const Real rW = r(i,j,k,0)*r(i,j,k,0) + r(i,j,k,1)*r(i,j,k,1)
+                              + r(i,j,k,2)*r(i,j,k,2);
+                const Real bE = b(i,j,k,3)*b(i,j,k,3) + b(i,j,k,4)*b(i,j,k,4)
+                              + b(i,j,k,5)*b(i,j,k,5);
+                const int b0 = amrex::min(NB - 1, ((i - dlo[0]) * NB) / n0);
+#if (AMREX_SPACEDIM > 1)
+                const int b1 = amrex::min(NB - 1, ((j - dlo[1]) * NB) / n1);
+#else
+                const int b1 = 0;
+                amrex::ignore_unused(j);
+#endif
+                amrex::ignore_unused(k);
+                amrex::HostDevice::Atomic::Add(pa + b1*NB + b0, rE);
+                amrex::HostDevice::Atomic::Add(pa + NB*NB + b1*NB + b0, bE);
+                amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 0, rW);
+                amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 1, rE);
+                amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 2, bE);
+                if (i == dlo[0]) { amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 3, rE); }
+                if (i == dhi[0]) { amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 4, rE); }
+#if (AMREX_SPACEDIM > 1)
+                if (j == dlo[1]) { amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 5, rE); }
+                if (j == dhi[1]) { amrex::HostDevice::Atomic::Add(pa + 2*NB*NB + 6, rE); }
+#endif
+            });
+    }
+    amrex::Gpu::streamSynchronize();
+    std::vector<amrex::Real> h(NACC, 0.0_rt);
+    amrex::Gpu::copy(amrex::Gpu::deviceToHost, acc.begin(), acc.end(), h.begin());
+    amrex::ParallelDescriptor::ReduceRealSum(h.data(), NACC);
+    const amrex::Real rW2 = h[2*NB*NB], rE2 = h[2*NB*NB + 1], bE2 = h[2*NB*NB + 2];
+    const amrex::Real irE = (rE2 > 0.0_rt) ? 1.0_rt/rE2 : 0.0_rt;
+    const amrex::Real ibE = (bE2 > 0.0_rt) ? 1.0_rt/bE2 : 0.0_rt;
+    amrex::Print() << "  pc_hybrid_pic inner residual: ||r_E||/||b_E|| "
+                   << std::sqrt(rE2*ibE) << ", ||r_W||/||r_E|| "
+                   << std::sqrt(rW2*irE) << "; r_E share on planes lo0 "
+                   << h[2*NB*NB + 3]*irE << " hi0 " << h[2*NB*NB + 4]*irE
+                   << " lo1 " << h[2*NB*NB + 5]*irE << " hi1 " << h[2*NB*NB + 6]*irE
+                   << "\n  block shares (dim-1 rows lo->hi | dim-0 cols lo->hi):"
+                   << "  r_E  ||  b_E\n";
+    for (int b1 = 0; b1 < NB; ++b1) {
+        amrex::Print() << "   ";
+        for (int b0 = 0; b0 < NB; ++b0) {
+            amrex::Print() << " " << std::fixed << std::setprecision(3)
+                           << h[b1*NB + b0]*irE;
+        }
+        amrex::Print() << "  ||";
+        for (int b0 = 0; b0 < NB; ++b0) {
+            amrex::Print() << " " << std::fixed << std::setprecision(3)
+                           << h[NB*NB + b1*NB + b0]*ibE;
+        }
+        amrex::Print() << std::defaultfloat << "\n";
+    }
 }
 
 template <class T, class Ops>
@@ -3219,7 +3516,6 @@ void HybridPICPC<T,Ops>::Apply ( T& a_x, const T& a_b )
                     s(i,j,k) = v * inv_kappa;   // physical dpe for the E leg
                 });
         }
-#if !defined(WARPX_DIM_RZ)
         if (m_pe_row_sweeps > 0) {
             // damped-Jacobi sweeps carrying the signed UPWIND advection
             // stencil theta*dt*gamma ue0.grad(.) (comps 11-13 hold
@@ -3239,6 +3535,13 @@ void HybridPICPC<T,Ops>::Apply ( T& a_x, const T& a_b )
                 dx_min_pe = std::min(dx_min_pe, m_geom[0].CellSize(d));
             }
             const amrex::Real capl = m_pe_ue_cap_fac * dx_min_pe;
+#if defined(WARPX_DIM_RZ)
+            // RZ m = 0: area-weighted radial Laplacian neighbours, even
+            // parity across the axis (u_r = 0 there by symmetry)
+            const bool sw_axis = m_has_axis;
+            const int sw_iax = m_geom[0].Domain().smallEnd(0);
+            const HybridPICPCGrid gsw = m_grid[0];
+#endif
             amrex::MultiFab& x2 = *m_pe_row_scr2;
             amrex::MultiFab::Copy(x2, xp, 0, 0, 1, 0);
             for (int sw = 0; sw < m_pe_row_sweeps; sw++) {
@@ -3282,6 +3585,25 @@ void HybridPICPC<T,Ops>::Apply ( T& a_x, const T& a_b )
                             adiag = gam * (std::abs(ux) * dxi[0] + std::abs(uz) * dxi[1]);
                             nbr = (xi(i+1,j,k) + xi(i-1,j,k))*dxi[0]*dxi[0]
                                 + (xi(i,j+1,k) + xi(i,j-1,k))*dxi[1]*dxi[1];
+#elif defined(WARPX_DIM_RZ)
+                            const bool on_ax = sw_axis && (i == sw_iax);
+                            const Real ur = on_ax ? 0.0_rt : clamp_u(cf(i,j,k,11));
+                            const Real uz = clamp_u(cf(i,j,k,13));
+                            up += gam * dxi[0] * (ur > 0.0_rt
+                                ? ur*(xi(i,j,k) - xi(i-1,j,k))
+                                : ur*(xi(i+1,j,k) - xi(i,j,k)));
+                            up += gam * dxi[1] * (uz > 0.0_rt
+                                ? uz*(xi(i,j,k) - xi(i,j-1,k))
+                                : uz*(xi(i,j+1,k) - xi(i,j,k)));
+                            adiag = gam * (std::abs(ur) * dxi[0] + std::abs(uz) * dxi[1]);
+                            if (on_ax) {
+                                nbr = 2.0_rt*xi(i+1,j,k)*dxi[0]*dxi[0];
+                            } else {
+                                const Real rn = gsw.rmin + i*gsw.dr;
+                                nbr = ((rn + 0.5_rt*gsw.dr)*xi(i+1,j,k)
+                                     + (rn - 0.5_rt*gsw.dr)*xi(i-1,j,k))/rn*dxi[0]*dxi[0];
+                            }
+                            nbr += (xi(i,j+1,k) + xi(i,j-1,k))*dxi[1]*dxi[1];
 #elif defined(WARPX_DIM_3D)
                             const Real ux = clamp_u(cf(i,j,k,11));
                             const Real uy = clamp_u(cf(i,j,k,12));
@@ -3332,7 +3654,6 @@ void HybridPICPC<T,Ops>::Apply ( T& a_x, const T& a_b )
                     });
             }
         }
-#endif
         FillGhosts(*m_pe_row_scr, 0);
     }
 
@@ -3351,6 +3672,9 @@ void HybridPICPC<T,Ops>::Apply ( T& a_x, const T& a_b )
         // scratch are zero-extended; the affected wall-tangential E rows are
         // identity-overridden on output anyway.
         const auto dxi = m_geom[0].InvCellSizeArray();
+        const bool pe_axis = m_has_axis;
+        const int pe_iax = m_geom[0].Domain().smallEnd(0);
+        amrex::ignore_unused(pe_axis, pe_iax);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -3367,6 +3691,13 @@ void HybridPICPC<T,Ops>::Apply ( T& a_x, const T& a_b )
                     be(i,j,k,2) -= ir * (s(i+1,j,k) - s(i-1,j,k)) * 0.5_rt * dxi[0];
 #elif defined(WARPX_DIM_XZ)
                     be(i,j,k,0) -= ir * (s(i+1,j,k) - s(i-1,j,k)) * 0.5_rt * dxi[0];
+                    be(i,j,k,2) -= ir * (s(i,j+1,k) - s(i,j-1,k)) * 0.5_rt * dxi[1];
+#elif defined(WARPX_DIM_RZ)
+                    // d_r pe = 0 on the axis (even scalar; the zero-extended
+                    // ghost would fake a gradient there)
+                    if (!(pe_axis && i == pe_iax)) {
+                        be(i,j,k,0) -= ir * (s(i+1,j,k) - s(i-1,j,k)) * 0.5_rt * dxi[0];
+                    }
                     be(i,j,k,2) -= ir * (s(i,j+1,k) - s(i,j-1,k)) * 0.5_rt * dxi[1];
 #elif defined(WARPX_DIM_3D)
                     be(i,j,k,0) -= ir * (s(i+1,j,k) - s(i-1,j,k)) * 0.5_rt * dxi[0];

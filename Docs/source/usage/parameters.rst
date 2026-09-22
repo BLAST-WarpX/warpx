@@ -353,6 +353,50 @@ Overall simulation parameters
           Smooth (tanh) cap on the electron velocity in the enthalpy flux of the in-loop electron pressure advance,
           as a multiple of :math:`\Delta x_{min}/(\theta\,\Delta t)`.
 
+        - ``implicit_evolve.pe_wall_mirror`` (``integer``, default: 2; hybrid theta-implicit scheme, collocated RZ grid).
+          Treatment of the electron-pressure nodes on the non-periodic axial faces (symmetry planes: PMC fields, reflecting
+          ions). ``0``: the face planes are skipped and keep their start-of-step value (identity rows), which leaves a pressure
+          layer inconsistent with Ohm's law once plasma reaches the plane. ``1``: the face nodes are advanced with the mirrored
+          stencil (axial index reflected about the face, axial electron flux odd, scalars even); unstable where the column
+          stagnates on the plane, because the folded ion current vanishes on the face node while the electron inflow one plane
+          in does not. ``2``: mirrored stencil for the interior nodes and an entropy slave of the face planes,
+          :math:`p_e = \bar{s}\,n^{\gamma}` with :math:`\bar{s}` the mean :math:`p_e/n^{\gamma}` of the three planes inside
+          (:math:`\partial_z s = 0` at a symmetry plane, the treatment of the RZ axis row).
+
+        - ``implicit_evolve.joule_Te_cutoff`` (``float``, in eV, default: -1 = off; hybrid theta-implicit scheme only).
+          In-loop counterpart of :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold`: the Joule and hyper-resistive
+          heat deposited into the electron pressure is multiplied by the smooth gate
+          :math:`\tfrac{1}{2}\,[1 - \tanh((T_e^n - T_c)/(w\,T_c))]` evaluated at the start-of-step temperature,
+          so electrons above :math:`T_c` no longer receive the dissipative heat (it leaves the energy ledger, as with
+          :pp:param:`hybrid_pic_model.include_joule_heating` off; the explicit path hands it to the ions instead).
+          Requires :pp:param:`hybrid_pic_model.include_joule_heating` and the collocated grid.
+          ``implicit_evolve.joule_Te_cutoff_width`` (``float``, default: 0.25) sets the gate width :math:`w` as a fraction of :math:`T_c`.
+
+        - ``implicit_evolve.joule_redirect_to_ions`` (``bool``, default: 0; requires ``implicit_evolve.joule_Te_cutoff`` > 0).
+          Deposit the energy the gate withholds from the electrons, :math:`(1 - s_J)\,Q\,\Delta t`, on the ion particles through the
+          QDSMC Ornstein-Uhlenbeck kernel at the end of the step (per species :math:`E_s = \tfrac{2}{3} Z_s (1 - s_J) Q \Delta t / n_e`,
+          the convention of :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold`), so the dissipated energy stays in the ledger.
+          ``implicit_evolve.joule_redirect_verbose`` (``int``, default: 0) prints the electron and ion Joule powers each step.
+
+        - ``implicit_evolve.predictor`` (``bool``, default: 0; hybrid theta-implicit scheme only).
+          Start the Newton iteration from the extrapolated guess :math:`E^n + (E^{n-1+\theta} - E^{n-1})`
+          (the previous step's theta-increment, electron pressure rows included) instead of :math:`E^n`.
+          Pair it with ``newton.absolute_tolerance``: the relative tolerance is measured against the initial residual,
+          which the predictor reduces.
+          ``implicit_evolve.predictor_max_iters`` (``integer``, default: 8): a step that needed at least this many Newton
+          iterations does not seed the next step's guess. ``implicit_evolve.predictor_max_step`` (``integer``, default: -1 = no limit):
+          use the predictor only for steps below this number (later steps start from :math:`E^n`).
+          ``implicit_evolve.dt_halving_max_levels`` (``integer``, default: 0 = off; hybrid theta-implicit scheme only):
+          when the Newton solve of a step ends unconverged (iteration cap, rejected directions or divergence), restore the
+          state at the step start and redo the step as two half-steps, recursively up to this many halvings
+          (:math:`\Delta t/2^n`); the outer time step and the diagnostic cadence are unchanged.
+          ``implicit_evolve.dt_halving_max_rel`` (``float``, default: 0.1): a sub-step at the deepest level that is still
+          unconverged is accepted only if its final relative residual is below this value; otherwise the step gives up
+          (negative exit status, the run aborts) rather than advancing from a corrupted state.
+          ``implicit_evolve.predictor_rho_factor`` (``float``, default: 0 = off):
+          multiply the increment by :math:`\tfrac{1}{2}[1 + \tanh((\rho - f\rho_\mathrm{floor})/\rho_\mathrm{floor})]`,
+          i.e. do not extrapolate at nodes below about :math:`f` times the density floor.
+
         - ``implicit_evolve.filter_push_fields`` (``bool``, default: false; hybrid theta-implicit scheme only).
           With :pp:param:`warpx.use_filter`, the particles gather the binomial-filtered electric field (the adjoint of the filtered
           current deposition) while Ohm's law keeps the unfiltered field. Fully periodic domains without external fields only.
@@ -418,7 +462,8 @@ Overall simulation parameters
             - ``pc_hybrid_pic.inner_max`` (``int``, default: 8): iteration cap of the inner GMRES; 0 disables the inner solve (linear V-cycle preconditioner).
             - ``pc_hybrid_pic.inner_rtol`` (``float``, default: 0.3): relative tolerance of the inner GMRES; 1.0 stops after one V-cycle and one Krylov step per application.
             - ``pc_hybrid_pic.vcycles`` (``int``, default: 1): V-cycles per application when ``inner_max = 0``.
-            - ``pc_hybrid_pic.verbose`` (``bool``, default: false)
+            - ``pc_hybrid_pic.pmc_closure`` (``bool``, default: 1): model PMC (Neumann) faces with the dual of the PEC closure (identity normal-E rows, tangential delta-B zeroed on the wall, parity-mirrored ghosts; collocated grid). 0 keeps the zero-extension fallback on those faces.
+            - ``pc_hybrid_pic.verbose`` (``int``, default: 0): 1 prints the setup banner, a per-Newton-iteration coefficient summary and the inner GMRES convergence per application; 2 adds a block map of where the un-reduced inner residual lives (diagnostic).
 
           - ``jacobian.pc_type = pc_petsc``: Use the PETSc solver.
 
@@ -3814,6 +3859,19 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
+.. pp:param:: hybrid_pic_model.pec_normal_E_from_interior
+    :type: ``bool``
+    :default: ``0``
+    :optional:
+
+    Collocated grids only. When ``1``, the electric-field component normal to a perfectly conducting wall
+    is taken at the wall node from the first interior node (zero normal gradient) instead of from Ohm's law
+    at the wall node. On the collocated grid the wall node carries the normal component, and Ohm's law there
+    closes through one-sided derivatives of the tangential magnetic field; with plasma on the wall the Hall
+    term feeds a wall-node current sheet that steepens along the wall without the dispersion an interior node has.
+    The staggered (Yee) grid has no normal electric field on the wall and is unaffected. The implicit
+    preconditioner treats the affected rows as identity rows.
+
 .. pp:param:: hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)
     :type: ``float`` or ``str``
     :default: ``0``
@@ -3871,6 +3929,16 @@ Maxwell solver: kinetic-fluid hybrid
     electron heating at the threshold and allows :math:`T_i > T_e` to develop, mimicking regimes where the
     electrons radiate strongly.
 
+.. pp:param:: hybrid_pic_model.joule_redirect_Te_width
+    :type: ``float``
+    :default: ``0``
+    :optional:
+
+    Relative width of the redirect gate. ``0`` keeps the hard step at the threshold; ``w > 0`` splits the
+    Joule heat with the smooth gate :math:`s_J = \tfrac{1}{2}\left(1 - \tanh\frac{T_e - T_c}{w\,T_c}\right)`
+    (the electrons receive the fraction :math:`s_J`, the ions the rest), the convention of the
+    theta-implicit scheme's ``implicit_evolve.joule_Te_cutoff_width``.
+
 .. pp:param:: hybrid_pic_model.electron_energy_solver
     :type: ``str``
     :default: ``qdsmc``
@@ -3881,7 +3949,14 @@ Maxwell solver: kinetic-fluid hybrid
     entropy with fictitious particles (no heat conduction). ``fluid`` advances the electron pressure with a
     conservative-flux fluid update (limited upwind enthalpy flux, work term, Joule deposit when
     :pp:param:`hybrid_pic_model.include_joule_heating` is on, :pp:param:`hybrid_pic_model.kappa_e` conduction),
-    forward Euler over every accepted B-field sub-step. Cartesian collocated grids only.
+    forward Euler over every accepted B-field sub-step. Cartesian collocated grids only. The fluid solver
+    shares the closure options of the theta-implicit in-loop pressure advance: the
+    :pp:param:`hybrid_pic_model.holmstrom_vacuum_region` blend of the advanced pressure toward the floored
+    adiabat, and the Te-gated Joule deposit with :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold` /
+    ``joule_redirect_Te_width`` (the gated-out heat is handed to the ions once per step).
+    ``hybrid_pic_model.pe_advection`` (``central`` | ``vanalbada``, default) selects the face reconstruction of
+    the enthalpy flux and ``hybrid_pic_model.pe_ue_cap`` (m/s, default 0 = off) a tanh soft cap on its
+    electron flux velocity.
 
 .. pp:param:: hybrid_pic_model.filter_push_fields
     :type: ``bool``
@@ -4037,6 +4112,26 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the vacuum region handling of the generalized Ohm's Law to suppress vacuum fluctuations. :cite:t:`param-holmstrom2013handlingvacuumregionshybrid`.
+    The Hall and electron-pressure terms are multiplied by the density weight :math:`w(\rho)`, a step at the density floor,
+    or the :math:`C^1` blend :math:`\tfrac{1}{2}[1 + \tanh((\rho - \rho_\mathrm{floor})/w)]` when :pp:param:`hybrid_pic_model.n_floor_smooth_width` is set;
+    the resistive and hyper-resistive terms are kept everywhere. The theta-implicit preconditioner ``pc_hybrid_pic`` applies the same weight to its whistler, convection and ion-response coefficients.
+    With the theta-implicit evolved electron pressure (``implicit_evolve.hybrid_closure = pe_unknown``) the same weight blends the advanced pressure toward the floored adiabat, :math:`p_e \leftarrow w\,p_e + (1-w)\,p_e^\mathrm{ad}(\max(\rho,\rho_\mathrm{floor}))`, so the transport and compression terms cannot run away where :math:`\mathbf{u}_e` is statistical noise.
+
+.. pp:param:: hybrid_pic_model.vacuum_weight_r_ref
+    :type: ``float`` (meters)
+    :default: ``0`` (off)
+    :optional:
+
+    RZ only, with :pp:param:`hybrid_pic_model.holmstrom_vacuum_region`. A uniform-weight loader puts a macro-particle count per node proportional to :math:`n\,r`, so at a fixed density floor the near-axis nodes hold far fewer particles than the outer ones and their moments are proportionally noisier.
+    When set, the density floor entering the vacuum weight (and its smooth width) is raised to :math:`n_\mathrm{floor}\,\min(f_\mathrm{max}, \max(1, r_\mathrm{ref}/r))` with :math:`r` clamped at half a cell, i.e. a constant macro-particle-count floor for :math:`r < r_\mathrm{ref}`.
+    The density floor of the Ohm's-law denominators is unchanged. Also applied by ``pc_hybrid_pic``.
+
+.. pp:param:: hybrid_pic_model.vacuum_weight_max_factor
+    :type: ``float``
+    :default: ``10``
+    :optional:
+
+    Cap :math:`f_\mathrm{max}` of the radial floor factor of :pp:param:`hybrid_pic_model.vacuum_weight_r_ref`.
 
 .. pp:param:: hybrid_pic_model.add_external_fields
     :type: ``bool``
