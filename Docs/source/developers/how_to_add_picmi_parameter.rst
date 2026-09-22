@@ -9,8 +9,9 @@ In C++, WarpX reads its :ref:`input parameters <running-cpp-parameters>` with ``
 
 .. code-block:: cpp
 
+   amrex::Real my_threshold = 0._rt;
    const amrex::ParmParse pp_warpx("warpx");
-   utils::parser::queryWithParser(pp_warpx, "my_threshold", m_my_threshold);
+   utils::parser::queryWithParser(pp_warpx, "my_threshold", my_threshold);
 
 In Python, users set up a simulation with PICMI classes, e.g., ``picmi.Simulation``, which write these input parameters for WarpX (see :ref:`development-python`).
 Parameters of the `PICMI standard <https://picmi.readthedocs.io/en/latest/standard/standard.html>`__ (`repo <https://github.com/picmi-standard/picmi>`__) have plain names, e.g., ``max_steps``.
@@ -69,13 +70,13 @@ When in doubt, look for existing parameters of the same prefix in ``Python/pywar
 
    grep -n "pywarpx.warpx\." Python/pywarpx/picmi.py
 
-Choose the class whose objects the parameter belongs to, e.g., a parameter of the PSATD solver belongs to ``ElectromagneticSolver``, even though it could also be written by ``Simulation``.
+Choose the class whose objects the parameter belongs to in PICMI, e.g., a parameter of the PSATD solver belongs to ``ElectromagneticSolver``, which is more fitting than the general ``Simulation`` that the ``amrex::ParmParse`` prefix ``warpx.`` might suggest.
 
 
 2. Add a parameter
 ------------------
 
-Add the parameter as a pydantic ``Field`` of the class, next to related parameter, with the name that it has in the inputs (without the prefix):
+Add the parameter as a pydantic ``Field`` of the class, next to related parameters, with the name that it has in the inputs (without the prefix):
 
 .. code-block:: python
 
@@ -132,8 +133,8 @@ constants that users give with the expression are collected, and the method that
 The ``warpx_`` prefix
 ^^^^^^^^^^^^^^^^^^^^^
 
-Users give an extension of a PICMI standard class with the prefix ``warpx_``, e.g., ``warpx_my_threshold``.
-The parameter itself has the name without prefix, which is also the name that the methods of the class use, e.g., ``self.my_threshold``.
+In PICMI, one adds WarpX code-specific class attributes with the prefix ``warpx_``, e.g., ``warpx_my_threshold``.
+The Python class member itself has the name without prefix, which is also the name that the methods of the class use internally, e.g., ``self.my_threshold``.
 The prefix is added to all parameters that a WarpX class adds to the PICMI standard class by
 
 .. code-block:: python
@@ -142,20 +143,6 @@ The prefix is added to all parameters that a WarpX class adds to the PICMI stand
 
 in the class.
 If the class does not have this line yet, add it (with the PICMI standard class that it derives from).
-
-Classes that only exist in WarpX, which derive from an extension class of the standard (``picmistandard.PICMI_Extension``, ``PICMI_SolverExtension``, ``PICMI_DiagnosticExtension``, ...), e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
-
-Name the parameter like the input parameter, so that users give it as ``warpx_`` followed by that name.
-Sometimes you might need an ``alias``, e.g., for backwards compatibility of a renamed parameter or because the intended PICMI extension name differs from the ``amrex::ParmParse`` name.
-For example, this adds both ``warpx_potential_xmin`` and ``warpx_potential_lo_x`` as PICMI Python parameters in a class:
-
-.. code-block:: python
-
-   potential_xmin: float | str | None = Field(
-       default=None,
-       alias="warpx_potential_lo_x",
-       description="Electrostatic potential on the lower x boundary",
-   )
 
 
 3. Write the input parameter
@@ -212,20 +199,37 @@ Then use the parameter in a test of the parameter's feature(s), in the PICMI inp
 The C++ parameter itself is documented in ``Docs/source/usage/parameters.rst``, as part of the C++ change.
 
 The :ref:`documentation of the PICMI classes <usage-picmi-parameters>` automatically shows the new parameter with its type, default and description, e.g., as ``warpx_my_threshold``.
-Nothing needs to be added to ``Docs/source/usage/python.rst``.
+For newly added parameters, the APIs are auto-generated for it in ``Docs/source/usage/python.rst`` and only need changing if a new extension class was defined.
 To check the documentation, build it as described in :ref:`developers-docs`.
 
 
-Checklist
----------
-
-* [ ] ``Field`` parameter added to the PICMI class of the parameter, with type, default ``None``, constraints and description.
-* [ ] The class has the ``warpx_`` prefix for its WarpX parameters (from the ``warpx_options`` helper), unless it is a WarpX-only class.
-* [ ] The parameter is written in the method of the class that writes its inputs.
-* [ ] The inputs contain the parameter (e.g., tested with ``write_input_file``), and invalid values are rejected.
-* [ ] A PICMI test uses the parameter.
-* [ ] ``pre-commit`` passes (see :ref:`developers-testing`).
+Tips and Advanced Options
+-------------------------
 
 .. tip::
 
-   LLM coding assistants in the WarpX repository can follow the skill ``/warpx-add-picmi-parameter``, which implements the steps above (see :ref:`developers-llm`).
+   LLM coding assistants in the WarpX repository can use the skill ``/warpx-add-picmi-parameter``, which implements the steps above (see :ref:`developers-llm`).
+
+We named our Python class parameters like the input parameters, so that users give them as ``warpx_`` followed by that name.
+Sometimes a parameter needs an ``alias``, e.g., because the intended PICMI extension name differs from the ``amrex::ParmParse`` name.
+The alias replaces the generated ``warpx_`` name, e.g., users give this parameter as ``warpx_potential_lo_x`` and not as ``warpx_potential_xmin``:
+
+.. code-block:: python
+
+   potential_xmin: float | str | None = Field(
+       default=None,
+       alias="warpx_potential_lo_x",
+       description="Electrostatic potential on the lower x boundary",
+   )
+
+To keep the name of a renamed parameter working, accept both names with ``validation_alias`` (``AliasChoices`` is imported from ``pydantic``), while the documentation and dumps show the new name:
+
+.. code-block:: python
+
+   new_name: float | None = Field(
+       default=None,
+       validation_alias=AliasChoices("warpx_new_name", "warpx_old_name"),
+       description="...",
+   )
+
+Classes that only exist in WarpX, which derive from an extension class of the standard (``picmistandard.PICMI_Extension``, ``PICMI_SolverExtension``, ``PICMI_DiagnosticExtension``, ...), e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
