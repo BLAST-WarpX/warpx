@@ -1,6 +1,6 @@
 .. _developers-how-to-add-picmi-parameter:
 
-How to Add a PICMI Parameter
+How to add a PICMI Parameter
 ============================
 
 This guide is for developers who added an input parameter in C++ and now need to expose it to users of the :ref:`Python (PICMI) interface <usage-picmi>`.
@@ -13,7 +13,7 @@ In C++, WarpX reads its :ref:`input parameters <running-cpp-parameters>` with ``
    utils::parser::queryWithParser(pp_warpx, "my_threshold", m_my_threshold);
 
 In Python, users set up a simulation with PICMI classes, e.g., ``picmi.Simulation``, which write these input parameters for WarpX (see :ref:`development-python`).
-Parameters of the PICMI standard have plain names, e.g., ``max_steps``.
+Parameters of the `PICMI standard <https://picmi.readthedocs.io/en/latest/standard/standard.html>`__ (`repo <https://github.com/picmi-standard/picmi>`__) have plain names, e.g., ``max_steps``.
 Parameters that only WarpX has are *extensions*, with the prefix ``warpx_``, e.g.:
 
 .. code-block:: python
@@ -22,12 +22,12 @@ Parameters that only WarpX has are *extensions*, with the prefix ``warpx_``, e.g
 
 The PICMI classes in ``Python/pywarpx/picmi.py`` are `pydantic <https://docs.pydantic.dev>`__ models:
 each parameter is a *field* with a type and a description.
-Pydantic checks the values that users give, and the :ref:`documentation of the PICMI classes <usage-picmi-parameters>` is generated from the fields.
+Pydantic checks the values that users pass, and the :ref:`documentation of the PICMI classes <usage-picmi-parameters>` is automatically generated from the field descriptions.
 
 .. note::
 
-   Users who pass a parameter that a PICMI class does not have get an error, e.g., ``warpx_my_threshold: Extra inputs are not permitted``.
-   So a new C++ parameter is only available in Python once it is added to the PICMI class as described below.
+   In order to catch typos and outdated parameters, users who pass a parameter that a PICMI class does not declare get an error, e.g., ``warpx_my_threshold: Extra inputs are not permitted``.
+   So a new C++ parameter is only available in PICMI Python once it is added to the PICMI class as described below.
 
 
 1. Find the PICMI class
@@ -89,7 +89,7 @@ Add the parameter as a field of the class, next to related fields, with the name
 
 Give the field:
 
-* **A type** that matches the C++ parameter (see the table below), with ``| None``.
+* **A type** that matches the C++ parameter (see the table below), combined with ``| None``.
 * **The default** ``None``, which means that the user did not set the parameter.
   WarpX then does not write it to the inputs, so that the default in C++ applies.
   Only give a different default if Python needs to override the C++ default, and explain why.
