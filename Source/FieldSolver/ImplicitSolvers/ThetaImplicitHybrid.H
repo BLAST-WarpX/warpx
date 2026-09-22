@@ -14,6 +14,10 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include <array>
+#include <memory>
+#include <vector>
+
 class HybridPICModel;
 
 /** @file
@@ -110,10 +114,24 @@ public:
     void AdvanceElectronPressure ( bool a_from_jacobian,
                                    amrex::Real a_theta_time );
 
+    /** pe_wall_mirror = 2: entropy slave of the non-periodic axial face planes applied to the
+     *  accepted pe^{n+1} (collocated RZ), see the definition. */
+    void SlaveWallPressure ( int lev );
+
     /** Positive-definite Joule deposit Q = eta |Jp|^2 + eta_H <|grad Jp|^2> of the
      *  collocated in-loop pe advance (include_joule_heating = 1), replacing the pointwise
      *  sign-indefinite -D.Jp pairing there; Yee/RZ keep -D.Jp. */
     mutable std::unique_ptr<amrex::MultiFab> m_Q_diss;
+
+    /** Joule redirect to the ions (implicit_evolve.joule_redirect_to_ions): the fraction of
+     *  Q the Te gate withholds from pe, staged per charged species as the (2/3)-scaled
+     *  per-ion energy E_s [J] that QDSMCApplyIonHeating deposits (explicit QDSMC
+     *  convention), plus the withheld power density (1 - sJ) Q [W/m^3] for the ledger print */
+    static constexpr int kMaxRedirectSpecies = 8;
+    mutable std::unique_ptr<amrex::MultiFab> m_ion_redirect_E;
+    mutable std::unique_ptr<amrex::MultiFab> m_Q_redir;
+    mutable int m_n_ion_species = 0;
+    mutable amrex::GpuArray<amrex::Real, kMaxRedirectSpecies> m_ion_Z{};
 
     /**
      * \brief Turn Efield_fp (holding the Newton iterate a_E) into the particle push
@@ -132,6 +150,11 @@ public:
      * to t^{n+1}. Public because the CUDA compiler requires the enclosing
      * function of an extended device lambda to have public access. */
     void FinishFieldUpdate ( amrex::Real end_time );
+
+    /** Apply the density weight to the predictor increment (see m_predictor_rho_factor).
+     * Public because the CUDA compiler requires the enclosing function of an extended
+     * device lambda to have public access. */
+    void WeightPredictorIncrement ();
 
     /** Rebuild rho from the base state and the divergence of the current response.
      * Public because the CUDA compiler requires the enclosing function of an
@@ -189,6 +212,11 @@ public:
      * include_joule_heating is off (the dissipative work then leaves the
      * system instead of heating pe, matching the explicit QDSMC path). */
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_D_zero;
+    /** Total push field E* + E_ext for the pe work pairing when external
+     * (vector-potential) fields are on: the ions are pushed with the total
+     * field and Ohm's law holds for it, so the electron work E.J_e must be
+     * evaluated with it too (see AdvanceElectronPressure). */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_E_pair;
 
     /**
      * J and rho (scaled + synced) captured right after PreRHSOp of the last nonlinear
@@ -247,6 +275,67 @@ public:
     WarpXSolverVec m_E;
     WarpXSolverVec m_Eold;
 
+    /** implicit_evolve.predictor (default 0): start Newton from the extrapolated
+     *  guess E^n + (E^{n-1+theta} - E^{n-1}) (the previous step's theta-increment,
+     *  = E^n + theta (E^n - E^{n-1}); pe rows included) instead of E^n. Pair it with
+     *  newton.absolute_tolerance: the relative tolerance is measured against the
+     *  initial residual, which the predictor shrinks. */
+    bool m_predictor = false;
+    /** the predictor is skipped after a step that needed this many Newton iterations */
+    int m_predictor_max_iters = 8;
+    /** implicit_evolve.predictor_max_step (default -1 = no limit): the predictor is
+     *  used only for steps < this number (a phase where the field evolves smoothly);
+     *  later steps start from E^n (the FRC formation halo phase, where extrapolating
+     *  particle-noise-set floor-node fields made the first linear solve diverge). */
+    int m_predictor_max_step = -1;
+
+    /** implicit_evolve.dt_halving_max_levels (default 0 = off): when the Newton solve
+     *  of a step ends unconverged (iteration cap, two rejected directions, divergence),
+     *  restore the state at the step start (total fields, electron pressure, particles)
+     *  and redo the step as two half-steps, recursively up to this many halvings
+     *  (dt/2^levels); the outer time step and the diagnostic cadence are unchanged. */
+    int m_dt_halving_max_levels = 0;
+    /** implicit_evolve.dt_halving_max_rel (default 0.1): with halving on, a sub-step at
+     *  the deepest level that is still unconverged is accepted only if its final relative
+     *  residual is below this; otherwise the step gives up (negative exit status: WarpX
+     *  aborts, the run can be restarted from a checkpoint). Accepting such a state
+     *  silently let the next sub-step start 30x worse and spiral (formation, 7.77 us). */
+    amrex::Real m_dt_halving_max_rel = 0.1;
+    /** saved total E^n, B^n and pe^n per halving level (see SaveStepStartState) */
+    std::vector<std::array<std::unique_ptr<amrex::MultiFab>,3>> m_E_save;
+    std::vector<std::array<std::unique_ptr<amrex::MultiFab>,3>> m_B_save;
+    std::vector<std::unique_ptr<amrex::MultiFab>> m_pe_save;
+    long m_dt_halvings = 0;   //!< number of halvings taken so far (statistics)
+    /** set by ComputeRHS when the trial iterate pushed particles beyond the deposition
+     *  guard range: the deposits of those tiles were skipped and the RHS holds
+     *  m_invalid_rhs_value, a state Newton must reject (see
+     *  WarpXParticleContainer::SetDepositOutOfRangeTolerant, ImplicitSolver::LastRHSInvalid) */
+    bool m_rhs_invalid = false;
+    long m_rhs_invalid_count = 0;   //!< number of such evaluations (statistics)
+    static constexpr amrex::Real m_invalid_rhs_value = 1.0e100;
+    [[nodiscard]] bool LastRHSInvalid () const override { return m_rhs_invalid; }
+    /** implicit_evolve.dt_halving_test_step (default -1 = off; testing only): treat the
+     *  first solve of this step as unconverged so the rejection/redo path runs. */
+    int m_dt_halving_test_step = -1;
+
+    /** One (sub)step at halving level a_level: solve, and on an unconverged solve
+     *  with a level left, restore and recurse with dt/2; otherwise finish the step. */
+    int AdvanceStep (amrex::Real start_time, amrex::Real a_dt, int a_step, int a_level);
+    /** External-field split, state saves and the Newton solve of one (sub)step.
+     *  Returns the nonlinear solver exit status; the state is left at the iterate. */
+    int SolveStep (amrex::Real start_time, amrex::Real a_dt, int a_step);
+    /** Everything after an accepted solve: fields and particles to t^{n+1}, Q_ei. */
+    void FinishStep (amrex::Real start_time, int a_step);
+    void SaveStepStartState (int a_level);
+    void RestoreStepStartState (int a_level);
+    /** implicit_evolve.predictor_rho_factor (default 0 = off): multiply the predictor
+     *  increment by 0.5 (1 + tanh((rho - f rho_floor)/rho_floor)), i.e. do not extrapolate
+     *  at nodes below ~f x the density floor, where the field is particle-noise dominated
+     *  (E ~ J/rho_floor) and its step-to-step increment is not a smooth continuation. */
+    amrex::Real m_predictor_rho_factor = 0.0;
+    WarpXSolverVec m_dE_prev;
+    bool m_have_dE_prev = false;
+
     /** implicit_evolve.pe_newton_unknown = 1 (in-loop pe closure only): solve for
      *  pe^{n+theta} as a Newton unknown in the solver vector's scalar slot, scaled by
      *  m_pe_scale = 1/(q_e n0_ref dx_min) so the pe row is commensurate with E. */
@@ -256,8 +345,17 @@ public:
     /** see DepositMassMatricesThisIter */
     int m_mass_matrices_deposit_interval = 1;
     int m_mass_matrices_step_interval = 1;
+    /** implicit_evolve.mass_matrices_rho_response_factor: the linear stage's
+     *  density response rho = rho_base - (dt/2) div(J - J_base) is applied only
+     *  where rho_base exceeds this factor times the density floor (below it the
+     *  1/n factors of Ohm's law amplify the noise of the response); the
+     *  Jacobian is frozen-rho in the excluded cells */
+    amrex::Real m_mm_rho_response_factor = 10.0;
     bool m_mm_deposit_this_step = true;
     bool m_mm_deposited_once = false;
+    /** dt of the last mass-matrix deposit: the kernels carry dt (gyro factors q dt B/(2m)),
+     *  so a lagged deposit is re-done whenever the (sub)step size changes (dt halving). */
+    amrex::Real m_mm_deposit_dt = -1.0;
 
     /** pe_newton_unknown mode: one-evaluation theta-update result at the
      *  current iterate, consumed by the residual row in ComputeRHS (the
@@ -283,6 +381,44 @@ public:
     /** implicit_evolve.pe_ue_cap_fac: multiplier on the marker-CFL u_e cap of the pe
      *  advance, ue_cap = fac * dx_min/(theta dt). */
     amrex::Real m_pe_ue_cap_fac = 1.0;
+
+    /** implicit_evolve.pe_wall_mirror (default 2), collocated RZ grid, non-periodic axial faces:
+     *  0 = legacy: the face planes are skipped and stay at pe^n (identity rows);
+     *  1 = mirror advance: the face nodes are advanced with the symmetry-plane stencil (axial
+     *      index mirrored, axial electron flux odd). Unstable where the column stagnates on
+     *      the plane: the folded ion current vanishes on the face node while the electron flow
+     *      one plane in is still the full inflow, so the flux convergence lands on the face
+     *      node with no density response (formation v2: wall Te 28 keV vs 70 eV one plane in);
+     *  2 = mirror advance inside the solve (as 1) + entropy slave of the face planes applied to
+     *      the accepted pe^{n+1} after each step, pe = s n^gamma with s the mean pe/n^gamma of
+     *      the three planes inside (d s/dz = 0 at a symmetry plane; the RZ axis-row treatment).
+     *      Imposing the slave inside the Newton solve instead broke the solve (v3). */
+    int m_pe_wall_mirror = 2;
+
+    /** implicit_evolve.joule_Te_cutoff [eV] (< 0: off): the in-loop counterpart of the
+     *  explicit QDSMC Te-threshold Joule redirect. The Joule + hyper-resistive deposit
+     *  into pe is multiplied by the smooth gate 0.5 (1 - tanh((Te^n - Tc)/(w Tc))),
+     *  Te^n = pe^n/(e n) at the node: electrons above Tc stop receiving the
+     *  dissipative heat (it leaves the ledger, as with include_joule_heating off,
+     *  unless joule_redirect_to_ions hands it to the ions as the explicit path
+     *  does). Width w = implicit_evolve.joule_Te_cutoff_width (fraction of Tc).
+     *  Collocated grids (positive-definite Joule deposit) only. */
+    amrex::Real m_joule_Te_cutoff_eV = -1.0;
+    amrex::Real m_joule_Te_cutoff_width = 0.25;
+
+    /** implicit_evolve.joule_redirect_to_ions (default 0): with the Te gate on, deposit the
+     *  withheld energy (1 - sJ) Q dt on the ion particles through the QDSMC
+     *  Ornstein-Uhlenbeck kernel in FinishStep (per species E_s = (2/3) Z_s (1 - sJ) Q dt /
+     *  n_e, the explicit joule_redirect_Te_threshold convention), restoring the energy
+     *  ledger. implicit_evolve.joule_redirect_verbose = 1 prints the two Joule powers. */
+    bool m_joule_redirect = false;
+    int m_joule_redirect_verbose = 0;
+
+    /** implicit_evolve.pe_debug_nodes = i1 j1 [i2 j2 ...]: print the per-term budget of
+     *  the in-loop pe advance (pairing field, electron flux, Joule deposit, flux
+     *  divergence, conduction, pe^n -> pe^{n+theta}) at these nodes after every
+     *  nonlinear residual evaluation (development diagnostic). */
+    std::vector<int> m_pe_debug_nodes;
 
     /**
      * \brief Update the E and B fields owned by WarpX. Updates B^{n+theta}

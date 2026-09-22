@@ -15,8 +15,14 @@
 #include "WarpX.H"
 #include <ablastr/utils/Communication.H>
 #include <ablastr/coarsen/sample.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
+#include <AMReX_GpuContainers.H>
+#include <AMReX_Reduce.H>
+
+#include <algorithm>
 #include <string>
+#include <vector>
 
 using warpx::fields::FieldType;
 using namespace amrex::literals;
@@ -61,12 +67,10 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         // enthalpy-flux discretization of the in-loop pe advance: the van Albada MUSCL
         // face flux needs the collocated (nodal J) Cartesian grid and is the default
         // there; central differences elsewhere
-#if defined(WARPX_DIM_RZ)
-        const bool pe_adv_muscl_ok = false;
-#else
+        // (collocated Cartesian and collocated RZ m = 0; the Yee branches keep
+        // the central edge flux)
         const bool pe_adv_muscl_ok = m_WarpX->m_fields.get(
             FieldType::current_fp, ablastr::fields::Direction{2}, 0)->ixType().nodeCentered();
-#endif
         std::string pe_adv_name = pe_adv_muscl_ok ? "vanalbada" : "central";
         pp_impl.query("pe_advection", pe_adv_name);
         if (pe_adv_name == "central") { m_pe_advection = 0; }
@@ -77,7 +81,7 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
                 " is not valid; options: central, vanalbada");
         }
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_pe_advection == 0 || pe_adv_muscl_ok,
-            "implicit_evolve.pe_advection = vanalbada requires the collocated Cartesian grid");
+            "implicit_evolve.pe_advection = vanalbada requires the collocated grid");
         pp_impl.query("filter_push_fields", m_filter_push_fields);
         if (m_filter_push_fields) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::use_filter,
@@ -93,6 +97,48 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
             }
         }
         pp_impl.query("pe_ue_cap_fac", m_pe_ue_cap_fac);
+        pp_impl.query("pe_wall_mirror", m_pe_wall_mirror);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_pe_wall_mirror >= 0 && m_pe_wall_mirror <= 2,
+            "implicit_evolve.pe_wall_mirror must be 0, 1 or 2");
+#if !defined(WARPX_DIM_RZ)
+        // The mirror closure is written for the RZ half-device deck, whose axial (index-1)
+        // lower face is the device mid-plane. In 3D index 1 is y (a wall face outside the
+        // EB), so the mirror would advance the y-face pressure planes with reflected
+        // stencils (2026-09-17: runaway face pe, 16-it Newton, guard-cell abort at step 4).
+        if (m_pe_wall_mirror != 0) {
+            ablastr::warn_manager::WMRecordWarning("ThetaImplicitHybrid",
+                "implicit_evolve.pe_wall_mirror is RZ-only; using the legacy face treatment",
+                ablastr::warn_manager::WarnPriority::medium);
+            m_pe_wall_mirror = 0;
+        }
+#endif
+        pp_impl.query("joule_Te_cutoff", m_joule_Te_cutoff_eV);
+        pp_impl.query("joule_Te_cutoff_width", m_joule_Te_cutoff_width);
+        pp_impl.query("joule_redirect_to_ions", m_joule_redirect);
+        pp_impl.query("joule_redirect_verbose", m_joule_redirect_verbose);
+        if (m_joule_redirect) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_joule_Te_cutoff_eV > 0.0_rt,
+                "implicit_evolve.joule_redirect_to_ions requires implicit_evolve.joule_Te_cutoff > 0");
+        }
+        pp_impl.queryarr("pe_debug_nodes", m_pe_debug_nodes);
+        pp_impl.query("predictor", m_predictor);
+        pp_impl.query("predictor_max_iters", m_predictor_max_iters);
+        pp_impl.query("predictor_max_step", m_predictor_max_step);
+        pp_impl.query("predictor_rho_factor", m_predictor_rho_factor);
+        pp_impl.query("dt_halving_max_levels", m_dt_halving_max_levels);
+        pp_impl.query("dt_halving_test_step", m_dt_halving_test_step);
+        pp_impl.query("dt_halving_max_rel", m_dt_halving_max_rel);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_dt_halving_max_levels >= 0,
+            "implicit_evolve.dt_halving_max_levels must be >= 0");
+        if (m_joule_Te_cutoff_eV > 0.0_rt) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_hybrid_pic_model->m_include_joule_heating &&
+                m_hybrid_pic_model->m_solve_electron_energy_equation,
+                "implicit_evolve.joule_Te_cutoff requires the in-loop electron energy "
+                "equation with hybrid_pic_model.include_joule_heating = 1");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_joule_Te_cutoff_width > 0.0_rt,
+                "implicit_evolve.joule_Te_cutoff_width must be positive");
+        }
         if (m_pe_unknown) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 m_hybrid_pic_model->m_solve_electron_energy_equation &&
@@ -117,6 +163,7 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         m_E.Define( m_WarpX, "Efield_fp" );
     }
     m_Eold.Define( m_E );
+    m_dE_prev.Define( m_E );
 
     // Define B_old MultiFabs
     using ablastr::fields::Direction;
@@ -147,6 +194,9 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         pp.query("mass_matrices_step_interval", m_mass_matrices_step_interval);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass_matrices_step_interval >= 1,
             "implicit_evolve.mass_matrices_step_interval must be >= 1");
+        pp.query("mass_matrices_rho_response_factor", m_mm_rho_response_factor);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mm_rho_response_factor >= 1.0_rt,
+            "implicit_evolve.mass_matrices_rho_response_factor must be >= 1");
     }
 
     m_nlsolver->Define(m_E, this);
@@ -177,6 +227,10 @@ void ThetaImplicitHybrid::PrintParameters () const
     amrex::Print() << "-------- THETA IMPLICIT HYBRID PIC SOLVER PARAMETERS ------\n";
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "Time-bias parameter theta:           " << m_theta << "\n";
+    if (m_dt_halving_max_levels > 0) {
+        amrex::Print() << "dt halving on unconverged Newton:    up to "
+                       << m_dt_halving_max_levels << " level(s)\n";
+    }
     if (m_use_mass_matrices) {
         amrex::Print() << "mass matrices deposit interval:      "
                        << m_mass_matrices_deposit_interval << "\n";
@@ -194,7 +248,74 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
 {
     BL_PROFILE("ThetaImplicitHybrid::OneStep()");
 
+    const int status = AdvanceStep(start_time, a_dt, a_step, 0);
+    // sub-steps set WarpX::dt to their own dt (the particle push reads it):
+    // leave it at the outer step for the caller
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) { m_WarpX->setdt(a_dt, lev); }
+    return status;
+}
+
+int ThetaImplicitHybrid::AdvanceStep ( const amrex::Real  start_time,
+                                        const amrex::Real  a_dt,
+                                        const int          a_step,
+                                        const int          a_level )
+{
+    using namespace amrex::literals;
+
+    const bool can_halve = (a_level < m_dt_halving_max_levels);
+    if (can_halve) { SaveStepStartState(a_level); }
+
+    const int status = SolveStep(start_time, a_dt, a_step);
+    // testing hook: force the rejection path once (outer level of one step)
+    const bool forced_fail = (a_level == 0 && a_step == m_dt_halving_test_step);
+    const bool converged = (status >= 0) && m_nlsolver->GetLastConverged() && !forced_fail;
+
+    if (!converged && can_halve) {
+        // Reject the step: back to the state at start_time and redo it as two
+        // half-steps, each again subject to halving up to the level cap.
+        RestoreStepStartState(a_level);
+        m_have_dE_prev = false;   // the rejected increment is no predictor
+        ++m_dt_halvings;
+        amrex::Print() << "ThetaImplicitHybrid: Newton did not converge (exit status "
+                       << status << ") at t = " << start_time << ", halving level "
+                       << a_level << ": redoing the step as two half-steps of dt = "
+                       << 0.5_rt*a_dt << " (" << m_dt_halvings << " halving(s) so far)\n";
+        const amrex::Real dt_half = 0.5_rt*a_dt;
+        const int s1 = AdvanceStep(start_time, dt_half, a_step, a_level + 1);
+        if (s1 < 0) { return s1; }
+        const int s2 = AdvanceStep(start_time + dt_half, dt_half, a_step, a_level + 1);
+        m_have_dE_prev = false;   // a half-step increment does not predict a full step
+        return s2;
+    }
+
+    // -5 = Newton did not converge (iteration cap or exhausted line search) with
+    // require_convergence: not fatal by itself here, the halving-limit policy below decides;
+    // any other negative status (divergence, giving up) ends the run
+    if (status < 0 && status != -5) { return status; }
+    if (!converged && m_dt_halving_max_levels > 0
+        && m_nlsolver->GetLastRelNorm() > m_dt_halving_max_rel) {
+        // deepest halving level and still far from converged: do not advance
+        // the state from here (the next step would start from a corrupted
+        // state and spiral); a negative status aborts the run cleanly
+        amrex::Print() << "ThetaImplicitHybrid: unconverged at the halving limit (relative "
+                       << "residual " << m_nlsolver->GetLastRelNorm() << " > "
+                       << m_dt_halving_max_rel << ", implicit_evolve.dt_halving_max_rel) at t = "
+                       << start_time << ": giving up the step\n";
+        return -5;
+    }
+    FinishStep(start_time, a_step);
+    return status;
+}
+
+int ThetaImplicitHybrid::SolveStep ( const amrex::Real  start_time,
+                                      const amrex::Real  a_dt,
+                                      const int          a_step )
+{
+    BL_PROFILE("ThetaImplicitHybrid::SolveStep()");
+
     m_dt = a_dt;
+    // the particle push (WarpX::PushParticlesandDeposit) reads WarpX::dt
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) { m_WarpX->setdt(a_dt, lev); }
 
     // Handle external field splitting: work with internal fields during the solve
     if (m_add_external_fields) {
@@ -235,23 +356,151 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         }
     }
 
-    // Initial guess: E^{n+θ} = E^n
+    // Initial guess: E^{n+θ} = E^n, or with implicit_evolve.predictor the previous
+    // step's theta-increment added: E^n + (E^{n-1+θ} - E^{n-1}). The residual at E^n
+    // is dominated by the per-step field change and its first Newton direction
+    // typically needs a line search (formation: alpha 0.5 at iteration 0 even with
+    // the exact Jacobian); the extrapolated guess starts inside the quadratic basin.
     m_E.Copy(m_Eold);
+    // step-limited predictor (see m_predictor_max_step)
+    const bool predictor_on = m_predictor
+        && (m_predictor_max_step < 0 || a_step < m_predictor_max_step);
+    if (predictor_on && m_have_dE_prev) {
+        m_E.linComb(1.0_rt, m_Eold, 1.0_rt, m_dE_prev);
+    }
 
     // Lagged mass matrices across steps (see DepositMassMatricesThisIter):
     // deposit on the first step of the run/restart and on every k-th step.
     if (m_use_mass_matrices) {
+        // also whenever the (sub)step size differs from the last deposit's: the kernels
+        // carry dt through the gyro factors, so half-step solves must not inherit
+        // full-step matrices (nor the next full step the half-step ones)
         m_mm_deposit_this_step = (m_mass_matrices_step_interval <= 1) || !m_mm_deposited_once
-                                 || (a_step % m_mass_matrices_step_interval == 0);
+                                 || (a_step % m_mass_matrices_step_interval == 0)
+                                 || (m_dt != m_mm_deposit_dt);
     }
 
     // Solve nonlinear system for E^{n+θ} (and eventually Pe^{n+θ})
     m_nlsolver->Solve( m_E, m_Eold, start_time, m_dt, a_step );
 
-    if (m_mm_deposit_this_step) { m_mm_deposited_once = true; }
+    if (m_mm_deposit_this_step) { m_mm_deposited_once = true; m_mm_deposit_dt = m_dt; }
 
     const int exit_status = m_nlsolver->GetExitStatus();
     if (exit_status < 0) { return exit_status; }
+
+    if (predictor_on) {
+        // theta-increment of this step, the next step's predictor -- unless this step
+        // struggled (>= predictor_max_iters Newton iterations: line-search-limited steps
+        // leave an increment that is not a smooth continuation; extrapolating it fed a
+        // diverging first linear solve in the formation run), then fall back to E^n
+        m_dE_prev.linComb(1.0_rt, m_E, -1.0_rt, m_Eold);
+        if (m_predictor_rho_factor > 0.0_rt) { WeightPredictorIncrement(); }
+        m_have_dE_prev = (m_nlsolver->GetLastIterations() < m_predictor_max_iters);
+    }
+
+    return exit_status;
+}
+
+namespace {
+/** Volume-weighted (RZ: 2 pi r dr dz) global sum of a nodal scalar field, for ledger prints */
+amrex::Real VolumeWeightedSum (const amrex::MultiFab& mf, const amrex::Geometry& geom)
+{
+    using namespace amrex::literals;
+    const auto dx = geom.CellSizeArray();
+    const amrex::Real rmin = geom.ProbLo(0);
+    amrex::ReduceOps<amrex::ReduceOpSum> reduce_op;
+    amrex::ReduceData<amrex::Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+    for (amrex::MFIter mfi(mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const amrex::Box& bx = mfi.tilebox();
+        auto const& a = mf.const_array(mfi);
+        reduce_op.eval(bx, reduce_data,
+            [=] AMREX_GPU_DEVICE (int i, int j, int k) -> ReduceTuple
+            {
+#if defined(WARPX_DIM_RZ)
+                const amrex::Real r = amrex::max(rmin + i*dx[0], 0.25_rt*dx[0]);
+                const amrex::Real w = 2.0_rt*MathConst::pi*r*dx[0]*dx[1];
+#elif defined(WARPX_DIM_3D)
+                const amrex::Real w = dx[0]*dx[1]*dx[2];
+                amrex::ignore_unused(rmin);
+#elif defined(WARPX_DIM_XZ)
+                const amrex::Real w = dx[0]*dx[1];
+                amrex::ignore_unused(rmin);
+#else
+                const amrex::Real w = dx[0];
+                amrex::ignore_unused(rmin);
+#endif
+                return {a(i,j,k)*w};
+            });
+    }
+    amrex::Real s = amrex::get<0>(reduce_data.value(reduce_op));
+    amrex::ParallelDescriptor::ReduceRealSum(s);
+    return s;
+}
+}
+
+void ThetaImplicitHybrid::SlaveWallPressure ( const int lev )
+{
+    // Entropy slave of the non-periodic axial face planes (pe_wall_mirror = 2, collocated RZ):
+    // pe = s n^gamma with s the mean pe/n^gamma of the three planes inside (d s/dz = 0 at a
+    // symmetry plane, the RZ axis-row treatment), applied to the ACCEPTED pe^{n+1} after the
+    // solve. Inside the solve the face nodes follow the mirror advance (pe_wall_mirror = 1),
+    // whose flux convergence has no work-term counterpart on the face (E_z = J_e,z = 0 there)
+    // and no density response, so left alone the face pressure e-folds every few steps
+    // (formation v2, 25 us: 28 keV on the plane, 70 eV one plane in). Imposing the slave as
+    // a Newton constraint instead (v3) broke the solve (7 rejections in 112 steps, death).
+    // EB-covered face nodes keep their value.
+#if defined(WARPX_DIM_RZ)
+    using namespace amrex::literals;
+    const amrex::Geometry& geom = m_WarpX->Geom(lev);
+    if (geom.isPeriodic(1)) { return; }
+    amrex::MultiFab* pe = m_WarpX->m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    const amrex::MultiFab* rho_mf = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+    const amrex::MultiFab* jz = m_WarpX->m_fields.get(FieldType::hybrid_current_fp_plasma,
+                                                      ablastr::fields::Direction{2}, lev);
+    if (!jz->ixType().nodeCentered()) { return; }   // collocated grids only
+    const amrex::Real gam = m_hybrid_pic_model->m_gamma;
+    const amrex::Real rfloor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+    const amrex::Box dom_n = amrex::convert(geom.Domain(), amrex::IntVect::TheNodeVector());
+    const int jlo = dom_n.smallEnd(1), jhi = dom_n.bigEnd(1);
+    const amrex::iMultiFab* eb_flag = EB::enabled()
+        ? m_WarpX->GetEBUpdateEFlag()[lev][0].get() : nullptr;
+    for (amrex::MFIter mfi(*pe, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const amrex::Box tb = mfi.tilebox(amrex::IntVect::TheNodeVector());
+        auto const& pe_a = pe->array(mfi);
+        auto const& rh   = rho_mf->const_array(mfi);
+        amrex::Array4<int const> ebq;
+        if (eb_flag) { ebq = eb_flag->const_array(mfi); }
+        const bool has_eb = (eb_flag != nullptr);
+        for (const int jw : {jlo, jhi}) {
+            if (jw < tb.smallEnd(1) || jw > tb.bigEnd(1)) { continue; }
+            const int dir = (jw == jlo) ? 1 : -1;
+            const amrex::Box tbw(amrex::IntVect(tb.smallEnd(0), jw),
+                                 amrex::IntVect(tb.bigEnd(0), jw), tb.ixType());
+            amrex::ParallelFor(tbw, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                if (has_eb && ebq(i,j,k) == 0) { return; }
+                amrex::Real sbar = 0._rt;
+                for (int jj = 1; jj <= 3; ++jj) {
+                    const amrex::Real nn = amrex::max(rh(i,j+dir*jj,k,0), rfloor);
+                    sbar += pe_a(i,j+dir*jj,k) / std::pow(nn, gam);
+                }
+                sbar *= (1._rt/3._rt);
+                const amrex::Real nw = amrex::max(rh(i,j,k,0), rfloor);
+                pe_a(i,j,k) = sbar * std::pow(nw, gam);
+            });
+        }
+    }
+    pe->OverrideSync(geom.periodicity());
+    pe->FillBoundary(geom.periodicity());
+#else
+    amrex::ignore_unused(lev);
+#endif
+}
+
+void ThetaImplicitHybrid::FinishStep ( const amrex::Real  start_time,
+                                        const int          a_step )
+{
+    BL_PROFILE("ThetaImplicitHybrid::FinishStep()");
 
     // Update WarpX fields to t^{n+θ}
     UpdateWarpXFields( m_E, start_time );
@@ -271,14 +520,30 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
 
     // Advance fields (including the electron pressure state) from t^{n+θ} to t^{n+1}
     FinishFieldUpdate( start_time + m_dt );
+    // symmetry-plane entropy pin of the axial face planes on the accepted pe^{n+1}; the
+    // start-of-step copy pe^n that FinishFieldUpdate just rolled must see the pinned value
+    // (the Q_ei block below re-rolls it only when relaxation or the redirect is on)
+    if (m_pe_wall_mirror == 2) {
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) { SlaveWallPressure(lev); }
+        if (m_pe_old) {
+            const amrex::MultiFab* pe =
+                m_WarpX->m_fields.get(FieldType::hybrid_electron_pressure_fp, 0);
+            amrex::MultiFab::Copy(*m_pe_old, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
+            m_pe_old->FillBoundary(m_WarpX->Geom(0).periodicity());
+        }
+    }
 
     // Electron energy equation: the transport/compression/Joule part of the
     // update already happened inside the Newton solve (in-loop pe advance,
     // energy-paired). What remains is the symmetric Q_ei ion-electron
     // collisional exchange, which must kick the ion particles and therefore
-    // runs once per step here, on the t^{n+1} state.
+    // runs once per step here, on the t^{n+1} state. The Joule redirect (energy the Te
+    // gate withheld from pe, staged in m_ion_redirect_E by the last residual
+    // evaluation) rides on the same ion-heating kernel.
+    const bool redirect_active = m_joule_redirect && m_ion_redirect_E &&
+        m_hybrid_pic_model->m_solve_electron_energy_equation;
     if (m_hybrid_pic_model->m_solve_electron_energy_equation &&
-        m_hybrid_pic_model->m_include_temperature_relaxation) {
+        (m_hybrid_pic_model->m_include_temperature_relaxation || redirect_active)) {
         // Without the Q_ei relaxation there is nothing left to do: transport,
         // compression and Joule heating are already handled by the in-loop pe
         // advance, so the energy equation reduces exactly to the gamma-law
@@ -323,6 +588,25 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
                     /*apply_boundary_and_scale_volume*/false,
                     /*interpolate_across_levels*/false);
             }
+            // Rebuild the species sum the Q_ei (and QDSMC Joule) kernels divide by,
+            // f_s = rho_s / Sigma_t rho_t. Only the explicit HybridPICDepositRhoAndJ
+            // refreshed hybrid_rho_species_sum_fp, so implicitly it held the
+            // initialization deposit for the whole run (f_s = n(t)/n(0): the relaxation
+            // 8x too fast in the compressed FRC core, arbitrary where plasma moved into
+            // initially empty cells) and ZERO after a restart (floored: f_s ~ 300, the
+            // electrons relaxed toward T_i at ~1 % per step = +28 J/step of spurious
+            // electron heating, 10x the physical rate; formation restarts 2026-09-17).
+            for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+                amrex::MultiFab* rsum =
+                    m_WarpX->m_fields.get("hybrid_rho_species_sum_fp", lev);
+                rsum->setVal(0.0_rt);
+                for (auto const & spec : mypc.GetSpeciesNames()) {
+                    auto & pc = mypc.GetParticleContainerFromName(spec);
+                    if (pc.getCharge() == 0._prt) { continue; }
+                    const amrex::MultiFab* rs = m_WarpX->m_fields.get("rho_fp_" + spec, lev);
+                    amrex::MultiFab::Add(*rsum, *rs, 0, 0, 1, amrex::IntVect::TheZeroVector());
+                }
+            }
         }
         // Deposit the per-species ion temperature T_<nm> for the Q_ei relaxation.
         // The explicit path fills it in HybridPICDepositRhoAndJ; the implicit path
@@ -335,8 +619,20 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
         // the in-loop pe^{n+1} and the freshly deposited rho^{n+1}.
         for (int lev = 0; lev < m_num_amr_levels; ++lev) {
             m_hybrid_pic_model->FillTeFromPe(lev);
-            m_hybrid_pic_model->ApplyIonElectronEnergyExchange(lev, m_dt);
+            m_hybrid_pic_model->ApplyIonElectronEnergyExchange(
+                lev, m_dt, (redirect_active && lev == 0) ? m_ion_redirect_E.get() : nullptr);
             m_hybrid_pic_model->FillPeFromTe(lev);
+        }
+        if (redirect_active) {
+            if (m_joule_redirect_verbose > 0 && m_Q_diss && m_Q_redir) {
+                const amrex::Real p_pe = VolumeWeightedSum(*m_Q_diss, m_WarpX->Geom(0));
+                const amrex::Real p_i  = VolumeWeightedSum(*m_Q_redir, m_WarpX->Geom(0));
+                amrex::Print() << "  Joule deposit: pe " << p_pe
+                               << " W, redirected to ions " << p_i << " W\n";
+            }
+            // consumed: a step whose residual evaluations never wrote it must not reuse it
+            m_ion_redirect_E->setVal(0.0_rt);
+            m_Q_redir->setVal(0.0_rt);
         }
         // Roll the in-loop pressure state so the next step starts from the
         // relaxed pe^{n+1}.
@@ -356,8 +652,59 @@ int ThetaImplicitHybrid::OneStep ( const amrex::Real  start_time,
             m_hybrid_pic_model->FillTeFromPe(lev);
         }
     }
+}
 
-    return exit_status;
+void ThetaImplicitHybrid::SaveStepStartState ( const int a_level )
+{
+    // Total fields (external part included: called before the split of
+    // SolveStep), the electron pressure and, through the x_n/u_n particle
+    // attributes written by SolveStep, the particles: everything a rejected
+    // step must be rewound to. One set of copies per halving level.
+    using ablastr::fields::Direction;
+    AMREX_ALWAYS_ASSERT(m_num_amr_levels == 1);
+    const int lev = 0;
+    if (static_cast<int>(m_E_save.size()) <= a_level) {
+        m_E_save.resize(a_level + 1);
+        m_B_save.resize(a_level + 1);
+        m_pe_save.resize(a_level + 1);
+    }
+    for (int n = 0; n < 3; ++n) {
+        const amrex::MultiFab* E = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{n}, lev);
+        const amrex::MultiFab* B = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{n}, lev);
+        if (!m_E_save[a_level][n]) {
+            m_E_save[a_level][n] = std::make_unique<amrex::MultiFab>(
+                E->boxArray(), E->DistributionMap(), E->nComp(), E->nGrowVect());
+            m_B_save[a_level][n] = std::make_unique<amrex::MultiFab>(
+                B->boxArray(), B->DistributionMap(), B->nComp(), B->nGrowVect());
+        }
+        amrex::MultiFab::Copy(*m_E_save[a_level][n], *E, 0, 0, E->nComp(), E->nGrowVect());
+        amrex::MultiFab::Copy(*m_B_save[a_level][n], *B, 0, 0, B->nComp(), B->nGrowVect());
+    }
+    const amrex::MultiFab* pe =
+        m_WarpX->m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    if (!m_pe_save[a_level]) {
+        m_pe_save[a_level] = std::make_unique<amrex::MultiFab>(
+            pe->boxArray(), pe->DistributionMap(), pe->nComp(), pe->nGrowVect());
+    }
+    amrex::MultiFab::Copy(*m_pe_save[a_level], *pe, 0, 0, pe->nComp(), pe->nGrowVect());
+}
+
+void ThetaImplicitHybrid::RestoreStepStartState ( const int a_level )
+{
+    // Inverse of SaveStepStartState. The densities, currents, mass matrices
+    // and push-field work arrays are rebuilt from these by the next solve;
+    // m_pe_old is only rolled in FinishStep and therefore still holds pe^n.
+    using ablastr::fields::Direction;
+    const int lev = 0;
+    for (int n = 0; n < 3; ++n) {
+        amrex::MultiFab* E = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{n}, lev);
+        amrex::MultiFab* B = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{n}, lev);
+        amrex::MultiFab::Copy(*E, *m_E_save[a_level][n], 0, 0, E->nComp(), E->nGrowVect());
+        amrex::MultiFab::Copy(*B, *m_B_save[a_level][n], 0, 0, B->nComp(), B->nGrowVect());
+    }
+    amrex::MultiFab* pe = m_WarpX->m_fields.get(FieldType::hybrid_electron_pressure_fp, lev);
+    amrex::MultiFab::Copy(*pe, *m_pe_save[a_level], 0, 0, pe->nComp(), pe->nGrowVect());
+    m_WarpX->RestoreParticlesAtImplicitStepStart();
 }
 
 void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
@@ -439,9 +786,32 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         // downstream keeps the unfiltered registry (Jacobian probes included)
         FilterPushFieldsSwap(true);
     }
+    // A trial iterate may push particles beyond the deposition guard range (a wild
+    // linear-solve direction, the stiff wall sheath of the 3D formation case): have the
+    // deposits count and skip them instead of asserting, and hand Newton a residual it
+    // must reject. Every evaluation re-pushes from the step-start state, so nothing of
+    // the skipped state survives.
+    WarpXParticleContainer::SetDepositOutOfRangeTolerant(true);
     PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+    WarpXParticleContainer::SetDepositOutOfRangeTolerant(false);
     if (m_filter_push_fields) {
         FilterPushFieldsSwap(false);
+    }
+    {
+        amrex::Long n_out = WarpXParticleContainer::NumDepositOutOfRange();
+        amrex::ParallelDescriptor::ReduceLongSum(n_out);
+        m_rhs_invalid = (n_out > 0);
+        if (m_rhs_invalid) {
+            ++m_rhs_invalid_count;
+            amrex::Print() << "ThetaImplicitHybrid: " << n_out << " particle(s) beyond the "
+                           << "deposition guard range in this residual evaluation (Newton "
+                           << "iteration " << a_nl_iter
+                           << (a_from_jacobian ? ", Jacobian probe" : "")
+                           << "): the trial is rejected (" << m_rhs_invalid_count
+                           << " such evaluation(s) so far)\n";
+            a_RHS.setVal(m_invalid_rhs_value);
+            return;
+        }
     }
 
     {
@@ -610,6 +980,7 @@ void ThetaImplicitHybrid::ApplyRhoResponseFromDivJ ()
     // the update would be noise that the 1/n factors of Ohm's law amplify. Restrict the
     // update to cells safely above the density floor and clamp the result at the floor.
     const amrex::Real rho_floor = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+    const amrex::Real rho_resp_min = m_mm_rho_response_factor * rho_floor;
 
     // Nodal domain box; the central div stencil (with nodal interpolation of J) reads
     // one cell beyond each node, which exceeds the J guard cells at domain-edge nodes.
@@ -681,7 +1052,7 @@ void ThetaImplicitHybrid::ApplyRhoResponseFromDivJ ()
             amrex::ignore_unused(i, j, k, dJx_n, dJz_n, dxi, half_dt, dlo, dhi);
 #endif
             const amrex::Real rho0v = rho_arr(i,j,k,0);
-            if (rho0v > 10._rt * rho_floor) {
+            if (rho0v > rho_resp_min) {
                 rho_arr(i,j,k,0) = amrex::max(rho0v - half_dt * div, rho_floor);
             }
         });
@@ -752,6 +1123,47 @@ void ThetaImplicitHybrid::SubtractDissipativeEFromPushField ()
     }
 }
 
+void ThetaImplicitHybrid::WeightPredictorIncrement ()
+{
+    // Predictor increment restricted to the plasma: at near-floor nodes the Ohm's-law
+    // field is set by a handful of macro-ions through E ~ J/rho_floor and flips between
+    // steps; extrapolating it seeded a first-evaluation particle kick beyond the guard
+    // cells in the formation halo phase (prod_dt4_peu_v5, step 902). The weight uses
+    // the same staggered rho interpolation as the Ohm solve and the pairing.
+    using namespace amrex::literals;
+    using warpx::fields::FieldType;
+    using namespace ablastr::coarsen::sample;
+    const int lev = 0;
+    const amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
+    const amrex::Real rho_f = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+    const amrex::Real r0 = m_predictor_rho_factor * rho_f;
+    const amrex::GpuArray<int, 3> nodal3 = {1, 1, 1};
+    const amrex::GpuArray<int, 3> crs3   = {1, 1, 1};
+    const std::array<amrex::GpuArray<int, 3>, 4> stags = {
+        m_hybrid_pic_model->Ex_IndexType, m_hybrid_pic_model->Ey_IndexType,
+        m_hybrid_pic_model->Ez_IndexType, nodal3};
+    for (int n = 0; n < (m_pe_unknown ? 4 : 3); ++n) {
+        amrex::MultiFab& dE = (n < 3) ? *m_dE_prev.getArrayVec()[lev][n]
+                                      : *m_dE_prev.getScalarVec()[lev];
+        const amrex::GpuArray<int, 3> stag = stags[n];
+        const int ng = amrex::max(0, amrex::min(dE.nGrowVect().min(),
+                                                rho->nGrowVect().min() - 1));
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(dE, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+            const amrex::Box bx = mfi.growntilebox(ng);
+            auto const& d  = dE.array(mfi);
+            auto const& rr = rho->const_array(mfi);
+            const int nc = dE.nComp();
+            amrex::ParallelFor(bx, nc, [=] AMREX_GPU_DEVICE (int i, int j, int k, int c) {
+                const amrex::Real rho_e = Interp(rr, nodal3, stag, crs3, i, j, k, 0);
+                d(i,j,k,c) *= 0.5_rt*(1.0_rt + std::tanh((rho_e - r0)/rho_f));
+            });
+        }
+    }
+}
+
 void ThetaImplicitHybrid::FilterPushFieldsSwap (const bool a_apply)
 {
     // Conservative smoothing: PreRHSOp binomial-filters Efield_fp in place for the gather;
@@ -797,12 +1209,69 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
         m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
     const ablastr::fields::VectorField Jp =
         m_WarpX->m_fields.get_alldirs(FieldType::hybrid_current_fp_plasma, lev);
-    // Efield_fp holds the push field E* = a_E - D (external-field contributions
-    // have already been subtracted again): the exact field the ions were pushed
-    // with. theta-Faraday consumes a_E = E* + D, whose dissipative part D enters
-    // the pairing as the -D.J_p heating term below.
-    const ablastr::fields::VectorField Efld =
+    // Efield_fp holds the internal push field E* = a_E - D (external-field
+    // contributions have already been subtracted again). theta-Faraday consumes
+    // a_E = E* + D, whose dissipative part D enters the pairing as the -D.J_p
+    // heating term below.
+    ablastr::fields::VectorField Efld =
         m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+    // With external (vector-potential) fields, Ohm's law -- hence the identity
+    // E.J_e = u_e.grad(pe) + eta J.J_e that the reversible pairing rests on -- holds
+    // for the Ohm's-law total field E_Ohm, of which the registry keeps the internal
+    // part a_E = E_Ohm - w(rho) E_ext (HybridExtSubWeight: w = 1 in the plasma, 0
+    // below the density floor, where the vacuum Ohm's law is read as the plasma-
+    // induced part and E_ext adds to it). The pairing must therefore read
+    // E* + w(rho) E_ext = E_Ohm - D. Pairing against the internal E* alone drops
+    // E_ext.J_e in the plasma: with a time-dependent coil drive (theta-pinch
+    // formation) that is the inductive work on the skin-current electrons, O(1)
+    // of the compression work (observed as a shell cooled to the Te floor inside
+    // the edge current and a hot rim where the current reverses); adding the full
+    // E_ext instead double counts it below the floor, where the skin current
+    // peaks in rarefied nodes (rim 5 -> 100 eV in 1 us, Joule-gate independent).
+    // Static external fields (E_ext = 0) are unaffected. hybrid_E_fp_external
+    // holds E_ext at the theta time here (UpdateHybridExternalFields in
+    // ComputeRHS), the same field the ions were pushed with; the weight uses the
+    // same staggered rho interpolation and floor parameters as the Ohm solve.
+    if (m_add_external_fields) {
+        const amrex::Real rho_f  = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
+        const amrex::Real flw    = m_hybrid_pic_model->m_n_floor_smooth_width * rho_f;
+        const amrex::GpuArray<int, 3> nodal3 = {1, 1, 1};
+        const amrex::GpuArray<int, 3> crs3   = {1, 1, 1};
+        const std::array<amrex::GpuArray<int, 3>, 3> Estag = {
+            m_hybrid_pic_model->Ex_IndexType, m_hybrid_pic_model->Ey_IndexType,
+            m_hybrid_pic_model->Ez_IndexType};
+        for (int n = 0; n < 3; ++n) {
+            const amrex::MultiFab& Eext = *m_WarpX->m_fields.get(
+                FieldType::hybrid_E_fp_external, Direction{n}, lev);
+            if (!m_E_pair[n]) {
+                m_E_pair[n] = std::make_unique<amrex::MultiFab>(
+                    Efld[n]->boxArray(), Efld[n]->DistributionMap(),
+                    Efld[n]->nComp(), Efld[n]->nGrowVect());
+            }
+            amrex::MultiFab::Copy(*m_E_pair[n], *Efld[n], 0, 0,
+                                  Efld[n]->nComp(), Efld[n]->nGrowVect());
+            // valid region plus the ghosts rho can serve (its stagger interpolation
+            // reads one neighbour); the pairing reads E at its own node
+            const int ng = amrex::min(Efld[n]->nGrowVect().min(),
+                                      rho->nGrowVect().min() - 1);
+            const amrex::GpuArray<int, 3> stag = Estag[n];
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(*m_E_pair[n], amrex::TilingIfNotGPU());
+                 mfi.isValid(); ++mfi) {
+                const amrex::Box bx = mfi.growntilebox(amrex::max(ng, 0));
+                auto const& ep = m_E_pair[n]->array(mfi);
+                auto const& ee = Eext.const_array(mfi);
+                auto const& rr = rho->const_array(mfi);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    const amrex::Real rho_e = Interp(rr, nodal3, stag, crs3, i, j, k, 0);
+                    ep(i,j,k) += HybridExtSubWeight(rho_e, rho_f, flw) * ee(i,j,k);
+                });
+            }
+        }
+        Efld = {m_E_pair[0].get(), m_E_pair[1].get(), m_E_pair[2].get()};
+    }
     for (int n = 0; n < 3; ++n) {
         if (!m_D[n]) {  // no dissipation configured: pair against D = 0
             m_D[n] = std::make_unique<amrex::MultiFab>(
@@ -887,6 +1356,20 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
         dx_min = std::min(dx_min, geom.CellSize(d));
     }
     const amrex::Real ue_cap = m_pe_ue_cap_fac * dx_min / theta_dt;
+    // symmetry-plane closure of the non-periodic axial faces (RZ collocated), see the kernel
+    const bool wall_mirror = (m_pe_wall_mirror >= 1);
+
+    // Holmstrom vacuum region: blend the advanced pressure toward the floored adiabat with
+    // the same (statistics-aware) vacuum weight Ohm's law uses. In near-empty cells u_e =
+    // (J_i - J)/rho is noise and the transport/compression terms ran away (formation
+    // 21.6 us: pe x100 in one step at an axis node with 0-2 macro-ions, grad-pe E 1e6 V/m,
+    // then a B/J spike the solver could not follow). Linear in pe, smooth in rho.
+    const bool vac_blend = m_hybrid_pic_model->m_holmstrom_vacuum_region;
+    const amrex::Real vac_floor_w = m_hybrid_pic_model->m_n_floor_smooth_width * rho_floor;
+    const amrex::Real vac_rref = m_hybrid_pic_model->m_vacuum_weight_r_ref;
+    const amrex::Real vac_maxf = m_hybrid_pic_model->m_vacuum_weight_max_factor;
+    const amrex::Real ad_n0 = m_hybrid_pic_model->m_n0_ref;
+    const amrex::Real ad_T0 = m_hybrid_pic_model->m_elec_temp;
 
     const amrex::GpuArray<int, 3> Jx_stag = m_hybrid_pic_model->Jx_IndexType;
     const amrex::GpuArray<int, 3> Jy_stag = m_hybrid_pic_model->Jy_IndexType;
@@ -911,6 +1394,17 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
     // Joule heating on the collocated grid: deposit the positive-definite Q (HybridPeJouleQ,
     // see m_Q_diss) instead of -D.Jp, whose hyper-resistive part is sign-indefinite pointwise
     const bool q_posdef = jheat && J_nodal;
+    // Te-threshold Joule gate (implicit counterpart of the explicit QDSMC redirect above
+    // joule_redirect_Te_threshold): the anomalous (Chodura ~ 1/sqrt(n)) resistivity times
+    // the edge skin current heats the rarefied rim nodes at rates the few electrons there
+    // cannot absorb (formation: 5 -> 80 eV by 0.5 us with the gate off, unbounded), so
+    // above Tc the dissipative deposit is withheld from pe. Frozen at pe^n: no Newton
+    // dependence. Positive-definite (collocated) deposit only, see m_joule_Te_cutoff_eV.
+    const bool jgate = jheat && m_joule_Te_cutoff_eV > 0.0_rt;
+    if (jgate) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(q_posdef,
+            "implicit_evolve.joule_Te_cutoff requires the collocated grid");
+    }
     if (q_posdef) {
         if (!m_Q_diss) {
             m_Q_diss = std::make_unique<amrex::MultiFab>(
@@ -927,6 +1421,44 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
         const amrex::Dim3 qlo = dlo, qhi = dhi;
         const amrex::GpuArray<bool, 3> qper = is_per;
         const auto dxiq = geom.InvCellSizeArray();
+        const amrex::Real jcut   = m_joule_Te_cutoff_eV;
+        const amrex::Real jcut_w = m_joule_Te_cutoff_width * m_joule_Te_cutoff_eV;
+        // Joule redirect to the ions: the gated-out fraction (1 - sJ) Q dt is staged per
+        // charged species as the (2/3)-scaled per-ion energy E_s = (2/3) Z_s (1 - sJ) Q dt / n_e
+        // [J] (explicit QDSMC convention) for QDSMCApplyIonHeating in FinishStep. Written by
+        // residual evaluations only (the last one is the accepted state), never by Jacobian
+        // probes. Q is the theta-state power density, dt the (sub)step, matching the sJ Q dt
+        // that pe receives over the step.
+        const bool do_redir = m_joule_redirect && jgate && !a_from_jacobian;
+        if (do_redir && !m_ion_redirect_E) {
+            auto & mypc = m_WarpX->GetPartContainer();
+            m_n_ion_species = 0;
+            for (auto const & nm : mypc.GetSpeciesNames()) {
+                auto & pc = mypc.GetParticleContainerFromName(nm);
+                if (pc.getCharge() == 0._prt) { continue; }
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_n_ion_species < kMaxRedirectSpecies,
+                    "implicit_evolve.joule_redirect_to_ions: too many charged species");
+                m_ion_Z[m_n_ion_species++] =
+                    static_cast<amrex::Real>(pc.getCharge() / PhysConst::q_e);
+            }
+            m_ion_redirect_E = std::make_unique<amrex::MultiFab>(
+                pe->boxArray(), pe->DistributionMap(), std::max(m_n_ion_species, 1),
+                amrex::IntVect::TheZeroVector());
+            m_ion_redirect_E->setVal(0.0_rt);
+            m_Q_redir = std::make_unique<amrex::MultiFab>(
+                pe->boxArray(), pe->DistributionMap(), 1, amrex::IntVect::TheZeroVector());
+            m_Q_redir->setVal(0.0_rt);
+        }
+        const int n_ion = do_redir ? m_n_ion_species : 0;
+        const amrex::GpuArray<amrex::Real, kMaxRedirectSpecies> Zs = m_ion_Z;
+        const amrex::Real dt_full = m_dt;
+        // the redirect is weighted by the Holmstrom vacuum weight of the node (the same
+        // C1 weight that blends the pe advance to the adiabat): in the floored halo the
+        // Joule power is E = eta J of the vacuum model, not a plasma process, and per ion
+        // it would be divided by the floored n_e (2026-09-17, 3D formation: keV ions off
+        // the face planes, guard-cell abort at step 4)
+        const amrex::Real drq = geom.CellSize(0);
+        const amrex::Real rminq = geom.ProbLo(0);
         for (amrex::MFIter mfi(*m_Q_diss, amrex::TilingIfNotGPU());
              mfi.isValid(); ++mfi) {
             const amrex::Box tb = mfi.tilebox();
@@ -938,13 +1470,47 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
             auto const& bya = Bf[1]->const_array(mfi);
             auto const& bza = Bf[2]->const_array(mfi);
             auto const& rr  = rho->const_array(mfi);
+            auto const& pen = m_pe_old->const_array(mfi);
+            amrex::Array4<amrex::Real> rd, qr;
+            if (do_redir) {
+                rd = m_ion_redirect_E->array(mfi);
+                qr = m_Q_redir->array(mfi);
+            }
             // shared with the explicit fluid pe solver (ElectronPressureFlux.H)
             amrex::ParallelFor(tb,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
-                    q(i,j,k) = HybridPeJouleQ(i, j, k, jpx, jpy, jpz, bxa, bya, bza, rr,
-                                              eta_ex, etah_ex, inc_hyp, t_now, dxiq,
-                                              qlo, qhi, qper);
+                    amrex::Real sJ = 1.0_rt;
+                    if (jgate) {
+                        // Te^n in eV = pe^n / (e n) = pe^n / rho (floored rho)
+                        const amrex::Real Te_eV =
+                            pen(i,j,k) / amrex::max(rr(i,j,k,0), rho_floor);
+                        sJ = 0.5_rt*(1.0_rt - std::tanh((Te_eV - jcut)/jcut_w));
+                    }
+                    const amrex::Real Q = HybridPeJouleQ(i, j, k, jpx, jpy, jpz, bxa, bya, bza,
+                                                         rr, eta_ex, etah_ex, inc_hyp, t_now,
+                                                         dxiq, qlo, qhi, qper);
+                    q(i,j,k) = sJ * Q;
+                    if (do_redir) {
+                        amrex::Real wv = 1.0_rt;
+                        if (vac_blend) {
+#if defined(WARPX_DIM_RZ)
+                            const amrex::Real r_w = rminq + i*drq;
+#else
+                            const amrex::Real r_w = 0.0_rt;
+#endif
+                            const amrex::Real rf = HybridVacuumFloor(rho_floor, r_w, vac_rref,
+                                                                     vac_maxf, drq);
+                            wv = HybridExtSubWeight(rr(i,j,k,0), rf, vac_floor_w*(rf/rho_floor));
+                        }
+                        const amrex::Real W = wv * (1.0_rt - sJ) * Q;   // withheld power density
+                        qr(i,j,k) = W;
+                        const amrex::Real ne =
+                            amrex::max(rr(i,j,k,0), rho_floor) / PhysConst::q_e;
+                        for (int s = 0; s < n_ion; ++s) {
+                            rd(i,j,k,s) = (2.0_rt/3.0_rt) * Zs[s] * W * dt_full / ne;
+                        }
+                    }
                 });
         }
     }
@@ -984,12 +1550,20 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
     if (m_pe_unknown) {
         // pe is a Newton unknown: evaluate the theta update once at the iterate (held by the
         // pressure field for Ohm's law) into m_pe_rhs for the residual row. Non-periodic
-        // domain-face nodes keep pe^n, so their rows are identities kappa*(pe - pe^n).
+        // domain-face nodes the kernel skips keep pe^n, so their rows are identities
+        // kappa*(pe - pe^n); the RZ collocated axial faces are advanced (mirror closure).
         amrex::MultiFab::Copy(*m_pe_scratch, *pe, 0, 0, pe->nComp(), pe->nGrowVect());
         amrex::MultiFab::Copy(*m_pe_rhs, *m_pe_old, 0, 0, pe->nComp(), pe->nGrowVect());
         // freeze the flux stencil's wall values at pe^n as the in-loop path does: a wall
         // value slaved to the interior iterate feeds the near-wall flux back onto itself
-        // (unstable wall layer); the wall rows themselves stay identities
+        // (unstable wall layer); the wall rows themselves stay identities. Exception: the
+        // RZ collocated axial faces are advanced as symmetry planes (mirror closure in the
+        // kernel), so their nodes are regular unknowns and must not be frozen here.
+#if defined(WARPX_DIM_RZ)
+        const bool z_mirror = J_nodal && (m_pe_wall_mirror >= 1);
+#else
+        const bool z_mirror = false;
+#endif
         for (amrex::MFIter mfi(*m_pe_scratch); mfi.isValid(); ++mfi) {
             const amrex::Box vbx = mfi.validbox();
             auto const& s  = m_pe_scratch->array(mfi);
@@ -1002,7 +1576,7 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
                     const bool face =
                         ((i == dl.x || i == dh.x) && !per[0])
 #if (AMREX_SPACEDIM >= 2)
-                        || ((j == dl.y || j == dh.y) && !per[1])
+                        || ((j == dl.y || j == dh.y) && !per[1] && !z_mirror)
 #endif
 #if (AMREX_SPACEDIM == 3)
                         || ((k == dl.z || k == dh.z) && !per[2])
@@ -1015,6 +1589,18 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
     } else {
         amrex::MultiFab::Copy(*m_pe_scratch, *m_pe_old, 0, 0, pe->nComp(), pe->nGrowVect());
     }
+    // optional per-node term breakdown (implicit_evolve.pe_debug_nodes), nonlinear
+    // evaluations only; slots of 16 reals per node, filled inside the kernel
+    const int n_dbg = static_cast<int>(m_pe_debug_nodes.size()) / 2;
+    amrex::Gpu::DeviceVector<amrex::Real> dbg_dev(std::max(1, 16*n_dbg), 0.0_rt);
+    amrex::Gpu::DeviceVector<int> dbg_ij(std::max(1, 2*n_dbg), -1);
+    if (n_dbg > 0) {
+        amrex::Gpu::copy(amrex::Gpu::hostToDevice, m_pe_debug_nodes.begin(),
+                         m_pe_debug_nodes.begin() + 2*n_dbg, dbg_ij.begin());
+    }
+    amrex::Real* const dbgp = (n_dbg > 0 && !a_from_jacobian) ? dbg_dev.data() : nullptr;
+    const int* const dbgij = dbg_ij.data();
+
     for (int pe_it = 0; pe_it < n_pe_iters; ++pe_it) {
 
     // EB: freeze covered nodes at pe^n (identity rows with pe_unknown, no-op otherwise) so
@@ -1067,6 +1653,24 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
             // grinds there; tanh keeps the bound and the small-u identity response
             auto uclamp = [&] (amrex::Real u) {
                 return ue_cap * std::tanh(u / ue_cap);
+            };
+            // Non-periodic axial faces are symmetry planes for the collocated RZ advance
+            // (PMC fields + reflecting ions at z_min; the PMC parity fold treats z_max the
+            // same): axial index reflected about the face, axial electron flux odd (zero
+            // through the wall), scalars even. Before 2026-09-17 the boundary planes were
+            // skipped, leaving pe there frozen at pe(t=0) while Ohm's law kept differencing
+            // it: with the corrected Polaris coils the open-field column reached z = 0 at
+            // ~20 us and the wall plane carried Te 50-100 eV (= pe(0)/n(t)) against 15-50
+            // eV one plane in, |E_r| 2.6e5 V/m at the wall, solver death at 22.4 us.
+            auto jm = [&] (int m) {
+                if (is_per[1] || !wall_mirror) { return m; }
+                if (m < dlo.y) { return 2*dlo.y - m; }
+                if (m > dhi.y) { return 2*dhi.y - m; }
+                return m;
+            };
+            auto sz = [&] (int m) {
+                return (!is_per[1] && wall_mirror && (m < dlo.y || m > dhi.y))
+                    ? -1.0_rt : 1.0_rt;
             };
             // electron velocity at a node: ue = (J_ion - J_net)/(e n)
             auto ue_x = [&] (int ii, int jj, int kk) {
@@ -1151,11 +1755,13 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
                     (rC - 0.5_rt*dr) * Fk(Tn(i-1,j,k), Tn(i,j,k),
                                           kapn(i-1,j,k), kapn(i,j,k),
                                           dxi[0]);
+                // axial neighbours reflected about non-periodic z faces (jm): the heat
+                // flux through a symmetry plane vanishes
                 cond = ((rC + 0.5_rt*dr)*Fkrp - rFkrm) / Ak
-                     + (Fk(Tn(i,j,k),   Tn(i,j+1,k),
-                           kapn(i,j,k), kapn(i,j+1,k), dxi[1])
-                      - Fk(Tn(i,j-1,k), Tn(i,j,k),
-                           kapn(i,j-1,k), kapn(i,j,k), dxi[1])) * dxi[1];
+                     + (Fk(Tn(i,j,k),   Tn(i,jm(j+1),k),
+                           kapn(i,j,k), kapn(i,jm(j+1),k), dxi[1])
+                      - Fk(Tn(i,jm(j-1),k), Tn(i,j,k),
+                           kapn(i,jm(j-1),k), kapn(i,j,k), dxi[1])) * dxi[1];
 #endif
             }
 
@@ -1296,17 +1902,25 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
                    + 0.5_rt * (qz(j-1) + qz(j));
             }
 #elif defined(WARPX_DIM_RZ)
-            // m = 0, Yee-staggered RZ (asserted at first use). The enthalpy flux
-            // uses the conservative flux form, so the volume-weighted grid sum
-            // telescopes exactly (including through the axis, where [r F] -> 0).
-            // W carries the full-Ohm pairing -E*.J_e + eta*Jp^2 evaluated per
-            // staggered component at its own location (matching the push-field
-            // subtraction), volume-split from the edges to the nodes so that
-            // sum_nodes(A W) = sum_edges(A q). The Hall channel and the RZ
-            // Faraday ledger pair at interpolation order (not machine-exact,
-            // unlike the collocated Cartesian grid).
-            amrex::ignore_unused(Fx, Fz, ue_x, ue_z, pe_face);
-            if ((j <= dlo.y || j >= dhi.y) && !is_per[1]) { return; }
+            // m = 0 RZ. The enthalpy flux uses the conservative area-weighted
+            // form, so the volume-weighted grid sum telescopes exactly
+            // (including through the axis, where [r F] -> 0).
+            //   collocated (J_nodal): face velocities averaged from the nodal
+            //   ue, limited upwind face pe (pe_adv != 0) or the central average,
+            //   and the nodal full-Ohm work pairing of the Cartesian collocated
+            //   branches. (Before 2026-09-14 this branch applied the Yee edge
+            //   formulas to nodal data, i.e. half-cell-shifted flux velocities:
+            //   an O(1) flux error at sharp density edges that cooled the
+            //   formation's plasma edge to 0.4 eV within 0.5 us.)
+            //   Yee: W carries the full-Ohm pairing -E*.J_e + eta*Jp^2 evaluated
+            //   per staggered component at its own location (matching the
+            //   push-field subtraction), volume-split from the edges to the
+            //   nodes so that sum_nodes(A W) = sum_edges(A q). The Hall channel
+            //   and the RZ Faraday ledger pair at interpolation order.
+            amrex::ignore_unused(Fx, Fz);
+            // collocated (J_nodal): the axial symmetry-plane closure (jm/sz) advances the
+            // boundary planes too; the Yee branch keeps skipping them
+            if ((j <= dlo.y || j >= dhi.y) && !is_per[1] && !(J_nodal && wall_mirror)) { return; }
             if (i >= dhi.x) { return; }                        // outer r boundary
             const amrex::Real r = rmin + i*dr;
             const bool on_axis = (r < 0.5_rt*dr);
@@ -1315,6 +1929,61 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
             const amrex::Real A_ip = (r + 0.5_rt*dr)*dr;       // r-edge at i+1/2
             const amrex::Real A_im = (r - 0.5_rt*dr)*dr;       // r-edge at i-1/2
 
+            if (J_nodal) {
+                // Flux-consistent enthalpy transport: F = Gamma_face * (pe/rho)_face,
+                // Gamma = J_i - J_p the nodal electron charge flux (no division by
+                // the rho of a rarefied node) and pe/rho the advected quantity
+                // (kB Te per charge), limited-upwind (pe_adv != 0) or central. The
+                // pressure then travels with the particle flux: a near-floor rim
+                // receives pressure only in proportion to the particles it
+                // receives. (u_face * pe_upwind, with u = Gamma/rho averaged between
+                // a bulk node and a rarefied node whose few outgoing tail ions
+                // give u ~ v_th, carried the BULK pressure into the rim at ~v_th/2
+                // while the density did not follow: Te_rim 33 eV by 0.4 us, 450 eV
+                // by 1.2 us in the formation runs.) The marker-CFL cap on u_e does
+                // not apply to this form.
+                // axial indices reflected about non-periodic z faces (jm), the axial
+                // charge flux odd there (sz): F_z(face beyond the wall) = -F_z(face inside)
+                auto Gr = [&] (int m) { return Jx(m,j,k) - Jpx(m,j,k); };
+                auto Gz = [&] (int m) {
+                    const int mm = jm(m);
+                    return sz(m) * (Jz(i,mm,k) - Jpz(i,mm,k));
+                };
+                auto Tq = [&] (int ii, int jj) {
+                    const int jr = jm(jj);
+                    return pec(ii,jr,k) / amrex::max(rho_arr(ii,jr,k,0), rho_floor);
+                };
+                // face between nodes m and m+1 (radial) / m and m+1 (axial);
+                // the axis-adjacent radial face keeps the central average (the
+                // limiter would read the axis ghost)
+                auto Fr_face = [&] (int m) {
+                    const amrex::Real gf = 0.5_rt*(Gr(m) + Gr(m+1));
+                    const amrex::Real tf = (pe_adv != 0 && m > dlo.x)
+                        ? pe_face(gf, Tq(m-1,j), Tq(m,j), Tq(m+1,j), Tq(m+2,j))
+                        : 0.5_rt*(Tq(m,j) + Tq(m+1,j));
+                    return gf * tf;
+                };
+                auto Fz_face = [&] (int m) {
+                    const amrex::Real gf = 0.5_rt*(Gz(m) + Gz(m+1));
+                    const amrex::Real tf = (pe_adv != 0)
+                        ? pe_face(gf, Tq(i,m-1), Tq(i,m), Tq(i,m+1), Tq(i,m+2))
+                        : 0.5_rt*(Tq(i,m) + Tq(i,m+1));
+                    return gf * tf;
+                };
+                amrex::ignore_unused(ue_x, ue_z);
+                const amrex::Real rFrm = on_axis ? 0.0_rt : (r - 0.5_rt*dr) * Fr_face(i-1);
+                divF += ((r + 0.5_rt*dr) * Fr_face(i) - rFrm) / A_i
+                      + (Fz_face(j) - Fz_face(j-1)) * dxi[1];
+                W += Ex_arr(i,j,k) * (Jx(i,j,k) - Jpx(i,j,k))
+                   + Ey_arr(i,j,k) * (Jy(i,j,k) - Jpy(i,j,k))
+                   + Ez_arr(i,j,k) * (Jz(i,j,k) - Jpz(i,j,k))
+                   - (q_posdef ? Qd(i,j,k)
+                      : (Dx(i,j,k) * Jpx(i,j,k)
+                       + Dy(i,j,k) * Jpy(i,j,k)
+                       + Dz(i,j,k) * Jpz(i,j,k)));
+                amrex::ignore_unused(A_ip, A_im);
+            } else {
+            amrex::ignore_unused(ue_x, ue_z, pe_face);
             // enthalpy flux, conservative form
             auto ue_redge = [&] (int ie) {
                 const amrex::Real rho_e = amrex::max(
@@ -1357,6 +2026,7 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
                    + 0.5_rt * (q_zedge(j-1) + q_zedge(j))
                    + q_theta;
             }
+            }   // Yee branch
 #elif defined(WARPX_DIM_3D)
             auto ue_y = [&] (int ii, int jj, int kk) {
                 const amrex::Real n_ = amrex::max(rho_arr(ii,jj,kk,0), rho_floor);
@@ -1455,10 +2125,64 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
 #endif
             const amrex::Real pe_new = pe0(i,j,k)
                 - theta_dt * (gamma * divF + (gamma - 1._rt) * (W - cond));
+            if (dbgp) {
+                for (int q = 0; q < n_dbg; ++q) {
+                    if (i == dbgij[2*q] && j == dbgij[2*q+1]) {
+                        amrex::Real* d = dbgp + 16*q;
+                        d[0] = Ex_arr(i,j,k); d[1] = Ey_arr(i,j,k); d[2] = Ez_arr(i,j,k);
+                        d[3] = Jx(i,j,k) - Jpx(i,j,k);
+                        d[4] = Jy(i,j,k) - Jpy(i,j,k);
+                        d[5] = Jz(i,j,k) - Jpz(i,j,k);
+                        d[6] = q_posdef ? Qd(i,j,k)
+                                        : (Dx(i,j,k)*Jpx(i,j,k) + Dy(i,j,k)*Jpy(i,j,k)
+                                           + Dz(i,j,k)*Jpz(i,j,k));
+                        d[7] = divF; d[8] = W; d[9] = cond;
+                        d[10] = pe0(i,j,k); d[11] = pe_new; d[12] = rho_arr(i,j,k,0);
+                        d[13] = pe_it_arr(i,j,k);
+                        d[14] = Jpx(i,j,k); d[15] = Jpy(i,j,k);
+                    }
+                }
+            }
+            amrex::Real pe_fin = pe_new;
+            if (vac_blend) {
+#if defined(WARPX_DIM_RZ)
+                const amrex::Real r_w = rmin + i*dr;
+#else
+                const amrex::Real r_w = 0.0_rt;   // no radial statistics scaling
+#endif
+                const amrex::Real rf = HybridVacuumFloor(rho_floor, r_w, vac_rref, vac_maxf, dr);
+                const amrex::Real wv = HybridExtSubWeight(rho_arr(i,j,k,0), rf,
+                                                          vac_floor_w*(rf/rho_floor));
+                const amrex::Real pe_ad = ElectronPressure::get_pressure(
+                    ad_n0, ad_T0, gamma, amrex::max(rho_arr(i,j,k,0), rho_floor));
+                pe_fin = wv*pe_new + (1.0_rt - wv)*pe_ad;
+            }
             // C1 positivity floor with compact support (exact identity for pe >= 2*eps,
             // hence energy-neutral there), shared with the explicit fluid solver
-            pe_arr(i,j,k) = HybridPeFloor(pe_new, pe_eps);
+            pe_arr(i,j,k) = HybridPeFloor(pe_fin, pe_eps);
         });
+    }
+    if (dbgp && pe_it == n_pe_iters - 1) {
+        amrex::Gpu::streamSynchronize();
+        std::vector<amrex::Real> h(16*n_dbg);
+        amrex::Gpu::copy(amrex::Gpu::deviceToHost, dbg_dev.begin(),
+                         dbg_dev.begin() + 16*n_dbg, h.begin());
+        for (int q = 0; q < n_dbg; ++q) {
+            const amrex::Real* d = h.data() + 16*q;
+            const amrex::Real EG = d[0]*d[3] + d[1]*d[4] + d[2]*d[5];
+            amrex::AllPrint() << "pe_debug (" << m_pe_debug_nodes[2*q] << ","
+                << m_pe_debug_nodes[2*q+1] << ") t=" << a_theta_time
+                << " Epair=(" << d[0] << "," << d[1] << "," << d[2] << ")"
+                << " G=Ji-Jp=(" << d[3] << "," << d[4] << "," << d[5] << ")"
+                << " Jp=(" << d[14] << "," << d[15] << ")"
+                << " rho=" << d[12] << " pe0=" << d[10] << " pe_it=" << d[13]
+                << " pe_new=" << d[11]
+                << " | dpe: E.G " << -theta_dt*(gamma - 1._rt)*EG
+                << " Qd " << theta_dt*(gamma - 1._rt)*d[6]
+                << " flux " << -theta_dt*gamma*d[7]
+                << " cond " << theta_dt*(gamma - 1._rt)*d[9]
+                << " (E.G=" << EG << " Qd=" << d[6] << " divF=" << d[7] << ")\n";
+        }
     }
 
     // Duplicated nodal points on box faces are written redundantly by each box;
