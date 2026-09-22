@@ -544,6 +544,33 @@ public:
 
     static void BackwardCompatibility ();
 
+    /** Tolerance of the deposition to particles beyond the guard range (implicit solvers).
+     *
+     *  While an implicit solver evaluates a Newton residual it sets the tolerant flag: a
+     *  tile holding particles beyond the range the charge/current deposition can address
+     *  (guard cells minus the shape extent) then skips its deposit and the particles are
+     *  counted, instead of the run aborting on the deposition's guard-cell assertion. A
+     *  trial iterate can push particles arbitrarily far (a wild linear-solve direction, a
+     *  stiff wall sheath); the solver rejects a residual evaluated with such a state
+     *  (ThetaImplicitHybrid::ComputeRHS, NewtonSolver). Off (assert as usual) otherwise.
+     */
+    static void SetDepositOutOfRangeTolerant (bool a_tolerant)
+    {
+        s_deposit_out_of_range_tolerant = a_tolerant;
+        if (a_tolerant) { s_num_deposit_out_of_range = 0; }
+    }
+    /** particles counted by tolerant deposits since the flag was last set (this rank) */
+    [[nodiscard]] static amrex::Long NumDepositOutOfRange () { return s_num_deposit_out_of_range; }
+    static void CountDepositOutOfRange (int a_n)
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp atomic
+#endif
+        s_num_deposit_out_of_range += a_n;
+    }
+    inline static bool s_deposit_out_of_range_tolerant = false;
+    inline static amrex::Long s_num_deposit_out_of_range = 0;
+
     /** \brief Apply particle BC.
      */
     void ApplyBoundaryConditions ();

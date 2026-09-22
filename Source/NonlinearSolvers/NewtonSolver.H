@@ -384,6 +384,9 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
     CurTime(a_time);
     CurTimeStep(a_dt);
+    this->m_last_converged = false;
+    // every exit path below sets the status explicitly; never inherit the previous solve's
+    this->m_exit_status = 0;
 
     amrex::Real norm_abs = 0.;
     amrex::Real norm0 = 1._rt;
@@ -399,6 +402,11 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
     int iter;
     int linear_solver_iters = 0;
+    // line-search safeguard state: a direction along which no trial reduces the
+    // residual is rejected (the iterate is kept) and the next linear solve is done
+    // at the tight (pinned) tolerance; two consecutive rejections end the step
+    int ls_fail_count = 0;
+    bool force_tight_solve = false;
     // line-search residual reuse: when set, m_F/m_R and the Ops state already hold the
     // residual of the current a_U (evaluated as this iteration's residual by the line
     // search), so the evaluation at the top of the loop is skipped
@@ -413,6 +421,19 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         // Compute norm of the residual
         norm_abs = m_F.norm2();
+        if (iter == 0 && m_ops->LastRHSInvalid()) {
+            // the residual of the initial iterate could not be evaluated (particles beyond
+            // the deposition guard range already with the step-start field): there is no
+            // reference norm to converge against. Report the step as unconverged so that
+            // the driver may redo it with a smaller dt (implicit_evolve.dt_halving_max_levels).
+            // Later invalid evaluations need no special case: their sentinel norm makes the
+            // line search reject the trial.
+            this->m_exit_status = (m_require_convergence ? -5 : 0);
+            norm_rel = 1._rt;
+            amrex::Print() << "Newton: the initial residual is invalid (particles beyond the "
+                           << "deposition guard range): exiting the step unconverged\n";
+            break;
+        }
         if (iter == 0) {
             if (norm_abs > 0.) { norm0 = norm_abs; }
             else { norm0 = 1._rt; }
@@ -428,6 +449,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         if (norm_abs < m_atol) {
             this->m_exit_status = 2;
+            this->m_last_converged = true;
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied absolute tolerance " << m_atol << "\n";
@@ -437,6 +459,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         if (norm_rel < m_rtol) {
             this->m_exit_status = 3;
+            this->m_last_converged = true;
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied relative tolerance " << m_rtol << "\n";
@@ -445,6 +468,10 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         }
 
         if (norm_abs > 100._rt*norm0) {
+            // Return the divergence to the caller instead of aborting here: the
+            // step driver may redo the step with a smaller dt
+            // (implicit_evolve.dt_halving_max_levels); without that option
+            // WarpX::OneStep() aborts on the negative exit status as before.
             this->m_exit_status = -9;
             amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                            << ". SOLVER DIVERGED! relative tolerance = " << m_rtol << "\n";
@@ -452,7 +479,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             convergenceMsg << "Newton: exiting at iteration " << std::setw(3) << iter <<
                               ". SOLVER DIVERGED! absolute norm = " << norm_abs <<
                               " has increased by 100X from that after first iteration.";
-            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
+            break;
         }
 
         // Prepare for the linear solve
@@ -479,6 +507,13 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
                 zeta = std::min( m_forcing_zeta_max,
                     std::max(zeta_B, m_forcing_gamma*eps_newton/norm_abs) );
                 zeta = std::max(zeta, m_forcing_zeta_min);
+            }
+            if (force_tight_solve) {
+                // after a rejected direction: the loose forcing (up to zeta_max, and
+                // zeta_A > 1 when the residual did not fall) is the usual reason the
+                // direction was not a descent direction; solve this one tightly
+                zeta = m_linsol_rtol_set ? m_linsol_rtol : m_forcing_zeta_min;
+                force_tight_solve = false;
             }
             zeta_prev = zeta;
             norm_prev = norm_abs;
@@ -516,14 +551,48 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
                 if (trial_norm < norm_abs) { break; }
                 alpha *= 0.5_rt;
             }
-            a_U.linComb(1._rt, m_U_ls, -best_alpha, m_dU);
-            // reuse when the accepted trial was the last one evaluated (the linComb above
-            // rebuilds the same a_U); exact only for Ops whose residual has no
-            // evaluation-order hysteresis, hence opt-in
-            have_residual = m_line_search_reuse && last_is_best;
-            if (this->m_verbose && best_alpha < 1._rt) {
-                amrex::Print() << "Newton: line search accepted alpha = "
-                               << best_alpha << "\n";
+            if (best_norm < norm_abs) {
+                a_U.linComb(1._rt, m_U_ls, -best_alpha, m_dU);
+                // reuse when the accepted trial was the last one evaluated (the linComb above
+                // rebuilds the same a_U); exact only for Ops whose residual has no
+                // evaluation-order hysteresis, hence opt-in
+                have_residual = m_line_search_reuse && last_is_best;
+                ls_fail_count = 0;
+                if (this->m_verbose && best_alpha < 1._rt) {
+                    amrex::Print() << "Newton: line search accepted alpha = "
+                                   << best_alpha << "\n";
+                }
+            } else {
+                // No trial reduced the residual: this is not a descent direction. Moving
+                // to the least-bad trial anyway (the previous behaviour) let the iterate
+                // drift into states with a residual up to 5 x the initial one, after which
+                // the adaptive forcing stayed at zeta_max and the next directions were
+                // worse still (FRC formation: residual bouncing 3e3-9e3 for 15 iterations,
+                // then GMRES divergence). Keep the iterate, re-evaluate its residual and
+                // re-solve with the tight linear tolerance; give up after two in a row.
+                a_U.Copy(m_U_ls);
+                have_residual = false;
+                force_tight_solve = true;
+                ++ls_fail_count;
+                if (this->m_verbose) {
+                    amrex::Print() << "Newton: line search failed (best trial "
+                                   << best_norm/norm_abs << " x the residual), direction "
+                                   << "rejected" << (ls_fail_count < 2
+                                       ? ", re-solving with the tight linear tolerance\n"
+                                       : " twice in a row, exiting the step\n");
+                }
+                if (ls_fail_count >= 2) {
+                    // exhausted: report the failure explicitly (a stale success status from
+                    // the previous solve must not survive) and put the operator state back
+                    // on the kept iterate -- the trial evaluations left particles, currents
+                    // and pressure at the last rejected trial
+                    EvalResidual(m_F, a_U, a_b, a_time, iter);
+                    norm_abs = m_F.norm2();
+                    norm_rel = norm_abs/norm0;
+                    this->m_exit_status = (m_require_convergence ? -5 : 0);
+                    iter++;
+                    break;
+                }
             }
         } else {
             a_U -= m_dU;
@@ -531,9 +600,16 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         iter++;
         if (iter >= m_maxits) {
+            // the last update was applied but not evaluated: evaluate it so the reported
+            // norm (and the caller's halving-limit acceptance test) refer to the returned
+            // iterate, and so the operator state matches it
+            EvalResidual(m_F, a_U, a_b, a_time, iter);
+            norm_abs = m_F.norm2();
+            norm_rel = norm_abs/norm0;
             if (this->m_verbose) {
                 amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
-                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+                               << ". Maximum iteration reached: iter = " << m_maxits
+                               << ", relative norm of the returned iterate " << norm_rel << "\n";
             }
             break;
         }
@@ -542,6 +618,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
     // Update total iteration count
     m_total_iters += iter;
+    this->m_last_iters = iter;
+    this->m_last_norm_rel = norm_rel;
     m_total_linsol_iters += linear_solver_iters;
 
     if (m_rtol > 0. && iter == m_maxits) {

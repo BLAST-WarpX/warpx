@@ -1483,6 +1483,20 @@ WarpX::PushParticlesandDeposit (
                 ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_buf, lev), lev-1);
             }
         }
+        // The implicit mass-matrix + sub-orbit path composes rho = rho_suborbit +
+        // rho_fp_non_suborbit after this call (ImplicitSolver::CumulateRho). The
+        // non-suborbit cache is (re)deposited here whenever the non-suborbit
+        // particles are pushed (every call except the suborbit-only linear stage,
+        // mirroring the reset in MultiParticleContainer::Evolve), so it needs the
+        // same inverse-volume scaling and axis folding once, or the composed rho is
+        // 2 pi r times the true density away from the axis and near zero on it.
+        if (implicit_options && implicit_options->use_rho_non_suborbit &&
+            !(implicit_options->use_mass_matrices_jacobian &&
+              implicit_options->linear_stage_of_jfnk) &&
+            m_fields.has(FieldType::rho_fp_non_suborbit, lev)) {
+            ApplyInverseVolumeScalingToChargeDensity(
+                m_fields.get(FieldType::rho_fp_non_suborbit, lev), lev);
+        }
 // #else
         // I left this comment here as a reminder that currently the
         // boundary handling for cartesian grids are not matching the RZ handling

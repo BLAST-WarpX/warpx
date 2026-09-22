@@ -102,13 +102,24 @@ struct VecObj
 };
 
 //! Copy a PETSc vector to a WarpX vector
+//
+//  The *AndMemType accessors hand back the array where the vector lives: the device
+//  array for VECCUDA/VECHIP, the host array for VECSTANDARD. The plain VecGetArray
+//  always returns the (pinned) host mirror, which for a device vector costs a
+//  device->host sync, a zero-copy PCIe write by the WarpXSolverVec kernels and a
+//  host->device sync on the next PETSc use (measured 3D FRC: 13% of the step).
+//  PETSc's device kernels run on PETSc's stream and the WarpXSolverVec copies on
+//  AMReX's, so both sides are synchronized around the raw-pointer hand-over.
 void copyVec(VecType& a_wvec, const Vec& a_pvec)
 {
     BL_PROFILE("warpx_petsc::copyVec()");
     const PetscScalar* Yarr;
-    VecGetArrayRead(a_pvec,&Yarr);
+    PetscMemType mtype;
+    VecGetArrayReadAndMemType(a_pvec,&Yarr,&mtype);
+    amrex::Gpu::synchronize();
     a_wvec.copyFrom( static_cast<const amrex::Real*>(Yarr) );
-    VecRestoreArrayRead(a_pvec,&Yarr);
+    amrex::Gpu::synchronize();
+    VecRestoreArrayReadAndMemType(a_pvec,&Yarr);
 }
 
 //! Copy a WarpX vector to a PETSc vector
@@ -116,9 +127,12 @@ void copyVec( Vec& a_pvec, const VecType& a_wvec)
 {
     BL_PROFILE("warpx_petsc::copyVec()");
     PetscScalar* Yarr;
-    VecGetArray(a_pvec,&Yarr);
+    PetscMemType mtype;
+    VecGetArrayAndMemType(a_pvec,&Yarr,&mtype);
+    amrex::Gpu::synchronize();
     a_wvec.copyTo( static_cast<amrex::Real*>(Yarr) );
-    VecRestoreArray(a_pvec,&Yarr);
+    amrex::Gpu::synchronize();
+    VecRestoreArrayAndMemType(a_pvec,&Yarr);
 }
 
 //! Compute RHS function
@@ -578,9 +592,11 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
     m_status = (int)reason;
     KSPGetResidualNorm( m_ksp->obj, &m_norm );
 
+    // the per-solve exit line is level-2 output; at level 1 only a solve
+    // that did not converge is reported (the counts go to newton.txt)
     const char* conv_reason;
     KSPGetConvergedReasonString(m_ksp->obj, &conv_reason);
-    if (m_verbose > 0) {
+    if (m_verbose > 1 || (m_verbose > 0 && reason < 0)) {
         amrex::Print() << "GMRES (PETSc KSP): exited due to \""
                        << conv_reason << "\" "
                        << "(abs. norm=" << m_norm << ").\n";

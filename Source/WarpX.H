@@ -141,6 +141,10 @@ public:
     //
     void SyncMassMatricesPC ();
     void SaveParticlesAtImplicitStepStart ();
+    /** Reset every particle's position and momentum to the values saved by
+     *  SaveParticlesAtImplicitStepStart (x_n, u_n): the step-start state, used
+     *  to redo a step whose nonlinear solve did not converge. */
+    void RestoreParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
@@ -602,7 +606,7 @@ public:
      */
     void ApplyJfieldBoundary (int lev, amrex::MultiFab* Jx,
                               amrex::MultiFab* Jy, amrex::MultiFab* Jz,
-                              PatchType patch_type);
+                              PatchType patch_type, bool even_parity = false);
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
@@ -724,6 +728,8 @@ public:
     void sett_new (int lev, amrex::Real time) {t_new[lev] = time;}
     [[nodiscard]] amrex::Vector<amrex::Real> getdt () const {return dt;}
     [[nodiscard]] amrex::Real getdt (int lev) const {return dt.at(lev);}
+    /** Set the time step of level lev (implicit sub-stepping: the particle push reads dt). */
+    void setdt (amrex::Real a_dt, int lev) {dt.at(lev) = a_dt;}
     [[nodiscard]] int getdo_moving_window() const {return do_moving_window;}
     [[nodiscard]] amrex::Real getmoving_window_x() const {return moving_window_x;}
     [[nodiscard]] bool getis_synchronized() const {return m_is_synchronized;}

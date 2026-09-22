@@ -97,6 +97,8 @@ namespace PEC {
      * \param[in]     lev                    level of the Multifab
      * \param[in]     patch_type             coarse or fine
      * \param[in]     ref_ratios             vector containing the refinement ratios of the refinement levels
+     * \param[in]     even_parity            fold every component with sign +1 (even-parity coefficient
+     *                                       fields such as the dJ/dE mass-matrix diagonals)
      */
     void ApplyReflectiveBoundarytoJfield(
                         amrex::MultiFab* Jx, amrex::MultiFab* Jy,
@@ -106,7 +108,8 @@ namespace PEC {
                         const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
                         const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
                         const amrex::Geometry& geom,
-                        int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
+                        int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
+                        bool even_parity = false);
 
     /**
      * \brief Apply the PEC boundary to the electron pressure field.

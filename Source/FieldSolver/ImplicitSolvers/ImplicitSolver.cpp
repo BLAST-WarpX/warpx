@@ -142,8 +142,10 @@ void ImplicitSolver::CumulateRho ( const bool a_include_old_comp )
     // at their (frozen) half-time positions. The new-time component of rho_fp always receives
     // rho0 here; the old-time component is fully deposited during the nonlinear stage and is
     // only composed this way during the suborbit-only linear stage of JFNK.
-    // Do this BEFORE the inverse-volume scaling and the call to SyncCurrentAndRho(),
-    // so rho0 stays unscaled and guard-cell deposits are folded in with the rest of rho.
+    // Both terms carry the RZ inverse-volume scaling and axis folding already: rho_fp
+    // receives it at the end of WarpX::PushParticlesandDeposit and rho0 in the same
+    // place whenever it is (re)deposited. Do this BEFORE SyncCurrentAndRho() so the
+    // guard-cell deposits of rho0 are summed with the rest of rho.
 
     using warpx::fields::FieldType;
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
@@ -979,13 +981,17 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     // Do addOp Exchange on MassMatrices_PC
     m_WarpX->SyncMassMatricesPC();
 
-    // Apply BCs to MassMatrices_PC
+    // Apply BCs to MassMatrices_PC: fold the image-particle contributions deposited in the
+    // guard cells back into the domain. The dJ/dE diagonals are EVEN under any mirror
+    // (normal x normal or tangential x tangential parity; q^2 for the image charge), unlike
+    // J itself whose per-component parity the default fold applies (that gave Sigma_zz the
+    // wrong sign in the cells next to a reflecting/PMC z face and Sigma_tt/zz at a PEC wall).
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         m_WarpX->ApplyJfieldBoundary(lev,
             m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
             m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
             m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
-            PatchType::fine);
+            PatchType::fine, true);
     }
 }
 

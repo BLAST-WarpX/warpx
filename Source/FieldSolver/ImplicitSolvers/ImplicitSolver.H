@@ -87,6 +87,12 @@ public:
                               int              a_nl_iter,
                               bool             a_from_jacobian ) = 0;
 
+    /** True when the last ComputeRHS could not evaluate the residual (the trial iterate
+     *  pushed particles beyond the deposition guard range) and returned a sentinel of huge
+     *  norm instead: NewtonSolver's line search rejects such a trial by its norm, and an
+     *  invalid initial residual ends the step unconverged (the driver may then halve dt). */
+    [[nodiscard]] virtual bool LastRHSInvalid () const { return false; }
+
     /**
      * Prepare for the linear solve: deposit the mass matrices and update the PC. The deposit
      * is skipped on 0-based Newton iterations where DepositMassMatricesThisIter says so

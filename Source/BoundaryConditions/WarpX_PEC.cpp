@@ -944,7 +944,8 @@ PEC::ApplyReflectiveBoundarytoJfield (
     const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_lo,
     const amrex::Array<ParticleBoundaryType,AMREX_SPACEDIM>& particle_boundary_hi,
     const amrex::Geometry& geom,
-    const int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios)
+    const int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios,
+    const bool even_parity)
 {
     amrex::Box domain_box = geom.Domain();
     if (patch_type == PatchType::coarse && (lev > 0)) {
@@ -1011,6 +1012,14 @@ PEC::ApplyReflectiveBoundarytoJfield (
                                   ||  (particle_boundary_hi[idim] == ParticleBoundaryType::Thermal)
                                   ||  (field_boundary_hi[idim] == FieldBoundaryType::PMC) )
                                       ? pmc_sign : -pmc_sign;
+
+            // Even-parity data (the dJ/dE mass-matrix diagonals, q^2 n/m-like coefficient
+            // fields): the mirror image carries the same value whatever the image charge
+            // sign or the component orientation, so the guard contribution is added as is.
+            if (even_parity) {
+                psign[idim][icomp][0] = 1._rt;
+                psign[idim][icomp][1] = 1._rt;
+            }
         }
 
         // Set the mirror index offset on lo and hi sides

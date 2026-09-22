@@ -70,6 +70,23 @@ public:
     int GetExitStatus() const { return m_exit_status; }
 
     /**
+     * \brief Return the number of nonlinear iterations of the last Solve() call.
+     */
+    int GetLastIterations() const { return m_last_iters; }
+
+    /**
+     * \brief True when the last Solve() call met its absolute or relative
+     *  tolerance (false: iteration cap, rejected directions, divergence).
+     *  Independent of require_convergence, which only decides the exit status.
+     */
+    bool GetLastConverged() const { return m_last_converged; }
+
+    /**
+     * \brief Relative residual norm at the end of the last Solve() call.
+     */
+    amrex::Real GetLastRelNorm() const { return m_last_norm_rel; }
+
+    /**
      * \brief Print parameters used by the nonlinear solver.
      */
     virtual void PrintParams () const = 0;
@@ -99,6 +116,9 @@ protected:
     bool m_usePC = false;
 
     mutable int m_exit_status = 0;
+    mutable int m_last_iters = 0;
+    mutable bool m_last_converged = true;
+    mutable amrex::Real m_last_norm_rel = 0.0;
 
 };
 

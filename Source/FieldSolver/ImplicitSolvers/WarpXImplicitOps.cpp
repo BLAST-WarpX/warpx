@@ -213,6 +213,75 @@ WarpX::SaveParticlesAtImplicitStepStart ( )
 }
 
 void
+WarpX::RestoreParticlesAtImplicitStepStart ( )
+{
+    // Inverse of SaveParticlesAtImplicitStepStart: put every particle back at
+    // its step-start position and momentum (x_n, u_n). The implicit push only
+    // rewrites x and u from these saved values inside the nonlinear solve and
+    // removes no particles before FinishImplicitParticleUpdate, so this is an
+    // exact reset of the particle state to t^n.
+    for (auto const& pc : *mypc) {
+
+        for (int lev = 0; lev <= finest_level; ++lev) {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            {
+            for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+
+                auto setPosition = SetParticlePosition<PIdx>(pti);
+
+                auto& attribs = pti.GetAttribs();
+                amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uy = attribs[PIdx::uy].dataPtr();
+                amrex::ParticleReal* const AMREX_RESTRICT uz = attribs[PIdx::uz].dataPtr();
+
+#if !defined(WARPX_DIM_1D_Z)
+                const amrex::ParticleReal* x_n = pti.GetAttribs("x_n").dataPtr();
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                const amrex::ParticleReal* y_n = pti.GetAttribs("y_n").dataPtr();
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+                const amrex::ParticleReal* z_n = pti.GetAttribs("z_n").dataPtr();
+#endif
+                const amrex::ParticleReal* ux_n = pti.GetAttribs("ux_n").dataPtr();
+                const amrex::ParticleReal* uy_n = pti.GetAttribs("uy_n").dataPtr();
+                const amrex::ParticleReal* uz_n = pti.GetAttribs("uz_n").dataPtr();
+
+                int *nsuborbits = (pc->HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() : nullptr);
+
+                const long np = pti.numParticles();
+
+                amrex::ParallelFor( np, [=] AMREX_GPU_DEVICE (long ip)
+                {
+                    amrex::ParticleReal xp = 0.0, yp = 0.0, zp = 0.0;
+#if !defined(WARPX_DIM_1D_Z)
+                    xp = x_n[ip];
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    yp = y_n[ip];
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+                    zp = z_n[ip];
+#endif
+                    setPosition(ip, xp, yp, zp);
+
+                    ux[ip] = ux_n[ip];
+                    uy[ip] = uy_n[ip];
+                    uz[ip] = uz_n[ip];
+
+                    if (nsuborbits) {
+                        nsuborbits[ip] = 1;
+                    }
+                });
+            }
+            }
+        }
+    }
+}
+
+void
 WarpX::FinishImplicitParticleUpdate (amrex::Real time)
 {
     using namespace amrex::literals;

@@ -444,6 +444,15 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
     AMREX_ASSERT_WITH_MESSAGE(
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for current deposition");
+    if (s_deposit_out_of_range_tolerant) {
+        // implicit trial iterate: count the particles beyond the range and skip the tile
+        // instead of asserting (see SetDepositOutOfRangeTolerant)
+        const int n_out = amrex::numParticlesOutOfRange(pti, range);
+        if (n_out > 0) {
+            CountDepositOutOfRange(n_out);
+            return;
+        }
+    }
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
@@ -1013,6 +1022,15 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     AMREX_ASSERT_WITH_MESSAGE(
         amrex::numParticlesOutOfRange(pti, range) == 0,
         "Particles shape does not fit within tile (CPU) or guard cells (GPU) used for current deposition");
+    if (s_deposit_out_of_range_tolerant) {
+        // implicit trial iterate: count the particles beyond the range and skip the tile
+        // instead of asserting (see SetDepositOutOfRangeTolerant)
+        const int n_out = amrex::numParticlesOutOfRange(pti, range);
+        if (n_out > 0) {
+            CountDepositOutOfRange(n_out);
+            return;
+        }
+    }
 
     const amrex::XDim3 dinv = WarpX::InvCellSize(std::max(depos_lev,0));
 
@@ -1511,6 +1529,34 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         "Cannot deposit charge in rho component icomp=" + std::to_string(icomp) +
         ": not enough components allocated (" + std::to_string(rho->nComp()) + "!"
     );
+
+    if (s_deposit_out_of_range_tolerant && np_to_deposit > 0) {
+        // implicit trial iterate: count the particles beyond the range and skip the tile
+        // instead of asserting (see SetDepositOutOfRangeTolerant); the same extent as the
+        // guard-cell assertion of ablastr::particles::deposit_charge
+#if   defined(WARPX_DIM_1D_Z)
+        const amrex::IntVect shape_extent(static_cast<int>(WarpX::noz/2+1));
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::IntVect shape_extent(static_cast<int>(WarpX::nox/2+1));
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const amrex::IntVect shape_extent(static_cast<int>(WarpX::nox/2+1),
+                                          static_cast<int>(WarpX::noz/2+1));
+#elif defined(WARPX_DIM_3D)
+        const amrex::IntVect shape_extent(static_cast<int>(WarpX::nox/2+1),
+                                          static_cast<int>(WarpX::noy/2+1),
+                                          static_cast<int>(WarpX::noz/2+1));
+#endif
+#ifndef AMREX_USE_GPU
+        const amrex::IntVect range = WarpX::GetInstance().get_ng_depos_rho() - shape_extent;
+#else
+        const amrex::IntVect range = rho->nGrowVect() - shape_extent;
+#endif
+        const int n_out = amrex::numParticlesOutOfRange(pti, range);
+        if (n_out > 0) {
+            CountDepositOutOfRange(n_out);
+            return;
+        }
+    }
 
     if (WarpX::do_shared_mem_charge_deposition)
     {

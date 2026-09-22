@@ -308,7 +308,7 @@ void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
 
 void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
                                  amrex::MultiFab* Jy, amrex::MultiFab* Jz,
-                                 PatchType patch_type)
+                                 PatchType patch_type, const bool even_parity)
 {
     BL_PROFILE("WarpX::ApplyJfieldBoundary()");
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
@@ -320,10 +320,12 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
         PEC::ApplyReflectiveBoundarytoJfield(Jx, Jy, Jz,
             field_boundary_lo, field_boundary_hi,
             particle_boundary_lo, particle_boundary_hi,
-            Geom(lev), lev, patch_type, ref_ratio);
+            Geom(lev), lev, patch_type, ref_ratio, even_parity);
     }
 
-    if (::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
+    // the insulator conductor zeroing is a current-density rule, not a coefficient one
+    if (!even_parity &&
+        ::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi)) {
         pec_insulator_boundary->ZeroParallelFieldInConductor({Jx, Jy, Jz},
             field_boundary_lo, field_boundary_hi,
             get_ng_fieldgather(), Geom(lev),
