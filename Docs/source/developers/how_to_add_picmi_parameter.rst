@@ -21,7 +21,7 @@ Parameters that only WarpX has are *extensions*, with the prefix ``warpx_``, e.g
    sim = picmi.Simulation(max_steps=100, warpx_my_threshold=0.2)
 
 The PICMI classes in ``Python/pywarpx/picmi.py`` are `pydantic <https://docs.pydantic.dev>`__ models:
-each parameter is a *field* with a type and a description.
+each parameter is a pydantic *field* with a type and a description.
 Pydantic checks the values that users pass, and the :ref:`documentation of the PICMI classes <usage-picmi-parameters>` is automatically generated from the field descriptions.
 
 .. note::
@@ -72,10 +72,10 @@ When in doubt, look for existing parameters of the same prefix in ``Python/pywar
 Choose the class whose objects the parameter belongs to, e.g., a parameter of the PSATD solver belongs to ``ElectromagneticSolver``, even though it could also be written by ``Simulation``.
 
 
-2. Add a field
---------------
+2. Add a parameter
+------------------
 
-Add the parameter as a field of the class, next to related fields, with the name that it has in the inputs (without the prefix):
+Add the parameter as a pydantic ``Field`` of the class, next to related parameter, with the name that it has in the inputs (without the prefix):
 
 .. code-block:: python
 
@@ -87,7 +87,7 @@ Add the parameter as a field of the class, next to related fields, with the name
            description="Fraction of ... above which ... [unit]",
        )
 
-Give the field:
+Give the parameter:
 
 * **A type** that matches the C++ parameter (see the table below), combined with ``| None``.
 * **The default** ``None``, which means that the user did not set the parameter.
@@ -133,8 +133,8 @@ The ``warpx_`` prefix
 ^^^^^^^^^^^^^^^^^^^^^
 
 Users give an extension of a PICMI standard class with the prefix ``warpx_``, e.g., ``warpx_my_threshold``.
-The field itself has the name without prefix, which is also the name that the methods of the class use, e.g., ``self.my_threshold``.
-The prefix is added to all fields that a WarpX class adds to the PICMI standard class by
+The parameter itself has the name without prefix, which is also the name that the methods of the class use, e.g., ``self.my_threshold``.
+The prefix is added to all parameters that a WarpX class adds to the PICMI standard class by
 
 .. code-block:: python
 
@@ -145,9 +145,9 @@ If the class does not have this line yet, add it (with the PICMI standard class 
 
 Classes that only exist in WarpX, which derive from an extension class of the standard (``picmistandard.PICMI_Extension``, ``PICMI_SolverExtension``, ``PICMI_DiagnosticExtension``, ...), e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
 
-Name the field like the input parameter, so that users give it as ``warpx_`` followed by that name.
-A few existing fields have a different name than their keyword, which then is given as the ``alias`` of the field.
-For example, the grids name the field ``potential_xmin``, following the names of the grid bounds in PICMI (``xmin``), while users give it as ``warpx_potential_lo_x``, following the input parameter ``boundary.potential_lo_x``:
+Name the parameter like the input parameter, so that users give it as ``warpx_`` followed by that name.
+Sometimes you might need an ``alias``, e.g., for backwards compatibility of a renamed parameter or because the intended PICMI extension name differs from the ``amrex::ParmParse`` name.
+For example, this adds both ``warpx_potential_xmin`` and ``warpx_potential_lo_x`` as PICMI Python parameters in a class:
 
 .. code-block:: python
 
@@ -161,7 +161,7 @@ For example, the grids name the field ``potential_xmin``, following the names of
 3. Write the input parameter
 ----------------------------
 
-In the method of the class that writes its inputs (see step 1), assign the field to the prefix:
+In the method of the class that writes its inputs (see step 1), assign the parameter to the prefix that matches ``amrex::ParmParse``:
 
 .. code-block:: python
 
@@ -169,7 +169,7 @@ In the method of the class that writes its inputs (see step 1), assign the field
        ...
        pywarpx.warpx.my_threshold = self.my_threshold
 
-This writes the line ``warpx.my_threshold = 0.2`` to the inputs, and nothing if the value is ``None``.
+This sets the ``amrex::ParmParse`` input ``warpx.my_threshold = 0.2``, or nothing if the value is ``None``.
 The prefixes of objects with a name, e.g., species and diagnostics, are attributes of the objects, e.g., ``self._species.my_flag = self.my_flag`` in ``Species``.
 
 
@@ -194,7 +194,7 @@ write a small script that sets the parameter, e.g., ``check.py``,
    sim = picmi.Simulation(solver=solver, max_steps=1, warpx_my_threshold=0.2)
    sim.write_input_file("inputs_check")
 
-and run it with the Python files of your source tree:
+and run it with the ``Python/`` files from the root of the WarpX source tree:
 
 .. code-block:: bash
 
@@ -203,27 +203,26 @@ and run it with the Python files of your source tree:
 
 Also check that an invalid value, e.g., ``warpx_my_threshold=-1.0``, raises a ``ValidationError``.
 
-Then use the parameter in a test of the parameter's feature, in the PICMI input script of an existing test (``Examples/**/inputs_test_*_picmi.py``) or in a new one, and run it as described in :ref:`developers-testing`.
-This needs a build of WarpX with ``-DWarpX_PYTHON=ON``.
+Then use the parameter in a test of the parameter's feature(s), in the PICMI input script of an existing test (``Examples/**/inputs_test_*_picmi.py``) or in a new one, and run it as described in :ref:`developers-testing` (built with ``-DWarpX_PYTHON=ON``).
 
 
 5. Check the documentation
 --------------------------
 
-The :ref:`documentation of the PICMI classes <usage-picmi-parameters>` shows the new field with its type, default and description, e.g., as ``warpx_my_threshold``.
+The C++ parameter itself is documented in ``Docs/source/usage/parameters.rst``, as part of the C++ change.
+
+The :ref:`documentation of the PICMI classes <usage-picmi-parameters>` automatically shows the new parameter with its type, default and description, e.g., as ``warpx_my_threshold``.
 Nothing needs to be added to ``Docs/source/usage/python.rst``.
 To check the documentation, build it as described in :ref:`developers-docs`.
-
-The C++ parameter itself is documented in ``Docs/source/usage/parameters.rst``, as part of the C++ change.
 
 
 Checklist
 ---------
 
-* [ ] Field added to the PICMI class of the parameter, with type, default ``None``, constraints and description.
-* [ ] The class has the ``warpx_`` prefix for its WarpX fields (``warpx_options``), unless it is a WarpX-only class.
-* [ ] The field is written in the method of the class that writes its inputs.
-* [ ] The inputs contain the parameter (``write_input_file``), and invalid values are rejected.
+* [ ] ``Field`` parameter added to the PICMI class of the parameter, with type, default ``None``, constraints and description.
+* [ ] The class has the ``warpx_`` prefix for its WarpX parameters (from the ``warpx_options`` helper), unless it is a WarpX-only class.
+* [ ] The parameter is written in the method of the class that writes its inputs.
+* [ ] The inputs contain the parameter (e.g., tested with ``write_input_file``), and invalid values are rejected.
 * [ ] A PICMI test uses the parameter.
 * [ ] ``pre-commit`` passes (see :ref:`developers-testing`).
 
