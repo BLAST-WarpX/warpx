@@ -77,6 +77,18 @@ amrex::Real HybridExtSubWeight (amrex::Real rho, amrex::Real rho_floor,
         + std::tanh((rho - rho_floor)/w_abs));
 }
 
+/** Statistics-aware floor of the vacuum weight (see
+ *  hybrid_pic_model.vacuum_weight_r_ref): rho_floor * min(max_fac, max(1, r_ref/r)),
+ *  r clamped at half a cell so the axis node is finite. r_ref <= 0 returns rho_floor. */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real HybridVacuumFloor (amrex::Real rho_floor, amrex::Real r,
+                               amrex::Real r_ref, amrex::Real max_fac, amrex::Real dr)
+{
+    if (r_ref <= amrex::Real(0.)) { return rho_floor; }
+    const amrex::Real rc = amrex::max(r, amrex::Real(0.5)*dr);
+    return rho_floor * amrex::min(max_fac, amrex::max(amrex::Real(1.), r_ref/rc));
+}
+
 class HybridPICModel
 {
 public:
@@ -174,6 +186,12 @@ public:
         std::array< std::unique_ptr<amrex::iMultiFab>,3 >& eb_update_E,
         int lev, PatchType patch_type, bool solve_for_Faraday,
         bool keep_grad_pe = false) const;
+
+    /** Collocated grids, hybrid_pic_model.pec_normal_E_from_interior: overwrite the
+     *  electric-field component normal to each perfectly conducting wall at the wall
+     *  node with the value at the first interior node (see the member documentation). */
+    void ApplyPECNormalEFromInterior (
+        ablastr::fields::VectorField const& Efield, int lev) const;
 
     void BfieldEvolve (
         ablastr::fields::MultiLevelVectorField const& Bfield,
@@ -423,7 +441,12 @@ public:
     /** Explicit fluid electron-pressure advance (electron_energy_solver = fluid): forward
      *  Euler over one accepted B substep dt_sub with the conservative enthalpy flux, the
      *  u_e.grad(pe) work term, the Joule deposit and the kappa_e conduction; a_Jfield and
-     *  a_rho are the ion current and charge density of the half step. Collocated only. */
+     *  a_rho are the ion current and charge density of the half step. Collocated only.
+     *  Shares the closure options of the theta-implicit in-loop advance: the Holmstrom
+     *  vacuum blend of the advanced pe toward the floored adiabat (holmstrom_vacuum_region),
+     *  the Te-gated Joule deposit (joule_redirect_Te_threshold / _width, the gated-out part
+     *  staged per charged species in m_pe_redirect_E and handed to the ions by
+     *  QDSMCApplyIonHeating in FinishElectronPressureFluid). */
     void AdvanceElectronPressureFluid (int lev, amrex::Real dt_sub, amrex::Real t_eval,
                                        ablastr::fields::VectorField const& a_Jfield,
                                        amrex::MultiFab const& a_rho) const;
@@ -501,6 +524,24 @@ public:
     int m_max_substep_attempts = 250;
 
     bool m_holmstrom_vacuum_region = false;
+    /** hybrid_pic_model.pec_normal_E_from_interior (default false; collocated grids):
+     *  the electric-field component normal to a perfectly conducting wall is taken
+     *  at the wall node from the first interior node instead of Ohm's law at the
+     *  wall node. On the collocated grid the wall node carries the normal component,
+     *  and Ohm's law there closes through one-sided radial/normal derivatives of the
+     *  tangential magnetic field; with plasma on the wall the Hall term then feeds a
+     *  wall-node current sheet that steepens along the wall without the dispersion an
+     *  interior node has. The staggered (Yee) grid has no normal E on the wall. */
+    bool m_pec_normal_E_from_interior = false;
+    /** hybrid_pic_model.vacuum_weight_r_ref [m] (default 0 = off; RZ only): the density
+     *  floor that enters the vacuum weight is raised to
+     *  n_floor * min(vacuum_weight_max_factor, max(1, r_ref / r)), the density at which a
+     *  node holds the same number of macro-particles as a node at r_ref does at n_floor
+     *  (uniform-weight loading: the count per node scales with n r). Near the axis a cell
+     *  at the floor density holds a fraction of a macro-particle and Ohm's law and the
+     *  electron pressure advance there are pure noise. */
+    amrex::Real m_vacuum_weight_r_ref = 0.0;
+    amrex::Real m_vacuum_weight_max_factor = 10.0;
 
     /** Electron temperature in eV */
     amrex::Real m_elec_temp;
@@ -540,6 +581,16 @@ public:
     /** pe at entry of the half step, restored when a NaN in the RK4 B
      *  substepping rewinds the half step to restart it with RKF45 */
     mutable std::unique_ptr<amrex::MultiFab> m_pe_fluid_entry;
+    /** fluid solver + Te-threshold redirect: per-ion redirected Joule energy E_s [J]
+     *  (one component per charged species, ordered as in QDSMCAddJouleHeating), nodal, no
+     *  ghosts, accumulated over the B substeps of the step and applied to the ions once
+     *  per step in FinishElectronPressureFluid; m_pe_redirect_entry is its half-step
+     *  entry snapshot for the RKF45 rewind. */
+    mutable std::unique_ptr<amrex::MultiFab> m_pe_redirect_E;
+    mutable std::unique_ptr<amrex::MultiFab> m_pe_redirect_entry;
+    static constexpr int kMaxFluidRedirectSpecies = 8;
+    mutable int m_pe_redirect_nspec = 0;
+    mutable amrex::GpuArray<amrex::Real, kMaxFluidRedirectSpecies> m_pe_redirect_Z{};
     /** hybrid_pic_model.filter_push_fields (requires warpx.use_filter): the ions gather
      *  the binomial-filtered E while Ohm's law and Faraday keep the unfiltered field;
      *  explicit counterpart of implicit_evolve.filter_push_fields. */
@@ -588,6 +639,12 @@ public:
      * derived from the threshold in ReadParameters, not a user input. */
     bool m_joule_redirect_to_ions = false;
     amrex::Real m_joule_redirect_Te_eV = -1.0;   // threshold [eV]; < 0 -> off
+    /** hybrid_pic_model.joule_redirect_Te_width (default 0 = hard step at the threshold):
+     *  with w > 0 the electron/ion split of the Joule heat is the smooth gate
+     *  sJ = 0.5 (1 - tanh((Te - Tc)/(w Tc))) (electrons receive sJ, the ions 1 - sJ),
+     *  the convention of the implicit scheme's implicit_evolve.joule_Te_cutoff_width, so
+     *  an explicit run can use the identical closure as its implicit twin. */
+    amrex::Real m_joule_redirect_Te_width = 0.0;
 
     /** Electron-ion thermal equilibration (Q_ei) on T_e:
      *   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),   dU_e/dt += -Q_ei,

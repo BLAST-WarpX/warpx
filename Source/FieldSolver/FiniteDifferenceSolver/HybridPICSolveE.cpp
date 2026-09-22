@@ -554,6 +554,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+    // statistics-aware vacuum floor (HybridVacuumFloor); the weight width scales with it
+    const amrex::Real vac_rref = hybrid_model->m_vacuum_weight_r_ref;
+    const amrex::Real vac_maxf = hybrid_model->m_vacuum_weight_max_factor;
+    auto vac_weight = [=] AMREX_GPU_DEVICE (amrex::Real rho_v, amrex::Real r_v, amrex::Real dr_v) {
+        const amrex::Real rf = HybridVacuumFloor(rho_floor, r_v, vac_rref, vac_maxf, dr_v);
+        return HybridExtSubWeight(rho_v, rf, floor_w * (rf / rho_floor));
+    };
 
     auto & warpx = WarpX::GetInstance();
     const amrex::Real t_new = warpx.gett_new(lev);
@@ -760,12 +767,23 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Skip field update in the embedded boundaries
                 if (update_Er_arr && update_Er_arr(i, j, 0) == 0) { return; }
 
+                // m = 0: E_r is odd about the axis. On the collocated grid E_r is
+                // nodal in r and its r = 0 row must vanish by symmetry (the Yee
+                // grid never places E_r on the axis); the general expression
+                // there would carry the one-sided d_r pe and the deposition-noise
+                // axis J_r and drive a coherent axis density mode.
+                if (Er_stag[0] == 1 && rmin + i*dr < 0.5_rt*dr) {
+                    Er(i, j, 0) = 0._rt;
+                    return;
+                }
+
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Er_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                    Er(i, j, 0) = 0._rt;
-                } else {
+                // Holmstrom vacuum region: the Hall and pressure terms are weighted
+                // by HybridExtSubWeight below (a hard step at
+                // n_floor_smooth_width = 0, the C1 blend otherwise)
+                {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                     const Real grad_Pe = (!solve_for_Faraday || keep_grad_pe) ?
@@ -779,6 +797,11 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const auto rho_val_limited = HybridSmoothFloor(rho_val, rho_floor, floor_w);
 
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
+                    if (holmstrom_vacuum_region) {
+                        // r at the E_r location (cell-centered in r on the Yee grid)
+                        const Real r_w = rmin + (i + 0.5_rt*(1 - Er_stag[0]))*dr;
+                        Er(i, j, 0) *= vac_weight(rho_val, r_w, dr);
+                    }
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -840,9 +863,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Etheta_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                    Etheta(i, j, 0) = 0._rt;
-                } else {
+                {
                     // Get the gradient of the electron pressure
                     // -> d/dt = 0 for m = 0
                     const auto grad_Pe = 0.0_rt;
@@ -854,6 +875,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const auto rho_val_limited = HybridSmoothFloor(rho_val, rho_floor, floor_w);
 
                     Etheta(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
+                    if (holmstrom_vacuum_region) {
+                        Etheta(i, j, 0) *= vac_weight(rho_val, r, dr);
+                    }
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -908,9 +932,7 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 // Interpolate to get the appropriate charge density in space
                 const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, 0, 0);
 
-                if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                    Ez(i, j, 0) = 0._rt;
-                } else {
+                {
                     // Get the gradient of the electron pressure if the longitudinal part of
                     // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                     const Real grad_Pe = (!solve_for_Faraday || keep_grad_pe) ?
@@ -924,6 +946,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     const auto rho_val_limited = HybridSmoothFloor(rho_val, rho_floor, floor_w);
 
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
+                    if (holmstrom_vacuum_region) {
+                        Ez(i, j, 0) *= vac_weight(rho_val, rmin + i*dr, dr);
+                    }
                 }
 
                 // Add resistivity only if E field value is used to update B
@@ -958,10 +983,17 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         if (r > 0.5_rt*dr) {
                             nabla2Jz += T_Algo::Dr_rDr_over_r(Jz, r, dr, coefs_r, n_coefs_r, i, j, 0, 0);
                         } else {
-                            // Special handling of the hyper-resistivity term on axis to avoid division by zero
-                            // and ensure that Jz remains well-behaved on axis for m=0 mode
-                            // This works since there is a symmetry condition on axis that cancels the geometric 1/r term
-                            nabla2Jz += T_Algo::Drr(Jz, coefs_r, n_coefs_r, i, j, 0, 0);
+                            // On axis (m = 0, J_z even in r) the radial part of the
+                            // Laplacian is the control-volume limit
+                            //   (1/r) d_r (r d_r J_z) -> 4 (J_z(dr) - J_z(0)) / dr^2,
+                            // which reads no r < 0 guard value. The guard J_z(-dr) is
+                            // never the even mirror: the Ampere kernel fills it with its
+                            // own axis regularization 4 B_theta(-dr)/dr from the B guard
+                            // (or leaves it untouched under an embedded boundary), so a
+                            // plain second difference through the guard is O(1) wrong on
+                            // the axis row and inconsistent with the symmetric stencil the
+                            // implicit preconditioner assumes there.
+                            nabla2Jz += 4._rt * (Jz(i+1, j, 0) - Jz(i, j, 0)) / (dr*dr);
                         }
 
                         Ez(i, j, 0) -= eta_h(rho_val, btot_val) * nabla2Jz;
@@ -1236,9 +1268,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                Ex(i, j, k) = 0._rt;
-            } else {
+            // Holmstrom vacuum region: the Hall and pressure terms are weighted by
+            // HybridExtSubWeight below (hard step at n_floor_smooth_width = 0)
+            {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                 const Real grad_Pe = (!solve_for_Faraday || keep_grad_pe) ?
@@ -1252,6 +1284,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 const auto rho_val_limited = HybridSmoothFloor(rho_val, rho_floor, floor_w);
 
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
+                if (holmstrom_vacuum_region) {
+                    Ex(i, j, k) *= HybridExtSubWeight(rho_val, rho_floor, floor_w);
+                }
             }
 
             // Add resistivity only if E field value is used to update B
@@ -1302,9 +1337,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                Ey(i, j, k) = 0._rt;
-            } else {
+            {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                 const Real grad_Pe = (!solve_for_Faraday || keep_grad_pe) ?
@@ -1318,6 +1351,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 const auto rho_val_limited = HybridSmoothFloor(rho_val, rho_floor, floor_w);
 
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
+                if (holmstrom_vacuum_region) {
+                    Ey(i, j, k) *= HybridExtSubWeight(rho_val, rho_floor, floor_w);
+                }
             }
 
             // Add resistivity only if E field value is used to update B
@@ -1368,9 +1404,7 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
-                Ez(i, j, k) = 0._rt;
-            } else {
+            {
                 // Get the gradient of the electron pressure if the longitudinal part of
                 // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
                 const Real grad_Pe = (!solve_for_Faraday || keep_grad_pe) ?
@@ -1384,6 +1418,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 const auto rho_val_limited = HybridSmoothFloor(rho_val, rho_floor, floor_w);
 
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
+                if (holmstrom_vacuum_region) {
+                    Ez(i, j, k) *= HybridExtSubWeight(rho_val, rho_floor, floor_w);
+                }
             }
 
             // Add resistivity only if E field value is used to update B

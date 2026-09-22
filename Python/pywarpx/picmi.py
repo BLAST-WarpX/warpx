@@ -2291,6 +2291,15 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         Explicit scheme only: ``'qdsmc'`` transports the electron entropy with
         fictitious particles, ``'fluid'`` advances the pressure with the fluid update.
 
+    pe_advection: str, default='vanalbada'
+        Fluid electron-pressure solver: face reconstruction of the enthalpy flux,
+        ``'central'`` or ``'vanalbada'`` (limited upwind).
+
+    pe_ue_cap: float, default=0
+        Fluid electron-pressure solver: tanh soft cap in m/s on the electron flux
+        velocity of the enthalpy flux (0 = off). The theta-implicit scheme uses
+        ``dx_min/(theta dt)``.
+
     kappa_e: float or str, optional
         Electron thermal conductivity in 1/(m s) for the heat flux
         ``q_e = -kappa_e * grad(pe/n)`` of the electron energy equation. A string
@@ -2306,6 +2315,13 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         instead of the electrons, allowing ``Ti > Te`` to develop. Specifying
         a value >= 0 enables the redirect (off by default). Requires
         ``include_joule_heating``.
+
+    joule_redirect_Te_width: float, default=0
+        Relative width of the Joule redirect gate: 0 is a hard step at
+        ``joule_redirect_Te_threshold``; ``w > 0`` splits the heat with the smooth
+        gate ``0.5 (1 - tanh((Te - Tc)/(w Tc)))`` (the electrons receive that
+        fraction, the ions the rest), the convention of the implicit scheme's
+        ``implicit_evolve.joule_Te_cutoff_width``.
 
     electron_ion_relaxation_rate: float or str, optional
         Value or expression for the electron-ion energy-equilibration rate
@@ -2427,9 +2443,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         solve_electron_energy_equation=None,
         include_joule_heating=None,
         electron_energy_solver=None,
+        pe_advection=None,
+        pe_ue_cap=None,
         kappa_e=None,
         te_seed_uniform=None,
         joule_redirect_Te_threshold=None,
+        joule_redirect_Te_width=None,
         electron_ion_relaxation_rate=None,
         qdsmc_n_floor=None,
         substeps=None,
@@ -2461,9 +2480,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         self.solve_electron_energy_equation = solve_electron_energy_equation
         self.include_joule_heating = include_joule_heating
         self.electron_energy_solver = electron_energy_solver
+        self.pe_advection = pe_advection
+        self.pe_ue_cap = pe_ue_cap
         self.kappa_e = kappa_e
         self.te_seed_uniform = te_seed_uniform
         self.joule_redirect_Te_threshold = joule_redirect_Te_threshold
+        self.joule_redirect_Te_width = joule_redirect_Te_width
         self.electron_ion_relaxation_rate = electron_ion_relaxation_rate
         self.qdsmc_n_floor = qdsmc_n_floor
 
@@ -2536,6 +2558,10 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             pywarpx.hybridpicmodel.include_joule_heating = self.include_joule_heating
         if self.electron_energy_solver is not None:
             pywarpx.hybridpicmodel.electron_energy_solver = self.electron_energy_solver
+        if self.pe_advection is not None:
+            pywarpx.hybridpicmodel.pe_advection = self.pe_advection
+        if self.pe_ue_cap is not None:
+            pywarpx.hybridpicmodel.pe_ue_cap = self.pe_ue_cap
         if self.kappa_e is not None:
             if isinstance(self.kappa_e, str):
                 pywarpx.hybridpicmodel.__setattr__(
@@ -2552,6 +2578,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
             pywarpx.hybridpicmodel.joule_redirect_Te_threshold = (
                 self.joule_redirect_Te_threshold
             )
+        if self.joule_redirect_Te_width is not None:
+            pywarpx.hybridpicmodel.joule_redirect_Te_width = self.joule_redirect_Te_width
         if self.electron_ion_relaxation_rate is not None:
             pywarpx.hybridpicmodel.__setattr__(
                 "electron_ion_relaxation_rate(rho,Te,Ti,t)",

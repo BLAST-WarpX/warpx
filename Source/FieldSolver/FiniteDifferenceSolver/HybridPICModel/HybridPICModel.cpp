@@ -72,6 +72,8 @@ void HybridPICModel::ReadParameters ()
     pp_hybrid.query("max_substep_attempts", m_max_substep_attempts);
 
     utils::parser::queryWithParser(pp_hybrid, "holmstrom_vacuum_region", m_holmstrom_vacuum_region);
+    utils::parser::queryWithParser(pp_hybrid, "vacuum_weight_r_ref", m_vacuum_weight_r_ref);
+    utils::parser::queryWithParser(pp_hybrid, "vacuum_weight_max_factor", m_vacuum_weight_max_factor);
 
     // The hybrid model requires an electron temperature, reference density
     // and exponent to be given. These values will be used to calculate the
@@ -87,6 +89,7 @@ void HybridPICModel::ReadParameters ()
 
     pp_hybrid.query("plasma_resistivity(rho,J,t)", m_eta_expression);
     pp_hybrid.query("plasma_hyper_resistivity(rho,B)", m_eta_h_expression);
+    pp_hybrid.query("pec_normal_E_from_interior", m_pec_normal_E_from_interior);
 
     utils::parser::queryWithParser(pp_hybrid, "n_floor", m_n_floor);
     utils::parser::queryWithParser(pp_hybrid, "n_floor_smooth_width",
@@ -167,6 +170,12 @@ void HybridPICModel::ReadParameters ()
     // (threshold < 0); specifying a threshold >= 0 enables the redirect.
     utils::parser::queryWithParser(pp_hybrid, "joule_redirect_Te_threshold", m_joule_redirect_Te_eV);
     m_joule_redirect_to_ions = (m_joule_redirect_Te_eV >= 0._rt);
+    // Gate width as a fraction of the threshold (0 = hard step): with w > 0 the split is
+    // the smooth gate sJ = 0.5 (1 - tanh((Te - Tc)/(w Tc))) of the implicit scheme
+    // (implicit_evolve.joule_Te_cutoff_width), see m_joule_redirect_Te_width.
+    utils::parser::queryWithParser(pp_hybrid, "joule_redirect_Te_width", m_joule_redirect_Te_width);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_joule_redirect_Te_width >= 0._rt,
+        "hybrid_pic_model.joule_redirect_Te_width must be >= 0");
 
     // Electron-ion thermal equilibration (Q_ei) on T_e:
     //   Q_ei = 3 n_e k_B nu_ei (T_e - T_i),  applied per ion species weighted by
@@ -219,10 +228,9 @@ void HybridPICModel::ReadParameters ()
                                       && (m_electron_energy_solver == 0
                                           || m_include_temperature_relaxation));
     }
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !(m_electron_energy_solver == 1 && m_joule_redirect_to_ions),
-        "hybrid_pic_model.joule_redirect_Te_threshold is a QDSMC-only "
-        "feature (electron_energy_solver = fluid does not support it)");
+    // (the Te-threshold Joule redirect is supported by both electron energy solvers: the
+    // QDSMC path stages it per step in QDSMCAddJouleHeating, the fluid path per B substep
+    // in AdvanceElectronPressureFluid)
 
     // convert electron temperature from eV to J
     m_elec_temp *= PhysConst::q_e;
@@ -302,6 +310,12 @@ void HybridPICModel::AllocateLevelMFs (
         fields.alloc_init(FieldType::hybrid_qdsmc_weights_fp,
             lev, amrex::convert(ba, rho_nodal_flag),
             dm, ncomps, ngRho, 0.0_rt);
+    }
+    // V_e is also needed by the fluid pe solver when the Q_ei exchange is on (the ion
+    // drag toward u_e in QDSMCApplyIonHeating; filled by QDSMCInitializeUe in
+    // FinishElectronPressureFluid)
+    if (m_solve_electron_energy_equation
+        && (m_electron_energy_solver == 0 || m_include_temperature_relaxation)) {
         fields.alloc_init(FieldType::hybrid_electron_velocity_fp, Direction{0},
             lev, amrex::convert(ba, rho_nodal_flag),
             dm, ncomps, ngRho, 0.0_rt);
@@ -681,9 +695,8 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(warpx.evolve_scheme == EvolveScheme::Explicit,
             "hybrid_pic_model.electron_energy_solver = fluid is for the explicit evolve "
             "scheme (the theta-implicit hybrid scheme advances pe in its Newton loop)");
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_holmstrom_vacuum_region,
-            "hybrid_pic_model.electron_energy_solver = fluid does not support "
-            "hybrid_pic_model.holmstrom_vacuum_region");
+        // holmstrom_vacuum_region: the advanced pe is blended toward the floored adiabat
+        // with the same vacuum weight Ohm's law uses (as the implicit in-loop advance does)
     }
     if (m_filter_push_fields) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::use_filter,
@@ -824,6 +837,73 @@ void HybridPICModel::HybridPICSolveE (
     );
     amrex::Real const time = warpx.gett_old(0) + warpx.getdt(0);
     warpx.ApplyEfieldBoundary(lev, patch_type, time);
+    if (m_pec_normal_E_from_interior) {
+        ApplyPECNormalEFromInterior(Efield, lev);
+    }
+}
+
+void HybridPICModel::ApplyPECNormalEFromInterior (
+    ablastr::fields::VectorField const& Efield, const int lev) const
+{
+    // Collocated grids only: there the component normal to a perfectly conducting wall
+    // sits on the wall node, and Ohm's law at that node closes through one-sided
+    // derivatives of the tangential magnetic field. Replace it by the value at the first
+    // interior node (zero normal gradient). On the staggered grid the normal component
+    // is cell-centered along its own direction and never lies on the wall.
+    auto& warpx = WarpX::GetInstance();
+    const amrex::Geometry& geom = warpx.Geom(lev);
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        if (geom.isPeriodic(idim)) { continue; }
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const int icomp = (idim == 0) ? 0 : 2;
+#elif defined(WARPX_DIM_1D_Z)
+        const int icomp = 2;
+#else
+        const int icomp = idim;
+#endif
+        amrex::MultiFab& E = *Efield[icomp];
+        if (!E.ixType().nodeCentered(idim)) { continue; }
+        bool any_pec = false;
+        for (int side = 0; side < 2; ++side) {
+            const FieldBoundaryType bt = (side == 0) ? WarpX::field_boundary_lo[idim]
+                                                     : WarpX::field_boundary_hi[idim];
+            any_pec = any_pec || (bt == FieldBoundaryType::PEC
+                               || bt == FieldBoundaryType::PEC_Insulator);
+        }
+        if (!any_pec) { continue; }
+        // The interior neighbour may belong to another box: make the guard cells current
+        E.FillBoundary(geom.periodicity());
+        const amrex::Box nodal_domain = amrex::convert(geom.Domain(), E.ixType());
+        for (int side = 0; side < 2; ++side) {
+            const FieldBoundaryType bt = (side == 0) ? WarpX::field_boundary_lo[idim]
+                                                     : WarpX::field_boundary_hi[idim];
+            if (bt != FieldBoundaryType::PEC && bt != FieldBoundaryType::PEC_Insulator) {
+                continue;
+            }
+            const int iwall = (side == 0) ? nodal_domain.smallEnd(idim)
+                                          : nodal_domain.bigEnd(idim);
+            const int shift = (side == 0) ? 1 : -1;
+            const int ncomp = E.nComp();
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(E, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                amrex::Box bx = mfi.tilebox();
+                if (bx.smallEnd(idim) > iwall || bx.bigEnd(idim) < iwall) { continue; }
+                bx.setSmall(idim, iwall);
+                bx.setBig(idim, iwall);
+                amrex::Array4<amrex::Real> const& arr = E.array(mfi);
+                amrex::ParallelFor(bx, ncomp,
+                    [=] AMREX_GPU_DEVICE (int i, int j, int k, int n)
+                {
+                    amrex::IntVect iv(AMREX_D_DECL(i, j, k));
+                    amrex::IntVect src = iv;
+                    src[idim] += shift;
+                    arr(iv, n) = arr(src, n);
+                });
+            }
+        }
+    }
 }
 
 void HybridPICModel::CalculateElectronPressure() const
@@ -1513,6 +1593,8 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
     bool const do_redirect = (redirect_E != nullptr);
     auto const K_per_eV    = PhysConst::q_e / PhysConst::kb;        // T[eV]*this = T[K]
     amrex::Real const Te_thresh_K = m_joule_redirect_Te_eV * K_per_eV;
+    // smooth-gate width in K (0 = hard step), see m_joule_redirect_Te_width
+    amrex::Real const Te_w_K = m_joule_redirect_Te_width * Te_thresh_K;
 
     auto & mypc = warpx.GetPartContainer();
 
@@ -1659,7 +1741,16 @@ void HybridPICModel::QDSMCAddJouleHeating (int const lev, amrex::Real const dt,
                 // usual Joule deposit); at/above it write this species'
                 // m_i-independent redirected energy E_s = (2/3) n_e Z_s e^2 eta
                 // |dV|^2 dt [J] into its component for the ion-heating step.
-                if (do_redirect && Te_arr(i,j,k) >= Te_thresh_K) {
+                // With joule_redirect_Te_width w > 0 the step becomes the smooth gate
+                // sJ = 0.5 (1 - tanh((Te - Tc)/(w Tc))) of the implicit scheme: the
+                // electrons receive sJ of the heat, the ions (1 - sJ) of E_s.
+                if (do_redirect && Te_w_K > 0.0_rt) {
+                    amrex::Real const sJ = 0.5_rt * (1.0_rt
+                        - std::tanh((Te_arr(i,j,k) - Te_thresh_K) / Te_w_K));
+                    redirect_arr(i,j,k,ion_comp) = (1.0_rt - sJ) * (2.0_rt/3.0_rt) * ne
+                        * Z_s * PhysConst::q_e * PhysConst::q_e * eta_s_eff * dv2 * dt;
+                    Te_arr(i,j,k) += sJ * dTe_s;
+                } else if (do_redirect && Te_arr(i,j,k) >= Te_thresh_K) {
                     redirect_arr(i,j,k,ion_comp) = (2.0_rt/3.0_rt) * ne
                         * Z_s * PhysConst::q_e * PhysConst::q_e * eta_s_eff * dv2 * dt;
                 } else {
@@ -1804,8 +1895,12 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
 
     amrex::MultiFab const & Te  = *warpx.m_fields.get(FieldType::hybrid_electron_temperature_fp, lev);
     amrex::MultiFab const & rho = *warpx.m_fields.get(FieldType::rho_fp, lev);
-    ablastr::fields::VectorField Ve =
-        warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
+    // u_e is only needed by the Q_ei drag; the fluid pe solver with the redirect alone
+    // does not register hybrid_electron_velocity_fp
+    ablastr::fields::VectorField Ve{nullptr, nullptr, nullptr};
+    if (do_relax) {
+        Ve = warpx.m_fields.get_alldirs(FieldType::hybrid_electron_velocity_fp, lev);
+    }
 
     auto const rho_floor = PhysConst::q_e * m_n_floor;
     auto const nu_ei     = m_nu_ei;
@@ -1863,9 +1958,12 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             amrex::Array4<amrex::Real const> const & rho_arr  = rho.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Te_arr   = Te.const_array(mfi);
             amrex::Array4<amrex::Real const> const & Ti_arr   = Ti_cc.const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vex_arr  = Ve[0]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vey_arr  = Ve[1]->const_array(mfi);
-            amrex::Array4<amrex::Real const> const & Vez_arr  = Ve[2]->const_array(mfi);
+            amrex::Array4<amrex::Real const> Vex_arr, Vey_arr, Vez_arr;   // read only when do_relax
+            if (do_relax) {
+                Vex_arr = Ve[0]->const_array(mfi);
+                Vey_arr = Ve[1]->const_array(mfi);
+                Vez_arr = Ve[2]->const_array(mfi);
+            }
             amrex::Array4<amrex::Real const> redirect_arr;
             if (do_redir) { redirect_arr = redirect_E->const_array(mfi); }
 
@@ -1927,6 +2025,13 @@ void HybridPICModel::QDSMCApplyIonHeating (int const lev, amrex::Real const dt,
             {
                 auto const p = WarpXParticleContainer::ParticleType(ptd, ip);
                 const auto [ii, jj, kk] = amrex::getParticleCell(p, plo, dxi).dim3();
+                // coef_p has no guard cells: a particle sitting on the tile's upper face
+                // (or one not yet redistributed) indexes past the array -- an undefined
+                // read that gave one ion a keV kick (3D formation, 40M ions, 2026-09-17:
+                // "shape does not fit within guard cells" at the next deposit)
+                if (ii < coef_arr.begin.vect[0] || ii >= coef_arr.end.vect[0] ||
+                    jj < coef_arr.begin.vect[1] || jj >= coef_arr.end.vect[1] ||
+                    kk < coef_arr.begin.vect[2] || kk >= coef_arr.end.vect[2]) { return; }
                 amrex::ParticleReal const nu   = coef_arr(ii,jj,kk,0);
                 amrex::ParticleReal const Te_K = coef_arr(ii,jj,kk,4);
                 amrex::ParticleReal const E_s  = coef_arr(ii,jj,kk,5);
@@ -2315,6 +2420,48 @@ void HybridPICModel::AdvanceElectronPressureFluid (
     // uncapped Ohm's-law velocity
     const amrex::Real ue_cap = m_pe_ue_cap;
     const bool jheat = m_include_joule_heating;
+    // Te-threshold Joule gate (joule_redirect_Te_threshold Tc, width w Tc): the electrons
+    // receive sJ Q with sJ = 0.5 (1 - tanh((Te - Tc)/(w Tc))) (hard step at w = 0), Te^s =
+    // pe^s/rho at the node; the gated-out (1 - sJ) Q dt_sub is staged per charged species
+    // as the per-ion energy E_s = (2/3) Z_s (1 - sJ) w_v Q dt_sub / n_e [J] for the
+    // ion-heating kick of FinishElectronPressureFluid (the implicit scheme's convention,
+    // including the Holmstrom weight w_v: in the floored halo the Joule power is that of
+    // the vacuum model, not a plasma process)
+    const bool jgate = jheat && m_joule_redirect_to_ions;
+    const amrex::Real jcut   = m_joule_redirect_Te_eV;
+    const amrex::Real jcut_w = m_joule_redirect_Te_width * m_joule_redirect_Te_eV;
+    if (jgate && !m_pe_redirect_E) {
+        auto& mypc = warpx.GetPartContainer();
+        m_pe_redirect_nspec = 0;
+        for (auto const& nm : mypc.GetSpeciesNames()) {
+            auto& pc = mypc.GetParticleContainerFromName(nm);
+            if (pc.getCharge() == 0._prt) { continue; }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_pe_redirect_nspec < kMaxFluidRedirectSpecies,
+                "electron_energy_solver = fluid + joule_redirect_Te_threshold: too many "
+                "charged species");
+            m_pe_redirect_Z[m_pe_redirect_nspec++] =
+                static_cast<amrex::Real>(pc.getCharge() / PhysConst::q_e);
+        }
+        m_pe_redirect_E = std::make_unique<amrex::MultiFab>(
+            pe->boxArray(), pe->DistributionMap(), std::max(m_pe_redirect_nspec, 1),
+            amrex::IntVect::TheZeroVector());
+        m_pe_redirect_E->setVal(0.0_rt);
+        m_pe_redirect_entry = std::make_unique<amrex::MultiFab>(
+            pe->boxArray(), pe->DistributionMap(), std::max(m_pe_redirect_nspec, 1),
+            amrex::IntVect::TheZeroVector());
+        m_pe_redirect_entry->setVal(0.0_rt);
+    }
+    const int n_redir = jgate ? m_pe_redirect_nspec : 0;
+    const amrex::GpuArray<amrex::Real, kMaxFluidRedirectSpecies> Zs = m_pe_redirect_Z;
+    // Holmstrom vacuum region: blend the advanced pe toward the floored adiabat with the
+    // (statistics-aware) vacuum weight Ohm's law uses, as the implicit in-loop advance
+    // does (u_e = (J_i - J)/rho is noise in near-empty cells)
+    const bool vac_blend = m_holmstrom_vacuum_region;
+    const amrex::Real vac_rref = m_vacuum_weight_r_ref;
+    const amrex::Real vac_maxf = m_vacuum_weight_max_factor;
+    const amrex::Real ad_n0 = m_n0_ref;
+    const amrex::Real ad_T0 = m_elec_temp;
+    const amrex::Real dx0 = geom.CellSize(0);
     const bool has_kappa = m_has_kappa_e;
     const bool has_kexpr = m_has_kappa_e_expression;
     const amrex::Real kappa_e = m_kappa_e;
@@ -2355,6 +2502,8 @@ void HybridPICModel::AdvanceElectronPressureFluid (
         amrex::Array4<amrex::Real const> const& Bx  = Bf[0]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& By  = Bf[1]->const_array(mfi);
         amrex::Array4<amrex::Real const> const& Bz  = Bf[2]->const_array(mfi);
+        amrex::Array4<amrex::Real> rd;
+        if (n_redir > 0) { rd = m_pe_redirect_E->array(mfi); }
 
         const amrex::Box tb = mfi.tilebox(amrex::IntVect::TheNodeVector());
 
@@ -2495,15 +2644,46 @@ void HybridPICModel::AdvanceElectronPressureFluid (
                       - Fk(Tn(i,j,k-1), Tn(i,j,k),   kapn(i,j,k-1), kapn(i,j,k),  dxi[2])) * dxi[2];
             }
 #endif
-            // positive-definite Joule deposit (resistive + hyper-resistive)
+            // Holmstrom vacuum weight of the node (1 without the vacuum region)
+            amrex::Real wv = 1._rt;
+            if (vac_blend) {
+                const amrex::Real rf = HybridVacuumFloor(rho_floor, 0._rt, vac_rref,
+                                                         vac_maxf, dx0);
+                wv = HybridExtSubWeight(rho_arr(i,j,k,0), rf, floor_w*(rf/rho_floor));
+            }
+            // positive-definite Joule deposit (resistive + hyper-resistive), Te-gated
             if (jheat) {
-                W -= HybridPeJouleQ(i, j, k, Jpx, Jpy, Jpz, Bx, By, Bz, rho_arr,
-                                    eta_ex, etah_ex, inc_hyp, t_eval, dxi,
-                                    dlo, dhi, is_per);
+                const amrex::Real Q = HybridPeJouleQ(i, j, k, Jpx, Jpy, Jpz, Bx, By, Bz,
+                                                     rho_arr, eta_ex, etah_ex, inc_hyp,
+                                                     t_eval, dxi, dlo, dhi, is_per);
+                amrex::Real sJ = 1._rt;
+                if (jgate) {
+                    // Te^s [eV] = pe^s / rho (floored rho)
+                    const amrex::Real Te_eV =
+                        pe0(i,j,k) / amrex::max(rho_arr(i,j,k,0), rho_floor);
+                    sJ = (jcut_w > 0._rt)
+                        ? 0.5_rt*(1._rt - std::tanh((Te_eV - jcut)/jcut_w))
+                        : ((Te_eV >= jcut) ? 0._rt : 1._rt);
+                    if (n_redir > 0) {
+                        const amrex::Real ne =
+                            amrex::max(rho_arr(i,j,k,0), rho_floor) / q_e;
+                        const amrex::Real Wd = wv * (1._rt - sJ) * Q;   // withheld power density
+                        for (int s = 0; s < n_redir; ++s) {
+                            rd(i,j,k,s) += (2._rt/3._rt) * Zs[s] * Wd * dt_sub / ne;
+                        }
+                    }
+                }
+                W -= sJ * Q;
             }
             const amrex::Real pe_new = pe0(i,j,k)
                 - dt_sub * (gamma * divF + (gamma - 1._rt) * (W - cond));
-            pe_arr(i,j,k) = HybridPeFloor(pe_new, pe_eps);
+            amrex::Real pe_fin = pe_new;
+            if (vac_blend) {
+                const amrex::Real pe_ad = ElectronPressure::get_pressure(
+                    ad_n0, ad_T0, gamma, amrex::max(rho_arr(i,j,k,0), rho_floor));
+                pe_fin = wv*pe_new + (1._rt - wv)*pe_ad;
+            }
+            pe_arr(i,j,k) = HybridPeFloor(pe_fin, pe_eps);
         });
     }
 
@@ -2549,10 +2729,19 @@ void HybridPICModel::FinishElectronPressureFluid (amrex::Real const dt) const
         // T_e = pe/(n k_B) from pe^{n+1} and rho^{n+1} ("Te" diagnostic; also
         // the state the Q_ei exchange relaxes)
         FillTeFromPe(lev);
+        // Symmetric Q_ei ion-electron exchange once per step on the t^{n+1} state and/or
+        // the Te-threshold Joule redirect: the energy withheld from the electrons over
+        // this step's B substeps goes to the ions through the same stochastic heating
+        // kick (one NGP lookup per ion; the ions sit in their valid cells since the
+        // step's deposit). The Q_ei drag needs u_e (hybrid_electron_velocity_fp).
+        const bool redir = (m_pe_redirect_E != nullptr) && (m_pe_redirect_nspec > 0);
+        if (m_include_temperature_relaxation || redir) {
+            if (m_include_temperature_relaxation) { QDSMCInitializeUe(lev); }
+            ApplyIonElectronEnergyExchange(lev, dt, redir ? m_pe_redirect_E.get() : nullptr);
+            if (redir) { m_pe_redirect_E->setVal(0.0_rt); }
+        }
         if (m_include_temperature_relaxation) {
-            // symmetric Q_ei ion-electron exchange once per step on the
-            // t^{n+1} state, then re-emit pe from the relaxed T_e
-            ApplyIonElectronEnergyExchange(lev, dt, nullptr);
+            // re-emit pe from the relaxed T_e
             FillPeFromTe(lev);
             warpx.ApplyElectronPressureBoundary(lev, PatchType::fine);
             ablastr::utils::communication::FillBoundary(
@@ -2648,6 +2837,10 @@ void HybridPICModel::BfieldEvolve (
                 pe_mf->boxArray(), pe_mf->DistributionMap(), pe_mf->nComp(), pe_mf->nGrowVect());
         }
         MultiFab::Copy(*m_pe_fluid_entry, *pe_mf, 0, 0, pe_mf->nComp(), pe_mf->nGrowVect());
+        if (m_pe_redirect_E) {
+            MultiFab::Copy(*m_pe_redirect_entry, *m_pe_redirect_E, 0, 0,
+                           m_pe_redirect_E->nComp(), 0);
+        }
     }
     auto advance_pe = [&] (amrex::Real dt_pe, amrex::Real t_end) {
         CalculatePlasmaCurrent(Bfield[lev], eb_update_E[lev], lev);
@@ -2712,6 +2905,10 @@ void HybridPICModel::BfieldEvolve (
                 if (fluid_pe) {
                     MultiFab::Copy(*pe_mf, *m_pe_fluid_entry, 0, 0,
                                    pe_mf->nComp(), pe_mf->nGrowVect());
+                    if (m_pe_redirect_E) {
+                        MultiFab::Copy(*m_pe_redirect_E, *m_pe_redirect_entry, 0, 0,
+                                       m_pe_redirect_E->nComp(), 0);
+                    }
                 }
                 use_rkf45 = true;
             }
