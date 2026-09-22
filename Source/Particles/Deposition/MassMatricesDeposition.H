@@ -459,14 +459,19 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
             // Deposit mass matrices
             if constexpr (full_mass_matrices) {
 
-                const int Ncomp0 = 1 + 2*depos_order;
-
                 for (int bb = 0; bb <= depos_order; bb++){
 
-                    const int row_base = depos_order + bb - iz;
+                    // offset of E node from J node; can go from -depos_order to +depos_order
+                    const int jj = bb - iz;
+                    // shifted to a non-negative index, for the storage position in S
+                    const int row_base = depos_order + jj;
+                    const int above_diag = (jj > 0) ? 1 : 0;
 
                     for (int aa = 0; aa <= depos_order; aa++){
-                        const int col_base = depos_order + aa - ix;
+                        // offset of E node from J node; can go from -depos_order to +depos_order
+                        const int ii = aa - ix;
+                        // shifted to a non-negative index, for the storage position in S
+                        const int col_base = depos_order + ii;
                         const amrex::Real weight_Ex = sx_jx[aa]*sz_jx[bb];
                         const amrex::Real weight_Ey = sx_jy[aa]*sz_jy[bb];
                         const amrex::Real weight_Ez = sx_jz[aa]*sz_jz[bb];
@@ -474,8 +479,11 @@ void doDirectJandSigmaDepositionKernel ([[maybe_unused]] const amrex::ParticleRe
                         int offset;
                         int Nc;
 
-                        // Reduced deposit for diagonal mass matrices
-                        if (col_base <= Ncomp0 - row_base) {
+                        // Reduced deposit for diagonal mass matrices: only the lower half
+                        // of the symmetric stencil is deposited (ii + jj < 0, or ii + jj == 0
+                        // with jj <= 0). The upper half is filled by copy in
+                        // ImplicitSolver::FinishMassMatricesDeposition().
+                        if (ii + jj <= -above_diag) {
                             offset = base_offset;
                             Nc = col_base + row_base*offset;
                             amrex::Gpu::Atomic::AddNoRet(
@@ -1350,8 +1358,15 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
     const int Ncomp_zy0 = 1 + Ncomp_base;
     const int Ncomp_zz0 = 1 + Ncomp_base;
 
+    // Stencil half-widths, used to compute the offset (ii,jj) of the E node from the J
+    // node. Only the lower half of the symmetric diagonal mass matrices is deposited
+    // (ii + jj < 0, or ii + jj == 0 with jj <= 0); the upper half is filled by copy in
+    // ImplicitSolver::FinishMassMatricesDeposition().
+    const int width_xx0 = depos_order - 1 + max_grid_crossings;  // (Ncomp_xx0 - 1)/2
     const int width_xx1 = depos_order + max_grid_crossings;  // (Ncomp_xx[1] - 1)/2
+    const int width_yy0 = width_xx1;                    // (Ncomp_yy0 - 1)/2
     const int width_yy1 = width_xx1;                    // (Ncomp_yy[1] - 1)/2
+    const int width_zz0 = width_xx1;                    // (Ncomp_zz0 - 1)/2
     const int width_zz1 = width_xx1 - 1;                // (Ncomp_zz[1] - 1)/2
 
     // Loop over segments and deposit full mass matrices
@@ -1368,11 +1383,17 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                     const int SegShiftZ = max_grid_crossings + SegNumZ[ms] - SegNumZ[ns];
                     // Deposit Sxx
                     for (int kE = 0; kE <= depos_order; kE++) {
+                        // storage index in S along z
                         const int row_xx = depos_order - k + kE + SegShiftZ;
-                        const int above_diag = (row_xx > width_xx1) ? 1 : 0;
+                        // offset of E node from J node; can go from -width_xx1 to +width_xx1
+                        const int jj = row_xx - width_xx1;
+                        const int above_diag = (jj > 0) ? 1 : 0;
                         for (int iE = 0; iE <= depos_order - 1; iE++) {
+                            // storage index in S along x
                             const int col_xx = depos_order - 1 - i + iE + SegShiftX;
-                            if (col_xx > Ncomp_xx0 - row_xx - above_diag) { break; } // Reduced deposit for diagonal mass matrices
+                            // offset of E node from J node; can go from -width_xx0 to +width_xx0
+                            const int ii = col_xx - width_xx0;
+                            if (ii + jj > -above_diag) { break; } // Reduced deposit for diagonal mass matrices
                             const int comp_xx = col_xx + Ncomp_xx0*row_xx;
                             const amrex::Real weight_E = weight_cellX_nodeZ[ms][iE][kE];
                             amrex::Gpu::Atomic::AddNoRet(&Sxx_arr(i_J, k_J, 0, comp_xx), fpxx*weight_J*weight_E);
@@ -1420,11 +1441,17 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                     }
                     // Deposit Szz
                     for (int kE = 0; kE <= depos_order - 1; kE++) {
+                        // storage index in S along z
                         const int row_zz = depos_order - 1 - k + kE + SegShiftZ;
-                        const int above_diag = (row_zz > width_zz1) ? 1 : 0;
+                        // offset of E node from J node; can go from -width_zz1 to +width_zz1
+                        const int jj = row_zz - width_zz1;
+                        const int above_diag = (jj > 0) ? 1 : 0;
                         for (int iE = 0; iE <= depos_order; iE++) {
+                            // storage index in S along x
                             const int col_zz = depos_order - i + iE + SegShiftX;
-                            if (col_zz > Ncomp_zz0 - 2 - row_zz - above_diag) { break; } // Reduced deposit for diagonal mass matrices
+                            // offset of E node from J node; can go from -width_zz0 to +width_zz0
+                            const int ii = col_zz - width_zz0;
+                            if (ii + jj > -above_diag) { break; } // Reduced deposit for diagonal mass matrices
                             const int comp_zz = col_zz + Ncomp_zz0*row_zz;
                             const amrex::Real weight_E = weight_nodeX_cellZ[ms][iE][kE];
                             amrex::Gpu::Atomic::AddNoRet( &Szz_arr(i_J, k_J, 0, comp_zz), fpzz*weight_J*weight_E);
@@ -1472,11 +1499,17 @@ void doVillasenorJandSigmaDepositionKernel ([[maybe_unused]] const amrex::Partic
                     }
                     // Deposit Syy
                     for (int kE = 0; kE <= depos_order; kE++) {
+                        // storage index in S along z
                         const int row_yy = depos_order - k + kE + SegShiftZ;
-                        const int above_diag = (row_yy > width_yy1) ? 1 : 0;
+                        // offset of E node from J node; can go from -width_yy1 to +width_yy1
+                        const int jj = row_yy - width_yy1;
+                        const int above_diag = (jj > 0) ? 1 : 0;
                         for (int iE = 0; iE <= depos_order; iE++) {
+                            // storage index in S along x
                             const int col_yy = depos_order - i + iE + SegShiftX;
-                            if (col_yy > Ncomp_yy0 - 1 - row_yy - above_diag) { break; } // Reduced deposit for diagonal mass matrices
+                            // offset of E node from J node; can go from -width_yy0 to +width_yy0
+                            const int ii = col_yy - width_yy0;
+                            if (ii + jj > -above_diag) { break; } // Reduced deposit for diagonal mass matrices
                             const int comp_yy = col_yy + Ncomp_yy0*row_yy;
                             const amrex::Real weight_E = weight_nodeX_nodeZ[ms][iE][kE];
                             amrex::Gpu::Atomic::AddNoRet( &Syy_arr(i_J, k_J, 0, comp_yy), fpyy*weight_J*weight_E);

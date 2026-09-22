@@ -1112,23 +1112,63 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
+namespace
+{
+    /**
+     * \brief Fill the upper half of the stencil of a diagonal mass matrix at cell (i,j,k)
+     *        from its deposited lower half.
+     *
+     * The diagonal mass matrices are symmetric: S(iv, d) = S(iv + d, -d), where d = (ii,jj,kk)
+     * is the stencil offset, stored as component
+     * c = (ii + width[0]) + ncomp[0]*((jj + width[1]) + ncomp[1]*(kk + width[2])).
+     * The deposition kernels in MassMatricesDeposition.H only deposit the lower half of the
+     * stencil (ii + jj + kk < 0, or ii + jj + kk == 0 with jj <= 0); the upper half is copied
+     * here. The components written (upper half) are disjoint from the components read (lower
+     * half), so the copy can be done in place and the iterations over cells are independent
+     * (see issue #7097).
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void FoldMassMatrix (int i, int j, int k,
+                         amrex::Array4<amrex::Real> const& S, amrex::Box const& Sb,
+                         amrex::GpuArray<int,3> const& ncomp, amrex::GpuArray<int,3> const& width)
+    {
+        amrex::ignore_unused(j, k);
+        const int ncomp_tot = ncomp[0]*ncomp[1]*ncomp[2];
+        const amrex::IntVect iv_dst(AMREX_D_DECL(i,j,k));
+        // Loop over the storage indices (c0,c1,c2) in S; (ii,jj,kk) is the corresponding
+        // offset of the E node from the J node; each can go from -width[dir] to +width[dir]
+        for (int c2 = 0; c2 < ncomp[2]; ++c2) {
+            const int kk = c2 - width[2];
+            for (int c1 = 0; c1 < ncomp[1]; ++c1) {
+                const int jj = c1 - width[1];
+                for (int c0 = 0; c0 < ncomp[0]; ++c0) {
+                    const int ii = c0 - width[0];
+                    // Skip the lower half (already written by the deposition kernel); the upper
+                    // half (not yet written) is filled in by symmetry below
+                    const int sum = ii + jj + kk;
+                    if (sum < 0 || (sum == 0 && jj <= 0)) { continue; }
+                    // Mirror entry to copy from: S(iv_dst, d) = S(iv_dst + d, -d)
+                    const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,kk));
+                    // Skip if the mirror node is outside this box (nothing to copy from)
+                    if (!Sb.contains(iv_src)) { continue; }
+                    const int dst_comp = c0 + ncomp[0]*(c1 + ncomp[1]*c2);
+                    // Copy from the component of offset -d
+                    S(iv_dst, dst_comp) = S(iv_src, ncomp_tot - 1 - dst_comp);
+                }
+            }
+        }
+    }
+}
+
 void ImplicitSolver::FinishMassMatricesDeposition ()
 {
     BL_PROFILE("ImplicitSolver::FinishMassMatricesDeposition()");
 
-    // The MM deposit routine takes advantage of symmetry for the diagonal mass
-    // matrices to only deposit roughly half of the values. The remainder are
-    // computed via copy here in this routine.
+    // The MM deposit routines take advantage of symmetry for the diagonal mass
+    // matrices to only deposit half of the values. The remainder are computed
+    // via copy here in this routine (see FoldMassMatrix).
 
-#if AMREX_SPACEDIM < 3
-    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
-
-#if AMREX_SPACEDIM > 1
-    const int ncomp_tot_xx = AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2]);
-    const int ncomp_tot_yy = AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2]);
-    const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
-#endif
 
     amrex::GpuArray<int,3> ncomp_xx = {1,1,1};
     amrex::GpuArray<int,3> ncomp_yy = {1,1,1};
@@ -1169,139 +1209,24 @@ void ImplicitSolver::FinishMassMatricesDeposition ()
             Sbz.grow(SZ[2]->nGrowVect());
             Sby.grow(SY[1]->nGrowVect());
 
-#if AMREX_SPACEDIM == 1
             amrex::ParallelFor( Sbx, Sby, Sbz,
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
-                // Sxx(i,d + n) = Sxx(i + n,d - n), where d = Sxx_width[0]
-                const int width = amrex::min(Sxx_width[0],Sbx.bigEnd(0)-i);
-                for (int n = 1; n <= width; ++n) {
-                    const int dst_comp = Sxx_width[0] + n;
-                    const int src_comp = Sxx_width[0] - n;
-                    Sxx(i,j,k,dst_comp) = Sxx(i + n,j,k,src_comp);
-                }
+                FoldMassMatrix(i, j, k, Sxx, Sbx, ncomp_xx, Sxx_width);
             },
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
-                // Syy(i,d + n) = Syy(i + n,d - n), where d = Syy_width[0]
-                const int width = std::min(Syy_width[0], Sby.bigEnd(0) - i);
-                for (int n = 1; n <= width; n++) {
-                    const int dst_comp = Syy_width[0] + n;
-                    const int src_comp = Syy_width[0] - n;
-                    Syy(i,j,k,dst_comp) = Syy(i + n,j,k,src_comp);
-                }
+                FoldMassMatrix(i, j, k, Syy, Sby, ncomp_yy, Syy_width);
             },
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
-                // Szz(i,d + n) = Szz(i + n,d - n), where d = Szz_width[0]
-                const int width_zz = std::min(Szz_width[0],Sbz.bigEnd(0) - i);
-                for (int n = 1; n <= width_zz; n++) {
-                    const int dst_comp = Szz_width[0] + n;
-                    const int src_comp = Szz_width[0] - n;
-                    Szz(i,j,k,dst_comp) = Szz(i + n,j,k,src_comp);
-                }
+                FoldMassMatrix(i, j, k, Szz, Sbz, ncomp_zz, Szz_width);
             });
-
-#elif AMREX_SPACEDIM == 2
-            // In-place fold of the mass matrices: for every (ncomp_x, ncomp_y)
-            // combination, the components written at iv_dst are disjoint from
-            // the components read at any i-offset source, so iterations of the
-            // vectorized i loop are independent, as required by ParallelFor
-            // (see issue #7097). Reads across j rely on the serial ascending j
-            // loop on CPU and must not be reordered.
-            amrex::ParallelFor( Sbx, Sby, Sbz,
-
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ignore_unused(k);
-                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
-
-                const int row_start = amrex::max(0,ncomp_xx[1] - ncomp_xx[0]);
-
-                for (int m = row_start; m < ncomp_xx[1]; ++m) {
-                    const int jj = m - Sxx_width[1];
-
-                    const int above_diag = (m > Sxx_width[1]) ? 1 : 0;
-                    const int width0 = amrex::min(m + above_diag - row_start + 1, ncomp_xx[0]);
-
-                    for (int n = 0; n < width0; ++n) {
-                        const int ii = Sxx_width[0] - n;
-
-                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
-                        if (!Sbx.contains(iv_src)) { continue; }
-
-                        const int dst_comp = ncomp_xx[0]*(m + 1) - (n + 1);
-                        const int src_comp = ncomp_tot_xx - 1 - dst_comp;
-
-                        Sxx(iv_dst,dst_comp) = Sxx(iv_src,src_comp);
-                    }
-
-                }
-
-            },
-
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ignore_unused(k);
-                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
-
-                const int row_start = 1;
-
-                for (int m = row_start; m < ncomp_yy[1]; m++) {
-                    const int jj = m - Syy_width[1];
-
-                    const int above_diag = (m > Syy_width[1]) ? 1 : 0;
-                    const int width0 = std::min(m + above_diag - row_start + 1, ncomp_yy[0]);
-
-                    for (int n = 0; n < width0; n++) {
-                        const int ii = Syy_width[0] - n;
-
-                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
-                        if (!Sby.contains(iv_src)) { continue; }
-
-                        const int dst_comp = ncomp_yy[0]*(m + 1) - (n + 1);
-                        const int src_comp = ncomp_tot_yy - 1 - dst_comp;
-
-                        Syy(iv_dst,dst_comp) = Syy(iv_src,src_comp);
-                    }
-                }
-
-            },
-
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ignore_unused(k);
-                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
-
-                const int row_start = std::max(0,ncomp_zz[1] - ncomp_zz[0]);
-
-                for (int m = row_start; m < ncomp_zz[1]; m++) {
-                    const int jj = m - Szz_width[1];
-
-                    const int above_diag = (m > Szz_width[1]) ? 1 : 0;
-                    const int width0 = std::min(m - row_start + above_diag + 1, ncomp_zz[0]);
-
-                    for (int n = 0; n < width0; n++) {
-                        const int ii = Szz_width[0] - n;
-
-                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
-                        if (!Sbz.contains(iv_src)) { continue; }
-
-                        const int dst_comp = ncomp_zz[0]*(m + 1) - (n + 1);
-                        const int src_comp = ncomp_tot_zz - 1 - dst_comp;
-
-                        Szz(iv_dst,dst_comp) = Szz(iv_src,src_comp);
-                    }
-                }
-
-            });
-#endif
         }
     }
-#endif
 }
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
