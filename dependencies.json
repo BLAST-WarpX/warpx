@@ -5,7 +5,7 @@
     "version_picsar": "26.05",
     "version_pybind11_min": "v3.0.0",
     "version_picmi": "0.34.0",
-    "commit_amrex": "d6d1aa11f38cab90fc592ee193ae574cdc001aaf",
+    "commit_amrex": "1c3354fc8aea567bbb11a11015ebec392675b983",
     "commit_pyamrex": "26.09",
     "commit_picsar": "26.05",
     "commit_pybind11": "v3.1.0",
