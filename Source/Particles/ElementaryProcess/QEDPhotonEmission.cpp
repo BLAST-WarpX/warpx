@@ -19,6 +19,9 @@
 PhotonEmissionTransformFunc::
 PhotonEmissionTransformFunc (QuantumSynchrotronGetOpticalDepth opt_depth_functor,
                              int const opt_depth_runtime_comp,
+                             int const chi_lepton_at_creation_comp,
+                             int const E_field_at_creation_comp,
+                             int const B_field_at_creation_comp,
                              QuantumSynchrotronPhotonEmission const emission_functor,
                              const WarpXParIter& a_pti, int lev, amrex::IntVect ngEB,
                              amrex::FArrayBox const& exfab,
@@ -32,6 +35,9 @@ PhotonEmissionTransformFunc (QuantumSynchrotronGetOpticalDepth opt_depth_functor
                              int a_offset):
     m_opt_depth_functor{opt_depth_functor},
     m_opt_depth_runtime_comp{opt_depth_runtime_comp},
+    m_chi_lepton_at_creation_comp{chi_lepton_at_creation_comp},
+    m_E_field_at_creation_comp{E_field_at_creation_comp},
+    m_B_field_at_creation_comp{B_field_at_creation_comp},
     m_emission_functor{emission_functor},
     m_Ex_external_particle{E_external_particle[0]},
     m_Ey_external_particle{E_external_particle[1]},

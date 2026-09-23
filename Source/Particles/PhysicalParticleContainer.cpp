@@ -283,6 +283,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
         AddRealComp("opticalDepthBW");
     }
 
+    if(AmIA<PhysicalSpecies::photon>()){
+        AddRealComp("chi_lepton_at_creation");
+        AddRealComp("E_field_at_creation");
+        AddRealComp("B_field_at_creation");
+    }
+
     if(m_do_qed_quantum_sync){
         pp_species_name.get("qed_quantum_sync_phot_product_species",
             m_qed_quantum_sync_phot_product_name);
