@@ -75,7 +75,7 @@ rm -rf $HOME/src/boost-temp
 if [ -d $HOME/src/c-blosc2 ]
 then
   cd $HOME/src/c-blosc2
-  git fetch --prune
+  git fetch --prune --tags
   git checkout v2.23.1
   cd -
 else
@@ -90,7 +90,7 @@ rm -rf ${build_dir}/c-blosc2-pm-gpu-build
 if [ -d $HOME/src/adios2 ]
 then
   cd $HOME/src/adios2
-  git fetch --prune
+  git fetch --prune --tags
   git checkout v2.12.1
   cd -
 else
@@ -105,7 +105,7 @@ rm -rf ${build_dir}/adios2-pm-gpu-build
 if [ -d $HOME/src/blaspp ]
 then
   cd $HOME/src/blaspp
-  git fetch --prune
+  git fetch --prune --tags
   git checkout v2024.05.31
   cd -
 else
@@ -120,7 +120,7 @@ rm -rf ${build_dir}/blaspp-pm-gpu-build
 if [ -d $HOME/src/lapackpp ]
 then
   cd $HOME/src/lapackpp
-  git fetch --prune
+  git fetch --prune --tags
   git checkout v2024.05.31
   cd -
 else
