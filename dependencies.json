@@ -2,12 +2,12 @@
     "version_warpx": "26.09",
     "version_amrex": "26.09",
     "version_pyamrex": "26.09",
-    "version_picsar": "26.05",
+    "version_picsar": "26.10",
     "version_pybind11_min": "v3.0.0",
     "version_picmi": "0.34.0",
     "commit_amrex": "1c3354fc8aea567bbb11a11015ebec392675b983",
     "commit_pyamrex": "26.09",
-    "commit_picsar": "26.05",
+    "commit_picsar": "26.10",
     "commit_pybind11": "v3.1.0",
     "commit_picmi": "a2fc467f3125d57ea0183562e69f414b84abe675"
 }
