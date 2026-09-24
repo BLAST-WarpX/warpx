@@ -105,7 +105,7 @@ namespace
         amrex::Real nppc = 0;
 
         std::string injection_style = "none";
-        pp_spec.query("injection_style", injection_style);
+        utils::parser::queryWithParser(pp_spec, "injection_style", injection_style);
         std::transform(injection_style.begin(),
                        injection_style.end(),
                        injection_style.begin(),
@@ -385,13 +385,13 @@ WarpX::PostProcessBaseGrids (BoxArray& ba0) const
         Real wtot = 0; // total number of particles
 
         std::vector<std::string> species_names;
-        pp0.queryarr("particles.species_names", species_names);
+        utils::parser::queryArrWithParser(pp0, "particles.species_names", species_names);
         for (auto const& species : species_names) { // loop over species
             Real density_min = std::numeric_limits<amrex::Real>::epsilon();
             Real nppc = 0;
             std::string profile, density_function;
             ParmParse pp_spec(species);
-            pp_spec.query("profile", profile);
+            utils::parser::queryWithParser(pp_spec, "profile", profile);
             bool split_using_this_species = false;
             if (profile == "parse_density_function" &&
                 pp_spec.queryline("density_function(x,y,z)", density_function))

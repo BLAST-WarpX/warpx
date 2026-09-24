@@ -565,13 +565,13 @@ WarpX::ReadParameters ()
         const ParmParse pp;// Traditionally, max_step and stop_time do not have prefix.
         utils::parser::queryWithParser(pp, "max_step", max_step);
         utils::parser::queryWithParser(pp, "stop_time", stop_time);
-        pp.query("authors", m_authors);
+        utils::parser::queryWithParser(pp, "authors", m_authors);
     }
 
     {
         const ParmParse pp_amr("amr");
 
-        pp_amr.query("restart", restart_chkfile);
+        utils::parser::queryWithParser(pp_amr, "restart", restart_chkfile);
     }
 
     {
@@ -642,7 +642,7 @@ WarpX::ReadParameters ()
 
         using ablastr::utils::SignalHandling;
         std::vector<std::string> signals_in;
-        pp_warpx.queryarr("break_signals", signals_in);
+        utils::parser::queryArrWithParser(pp_warpx, "break_signals", signals_in);
 
 #if defined(__linux__) || defined(__APPLE__)
         for (const std::string &str : signals_in) {
@@ -659,12 +659,12 @@ WarpX::ReadParameters ()
 
         const ParmParse pp("diagnostics");
         std::vector<std::string> diags_names;
-        pp.queryarr("diags_names", diags_names);
+        utils::parser::queryArrWithParser(pp, "diags_names", diags_names);
 
         for (const auto &diag : diags_names) {
             const ParmParse dd(diag);
             std::string format;
-            dd.query("format", format);
+            utils::parser::queryWithParser(dd, "format", format);
             if (format == "checkpoint") {
                 have_checkpoint_diagnostic = true;
                 break;
@@ -673,7 +673,7 @@ WarpX::ReadParameters ()
 
         pp_warpx.query("write_diagnostics_on_restart", write_diagnostics_on_restart);
 
-        pp_warpx.queryarr("checkpoint_signals", signals_in);
+        utils::parser::queryArrWithParser(pp_warpx, "checkpoint_signals", signals_in);
 #if defined(__linux__) || defined(__APPLE__)
         for (const std::string &str : signals_in) {
             const int sig = SignalHandling::parseSignalNameToNumber(str);
@@ -699,7 +699,7 @@ WarpX::ReadParameters ()
         pp_warpx.query("use_hybrid_QED", use_hybrid_QED);
         pp_warpx.query("safe_guard_cells", m_safe_guard_cells);
         std::vector<std::string> override_sync_intervals_string_vec = {"1"};
-        pp_warpx.queryarr("override_sync_intervals", override_sync_intervals_string_vec);
+        utils::parser::queryArrWithParser(pp_warpx, "override_sync_intervals", override_sync_intervals_string_vec);
         override_sync_intervals =
             ablastr::utils::text::IntervalsParser(override_sync_intervals_string_vec);
 
@@ -844,7 +844,7 @@ WarpX::ReadParameters ()
         utils::parser::queryWithParser(pp_warpx, "max_omegap_dt", m_max_omegap_dt);
         utils::parser::queryWithParser(pp_warpx, "max_omegac_dt", m_max_omegac_dt);
         std::vector<std::string> dt_interval_vec = {"-1"};
-        pp_warpx.queryarr("dt_update_interval", dt_interval_vec);
+        utils::parser::queryArrWithParser(pp_warpx, "dt_update_interval", dt_interval_vec);
         m_dt_update_interval = ablastr::utils::text::IntervalsParser(dt_interval_vec);
         if (m_dt_update_interval.isActivated()) {
             pp_warpx.query("dt_update_diagnostic_file", m_dt_update_diagnostic_file);
@@ -1150,7 +1150,7 @@ WarpX::ReadParameters ()
         {
             const ParmParse pp_fluids("fluids");
             std::vector<std::string> fluid_species_names = {};
-            pp_fluids.queryarr("species_names", fluid_species_names);
+            utils::parser::queryArrWithParser(pp_fluids, "species_names", fluid_species_names);
             do_fluid_species = !fluid_species_names.empty();
             if (do_fluid_species) {
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_level <= 1,
@@ -1446,7 +1446,7 @@ WarpX::ReadParameters ()
 
         // Load balancing parameters
         std::vector<std::string> load_balance_intervals_string_vec = {"0"};
-        pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
+        utils::parser::queryArrWithParser(pp_algo, "load_balance_intervals", load_balance_intervals_string_vec);
         load_balance_intervals = ablastr::utils::text::IntervalsParser(
             load_balance_intervals_string_vec);
         pp_algo.query("load_balance_with_sfc", load_balance_with_sfc);
@@ -1468,11 +1468,11 @@ WarpX::ReadParameters ()
         // (do this only if there is at least one particle or laser species)
         const ParmParse pp_particles("particles");
         std::vector<std::string> species_names;
-        pp_particles.queryarr("species_names", species_names);
+        utils::parser::queryArrWithParser(pp_particles, "species_names", species_names);
 
         const ParmParse pp_lasers("lasers");
         std::vector<std::string> lasers_names;
-        pp_lasers.queryarr("names", lasers_names);
+        utils::parser::queryArrWithParser(pp_lasers, "names", lasers_names);
 
 #ifdef WARPX_DIM_RZ
         // Here we check if the simulation includes laser and the number of
@@ -1529,7 +1529,7 @@ WarpX::ReadParameters ()
         }
 
         const amrex::ParmParse pp_warpx("warpx");
-        pp_warpx.queryarr("sort_intervals", sort_intervals_string_vec);
+        utils::parser::queryArrWithParser(pp_warpx, "sort_intervals", sort_intervals_string_vec);
         sort_intervals = ablastr::utils::text::IntervalsParser(sort_intervals_string_vec);
 
         Vector<int> vect_sort_bin_size(AMREX_SPACEDIM,1);
@@ -1966,7 +1966,7 @@ WarpX::ReadParameters ()
     m_collisions_split_momentum_push = false;
     const amrex::ParmParse pp_collisions("collisions");
     amrex::Vector<std::string> collision_names;
-    pp_collisions.queryarr("collision_names", collision_names);
+    utils::parser::queryArrWithParser(pp_collisions, "collision_names", collision_names);
     if (!collision_names.empty()) {
         if (evolve_scheme == EvolveScheme::Explicit) {
             m_collisions_split_momentum_push = true;

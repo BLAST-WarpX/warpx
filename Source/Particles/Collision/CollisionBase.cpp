@@ -21,7 +21,7 @@ CollisionBase::CollisionBase (const std::string& collision_name) :
 
     // read collision species
     const amrex::ParmParse pp_collision_name(collision_name);
-    pp_collision_name.getarr("species", m_species_names);
+    utils::parser::getArrWithParser(pp_collision_name, "species", m_species_names);
 
     // time step control: ndt_supercycle or ndt_subcycle (mutually exclusive)
     int ndt_supercycle = 0;
@@ -68,7 +68,7 @@ CollisionBase::BackwardCompatibility ()
     // The 'back' and 'forward' scattering process names are no longer supported: the
     // scattering angle is now an attribute of the process (see <process>_scattering_angle_model).
     amrex::Vector<std::string> scattering_process_names;
-    pp_collision_name.queryarr("scattering_processes", scattering_process_names);
+    utils::parser::queryArrWithParser(pp_collision_name, "scattering_processes", scattering_process_names);
     for (const auto& scattering_process : scattering_process_names) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             scattering_process != "back" && scattering_process != "forward",

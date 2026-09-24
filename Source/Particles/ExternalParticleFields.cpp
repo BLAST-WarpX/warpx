@@ -31,7 +31,7 @@ ExternalParticleFields::ReadParameters () {
         ParticleFieldMetaData md;
 
         // if the name is specified, so must be the path
-        pp_particles.get(fname + ".read_fields_from_path", md.path);
+        utils::parser::getWithParser(pp_particles, fname + ".read_fields_from_path", md.path);
 
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             !md.path.empty(),
@@ -55,12 +55,12 @@ ExternalParticleFields::ReadParameters () {
     };
 
     std::string e_init;
-    pp_particles.query("E_ext_particle_init_style", e_init);
+    utils::parser::queryWithParser(pp_particles, "E_ext_particle_init_style", e_init);
     if (e_init == "read_from_file") {
 
         // Read in E field names
         std::vector<std::string> E_names;
-        pp_particles.queryarr("E_ext_particle_fields", E_names);
+        utils::parser::queryArrWithParser(pp_particles, "E_ext_particle_fields", E_names);
 
         // Initialize E fields by name
         for (const auto& n : E_names) {
@@ -72,7 +72,7 @@ ExternalParticleFields::ReadParameters () {
 
             // no E field names provided but read_from_file requested, force to
             // read path
-            pp_particles.get("read_fields_from_path", single_field_path);
+            utils::parser::getWithParser(pp_particles, "read_fields_from_path", single_field_path);
 
             // initialize single E field meta data
             ParticleFieldMetaData md;
@@ -113,7 +113,7 @@ ExternalParticleFields::ReadParameters () {
     }
 
     std::string b_init;
-    pp_particles.query("B_ext_particle_init_style", b_init);
+    utils::parser::queryWithParser(pp_particles, "B_ext_particle_init_style", b_init);
     if (b_init == "read_from_file") {
 
         // Read in B field names
@@ -130,7 +130,7 @@ ExternalParticleFields::ReadParameters () {
 
             // no B field names provided but read_from_file requested, force to
             // read path
-            pp_particles.get("read_fields_from_path", single_field_path);
+            utils::parser::getWithParser(pp_particles, "read_fields_from_path", single_field_path);
 
             // initialize single B field meta data
 

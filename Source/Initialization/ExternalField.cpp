@@ -72,11 +72,11 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
     // are used to set the E and B field when "constant" or
     // "parser" is not explicitly used in the input.
     std::string B_ext_grid_s;
-    pp_warpx.query("B_ext_grid_init_style", B_ext_grid_s);
+    utils::parser::queryWithParser(pp_warpx, "B_ext_grid_init_style", B_ext_grid_s);
     B_ext_grid_type = string_to_external_field_type<EMFieldType::B>(B_ext_grid_s);
 
     std::string E_ext_grid_s;
-    pp_warpx.query("E_ext_grid_init_style", E_ext_grid_s);
+    utils::parser::queryWithParser(pp_warpx, "E_ext_grid_init_style", E_ext_grid_s);
     E_ext_grid_type = string_to_external_field_type<EMFieldType::E>(E_ext_grid_s);
 
     //
@@ -185,7 +185,7 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
     if (E_ext_grid_type == ExternalFieldType::read_from_file ||
         B_ext_grid_type == ExternalFieldType::read_from_file){
             const std::string read_fields_from_path="./";
-            pp_warpx.query("read_fields_from_path", external_fields_path);
+            utils::parser::queryWithParser(pp_warpx, "read_fields_from_path", external_fields_path);
     }
     //___________________________________________________________________________
 }

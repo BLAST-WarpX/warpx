@@ -16,7 +16,7 @@ using namespace amrex;
 MultiFluidContainer::MultiFluidContainer ()
 {
     const ParmParse pp_fluids("fluids");
-    pp_fluids.queryarr("species_names", species_names);
+    utils::parser::queryArrWithParser(pp_fluids, "species_names", species_names);
 
     const int nspecies = static_cast<int>(species_names.size());
 

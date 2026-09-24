@@ -57,7 +57,7 @@ ParticleHistogram::ParticleHistogram (const std::string& rd_name)
 
     // read species
     std::string selected_species_name;
-    pp_rd_name.get("species",selected_species_name);
+    utils::parser::getWithParser(pp_rd_name, "species",selected_species_name);
 
     // read bin parameters
     int bin_num = 0;
@@ -79,7 +79,7 @@ ParticleHistogram::ParticleHistogram (const std::string& rd_name)
 
     // read normalization type
     std::string norm_string = "default";
-    pp_rd_name.query("normalization",norm_string);
+    utils::parser::queryWithParser(pp_rd_name, "normalization",norm_string);
 
     // set normalization type
     if ( norm_string == "default" ) {

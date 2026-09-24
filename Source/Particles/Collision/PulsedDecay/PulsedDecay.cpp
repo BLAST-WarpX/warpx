@@ -37,7 +37,7 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
     const amrex::ParmParse pp_collision_name(collision_name);
 
     // Get the product species
-    pp_collision_name.queryarr("product_species", m_product_species);
+    utils::parser::queryArrWithParser(pp_collision_name, "product_species", m_product_species);
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( m_product_species.size() == 2,
         "PulsedDecay: product_species size must be equal to two");
@@ -69,7 +69,7 @@ PulsedDecay::PulsedDecay (std::string const& collision_name, MultiParticleContai
         "PulsedDecay: total mass of product species must match the parent species mass");
 
     // Get the fixed product particle weight
-    pp_collision_name.get("fixed_product_weight", m_fixed_product_weight);
+    utils::parser::getWithParser(pp_collision_name, "fixed_product_weight", m_fixed_product_weight);
 
     // Parse the direction-dependent temperature for product species A
     amrex::Vector<amrex::ParticleReal> TA_tmp;

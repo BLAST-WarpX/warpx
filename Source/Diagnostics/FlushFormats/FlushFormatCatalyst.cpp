@@ -2,6 +2,7 @@
 
 #include "WarpX.H"
 #include "Utils/TextMsg.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
@@ -78,9 +79,9 @@ FlushFormatCatalyst::FlushFormatCatalyst() {
     std::string scriptPaths;
     std::string implementation {"paraview"};
     std::string searchPaths;
-    pp_catalyst.query("script_paths", scriptPaths);
-    pp_catalyst.query("implementation", implementation);
-    pp_catalyst.query("implementation_search_paths", searchPaths);
+    utils::parser::queryWithParser(pp_catalyst, "script_paths", scriptPaths);
+    utils::parser::queryWithParser(pp_catalyst, "implementation", implementation);
+    utils::parser::queryWithParser(pp_catalyst, "implementation_search_paths", searchPaths);
 
 #ifdef AMREX_USE_CATALYST
     conduit::Node node;

@@ -29,13 +29,13 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
     amrex::ignore_unused(geom);
 
     std::string mom_dist_s;
-    utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
+    utils::parser::queryWithParser(pp, source_name, "momentum_distribution_type", mom_dist_s);
 
     if (mom_dist_s == "maxwell_juttner") {
         // Set defaults
         amrex::Real theta = 0; // quiet GCC warning maybe-uninitialized
         std::string temp_dist_s = "constant";
-        utils::parser::query(pp, source_name, "theta_distribution_type", temp_dist_s);
+        utils::parser::queryWithParser(pp, source_name, "theta_distribution_type", temp_dist_s);
 
         if (temp_dist_s == "constant") {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -67,7 +67,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
     else if (mom_dist_s == "maxwellian") {
         // ``maxwellian`` distribution uses ``u_std_*``
         std::string u_std_dist_s = "constant";
-        utils::parser::query(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
+        utils::parser::queryWithParser(pp, source_name, "maxwellian_u_std_distribution_type", u_std_dist_s);
 
         if (u_std_dist_s == "constant") {
             utils::parser::queryWithParser(pp, source_name, "ux_std", m_ux_std);

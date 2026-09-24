@@ -71,7 +71,7 @@ public:
         }
 
         std::string scattering_model_str = "BOBYLEV";
-        pp_collision_name.query("cumulative_scattering_angle_model", scattering_model_str);
+        utils::parser::queryWithParser(pp_collision_name, "cumulative_scattering_angle_model", scattering_model_str);
 
         if (scattering_model_str == "NANBU") {
             m_scattering_model = NANBU;

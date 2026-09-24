@@ -18,6 +18,7 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/SpeciesPhysicalProperties.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
@@ -62,7 +63,7 @@ ParticleExtrema::ParticleExtrema (const std::string& rd_name)
 {
     // read species name
     const amrex::ParmParse pp_rd_name(rd_name);
-    pp_rd_name.get("species",m_species_name);
+    utils::parser::getWithParser(pp_rd_name, "species",m_species_name);
 
     // get WarpX class object
     auto & warpx = WarpX::GetInstance();

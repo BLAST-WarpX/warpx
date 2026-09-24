@@ -9,6 +9,7 @@
 #include "EmbeddedBoundary/DistanceToEB.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
@@ -335,7 +336,7 @@ const std::vector<std::string>& ParticleBoundaryBuffer::getSpeciesNames() const
     if (!m_species_names_initialized)
     {
         const amrex::ParmParse pp_particles("particles");
-        pp_particles.queryarr("species_names", m_species_names);
+        utils::parser::queryArrWithParser(pp_particles, "species_names", m_species_names);
         m_species_names_initialized = true;
     }
     return m_species_names;
