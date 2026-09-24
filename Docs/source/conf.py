@@ -76,8 +76,43 @@ extensions = [
     "myst_parser",
     "sphinxcontrib.bibtex",
     "sphinxcontrib.googleanalytics",
+    "sphinxcontrib.autodoc_pydantic",
     "parmparse",
 ]
+
+# Document members (incl. pydantic fields) so the auto-generated parameter list
+# (from each Field(description=...)) is rendered for every documented class.
+# ``undoc-members`` is required because pydantic fields carry no __doc__ (their text
+# lives in Field(description=...)); without it autodoc skips them as "undocumented".
+# ``model_post_init`` is an internal initialization hook (pydantic generates it for models
+# with private attributes), not a user-facing method.
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "exclude-members": "model_post_init",
+}
+
+# -- autodoc-pydantic ---------------------------------------------------------
+# The PICMI bindings are pydantic models; render their (and the warpx_ extension)
+# fields cleanly, hiding the pydantic internals.
+# Hide the (very long) full field list from the class signature; the parameters are
+# documented individually as the field list below instead.
+autodoc_pydantic_model_hide_paramlist = True
+autodoc_pydantic_model_show_json = False
+autodoc_pydantic_model_show_config_summary = False
+autodoc_pydantic_model_show_validator_summary = False
+autodoc_pydantic_model_show_validator_members = False
+autodoc_pydantic_model_show_field_summary = False
+# Group members by type so all parameters (pydantic fields) are listed first as one
+# block, followed by methods and properties (mirrors the old "Parameters first" layout).
+autodoc_pydantic_model_member_order = "groupwise"
+autodoc_pydantic_field_list_validators = False
+autodoc_pydantic_field_show_constraints = False
+autodoc_pydantic_field_show_default = True
+# Render each field as "parameter <name>" instead of the default "field <name>".
+autodoc_pydantic_field_signature_prefix = "parameter"
+autodoc_pydantic_field_show_alias = True
+autodoc_pydantic_field_swap_name_and_alias = True
 
 # Google Analytics
 googleanalytics_id = "G-QZGY5060MZ"
@@ -283,3 +318,125 @@ subprocess.call(
 )
 
 suppress_warnings = ["bibtex.duplicate_label"]
+
+
+def setup(app):
+    """Post-process the reST that autodoc-pydantic generates for pydantic PICMI models
+    (we do not reimplement any autodoc internals). Two passes:
+
+    1. Insert ``Parameters`` / ``Methods`` / ``Attributes`` / ``Properties`` rubric
+       headers between the groupwise member groups, so the long field list is visually
+       separated from the methods and properties.
+    2. Strip the ``:type:`` / ``:value:`` of class attributes whose value is just an
+       object repr (e.g. the ``extension`` handle), so they render as a bare name instead
+       of ``extension: ClassVar[Any] = <... object>``.
+
+    Parameters are shown with their user-facing name, i.e., their alias (e.g.,
+    ``warpx_break_signals``) instead of their field name (``break_signals``). Also use
+    that name to sort the parameters and in the table of contents.
+    """
+    import re
+
+    from sphinxcontrib.autodoc_pydantic.directives.autodocumenters import (
+        PydanticFieldDocumenter,
+        PydanticModelDocumenter,
+    )
+    from sphinxcontrib.autodoc_pydantic.directives.directives import PydanticField
+
+    # Directive emitted for each member type -> rubric label (groupwise order).
+    group_labels = [
+        (".. py:pydantic_field::", "Parameters"),
+        (".. py:method::", "Methods"),
+        (".. py:attribute::", "Attributes"),
+        (".. py:property::", "Properties"),
+    ]
+    object_repr = re.compile(r":value:\s*<.* object.*>")
+
+    class GroupedPydanticModelDocumenter(PydanticModelDocumenter):
+        def sort_members(self, documenters, order):
+            documenters = super().sort_members(documenters, order)
+            if (
+                order == "groupwise"
+                and self.config.autodoc_pydantic_field_swap_name_and_alias
+            ):
+                fields = self.object.model_fields
+
+                def user_facing_name(documenter):
+                    name = documenter.name.rsplit(".", 1)[-1]
+                    field = fields.get(name)
+                    if isinstance(documenter, PydanticFieldDocumenter) and field:
+                        return field.alias or name
+                    return name
+
+                documenters.sort(
+                    key=lambda entry: (
+                        entry[0].member_order,
+                        user_facing_name(entry[0]),
+                    )
+                )
+            return documenters
+
+        def document_members(self, all_members: bool = False) -> None:
+            result = self.directive.result
+            start = len(result.data)
+            super().document_members(all_members)
+
+            # Pass 2: drop ``:type:``/``:value:`` for object-repr attributes.
+            to_delete = []
+            i = start
+            while i < len(result.data):
+                if result.data[i].lstrip().startswith(".. py:attribute::"):
+                    opts, j = {}, i + 1
+                    while j < len(result.data):
+                        m = re.match(r":(\w+):", result.data[j].strip())
+                        if not m:
+                            break
+                        opts[m.group(1)] = j
+                        j += 1
+                    if "value" in opts and object_repr.search(
+                        result.data[opts["value"]].strip()
+                    ):
+                        to_delete += [opts[k] for k in ("type", "value") if k in opts]
+                    i = j
+                else:
+                    i += 1
+            for idx in sorted(to_delete, reverse=True):
+                del result[idx]
+
+            # Pass 1: insert group rubrics before the first member of each type.
+            insertions = []
+            seen = set()
+            for i in range(start, len(result.data)):
+                stripped = result.data[i].lstrip()
+                for prefix, label in group_labels:
+                    if stripped.startswith(prefix) and label not in seen:
+                        seen.add(label)
+                        line = result.data[i]
+                        indent = line[: len(line) - len(stripped)]
+                        insertions.append((i, indent, label))
+            for i, indent, label in reversed(insertions):
+                src, offset = result.info(i)
+                result.insert(i, "", src, offset)
+                result.insert(i, f"{indent}.. rubric:: {label}", src, offset)
+                result.insert(i, "", src, offset)
+
+    class UserFacingNamePydanticField(PydanticField):
+        def _toc_entry_name(self, sig_node):
+            # autodoc-pydantic swaps the field name with the alias only in the signature
+            entry = super()._toc_entry_name(sig_node)
+            alias = self.options.get("alias")
+            if (
+                entry
+                and alias
+                and self.pyautodoc.get_value("field-swap-name-and-alias")
+            ):
+                name = sig_node["_toc_parts"][-1]
+                if entry.endswith(name):
+                    entry = entry[: -len(name)] + alias
+            return entry
+
+    app.setup_extension("sphinxcontrib.autodoc_pydantic")
+    app.add_autodocumenter(GroupedPydanticModelDocumenter, override=True)
+    app.add_directive_to_domain(
+        "py", "pydantic_field", UserFacingNamePydanticField, override=True
+    )

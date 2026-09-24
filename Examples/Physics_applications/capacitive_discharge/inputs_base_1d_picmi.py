@@ -6,8 +6,10 @@
 
 import argparse
 import sys
+from typing import Literal
 
 import numpy as np
+from pydantic import ConfigDict, Field, field_validator
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
@@ -22,24 +24,34 @@ class PoissonSolver1D(picmi.ElectrostaticSolver):
     However, it is not necessarily needed since the 1D code has the direct tridiagonal
     solver implemented."""
 
-    def __init__(self, grid, **kwargs):
-        """Direct solver for the Poisson equation using superLU. This solver is
-        useful for 1D cases.
+    # NumPy and SciPy types in the runtime state of the solver
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-        Arguments:
-            grid (picmi.Cartesian1DGrid): Instance of the grid on which the
-            solver will be installed.
+    # Different defaults than the WarpX solver
+    method: Literal["FFT", "Multigrid"] | None = "Multigrid"
+    required_precision: float | None = 1.0
+
+    # Runtime state of the solver
+    sim: picmi.Simulation | None = Field(default=None, exclude=True)
+    right_voltage: float | str | None = None
+    nz: int | None = None
+    dz: float | None = None
+    nxguardphi: int | None = None
+    nzguardphi: int | None = None
+    phi: np.ndarray | None = None
+    nsolve: int | None = None
+    lu: sla.SuperLU | None = None
+    rho_data: np.ndarray | None = None
+
+    @field_validator("grid")
+    @classmethod
+    def _check_grid(cls, grid):
+        """Sanity check that this solver is appropriate to use: the direct
+        solver for the Poisson equation using superLU is useful for 1D cases.
         """
-        # Sanity check that this solver is appropriate to use
         if not isinstance(grid, picmi.Cartesian1DGrid):
-            raise RuntimeError("Direct solver can only be used on a 1D grid.")
-
-        super(PoissonSolver1D, self).__init__(
-            grid=grid,
-            method=kwargs.pop("method", "Multigrid"),
-            required_precision=1,
-            **kwargs,
-        )
+            raise ValueError("Direct solver can only be used on a 1D grid.")
+        return grid
 
     def solver_initialize_inputs(self):
         """Grab geometrical quantities from the grid. The boundary potentials
@@ -367,7 +379,9 @@ class CapacitiveDischargeExample(object):
             warpx_collisions_split_momentum_push=0,
             verbose=self.test,
         )
-        self.solver.sim = self.sim
+        if self.pythonsolver:
+            # the Python solver reads the fields of the simulation on every step
+            self.solver.sim = self.sim
 
         self.sim.add_species(
             self.electrons,
@@ -388,7 +402,6 @@ class CapacitiveDischargeExample(object):
                     n_macroparticle_per_cell=[self.seed_nppc // 2], grid=self.grid
                 ),
             )
-        self.solver.sim_ext = self.sim.extension
 
         if self.dsmc:
             # Periodically reset neutral density to starting temperature
@@ -455,7 +468,7 @@ class CapacitiveDischargeExample(object):
 
         if self.pythonsolver:
             # confirm that the external solver was run
-            assert hasattr(self.solver, "phi")
+            assert self.solver.phi is not None
 
         if libwarpx.amr.ParallelDescriptor.MyProc() == 0:
             np.save(f"ion_density_case_{self.n + 1}.npy", self.ion_density_array)
