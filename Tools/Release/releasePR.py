@@ -97,7 +97,7 @@ subprocess.run(
 
 # PICSAR New Version ##########################################################
 
-PICSAR_version = "25.04"
+PICSAR_version = "25.10"
 answers = concat_answers(["y", PICSAR_version, PICSAR_version, "y"])
 
 process = subprocess.Popen(
