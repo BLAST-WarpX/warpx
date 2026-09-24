@@ -11,7 +11,6 @@
 #include <AMReX_GpuContainers.H>
 #include <AMReX_Print.H>
 
-#include <array>
 #include <cmath>
 #include <limits>
 
@@ -37,24 +36,34 @@ int main (int argc, char* argv[])
         }
         long double reference_energy = 0;
         long double reference_weight = 0;
+        bool const photons = ions.AmIA<PhysicalSpecies::photon>();
+        auto const mass = ions.getMass();
         for (auto const& [key, tile] : ions.GetParticles(0)) {
             amrex::ignore_unused(key);
             auto const count = tile.numParticles();
-            std::array<amrex::Gpu::HostVector<amrex::ParticleReal>, 4> host;
-            std::array<int, 4> const components{PIdx::w, PIdx::ux, PIdx::uy, PIdx::uz};
-            for (int c = 0; c < 4; ++c) {
-                host[c].resize(count);
-                auto const& values = tile.GetStructOfArrays().GetRealData(components[c]);
-                amrex::Gpu::copy(amrex::Gpu::deviceToHost, values.begin(),
-                    values.begin() + count, host[c].begin());
-            }
+            amrex::Gpu::HostVector<amrex::ParticleReal> host_weight(count);
+            auto const& weights = tile.GetStructOfArrays().GetRealData(PIdx::w);
+            amrex::Gpu::copy(amrex::Gpu::deviceToHost, weights.begin(),
+                weights.begin() + count, host_weight.begin());
+            // Evaluate native per-particle energy on the same backend as the
+            // reduction; isolate weighting/summing from host/device math differences.
+            amrex::Gpu::DeviceVector<amrex::ParticleReal> energies(count);
+            auto* energy = energies.data();
+            auto const& soa = tile.GetStructOfArrays();
+            auto const* ux = soa.GetRealData(PIdx::ux).data();
+            auto const* uy = soa.GetRealData(PIdx::uy).data();
+            auto const* uz = soa.GetRealData(PIdx::uz).data();
+            amrex::ParallelFor(count, [=] AMREX_GPU_DEVICE(long i) {
+                energy[i] = photons
+                    ? Algorithms::KineticEnergyPhotons(ux[i], uy[i], uz[i])
+                    : Algorithms::KineticEnergy(ux[i], uy[i], uz[i], mass);
+            });
+            amrex::Gpu::HostVector<amrex::ParticleReal> host_energy(count);
+            amrex::Gpu::copy(amrex::Gpu::deviceToHost, energies.begin(), energies.end(),
+                host_energy.begin());
             for (long i = 0; i < count; ++i) {
-                // Keep the existing per-particle kinetic-energy calculation.
-                // Only weighting and reduction are independently evaluated.
-                auto const energy = Algorithms::KineticEnergy(
-                    host[1][i], host[2][i], host[3][i], ions.getMass());
-                reference_energy += static_cast<long double>(host[0][i]) * energy;
-                reference_weight += static_cast<long double>(host[0][i]);
+                reference_energy += static_cast<long double>(host_weight[i]) * host_energy[i];
+                reference_weight += static_cast<long double>(host_weight[i]);
             }
         }
         AMREX_ALWAYS_ASSERT(reference_energy > 0 && reference_weight > 0);

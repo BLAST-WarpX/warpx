@@ -7,9 +7,14 @@ if(WarpX_LIB AND "1" IN_LIST WarpX_DIMS)
         target_compile_features(test_particle_energy_precision PRIVATE cuda_std_20)
     endif()
     warpx_set_compile_warnings(test_particle_energy_precision)
-    add_test(NAME test_1d_particle_energy_precision COMMAND test_particle_energy_precision
-        ${CMAKE_CURRENT_SOURCE_DIR}/inputs_base_particle_energy_precision
-        amrex.the_arena_init_size=0)
-    set_tests_properties(test_1d_particle_energy_precision PROPERTIES
-        ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 60)
+    foreach(species IN ITEMS proton photon)
+        set(test_name test_1d_particle_energy_precision_${species})
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${species})
+        add_test(NAME ${test_name} COMMAND test_particle_energy_precision
+            ${CMAKE_CURRENT_SOURCE_DIR}/inputs_base_particle_energy_precision
+            ions.species_type=${species} amrex.the_arena_init_size=0)
+        set_tests_properties(${test_name} PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${species}
+            ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 60)
+    endforeach()
 endif()

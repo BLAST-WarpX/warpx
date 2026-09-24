@@ -475,10 +475,11 @@ public:
     /// This returns the total energy/weight/charge for all the particles in this ParticleContainer.
     /// The total charge is needed when solving Poisson's equation with periodic boundary conditions.
     ///
-    std::pair<amrex::ParticleReal, amrex::ParticleReal> sumParticleWeightAndEnergy (bool local = false) const;
+    /// Retain field precision in energy reductions even with lower-precision particle storage.
+    std::pair<amrex::Real, amrex::Real> sumParticleWeightAndEnergy (bool local = false) const;
     amrex::ParticleReal sumParticleCharge (bool local = false) const;
     amrex::ParticleReal sumParticleWeight (bool local = false) const;
-    amrex::ParticleReal sumParticleEnergy (bool local = false) const;
+    amrex::Real sumParticleEnergy (bool local = false) const;
 
     std::array<amrex::ParticleReal, 3> meanParticleVelocity(bool local = false);
 

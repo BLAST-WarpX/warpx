@@ -29,6 +29,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <type_traits>
 #include <vector>
 
 using namespace amrex;
@@ -96,7 +97,7 @@ void ParticleEnergy::ComputeDiags (int step)
     // Get number of species
     const int nSpecies = mypc.nSpecies();
 
-    amrex::ParticleReal Wtot = 0.0_rt;
+    std::common_type_t<amrex::Real, amrex::ParticleReal> Wtot = 0.0_rt;
 
     // Loop over species
     for (int i_s = 0; i_s < nSpecies; ++i_s)
