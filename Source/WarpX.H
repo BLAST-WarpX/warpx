@@ -21,6 +21,7 @@
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel_fwd.H"
 #include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties_fwd.H"
+#include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver_fwd.H"
 #include "Filter/NCIGodfreyFilter_fwd.H"
 #include "Fluids/MultiFluidContainer_fwd.H"
