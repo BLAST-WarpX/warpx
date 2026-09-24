@@ -2,6 +2,7 @@
 # Copyright 2026 The WarpX Community
 # License: BSD-3-Clause-LBNL
 """Check output units, runtime attributes, and unchanged filter selections."""
+
 import numpy as np
 import yt
 
@@ -33,5 +34,7 @@ for mode, selected in (
     assert np.count_nonzero(selected) == 32
     assert output.keys() == baseline.keys()
     for name in baseline:
-        np.testing.assert_array_equal(output[name], baseline[name][selected], err_msg=name)
+        np.testing.assert_array_equal(
+            output[name], baseline[name][selected], err_msg=name
+        )
 print("SI output and uniform/parser selections pass")
