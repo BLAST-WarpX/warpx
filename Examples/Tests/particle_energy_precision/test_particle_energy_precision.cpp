@@ -28,10 +28,10 @@ int main (int argc, char* argv[])
             auto* uy = soa.GetRealData(PIdx::uy).data();
             auto* uz = soa.GetRealData(PIdx::uz).data();
             amrex::ParallelFor(iterator.numParticles(), [=] AMREX_GPU_DEVICE(long ip) {
-                w[ip] = 1.1 + (ip % 3) * 0.2;
-                ux[ip] = 12345.5 + ip * 0.25;
-                uy[ip] = -45678.25 - ip * 0.5;
-                uz[ip] = 98765.75 + ip * 0.125;
+                w[ip] = static_cast<amrex::ParticleReal>(1.1 + (ip % 3) * 0.2);
+                ux[ip] = static_cast<amrex::ParticleReal>(12345.5 + ip * 0.25);
+                uy[ip] = static_cast<amrex::ParticleReal>(-45678.25 - ip * 0.5);
+                uz[ip] = static_cast<amrex::ParticleReal>(98765.75 + ip * 0.125);
             });
         }
         long double reference_energy = 0;
