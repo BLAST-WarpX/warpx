@@ -1,0 +1,17 @@
+# This kernel-level regression does not need a WarpX simulation/input deck.
+foreach(dimension IN LISTS WarpX_DIMS)
+    warpx_set_suffix_dims(suffix ${dimension})
+    set(test_name test_${suffix}_temperature_deposition_offset)
+    add_executable(${test_name} test_temperature_offset.cpp)
+    target_link_libraries(${test_name} PRIVATE ablastr_${suffix})
+    target_include_directories(${test_name} PRIVATE ${WarpX_SOURCE_DIR}/Source)
+    target_compile_features(${test_name} PRIVATE cxx_std_20)
+    if(WarpX_COMPUTE STREQUAL "CUDA")
+        setup_target_for_cuda_compilation(${test_name})
+        target_compile_features(${test_name} PRIVATE cuda_std_20)
+    endif()
+    warpx_set_compile_warnings(${test_name})
+    add_test(NAME ${test_name} COMMAND ${test_name} amrex.the_arena_init_size=0)
+    set_tests_properties(${test_name} PROPERTIES
+        ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 30)
+endforeach()
