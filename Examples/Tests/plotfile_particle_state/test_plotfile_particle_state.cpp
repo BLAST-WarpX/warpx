@@ -30,7 +30,7 @@ namespace
                 auto const offset = result.size();
                 result.resize(offset + count);
                 amrex::Gpu::copy(amrex::Gpu::deviceToHost, values.begin(),
-                    values.begin() + count, result.begin() + offset);
+                    values.begin() + count, result.data() + offset);
             }
         }
         return result;
@@ -38,6 +38,7 @@ namespace
 }
 
 int main (int argc, char* argv[])
+try
 {
     warpx::initialization::initialize_external_libraries(argc, argv);
     {
@@ -53,10 +54,11 @@ int main (int argc, char* argv[])
             auto* uz = soa.GetRealData(PIdx::uz).data();
             auto* sentinel = soa.GetRealData(sentinel_index).data();
             amrex::ParallelFor(iterator.numParticles(), [=] AMREX_GPU_DEVICE(long ip) {
-                ux[ip] = 12345.6789123 + ip * 0.314159;
-                uy[ip] = -87654.32198 - ip * 0.192837;
-                uz[ip] = (ip % 2 ? -1 : 1) * (90000.1234 + ip * 0.271828);
-                sentinel[ip] = (ip + 1) * 1.e-30;
+                ux[ip] = static_cast<amrex::ParticleReal>(12345.6789123 + ip * 0.314159);
+                uy[ip] = static_cast<amrex::ParticleReal>(-87654.32198 - ip * 0.192837);
+                uz[ip] = static_cast<amrex::ParticleReal>(
+                    (ip % 2 ? -1 : 1) * (90000.1234 + ip * 0.271828));
+                sentinel[ip] = static_cast<amrex::ParticleReal>((ip + 1) * 1.e-30);
             });
         }
         auto const before = Snapshot(ions);
@@ -71,7 +73,7 @@ int main (int argc, char* argv[])
         fields[0].define(ions.ParticleBoxArray(0), ions.ParticleDistributionMap(0), 1, 0);
         fields[0].setVal(0);
         amrex::Vector<amrex::Geometry> geometry{simulation.Geom(0)};
-        FlushFormatPlotfile writer;
+        FlushFormatPlotfile const writer;
         for (int mode = 0; mode < 3; ++mode) {
             diagnostics[0].m_do_uniform_filter = mode == 1;
             diagnostics[0].m_uniform_stride = 2;
@@ -88,4 +90,9 @@ int main (int argc, char* argv[])
         WarpX::Finalize();
     }
     warpx::initialization::finalize_external_libraries();
+}
+catch (...)
+{
+    amrex::Abort("Unhandled exception in plotfile particle-state regression");
+    return 1;
 }
