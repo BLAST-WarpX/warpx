@@ -147,7 +147,7 @@ def test_mass_matrices_match_push_and_deposit(particle_shape, sync_scheme):
     warpx.save_particles_at_implicit_step_start()
 
     solver = warpx.implicit_solver()
-    warpx.deposit_mass_matrices()
+    warpx.deposit_mass_matrices(dt)
     # Fill the second half of the diagonal mass matrices by symmetry: the
     # deposition is not complete until this is done
     solver.finish_mass_matrices_deposit()
