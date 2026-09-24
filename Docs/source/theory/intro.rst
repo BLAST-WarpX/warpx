@@ -46,6 +46,12 @@ Models & Algorithms
 Grid & Geometries
 =================
 
+.. toctree::
+   :maxdepth: 1
+
+   planar_geometries
+   cylindrical_and_spherical_geometries
+
 .. _theory-species_representations:
 
 Species Representations
