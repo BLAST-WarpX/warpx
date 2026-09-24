@@ -227,6 +227,19 @@ Overall simulation parameters
 
     * ``theta_implicit_em``: Use a :math:`\theta`-implicit electromagnetic solver.
 
+      - **PML boundaries:**
+        Exterior vacuum PML is supported on single-level 2D and 3D Cartesian
+        staggered Yee grids, with ``implicit_evolve.nonlinear_solver = newton``
+        and ``jacobian.pc_type = none``. Other field boundaries must be periodic.
+        PML conductivity is integrated with the same :math:`\theta` method as
+        the interior fields. Absorption accuracy still depends on spatial and
+        temporal resolution. PML removes electromagnetic energy, including when
+        :math:`\theta = 0.5`.
+        In-domain PML, particles in the PML, divergence cleaning, embedded
+        boundaries, mesh refinement, moving windows, and load balancing are
+        not supported with this combination. The semi-implicit solver does not
+        support this PML update.
+
       - **Time-biasing parameter:**
         The fields (:math:`\textbf{E}` & :math:`\textbf{B}`) used to advance the system are computed at time :math:`t^{n+\theta}`: :math:`\mathbf{E}^{n+\theta}=\left(1-\theta\right)\mathbf{E}^n + \theta\mathbf{E}^{n+1}`, where :math:`\theta\in[0.5,1.0]`.
 
