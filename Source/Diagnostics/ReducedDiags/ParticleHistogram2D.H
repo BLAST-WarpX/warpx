@@ -65,7 +65,7 @@ public:
     std::string value_string;
 
 /// Parser to read expression for particle quantity from the input file.
-    /// 7 elements are t, x, y, z, ux, uy, uz, w
+    /// 8 elements are t, x, y, z, ux, uy, uz, w
     static constexpr int m_nvars = 8;
     std::unique_ptr<amrex::Parser> m_parser_abs;
     std::unique_ptr<amrex::Parser> m_parser_ord;
@@ -76,11 +76,11 @@ public:
     /// Whether the filter is activated
     bool m_do_parser_filter = false;
 
-    /// Optional parser to filter particles before doing the histogram
+    /// Optional parser to read particle quantity from input file (comments updated to match documentation)
     std::unique_ptr<amrex::Parser> m_parser_value;
 
-    /// Whether the filter is activated
-    bool m_do_parser_value;
+    /// Whether a custom value function is assigned
+    bool m_do_parser_value = false; // was uninitialized
 
     /**
      * This function computes a histogram of user defined quantity.
