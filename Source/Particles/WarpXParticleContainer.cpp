@@ -2166,14 +2166,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
                 if (N_array(i,j,k) == 0._rt) { return; }
                 const amrex::Real invsum = 1._rt/N_array(i,j,k);
-#ifdef AMREX_USE_FLOAT
-                // mass*invsum can underflow for physical electron masses and
-                // macroparticle weights even when the temperature is normal.
+                // This operation order reduces the risk of underflow in single precision.
                 temp_array(i,j,k) *= (mass/(3._rt*PhysConst::q_e))*invsum;
-#else
-                // Keep the established double-precision operation order.
-                temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
-#endif
             });
     }
 
