@@ -170,7 +170,8 @@ deposit_charge (typename T_PC::ParIterType& pti,
     auto & rho_fab = local_rho;
 #endif
 
-    const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
+    using PReal_t = typename T_PC::RealVector::value_type;
+    const auto GetPosition = GetParticlePosition<PIdx, PReal_t>(pti, offset);
 
     // Indices of the lower bound
     const amrex::Dim3 lo = lbound(tilebox);
