@@ -76,7 +76,6 @@
 #   include <openPMD/openPMD.hpp>
 #endif
 
-#include <any>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -609,79 +608,156 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
                                              amrex::ParticleReal q_tot,
                                              amrex::ParticleReal z_shift)
 {
-    // Declare temporary vectors on the CPU
-    amrex::Gpu::HostVector<ParticleReal> particle_x;
-    amrex::Gpu::HostVector<ParticleReal> particle_z;
-    amrex::Gpu::HostVector<ParticleReal> particle_ux;
-    amrex::Gpu::HostVector<ParticleReal> particle_uz;
-    amrex::Gpu::HostVector<ParticleReal> particle_w;
-    amrex::Gpu::HostVector<ParticleReal> particle_y;
-    amrex::Gpu::HostVector<ParticleReal> particle_uy;
-
 #ifdef WARPX_USE_OPENPMD
-    //TODO: Make changes for read/write in multiple MPI ranks
-    if (ParallelDescriptor::IOProcessor()) {
-        // take ownership of the series and close it when done
-        auto series = std::any_cast<openPMD::Series>(std::move(plasma_injector.m_openpmd_input_series));
+    // Maximum particles per sub-chunk controls peak memory per rank.
+    // ~80 bytes/particle in read buffers (10 arrays x 8 bytes), plus
+    // PinnedTile + GPU tile inside AddNParticles => ~3x that transiently.
+    // At 2^22 (4M particles): ~960 MB peak per rank.
+    constexpr uint64_t max_sub_chunk = 4194304u; // 2^22
 
-        // assumption asserts: see PlasmaInjector
-        openPMD::Iteration it = series.iterations.begin()->second;
-        const ParmParse pp_species_name(species_name);
-        pp_species_name.query("impose_t_lab_from_file", impose_t_lab_from_file);
-        double t_lab = 0._prt;
-        if (impose_t_lab_from_file) {
-            // Impose t_lab as being the time stored in the openPMD file
-            t_lab = it.time<double>() * it.timeUnitSI();
-        }
-        std::string const ps_name = it.particles.begin()->first;
-        openPMD::ParticleSpecies ps = it.particles.begin()->second;
+    // All ranks open the file collectively for distributed reading.
+#if defined(AMREX_USE_MPI)
+    auto series = openPMD::Series(
+        plasma_injector.m_injection_file_path, openPMD::Access::READ_ONLY,
+        ParallelDescriptor::Communicator());
+#else
+    auto series = openPMD::Series(
+        plasma_injector.m_injection_file_path, openPMD::Access::READ_ONLY);
+#endif
 
-        auto const npart = ps["position"]["x"].getExtent()[0];
+    // assumption asserts: see PlasmaInjector
+    openPMD::Iteration it = series.iterations.begin()->second;
+    const ParmParse pp_species_name(species_name);
+    pp_species_name.query("impose_t_lab_from_file", impose_t_lab_from_file);
+    double t_lab = 0._prt;
+    if (impose_t_lab_from_file) {
+        // Impose t_lab as being the time stored in the openPMD file
+        t_lab = it.time<double>() * it.timeUnitSI();
+    }
+    std::string const ps_name = it.particles.begin()->first;
+    openPMD::ParticleSpecies ps = it.particles.begin()->second;
+
+    auto const npart_total = ps["position"]["x"].getExtent()[0];
+    bool const has_momentum_y = ps["momentum"].contains("y");
+
+    // Unit conversion factors (metadata, no bulk I/O)
 #if !defined(WARPX_DIM_1D_Z)  // 2D, 3D, RZ, 1D_R
-        const std::shared_ptr<ParticleReal> ptr_x = ps["position"]["x"].loadChunk<ParticleReal>();
-        const std::shared_ptr<ParticleReal> ptr_offset_x = ps["positionOffset"]["x"].loadChunk<ParticleReal>();
-        auto const position_unit_x = static_cast<ParticleReal>(ps["position"]["x"].unitSI());
-        auto const position_offset_unit_x = static_cast<ParticleReal>(ps["positionOffset"]["x"].unitSI());
+    auto const position_unit_x = static_cast<ParticleReal>(ps["position"]["x"].unitSI());
+    auto const position_offset_unit_x = static_cast<ParticleReal>(ps["positionOffset"]["x"].unitSI());
 #endif
 #if !(defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z))
-        const std::shared_ptr<ParticleReal> ptr_y = ps["position"]["y"].loadChunk<ParticleReal>();
-        const std::shared_ptr<ParticleReal> ptr_offset_y = ps["positionOffset"]["y"].loadChunk<ParticleReal>();
-        auto const position_unit_y = static_cast<ParticleReal>(ps["position"]["y"].unitSI());
-        auto const position_offset_unit_y = static_cast<ParticleReal>(ps["positionOffset"]["y"].unitSI());
+    auto const position_unit_y = static_cast<ParticleReal>(ps["position"]["y"].unitSI());
+    auto const position_offset_unit_y = static_cast<ParticleReal>(ps["positionOffset"]["y"].unitSI());
 #endif
 #if !defined(WARPX_DIM_RCYLINDER)
-        const std::shared_ptr<ParticleReal> ptr_z = ps["position"]["z"].loadChunk<ParticleReal>();
-        const std::shared_ptr<ParticleReal> ptr_offset_z = ps["positionOffset"]["z"].loadChunk<ParticleReal>();
-        auto const position_unit_z = static_cast<ParticleReal>(ps["position"]["z"].unitSI());
-        auto const position_offset_unit_z = static_cast<ParticleReal>(ps["positionOffset"]["z"].unitSI());
+    auto const position_unit_z = static_cast<ParticleReal>(ps["position"]["z"].unitSI());
+    auto const position_offset_unit_z = static_cast<ParticleReal>(ps["positionOffset"]["z"].unitSI());
 #endif
+    auto const momentum_unit_x = static_cast<ParticleReal>(ps["momentum"]["x"].unitSI());
+    auto const momentum_unit_z = static_cast<ParticleReal>(ps["momentum"]["z"].unitSI());
+    auto const w_unit = static_cast<ParticleReal>(
+        ps["weighting"][openPMD::RecordComponent::SCALAR].unitSI());
+    auto momentum_unit_y = 1.0_prt;
+    if (has_momentum_y) {
+        momentum_unit_y = static_cast<ParticleReal>(ps["momentum"]["y"].unitSI());
+    }
 
-        const std::shared_ptr<ParticleReal> ptr_ux = ps["momentum"]["x"].loadChunk<ParticleReal>();
-        auto const momentum_unit_x = static_cast<ParticleReal>(ps["momentum"]["x"].unitSI());
-        const std::shared_ptr<ParticleReal> ptr_uz = ps["momentum"]["z"].loadChunk<ParticleReal>();
-        auto const momentum_unit_z = static_cast<ParticleReal>(ps["momentum"]["z"].unitSI());
-        const std::shared_ptr<ParticleReal> ptr_w = ps["weighting"][openPMD::RecordComponent::SCALAR].loadChunk<ParticleReal>();
-        auto const w_unit = static_cast<ParticleReal>(ps["weighting"][openPMD::RecordComponent::SCALAR].unitSI());
-        std::shared_ptr<ParticleReal> ptr_uy = nullptr;
-        auto momentum_unit_y = 1.0_prt;
-        if (ps["momentum"].contains("y")) {
-            ptr_uy = ps["momentum"]["y"].loadChunk<ParticleReal>();
-            momentum_unit_y = static_cast<ParticleReal>(ps["momentum"]["y"].unitSI());
+    // The normalized momentum is u = p / m = gamma beta c
+    // with m = m_e for photons, m the particle mass otherwise.
+    amrex::ParticleReal const mass_eff = (m_mass > 0.0_prt) ? m_mass : PhysConst::m_e;
+
+    if (q_tot != 0.0 && ParallelDescriptor::IOProcessor()) {
+        std::stringstream warnMsg;
+        warnMsg << " Loading particle species from file. "
+                << ps_name << ".q_tot is ignored.";
+        ablastr::warn_manager::WMRecordWarning("AddPlasmaFromFile",
+            warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
+    }
+
+    // Distribute particle index range across MPI ranks
+    int const nranks = ParallelDescriptor::NProcs();
+    int const myrank = ParallelDescriptor::MyProc();
+    auto const rank_chunk = (npart_total + nranks - 1) / nranks;
+    auto const my_start = std::min(static_cast<uint64_t>(myrank) * rank_chunk,
+                                   npart_total);
+    auto const my_end = std::min(my_start + rank_chunk, npart_total);
+
+    // Number of sub-chunks must be identical across all ranks so
+    // collective AddNParticles() calls stay synchronized.
+    auto const num_sub_chunks = std::max(
+        (rank_chunk + max_sub_chunk - 1) / max_sub_chunk,
+        static_cast<uint64_t>(1));
+
+    uint64_t total_particles_loaded = 0;
+
+    for (uint64_t sc = 0; sc < num_sub_chunks; ++sc)
+    {
+        auto const sub_start = my_start + sc * max_sub_chunk;
+        uint64_t sub_count = 0;
+        if (sub_start < my_end) {
+            sub_count = std::min(max_sub_chunk, my_end - sub_start);
         }
-        series.flush();  // shared_ptr data can be read now
 
-        if (q_tot != 0.0) {
-            std::stringstream warnMsg;
-            warnMsg << " Loading particle species from file. " << ps_name << ".q_tot is ignored.";
-            ablastr::warn_manager::WMRecordWarning("AddPlasmaFromFile",
-               warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
-        }
+        // Temporary host vectors for filtered particles (this sub-chunk).
+        // Reserve sub_count as upper bound to avoid reallocations.
+        amrex::Gpu::HostVector<ParticleReal> particle_x;  particle_x.reserve(sub_count);
+        amrex::Gpu::HostVector<ParticleReal> particle_y;  particle_y.reserve(sub_count);
+        amrex::Gpu::HostVector<ParticleReal> particle_z;  particle_z.reserve(sub_count);
+        amrex::Gpu::HostVector<ParticleReal> particle_ux; particle_ux.reserve(sub_count);
+        amrex::Gpu::HostVector<ParticleReal> particle_uy; particle_uy.reserve(sub_count);
+        amrex::Gpu::HostVector<ParticleReal> particle_uz; particle_uz.reserve(sub_count);
+        amrex::Gpu::HostVector<ParticleReal> particle_w;  particle_w.reserve(sub_count);
 
-        for (auto i = decltype(npart){0}; i<npart; ++i){
+        // Declare chunk pointers outside the guard so they survive
+        // across the collective flush() call.
+#if !defined(WARPX_DIM_1D_Z)
+        std::shared_ptr<ParticleReal> ptr_x, ptr_offset_x;
+#endif
+#if !(defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z))
+        std::shared_ptr<ParticleReal> ptr_y, ptr_offset_y;
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+        std::shared_ptr<ParticleReal> ptr_z, ptr_offset_z;
+#endif
+        std::shared_ptr<ParticleReal> ptr_ux, ptr_uz, ptr_w, ptr_uy;
 
-            amrex::ParticleReal const weight = ptr_w.get()[i]*w_unit;
+        // Guard: loadChunk with extent=0 is not safe in openPMD-api.
+        // Ranks with sub_count==0 skip I/O but still call flush() and
+        // AddNParticles below to participate in the collectives.
+        if (sub_count > 0)
+        {
+            openPMD::Offset const offset{sub_start};
+            openPMD::Extent const extent{sub_count};
 
 #if !defined(WARPX_DIM_1D_Z)
+            ptr_x = ps["position"]["x"].loadChunk<ParticleReal>(offset, extent);
+            ptr_offset_x = ps["positionOffset"]["x"].loadChunk<ParticleReal>(offset, extent);
+#endif
+#if !(defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z))
+            ptr_y = ps["position"]["y"].loadChunk<ParticleReal>(offset, extent);
+            ptr_offset_y = ps["positionOffset"]["y"].loadChunk<ParticleReal>(offset, extent);
+#endif
+#if !defined(WARPX_DIM_RCYLINDER)
+            ptr_z = ps["position"]["z"].loadChunk<ParticleReal>(offset, extent);
+            ptr_offset_z = ps["positionOffset"]["z"].loadChunk<ParticleReal>(offset, extent);
+#endif
+            ptr_ux = ps["momentum"]["x"].loadChunk<ParticleReal>(offset, extent);
+            ptr_uz = ps["momentum"]["z"].loadChunk<ParticleReal>(offset, extent);
+            ptr_w = ps["weighting"][openPMD::RecordComponent::SCALAR]
+                .loadChunk<ParticleReal>(offset, extent);
+            if (has_momentum_y) {
+                ptr_uy = ps["momentum"]["y"].loadChunk<ParticleReal>(offset, extent);
+            }
+        }
+        // flush() may be collective with MPI backends (ADIOS2, HDF5).
+        // All ranks must call it even when sub_count == 0.
+        series.flush();
+
+        for (uint64_t i = 0; i < sub_count; ++i)
+        {
+            amrex::ParticleReal const weight = ptr_w.get()[i]*w_unit;
+
+#if !defined(WARPX_DIM_1D_Z)  // 2D, 3D, RZ, 1D_R
             amrex::ParticleReal const x = ptr_x.get()[i]*position_unit_x + ptr_offset_x.get()[i]*position_offset_unit_x;
 #else
             amrex::ParticleReal const x = 0.0_prt;
@@ -698,14 +774,10 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
 #endif
 
             if (plasma_injector.insideBounds(x, y, z)) {
-
-                // The normalized momentum is u = p / m = gamma beta c
-                // with m = m_e for photons, m the particle mass otherwise.
-                amrex::ParticleReal const mass_eff = (m_mass > 0.0_prt) ? m_mass : PhysConst::m_e;
                 amrex::ParticleReal const ux = ptr_ux.get()[i]*momentum_unit_x/mass_eff;
                 amrex::ParticleReal const uz = ptr_uz.get()[i]*momentum_unit_z/mass_eff;
                 amrex::ParticleReal uy = 0.0_prt;
-                if (ps["momentum"].contains("y")) {
+                if (has_momentum_y) {
                     uy = ptr_uy.get()[i]*momentum_unit_y/mass_eff;
                 }
                 CheckAndAddParticle(x, y, z, ux, uy, uz, weight,
@@ -714,29 +786,43 @@ PhysicalParticleContainer::AddPlasmaFromFile(PlasmaInjector & plasma_injector,
                                     particle_w, static_cast<amrex::Real>(t_lab));
             }
         }
-        auto const np = particle_z.size();
-        if (np < npart) {
-            ablastr::warn_manager::WMRecordWarning("Species",
-                "Simulation box doesn't cover all particles",
-                ablastr::warn_manager::WarnPriority::high);
-        }
-    } // IO Processor
-    auto const np = static_cast<long>(particle_z.size());
-    const amrex::Vector<ParticleReal> xp(particle_x.data(), particle_x.data() + np);
-    const amrex::Vector<ParticleReal> yp(particle_y.data(), particle_y.data() + np);
-    const amrex::Vector<ParticleReal> zp(particle_z.data(), particle_z.data() + np);
-    const amrex::Vector<ParticleReal> uxp(particle_ux.data(), particle_ux.data() + np);
-    const amrex::Vector<ParticleReal> uyp(particle_uy.data(), particle_uy.data() + np);
-    const amrex::Vector<ParticleReal> uzp(particle_uz.data(), particle_uz.data() + np);
 
-    amrex::Vector<amrex::Vector<ParticleReal>> attr;
-    const amrex::Vector<ParticleReal> wp(particle_w.data(), particle_w.data() + np);
-    attr.push_back(wp);
+        // AddNParticles is collective: all ranks must call each iteration.
+        auto const np = static_cast<long>(particle_z.size());
+        total_particles_loaded += static_cast<uint64_t>(np);
 
-    const amrex::Vector<amrex::Vector<int>> attr_int;
+        const amrex::Vector<ParticleReal> xp(particle_x.data(), particle_x.data() + np);
+        const amrex::Vector<ParticleReal> yp(particle_y.data(), particle_y.data() + np);
+        const amrex::Vector<ParticleReal> zp(particle_z.data(), particle_z.data() + np);
+        const amrex::Vector<ParticleReal> uxp(particle_ux.data(), particle_ux.data() + np);
+        const amrex::Vector<ParticleReal> uyp(particle_uy.data(), particle_uy.data() + np);
+        const amrex::Vector<ParticleReal> uzp(particle_uz.data(), particle_uz.data() + np);
 
-    AddNParticles(0, np, xp,  yp,  zp, uxp, uyp, uzp,
-                  1, attr, 0, attr_int, 1);
+        amrex::Vector<amrex::Vector<ParticleReal>> attr;
+        const amrex::Vector<ParticleReal> wp(particle_w.data(), particle_w.data() + np);
+        attr.push_back(wp);
+
+        const amrex::Vector<amrex::Vector<int>> attr_int;
+
+        AddNParticles(0, np, xp,  yp,  zp, uxp, uyp, uzp,
+                      1, attr, 0, attr_int, 1);
+    } // sub-chunk loop
+
+    // Warn if some particles were outside the simulation box.
+    long global_loaded = static_cast<long>(total_particles_loaded);
+#ifdef AMREX_USE_MPI
+    // ReduceLongSum gives the global total on all ranks; only IO rank warns.
+    ParallelDescriptor::ReduceLongSum(global_loaded);
+#endif
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        static_cast<uint64_t>(global_loaded) <= npart_total,
+        "AddPlasmaFromFile: loaded more particles than exist in the file");
+    if (ParallelDescriptor::IOProcessor()
+        && static_cast<uint64_t>(global_loaded) < npart_total) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Simulation box doesn't cover all particles",
+            ablastr::warn_manager::WarnPriority::high);
+    }
 #endif // WARPX_USE_OPENPMD
 
     ignore_unused(plasma_injector, q_tot, z_shift);
