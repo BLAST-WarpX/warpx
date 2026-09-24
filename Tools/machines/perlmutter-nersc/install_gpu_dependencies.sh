@@ -71,33 +71,33 @@ cd $HOME/src/boost-temp/boost_1_82_0
 cd -
 rm -rf $HOME/src/boost-temp
 
-# c-blosc (I/O compression)
-if [ -d $HOME/src/c-blosc ]
+# c-blosc2 (I/O compression)
+if [ -d $HOME/src/c-blosc2 ]
 then
-  cd $HOME/src/c-blosc
+  cd $HOME/src/c-blosc2
   git fetch --prune
-  git checkout v1.21.1
+  git checkout v2.23.1
   cd -
 else
-  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git $HOME/src/c-blosc
+  git clone -b v2.23.1 https://github.com/Blosc/c-blosc2.git $HOME/src/c-blosc2
 fi
-rm -rf $HOME/src/c-blosc-pm-gpu-build
-cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-gpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build ${build_dir}/c-blosc-pm-gpu-build --target install --parallel ${PARALLEL}
-rm -rf ${build_dir}/c-blosc-pm-gpu-build
+rm -rf $HOME/src/c-blosc2-pm-gpu-build
+cmake -S $HOME/src/c-blosc2 -B ${build_dir}/c-blosc2-pm-gpu-build -DBUILD_STATIC=OFF -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXAMPLES=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc2-2.23.1
+cmake --build ${build_dir}/c-blosc2-pm-gpu-build --target install --parallel ${PARALLEL}
+rm -rf ${build_dir}/c-blosc2-pm-gpu-build
 
 # ADIOS2
 if [ -d $HOME/src/adios2 ]
 then
   cd $HOME/src/adios2
   git fetch --prune
-  git checkout v2.10.2
+  git checkout v2.12.1
   cd -
 else
-  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
+  git clone -b v2.12.1 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
 fi
 rm -rf $HOME/src/adios2-pm-gpu-build
-cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
+cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-gpu-build -DADIOS2_USE_Blosc2=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.12.1
 cmake --build ${build_dir}/adios2-pm-gpu-build --target install -j ${PARALLEL}
 rm -rf ${build_dir}/adios2-pm-gpu-build
 
