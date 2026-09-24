@@ -1,0 +1,8 @@
+FILE = inputs_base_2d_refined
+amr.n_cell = 32 16
+# Particle costs split the occupied coarse box and retain its empty neighbor.
+# Keep particles outside the refined patch, so its heuristic costs are all zero.
+electrons.xmax = 5.e-6
+algo.costs_heuristic_cells_wt = 0.
+algo.costs_heuristic_particles_wt = 1.
+warpx.split_high_density_boxes_threshold = 1.1

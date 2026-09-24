@@ -24,6 +24,7 @@ endif()
 # analysis: custom test analysis command, always run without MPI
 # checksum: default regression analysis command (checksum benchmark)
 # dependency: name of base test that must run first
+# RUN_WRAPPER: optional command prefix that runs and checks one or more cases
 #
 function(add_warpx_test
     name
@@ -34,6 +35,8 @@ function(add_warpx_test
     checksum
     dependency
 )
+    cmake_parse_arguments(PARSE_ARGV 7 test "" "" "RUN_WRAPPER")
+
     # cannot run MPI tests w/o MPI build
     if(nprocs GREATER_EQUAL 2 AND NOT WarpX_MPI)
         return()
@@ -135,6 +138,7 @@ function(add_warpx_test
         add_test(
             NAME ${name}.run
             COMMAND
+                ${test_RUN_WRAPPER}
                 ${THIS_MPI_TEST_EXE}
                 ${THIS_Python_EXE}
                 ${INPUTS_FILE}
@@ -171,6 +175,7 @@ function(add_warpx_test
         add_test(
             NAME ${name}.run
             COMMAND
+                ${test_RUN_WRAPPER}
                 ${THIS_MPI_TEST_EXE}
                 $<TARGET_FILE:app_${SD}>
                 ${INPUTS_FILE}

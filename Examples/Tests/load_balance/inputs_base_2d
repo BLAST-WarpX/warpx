@@ -1,0 +1,41 @@
+# Zero fields expose unwritten field data, and particle counts detect particle
+# loss during a layout change. The merge case also checks nonzero fields.
+max_step = 4
+amr.n_cell = 32 32
+amr.max_grid_size = 16
+amr.blocking_factor = 8
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = 0. 0.
+geometry.prob_hi = 1.e-4 1.e-4
+boundary.field_lo = absorbing_silver_mueller absorbing_silver_mueller
+boundary.field_hi = absorbing_silver_mueller absorbing_silver_mueller
+warpx.use_filter = 0
+algo.particle_shape = 1
+
+particles.species_names = electrons
+electrons.species_type = electron
+electrons.injection_style = NUniformPerCell
+electrons.num_particles_per_cell_each_dim = 2 2
+electrons.profile = constant
+electrons.momentum_distribution_type = at_rest
+
+algo.load_balance_intervals = 2
+algo.load_balance_costs_update = heuristic
+algo.costs_heuristic_cells_wt = 1.
+algo.costs_heuristic_particles_wt = 0.
+# Force redistribution even for an already balanced, unchanged layout.
+algo.load_balance_efficiency_ratio_threshold = 0.5
+warpx.split_high_density_boxes = 1
+# Detect missing copies of physical boundary ghost cells on CPU and GPU.
+fab.do_initval = 1
+
+warpx.reduced_diags_names = FE LBE LBC PN
+FE.type = FieldEnergy
+FE.intervals = 1
+LBE.type = LoadBalanceEfficiency
+LBE.intervals = 1
+LBC.type = LoadBalanceCosts
+LBC.intervals = 1
+PN.type = ParticleNumber
+PN.intervals = 1

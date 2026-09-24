@@ -1207,12 +1207,16 @@ Distribution across MPI ranks and parallelization
     Using the `Time intervals`_ syntax, this string defines the timesteps at which
     WarpX should try to redistribute the work across MPI ranks, in order to have
     better load balancing.
-    Use 0 to disable load_balancing.
+    Use 0 to disable load balancing.
+
+    Runtime load balancing is not supported with implicit or semi-implicit
+    evolution schemes (including Darwin) or with the ECT solver. For these solvers, set
+    ``algo.load_balance_intervals = 0`` when using multiple MPI ranks.
 
     When performing load balancing, WarpX measures the wall time for
     computational parts of the PIC cycle. It then uses this data to decide
-    how to redistribute the subdomains across MPI ranks. (Each subdomain
-    is unchanged, but its owner is changed in order to have better performance.)
+    how to redistribute the subdomains across MPI ranks. Subdomains can also
+    be split or merged when :pp:param:`warpx.split_high_density_boxes` is enabled.
     This relies on each MPI rank handling several (in fact many) subdomains
     (see ``max_grid_size``).
 
@@ -1221,9 +1225,12 @@ Distribution across MPI ranks and parallelization
     :default: ``1.1``
     :optional:
 
-    Controls whether to adopt a proposed distribution mapping computed during a load balance.
-    If the the ratio of the proposed to current distribution mapping *efficiency* (i.e.,
-    average cost per MPI process; efficiency is a number in the range [0, 1]) is greater
+    Controls whether to adopt a proposed distribution mapping when load balancing
+    without changing the boxes. Splitting and merging with
+    :pp:param:`warpx.split_high_density_boxes` do not use this threshold.
+    To disable all runtime load balancing, set :pp:param:`algo.load_balance_intervals` to ``0``.
+    If the ratio of the proposed to current distribution mapping *efficiency* (the
+    mean cost over MPI ranks divided by the maximum cost, in the range [0, 1]) is greater
     than the threshold value, the proposed distribution mapping is adopted.  The suggested
     range of values is :pp:param:`algo.load_balance_efficiency_ratio_threshold >= 1`, which ensures
     that the new distribution mapping is adopted only if doing so would improve the load
@@ -1232,7 +1239,7 @@ Distribution across MPI ranks and parallelization
     :pp:param:`algo.load_balance_efficiency_ratio_threshold = 1`, the proposed distribution is
     adopted *any* time the proposed distribution improves load balancing; if instead
     :pp:param:`algo.load_balance_efficiency_ratio_threshold = 2`, the proposed distribution is
-    adopted only if doing so would yield a 100% to the load balance efficiency (with this
+    adopted only if doing so would yield a 100% increase in load balance efficiency (with this
     threshold value, if the  current efficiency is ``0.45``, the new distribution would only be
     adopted if the proposed efficiency were greater than ``0.9``).
 
@@ -1340,8 +1347,22 @@ Distribution across MPI ranks and parallelization
     :default: false
     :optional:
 
-    Whether to split high density boxes during initialization. This can
-    improve the potential for load balancing.
+    Whether to split high density boxes during initialization and split or
+    merge boxes at runtime load-balancing intervals. Boxes are merged when
+    their combined cost is below 90% of the splitting threshold and their combined size does
+    not exceed ``amr.max_grid_size``.
+    Runtime splitting preserves alignment with the next coarser level.
+    Levels with zero total load-balancing cost are not split or merged.
+
+    With the PSATD solver, this option only splits boxes during initialization.
+    Runtime load balancing redistributes existing boxes without splitting or merging them,
+    to preserve the grid sizes validated against the solver's guard-cell requirements at startup.
+
+    Splitting during initialization or runtime can produce boxes incompatible with
+    :pp:param:`<diag_name>.coarsening_ratio`, even when that ratio divides
+    ``amr.blocking_factor``. This causes an error at diagnostic initialization or
+    at a later field output after runtime splitting. Use a diagnostic coarsening
+    ratio of ``1`` in every dimension to avoid this limitation.
 
 .. pp:param:: warpx.split_high_density_boxes_threshold
     :type: ``float``
@@ -1351,6 +1372,8 @@ Distribution across MPI ranks and parallelization
     Threshold used in splitting high density boxes. If a Box has more
     particles than the average number of particles per MPI process
     multiplied by this factor, we try to split this Box into smaller ones.
+    During runtime load balancing, the same criterion uses the selected
+    load-balancing costs instead of particle counts.
 
 .. pp:param:: warpx.split_high_density_boxes_min_box_size
     :type: ``integer``
@@ -1359,6 +1382,10 @@ Distribution across MPI ranks and parallelization
 
     During splitting high density boxes, if a Box's longest side is already
     less than or equal to this number, it will not be split.
+    This is a stopping threshold for the parent box; the resulting children can
+    have shorter sides than this value.
+    Runtime splitting also requires each child's fine and coarse patches to have
+    more valid cells than guard cells in every direction for the allocated fields.
 
 
 .. _running-cpp-parameters-particle:
@@ -4727,6 +4754,9 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     the :ref:`domain decomposition <usage_domain_decomposition>` section, ``coarsening_ratio`` should be an integer
     divisor of ``blocking_factor``. If :pp:param:`warpx.numprocs` is used instead, the total number of cells in a given
     dimension must be a multiple of the ``coarsening_ratio`` multiplied by ``numprocs`` in that dimension.
+    When :pp:param:`warpx.split_high_density_boxes` is enabled, these conditions
+    do not guarantee that the split boxes remain coarsenable. Use ``1`` in every
+    dimension to avoid this limitation.
 
 .. pp:param:: <diag_name>.file_prefix
     :type: ``string``
@@ -5294,12 +5324,16 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         :math:`w_{\text{cell}}` is the cell cost weight factor (controlled by :pp:param:`algo.costs_heuristic_cells_wt`).
 
     * ``LoadBalanceEfficiency``
-        This type computes the load balance efficiency, given the present costs
-        and distribution mapping. Load balance efficiency is computed as the
+        This type reports the efficiency of the last accepted load balance.
+        Load balance efficiency is computed as the
         mean cost over all ranks, divided by the maximum cost over all ranks.
-        Until costs are recorded, load balance efficiency is output as ``-1``;
-        at earliest, the load balance efficiency can be output starting at step
-        ``2``, since costs are not recorded until step ``1``.
+        After splitting or merging boxes, this uses estimated costs: each child
+        receives half its parent's cost, and a merged box receives the sum of its
+        constituent costs. It is not a measurement of the work after redistribution.
+        The value is retained until the next accepted load balance.
+        Before the first accepted load balance, the value is ``-1``. The earliest
+        update is at step ``2``, since costs are not recorded until step ``1``.
+        Serial runs report ``1`` after the first load-balancing check.
 
     * ``ParticleHistogram``
         This type computes a user defined particle histogram.

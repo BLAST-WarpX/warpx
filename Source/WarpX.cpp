@@ -83,6 +83,7 @@
 #include <AMReX_MFIter.H>
 #include <AMReX_MakeType.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_ParallelContext.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
@@ -1449,6 +1450,16 @@ WarpX::ReadParameters ()
         pp_algo.queryarr("load_balance_intervals", load_balance_intervals_string_vec);
         load_balance_intervals = ablastr::utils::text::IntervalsParser(
             load_balance_intervals_string_vec);
+        if (load_balance_intervals.isActivated() && ParallelContext::NProcsSub() > 1) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                evolve_scheme == EvolveScheme::Explicit,
+                "Runtime load balancing requires an explicit evolution scheme. "
+                "Set algo.load_balance_intervals = 0.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                electromagnetic_solver_id != ElectromagneticSolverAlgo::ECT,
+                "Runtime load balancing is not supported with the ECT solver. "
+                "Set algo.load_balance_intervals = 0.");
+        }
         pp_algo.query("load_balance_with_sfc", load_balance_with_sfc);
         // Knapsack factor only used with non-SFC strategy
         if (!load_balance_with_sfc) {
