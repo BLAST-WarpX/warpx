@@ -120,6 +120,8 @@ public:
         ImplicitOptions const * implicit_options = nullptr
     );
 
+    void DepositChargeComponent (ablastr::fields::MultiFabRegister& fields, int rho_comp);
+
     /**
      * \brief Deposit mass matrices.
     */
@@ -224,6 +226,15 @@ public:
     * @param[in] verbose flag to control if information on the resampling process is printed out.
     */
     void doResampling (const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose);
+
+    /** True if any species uses particle_splitting. */
+    [[nodiscard]] bool hasParticleSplitting () const;
+
+    /** Split particle-splitting species and add child remap current. Does not reset J. */
+    void doParticleSplittingAndDepositRemap (
+        ablastr::fields::MultiLevelVectorField const& J,
+        const amrex::Vector<amrex::Geometry>& geom,
+        int timestep, amrex::Real dt, bool verbose, bool deposit_virtual_j);
 
 #ifdef WARPX_QED
     /** If Schwinger process is activated, this function is called at every

@@ -22,6 +22,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_2d_langmuir_splitting_remapping  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_langmuir_splitting_remapping  # inputs
+    "analysis_splitting_remapping.py diags/diag1000001"  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_langmuir_multi_mr  # name
     2  # dims
     2  # nprocs

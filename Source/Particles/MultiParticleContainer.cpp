@@ -521,7 +521,46 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
+        pc->Evolve(
+            fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition,
+            position_push_type, momentum_push_type, implicit_options);
+    }
+}
+
+void
+MultiParticleContainer::DepositChargeComponent (
+    ablastr::fields::MultiFabRegister& fields, int rho_comp)
+{
+    ABLASTR_PROFILE("MultiParticleContainer::DepositChargeComponent()");
+
+    if (allcontainers.empty()) { return; }
+
+    const int finest_level = allcontainers[0]->finestLevel();
+    const int nc = WarpX::ncomps;
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        if (!fields.has(FieldType::rho_fp, lev)) { continue; }
+
+        amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            rho->nComp() >= (rho_comp + 1) * nc,
+            "Cannot deposit requested rho component: not enough components allocated.");
+        rho->setVal(0.0_rt, rho_comp * nc, nc, rho->nGrowVect());
+
+        if (fields.has(FieldType::rho_buf, lev))
+        {
+            amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                crho->nComp() >= (rho_comp + 1) * nc,
+                "Cannot deposit requested rho_buf component: not enough components allocated.");
+            crho->setVal(0.0_rt, rho_comp * nc, nc, crho->nGrowVect());
+        }
+
+        for (auto& pc : allcontainers)
+        {
+            pc->DepositChargeComponent(fields, lev, rho_comp);
+        }
     }
 }
 
@@ -1229,8 +1268,32 @@ void MultiParticleContainer::doResampling (
     {
         // do_resampling can only be true for PhysicalParticleContainers
         if (!pc->do_resampling){ continue; }
+        // Particle splitting runs inside OneStep, before J is synced.
+        if (pc->doParticleSplitting()) { continue; }
 
         pc->resample(geom, timestep, verbose);
+    }
+}
+
+bool MultiParticleContainer::hasParticleSplitting () const
+{
+    for (auto const& pc : allcontainers)
+    {
+        if (pc->doParticleSplitting()) { return true; }
+    }
+    return false;
+}
+
+void MultiParticleContainer::doParticleSplittingAndDepositRemap (
+    ablastr::fields::MultiLevelVectorField const& J,
+    const amrex::Vector<amrex::Geometry>& geom,
+    const int timestep, const amrex::Real dt, const bool verbose,
+    const bool deposit_virtual_j)
+{
+    for (auto& pc : allcontainers)
+    {
+        if (!pc->doParticleSplitting()) { continue; }
+        pc->splitAndDepositRemappingCurrent(J, geom, timestep, dt, verbose, deposit_virtual_j);
     }
 }
 

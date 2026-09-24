@@ -1,0 +1,40 @@
+# Neutral 2D Langmuir plasma: split electrons only, remapping current on.
+#
+# Gauss on total rho is sensitive to remapping only if one species moves
+# (symmetric e+/e- split leaves rho ~ 0 and masks a missing J_child).
+# Electrons split at step 1; positrons stay put. do_not_push => J_phys = 0.
+#
+# Do not use initialize_self_fields here: periodic Poisson/MLMG does not
+# converge for each charged species separately (non-zero net Q per species).
+# E starts at 0; remapping J at step 1 must update E to match rho(x_c).
+
+FILE = inputs_base_2d
+
+max_step = 3
+amr.n_cell = 16 16
+amr.max_grid_size = 16
+
+algo.current_deposition = esirkepov
+algo.maxwell_solver = yee
+
+#electrons.do_not_push = 1
+#positrons.do_not_push = 1
+
+diag1.intervals = 1
+diag1.fields_to_plot = rho divE
+
+# Split electrons only (positrons fixed => local rho changes if children move)
+electrons.do_resampling = 1
+electrons.resampling_algorithm = particle_splitting
+electrons.resampling_trigger_intervals = 1
+electrons.resampling_min_ppc = 1
+electrons.resampling_split_weight_koef = 0.5
+electrons.resampling_splitting_type = axis_aligned
+electrons.splitting_max_ppc = 10000
+electrons.do_remapping_current = 1
+
+warpx.do_dive_cleaning = 1
+
+warpx.reduced_diags_names = ParticleNumber
+ParticleNumber.type = ParticleNumber
+ParticleNumber.intervals = 1

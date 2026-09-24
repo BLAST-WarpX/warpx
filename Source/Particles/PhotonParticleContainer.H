@@ -119,8 +119,8 @@ public:
                                  int const /*depos_lev*/,
                                  amrex::Real const /*dt*/,
                                  amrex::Real const /*relative_time*/,
-                                 PushType /*push_type*/) override {}
-
+                                 PushType /*push_type*/,
+                                 bool /*use_stored_old_position*/) override {}
     /**
      * \brief No-op override: photons are massless and carry no charge, so
      * they do not contribute to the implicit-solver mass matrices

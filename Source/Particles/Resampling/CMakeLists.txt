@@ -6,5 +6,6 @@ foreach(D IN LISTS WarpX_DIMS)
         ResamplingTrigger.cpp
         LevelingThinning.cpp
         VelocityCoincidenceThinning.cpp
+        ParticleSplitting.cpp
     )
 endforeach()

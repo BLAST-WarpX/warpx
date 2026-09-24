@@ -253,6 +253,7 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     pp_species_name.query("do_resampling", do_resampling);
     if (do_resampling) { m_resampler = Resampling(species_name); }
+    pp_species_name.query("do_remapping_current", m_do_remapping_current);
 
     //check if Radiation Reaction is enabled and do consistency checks
     pp_species_name.query("do_classical_radiation_reaction", do_classical_radiation_reaction);
@@ -335,6 +336,12 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
 
     // If old particle positions should be saved add the needed components
     pp_species_name.query("save_previous_position", m_save_previous_position);
+    // Particle-splitting remap deposits x^{n+1} → x_c from stored prev_*.
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    if (do_resampling && m_resampler.isParticleSplitting()) {
+        m_save_previous_position = true;
+    }
+#endif
     if (m_save_previous_position) {
 #if !defined(WARPX_DIM_1D_Z)
         AddRealComp("prev_x");
@@ -859,6 +866,63 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     // may result in split particles to deposit twice on the coarse level.
     if (split_particles) {
         SplitParticles(lev);
+    }
+}
+
+void
+PhysicalParticleContainer::DepositChargeComponent (
+    ablastr::fields::MultiFabRegister& fields, int lev, int rho_comp)
+{
+    using warpx::fields::FieldType;
+
+    ABLASTR_PROFILE("PhysicalParticleContainer::DepositChargeComponent()");
+
+    if (do_not_deposit || !fields.has(FieldType::rho_fp, lev)) { return; }
+
+    const bool has_J_buf = fields.has_vector(FieldType::current_buf, lev);
+    const bool has_E_cax = fields.has_vector(FieldType::Efield_cax, lev);
+    const bool has_buffer = has_E_cax || has_J_buf;
+
+    const iMultiFab* current_masks = WarpX::CurrentBufferMasks(lev);
+    const iMultiFab* gather_masks = WarpX::GatherBufferMasks(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+    {
+#ifdef AMREX_USE_OMP
+        const int thread_num = omp_get_thread_num();
+#else
+        const int thread_num = 0;
+#endif
+
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            const auto& wp = pti.GetAttribs(PIdx::w);
+            const long np = pti.numParticles();
+
+            long nfine_deposit = np;
+            long nfine_gather = np;
+            if (has_buffer && !do_not_push) {
+                PartitionParticlesInBuffers( nfine_deposit, nfine_gather, np,
+                    pti, lev, WarpX::n_field_gather_buffer,
+                    WarpX::n_current_deposition_buffer, current_masks, gather_masks );
+            }
+
+            const long np_to_deposit = has_J_buf ? nfine_deposit : np;
+
+            const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
+                pti.GetiAttribs("ionizationLevel").dataPtr():nullptr;
+
+            amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
+            DepositCharge(pti, wp, ion_lev, rho, rho_comp, 0,
+                          np_to_deposit, thread_num, lev, lev);
+            if (has_buffer) {
+                amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
+                DepositCharge(pti, wp, ion_lev, crho, rho_comp, np_to_deposit,
+                              np-np_to_deposit, thread_num, lev, lev-1);
+            }
+        }
     }
 }
 
@@ -1764,6 +1828,79 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
         }
     }
     ABLASTR_PROFILE_VAR_STOP(blp_resample_actual);
+}
+
+void PhysicalParticleContainer::splitAndDepositRemappingCurrent (
+    ablastr::fields::MultiLevelVectorField const& J,
+    const amrex::Vector<amrex::Geometry>& geom,
+    const int timestep, const amrex::Real dt, const bool verbose,
+    const bool deposit_virtual_j)
+{
+    if (!doParticleSplitting()) { return; }
+
+    ABLASTR_PROFILE("PhysicalParticleContainer::splitAndDepositRemappingCurrent");
+
+    const amrex::Real global_numparts = TotalNumberOfParticles();
+    if (!m_resampler.triggered(timestep, global_numparts)) { return; }
+
+    Redistribute();
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    const bool do_child_deposit = (
+        !do_not_deposit && deposit_virtual_j && m_do_remapping_current &&
+        (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov));
+#else
+    const bool do_child_deposit = false;
+    amrex::ignore_unused(deposit_virtual_j, J);
+#endif
+
+    for (int lev = 0; lev <= maxLevel(); ++lev)
+    {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            auto& ptile = ParticlesAt(lev, pti);
+            if (!do_child_deposit) {
+                m_resampler(geom[lev], pti, lev, this);
+                continue;
+            }
+
+            const long old_np = ptile.numParticles();
+            m_resampler(geom[lev], pti, lev, this);
+            const long num_new = ptile.numParticles() - old_np;
+            if (num_new == 0) { continue; }
+
+#ifdef AMREX_USE_OMP
+            const int thread_num = omp_get_thread_num();
+#else
+            const int thread_num = 0;
+#endif
+            const auto& wp = pti.GetAttribs(PIdx::w);
+            const auto& uxp = pti.GetAttribs(PIdx::ux);
+            const auto& uyp = pti.GetAttribs(PIdx::uy);
+            const auto& uzp = pti.GetAttribs(PIdx::uz);
+            const int* ion_lev = (do_field_ionization) ?
+                pti.GetiAttribs("ionizationLevel").dataPtr() : nullptr;
+
+            DepositCurrent(pti, wp, uxp, uyp, uzp, ion_lev,
+                           J[lev][0], J[lev][1], J[lev][2],
+                           old_np, num_new, thread_num,
+                           lev, lev, dt, amrex::Real(0.0), PushType::Explicit,
+                           /*use_stored_old_position=*/true);
+        }
+    }
+
+    deleteInvalidParticles();
+
+    if (verbose) {
+        amrex::Print() << Utils::TextMsg::Info(
+            "Resampled " + species_name + " at step " + std::to_string(timestep)
+            + ": macroparticle count decreased by "
+            + std::to_string(static_cast<int>(global_numparts - TotalNumberOfParticles()))
+        );
+    }
 }
 
 bool

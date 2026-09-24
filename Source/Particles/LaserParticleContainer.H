@@ -73,6 +73,9 @@ public:
                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) final;
 
+    void DepositChargeComponent (
+        ablastr::fields::MultiFabRegister& fields, int lev, int rho_comp) final;
+
     void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& ,
                         const amrex::MultiFab& ,
