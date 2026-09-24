@@ -50,6 +50,10 @@ void ElectrostaticSolver::ReadParameters () {
     // FFT solver flags
     utils::parser::queryWithParser(
         pp_warpx, "use_2d_slices_fft_solver", is_igf_2d_slices);
+
+    // Flag setting whether the domain boundary values should not be updated every step
+    utils::parser::queryWithParser(
+        pp_warpx, "skip_domain_bc_value_update", m_skip_domain_bc_value_update);
 }
 
 void
@@ -58,6 +62,9 @@ ElectrostaticSolver::setPhiBC (
     amrex::Real t
 ) const
 {
+    // skip if user set the skip_domain_bc_value_update flag
+    if (m_skip_domain_bc_value_update) { return; }
+
     // check if any dimension has non-periodic boundary conditions
     if (!m_poisson_boundary_handler->has_non_periodic) { return; }
 
