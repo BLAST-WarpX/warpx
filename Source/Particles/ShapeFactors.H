@@ -12,6 +12,7 @@
 #include <AMReX.H>
 #include <AMReX_GpuQualifiers.H>
 
+#include <cmath>
 
 /**
  *  Compute shape factor and return index of leftmost cell where
