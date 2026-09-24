@@ -568,3 +568,15 @@ void FiniteDifferenceSolver::EvolveESpherical (
 }
 
 #endif // corresponds to ifndef WARPX_DIM_RZ
+
+#ifdef WARPX_DIM_RZ
+void FiniteDifferenceSolver::EvolveEPMLRZ (
+    ablastr::fields::VectorField const& increment,
+    ablastr::fields::VectorField const& B,
+    ablastr::fields::VectorField const& zero_current, amrex::Real dt)
+{
+    const std::array<std::unique_ptr<amrex::iMultiFab>, 3> no_eb;
+    EvolveECylindrical<CylindricalYeeAlgorithm>(
+        increment, B, zero_current, no_eb, nullptr, 0, dt);
+}
+#endif

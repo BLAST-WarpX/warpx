@@ -853,6 +853,12 @@ Domain Boundary Conditions
 
     * ``pml`` (default): This option can be used to add Perfectly Matched Layers (PML) around the simulation domain. See the :ref:`PML theory section <theory-bc-PML>` for more details.
       Additional pml algorithms can be explored using the parameters :pp:param:`warpx.do_pml_in_domain`, :pp:param:`warpx.pml_has_particles`, and :pp:param:`warpx.do_pml_j_damping`.
+      In RZ, PSATD and explicit Yee support absorption at the outer radial boundary.
+      RZ Yee uses a cylindrical uniaxial PML and currently requires a single-level
+      staggered vacuum grid, periodic boundaries along z, and exterior layers
+      without particles. Moving windows, load balancing, embedded boundaries,
+      and divergence cleaning are not supported with RZ Yee PML.
+      See :ref:`the radial PML formulation <theory-bc-rz-yee-pml>`.
 
     * ``absorbing_silver_mueller``: This option can be used to set the Silver-Mueller absorbing boundary conditions. These boundary conditions are simpler and less computationally expensive than the pml, but are also less effective at absorbing the field. They only work with the Yee Maxwell solver.
 
