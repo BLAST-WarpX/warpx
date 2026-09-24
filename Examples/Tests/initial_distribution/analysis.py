@@ -21,6 +21,7 @@
 # 12 denotes maxwellian (from openPMD file mean/std) w/ spatially-varying mean and thermal spread
 # The distribution is obtained through reduced diagnostic ParticleHistogram.
 
+
 import numpy as np
 import scipy.constants as scc
 import scipy.special as scs
@@ -36,6 +37,8 @@ print("Tolerance:", tolerance)
 # ===============================
 
 # load data
+ts = OpenPMDTimeSeries("./diags/diag1")
+
 bin_value, h1x = read_reduced_diags_histogram("h1x.txt")[2:]
 h1y = read_reduced_diags_histogram("h1y.txt")[3]
 h1z = read_reduced_diags_histogram("h1z.txt")[3]
@@ -122,6 +125,15 @@ f3_error = (
 print("Maxwell-Juttner distribution difference:", f3_error)
 
 assert f3_error < tolerance
+
+# check temperature diagnostic
+Te_maxwell_juttner, info = ts.get_field("T_maxwell_juttner", iteration=0)
+Te_analytic = theta * scc.m_e * scc.c**2 / scc.e
+Te_error_max = (np.abs(Te_maxwell_juttner - Te_analytic) / Te_analytic).max()
+
+print(f"Maxwell-Juttner temperature diagnostic error: {Te_error_max}")
+
+assert Te_error_max < 0.1
 
 # ==============
 # gaussian beam
@@ -410,8 +422,6 @@ def check_standard_normal(u, mean_ref, std_ref, tolerance):
 
 
 z_array = np.linspace(-1.0, 1.0, 8)
-
-ts = OpenPMDTimeSeries("./diags/diag1")
 
 ux, uy, uz, z = ts.get_particle(
     ["ux", "uy", "uz", "z"],

@@ -1992,7 +1992,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                                   remake, redistribute_on_remake);
     }
     if (!warpx.m_fields.has(N_field_name, lev)) {
-        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps, ng, 0.,
+        warpx.m_fields.alloc_init(N_field_name, lev, ba, dm, ncomps + 1, ng, 0.,
                                   remake, redistribute_on_remake);
     }
     if (!warpx.m_fields.has(u_field_name, Direction{0}, lev)) {
@@ -2045,7 +2045,7 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const auto p = WarpXParticleContainer::ParticleType(ptd, ip);
                 const auto [ii, jj, kk] = getParticleCell(p, plo, dxi).dim3();
 
-                const amrex::ParticleReal w  = wp[ip];
+                const amrex::ParticleReal w = wp[ip];
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 amrex::ParticleReal ux = uxp[ip];
                 amrex::ParticleReal uy = uyp[ip];
@@ -2064,7 +2064,8 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 const amrex::ParticleReal uy = uyp[ip];
                 const amrex::ParticleReal uz = uzp[ip];
 #endif
-                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk), (amrex::Real)(w));
+                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk, 0), (amrex::Real)(w));
+                amrex::Gpu::Atomic::AddNoRet(&N_array(ii, jj, kk, 1), (amrex::Real)(w*w));
                 amrex::Gpu::Atomic::AddNoRet(&ux_array(ii, jj, kk), (amrex::Real)(w*ux));
                 amrex::Gpu::Atomic::AddNoRet(&uy_array(ii, jj, kk), (amrex::Real)(w*uy));
                 amrex::Gpu::Atomic::AddNoRet(&uz_array(ii, jj, kk), (amrex::Real)(w*uz));
@@ -2085,8 +2086,9 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& uz_array = uz_mf.array(mfi);
         amrex::ParallelFor(box,
                 [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                    if (N_array(i,j,k) == 0._rt) { return; }
-                    const amrex::Real invsum = 1._rt/N_array(i,j,k);
+                    if (N_array(i,j,k,0) == 0._rt) { return; }
+                    const amrex::Real invsum = 1._rt/N_array(i,j,k,0);
+                    N_array(i,j,k,1) *= invsum;
                     ux_array(i,j,k) *= invsum;
                     uy_array(i,j,k) *= invsum;
                     uz_array(i,j,k) *= invsum;
@@ -2140,15 +2142,18 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
                 // or to [ur,uth,uph] for RSPHERE geometry
                 transform_momentum_to_curvilinear(ux, uy, uz, theta, phi);
 #else
-                const amrex::ParticleReal ux = uxp[ip];
-                const amrex::ParticleReal uy = uyp[ip];
-                const amrex::ParticleReal uz = uzp[ip];
+                amrex::ParticleReal ux = uxp[ip];
+                amrex::ParticleReal uy = uyp[ip];
+                amrex::ParticleReal uz = uzp[ip];
 #endif
-                const amrex::ParticleReal uxr = ux - ux_array(ii, jj, kk);
-                const amrex::ParticleReal uyr = uy - uy_array(ii, jj, kk);
-                const amrex::ParticleReal uzr = uz - uz_array(ii, jj, kk);
-                const auto vsq = (amrex::Real)(w*(uxr*uxr + uyr*uyr + uzr*uzr));
-                amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), vsq);
+                const amrex::ParticleReal mean_ux = ux_array(ii, jj, kk);
+                const amrex::ParticleReal mean_uy = uy_array(ii, jj, kk);
+                const amrex::ParticleReal mean_uz = uz_array(ii, jj, kk);
+                ParticleUtils::doLorentzTransformWithU(ux, uy, uz, mean_ux, mean_uy, mean_uz);
+                amrex::ParticleReal const usq = ux*ux + uy*uy + uz*uz;
+                amrex::ParticleReal const gaminv = 1._rt/std::sqrt(1._rt + usq/(PhysConst::c*PhysConst::c));
+                const auto gammausq = (amrex::Real)(w*gaminv*usq);
+                amrex::Gpu::Atomic::AddNoRet(&temp_array(ii, jj, kk), gammausq);
             });
     }
 
@@ -2164,8 +2169,11 @@ WarpXParticleContainer::DepositTotalNGPTemperature (int lev)
         amrex::Array4<amrex::Real> const& temp_array = temperature.array(mfi);
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE (int i, int j, int k) {
-                if (N_array(i,j,k) == 0._rt) { return; }
-                const amrex::Real invsum = 1._rt/N_array(i,j,k);
+                if (N_array(i,j,k,0) == 0._rt) { return; }
+                // Use the unbiased weighted sample variance,
+                // dividing by sum(w) - ave(w)
+                const amrex::Real denom = N_array(i,j,k,0) - N_array(i,j,k,1);
+                const amrex::Real invsum = denom > 0._rt ? 1._rt/denom : 0._rt;
                 temp_array(i,j,k) *= mass*invsum/(3._rt*PhysConst::q_e);
             });
     }
