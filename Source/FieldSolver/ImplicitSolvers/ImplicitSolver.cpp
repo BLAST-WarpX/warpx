@@ -635,11 +635,6 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
             m_mass_matrices_pc_width = 0;
             pp.query("mass_matrices_pc_width", m_mass_matrices_pc_width);
         }
-#if defined(WARPX_DIM_RSPHERE)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RSPHERE!");
-#endif
         if ( (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
               WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
              (WarpX::nox < 2) ) {
