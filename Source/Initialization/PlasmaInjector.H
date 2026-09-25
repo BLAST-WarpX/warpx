@@ -153,6 +153,7 @@ public:
     [[nodiscard]] InjectorFlux*  getInjectorFlux () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumDevice () const;
     [[nodiscard]] InjectorMomentum* getInjectorMomentumHost () const;
+    [[nodiscard]] InjectorMomentum* getInjectorMomentum (int li) const;
 
     void prepare (amrex::BoxArray const& grids,
                   amrex::DistributionMapping const& dmap,
@@ -198,6 +199,7 @@ protected:
 
     std::unique_ptr<InjectorMomentum,InjectorMomentumDeleter> h_inj_mom;
     InjectorMomentum* d_inj_mom = nullptr;
+    bool inj_mom_distributed = false;
 
     // Keep a pointer to TemperatureProperties to ensure the lifetime of the
     // contained Parser

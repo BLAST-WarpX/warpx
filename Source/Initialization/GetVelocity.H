@@ -12,8 +12,12 @@
 #include "VelocityProperties.H"
 
 #include <AMReX.H>
+#include <AMReX_BoxArray.H>
 #include <AMReX_Dim3.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_REAL.H>
+
+#include <functional>
 
 /** Get the bulk drift momentum vector at a point on the grid
  *
@@ -34,7 +38,13 @@ struct GetVelocityVector
 
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    /** View on the openPMD data, if m_type == VelFromFileVector */
     ExternalFieldVectorView m_from_file;
+    /** Readers of the three components of `u_mean`. These are owned by the
+     * VelocityProperties object that was passed to the constructor. */
+    ExternalFieldReader* m_u_mean_x_reader = nullptr;
+    ExternalFieldReader* m_u_mean_y_reader = nullptr;
+    ExternalFieldReader* m_u_mean_z_reader = nullptr;
 #endif
 
     /**
@@ -44,6 +54,29 @@ struct GetVelocityVector
      * populate the functor
      */
     explicit GetVelocityVector (VelocityProperties const& vel) noexcept;
+
+    // This function needs to be called before initializing the momentum of the
+    // particles, when `u_mean` is read from a file. When the readers are
+    // created in the constructor of VelocityProperties, we do not know the
+    // particle containers' BoxArray and DistributionMapping yet.
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    // This function needs to be called before we do continuous injection of
+    // particles to inform the readers to load the data we need.
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    // For distributed data, this function prepares the functor for reading
+    // data in this Box. Here `li` is the local index for the Box in a
+    // particle container.
+    void prepare (int li);
+
+    [[nodiscard]] bool needPreparation () const;
+
+    [[nodiscard]] bool distributed () const;
 
     /**
      * \brief Functor call. Returns the value of velocity at the location (x,y,z)

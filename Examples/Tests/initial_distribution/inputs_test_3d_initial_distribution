@@ -199,6 +199,9 @@ gaussian_momentum_from_file.maxwellian_u_mean_distribution_type = "read_from_fil
 gaussian_momentum_from_file.read_u_mean_from_path = "../test_3d_initial_distribution_prepare/example-u-mean.h5"
 gaussian_momentum_from_file.maxwellian_u_std_distribution_type = "read_from_file"
 gaussian_momentum_from_file.read_u_std_from_path = "../test_3d_initial_distribution_prepare/example-u-std.h5"
+# u_mean uses the default (distributed) reading, u_std is read in full on every
+# MPI rank: this covers both code paths in a single test.
+gaussian_momentum_from_file.read_u_std_distributed = 0
 
 #################################
 ########## DIAGNOSTIC ###########
