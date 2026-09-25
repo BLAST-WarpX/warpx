@@ -20,6 +20,7 @@
 #endif
 
 #include <algorithm>
+#include <cstddef>
 #include <functional>
 #include <numeric>
 #include <vector>
@@ -278,6 +279,25 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 
     // Load the first component if m_component is empty
     auto FC = m_component.empty() ? F.begin()->second : F[m_component];
+
+    // Respect the component's openPMD in-cell position (staggering): file
+    // lattice point i sits at gridGlobalOffset + (i + position)*gridSpacing.
+    {
+        const auto pos = FC.position<double>();
+        constexpr auto ndim = static_cast<std::size_t>(AMREX_SPACEDIM);
+        if (pos.size() >= ndim) {
+            if (xyz_order) {
+                AMREX_D_TERM(m_offset[0] += Real(pos.at(0))*m_dx[0];,
+                             m_offset[1] += Real(pos.at(1))*m_dx[1];,
+                             m_offset[2] += Real(pos.at(2))*m_dx[2]);
+            } else {
+                AMREX_D_TERM(m_offset[0] += Real(pos.at(pos.size()-1))*m_dx[0];,
+                             m_offset[1] += Real(pos.at(pos.size()-2))*m_dx[1];,
+                             m_offset[2] += Real(pos.at(pos.size()-3))*m_dx[2]);
+            }
+        }
+    }
+
     const auto extent = FC.getExtent();
     for (auto ex : extent) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ex < decltype(ex)(std::numeric_limits<int>::max()),
