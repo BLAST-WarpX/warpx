@@ -174,7 +174,7 @@ Attribute name      ``int``/``real``  Description                        Default
                                       when they were created.
 ==================  ================  =================================  ==============
 
-A Python example that adds runtime options can be found in :download:`Examples/Tests/particle_data_python <../../../Examples/Tests/particle_data_python/inputs_test_2d_prev_positions_picmi.py>`
+A Python example that adds runtime options can be found in :download:`Examples/Tests/restart <../../../Examples/Tests/restart/inputs_test_2d_runtime_components_picmi.py>`
 
 .. note::
 
