@@ -596,6 +596,10 @@ public:
 
     int DoFieldIonization() const { return do_field_ionization; }
 
+    /** Maximum ionization level (i.e. atomic number) of this species.
+     *  Only meaningful when field ionization is enabled for this species. */
+    int getIonizationMaxLevel() const { return ion_atomic_number; }
+
 #ifdef WARPX_QED
     //Species for which QED effects are relevant should override these methods
     virtual bool has_quantum_sync() const {return false;}
@@ -697,7 +701,7 @@ protected:
     int do_adk_correction = 0;
     int ionization_product;
     std::string ionization_product_name;
-    int ion_atomic_number;
+    int ion_atomic_number = 0;
     int ionization_initial_level = 0;
     amrex::Gpu::DeviceVector<amrex::Real> ionization_energies;
     amrex::Gpu::DeviceVector<amrex::Real> adk_power;

@@ -33,6 +33,12 @@
  *            account for all other possible binary collision partners.
  * @param[in] process_count number of scattering processes to consider.
  * @param[in] scattering_processes an array of scattering processes included for consideration.
+ * @param[in] target_ion_lev current ionization level of the target particle (species 2), or -1
+ *            if the target species does not undergo field ionization (in which case the gate below
+ *            is disabled). This is used to prevent impact ionization of an already fully-ionized
+ *            target, which can occur when field ionization and DSMC impact ionization act on the
+ *            same species (see WarpX discussion #6220).
+ * @param[in] target_max_ion_lev maximum ionization level (atomic number) of the target species.
  * @param[in] engine the random engine.
  */
 template <int max_process_count, typename index_type>
@@ -48,6 +54,8 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
                           const int multiplier,
                           const int process_count,
                           const ScatteringProcess::Executor* scattering_processes,
+                          const int target_ion_lev,
+                          const int target_max_ion_lev,
                           const amrex::RandomEngine& engine)
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
@@ -80,7 +88,17 @@ void CollisionPairFilter (const amrex::ParticleReal u1x, const amrex::ParticleRe
     amrex::ParticleReal sigma_sums[max_process_count] = {0._prt};
     for (int ii = 0; ii < process_count; ii++) {
         auto const& scattering_process = scattering_processes[ii];
-        const amrex::ParticleReal sigma = scattering_process.getCrossSection(E_coll);
+        amrex::ParticleReal sigma = scattering_process.getCrossSection(E_coll);
+        // Disable impact ionization of a target that is already fully ionized. This
+        // situation arises when the target species undergoes both field ionization and
+        // DSMC impact ionization: once field ionization has stripped all electrons, the
+        // target has no bound electron left for impact ionization (see WarpX discussion
+        // #6220). target_ion_lev < 0 means the target does not carry an ionization level,
+        // in which case this gate is disabled.
+        if (scattering_process.m_type == ScatteringProcessType::IONIZATION &&
+            target_ion_lev >= 0 && target_ion_lev >= target_max_ion_lev) {
+            sigma = 0._prt;
+        }
         sigma_sums[ii] = sigma + ((ii == 0) ? 0._prt : sigma_sums[ii-1]);
     }
     const auto sigma_tot = sigma_sums[process_count-1];
