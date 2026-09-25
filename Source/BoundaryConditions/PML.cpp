@@ -852,16 +852,16 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     const amrex::BoxArray ba_Ex = amrex::convert(ba, fields.get(FieldType::Efield_fp, Direction{0}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_Ey = amrex::convert(ba, fields.get(FieldType::Efield_fp, Direction{1}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_Ez = amrex::convert(ba, fields.get(FieldType::Efield_fp, Direction{2}, 0)->ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Ex, dm, ncompe, nge, 0.0_rt, false, false);
-    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Ey, dm, ncompe, nge, 0.0_rt, false, false);
-    fields.alloc_init(FieldType::pml_E_fp, Direction{2}, lev, ba_Ez, dm, ncompe, nge, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{0}, lev, ba_Ex, dm, ncompe, nge, 0.0_rt, false, false, true);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{1}, lev, ba_Ey, dm, ncompe, nge, 0.0_rt, false, false, true);
+    fields.alloc_init(FieldType::pml_E_fp, Direction{2}, lev, ba_Ez, dm, ncompe, nge, 0.0_rt, false, false, true);
 
     const amrex::BoxArray ba_Bx = amrex::convert(ba, fields.get(FieldType::Bfield_fp, Direction{0}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_By = amrex::convert(ba, fields.get(FieldType::Bfield_fp, Direction{1}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_Bz = amrex::convert(ba, fields.get(FieldType::Bfield_fp, Direction{2}, 0)->ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Bx, dm, ncompb, ngb, 0.0_rt, false, false);
-    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_By, dm, ncompb, ngb, 0.0_rt, false, false);
-    fields.alloc_init(FieldType::pml_B_fp, Direction{2}, lev, ba_Bz, dm, ncompb, ngb, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{0}, lev, ba_Bx, dm, ncompb, ngb, 0.0_rt, false, false, true);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{1}, lev, ba_By, dm, ncompb, ngb, 0.0_rt, false, false, true);
+    fields.alloc_init(FieldType::pml_B_fp, Direction{2}, lev, ba_Bz, dm, ncompb, ngb, 0.0_rt, false, false, true);
 
     const amrex::BoxArray ba_jx = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_jy = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect());
@@ -996,16 +996,16 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         const amrex::BoxArray cba_Ex = amrex::convert(cba, fields.get(FieldType::Efield_cp, Direction{0}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_Ey = amrex::convert(cba, fields.get(FieldType::Efield_cp, Direction{1}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_Ez = amrex::convert(cba, fields.get(FieldType::Efield_cp, Direction{2}, 1)->ixType().toIntVect());
-        fields.alloc_init(FieldType::pml_E_cp, Direction{0}, lev, cba_Ex, cdm, ncompe, nge, 0.0_rt, false, false);
-        fields.alloc_init(FieldType::pml_E_cp, Direction{1}, lev, cba_Ey, cdm, ncompe, nge, 0.0_rt, false, false);
-        fields.alloc_init(FieldType::pml_E_cp, Direction{2}, lev, cba_Ez, cdm, ncompe, nge, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_E_cp, Direction{0}, lev, cba_Ex, cdm, ncompe, nge, 0.0_rt, false, false, true);
+        fields.alloc_init(FieldType::pml_E_cp, Direction{1}, lev, cba_Ey, cdm, ncompe, nge, 0.0_rt, false, false, true);
+        fields.alloc_init(FieldType::pml_E_cp, Direction{2}, lev, cba_Ez, cdm, ncompe, nge, 0.0_rt, false, false, true);
 
         const amrex::BoxArray cba_Bx = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{0}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_By = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{1}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_Bz = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{2}, 1)->ixType().toIntVect());
-        fields.alloc_init(FieldType::pml_B_cp, Direction{0}, lev, cba_Bx, cdm, ncompb, ngb, 0.0_rt, false, false);
-        fields.alloc_init(FieldType::pml_B_cp, Direction{1}, lev, cba_By, cdm, ncompb, ngb, 0.0_rt, false, false);
-        fields.alloc_init(FieldType::pml_B_cp, Direction{2}, lev, cba_Bz, cdm, ncompb, ngb, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_B_cp, Direction{0}, lev, cba_Bx, cdm, ncompb, ngb, 0.0_rt, false, false, true);
+        fields.alloc_init(FieldType::pml_B_cp, Direction{1}, lev, cba_By, cdm, ncompb, ngb, 0.0_rt, false, false, true);
+        fields.alloc_init(FieldType::pml_B_cp, Direction{2}, lev, cba_Bz, cdm, ncompb, ngb, 0.0_rt, false, false, true);
 
         if (m_dive_cleaning)
         {
@@ -1246,72 +1246,6 @@ PML::FillBoundary (amrex::MultiFab & mf_pml, PatchType patch_type, std::optional
         m_cgeom->periodicity();
 
     ablastr::utils::communication::FillBoundary(mf_pml, WarpX::do_single_precision_comms, period, nodal_sync);
-}
-
-void
-PML::CheckPoint (
-    ablastr::fields::MultiFabRegister& fields,
-    const std::string& dir
-) const
-{
-    using ablastr::fields::Direction;
-
-    if (fields.has_vector(FieldType::pml_E_fp, 0))
-    {
-        ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, 0);
-        ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, 0);
-        VisMF::AsyncWrite(*pml_E_fp[0], dir+"_Ex_fp");
-        VisMF::AsyncWrite(*pml_E_fp[1], dir+"_Ey_fp");
-        VisMF::AsyncWrite(*pml_E_fp[2], dir+"_Ez_fp");
-        VisMF::AsyncWrite(*pml_B_fp[0], dir+"_Bx_fp");
-        VisMF::AsyncWrite(*pml_B_fp[1], dir+"_By_fp");
-        VisMF::AsyncWrite(*pml_B_fp[2], dir+"_Bz_fp");
-    }
-
-    if (fields.has_vector(FieldType::pml_E_cp, 0))
-    {
-        ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, 0);
-        ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, 0);
-        VisMF::AsyncWrite(*pml_E_cp[0], dir+"_Ex_cp");
-        VisMF::AsyncWrite(*pml_E_cp[1], dir+"_Ey_cp");
-        VisMF::AsyncWrite(*pml_E_cp[2], dir+"_Ez_cp");
-        VisMF::AsyncWrite(*pml_B_cp[0], dir+"_Bx_cp");
-        VisMF::AsyncWrite(*pml_B_cp[1], dir+"_By_cp");
-        VisMF::AsyncWrite(*pml_B_cp[2], dir+"_Bz_cp");
-    }
-}
-
-void
-PML::Restart (
-    ablastr::fields::MultiFabRegister& fields,
-    const std::string& dir
-)
-{
-    using ablastr::fields::Direction;
-
-    if (fields.has_vector(FieldType::pml_E_fp, 0))
-    {
-        ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, 0);
-        ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, 0);
-        VisMF::Read(*pml_E_fp[0], dir+"_Ex_fp");
-        VisMF::Read(*pml_E_fp[1], dir+"_Ey_fp");
-        VisMF::Read(*pml_E_fp[2], dir+"_Ez_fp");
-        VisMF::Read(*pml_B_fp[0], dir+"_Bx_fp");
-        VisMF::Read(*pml_B_fp[1], dir+"_By_fp");
-        VisMF::Read(*pml_B_fp[2], dir+"_Bz_fp");
-    }
-
-    if (fields.has_vector(FieldType::pml_E_cp, 0))
-    {
-        ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, 0);
-        ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, 0);
-        VisMF::Read(*pml_E_cp[0], dir+"_Ex_cp");
-        VisMF::Read(*pml_E_cp[1], dir+"_Ey_cp");
-        VisMF::Read(*pml_E_cp[2], dir+"_Ez_cp");
-        VisMF::Read(*pml_B_cp[0], dir+"_Bx_cp");
-        VisMF::Read(*pml_B_cp[1], dir+"_By_cp");
-        VisMF::Read(*pml_B_cp[2], dir+"_Bz_cp");
-    }
 }
 
 #ifdef WARPX_USE_FFT
