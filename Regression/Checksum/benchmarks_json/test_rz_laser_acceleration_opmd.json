@@ -40,14 +40,14 @@
     "jz_1_real": 1172523092341925.8,
     "part_per_cell": 6288.0,
     "part_per_grid": 25755648.0,
-    "rho_0_real": 102937064.08317842,
-    "rho_1_imag": 89923468.89270458,
-    "rho_1_real": 3973283.3675534828,
+    "rho_0_real": 102018758.39786002,
+    "rho_1_imag": 89923468.60863017,
+    "rho_1_real": 3973283.3675534823,
     "rho_beam_0_real": 12227390.453651775,
     "rho_beam_1_imag": 3605934.131031575,
     "rho_beam_1_real": 3973148.562614533,
-    "rho_electrons_0_real": 90709673.62952664,
-    "rho_electrons_1_imag": 34156.944299420196,
-    "rho_electrons_1_real": 134.8049389340872
+    "rho_electrons_0_real": 89791367.94420825,
+    "rho_electrons_1_imag": 34156.94429941998,
+    "rho_electrons_1_real": 134.80493893368885
   }
 }

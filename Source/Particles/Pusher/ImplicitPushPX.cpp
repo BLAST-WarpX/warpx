@@ -1100,10 +1100,20 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     const amrex::Real rhop = 2.0_rt*wq_invvol*gaminv; // approximation when neglecting MM coupling terms
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                    const amrex::Real rp_mid = 0.5_rt*(std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1)
-                                                     + std::sqrt(xp_n*xp_n + yp_n*yp_n));
+                    const amrex::Real rp_new = std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1);
+                    const amrex::Real rp_old = std::sqrt(xp_n*xp_n + yp_n*yp_n);
+                    const amrex::Real rp_mid = 0.5_rt*(rp_new + rp_old);
                     const amrex::Real costh = (rp_mid > 0._rt ? xp/rp_mid : 1._rt);
                     const amrex::Real sinth = (rp_mid > 0._rt ? yp/rp_mid : 0._rt);
+#elif defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real rp_new = std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1);
+                    const amrex::Real rp_old = std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n);
+                    const amrex::Real rp_mid = 0.5_rt*(rp_new + rp_old);
+                    const amrex::Real rpxy_mid = std::sqrt(xp*xp + yp*yp);
+                    const amrex::Real costh = (rpxy_mid > 0._rt ? xp/rpxy_mid : 1._rt);
+                    const amrex::Real sinth = (rpxy_mid > 0._rt ? yp/rpxy_mid : 0._rt);
+                    const amrex::Real cosph = (rp_mid > 0._rt ? rpxy_mid/rp_mid : 1._rt);
+                    const amrex::Real sinph = (rp_mid > 0._rt ? zp/rp_mid : 0._rt);
 #endif
 
                     // Set the Mass Matrices kernels
@@ -1111,14 +1121,44 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                     amrex::ParticleReal fpyx, fpyy, fpyz;
                     amrex::ParticleReal fpzx, fpzy, fpzz;
                     setMassMatricesKernels(q, mass, dt_suborbit, rhop,
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                                            costh, sinth,
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                                           cosph, sinph,
 #endif
                                            ux[ip], uy[ip], uz[ip],
                                            Bxp, Byp, Bzp,
                                            fpxx, fpxy, fpxz,
                                            fpyx, fpyy, fpyz,
                                            fpzx, fpzy, fpzz);
+
+                    // Form grid-basis current components once, before orbit cropping.
+                    // Reuse the mapping factors used by the mass matrix kernel.
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real vx = (rp_new - rp_old)/dt_suborbit;
+                    const amrex::Real vy = (-ux[ip]*sinth + uy[ip]*costh)*gaminv;
+#elif defined(WARPX_DIM_1D_Z)
+                    const amrex::Real vx = ux[ip]*gaminv;
+                    const amrex::Real vy = uy[ip]*gaminv;
+#else
+                    const amrex::Real vx = (xp_np1 - xp_n)/dt_suborbit;
+#if defined(WARPX_DIM_3D)
+                    const amrex::Real vy = (yp_np1 - yp_n)/dt_suborbit;
+#else
+                    const amrex::Real vy = uy[ip]*gaminv;
+#endif
+#endif
+#if defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real vz = (-ux[ip]*costh*sinph - uy[ip]*sinth*sinph + uz[ip]*cosph)*gaminv;
+#elif defined(WARPX_DIM_RCYLINDER)
+                    const amrex::Real vz = uz[ip]*gaminv;
+#else
+                    const amrex::Real vz = (zp_np1 - zp_n)/dt_suborbit;
+#endif
+                    const amrex::Real wqx = wq_invvol*vx;
+                    const amrex::Real wqy = wq_invvol*vy;
+                    const amrex::Real wqz = wq_invvol*vz;
 
                     // The ignore_unused is needed so that the variables are not first-captured
                     // in a constexpr-if context.
@@ -1131,7 +1171,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                         doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true,
                                                               WarpX::villasenor_mass_matrices_max_grid_crossings>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
+                                                              wqx, wqy, wqz,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
                                                               fpzx, fpzy, fpzz,
@@ -1141,13 +1181,13 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
+                                                              dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_two) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<2,false,/*deposit_J=*/true,
                                                               WarpX::villasenor_mass_matrices_max_grid_crossings>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
+                                                              wqx, wqy, wqz,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
                                                               fpzx, fpzy, fpzz,
@@ -1157,13 +1197,13 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
+                                                              dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_three) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<3,false,/*deposit_J=*/true,
                                                               WarpX::villasenor_mass_matrices_max_grid_crossings>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
+                                                              wqx, wqy, wqz,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
                                                               fpzx, fpzy, fpzz,
@@ -1173,13 +1213,13 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
+                                                              dinv, xyzmin, domain_double, do_cropping, lo );
                     } else if constexpr (depos_order_control == order_four) {
                         //NOLINTNEXTLINE(readability-suspicious-call-argument)
                         doVillasenorJandSigmaDepositionKernel<4,false,/*deposit_J=*/true,
                                                               WarpX::villasenor_mass_matrices_max_grid_crossings>(
                                                               xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wq_invvol, ux[ip], uy[ip], uz[ip], gaminv,
+                                                              wqx, wqy, wqz,
                                                               fpxx, fpxy, fpxz,
                                                               fpyx, fpyy, fpyz,
                                                               fpzx, fpzy, fpzz,
@@ -1189,7 +1229,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                               pSbuf[0], pSbuf[1], pSbuf[2],
                                                               pSbuf[3], pSbuf[4], pSbuf[5],
                                                               pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              dt_suborbit, dinv, xyzmin, domain_double, do_cropping, lo );
+                                                              dinv, xyzmin, domain_double, do_cropping, lo );
                     }
 
                 } else {
