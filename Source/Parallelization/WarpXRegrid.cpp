@@ -203,6 +203,12 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
                     RemakeMultiFab( m_eb_update_E[lev][idim] );
                     RemakeMultiFab( m_eb_update_B[lev][idim] );
                     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+                        // InitializeEBGridData (called below) writes these flag fields through
+                        // MFIters over the new layout, so they must be on the new DistributionMapping
+                        // first. The ECT face owner mask needs no remake: it is rebuilt from scratch
+                        // there (amrex::OwnerMask, WarpXInitData.cpp) before ComputeFaceExtensions.
+                        RemakeMultiFab( m_flag_info_face[lev][idim] );
+                        RemakeMultiFab( m_flag_ext_face[lev][idim] );
                         m_borrowing[lev][idim] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(amrex::convert(ba, Bfield_fp[lev][idim]->ixType().toIntVect()), dm);
                     }
                 }
