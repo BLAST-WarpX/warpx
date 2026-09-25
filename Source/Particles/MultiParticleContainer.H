@@ -383,6 +383,29 @@ public:
                       const amrex::MultiFab& Bx,
                       const amrex::MultiFab& By,
                       const amrex::MultiFab& Bz);
+
+    /**
+    * \brief Advances the quantum synchrotron optical depth by one time step.
+    *
+    * The optical depth is a Monte-Carlo quantity, decremented at the photon emission rate,
+    * that triggers an emission when it becomes negative. It is advanced here, outside the
+    * pusher, so that the momentum push carries no compile-time QED option and the implicit
+    * solver never has to roll it back.
+    *
+    * Must be called from the time loop after both the particle push and the photon
+    * emission (doQedQuantumSync): after the push so that the optical depth is advanced
+    * with the end-of-step momentum, and after the emission so that a particle emits on the
+    * optical depth accumulated over previous steps only. In particular, this prevents a
+    * particle created by pair production from radiating within the same step.
+    */
+    void doQedQuantumSyncEvolveOpticalDepth (int lev,
+                                             const amrex::MultiFab& Ex,
+                                             const amrex::MultiFab& Ey,
+                                             const amrex::MultiFab& Ez,
+                                             const amrex::MultiFab& Bx,
+                                             const amrex::MultiFab& By,
+                                             const amrex::MultiFab& Bz,
+                                             amrex::Real dt);
 #endif
 
     [[nodiscard]] int getSpeciesID (const std::string& product_str) const;
