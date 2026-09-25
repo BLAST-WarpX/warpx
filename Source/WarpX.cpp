@@ -431,6 +431,13 @@ WarpX::WarpX ()
         m_hybrid_pic_model = std::make_unique<HybridPICModel>();
     }
 
+    // The conformal embedded-boundary field update is used by the ECT Maxwell
+    // solver and, opt-in, by the hybrid-PIC solver (hybrid_pic_model.use_conformal_eb).
+    m_eb_use_conformal_solve =
+        (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) ||
+        (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC &&
+         m_hybrid_pic_model->m_use_conformal_eb);
+
     current_buffer_masks.resize(nlevs_max);
     gather_buffer_masks.resize(nlevs_max);
 
@@ -2677,7 +2684,9 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
                                   guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]", 1);
             }
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
+            // The conformal (ECT) EB MultiFabs below are used by the ECT Maxwell
+            // solver and by the hybrid-PIC conformal wall.
+            if (WarpX::UseConformalEBSolve()) {
 
                 //! EB: Lengths of the mesh edges
                 m_fields.alloc_init(FieldType::edge_lengths, Direction{0}, lev, amrex::convert(ba, Ex_nodal_flag),
