@@ -102,35 +102,32 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
 
 
     //
-    //  External E field with parser
+    //  External B field with parser
     //
 
     // if the input string for the B-field is "parse_b_ext_grid_function",
     // then the analytical expression or function must be
-    // provided in the input file.
+    // provided in the input file. Components that are omitted default to 0
+    // (e.g. PICMI AnalyticInitialField with only Bz_expression set).
     if (B_ext_grid_type == ExternalFieldType::parse_ext_grid_function) {
 
         //! Strings storing parser function to initialize the components of the magnetic field on the grid
-        std::string str_Bx_ext_grid_function;
-        std::string str_By_ext_grid_function;
-        std::string str_Bz_ext_grid_function;
+        std::string str_Bx_ext_grid_function = "0";
+        std::string str_By_ext_grid_function = "0";
+        std::string str_Bz_ext_grid_function = "0";
 
 #if defined(WARPX_DIM_RZ)
         std::stringstream warnMsg;
-        warnMsg << "Parser for external B (r and theta) fields does not work with cylindrical and spherical\n"
-            << "The initial Br and Bt fields are currently hardcoded to 0.\n"
-            << "The initial Bz field should only be a function of z.\n";
+        warnMsg << "Parser for external B (r and theta) fields in RZ geometry only initializes the m=0 (axisymmetric) mode.\n"
+            << "For theta-dependent external fields (modes m > 0), use Python (PICMI) or read from file.\n";
         ablastr::warn_manager::WMRecordWarning(
-          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::high);
-        str_Bx_ext_grid_function = "0";
-        str_By_ext_grid_function = "0";
-#else
-        utils::parser::Store_parserString(pp_warpx, "Bx_external_grid_function(x,y,z)",
-          str_Bx_ext_grid_function);
-        utils::parser::Store_parserString(pp_warpx, "By_external_grid_function(x,y,z)",
-          str_By_ext_grid_function);
+          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::low);
 #endif
-        utils::parser::Store_parserString(pp_warpx, "Bz_external_grid_function(x,y,z)",
+        utils::parser::Query_parserString(pp_warpx, "Bx_external_grid_function(x,y,z)",
+          str_Bx_ext_grid_function);
+        utils::parser::Query_parserString(pp_warpx, "By_external_grid_function(x,y,z)",
+          str_By_ext_grid_function);
+        utils::parser::Query_parserString(pp_warpx, "Bz_external_grid_function(x,y,z)",
             str_Bz_ext_grid_function);
 
         Bxfield_parser = std::make_unique<amrex::Parser>(
@@ -144,29 +141,33 @@ ExternalFieldParams::ExternalFieldParams(const amrex::ParmParse& pp_warpx)
 
 
     //
-    //  External B field with parser
+    //  External E field with parser
     //
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
     // then the analytical expression or function must be
-    // provided in the input file.
+    // provided in the input file. Components that are omitted default to 0
+    // (e.g. PICMI AnalyticInitialField with only Ez_expression set).
     if (E_ext_grid_type == ExternalFieldType::parse_ext_grid_function) {
 
 #ifdef WARPX_DIM_RZ
-        WARPX_ABORT_WITH_MESSAGE(
-            "E parser for external fields does not work with RZ -- TO DO");
+        std::stringstream warnMsg;
+        warnMsg << "Parser for external E (r and theta) fields in RZ geometry only initializes the m=0 (axisymmetric) mode.\n"
+            << "For theta-dependent external fields (modes m > 0), use Python (PICMI) or read from file.\n";
+        ablastr::warn_manager::WMRecordWarning(
+          "Inputs", warnMsg.str(), ablastr::warn_manager::WarnPriority::low);
 #endif
 
         //! Strings storing parser function to initialize the components of the electric field on the grid
-        std::string str_Ex_ext_grid_function;
-        std::string str_Ey_ext_grid_function;
-        std::string str_Ez_ext_grid_function;
+        std::string str_Ex_ext_grid_function = "0";
+        std::string str_Ey_ext_grid_function = "0";
+        std::string str_Ez_ext_grid_function = "0";
 
-        utils::parser::Store_parserString(pp_warpx, "Ex_external_grid_function(x,y,z)",
+        utils::parser::Query_parserString(pp_warpx, "Ex_external_grid_function(x,y,z)",
             str_Ex_ext_grid_function);
-        utils::parser::Store_parserString(pp_warpx, "Ey_external_grid_function(x,y,z)",
+        utils::parser::Query_parserString(pp_warpx, "Ey_external_grid_function(x,y,z)",
            str_Ey_ext_grid_function);
-        utils::parser::Store_parserString(pp_warpx, "Ez_external_grid_function(x,y,z)",
+        utils::parser::Query_parserString(pp_warpx, "Ez_external_grid_function(x,y,z)",
            str_Ez_ext_grid_function);
 
         Exfield_parser = std::make_unique<amrex::Parser>(
