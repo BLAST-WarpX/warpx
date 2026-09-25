@@ -25,6 +25,18 @@ if(WarpX_EB)
     )
 endif()
 
+if(WarpX_EB AND WarpX_HYPRE)
+    add_warpx_test(
+        test_3d_electrostatic_sphere_eb_mixed_bc_hypre  # name
+        3  # dims
+        2  # nprocs
+        inputs_test_3d_electrostatic_sphere_eb_mixed_bc_hypre  # inputs
+        OFF  # analysis
+        "analysis_default_regression.py --path diags/diag1000001"  # checksum
+        OFF  # dependency
+    )
+endif()
+
 if(WarpX_EB)
     add_warpx_test(
         test_3d_electrostatic_sphere_eb_picmi  # name
