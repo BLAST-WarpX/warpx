@@ -87,6 +87,24 @@ The skill will:
 #. Format the entry in the RST style used in the file.
 #. Create a branch, commit the change, and optionally open a pull request.
 
+``/warpx-add-picmi-parameter``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Exposes a C++ input parameter in the Python PICMI interface (``Python/pywarpx/picmi.py``), following :ref:`developers-how-to-add-picmi-parameter`.
+
+Usage (in Claude Code):
+
+.. code-block:: text
+
+   /warpx-add-picmi-parameter warpx.my_threshold
+
+The skill will:
+
+#. Find where C++ reads the parameter and read its documentation (type, default, allowed values).
+#. Find the PICMI class that writes the inputs of the parameter's prefix.
+#. Add the parameter as a typed field with the ``warpx_`` prefix, and write it to the inputs.
+#. Verify the inputs that the class writes, without building WarpX, and propose a PICMI test that uses the parameter.
+
 To add new skills, create a directory under ``.claude/skills/<skill-name>/`` containing a ``SKILL.md`` file that describes the step-by-step procedure.
 
 
