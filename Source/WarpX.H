@@ -147,12 +147,12 @@ public:
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_thetadt, amrex::Real start_time );
-    void SpectralSourceFreeFieldAdvance ( amrex::Real start_time);
-    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
-                                          amrex::Real a_theta, amrex::Real a_time );
-    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
-                               const ablastr::fields::MultiLevelVectorField& Field_n,
-                               amrex::Real theta );
+    void SpectralSourceFreeFieldAdvance (amrex::Real start_time);
+    void FinishElectricFieldAndApplyBCs (amrex::Real a_theta, amrex::Real a_time);
+    void FinishMagneticFieldAndApplyBCs (amrex::Real a_theta, amrex::Real a_time);
+    void FinishImplicitField (const ablastr::fields::MultiLevelVectorField& Field_fp,
+                              const ablastr::fields::MultiLevelVectorField& Field_n,
+                              amrex::Real theta);
     void DepositMassMatrices ();
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
