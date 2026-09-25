@@ -1280,8 +1280,12 @@ WarpX::InitLevelData (int lev, Real /*time*/)
     }
 
 #ifdef AMREX_USE_EB
+    bool const sink_enabled = ParticleSink::enabled();
+    if (sink_enabled) { ComputeDistanceToParticleSinks (); }
+
     bool const eb_enabled = EB::enabled();
     if (eb_enabled) { InitializeEBGridData(lev); }
+
 #endif
 
     // if the input string for the B-field is "parse_b_ext_grid_function",
@@ -1642,7 +1646,6 @@ void WarpX::InitializeEBGridData (int lev)
             }
 
         }
-
         ComputeDistanceToEB();
         warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
 
