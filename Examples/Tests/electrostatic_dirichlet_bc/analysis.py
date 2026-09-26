@@ -18,7 +18,7 @@ import glob
 import numpy as np
 import yt
 
-files = sorted(glob.glob("diags/diag1*"))[1:]
+files = sorted(glob.glob("diags/diag1" + 6 * "[0-9]"))[1:]
 assert len(files) > 0
 
 times = np.ones(len(files))

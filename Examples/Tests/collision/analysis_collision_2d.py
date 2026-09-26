@@ -58,7 +58,7 @@ last_it = last_fn[-6:]  # i.e., 000150
 prefix = last_fn[:-6]  # i.e., diags/diag1
 
 # Collect all output files in fn_list (names match pattern prefix + arbitrary number)
-fn_list = glob.glob(prefix + "*[0-9]")
+fn_list = glob.glob(prefix + 6 * "[0-9]")
 
 print(last_fn)
 print(last_it)

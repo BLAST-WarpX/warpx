@@ -24,7 +24,6 @@ beta is the velocity normalized by the speed of light
 """
 
 import glob
-import re
 import sys
 
 import matplotlib.pyplot as plt
@@ -36,14 +35,14 @@ yt.funcs.mylog.setLevel(0)
 
 # Check plotfile name specified in command line
 last_filename = sys.argv[1]
-filename_radical = re.findall(r"(.*?)\d+/*$", last_filename)[0]
+filename_radical = last_filename[:-6]
 
 # Loop through files, and extract the position and velocity of both particles
 x1 = []
 x2 = []
 beta1 = []
 beta2 = []
-for filename in sorted(glob.glob(filename_radical + "*")):
+for filename in sorted(glob.glob(filename_radical + 6 * "[0-9]")):
     print(filename)
     ds = yt.load(filename)
     ad = ds.all_data()
