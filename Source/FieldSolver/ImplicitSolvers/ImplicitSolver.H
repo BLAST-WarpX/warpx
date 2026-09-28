@@ -194,6 +194,17 @@ public:
     }
 
     /**
+     * \brief Return the nodal coefficients (alpha*rho, alpha*B_x, alpha*B_y, alpha*B_z with
+     * alpha = (q/m) dt/2) of a grid-moment (fluid) ion response in the Jacobian on level lev,
+     * from which a preconditioner builds its ion block. Solvers without one return nullptr.
+     */
+    virtual const amrex::MultiFab* GetFluidIonResponseForPC (int lev) const
+    {
+        amrex::ignore_unused(lev);
+        return nullptr;
+    }
+
+    /**
      * \brief Apply deposited mass matrices to a vector field.
      * Computes a_out += a_scale * S * (a_in - a_in_ref) [+ a_baseline],
      * where S is the mass matrix, accumulating into a_out.

@@ -860,8 +860,9 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
                                    m_use_mass_matrices_jacobian && m_particle_suborbits &&
                                    m_WarpX->m_fields.has(FieldType::rho_fp, 0);
 
-    if (a_nl_iter == 0 && !a_from_jacobian &&
-        m_use_mass_matrices_jacobian && m_skip_particle_picard_init) {
+    // set only with a linear ion model in the Jacobian (mass matrices, or the fluid ion
+    // response of the hybrid scheme)
+    if (a_nl_iter == 0 && !a_from_jacobian && m_skip_particle_picard_init) {
         // Only do a single Picard iteration for particles on the initial Newton step
         options.max_particle_iterations = 1;
         options.particle_tolerance = 0.0;

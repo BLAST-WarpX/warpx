@@ -11,6 +11,7 @@
 #include "ImplicitSolver.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
@@ -185,7 +186,36 @@ public:
      *  component nComp()/2 (rho_fp registry). */
     const amrex::MultiFab* GetRhoMidForPC (int lev) const override;
 
+    /** implicit_evolve.use_fluid_ion_response: the nodal coefficients (alpha*rho, b = alpha*B,
+     *  alpha = (q/m) dt/2) of the grid-moment ion response, for the preconditioner's ion block;
+     *  nullptr when the option is off. */
+    const amrex::MultiFab* GetFluidIonResponseForPC (int lev) const override;
+
+    /** Fluid ion response (implicit_evolve.use_fluid_ion_response, see
+     *  ThetaImplicitHybridFluidIonResponse.cpp): nonlinear evaluations save the push field E0 and
+     *  fill the coefficients alpha*rho, alpha*B of the linearization point; each Jacobian action
+     *  sets current_fp = J_base + dJ(E - E0) without particle work. Public because the CUDA
+     *  compiler requires the enclosing function of an extended device lambda to have public
+     *  access. */
+    void SaveFluidIonResponseE0 ();
+    void FillFluidIonResponseCoeff ();
+    void FluidIonResponseCurrent ();
+
     private:
+
+    /** implicit_evolve.use_fluid_ion_response: the Jacobian actions take the ion current response
+     *  from the grid moments instead of re-pushing the particles, and pc_hybrid_pic builds its
+     *  ion block from the same coefficients (collocated grid; Cartesian or RZ with one azimuthal
+     *  mode; one charge-to-mass ratio; not with the mass-matrix Jacobian or PC). */
+    bool m_fluid_ion_response = false;
+    /** its coefficients (alpha*rho, b_x, b_y, b_z at the nodes), linearization-point push field,
+     *  E - E0 scratch (shape-order ghosts), owner mask of the nodes and common q/m */
+    std::unique_ptr<amrex::MultiFab> m_fir_coef;
+    std::array<std::unique_ptr<amrex::MultiFab>, 3> m_fir_E0;
+    std::unique_ptr<amrex::MultiFab> m_fir_dE;
+    std::unique_ptr<amrex::iMultiFab> m_fir_owner;
+    amrex::Real m_fir_qom = 0.0;
+    void InitFluidIonResponse ();
 
     /**
      * \brief Pointer to the hybrid-PIC model that computes E from Ohm's law.

@@ -6,6 +6,7 @@ foreach(D IN LISTS WarpX_DIMS)
         SemiImplicitEM.cpp
         ThetaImplicitEM.cpp
         ThetaImplicitHybrid.cpp
+        ThetaImplicitHybridFluidIonResponse.cpp
         StrangImplicitSpectralEM.cpp
         WarpXImplicitOps.cpp
         WarpXSolverDOF.cpp

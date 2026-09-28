@@ -1409,10 +1409,12 @@ void HybridPICPC<T,Ops>::printParameters () const
     if (m_pe_row_sweeps > 0) {
         Print() << "  pe-row upwind/conduction sweeps: " << m_pe_row_sweeps << "\n";
     }
-    Print() << "  ion response (deposited mass-matrix diagonal, "
-            << "implicit_evolve.use_mass_matrices_pc): "
+    Print() << "  ion response: "
             << ((m_ops != nullptr && m_ops->GetMassMatricesCoeff() != nullptr)
-                ? "true" : "false")
+                ? "deposited mass-matrix diagonal (implicit_evolve.use_mass_matrices_pc)"
+                : (m_ops != nullptr && m_ops->GetFluidIonResponseForPC(0) != nullptr)
+                ? "fluid ion response (implicit_evolve.use_fluid_ion_response)"
+                : "none")
             << "\n";
     Print() << "  boundary closure: "
             << (m_has_wall
@@ -1516,8 +1518,29 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
     // iteration in PreLinearSolve) for the optional ion-response leg,
     // provided through implicit_evolve.use_mass_matrices_pc = 1
     const auto* mmpc = m_ops->GetMassMatricesCoeff();
-    m_have_mm = (mmpc != nullptr) && !mmpc->empty();
-    const bool have_mm = m_have_mm;
+    const bool have_mm = (mmpc != nullptr) && !mmpc->empty();
+    // or from the fluid ion response of the Jacobian (implicit_evolve.use_fluid_ion_response):
+    // its nodal coefficients alpha*rho, b = alpha*B give the diagonal kappa alpha rho R(b)_dd,
+    // with kappa = (int S^2)^dim the same-node weight of its kernel
+    const amrex::MultiFab* fir = have_mm ? nullptr : m_ops->GetFluidIonResponseForPC(0);
+    const bool have_fir = (fir != nullptr);
+    m_have_mm = have_mm || have_fir;
+    Real kappa_fir = 1.0_rt;
+    if (have_fir) {
+        AMREX_ALWAYS_ASSERT(fir->boxArray() == m_coef[0]->boxArray()
+                            && fir->DistributionMap() == m_coef[0]->DistributionMap());
+        const int shape = WarpX::nox;
+        const Real k1 = (shape == 1) ? 2._rt/3._rt
+                      : (shape == 2) ? 11._rt/20._rt
+                      : (shape == 3) ? 151._rt/315._rt
+                      : 15619._rt/36288._rt;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) { kappa_fir *= k1; }
+    }
+#if defined(WARPX_DIM_RZ)
+    // S_rr vanishes on the axis, as for the deposited mass matrices
+    const bool fir_axis = have_fir && (m_geom[0].ProbLo(0) == 0.0_rt);
+    const int fir_ilo = m_geom[0].Domain().smallEnd(0);
+#endif
     const amrex::MultiFab* Sxx_mf = have_mm ? (*mmpc)[0][0] : nullptr;
     const amrex::MultiFab* Syy_mf = have_mm ? (*mmpc)[0][1] : nullptr;
     const amrex::MultiFab* Szz_mf = have_mm ? (*mmpc)[0][2] : nullptr;
@@ -1577,6 +1600,8 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
             Syy = Syy_mf->const_array(mfi);
             Szz = Szz_mf->const_array(mfi);
         }
+        Array4<const Real> Fir;
+        if (have_fir) { Fir = fir->const_array(mfi); }
         Array4<const Real> const& Jix = Ji_fp[0]->const_array(mfi);
         Array4<const Real> const& Jiy = Ji_fp[1]->const_array(mfi);
         Array4<const Real> const& Jiz = Ji_fp[2]->const_array(mfi);
@@ -1679,6 +1704,19 @@ void HybridPICPC<T,Ops>::Update ( const T& a_U )
                     w6 = Sxx(i,j,k,cxx) * bfac;
                     w7 = Syy(i,j,k,cyy) * bfac;
                     w8 = Szz(i,j,k,czz) * bfac;
+                } else if (have_fir) {
+                    const Real bfac = wvac * Bmag / rho_e;
+                    const Real fbx = Fir(i,j,k,1);
+                    const Real fby = Fir(i,j,k,2);
+                    const Real fbz = Fir(i,j,k,3);
+                    const Real sf = kappa_fir * Fir(i,j,k,0)
+                                  / (1.0_rt + fbx*fbx + fby*fby + fbz*fbz);
+                    w6 = sf * (1.0_rt + fbx*fbx) * bfac;
+                    w7 = sf * (1.0_rt + fby*fby) * bfac;
+                    w8 = sf * (1.0_rt + fbz*fbz) * bfac;
+#if defined(WARPX_DIM_RZ)
+                    if (fir_axis && i == fir_ilo) { w6 = 0.0_rt; }
+#endif
                 }
                 coef(i,j,k,6) = w6;
                 coef(i,j,k,7) = w7;

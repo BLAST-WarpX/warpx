@@ -316,7 +316,7 @@ Overall simulation parameters
           When ``true``, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
 
           - ``implicit_evolve.skip_particle_picard_init`` (``bool``, default: false).
-            When ``true`` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
+            When ``true`` and ``implicit_evolve.use_mass_matrices_jacobian = true`` (or ``implicit_evolve.use_fluid_ion_response = true``), the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
             This can enhance the overall efficiency of the Newton solver.
             Default is true if ``implicit_evolve.particle_suborbits = true``.
 
@@ -341,6 +341,16 @@ Overall simulation parameters
         - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 0).
           If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
           In most cases, a width of 1 is sufficient for good GMRES performance.
+
+        - ``implicit_evolve.use_fluid_ion_response`` (``bool``, default: false; hybrid theta-implicit scheme only).
+          When ``true``, the ion current response in the linear stage of PS-JFNK is computed from the grid moments instead of re-pushing the particles or depositing mass matrices:
+          :math:`\delta\mathbf{J}_g = \alpha\rho_g\,\mathsf{R}(\mathbf{b}_g)\sum_{g'}K_{g-g'}\,\delta\mathbf{E}_{g'}`, with :math:`\alpha = (q/m)\Delta t/2`, :math:`\mathbf{b} = \alpha\mathbf{B}`,
+          :math:`\mathsf{R} = (\mathsf{I} + \mathbf{b}\mathbf{b}^T - [\mathbf{b}]_\times)/(1+b^2)` (the implicit gyro-rotation of the particle push), and :math:`K` the autocorrelation of the particle shape factor
+          (the mass matrices of uniformly distributed particles, whose rows sum to one: the long-wavelength limit is the cold-fluid response). In cylindrical geometry the radial weights include the volume element, with tabulated rows next to the axis and the outer boundary.
+          :math:`\rho` and :math:`\mathbf{B}` are taken at the linearization point once per Newton iteration; each Jacobian action is a stencil operation on the mesh with no particle work.
+          The nonlinear residual still pushes the particles, so Newton converges to the same solution.
+          ``jacobian.pc_type = pc_hybrid_pic`` then builds its ion block from the same coefficients.
+          Requires the collocated grid, Cartesian geometry or RZ with ``warpx.n_rz_azimuthal_modes = 1``, and a common charge-to-mass ratio of all charged species; cannot be combined with ``implicit_evolve.use_mass_matrices_jacobian`` or ``implicit_evolve.use_mass_matrices_pc``.
 
         - ``implicit_evolve.freeze_dissipation_rho`` (``bool``, default: 0; hybrid theta-implicit scheme only).
           The dissipative part of Ohm's law that is removed from the particle push field is evaluated with the charge density left by the previous residual evaluation.
@@ -457,7 +467,7 @@ Overall simulation parameters
             - ``precond.bb_device_solve`` (``bool``, default: true when compiled with ``WarpX_CUDSS``): factorize and solve on GPU via cuDSS.
 
           - ``jacobian.pc_type = pc_hybrid_pic``: Multigrid preconditioner for the theta-implicit hybrid (generalized Ohm's law) solver.
-            The linearized Faraday-Ohm operator (Hall, resistive, hyper-resistive and electron-convection terms, the electron-pressure row when it is a Newton unknown, and the ion response from the mass matrices when ``implicit_evolve.use_mass_matrices_pc`` is set) is solved approximately as the primal pair (E, W = curl curl E) with a joint block-Jacobi smoother inside geometric-multigrid V-cycles that precondition an inner GMRES.
+            The linearized Faraday-Ohm operator (Hall, resistive, hyper-resistive and electron-convection terms, the electron-pressure row when it is a Newton unknown, and the ion response from the mass matrices when ``implicit_evolve.use_mass_matrices_pc`` is set or from the grid moments when ``implicit_evolve.use_fluid_ion_response`` is set) is solved approximately as the primal pair (E, W = curl curl E) with a joint block-Jacobi smoother inside geometric-multigrid V-cycles that precondition an inner GMRES.
             The inner solve makes the preconditioner nonlinear, so it requires a flexible outer Krylov solver (``newton.linear_solver = petsc_ksp`` with ``PETSC_OPTIONS="-ksp_type fgmres"``); with ``inner_max = 0`` the preconditioner is instead a fixed number of V-cycles, a linear operator that also works under ``newton.linear_solver = amrex_gmres``.
             Supported grids: collocated Cartesian 1D/2D/3D and RZ (azimuthal mode m = 0), and the staggered (Yee) Cartesian grid with periodic boundaries.
 

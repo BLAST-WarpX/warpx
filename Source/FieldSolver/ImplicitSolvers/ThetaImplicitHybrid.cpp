@@ -204,6 +204,27 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
     }
     pp.query("freeze_dissipation_rho", m_freeze_dissipation_rho);
 
+    pp.query("use_fluid_ion_response", m_fluid_ion_response);
+    if (m_fluid_ion_response) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_use_mass_matrices,
+            "implicit_evolve.use_fluid_ion_response cannot be combined with "
+            "implicit_evolve.use_mass_matrices_jacobian or use_mass_matrices_pc");
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        WARPX_ABORT_WITH_MESSAGE(
+            "implicit_evolve.use_fluid_ion_response is not implemented in 1D radial geometries");
+#elif defined(WARPX_DIM_RZ)
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::n_rz_azimuthal_modes == 1,
+            "implicit_evolve.use_fluid_ion_response in RZ needs warpx.n_rz_azimuthal_modes = 1");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::nox >= 1 && WarpX::nox <= 4,
+            "implicit_evolve.use_fluid_ion_response needs algo.particle_shape = 1 to 4");
+        // as with the mass-matrix Jacobian: a single Picard pass for the particles on the first
+        // Newton iteration when they have suborbits
+        if (m_particle_suborbits) { m_skip_particle_picard_init = true; }
+        pp.query("skip_particle_picard_init", m_skip_particle_picard_init);
+        InitFluidIonResponse();
+    }
+
     m_nlsolver->Define(m_E, this);
 
     if (m_pe_unknown) {
@@ -234,6 +255,11 @@ void ThetaImplicitHybrid::PrintParameters () const
     amrex::Print() << "Time-bias parameter theta:           " << m_theta << "\n";
     if (m_freeze_dissipation_rho) {
         amrex::Print() << "freeze dissipation rho in probes:    true\n";
+    }
+    if (m_fluid_ion_response) {
+        amrex::Print() << "fluid ion response in the Jacobian:  true"
+                       << (m_skip_particle_picard_init ? " (skip particle Picard init)" : "")
+                       << "\n";
     }
     if (m_dt_halving_max_levels > 0) {
         amrex::Print() << "dt halving on unconverged Newton:    up to "
@@ -738,7 +764,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
 
     m_hybrid_pic_model->CalculatePlasmaCurrent(Bfield_fp, m_WarpX->GetEBUpdateEFlag());
 
-    if (m_use_mass_matrices_jacobian && a_from_jacobian && m_Ji_save[0]) {
+    if ((m_use_mass_matrices_jacobian || m_fluid_ion_response) && a_from_jacobian && m_Ji_save[0]) {
         // Use the ion current frozen at the last nonlinear evaluation, so the push
         // field is a pure function of the Newton variable (see m_Ji_save).
         for (int n = 0; n < 3; ++n) {
@@ -778,19 +804,23 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         AddExternalEfield();
     }
 
-    if (!a_from_jacobian && m_use_mass_matrices_jacobian) {
-        // Save the push field E0 for the mass-matrix linear model J = J0 + MM*(E - E0).
-        // This must be the same field the linear stage sees at this point of the
-        // evaluation (the resistivity-free Ohm's-law E, incl. external fields), not the
-        // full Ohm's-law E that Efield_fp holds after ComputeRHS: saving the latter
-        // (the default SaveE in PreLinearSolve) puts an O(||R||) offset into MM*(E-E0)
-        // and stalls Newton once the fluctuation amplitude grows.
-        SaveE();
-        if (WarpX::use_filter) {
-            // PreRHSOp filters Efield_fp in place before the linear stage contracts the
-            // mass matrices with it, so E0 must be the filtered push field as well
-            m_WarpX->ApplyFilterMF(
-                m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp_save, 0), 0);
+    if (!a_from_jacobian && (m_use_mass_matrices_jacobian || m_fluid_ion_response)) {
+        // Save the push field E0 for the linear model J = J0 + MM*(E - E0) (mass matrices) or
+        // J = J_base + dJ(E - E0) (fluid ion response). This must be the same field the linear
+        // stage sees at this point of the evaluation (the resistivity-free Ohm's-law E, incl.
+        // external fields), not the full Ohm's-law E that Efield_fp holds after ComputeRHS:
+        // saving the latter (the default SaveE in PreLinearSolve) puts an O(||R||) offset into
+        // MM*(E-E0) and stalls Newton once the fluctuation amplitude grows.
+        if (m_fluid_ion_response) {
+            SaveFluidIonResponseE0();
+        } else {
+            SaveE();
+            if (WarpX::use_filter) {
+                // PreRHSOp filters Efield_fp in place before the linear stage contracts the
+                // mass matrices with it, so E0 must be the filtered push field as well
+                m_WarpX->ApplyFilterMF(
+                    m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp_save, 0), 0);
+            }
         }
         // Also capture the ion current that produced this push field (see m_Ji_save).
         for (int n = 0; n < 3; ++n) {
@@ -803,38 +833,52 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         }
     }
 
-    if (m_filter_push_fields) {
-        // conservative smoothing: the particles gather the filtered push field, everything
-        // downstream keeps the unfiltered registry (Jacobian probes included)
-        FilterPushFieldsSwap(true);
-    }
-    if (m_filter_gather_B) { FilterGatherBSwap(true); }
-    // A trial iterate may push particles beyond the deposition guard range (a wild
-    // linear-solve direction, the stiff wall sheath of the 3D formation case): have the
-    // deposits count and skip them instead of asserting, and hand Newton a residual it
-    // must reject. Every evaluation re-pushes from the step-start state, so nothing of
-    // the skipped state survives.
-    WarpXParticleContainer::SetDepositOutOfRangeTolerant(true);
-    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
-    WarpXParticleContainer::SetDepositOutOfRangeTolerant(false);
-    if (m_filter_gather_B) { FilterGatherBSwap(false); }
-    if (m_filter_push_fields) {
-        FilterPushFieldsSwap(false);
-    }
-    {
-        amrex::Long n_out = WarpXParticleContainer::NumDepositOutOfRange();
-        amrex::ParallelDescriptor::ReduceLongSum(n_out);
-        m_rhs_invalid = (n_out > 0);
-        if (m_rhs_invalid) {
-            ++m_rhs_invalid_count;
-            amrex::Print() << "ThetaImplicitHybrid: " << n_out << " particle(s) beyond the "
-                           << "deposition guard range in this residual evaluation (Newton "
-                           << "iteration " << a_nl_iter
-                           << (a_from_jacobian ? ", Jacobian probe" : "")
-                           << "): the trial is rejected (" << m_rhs_invalid_count
-                           << " such evaluation(s) so far)\n";
-            a_RHS.setVal(m_invalid_rhs_value);
-            return;
+    if (a_from_jacobian && m_fluid_ion_response) {
+        // Jacobian action of the fluid ion response: J = J_base + dJ(E - E0) from the grid
+        // moments of the linearization point, with the particles left at the iterate. The
+        // push field is filtered as PreRHSOp filters it for the particles.
+        if (m_filter_push_fields) { FilterPushFieldsSwap(true); }
+        if (WarpX::use_filter) {
+            m_WarpX->ApplyFilterMF(
+                m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, 0), 0);
+        }
+        FluidIonResponseCurrent();
+        if (m_filter_push_fields) { FilterPushFieldsSwap(false); }
+        m_rhs_invalid = false;
+    } else {
+        if (m_filter_push_fields) {
+            // conservative smoothing: the particles gather the filtered push field, everything
+            // downstream keeps the unfiltered registry (Jacobian probes included)
+            FilterPushFieldsSwap(true);
+        }
+        if (m_filter_gather_B) { FilterGatherBSwap(true); }
+        // A trial iterate may push particles beyond the deposition guard range (a wild
+        // linear-solve direction, the stiff wall sheath of the 3D formation case): have the
+        // deposits count and skip them instead of asserting, and hand Newton a residual it
+        // must reject. Every evaluation re-pushes from the step-start state, so nothing of
+        // the skipped state survives.
+        WarpXParticleContainer::SetDepositOutOfRangeTolerant(true);
+        PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
+        WarpXParticleContainer::SetDepositOutOfRangeTolerant(false);
+        if (m_filter_gather_B) { FilterGatherBSwap(false); }
+        if (m_filter_push_fields) {
+            FilterPushFieldsSwap(false);
+        }
+        {
+            amrex::Long n_out = WarpXParticleContainer::NumDepositOutOfRange();
+            amrex::ParallelDescriptor::ReduceLongSum(n_out);
+            m_rhs_invalid = (n_out > 0);
+            if (m_rhs_invalid) {
+                ++m_rhs_invalid_count;
+                amrex::Print() << "ThetaImplicitHybrid: " << n_out << " particle(s) beyond the "
+                               << "deposition guard range in this residual evaluation (Newton "
+                               << "iteration " << a_nl_iter
+                               << (a_from_jacobian ? ", Jacobian probe" : "")
+                               << "): the trial is rejected (" << m_rhs_invalid_count
+                               << " such evaluation(s) so far)\n";
+                a_RHS.setVal(m_invalid_rhs_value);
+                return;
+            }
         }
     }
 
@@ -864,11 +908,12 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         }
     }
 
-    if (m_use_mass_matrices_jacobian) {
+    if (m_use_mass_matrices_jacobian || m_fluid_ion_response) {
         if (!a_from_jacobian) {
             // Nonlinear evaluation: J and rho are now scaled and synced; capture the
             // linearization base for the rho response (see m_J_base in the header).
             CaptureJRhoBase();
+            if (m_fluid_ion_response) { FillFluidIonResponseCoeff(); }
         } else if (m_J_base[0]) {
             // Linear stage: rho = rho_base - (dt/2) div(J - J_base). This replaces both
             // the frozen-rho and retained-rho semantics of the MM linear stage.

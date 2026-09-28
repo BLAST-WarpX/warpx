@@ -2220,16 +2220,26 @@ class ThetaImplicitHybridEvolveScheme(picmistandard.base._ClassWithInit):
     theta: float, optional
         The "theta" parameter, determining the level of implicitness.
 
+    use_fluid_ion_response: bool, optional
+        Whether the Jacobian actions take the ion current response from the grid moments
+        (charge density and magnetic field) instead of re-pushing the particles; the
+        pc_hybrid_pic preconditioner then builds its ion block from the same moments.
+        Cannot be combined with the mass-matrix Jacobian or preconditioner.
+
     """
 
-    def __init__(self, nonlinear_solver, theta=None):
+    def __init__(self, nonlinear_solver, theta=None, use_fluid_ion_response=None):
         self.nonlinear_solver = nonlinear_solver
         self.theta = theta
+        self.use_fluid_ion_response = use_fluid_ion_response
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "theta_implicit_hybrid"
         implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
         implicit_evolve.theta = self.theta
+        # only when given: a deck may have set the bucket directly
+        if self.use_fluid_ion_response is not None:
+            implicit_evolve.use_fluid_ion_response = self.use_fluid_ion_response
 
         self.nonlinear_solver.nonlinear_solver_initialize_inputs()
 
