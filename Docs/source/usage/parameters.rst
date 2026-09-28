@@ -3037,6 +3037,16 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
     Useful when a large PIC time step is desired but collisions require finer time resolution.
 
+.. pp:param:: <collision_name>.start_step
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    First time step on which the collision is applied. Must be >= 0.
+    When used with ``ndt_supercycle``, this acts as an offset: the collision is executed
+    on steps ``start_step``, ``start_step + ndt_supercycle``, ``start_step + 2*ndt_supercycle``, etc.
+    When used with ``ndt_subcycle``, the collision is subcycled on every step starting from ``start_step``.
+
 .. pp:param:: <collision_name>.cumulative_scattering_angle_model
     :type: ``string``
     :default: ``bobylev``

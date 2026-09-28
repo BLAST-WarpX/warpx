@@ -3267,6 +3267,12 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         Run collision ndt_subcycle times per PIC time step
         (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
         Mutually exclusive with ndt_supercycle.
+
+    start_step: integer, optional
+        First PIC time step on which the collision is applied. Must be >= 0.
+        With ndt_supercycle, this acts as an offset: the collision runs on steps
+        start_step, start_step + ndt_supercycle, start_step + 2*ndt_supercycle, ...
+        Default is 0.
     """
 
     def __init__(
@@ -3276,6 +3282,7 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         CoulombLog=None,
         ndt_supercycle=None,
         ndt_subcycle=None,
+        start_step=None,
         **kw,
     ):
         self.name = name
@@ -3283,6 +3290,7 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         self.CoulombLog = CoulombLog
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
+        self.start_step = start_step
 
         if "ndt" in kw:
             raise ValueError(
@@ -3299,6 +3307,7 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         collision.CoulombLog = self.CoulombLog
         collision.ndt_supercycle = self.ndt_supercycle
         collision.ndt_subcycle = self.ndt_subcycle
+        collision.start_step = self.start_step
 
 
 class MCCCollisions(picmistandard.base._ClassWithInit):
@@ -3341,6 +3350,12 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         Run collision ndt_subcycle times per PIC time step
         (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
         Mutually exclusive with ndt_supercycle.
+
+    start_step: integer, optional
+        First PIC time step on which the collision is applied. Must be >= 0.
+        With ndt_supercycle, this acts as an offset: the collision runs on steps
+        start_step, start_step + ndt_supercycle, start_step + 2*ndt_supercycle, ...
+        Default is 0.
     """
 
     def __init__(
@@ -3354,6 +3369,7 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         max_background_density=None,
         ndt_supercycle=None,
         ndt_subcycle=None,
+        start_step=None,
         **kw,
     ):
         self.name = name
@@ -3365,6 +3381,7 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         self.max_background_density = max_background_density
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
+        self.start_step = start_step
 
         if "ndt" in kw:
             raise ValueError(
@@ -3394,6 +3411,7 @@ class MCCCollisions(picmistandard.base._ClassWithInit):
         collision.max_background_density = self.max_background_density
         collision.ndt_supercycle = self.ndt_supercycle
         collision.ndt_subcycle = self.ndt_subcycle
+        collision.start_step = self.start_step
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -3433,6 +3451,12 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         Run collision ndt_subcycle times per PIC time step
         (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
         Mutually exclusive with ndt_supercycle.
+
+    start_step: integer, optional
+        First PIC time step on which the collision is applied. Must be >= 0.
+        With ndt_supercycle, this acts as an offset: the collision runs on steps
+        start_step, start_step + ndt_supercycle, start_step + 2*ndt_supercycle, ...
+        Default is 0.
     """
 
     def __init__(
@@ -3443,6 +3467,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         product_species=None,
         ndt_supercycle=None,
         ndt_subcycle=None,
+        start_step=None,
         **kw,
     ):
         self.name = name
@@ -3451,6 +3476,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         self.product_species = product_species
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
+        self.start_step = start_step
 
         if "ndt" in kw:
             raise ValueError(
@@ -3470,6 +3496,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
             ]
         collision.ndt_supercycle = self.ndt_supercycle
         collision.ndt_subcycle = self.ndt_subcycle
+        collision.start_step = self.start_step
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
@@ -3544,6 +3571,12 @@ class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
         Run collision ndt_subcycle times per PIC time step
         (dt_collision = dt_PIC / ndt_subcycle). Must be >= 1.
         Mutually exclusive with ndt_supercycle.
+
+    start_step: integer, optional
+        First PIC time step on which the collision is applied. Must be >= 0.
+        With ndt_supercycle, this acts as an offset: the collision runs on steps
+        start_step, start_step + ndt_supercycle, start_step + 2*ndt_supercycle, ...
+        Default is 0.
     """
 
     def __init__(
@@ -3553,6 +3586,7 @@ class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
         energy_fraction=None,
         ndt_supercycle=None,
         ndt_subcycle=None,
+        start_step=None,
         **kw,
     ):
         self.name = name
@@ -3560,6 +3594,7 @@ class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
         self.energy_fraction = energy_fraction
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
+        self.start_step = start_step
 
         self.handle_init(kw)
 
@@ -3570,6 +3605,7 @@ class InverseBremsstrahlungCollisions(picmistandard.base._ClassWithInit):
         collision.energy_fraction = self.energy_fraction
         collision.ndt_supercycle = self.ndt_supercycle
         collision.ndt_subcycle = self.ndt_subcycle
+        collision.start_step = self.start_step
 
 
 class EmbeddedBoundary(picmistandard.base._ClassWithInit):
