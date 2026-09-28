@@ -1,0 +1,124 @@
+name: NVHPC SCALEFS repro
+
+# Scratch workflow (not for upstream): reproduce the nvc++ backend crash
+#   LLVM ERROR: Cannot select: ... X86ISD::SCALEFS
+# seen on AMD Zen 4 GitHub runners with the default (host) -tp.
+# It did not reproduce with -tp=znver4 on a Zen 3 host, nor with NVHPC's
+# llc and explicit -mcpu=znver4, so we need nvc++'s host detection on a
+# real Zen 4 runner. Several jobs sample the mixed Intel/AMD runner pool.
+
+on:
+  push:
+    branches:
+      - "nvhpc-scalefs-repro"
+  workflow_dispatch:
+
+jobs:
+  repro:
+    name: sample ${{ matrix.sample }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [1, 2, 3, 4, 5, 6, 7, 8]
+    env:
+      NVHPC_VERSION: "26.5"
+    steps:
+    - name: CPU
+      run: |
+        lscpu
+        echo "AVX-512 flags visible in /proc/cpuinfo:"
+        grep -m1 '^flags' /proc/cpuinfo | tr ' ' '\n' | grep avx512 || echo "  none"
+
+    - name: Free More Disk Space
+      uses: ax3l/free-disk-space@main
+      with:
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: true
+        swap-storage: false
+
+    - name: Install NVHPC
+      run: |
+        VERSION_DASHED=${NVHPC_VERSION/./-}
+        curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK \
+          | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+        echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' \
+          | sudo tee /etc/apt/sources.list.d/nvhpc.list
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends nvhpc-${VERSION_DASHED}
+
+    - name: Write reproducers
+      run: |
+        mkdir -p repro out
+        cat > repro/ldexp_znver4.cpp <<'EOF'
+        // Reduced from AMReX ParmParse (AMReX PR #5913)
+        #include <cmath>
+        #include <limits>
+
+        bool in_int_range (double d)
+        {
+            return d >= static_cast<double>(std::numeric_limits<int>::lowest()) &&
+                   d <  std::ldexp(1.0, std::numeric_limits<int>::digits);
+        }
+
+        double scale (double x, int e)
+        {
+            return std::ldexp(x, e);
+        }
+        EOF
+        cat > repro/ldexp.ll <<'EOF'
+        target triple = "x86_64-unknown-linux-gnu"
+        declare double @llvm.ldexp.f64.i32(double, i32)
+
+        define i1 @in_int_range(double %d) {
+          %hi = call double @llvm.ldexp.f64.i32(double 1.0, i32 31)
+          %c = fcmp olt double %d, %hi
+          ret i1 %c
+        }
+        EOF
+
+    - name: Reproduce
+      run: |
+        NVHOME=/opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}
+        export PATH=${NVHOME}/compilers/bin:${PATH}
+        LLC=${NVHOME}/compilers/share/llvm/bin/llc
+
+        nvc++ --version
+        nvcc --version | tail -2
+        ${LLC} --version
+
+        echo "== backend command line with default -tp (host)"
+        nvc++ -std=c++17 -O3 -dryrun -c repro/ldexp_znver4.cpp -o /dev/null 2>&1 | grep llc | tee out/dryrun_llc.txt || true
+
+        status=0
+        run () {
+            local name=$1; shift
+            if "$@" > out/${name}.log 2>&1; then
+                echo "ok     ${name}"
+            else
+                status=1
+                echo "FAIL   ${name}"
+                grep -E 'LLVM ERROR|In function|TERMINATED' out/${name}.log || tail -5 out/${name}.log
+            fi
+        }
+
+        echo "== results"
+        run nvcxx_O3       nvc++ -std=c++17 -O3   -c repro/ldexp_znver4.cpp -o /dev/null
+        run nvcxx_fast     nvc++ -std=c++17 -fast -c repro/ldexp_znver4.cpp -o /dev/null
+        run nvcxx_O3_v3    nvc++ -std=c++17 -O3 -tp=x86-64-v3 -c repro/ldexp_znver4.cpp -o /dev/null
+        run nvcc_ccbin_O3  nvcc -ccbin=$(which nvc++) -x cu -std=c++17 -O3 -c repro/ldexp_znver4.cpp -o /dev/null
+        run llc_native     ${LLC} -O3 -mcpu=native repro/ldexp.ll -o out/llc_native.s
+        exit ${status}
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: nvhpc-scalefs-repro-${{ matrix.sample }}
+        path: |
+          repro/
+          out/
