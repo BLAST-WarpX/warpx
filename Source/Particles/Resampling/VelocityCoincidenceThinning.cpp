@@ -7,7 +7,9 @@
  * License: BSD-3-Clause-LBNL
  */
 
+#include "Particles/ShapeFactors.H"
 #include "VelocityCoincidenceThinning.H"
+#include "WarpX.H"
 
 
 VelocityCoincidenceThinning::VelocityCoincidenceThinning (const std::string& species_name)
@@ -87,8 +89,55 @@ void VelocityCoincidenceThinning::operator() (
     auto * const AMREX_RESTRICT w = soa.GetRealData(PIdx::w).data();
     auto * const AMREX_RESTRICT idcpu = soa.GetIdCPUData().data();
 
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+    // These quantities are needed for the charge conservation code
+    const auto dxi = geom_lev.InvCellSizeArray();
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(pti.tilebox(), lev, 0._rt);
+    const int depos_order = WarpX::nox;
+#endif
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE) || defined(WARPX_DIM_1D_Z)
+    const int depos_order = WarpX::nox;
+    amrex::Geometry geom_sub;
+    amrex::Box cbx;
+    if (depos_order == 2) {
+        // Create a new geometry with cell sizes one half smaller
+        // This is done as part of the code for charge conservation.
+        // The particles in the lower and upper half of a grid cell contribute
+        // their weight to a different set of nodes so to facilitate
+        // charge conservation, they need to be handled separately.
+        // This sets up the geometry to do that separation into half-cells.
+        // This is only supported in 1D for now.
+        const amrex::Box& dom = geom_lev.Domain();
+        const int coord = geom_lev.Coord();
+
+        // Physical bounds stay the same
+        amrex::RealBox rb(geom_lev.ProbLo(), geom_lev.ProbHi());
+
+        // Refine index-space domain by factor 2 in every direction
+        amrex::Box fine_dom = amrex::refine(dom, 2);
+        cbx = fine_dom;
+
+        geom_sub = amrex::Geometry(fine_dom, rb, coord, geom_lev.isPeriodic());
+    } else {
+        geom_sub = geom_lev;
+        cbx = pti.tilebox(amrex::IntVect::TheZeroVector());
+    }
+    auto const dxi = geom_lev.InvCellSizeArray();
+    auto const dx = geom_lev.CellSizeArray();
+    amrex::Box box = pti.validbox();
+    const WarpX& warpx = WarpX::GetInstance();
+    const amrex::IntVect& ng_rho = warpx.get_ng_depos_rho();
+    box.grow(ng_rho);
+    const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
+    Compute_shape_factor<2> const compute_shape_factor;
+#else
+    amrex::Geometry const & geom_sub = geom_lev;
+    amrex::Box const & cbx = pti.tilebox(amrex::IntVect::TheZeroVector());
+#endif
+
     // Using this function means that we must loop over the cells in the ParallelFor.
-    auto bins = ParticleUtils::findParticlesInEachCell(geom_lev, pti, ptile);
+    auto bins = ParticleUtils::findParticlesInEachCell(geom_sub, cbx, ptile);
 
     const auto n_cells = static_cast<int>(bins.numBins());
     auto *const indices = bins.permutationPtr();
@@ -198,6 +247,18 @@ void VelocityCoincidenceThinning::operator() (
 #endif
             amrex::ParticleReal cluster_ux = 0._prt, cluster_uy = 0._prt, cluster_uz = 0._prt;
 
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+            amrex::ParticleReal cluster_xz = 0._prt;
+#endif
+
+            // When depos_order == 2 and 1D, save the deposition weights.
+            // The location of the two particles will depend on these in order to conserve charge
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+            amrex::ParticleReal cluster_wx[3] = {0._prt};
+#elif defined(WARPX_DIM_1D_Z)
+            amrex::ParticleReal cluster_wz[3] = {0._prt};
+#endif
+
             // Finally, loop through the particles in the cell and merge
             // ones in the same momentum bin
             for (int i = cell_start; i < cell_stop; ++i)
@@ -214,6 +275,11 @@ void VelocityCoincidenceThinning::operator() (
 #if defined(WARPX_ZINDEX)
                 cluster_z += w[part_idx]*z[part_idx];
 #endif
+
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                cluster_xz += w[part_idx]*x[part_idx]*z[part_idx];
+#endif
+
                 cluster_ux += w[part_idx]*ux[part_idx];
                 cluster_uy += w[part_idx]*uy[part_idx];
                 cluster_uz += w[part_idx]*uz[part_idx];
@@ -221,6 +287,30 @@ void VelocityCoincidenceThinning::operator() (
                 total_energy += w[part_idx] * Algorithms::KineticEnergy(
                     ux[part_idx], uy[part_idx], uz[part_idx], mass
                 );
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                if (depos_order == 2) {
+                    // These use compute_shape_factor for convenience, but it slightly wasteful
+                    // since the shape factor wx[1] is not used here.
+                    double ss[3];
+                    double const wx = (x[part_idx] - xyzmin.x)*dxi[0];
+                    compute_shape_factor(ss, wx);
+                    for (int iw = 0 ; iw < 3 ; iw++) {
+                        cluster_wx[iw] += ss[iw]*w[part_idx];
+                    }
+                }
+#elif defined(WARPX_DIM_1D_Z)
+                if (depos_order == 2) {
+                    // These use compute_shape_factor for convenience, but it slightly wasteful
+                    // since the shape factor wx[1] is not used here.
+                    double ss[3];
+                    double const wz = (z[part_idx] - xyzmin.z)*dxi[WARPX_ZINDEX];
+                    compute_shape_factor(ss, wz);
+                    for (int iw = 0 ; iw < 3 ; iw++) {
+                        cluster_wz[iw] += ss[iw]*w[part_idx];
+                    }
+                }
+#endif
 
                 // check if this is the last particle in the current momentum bin,
                 // or if the next particle would push the current cluster weight
@@ -230,8 +320,10 @@ void VelocityCoincidenceThinning::operator() (
                     || (momentum_bin_number_data[sorted_indices_data[i]] != momentum_bin_number_data[sorted_indices_data[i + 1]])
                     || (total_weight + w[indices[sorted_indices_data[i+1]]] > cluster_weight)
                 ) {
+
                     // check if the bin has more than 2 particles in it
                     if ( particles_in_bin > 2 && total_weight > std::numeric_limits<amrex::ParticleReal>::min() ){
+
                         // get average quantities for the bin
 #if !defined(WARPX_DIM_1D_Z)
                         cluster_x /= total_weight;
@@ -242,6 +334,11 @@ void VelocityCoincidenceThinning::operator() (
 #if defined(WARPX_ZINDEX)
                         cluster_z /= total_weight;
 #endif
+
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                        cluster_xz /= total_weight;
+#endif
+
                         cluster_ux /= total_weight;
                         cluster_uy /= total_weight;
                         cluster_uz /= total_weight;
@@ -288,31 +385,147 @@ void VelocityCoincidenceThinning::operator() (
                         // the bin's aggregate values
                         const auto part_idx2 = indices[sorted_indices_data[i - 1]];
 
-                        w[part_idx] = total_weight / 2._prt;
-                        w[part_idx2] = total_weight / 2._prt;
+                        bool do_merge = true;
+
 #if !defined(WARPX_DIM_1D_Z)
-                        x[part_idx] = cluster_x;
-                        x[part_idx2] = cluster_x;
-#endif
-#if defined(WARPX_DIM_3D)
-                        y[part_idx] = cluster_y;
-                        y[part_idx2] = cluster_y;
+                        amrex::ParticleReal cluster_x1 = cluster_x;
+                        amrex::ParticleReal cluster_x2 = cluster_x;
 #endif
 #if defined(WARPX_ZINDEX)
-                        z[part_idx] = cluster_z;
-                        z[part_idx2] = cluster_z;
+                        amrex::ParticleReal cluster_z1 = cluster_z;
+                        amrex::ParticleReal cluster_z2 = cluster_z;
 #endif
 
-                        ux[part_idx] = ux_new;
-                        uy[part_idx] = uy_new;
-                        uz[part_idx] = uz_new;
-                        ux[part_idx2] = 2._prt * cluster_ux - ux_new;
-                        uy[part_idx2] = 2._prt * cluster_uy - uy_new;
-                        uz[part_idx2] = 2._prt * cluster_uz - uz_new;
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE) || defined(WARPX_DIM_1D_Z)
+                        if (depos_order == 2) {
+                            // Handle charge conservation
+                            // The two particles are placed at positions that will have the same deposition
+                            // as the particles to be merged.
+                            // The positions are obtained by solving the pair of equations for the deposition
+                            // at the lower and upper nodes.
+                            auto shape2_positions = [=] AMREX_GPU_DEVICE(int idir, amrex::Real gmin,
+                                                                         amrex::ParticleReal cluster_avg,
+                                                                         amrex::ParticleReal const * cluster_w,
+                                                                         bool & a_do_merge,
+                                                                         amrex::ParticleReal & pos1,
+                                                                         amrex::ParticleReal & pos2) noexcept {
+                                const amrex::ParticleReal W0 = cluster_w[0];
+                                const amrex::ParticleReal W2 = cluster_w[2];
+                                const amrex::ParticleReal A = W2 - W0;
+                                const amrex::ParticleReal B = W0 + W2 - 0.25_prt*total_weight;
 
-                        // set ids of merged particles so they will be removed
-                        for (int j = 2; j < particles_in_bin; ++j){
-                            idcpu[indices[sorted_indices_data[i - j]]] = amrex::ParticleIdCpus::Invalid;
+                                pos1 = (A + std::sqrt(total_weight*B - A*A))/total_weight;
+                                pos2 = (A - std::sqrt(total_weight*B - A*A))/total_weight;
+
+                                // Check whether the new particles are within the half-grid cell.
+                                // If the particle distribution is heavier on one side of the half-cell, the calculated
+                                // position can end up outside the half-cell. This is more likely to happen when the
+                                // number of particles merged is small.
+                                // ig is relative to the half-cell. When ig is even, it is the lower half-cell,
+                                // when odd, the upper half cell. The lower and upper range of the half-cell is
+                                // set accordingly. Note that for the upper half-cell, it is relative to the node above.
+                                const int ig = static_cast<int>((cluster_avg - gmin)*dxi[idir]*2._prt);
+                                const amrex::ParticleReal xlower = (ig % 2 == 0 ? 0._prt : -0.5_prt);
+                                const amrex::ParticleReal xupper = (ig % 2 == 0 ? 0.5_prt : 0._prt);
+
+                                // Only do the merge if the new particles are within the half-grid cell
+                                a_do_merge = (pos1 < xupper && pos2 > xlower);
+
+                                if (a_do_merge) {
+                                    // Convert the position in the helf-cell to the physical location
+                                    const int i_sub = static_cast<int>((cluster_avg - gmin)*dxi[idir] + 0.5_prt);
+                                    pos1 = gmin + (i_sub + pos1)*dx[idir];
+                                    pos2 = gmin + (i_sub + pos2)*dx[idir];
+                                }
+                            };
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                            shape2_positions(0, xyzmin.x, cluster_x, cluster_wx, do_merge, cluster_x1, cluster_x2);
+#elif defined(WARPX_DIM_1D_Z)
+                            shape2_positions(WARPX_ZINDEX, xyzmin.z, cluster_z, cluster_wz, do_merge, cluster_z1, cluster_z2);
+#endif
+                        }
+#endif
+
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                        if (depos_order == 1) {
+                            // Ensure conservation of charge when depos_order == 1 and 2D.
+                            // In 1D, putting the two particles at the average position ensures
+                            // charge conservation. (Two particles are needed to conserve energy and momentum.)
+                            // However, in 2D, the particles to be merged may have correlation between x and z,
+                            // defined as Cxz = ave(x*z) - ave(x)*ave(z) not equal to zero.
+                            // This cannot be accounted for by two particles at the same location.
+                            // A small plus/minus offset to the particles can provide that correlation.
+                            // Using the expression for the deposition in the far upper corner, the relation
+                            // between the x and z offsets can be found based on the correlation,
+                            // deltaz = Cxz/deltax.
+                            // The x and z offset magnitudes can be made equal, deltax = deltaz = sqrt(Cxz),
+                            // though note that Cxz can be negative with the sign given to deltaz.
+                            const amrex::ParticleReal correlation = cluster_xz - cluster_x*cluster_z;
+                            amrex::ParticleReal deltax = std::sqrt(std::abs(correlation));
+                            amrex::ParticleReal deltaz = std::copysign(deltax, correlation);
+
+                            // Ensure that the offset does not shift the particle outside of the grid cell.
+                            // This can happen when the particle distribution is heavier near the edge of the cell.
+                            // This is more likely to happen when the number of particles merged is small.
+                            int ixcell = static_cast<int>((cluster_x - xyzmin.x)*dxi[0]);
+                            int izcell = static_cast<int>((cluster_z - xyzmin.z)*dxi[WARPX_ZINDEX]);
+                            const amrex::ParticleReal xgbar = (cluster_x - xyzmin.x)*dxi[0] - ixcell;
+                            const amrex::ParticleReal zgbar = (cluster_z - xyzmin.z)*dxi[WARPX_ZINDEX] - izcell;
+                            const amrex::ParticleReal deltax_max = std::min(xgbar, 1._prt - xgbar);
+                            const amrex::ParticleReal deltaz_max = std::min(zgbar, 1._prt - zgbar);
+
+                            // If one of the shifts are too large, adjust it down to the maximum allowed value
+                            // (updating the other offset as needed)
+                            if (deltax > deltax_max) {
+                                deltax = deltax_max;
+                                deltaz = deltax > 0._prt ? correlation/deltax : 0._prt;
+                            }
+                            if (deltaz > deltaz_max) {
+                                deltaz = deltaz_max;
+                                deltax = deltaz > 0._prt ? correlation/deltaz : 0._prt;
+                            }
+
+                            // Only do the merge if a solution if feasible (i.e. the correction doesn't push the
+                            // particle out of the cell along the other axis, and particles are not out of the cell
+                            // along both axis)
+                            do_merge = (deltax < deltax_max && deltaz < deltaz_max);
+
+                            cluster_x1 = cluster_x + deltax;
+                            cluster_x2 = cluster_x - deltax;
+                            cluster_z1 = cluster_z + deltaz;
+                            cluster_z2 = cluster_z - deltaz;
+                        }
+#endif
+
+                        if (do_merge) {
+                            w[part_idx] = total_weight / 2._prt;
+                            w[part_idx2] = total_weight / 2._prt;
+
+#if !defined(WARPX_DIM_1D_Z)
+                            x[part_idx] = cluster_x1;
+                            x[part_idx2] = cluster_x2;
+#endif
+#if defined(WARPX_DIM_3D)
+                            y[part_idx] = cluster_y;
+                            y[part_idx2] = cluster_y;
+#endif
+#if defined(WARPX_ZINDEX)
+                            z[part_idx] = cluster_z1;
+                            z[part_idx2] = cluster_z2;
+#endif
+
+                            ux[part_idx] = ux_new;
+                            uy[part_idx] = uy_new;
+                            uz[part_idx] = uz_new;
+                            ux[part_idx2] = 2._prt * cluster_ux - ux_new;
+                            uy[part_idx2] = 2._prt * cluster_uy - uy_new;
+                            uz[part_idx2] = 2._prt * cluster_uz - uz_new;
+
+                            // set ids of merged particles so they will be removed
+                            for (int j = 2; j < particles_in_bin; ++j){
+                                idcpu[indices[sorted_indices_data[i - j]]] = amrex::ParticleIdCpus::Invalid;
+                            }
                         }
                     }
 
@@ -329,6 +542,21 @@ void VelocityCoincidenceThinning::operator() (
 #if defined(WARPX_ZINDEX)
                     cluster_z = 0_prt;
 #endif
+
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    cluster_xz = 0._prt;
+#endif
+
+#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    for (int iw=0 ; iw < 3 ; iw++) {
+                        cluster_wx[iw] = 0._prt;
+                    }
+#elif defined(WARPX_DIM_1D_Z)
+                    for (int iw=0 ; iw < 3 ; iw++) {
+                        cluster_wz[iw] = 0._prt;
+                    }
+#endif
+
                     cluster_ux = 0_prt;
                     cluster_uy = 0_prt;
                     cluster_uz = 0_prt;
