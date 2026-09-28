@@ -138,7 +138,7 @@ private:
      * \brief Relative perturbation scale for the finite-difference JVP
      * (matrix-free Jacobian action) in the linear solve.
      */
-    amrex::Real m_jfnk_epsilon = 1.0e-6;
+    static constexpr amrex::Real m_jfnk_epsilon = 1.0e-6;
 
     /**
      * \brief Maximum iterations for the Newton solver.
@@ -215,7 +215,7 @@ private:
      *  overshoots -- stiff or state-dependent coefficients (vacuum
      *  resistivity ramps, flux limiters) and noisy residual landscapes. */
     bool m_use_line_search = false;
-    int m_line_search_max_halvings = 6;
+    static constexpr int m_line_search_max_halvings = 6;
     /** newton.line_search_reuse_residual = 1: reuse the accepted line-search trial
      *  residual as the next iteration's residual instead of re-evaluating it
      *  (one residual evaluation less per Newton iteration; see Solve()). */
@@ -229,10 +229,10 @@ private:
      *  oversolving the linear system when far from the root. Off by
      *  default; the fixed-tolerance path is unchanged. */
     bool m_adaptive_forcing = false;
-    amrex::Real m_forcing_gamma = 0.9;
-    amrex::Real m_forcing_xi = 1.5;
-    amrex::Real m_forcing_zeta_max = 0.8;
-    amrex::Real m_forcing_zeta_min = 1.0e-4;
+    static constexpr amrex::Real m_forcing_gamma = 0.9;
+    static constexpr amrex::Real m_forcing_xi = 1.5;
+    static constexpr amrex::Real m_forcing_zeta_max = 0.8;
+    static constexpr amrex::Real m_forcing_zeta_min = 1.0e-4;
     /** True when the user explicitly set the linear-solver relative
      *  tolerance; adaptive forcing then starts from that value on the
      *  first Newton iteration instead of zeta_max. */
@@ -333,15 +333,9 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_newton.query("relative_tolerance",  m_rtol);
     pp_newton.query("max_iterations",      m_maxits);
     pp_newton.query("require_convergence", m_require_convergence);
-    pp_newton.query("jfnk_epsilon",        m_jfnk_epsilon);
     pp_newton.query("line_search",          m_use_line_search);
-    pp_newton.query("line_search_max_halvings", m_line_search_max_halvings);
     pp_newton.query("line_search_reuse_residual", m_line_search_reuse);
     pp_newton.query("adaptive_forcing",    m_adaptive_forcing);
-    pp_newton.query("forcing_gamma",       m_forcing_gamma);
-    pp_newton.query("forcing_xi",          m_forcing_xi);
-    pp_newton.query("forcing_zeta_max",    m_forcing_zeta_max);
-    pp_newton.query("forcing_zeta_min",    m_forcing_zeta_min);
     pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
     pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
 

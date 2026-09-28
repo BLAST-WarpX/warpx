@@ -1031,9 +1031,6 @@ class HybridPICPC : public Preconditioner<T,Ops>
         /** PMC (Neumann) faces: modeled with the dual parities (collocated
          *  grid; the staggered path requires periodic BCs). */
         bool m_wall_pmc[AMREX_SPACEDIM][2] = {};
-        /** pc_hybrid_pic.pmc_closure (default true): model PMC faces; false
-         *  keeps the zero-extension fallback there (attribution A/B). */
-        bool m_pmc_closure = true;
         /** Non-periodic faces under the zero-extension fallback: on the
          *  staggered grid the hi-side wall plane of components nodal along
          *  the face normal lives in the container's ghost region and is not
@@ -1093,9 +1090,6 @@ void HybridPICPC<T,Ops>::Define ( const T& a_U, Ops* a_ops )
     m_has_axis = true;
 #endif
     {
-        // read before the face classification below uses it
-        const amrex::ParmParse pp_bc("pc_hybrid_pic");
-        pp_bc.query("pmc_closure", m_pmc_closure);
         m_pec_normal_from_interior =
             warpx.get_pointer_HybridPICModel()->m_pec_normal_E_from_interior && !m_staggered;
         const auto& fbc_lo = a_ops->GetFieldBoundaryLo();
@@ -1109,8 +1103,7 @@ void HybridPICPC<T,Ops>::Define ( const T& a_U, Ops* a_ops )
                     || bt == FieldBoundaryType::PEC_Insulator) {
                     m_wall_pec[d][side] = true;
                     m_has_wall = true;
-                } else if (bt == FieldBoundaryType::PMC && !m_staggered
-                           && m_pmc_closure) {
+                } else if (bt == FieldBoundaryType::PMC && !m_staggered) {
                     // Neumann is an alias of PMC
                     m_wall_pmc[d][side] = true;
                     m_has_wall = true;

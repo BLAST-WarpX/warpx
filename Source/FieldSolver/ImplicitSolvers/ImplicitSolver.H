@@ -278,13 +278,6 @@ protected:
     bool m_particle_suborbits = false;
 
     /**
-     * With mass matrices + suborbits, cache rho from the non-suborbit particles once per
-     * nonlinear iteration so that only suborbit particles deposit rho during the linear
-     * stage of JFNK. Enabled by default; can be disabled for debugging/benchmarking.
-     */
-    bool m_use_rho_non_suborbit = true;
-
-    /**
      * When true, the evolve scheme saves E0 (Efield_fp_save) itself inside ComputeRHS,
      * at the point in the evaluation that the mass-matrix linear model actually uses,
      * and PreLinearSolve must not overwrite it. Needed by schemes (e.g. hybrid) for

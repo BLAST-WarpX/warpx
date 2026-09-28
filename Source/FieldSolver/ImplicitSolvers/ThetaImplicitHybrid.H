@@ -152,11 +152,6 @@ public:
      * function of an extended device lambda to have public access. */
     void FinishFieldUpdate ( amrex::Real end_time );
 
-    /** Apply the density weight to the predictor increment (see m_predictor_rho_factor).
-     * Public because the CUDA compiler requires the enclosing function of an extended
-     * device lambda to have public access. */
-    void WeightPredictorIncrement ();
-
     /** Rebuild rho from the base state and the divergence of the current response.
      * Public because the CUDA compiler requires the enclosing function of an
      * extended device lambda to have public access. */
@@ -323,12 +318,7 @@ public:
      *  initial residual, which the predictor shrinks. */
     bool m_predictor = false;
     /** the predictor is skipped after a step that needed this many Newton iterations */
-    int m_predictor_max_iters = 8;
-    /** implicit_evolve.predictor_max_step (default -1 = no limit): the predictor is
-     *  used only for steps < this number (a phase where the field evolves smoothly);
-     *  later steps start from E^n (the FRC formation halo phase, where extrapolating
-     *  particle-noise-set floor-node fields made the first linear solve diverge). */
-    int m_predictor_max_step = -1;
+    static constexpr int m_predictor_max_iters = 8;
 
     /** implicit_evolve.dt_halving_max_levels (default 0 = off): when the Newton solve
      *  of a step ends unconverged (iteration cap, two rejected directions, divergence),
@@ -336,12 +326,12 @@ public:
      *  and redo the step as two half-steps, recursively up to this many halvings
      *  (dt/2^levels); the outer time step and the diagnostic cadence are unchanged. */
     int m_dt_halving_max_levels = 0;
-    /** implicit_evolve.dt_halving_max_rel (default 0.1): with halving on, a sub-step at
-     *  the deepest level that is still unconverged is accepted only if its final relative
-     *  residual is below this; otherwise the step gives up (negative exit status: WarpX
-     *  aborts, the run can be restarted from a checkpoint). Accepting such a state
-     *  silently let the next sub-step start 30x worse and spiral (formation, 7.77 us). */
-    amrex::Real m_dt_halving_max_rel = 0.1;
+    /** With halving on, a sub-step at the deepest level that is still unconverged is
+     *  accepted only if its final relative residual is below this; otherwise the step gives
+     *  up (negative exit status: WarpX aborts, the run can be restarted from a checkpoint).
+     *  Accepting such a state silently let the next sub-step start 30x worse and spiral
+     *  (formation, 7.77 us). */
+    static constexpr amrex::Real m_dt_halving_max_rel = 0.1;
     /** saved total E^n, B^n and pe^n per halving level (see SaveStepStartState) */
     std::vector<std::array<std::unique_ptr<amrex::MultiFab>,3>> m_E_save;
     std::vector<std::array<std::unique_ptr<amrex::MultiFab>,3>> m_B_save;
@@ -355,9 +345,6 @@ public:
     long m_rhs_invalid_count = 0;   //!< number of such evaluations (statistics)
     static constexpr amrex::Real m_invalid_rhs_value = 1.0e100;
     [[nodiscard]] bool LastRHSInvalid () const override { return m_rhs_invalid; }
-    /** implicit_evolve.dt_halving_test_step (default -1 = off; testing only): treat the
-     *  first solve of this step as unconverged so the rejection/redo path runs. */
-    int m_dt_halving_test_step = -1;
 
     /** One (sub)step at halving level a_level: solve, and on an unconverged solve
      *  with a level left, restore and recurse with dt/2; otherwise finish the step. */
@@ -369,11 +356,6 @@ public:
     void FinishStep (amrex::Real start_time, int a_step);
     void SaveStepStartState (int a_level);
     void RestoreStepStartState (int a_level);
-    /** implicit_evolve.predictor_rho_factor (default 0 = off): multiply the predictor
-     *  increment by 0.5 (1 + tanh((rho - f rho_floor)/rho_floor)), i.e. do not extrapolate
-     *  at nodes below ~f x the density floor, where the field is particle-noise dominated
-     *  (E ~ J/rho_floor) and its step-to-step increment is not a smooth continuation. */
-    amrex::Real m_predictor_rho_factor = 0.0;
     WarpXSolverVec m_dE_prev;
     bool m_have_dE_prev = false;
 
@@ -386,12 +368,11 @@ public:
     /** see DepositMassMatricesThisIter */
     int m_mass_matrices_deposit_interval = 1;
     int m_mass_matrices_step_interval = 1;
-    /** implicit_evolve.mass_matrices_rho_response_factor: the linear stage's
-     *  density response rho = rho_base - (dt/2) div(J - J_base) is applied only
+    /** The linear stage's density response rho = rho_base - (dt/2) div(J - J_base) is applied only
      *  where rho_base exceeds this factor times the density floor (below it the
      *  1/n factors of Ohm's law amplify the noise of the response); the
      *  Jacobian is frozen-rho in the excluded cells */
-    amrex::Real m_mm_rho_response_factor = 10.0;
+    static constexpr amrex::Real m_mm_rho_response_factor = 10.0;
     bool m_mm_deposit_this_step = true;
     bool m_mm_deposited_once = false;
     /** dt of the last mass-matrix deposit: the kernels carry dt (gyro factors q dt B/(2m)),
@@ -462,15 +443,9 @@ public:
      *  withheld energy (1 - sJ) Q dt on the ion particles through the QDSMC
      *  Ornstein-Uhlenbeck kernel in FinishStep (per species E_s = (2/3) Z_s (1 - sJ) Q dt /
      *  n_e, the explicit joule_redirect_Te_threshold convention), restoring the energy
-     *  ledger. implicit_evolve.joule_redirect_verbose = 1 prints the two Joule powers. */
+     *  ledger. */
     bool m_joule_redirect = false;
-    int m_joule_redirect_verbose = 0;
 
-    /** implicit_evolve.pe_debug_nodes = i1 j1 [i2 j2 ...]: print the per-term budget of
-     *  the in-loop pe advance (pairing field, electron flux, Joule deposit, flux
-     *  divergence, conduction, pe^n -> pe^{n+theta}) at these nodes after every
-     *  nonlinear residual evaluation (development diagnostic). */
-    std::vector<int> m_pe_debug_nodes;
 
     /**
      * \brief Update the E and B fields owned by WarpX. Updates B^{n+theta}

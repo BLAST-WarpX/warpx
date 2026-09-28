@@ -119,19 +119,12 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         pp_impl.query("joule_Te_cutoff", m_joule_Te_cutoff_eV);
         pp_impl.query("joule_Te_cutoff_width", m_joule_Te_cutoff_width);
         pp_impl.query("joule_redirect_to_ions", m_joule_redirect);
-        pp_impl.query("joule_redirect_verbose", m_joule_redirect_verbose);
         if (m_joule_redirect) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_joule_Te_cutoff_eV > 0.0_rt,
                 "implicit_evolve.joule_redirect_to_ions requires implicit_evolve.joule_Te_cutoff > 0");
         }
-        pp_impl.queryarr("pe_debug_nodes", m_pe_debug_nodes);
         pp_impl.query("predictor", m_predictor);
-        pp_impl.query("predictor_max_iters", m_predictor_max_iters);
-        pp_impl.query("predictor_max_step", m_predictor_max_step);
-        pp_impl.query("predictor_rho_factor", m_predictor_rho_factor);
         pp_impl.query("dt_halving_max_levels", m_dt_halving_max_levels);
-        pp_impl.query("dt_halving_test_step", m_dt_halving_test_step);
-        pp_impl.query("dt_halving_max_rel", m_dt_halving_max_rel);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_dt_halving_max_levels >= 0,
             "implicit_evolve.dt_halving_max_levels must be >= 0");
         if (m_joule_Te_cutoff_eV > 0.0_rt) {
@@ -198,9 +191,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         pp.query("mass_matrices_step_interval", m_mass_matrices_step_interval);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mass_matrices_step_interval >= 1,
             "implicit_evolve.mass_matrices_step_interval must be >= 1");
-        pp.query("mass_matrices_rho_response_factor", m_mm_rho_response_factor);
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mm_rho_response_factor >= 1.0_rt,
-            "implicit_evolve.mass_matrices_rho_response_factor must be >= 1");
     }
 
     pp.query("use_fluid_ion_response", m_fluid_ion_response);
@@ -296,9 +286,7 @@ int ThetaImplicitHybrid::AdvanceStep ( const amrex::Real  start_time,
     if (can_halve) { SaveStepStartState(a_level); }
 
     const int status = SolveStep(start_time, a_dt, a_step);
-    // testing hook: force the rejection path once (outer level of one step)
-    const bool forced_fail = (a_level == 0 && a_step == m_dt_halving_test_step);
-    const bool converged = (status >= 0) && m_nlsolver->GetLastConverged() && !forced_fail;
+    const bool converged = (status >= 0) && m_nlsolver->GetLastConverged();
 
     if (!converged && can_halve) {
         // Reject the step: back to the state at start_time and redo it as two
@@ -329,7 +317,7 @@ int ThetaImplicitHybrid::AdvanceStep ( const amrex::Real  start_time,
         // state and spiral); a negative status aborts the run cleanly
         amrex::Print() << "ThetaImplicitHybrid: unconverged at the halving limit (relative "
                        << "residual " << m_nlsolver->GetLastRelNorm() << " > "
-                       << m_dt_halving_max_rel << ", implicit_evolve.dt_halving_max_rel) at t = "
+                       << m_dt_halving_max_rel << ") at t = "
                        << start_time << ": giving up the step\n";
         return -5;
     }
@@ -392,10 +380,7 @@ int ThetaImplicitHybrid::SolveStep ( const amrex::Real  start_time,
     // typically needs a line search (formation: alpha 0.5 at iteration 0 even with
     // the exact Jacobian); the extrapolated guess starts inside the quadratic basin.
     m_E.Copy(m_Eold);
-    // step-limited predictor (see m_predictor_max_step)
-    const bool predictor_on = m_predictor
-        && (m_predictor_max_step < 0 || a_step < m_predictor_max_step);
-    if (predictor_on && m_have_dE_prev) {
+    if (m_predictor && m_have_dE_prev) {
         m_E.linComb(1.0_rt, m_Eold, 1.0_rt, m_dE_prev);
     }
 
@@ -418,13 +403,12 @@ int ThetaImplicitHybrid::SolveStep ( const amrex::Real  start_time,
     const int exit_status = m_nlsolver->GetExitStatus();
     if (exit_status < 0) { return exit_status; }
 
-    if (predictor_on) {
+    if (m_predictor) {
         // theta-increment of this step, the next step's predictor -- unless this step
-        // struggled (>= predictor_max_iters Newton iterations: line-search-limited steps
+        // struggled (>= m_predictor_max_iters Newton iterations: line-search-limited steps
         // leave an increment that is not a smooth continuation; extrapolating it fed a
         // diverging first linear solve in the formation run), then fall back to E^n
         m_dE_prev.linComb(1.0_rt, m_E, -1.0_rt, m_Eold);
-        if (m_predictor_rho_factor > 0.0_rt) { WeightPredictorIncrement(); }
         m_have_dE_prev = (m_nlsolver->GetLastIterations() < m_predictor_max_iters);
     }
 
@@ -654,12 +638,6 @@ void ThetaImplicitHybrid::FinishStep ( const amrex::Real  start_time,
             m_hybrid_pic_model->FillPeFromTe(lev);
         }
         if (redirect_active) {
-            if (m_joule_redirect_verbose > 0 && m_Q_diss && m_Q_redir) {
-                const amrex::Real p_pe = VolumeWeightedSum(*m_Q_diss, m_WarpX->Geom(0));
-                const amrex::Real p_i  = VolumeWeightedSum(*m_Q_redir, m_WarpX->Geom(0));
-                amrex::Print() << "  Joule deposit: pe " << p_pe
-                               << " W, redirected to ions " << p_i << " W\n";
-            }
             // consumed: a step whose residual evaluations never wrote it must not reuse it
             m_ion_redirect_E->setVal(0.0_rt);
             m_Q_redir->setVal(0.0_rt);
@@ -1188,47 +1166,6 @@ void ThetaImplicitHybrid::SubtractDissipativeEFromPushField ()
     }
 }
 
-void ThetaImplicitHybrid::WeightPredictorIncrement ()
-{
-    // Predictor increment restricted to the plasma: at near-floor nodes the Ohm's-law
-    // field is set by a handful of macro-ions through E ~ J/rho_floor and flips between
-    // steps; extrapolating it seeded a first-evaluation particle kick beyond the guard
-    // cells in the formation halo phase (prod_dt4_peu_v5, step 902). The weight uses
-    // the same staggered rho interpolation as the Ohm solve and the pairing.
-    using namespace amrex::literals;
-    using warpx::fields::FieldType;
-    using namespace ablastr::coarsen::sample;
-    const int lev = 0;
-    const amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, lev);
-    const amrex::Real rho_f = m_hybrid_pic_model->m_n_floor * PhysConst::q_e;
-    const amrex::Real r0 = m_predictor_rho_factor * rho_f;
-    const amrex::GpuArray<int, 3> nodal3 = {1, 1, 1};
-    const amrex::GpuArray<int, 3> crs3   = {1, 1, 1};
-    const std::array<amrex::GpuArray<int, 3>, 4> stags = {
-        m_hybrid_pic_model->Ex_IndexType, m_hybrid_pic_model->Ey_IndexType,
-        m_hybrid_pic_model->Ez_IndexType, nodal3};
-    for (int n = 0; n < (m_pe_unknown ? 4 : 3); ++n) {
-        amrex::MultiFab& dE = (n < 3) ? *m_dE_prev.getArrayVec()[lev][n]
-                                      : *m_dE_prev.getScalarVec()[lev];
-        const amrex::GpuArray<int, 3> stag = stags[n];
-        const int ng = amrex::max(0, amrex::min(dE.nGrowVect().min(),
-                                                rho->nGrowVect().min() - 1));
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-        for (amrex::MFIter mfi(dE, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
-            const amrex::Box bx = mfi.growntilebox(ng);
-            auto const& d  = dE.array(mfi);
-            auto const& rr = rho->const_array(mfi);
-            const int nc = dE.nComp();
-            amrex::ParallelFor(bx, nc, [=] AMREX_GPU_DEVICE (int i, int j, int k, int c) {
-                const amrex::Real rho_e = Interp(rr, nodal3, stag, crs3, i, j, k, 0);
-                d(i,j,k,c) *= 0.5_rt*(1.0_rt + std::tanh((rho_e - r0)/rho_f));
-            });
-        }
-    }
-}
-
 void ThetaImplicitHybrid::FilterPushFieldsSwap (const bool a_apply)
 {
     // Conservative smoothing: PreRHSOp binomial-filters Efield_fp in place for the gather;
@@ -1688,17 +1625,6 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
     } else {
         amrex::MultiFab::Copy(*m_pe_scratch, *m_pe_old, 0, 0, pe->nComp(), pe->nGrowVect());
     }
-    // optional per-node term breakdown (implicit_evolve.pe_debug_nodes), nonlinear
-    // evaluations only; slots of 16 reals per node, filled inside the kernel
-    const int n_dbg = static_cast<int>(m_pe_debug_nodes.size()) / 2;
-    amrex::Gpu::DeviceVector<amrex::Real> dbg_dev(std::max(1, 16*n_dbg), 0.0_rt);
-    amrex::Gpu::DeviceVector<int> dbg_ij(std::max(1, 2*n_dbg), -1);
-    if (n_dbg > 0) {
-        amrex::Gpu::copy(amrex::Gpu::hostToDevice, m_pe_debug_nodes.begin(),
-                         m_pe_debug_nodes.begin() + 2*n_dbg, dbg_ij.begin());
-    }
-    amrex::Real* const dbgp = (n_dbg > 0 && !a_from_jacobian) ? dbg_dev.data() : nullptr;
-    const int* const dbgij = dbg_ij.data();
 
     for (int pe_it = 0; pe_it < n_pe_iters; ++pe_it) {
 
@@ -2224,24 +2150,6 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
 #endif
             const amrex::Real pe_new = pe0(i,j,k)
                 - theta_dt * (gamma * divF + (gamma - 1._rt) * (W - cond));
-            if (dbgp) {
-                for (int q = 0; q < n_dbg; ++q) {
-                    if (i == dbgij[2*q] && j == dbgij[2*q+1]) {
-                        amrex::Real* d = dbgp + 16*q;
-                        d[0] = Ex_arr(i,j,k); d[1] = Ey_arr(i,j,k); d[2] = Ez_arr(i,j,k);
-                        d[3] = Jx(i,j,k) - Jpx(i,j,k);
-                        d[4] = Jy(i,j,k) - Jpy(i,j,k);
-                        d[5] = Jz(i,j,k) - Jpz(i,j,k);
-                        d[6] = q_posdef ? Qd(i,j,k)
-                                        : (Dx(i,j,k)*Jpx(i,j,k) + Dy(i,j,k)*Jpy(i,j,k)
-                                           + Dz(i,j,k)*Jpz(i,j,k));
-                        d[7] = divF; d[8] = W; d[9] = cond;
-                        d[10] = pe0(i,j,k); d[11] = pe_new; d[12] = rho_arr(i,j,k,0);
-                        d[13] = pe_it_arr(i,j,k);
-                        d[14] = Jpx(i,j,k); d[15] = Jpy(i,j,k);
-                    }
-                }
-            }
             amrex::Real pe_fin = pe_new;
             if (vac_blend) {
 #if defined(WARPX_DIM_RZ)
@@ -2260,28 +2168,6 @@ void ThetaImplicitHybrid::AdvanceElectronPressure ( const bool a_from_jacobian,
             // hence energy-neutral there), shared with the explicit fluid solver
             pe_arr(i,j,k) = HybridPeFloor(pe_fin, pe_eps);
         });
-    }
-    if (dbgp && pe_it == n_pe_iters - 1) {
-        amrex::Gpu::streamSynchronize();
-        std::vector<amrex::Real> h(16*n_dbg);
-        amrex::Gpu::copy(amrex::Gpu::deviceToHost, dbg_dev.begin(),
-                         dbg_dev.begin() + 16*n_dbg, h.begin());
-        for (int q = 0; q < n_dbg; ++q) {
-            const amrex::Real* d = h.data() + 16*q;
-            const amrex::Real EG = d[0]*d[3] + d[1]*d[4] + d[2]*d[5];
-            amrex::AllPrint() << "pe_debug (" << m_pe_debug_nodes[2*q] << ","
-                << m_pe_debug_nodes[2*q+1] << ") t=" << a_theta_time
-                << " Epair=(" << d[0] << "," << d[1] << "," << d[2] << ")"
-                << " G=Ji-Jp=(" << d[3] << "," << d[4] << "," << d[5] << ")"
-                << " Jp=(" << d[14] << "," << d[15] << ")"
-                << " rho=" << d[12] << " pe0=" << d[10] << " pe_it=" << d[13]
-                << " pe_new=" << d[11]
-                << " | dpe: E.G " << -theta_dt*(gamma - 1._rt)*EG
-                << " Qd " << theta_dt*(gamma - 1._rt)*d[6]
-                << " flux " << -theta_dt*gamma*d[7]
-                << " cond " << theta_dt*(gamma - 1._rt)*d[9]
-                << " (E.G=" << EG << " Qd=" << d[6] << " divF=" << d[7] << ")\n";
-        }
     }
 
     // Duplicated nodal points on box faces are written redundantly by each box;

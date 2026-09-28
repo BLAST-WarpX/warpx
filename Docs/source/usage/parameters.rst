@@ -271,10 +271,9 @@ Overall simulation parameters
           - ``newton.max_iterations`` (``int``, default: 100)
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
-          - ``newton.jfnk_epsilon`` (``float``, default: 1.0e-6) Relative perturbation scale for the finite-difference JVP in the matrix-free linear solve.
           - ``newton.line_search`` (``bool``, default: false)
             Backtracking line search on the Newton update: accept the largest step fraction in
-            :math:`\{1, 1/2, \ldots, 2^{-n}\}` (``newton.line_search_max_halvings``, default 6) that reduces the residual norm.
+            :math:`\{1, 1/2, \ldots, 2^{-6}\}` that reduces the residual norm.
           - ``newton.line_search_reuse_residual`` (``bool``, default: false)
             With ``newton.line_search``, reuse the residual of the accepted line-search trial as the next iteration's residual
             instead of re-evaluating it (saves one residual evaluation per Newton iteration).
@@ -282,17 +281,12 @@ Overall simulation parameters
           - ``newton.diagnostic_interval`` (``int``, default: 1)
           - ``newton.adaptive_forcing`` (``bool``, default: false)
             When ``true``, the GMRES relative tolerance is chosen adaptively each Newton iteration from the observed nonlinear residual decrease (Eisenstat-Walker Choice 2 with safeguards, as in `Chacón, J. Comput. Phys. 526 (2025) 113789 <https://doi.org/10.1016/j.jcp.2025.113789>`__, Eq. 21):
-            :math:`\zeta_A = \gamma\,(\|G_k\|/\|G_{k-1}\|)^\xi`,
+            :math:`\zeta_A = \gamma\,(\|G_k\|/\|G_{k-1}\|)^\xi` with :math:`\gamma = 0.9`, :math:`\xi = 1.5`,
             :math:`\zeta_B = \min[\zeta_\mathrm{max}, \max(\zeta_A, \gamma \zeta_{k-1}^\xi)]`,
             :math:`\zeta_k = \min[\zeta_\mathrm{max}, \max(\zeta_B, \gamma\,\epsilon_\mathrm{Newton}/\|G_k\|)]`,
-            floored at :math:`\zeta_\mathrm{min}`, where :math:`\epsilon_\mathrm{Newton}` is the Newton convergence target.
+            with :math:`\zeta_\mathrm{max} = 0.8`, floored at :math:`\zeta_\mathrm{min} = 10^{-4}`, where :math:`\epsilon_\mathrm{Newton}` is the Newton convergence target.
             The first iteration uses :math:`\zeta_\mathrm{max}`, unless the user explicitly set ``gmres.relative_tolerance``, in which case that value is used.
             This avoids over-solving the linear system far from the nonlinear root; with it off, the fixed ``gmres.relative_tolerance`` is used every iteration (exact prior behavior).
-
-            - ``newton.forcing_gamma`` (``float``, default: 0.9)
-            - ``newton.forcing_xi`` (``float``, default: 1.5)
-            - ``newton.forcing_zeta_max`` (``float``, default: 0.8)
-            - ``newton.forcing_zeta_min`` (``float``, default: 1.0e-4)
 
           - The PS-JFNK solver uses GMRES to solve the linear system at each nonlinear iteration:
 
@@ -319,12 +313,6 @@ Overall simulation parameters
             When ``true`` and ``implicit_evolve.use_mass_matrices_jacobian = true`` (or ``implicit_evolve.use_fluid_ion_response = true``), the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
             This can enhance the overall efficiency of the Newton solver.
             Default is true if ``implicit_evolve.particle_suborbits = true``.
-
-          - ``implicit_evolve.use_rho_non_suborbit`` (``bool``, default: true).
-            Only used when ``implicit_evolve.use_mass_matrices_jacobian = true``, ``implicit_evolve.particle_suborbits = true``, and the charge density is allocated (e.g., with the hybrid-PIC solver).
-            When ``true``, the charge density from the particles represented by the mass matrices is cached once per nonlinear iteration, so that only the suborbit particles deposit charge density during the linear stage of PS-JFNK, analogous to the treatment of the current density.
-            This avoids all-particle charge deposits in every GMRES iteration.
-            Can be set to ``false`` for debugging or benchmarking.
 
           - ``implicit_evolve.mass_matrices_deposit_interval`` (``integer``, default: 1; hybrid theta-implicit scheme only).
             Re-deposit the mass matrices every n-th Newton iteration of a step (iterations 0, n, 2n, ...); 0 deposits once per step.
@@ -386,26 +374,18 @@ Overall simulation parameters
           Deposit the energy the gate withholds from the electrons, :math:`(1 - s_J)\,Q\,\Delta t`, on the ion particles through the
           QDSMC Ornstein-Uhlenbeck kernel at the end of the step (per species :math:`E_s = \tfrac{2}{3} Z_s (1 - s_J) Q \Delta t / n_e`,
           the convention of :pp:param:`hybrid_pic_model.joule_redirect_Te_threshold`), so the dissipated energy stays in the ledger.
-          ``implicit_evolve.joule_redirect_verbose`` (``int``, default: 0) prints the electron and ion Joule powers each step.
 
         - ``implicit_evolve.predictor`` (``bool``, default: 0; hybrid theta-implicit scheme only).
           Start the Newton iteration from the extrapolated guess :math:`E^n + (E^{n-1+\theta} - E^{n-1})`
           (the previous step's theta-increment, electron pressure rows included) instead of :math:`E^n`.
           Pair it with ``newton.absolute_tolerance``: the relative tolerance is measured against the initial residual,
-          which the predictor reduces.
-          ``implicit_evolve.predictor_max_iters`` (``integer``, default: 8): a step that needed at least this many Newton
-          iterations does not seed the next step's guess. ``implicit_evolve.predictor_max_step`` (``integer``, default: -1 = no limit):
-          use the predictor only for steps below this number (later steps start from :math:`E^n`).
+          which the predictor reduces. A step that needed eight or more Newton iterations does not seed the next step's guess.
           ``implicit_evolve.dt_halving_max_levels`` (``integer``, default: 0 = off; hybrid theta-implicit scheme only):
           when the Newton solve of a step ends unconverged (iteration cap, rejected directions or divergence), restore the
           state at the step start and redo the step as two half-steps, recursively up to this many halvings
           (:math:`\Delta t/2^n`); the outer time step and the diagnostic cadence are unchanged.
-          ``implicit_evolve.dt_halving_max_rel`` (``float``, default: 0.1): a sub-step at the deepest level that is still
-          unconverged is accepted only if its final relative residual is below this value; otherwise the step gives up
-          (negative exit status, the run aborts) rather than advancing from a corrupted state.
-          ``implicit_evolve.predictor_rho_factor`` (``float``, default: 0 = off):
-          multiply the increment by :math:`\tfrac{1}{2}[1 + \tanh((\rho - f\rho_\mathrm{floor})/\rho_\mathrm{floor})]`,
-          i.e. do not extrapolate at nodes below about :math:`f` times the density floor.
+          A sub-step at the deepest level that is still unconverged is accepted only if its final relative residual is below 0.1;
+          otherwise the step gives up (negative exit status, the run aborts) rather than advancing from a corrupted state.
 
         - ``implicit_evolve.filter_push_fields`` (``bool``, default: false; hybrid theta-implicit scheme only).
           With :pp:param:`warpx.use_filter`, the particles gather the binomial-filtered electric field (the adjoint of the filtered
@@ -475,7 +455,6 @@ Overall simulation parameters
             - ``pc_hybrid_pic.inner_max`` (``int``, default: 8): iteration cap of the inner GMRES; 0 disables the inner solve (linear V-cycle preconditioner).
             - ``pc_hybrid_pic.inner_rtol`` (``float``, default: 0.3): relative tolerance of the inner GMRES; 1.0 stops after one V-cycle and one Krylov step per application.
             - ``pc_hybrid_pic.vcycles`` (``int``, default: 1): V-cycles per application when ``inner_max = 0``.
-            - ``pc_hybrid_pic.pmc_closure`` (``bool``, default: 1): model PMC (Neumann) faces with the dual of the PEC closure (identity normal-E rows, tangential delta-B zeroed on the wall, parity-mirrored ghosts; collocated grid). 0 keeps the zero-extension fallback on those faces.
             - ``pc_hybrid_pic.verbose`` (``int``, default: 0): 1 prints the setup banner, a per-Newton-iteration coefficient summary and the inner GMRES convergence per application; 2 adds a block map of where the un-reduced inner residual lives (diagnostic).
 
           - ``jacobian.pc_type = pc_petsc``: Use the PETSc solver.
@@ -4129,7 +4108,7 @@ Maxwell solver: kinetic-fluid hybrid
     The Hall and electron-pressure terms are multiplied by the density weight :math:`w(\rho)`, a step at the density floor,
     or the :math:`C^1` blend :math:`\tfrac{1}{2}[1 + \tanh((\rho - \rho_\mathrm{floor})/w)]` when :pp:param:`hybrid_pic_model.n_floor_smooth_width` is set;
     the resistive and hyper-resistive terms are kept everywhere. The theta-implicit preconditioner ``pc_hybrid_pic`` applies the same weight to its whistler, convection and ion-response coefficients.
-    With the theta-implicit evolved electron pressure (``implicit_evolve.hybrid_closure = pe_unknown``) the same weight blends the advanced pressure toward the floored adiabat, :math:`p_e \leftarrow w\,p_e + (1-w)\,p_e^\mathrm{ad}(\max(\rho,\rho_\mathrm{floor}))`, so the transport and compression terms cannot run away where :math:`\mathbf{u}_e` is statistical noise.
+    With the theta-implicit evolved electron pressure (``implicit_evolve.pe_newton_unknown = 1``) the same weight blends the advanced pressure toward the floored adiabat, :math:`p_e \leftarrow w\,p_e + (1-w)\,p_e^\mathrm{ad}(\max(\rho,\rho_\mathrm{floor}))`, so the transport and compression terms cannot run away where :math:`\mathbf{u}_e` is statistical noise.
 
 .. pp:param:: hybrid_pic_model.vacuum_weight_r_ref
     :type: ``float`` (meters)

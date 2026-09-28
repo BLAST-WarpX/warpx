@@ -512,7 +512,6 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
-        pp.query("use_rho_non_suborbit", m_use_rho_non_suborbit);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
             m_use_mass_matrices = true;
         }
@@ -856,8 +855,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
     options.use_mass_matrices_pc = m_use_mass_matrices_pc;
     options.use_mass_matrices_jacobian = m_use_mass_matrices_jacobian;
     options.evolve_suborbit_particles_only = false;
-    options.use_rho_non_suborbit = m_use_rho_non_suborbit &&
-                                   m_use_mass_matrices_jacobian && m_particle_suborbits &&
+    options.use_rho_non_suborbit = m_use_mass_matrices_jacobian && m_particle_suborbits &&
                                    m_WarpX->m_fields.has(FieldType::rho_fp, 0);
 
     // set only with a linear ion model in the Jacobian (mass matrices, or the fluid ion
@@ -1237,9 +1235,6 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
             amrex::Print() << "    for jacobian calc:   " << (m_use_mass_matrices_jacobian ? "true":"false") << "\n";
             if (m_use_mass_matrices_jacobian) {
                 amrex::Print() << "        skip particle picard init:  " << (m_skip_particle_picard_init ? "true":"false") << "\n";
-                if (m_particle_suborbits) {
-                    amrex::Print() << "        use rho non suborbit:       " << (m_use_rho_non_suborbit ? "true":"false") << "\n";
-                }
             }
             amrex::Print() << "    for preconditioner:  " << (m_use_mass_matrices_pc ? "true":"false") << "\n";
             if (m_use_mass_matrices_pc) {
