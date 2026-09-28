@@ -202,6 +202,7 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mm_rho_response_factor >= 1.0_rt,
             "implicit_evolve.mass_matrices_rho_response_factor must be >= 1");
     }
+    pp.query("freeze_dissipation_rho", m_freeze_dissipation_rho);
 
     m_nlsolver->Define(m_E, this);
 
@@ -231,6 +232,9 @@ void ThetaImplicitHybrid::PrintParameters () const
     amrex::Print() << "-------- THETA IMPLICIT HYBRID PIC SOLVER PARAMETERS ------\n";
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "Time-bias parameter theta:           " << m_theta << "\n";
+    if (m_freeze_dissipation_rho) {
+        amrex::Print() << "freeze dissipation rho in probes:    true\n";
+    }
     if (m_dt_halving_max_levels > 0) {
         amrex::Print() << "dt halving on unconverged Newton:    up to "
                        << m_dt_halving_max_levels << " level(s)\n";
@@ -749,6 +753,20 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     // Jacobian through the particle response -- in particular the electrostatic
     // limit (B = 0) is degenerate with any recomputed push field, which would
     // not depend on the solver variable at all.
+    if (m_freeze_dissipation_rho) {
+        // D reads rho_fp as left by the previous evaluation: give the Jacobian probes the
+        // density the base evaluation used (see m_freeze_dissipation_rho)
+        amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, 0);
+        if (!a_from_jacobian) {
+            if (!m_rho_D) {
+                m_rho_D = std::make_unique<amrex::MultiFab>(
+                    rho->boxArray(), rho->DistributionMap(), rho->nComp(), rho->nGrowVect());
+            }
+            amrex::MultiFab::Copy(*m_rho_D, *rho, 0, 0, rho->nComp(), rho->nGrowVect());
+        } else if (m_rho_D) {
+            amrex::MultiFab::Copy(*rho, *m_rho_D, 0, 0, rho->nComp(), rho->nGrowVect());
+        }
+    }
     SubtractDissipativeEFromPushField();
 
     m_WarpX->ApplyFillBoundaryE();

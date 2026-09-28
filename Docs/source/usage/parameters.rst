@@ -342,6 +342,11 @@ Overall simulation parameters
           If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
           In most cases, a width of 1 is sufficient for good GMRES performance.
 
+        - ``implicit_evolve.freeze_dissipation_rho`` (``bool``, default: 0; hybrid theta-implicit scheme only).
+          The dissipative part of Ohm's law that is removed from the particle push field is evaluated with the charge density left by the previous residual evaluation.
+          When this option is on, the Jacobian actions reuse the density the base residual evaluation used, so that a resistivity or hyper-resistivity that depends on the density does not put an evaluation-order offset into the Jacobian.
+          The nonlinear residual is unchanged.
+
         - ``implicit_evolve.pe_newton_unknown`` (``bool``, default: 0; hybrid theta-implicit scheme only).
           Evolve the electron pressure as a Newton unknown with its own residual row (requires the in-loop electron energy equation).
           The pressure row is preconditioned by ``jacobian.pc_type = pc_hybrid_pic``.
