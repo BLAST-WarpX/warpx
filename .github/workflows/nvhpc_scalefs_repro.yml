@@ -80,6 +80,58 @@ jobs:
           ret i1 %c
         }
         EOF
+        # AMReX work-around: compile-time bound instead of std::ldexp
+        cat > repro/ldexp_fixed.cpp <<'EOF'
+        #include <limits>
+
+        template <class T>
+        constexpr double int_upper_bound () noexcept
+        {
+            double r = 1.0;
+            for (int i = 0; i < std::numeric_limits<T>::digits; ++i) { r *= 2.0; }
+            return r;
+        }
+
+        bool in_int_range (double d)
+        {
+            constexpr double upper = int_upper_bound<int>();
+            return d >= static_cast<double>(std::numeric_limits<int>::lowest()) &&
+                   d <  upper;
+        }
+        EOF
+        # real AMReX header: instantiate the ParmParse range checks
+        mkdir -p repro/amrex_pp
+        cat > repro/amrex_pp/main.cpp <<'EOF'
+        #include <AMReX_ParmParse.H>
+
+        #include <cstdint>
+
+        template <class T>
+        T query ()
+        {
+            amrex::ParmParse pp;
+            T x{};
+            pp.queryAsDouble("x", x);
+            T y[2]{};
+            pp.queryarrAsDouble("y", 2, y);
+            return x + y[0];
+        }
+
+        int q_int () { return query<int>(); }
+        unsigned q_unsigned () { return query<unsigned>(); }
+        std::int64_t q_int64 () { return query<std::int64_t>(); }
+        EOF
+        cat > repro/amrex_pp/CMakeLists.txt <<'EOF'
+        cmake_minimum_required(VERSION 3.24)
+        project(amrex_pp CXX)
+        set(AMReX_MPI OFF CACHE BOOL "")
+        set(AMReX_OMP OFF CACHE BOOL "")
+        set(AMReX_FORTRAN OFF CACHE BOOL "")
+        set(AMReX_SPACEDIM 1 CACHE STRING "")
+        add_subdirectory(${AMREX_SRC} amrex)
+        add_library(amrex_pp OBJECT main.cpp)
+        target_link_libraries(amrex_pp PRIVATE AMReX::amrex_1d)
+        EOF
 
     - name: Reproduce
       run: |
@@ -94,17 +146,32 @@ jobs:
         echo "== backend command line with default -tp (host)"
         nvc++ -std=c++17 -O3 -dryrun -c repro/ldexp_znver4.cpp -o /dev/null 2>&1 | grep llc | tee out/dryrun_llc.txt || true
 
+        # baselines are expected to crash on affected hosts; the job only
+        # fails if a work-around ("fixed_*") fails
         status=0
         run () {
             local name=$1; shift
             if "$@" > out/${name}.log 2>&1; then
                 echo "ok     ${name}"
             else
-                status=1
+                [[ ${name} == fixed_* ]] && status=1
                 echo "FAIL   ${name}"
                 grep -E 'LLVM ERROR|In function|TERMINATED' out/${name}.log || tail -5 out/${name}.log
             fi
         }
+
+        amrex_pp () {
+            local src=$1 build=$2
+            CC=nvc CXX=nvc++ cmake -S repro/amrex_pp -B ${build} -G "Unix Makefiles" \
+                -DCMAKE_BUILD_TYPE=Release -DAMREX_SRC=${PWD}/${src} \
+            && cmake --build ${build} --target main.cpp.o -- VERBOSE=1
+        }
+
+        git clone -q --depth 1 --branch development https://github.com/AMReX-Codes/amrex.git amrex_base
+        git -C amrex_base log -1 --oneline
+        git clone -q --depth 1 --branch topic-parmparse-constexpr-bound https://github.com/ax3l/amrex.git amrex_fixed \
+            && git -C amrex_fixed log -1 --oneline \
+            || echo "ax3l/amrex topic-parmparse-constexpr-bound not found: skipping patched AMReX"
 
         echo "== results"
         run nvcxx_O3       nvc++ -std=c++17 -O3   -c repro/ldexp_znver4.cpp -o /dev/null
@@ -112,6 +179,13 @@ jobs:
         run nvcxx_O3_v3    nvc++ -std=c++17 -O3 -tp=x86-64-v3 -c repro/ldexp_znver4.cpp -o /dev/null
         run nvcc_ccbin_O3  nvcc -ccbin=$(which nvc++) -x cu -std=c++17 -O3 -c repro/ldexp_znver4.cpp -o /dev/null
         run llc_native     ${LLC} -O3 -mcpu=native repro/ldexp.ll -o out/llc_native.s
+        run amrex_base     amrex_pp amrex_base build_base
+        run fixed_nvcxx_O3   nvc++ -std=c++17 -O3   -c repro/ldexp_fixed.cpp -o /dev/null
+        run fixed_nvcxx_fast nvc++ -std=c++17 -fast -c repro/ldexp_fixed.cpp -o /dev/null
+        run fixed_nvcc_ccbin nvcc -ccbin=$(which nvc++) -x cu -std=c++17 -O3 -c repro/ldexp_fixed.cpp -o /dev/null
+        if [[ -d amrex_fixed ]]; then
+            run fixed_amrex  amrex_pp amrex_fixed build_fixed
+        fi
         exit ${status}
 
     - name: Upload logs
