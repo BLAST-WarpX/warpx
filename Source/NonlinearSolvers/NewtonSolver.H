@@ -213,13 +213,12 @@ private:
      *  {1, 1/2, ..., 2^-max_halvings} that reduces the residual norm
      *  (keeping the best trial seen). Stabilizes Newton when the update
      *  overshoots -- stiff or state-dependent coefficients (vacuum
-     *  resistivity ramps, flux limiters) and noisy residual landscapes. */
+     *  resistivity ramps, flux limiters) and noisy residual landscapes. The
+     *  accepted trial's residual is reused as the next iteration's residual when
+     *  it was the last one evaluated (one residual evaluation less per Newton
+     *  iteration; see Solve()). */
     bool m_use_line_search = false;
     static constexpr int m_line_search_max_halvings = 6;
-    /** newton.line_search_reuse_residual = 1: reuse the accepted line-search trial
-     *  residual as the next iteration's residual instead of re-evaluating it
-     *  (one residual evaluation less per Newton iteration; see Solve()). */
-    bool m_line_search_reuse = false;
     mutable Vec m_U_ls;
 
     /** Eisenstat-Walker adaptive forcing (newton.adaptive_forcing = 1):
@@ -334,7 +333,6 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_newton.query("max_iterations",      m_maxits);
     pp_newton.query("require_convergence", m_require_convergence);
     pp_newton.query("line_search",          m_use_line_search);
-    pp_newton.query("line_search_reuse_residual", m_line_search_reuse);
     pp_newton.query("adaptive_forcing",    m_adaptive_forcing);
     pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
     pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
@@ -523,7 +521,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         if (m_use_line_search) {
             // Backtracking: try alpha = 1, 1/2, ... and accept the first trial that
             // reduces the residual norm (falling back to the best trial seen); the
-            // accepted state is re-evaluated at the top of the next iteration unless reused.
+            // accepted state is re-evaluated at the top of the next iteration unless its
+            // residual was the last one evaluated (then it is reused).
             m_U_ls.Copy(a_U);
             amrex::Real alpha = 1._rt;
             amrex::Real best_alpha = 1._rt;
@@ -531,10 +530,10 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             bool last_is_best = false;
             for (int ls = 0; ls <= m_line_search_max_halvings; ++ls) {
                 a_U.linComb(1._rt, m_U_ls, -alpha, m_dU);
-                // with residual reuse the trials are evaluated as the next iteration's
-                // residual (a_iter = iter + 1), so an accepted trial is a full evaluation
-                // (the Ops only test a_nl_iter == 0 for the reduced first evaluation)
-                EvalResidual(m_F, a_U, a_b, a_time, m_line_search_reuse ? iter + 1 : iter);
+                // the trials are evaluated as the next iteration's residual (a_iter =
+                // iter + 1), so an accepted trial is a full evaluation (the Ops only test
+                // a_nl_iter == 0 for the reduced first evaluation)
+                EvalResidual(m_F, a_U, a_b, a_time, iter + 1);
                 amrex::Real const trial_norm = m_F.norm2();
                 last_is_best = false;
                 if (best_norm < 0._rt || trial_norm < best_norm) {
@@ -548,9 +547,10 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             if (best_norm < norm_abs) {
                 a_U.linComb(1._rt, m_U_ls, -best_alpha, m_dU);
                 // reuse when the accepted trial was the last one evaluated (the linComb above
-                // rebuilds the same a_U); exact only for Ops whose residual has no
-                // evaluation-order hysteresis, hence opt-in
-                have_residual = m_line_search_reuse && last_is_best;
+                // rebuilds the same a_U); exact for Ops whose residual has no evaluation-order
+                // hysteresis (the hybrid scheme saves the input density of its dissipative
+                // term at every evaluation for this reason)
+                have_residual = last_is_best;
                 ls_fail_count = 0;
                 if (this->m_verbose && best_alpha < 1._rt) {
                     amrex::Print() << "Newton: line search accepted alpha = "

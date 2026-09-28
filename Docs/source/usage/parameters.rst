@@ -273,10 +273,8 @@ Overall simulation parameters
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
           - ``newton.line_search`` (``bool``, default: false)
             Backtracking line search on the Newton update: accept the largest step fraction in
-            :math:`\{1, 1/2, \ldots, 2^{-6}\}` that reduces the residual norm.
-          - ``newton.line_search_reuse_residual`` (``bool``, default: false)
-            With ``newton.line_search``, reuse the residual of the accepted line-search trial as the next iteration's residual
-            instead of re-evaluating it (saves one residual evaluation per Newton iteration).
+            :math:`\{1, 1/2, \ldots, 2^{-6}\}` that reduces the residual norm. The residual of the accepted trial is reused
+            as the next iteration's residual when it was the last one evaluated (one residual evaluation less per Newton iteration).
           - ``newton.diagnostic_file`` (``string``, default: None)
           - ``newton.diagnostic_interval`` (``int``, default: 1)
           - ``newton.adaptive_forcing`` (``bool``, default: false)
