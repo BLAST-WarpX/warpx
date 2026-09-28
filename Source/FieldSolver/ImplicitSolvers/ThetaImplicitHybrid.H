@@ -372,11 +372,22 @@ public:
      *  Ohm's law and the pe work pairing keep the unfiltered E (conservative smoothing). */
     bool m_filter_push_fields = false;
 
+    /** warpx.use_filter on a fully periodic domain without external fields: the ions also
+     *  gather the filtered B. Ohm's law uses the filtered ion current F J_i, so the net ion
+     *  force leaves sum_g (I - F) J_i x B unbalanced when the gather sees the unfiltered B;
+     *  gathering F B cancels it (sum J x F B = sum F J x B for the self-adjoint filter) and keeps
+     *  total momentum. Energy is unaffected either way (v x B does no work). */
+    bool m_filter_gather_B = false;
+
     /** unfiltered E push-field copies for the filter_push_fields swap */
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_E_unfiltered;
+    /** unfiltered B copies for the filtered-B gather (m_filter_gather_B) */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_B_unfiltered;
 
     /** apply (true) / restore (false) the push-field filter swap */
     void FilterPushFieldsSwap (bool a_apply);
+    /** apply (true) / restore (false) the filtered B of the gather (m_filter_gather_B) */
+    void FilterGatherBSwap (bool a_apply);
 
     /** implicit_evolve.pe_ue_cap_fac: multiplier on the marker-CFL u_e cap of the pe
      *  advance, ue_cap = fac * dx_min/(theta dt). */

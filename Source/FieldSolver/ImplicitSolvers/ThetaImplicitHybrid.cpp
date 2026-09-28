@@ -83,6 +83,10 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_pe_advection == 0 || pe_adv_muscl_ok,
             "implicit_evolve.pe_advection = vanalbada requires the collocated grid");
         pp_impl.query("filter_push_fields", m_filter_push_fields);
+        // the ions gather the filtered B whenever the push field is filtered, on fully periodic
+        // domains without external fields (where the filter is self-adjoint)
+        m_filter_gather_B = WarpX::use_filter && !m_add_external_fields
+                            && m_WarpX->Geom(0).isAllPeriodic();
         if (m_filter_push_fields) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(WarpX::use_filter,
                 "implicit_evolve.filter_push_fields requires warpx.use_filter = 1");
@@ -786,6 +790,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
         // downstream keeps the unfiltered registry (Jacobian probes included)
         FilterPushFieldsSwap(true);
     }
+    if (m_filter_gather_B) { FilterGatherBSwap(true); }
     // A trial iterate may push particles beyond the deposition guard range (a wild
     // linear-solve direction, the stiff wall sheath of the 3D formation case): have the
     // deposits count and skip them instead of asserting, and hand Newton a residual it
@@ -794,6 +799,7 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     WarpXParticleContainer::SetDepositOutOfRangeTolerant(true);
     PreRHSOp( theta_time, a_nl_iter, a_from_jacobian );
     WarpXParticleContainer::SetDepositOutOfRangeTolerant(false);
+    if (m_filter_gather_B) { FilterGatherBSwap(false); }
     if (m_filter_push_fields) {
         FilterPushFieldsSwap(false);
     }
@@ -1168,7 +1174,7 @@ void ThetaImplicitHybrid::FilterPushFieldsSwap (const bool a_apply)
 {
     // Conservative smoothing: PreRHSOp binomial-filters Efield_fp in place for the gather;
     // save E* before and restore it after so Ohm's law and the pe work pairing keep the
-    // unfiltered field (B needs no treatment, v x B does no work).
+    // unfiltered field (B: see FilterGatherBSwap).
     using warpx::fields::FieldType;
     const int lev = 0;
     const ablastr::fields::VectorField E =
@@ -1187,6 +1193,40 @@ void ThetaImplicitHybrid::FilterPushFieldsSwap (const bool a_apply)
             amrex::MultiFab::Copy(Emf, *m_E_unfiltered[n], 0, 0,
                                   Emf.nComp(), Emf.nGrowVect());
         }
+    }
+}
+
+void ThetaImplicitHybrid::FilterGatherBSwap (const bool a_apply)
+{
+    // With the push field filtered (warpx.use_filter), Ohm's law uses the filtered ion current
+    // F J_i, and only a filtered B in v x B balances its J_i x B term in the net ion force:
+    // sum_g J_i x F B = sum_g F J_i x B for the self-adjoint (periodic) filter, so total
+    // momentum is conserved; v x B does no work, so energy is unaffected. Bfield_aux aliases
+    // Bfield_fp at level 0 on the collocated grid, so the gather sees the filtered copy while
+    // Faraday, Ohm's law, the pe advance and the PC see the restored B.
+    using warpx::fields::FieldType;
+    const int lev = 0;
+    const ablastr::fields::VectorField B =
+        m_WarpX->m_fields.get_alldirs(FieldType::Bfield_fp, lev);
+    for (int n = 0; n < 3; ++n) {
+        amrex::MultiFab& Bmf = *B[n];
+        if (a_apply) {
+            if (!m_B_unfiltered[n]) {
+                m_B_unfiltered[n] = std::make_unique<amrex::MultiFab>(
+                    Bmf.boxArray(), Bmf.DistributionMap(),
+                    Bmf.nComp(), Bmf.nGrowVect());
+            }
+            amrex::MultiFab::Copy(*m_B_unfiltered[n], Bmf, 0, 0,
+                                  Bmf.nComp(), Bmf.nGrowVect());
+        } else {
+            amrex::MultiFab::Copy(Bmf, *m_B_unfiltered[n], 0, 0,
+                                  Bmf.nComp(), Bmf.nGrowVect());
+        }
+    }
+    if (a_apply) {
+        m_WarpX->ApplyFilterMF(
+            m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, lev), lev);
+        for (int n = 0; n < 3; ++n) { B[n]->FillBoundary(m_WarpX->Geom(lev).periodicity()); }
     }
 }
 

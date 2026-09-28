@@ -2757,7 +2757,10 @@ void HybridPICModel::FilterPushFieldsSwap (const bool a_apply) const
 {
     // Conservative smoothing: the ions gather the binomial-filtered E (the
     // adjoint of the filtered current deposition) while Ohm's law and Faraday
-    // keep the unfiltered registry field; B needs no treatment.
+    // keep the unfiltered registry field. B is filtered for the gather as well:
+    // Ohm's law uses the filtered ion current, and only a filtered B in v x B
+    // balances it in the net ion force (momentum); v x B does no work, so energy
+    // is unaffected.
     using ablastr::fields::Direction;
     auto& warpx = WarpX::GetInstance();
     const int lev = 0;
@@ -2772,10 +2775,26 @@ void HybridPICModel::FilterPushFieldsSwap (const bool a_apply) const
         } else {
             amrex::MultiFab::Copy(Emf, *m_E_unfiltered[n], 0, 0, Emf.nComp(), Emf.nGrowVect());
         }
+        amrex::MultiFab& Bmf = *warpx.m_fields.get(FieldType::Bfield_fp, Direction{n}, lev);
+        if (a_apply) {
+            if (!m_B_unfiltered[n]) {
+                m_B_unfiltered[n] = std::make_unique<amrex::MultiFab>(
+                    Bmf.boxArray(), Bmf.DistributionMap(), Bmf.nComp(), Bmf.nGrowVect());
+            }
+            amrex::MultiFab::Copy(*m_B_unfiltered[n], Bmf, 0, 0, Bmf.nComp(), Bmf.nGrowVect());
+        } else {
+            amrex::MultiFab::Copy(Bmf, *m_B_unfiltered[n], 0, 0, Bmf.nComp(), Bmf.nGrowVect());
+        }
     }
     if (a_apply) {
         warpx.ApplyFilterMF(
             warpx.m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, lev), lev);
+        warpx.ApplyFilterMF(
+            warpx.m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, lev), lev);
+        for (int n = 0; n < 3; ++n) {
+            warpx.m_fields.get(FieldType::Bfield_fp, Direction{n}, lev)->FillBoundary(
+                warpx.Geom(lev).periodicity());
+        }
     }
 }
 

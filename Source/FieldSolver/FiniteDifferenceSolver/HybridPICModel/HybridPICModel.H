@@ -597,6 +597,8 @@ public:
     bool m_filter_push_fields = false;
     /** unfiltered E copies for the filter_push_fields swap */
     mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_E_unfiltered;
+    /** unfiltered B copies for the filter_push_fields swap (the ions gather the filtered B) */
+    mutable std::array<std::unique_ptr<amrex::MultiFab>, 3> m_B_unfiltered;
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as

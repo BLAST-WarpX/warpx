@@ -400,6 +400,9 @@ Overall simulation parameters
         - ``implicit_evolve.filter_push_fields`` (``bool``, default: false; hybrid theta-implicit scheme only).
           With :pp:param:`warpx.use_filter`, the particles gather the binomial-filtered electric field (the adjoint of the filtered
           current deposition) while Ohm's law keeps the unfiltered field. Fully periodic domains without external fields only.
+          In the hybrid theta-implicit scheme, whenever :pp:param:`warpx.use_filter` is on in a fully periodic domain without external
+          fields (with or without this option), the particles also gather the filtered magnetic field, which balances the filtered
+          ion current of Ohm's law in the net ion force and so conserves total momentum.
 
         - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are five options:
 
@@ -3964,8 +3967,9 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     Explicit scheme with :pp:param:`warpx.use_filter`: the particles gather the binomial-filtered electric
-    field (the adjoint of the filtered current deposition) while Ohm's law and Faraday's law keep the
-    unfiltered field. Fully periodic domains without external fields only.
+    and magnetic fields (the adjoint of the filtered current deposition; the filtered magnetic field keeps
+    the net ion force, and so total momentum, balanced) while Ohm's law and Faraday's law keep the
+    unfiltered fields. Fully periodic domains without external fields only.
 
 .. pp:param:: hybrid_pic_model.kappa_e
     :type: ``float``
