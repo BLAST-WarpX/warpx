@@ -202,7 +202,6 @@ void ThetaImplicitHybrid::Define (WarpX* const a_WarpX, bool /*from_restart*/)
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mm_rho_response_factor >= 1.0_rt,
             "implicit_evolve.mass_matrices_rho_response_factor must be >= 1");
     }
-    pp.query("freeze_dissipation_rho", m_freeze_dissipation_rho);
 
     pp.query("use_fluid_ion_response", m_fluid_ion_response);
     if (m_fluid_ion_response) {
@@ -253,9 +252,6 @@ void ThetaImplicitHybrid::PrintParameters () const
     amrex::Print() << "-------- THETA IMPLICIT HYBRID PIC SOLVER PARAMETERS ------\n";
     amrex::Print() << "-----------------------------------------------------------\n";
     amrex::Print() << "Time-bias parameter theta:           " << m_theta << "\n";
-    if (m_freeze_dissipation_rho) {
-        amrex::Print() << "freeze dissipation rho in probes:    true\n";
-    }
     if (m_fluid_ion_response) {
         amrex::Print() << "fluid ion response in the Jacobian:  true"
                        << (m_skip_particle_picard_init ? " (skip particle Picard init)" : "")
@@ -779,9 +775,9 @@ void ThetaImplicitHybrid::ComputeRHS ( WarpXSolverVec&        a_RHS,
     // Jacobian through the particle response -- in particular the electrostatic
     // limit (B = 0) is degenerate with any recomputed push field, which would
     // not depend on the solver variable at all.
-    if (m_freeze_dissipation_rho) {
-        // D reads rho_fp as left by the previous evaluation: give the Jacobian probes the
-        // density the base evaluation used (see m_freeze_dissipation_rho)
+    {
+        // D reads rho_fp as left by the previous evaluation: give the Jacobian actions the
+        // density the base evaluation used (see m_rho_D)
         amrex::MultiFab* rho = m_WarpX->m_fields.get(FieldType::rho_fp, 0);
         if (!a_from_jacobian) {
             if (!m_rho_D) {

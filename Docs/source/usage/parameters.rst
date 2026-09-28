@@ -352,11 +352,6 @@ Overall simulation parameters
           ``jacobian.pc_type = pc_hybrid_pic`` then builds its ion block from the same coefficients.
           Requires the collocated grid, Cartesian geometry or RZ with ``warpx.n_rz_azimuthal_modes = 1``, and a common charge-to-mass ratio of all charged species; cannot be combined with ``implicit_evolve.use_mass_matrices_jacobian`` or ``implicit_evolve.use_mass_matrices_pc``.
 
-        - ``implicit_evolve.freeze_dissipation_rho`` (``bool``, default: 0; hybrid theta-implicit scheme only).
-          The dissipative part of Ohm's law that is removed from the particle push field is evaluated with the charge density left by the previous residual evaluation.
-          When this option is on, the Jacobian actions reuse the density the base residual evaluation used, so that a resistivity or hyper-resistivity that depends on the density does not put an evaluation-order offset into the Jacobian.
-          The nonlinear residual is unchanged.
-
         - ``implicit_evolve.pe_newton_unknown`` (``bool``, default: 0; hybrid theta-implicit scheme only).
           Evolve the electron pressure as a Newton unknown with its own residual row (requires the in-loop electron energy equation).
           The pressure row is preconditioned by ``jacobian.pc_type = pc_hybrid_pic``.

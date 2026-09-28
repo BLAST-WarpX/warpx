@@ -262,16 +262,14 @@ public:
     mutable std::unique_ptr<amrex::MultiFab> m_rho_base;
 
     /**
-     * implicit_evolve.freeze_dissipation_rho (default 0): the dissipative field D reads the
-     * charge density that rho_fp holds at the entry of each residual evaluation, i.e. the
-     * one left by the previous evaluation. A Jacobian probe therefore evaluates D with the
-     * base evaluation's post-push density while the base residual R0 used the density
-     * before it, and the difference, divided by the probe epsilon, enters every Jacobian
-     * action whenever eta or eta_h depend on rho. With the option on, every nonlinear
-     * evaluation saves its D input density (m_rho_D) and the Jacobian probes restore it,
-     * so the probes see the same D input as R0. The nonlinear residual is unchanged.
+     * The dissipative field D reads the charge density that rho_fp holds at the entry of each
+     * residual evaluation, i.e. the one left by the previous evaluation. Without care a Jacobian
+     * action would evaluate D with the base evaluation's post-push density (or the previous
+     * action's density response) while the base residual used the density before it, and the
+     * difference, divided by the probe epsilon, would enter every Jacobian action wherever eta
+     * or eta_h depend on rho. Every nonlinear evaluation therefore saves its D input density
+     * (m_rho_D) and every Jacobian action restores it; the nonlinear residual is unchanged.
      */
-    bool m_freeze_dissipation_rho = false;
     mutable std::unique_ptr<amrex::MultiFab> m_rho_D;
 
     /**
