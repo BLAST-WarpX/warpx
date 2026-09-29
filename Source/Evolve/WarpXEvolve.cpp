@@ -168,7 +168,19 @@ WarpX::Evolve (int numsteps)
     for (int step = istep[0]; step < numsteps_max && cur_time < stop_time; ++step)
     {
         ABLASTR_PROFILE("WarpX::Evolve::step");
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::Setup", blp_setup);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::FieldIonizationQED", blp_ionization_qed);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::ResamplingMirrors", blp_resampling_mirrors);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::DiagsBeforeMoveWindow", blp_diags_before_mw);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::UpdateElementFinder", blp_element_finder);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::AfterBoundaries", blp_after_boundaries);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::SynchronizeVelocity", blp_sync_velocity);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::ReducedDiags", blp_reduced_diags);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::Diags", blp_diags);
+        ABLASTR_PROFILE_VAR_NS("WarpX::Evolve::step::EndOfStep", blp_end_of_step);
         const auto evolve_time_beg_step = static_cast<Real>(amrex::second());
+
+        ABLASTR_PROFILE_VAR_START(blp_setup);
 
         // Check and clear signal flags and asynchronously broadcast them from process 0
         SignalHandling::CheckSignals();
@@ -225,7 +237,9 @@ WarpX::Evolve (int numsteps)
             HybridPICInitializeRhoJandB();
             m_hybrid_pic_model->m_evolve_initialized = true;
         }
+        ABLASTR_PROFILE_VAR_STOP(blp_setup);
 
+        ABLASTR_PROFILE_VAR_START(blp_ionization_qed);
         // multi-physics: field ionization
         doFieldIonization();
 
@@ -234,6 +248,7 @@ WarpX::Evolve (int numsteps)
         doQEDEvents();
         mypc->doQEDSchwinger();
 #endif
+        ABLASTR_PROFILE_VAR_STOP(blp_ionization_qed);
 
         // perform particle injection
         ExecutePythonCallback("particleinjection");
@@ -241,6 +256,7 @@ WarpX::Evolve (int numsteps)
         // perform collisions and advance fields and particles by one time step
         OneStep(cur_time, dt[0], step, verbose_step);
 
+        ABLASTR_PROFILE_VAR_START(blp_resampling_mirrors);
         // Resample particles
         // +1 is necessary here because value of step seen by user (first step is 1) is different than
         // value of step in code (first step is 0)
@@ -251,6 +267,7 @@ WarpX::Evolve (int numsteps)
             // E : guard cells are NOT up-to-date
             // B : guard cells are NOT up-to-date
         }
+        ABLASTR_PROFILE_VAR_STOP(blp_resampling_mirrors);
 
         for (int lev = 0; lev <= max_level; ++lev) {
             ++istep[lev];
@@ -265,7 +282,9 @@ WarpX::Evolve (int numsteps)
             t_old[i] = t_new[i];
             t_new[i] = cur_time;
         }
+        ABLASTR_PROFILE_VAR_START(blp_diags_before_mw);
         multi_diags->FilterComputePackFlush( step, false, true );
+        ABLASTR_PROFILE_VAR_STOP(blp_diags_before_mw);
 
         const bool move_j = m_is_synchronized;
         // If m_is_synchronized we need to shift j too so that next step we can evolve E by dt/2.
@@ -274,13 +293,17 @@ WarpX::Evolve (int numsteps)
 
         // Update the accelerator lattice element finder if the window has moved,
         // from either a moving window or a boosted frame
+        ABLASTR_PROFILE_VAR_START(blp_element_finder);
         if (num_moved != 0 || gamma_boost > 1) {
             for (int lev = 0; lev <= finest_level; ++lev) {
                 m_accelerator_lattice[lev]->UpdateElementFinder(lev, gett_new());
             }
         }
+        ABLASTR_PROFILE_VAR_STOP(blp_element_finder);
 
         HandleParticlesAtBoundaries(step, cur_time, num_moved);
+
+        ABLASTR_PROFILE_VAR_START(blp_after_boundaries);
 
         // Apply particle thermalizer (no-op until implemented)
         if (m_particle_thermalizer.defined()) {
@@ -341,6 +364,9 @@ WarpX::Evolve (int numsteps)
             ExecutePythonCallback("afterEsolve");
         }
 
+        ABLASTR_PROFILE_VAR_STOP(blp_after_boundaries);
+
+        ABLASTR_PROFILE_VAR_START(blp_sync_velocity);
         bool const do_diagnostic = (multi_diags->DoComputeAndPack(step) || reduced_diags->DoDiags(step));
         bool const end_of_step_loop = (step == numsteps_max - 1) || (cur_time + dt[0] >= stop_time - 1.e-3*dt[0]);
         if (synchronize_velocity_for_diagnostics &&
@@ -354,15 +380,23 @@ WarpX::Evolve (int numsteps)
         // afterstep callback runs with the updated global time. It is included
         // in the evolve timing.
         ExecutePythonCallback("afterstep");
+        ABLASTR_PROFILE_VAR_STOP(blp_sync_velocity);
 
         /// reduced diags
+        ABLASTR_PROFILE_VAR_START(blp_reduced_diags);
         if (reduced_diags->m_plot_rd != 0)
         {
             reduced_diags->LoadBalance();
             reduced_diags->ComputeDiags(step);
             reduced_diags->WriteToFile(step);
         }
+        ABLASTR_PROFILE_VAR_STOP(blp_reduced_diags);
+
+        ABLASTR_PROFILE_VAR_START(blp_diags);
         multi_diags->FilterComputePackFlush( step );
+        ABLASTR_PROFILE_VAR_STOP(blp_diags);
+
+        ABLASTR_PROFILE_VAR_START(blp_end_of_step);
 
         // execute afterdiagnostic callbacks
         ExecutePythonCallback("afterdiagnostics");
@@ -386,6 +420,7 @@ WarpX::Evolve (int numsteps)
                       << " s; This step = " << evolve_time_end_step-evolve_time_beg_step
                       << " s; Avg. per step = " << evolve_time/(step-step_begin+1) << " s\n\n";
         }
+        ABLASTR_PROFILE_VAR_STOP(blp_end_of_step);
 
         if (checkStopSimulation(cur_time)) {
             break;
@@ -741,12 +776,23 @@ void WarpX::ExplicitFillBoundaryEBUpdateAux ()
 
 void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num_moved)
 {
+    ABLASTR_PROFILE("WarpX::HandleParticlesAtBoundaries()");
+    ABLASTR_PROFILE_VAR_NS("WarpX::HandleParticlesAtBoundaries::ContinuousFluxInjection", blp_flux_injection);
+    ABLASTR_PROFILE_VAR_NS("WarpX::HandleParticlesAtBoundaries::GatherScrapedParticles", blp_gather_scraped);
+    ABLASTR_PROFILE_VAR_NS("WarpX::HandleParticlesAtBoundaries::Redistribute", blp_redistribute);
+
+    ABLASTR_PROFILE_VAR_START(blp_flux_injection);
     mypc->ContinuousFluxInjection(cur_time, dt[0]);
+    ABLASTR_PROFILE_VAR_STOP(blp_flux_injection);
 
     ExecutePythonCallback("particlescraper");
 
     mypc->ApplyBoundaryConditions();
+    ABLASTR_PROFILE_VAR_START(blp_gather_scraped);
     m_particle_boundary_buffer->gatherParticlesFromDomainBoundaries(*mypc, cur_time);
+    ABLASTR_PROFILE_VAR_STOP(blp_gather_scraped);
+
+    ABLASTR_PROFILE_VAR_START(blp_redistribute);
 
     // Without mesh refinement, use a local redistribute when particles can only
     // have moved by a small number of cells; otherwise fall back to a global one.
@@ -810,6 +856,7 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
     else {
         mypc->Redistribute();
     }
+    ABLASTR_PROFILE_VAR_STOP(blp_redistribute);
 
     // interact the particles with EB walls (if present)
     if (EB::enabled()) {
@@ -1425,6 +1472,8 @@ WarpX::PushParticlesandDeposit (
     ImplicitOptions const * implicit_options
 )
 {
+    ABLASTR_PROFILE("WarpX::PushParticlesandDeposit()");
+
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 

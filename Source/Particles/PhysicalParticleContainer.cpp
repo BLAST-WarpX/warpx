@@ -502,7 +502,19 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
     ABLASTR_PROFILE("PhysicalParticleContainer::Evolve()");
     ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::Setup", blp_setup);
+    // Note: TinyProfiler only records on the OpenMP master thread. The timers below that are
+    // inside the OpenMP parallel region thus only measure the tiles processed by the master thread.
+    // The difference between "OMPRegion" and "TileLoop" is the time that the master thread
+    // spends waiting for the other threads (load imbalance) and the OpenMP fork/join overhead.
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::OMPRegion", blp_omp_region);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::TileLoop", blp_tile_loop);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::TileSetup", blp_tile_setup);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::DepositCharge", blp_deposit_charge);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::DepositCurrent", blp_deposit_current);
+    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::SplitParticles", blp_split);
 
+    ABLASTR_PROFILE_VAR_START(blp_setup);
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
     const PushType push_type = (implicit_options == nullptr) ? PushType::Explicit : PushType::Implicit;
@@ -540,7 +552,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         (subcycling_half == SubcyclingHalf::None || subcycling_half == SubcyclingHalf::SecondHalf) &&
         (position_push_type == PositionPushType::Full)
     );
+    ABLASTR_PROFILE_VAR_STOP(blp_setup);
 
+    ABLASTR_PROFILE_VAR_START(blp_omp_region);
 #ifdef AMREX_USE_OMP
 #pragma omp parallel
 #endif
@@ -554,8 +568,10 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
         FArrayBox filtered_Ex, filtered_Ey, filtered_Ez;
         FArrayBox filtered_Bx, filtered_By, filtered_Bz;
 
+        ABLASTR_PROFILE_VAR_START(blp_tile_loop);
         for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
         {
+            ABLASTR_PROFILE_VAR_START(blp_tile_setup);
             if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
             {
                 amrex::Gpu::synchronize();
@@ -613,8 +629,10 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
             }
 
             const long np_to_deposit = has_J_buf ? nfine_deposit : np;
+            ABLASTR_PROFILE_VAR_STOP(blp_tile_setup);
 
             if (deposit_charge) {
+                ABLASTR_PROFILE_VAR_START(blp_deposit_charge);
                 // Deposit charge before particle push, in component 0 of MultiFab rho.
 
                 const int* const AMREX_RESTRICT ion_lev = (do_field_ionization)?
@@ -628,6 +646,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                     DepositCharge(pti, wp, ion_lev, crho, 0, np_to_deposit,
                                   np-np_to_deposit, thread_num, lev, lev-1);
                 }
+                ABLASTR_PROFILE_VAR_STOP(blp_deposit_charge);
             }
 
             if (! do_not_push)
@@ -735,6 +754,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 // Current Deposition
                 if (deposit_current)
                 {
+                    ABLASTR_PROFILE_VAR_START(blp_deposit_current);
                     // Deposit at t_{n+1/2} with explicit push
                     const amrex::Real relative_time = (push_type == PushType::Explicit ? -0.5_rt * dt : 0.0_rt);
 
@@ -768,6 +788,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                        np_to_deposit, np-np_to_deposit, thread_num,
                                        lev, lev-1, dt, relative_time, push_type);
                     }
+                    ABLASTR_PROFILE_VAR_STOP(blp_deposit_current);
                 } // end of "if skip_deposition"
 
                 if (push_type == PushType::Implicit) {
@@ -849,7 +870,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 amrex::HostDevice::Atomic::Add( &(*cost)[pti.index()], wt);
             }
         }
+        ABLASTR_PROFILE_VAR_STOP(blp_tile_loop);
     }
+    ABLASTR_PROFILE_VAR_STOP(blp_omp_region);
 
     // Split particles at the end of the time step.
     // When subcycling is ON, the splitting is done on the last call to
@@ -858,7 +881,9 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     // are not consistent, and the call to Redistribute (in SplitParticles)
     // may result in split particles to deposit twice on the coarse level.
     if (split_particles) {
+        ABLASTR_PROFILE_VAR_START(blp_split);
         SplitParticles(lev);
+        ABLASTR_PROFILE_VAR_STOP(blp_split);
     }
 }
 

@@ -444,6 +444,7 @@ WarpX::MoveWindow (const int step, bool move_j)
     int num_shift      = num_shift_base;
     int num_shift_crse = num_shift;
 
+    ABLASTR_PROFILE_VAR("WarpX::MoveWindow::ShiftFields", blp_shift_fields);
     // Shift the mesh fields
     for (int lev = 0; lev <= finest_level; ++lev) {
 
@@ -626,7 +627,9 @@ WarpX::MoveWindow (const int step, bool move_j)
             }
         }
     }
+    ABLASTR_PROFILE_VAR_STOP(blp_shift_fields);
 
+    ABLASTR_PROFILE_VAR("WarpX::MoveWindow::ContinuousInjection", blp_continuous_injection);
     // Loop over species (particles and lasers)
     const int n_containers = mypc->nContainers();
     for (int i=0; i<n_containers; i++)
@@ -677,6 +680,7 @@ WarpX::MoveWindow (const int step, bool move_j)
             }
         }
     }
+    ABLASTR_PROFILE_VAR_STOP(blp_continuous_injection);
 
     // Continuously inject fluid species in new cells (by default only on level 0)
     const int lev = 0;
