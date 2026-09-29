@@ -18,6 +18,8 @@ import glob
 import numpy as np
 import yt
 
+# Match only diag1 + 6-digit step number (assumes the default diagnostics
+# file_min_digits = 6 and fewer than 10^6 steps)
 files = sorted(glob.glob("diags/diag1" + 6 * "[0-9]"))[1:]
 assert len(files) > 0
 

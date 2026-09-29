@@ -35,7 +35,9 @@ yt.funcs.mylog.setLevel(0)
 
 # Check plotfile name specified in command line
 last_filename = sys.argv[1]
-filename_radical = last_filename[:-6]
+# Strip the 6-digit step number (assumes the default diagnostics file_min_digits = 6
+# and fewer than 10^6 steps)
+filename_radical = last_filename.rstrip("/")[:-6]
 
 # Loop through files, and extract the position and velocity of both particles
 x1 = []
