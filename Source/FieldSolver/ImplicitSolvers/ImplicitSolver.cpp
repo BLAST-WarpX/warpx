@@ -9,6 +9,7 @@
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 
+#include <algorithm>
 #include <sstream>
 
 using namespace amrex;
@@ -227,6 +228,24 @@ void ImplicitSolver::SaveE ()
         amrex::MultiFab::Copy(*E0[2], *E[2], 0, 0, E[2]->nComp(), E[2]->nGrowVect());
     }
 
+}
+
+amrex::IntVect ImplicitSolver::MassMatricesStencilHalfWidth () const
+{
+    // For each of the nine blocks, ApplyMassMatrices() gathers over the offsets
+    // -offset_ab ... ncomp_ab-1-offset_ab, where offset_ab is either
+    // (ncomp_ab-1)/2 or ncomp_ab/2 depending on the relative staggering of the
+    // two components involved. In both cases the furthest cell reached in a
+    // given direction is ncomp_ab/2 (integer division) away, so take the
+    // largest such reach over all nine blocks.
+    amrex::IntVect half_width = amrex::IntVect::TheZeroVector();
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        half_width[dir] = std::max({
+            m_ncomp_xx[dir]/2, m_ncomp_xy[dir]/2, m_ncomp_xz[dir]/2,
+            m_ncomp_yx[dir]/2, m_ncomp_yy[dir]/2, m_ncomp_yz[dir]/2,
+            m_ncomp_zx[dir]/2, m_ncomp_zy[dir]/2, m_ncomp_zz[dir]/2 });
+    }
+    return half_width;
 }
 
 void ImplicitSolver::ApplyMassMatrices (
