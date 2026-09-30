@@ -1,0 +1,11 @@
+FILE=inputs_base_3d_field_probe
+
+max_step = 0
+warpx.do_moving_window = 0
+
+FP.intervals = 1
+FP.probe_geometry = Point
+FP.x_probe = 31.e-6
+FP.y_probe = 0
+FP.z_probe = 0
+FP.do_moving_window_FP = 0

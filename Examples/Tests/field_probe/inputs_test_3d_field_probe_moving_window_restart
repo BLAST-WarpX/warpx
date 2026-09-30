@@ -1,0 +1,3 @@
+FILE=inputs_test_3d_field_probe_moving_window_checkpoint
+
+amr.restart = "../test_3d_field_probe_moving_window_checkpoint/diags/chk000010"
