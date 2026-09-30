@@ -233,4 +233,4 @@ To keep the name of a renamed parameter working, accept both names with ``valida
        description="...",
    )
 
-Classes that only exist in WarpX, which derive from an extension class of the standard (``picmistandard.PICMI_Extension``, ``PICMI_SolverExtension``, ``PICMI_DiagnosticExtension``, ...), e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
+Classes that only exist in WarpX, which derive from the base class of their kind in the standard (``picmistandard.PICMI_Solver``, ``PICMI_Diagnostic``, ...) or from ``picmistandard.PICMI_Extension`` if they have no kind, e.g., ``HybridPICSolver`` or ``ReducedDiagnostic``, use no prefix: all their parameters are WarpX parameters.
