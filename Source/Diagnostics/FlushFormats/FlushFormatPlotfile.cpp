@@ -431,12 +431,11 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
                                    utils::parser::compileParser<ParticleDiag::m_nvars>
                                        (part_diag.m_particle_filter_parser.get()),
                                    pc->getMass(), time);
-        parser_filter.m_units = InputUnits::SI;
+        parser_filter.m_units = InputUnits::WarpX;
         GeometryFilter const geometry_filter(part_diag.m_do_geom_filter,
                                              part_diag.m_diag_domain);
 
         if (!isBTD) {
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pc, mass);
             using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
             tmp.copyParticles(*pc,
                               [random_filter,uniform_filter,parser_filter,geometry_filter]
@@ -447,9 +446,7 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
                 return random_filter(p, engine) * uniform_filter(p, engine)
                     * parser_filter(p, engine) * geometry_filter(p, engine);
             }, true);
-            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pc, mass);
         } else {
-            particlesConvertUnits(ConvertDirection::WarpX_to_SI, pinned_pc, mass);
             using SrcData = WarpXParticleContainer::ParticleTileType::ConstParticleTileDataType;
             tmp.copyParticles(*pinned_pc,
                               [random_filter,uniform_filter,parser_filter,geometry_filter]
@@ -460,8 +457,10 @@ FlushFormatPlotfile::WriteParticles(const std::string& dir,
                 return random_filter(p, engine) * uniform_filter(p, engine)
                     * parser_filter(p, engine) * geometry_filter(p, engine);
             }, true);
-            particlesConvertUnits(ConvertDirection::SI_to_WarpX, pinned_pc, mass);
         }
+        // Convert only the output copy: a floating-point SI round trip is not
+        // an exact inverse and must not perturb live particles or BTD buffers.
+        particlesConvertUnits(ConvertDirection::WarpX_to_SI, &tmp, mass);
 
         // real_names contains a list of all particle attributes.
         // real_flags & int_flags are 1 or 0, whether quantity is dumped or not.
