@@ -435,6 +435,64 @@ def setup(app):
                     entry = entry[: -len(name)] + alias
             return entry
 
+    # The classes of each kind, e.g., the field solvers, which the types of the parameters name
+    # (``PICMI_AnySolver``): the classes of the standard and the WarpX classes deriving from them.
+    import types as _types
+
+    from docutils import nodes
+    from docutils.parsers.rst import Directive
+    from docutils.statemachine import StringList
+
+    import picmistandard
+    import pywarpx.picmi
+
+    picmi_kinds = {
+        name: value
+        for name, value in vars(picmistandard).items()
+        if name.startswith("PICMI_Any") and isinstance(value, _types.UnionType)
+    }
+
+    def warpx_classes_of_kind(union):
+        return sorted(
+            name
+            for name, value in vars(pywarpx.picmi).items()
+            if isinstance(value, type)
+            and value.__module__ == "pywarpx.picmi"
+            and issubclass(value, union.__args__)
+        )
+
+    class PicmiKinds(Directive):
+        """Document the classes that each type alias of the PICMI standard accepts in WarpX"""
+
+        def run(self):
+            lines = []
+            for name, union in picmi_kinds.items():
+                classes = warpx_classes_of_kind(union)
+                if not classes:
+                    continue
+                lines += [
+                    f".. py:data:: picmistandard.{name}",
+                    "",
+                    "    "
+                    + ", ".join(f":py:class:`~pywarpx.picmi.{c}`" for c in classes),
+                    "",
+                ]
+            node = nodes.section()
+            self.state.nested_parse(StringList(lines), self.content_offset, node)
+            return node.children
+
+    def resolve_picmi_kinds(app, env, node, contnode):
+        # the types name the aliases of the standard, which are documented above as data
+        target = node.get("reftarget", "")
+        if node.get("refdomain") == "py" and target.rsplit(".", 1)[-1] in picmi_kinds:
+            return env.get_domain("py").resolve_xref(
+                env, node["refdoc"], app.builder, "obj", target, node, contnode
+            )
+        return None
+
+    app.add_directive("picmi-kinds", PicmiKinds)
+    app.connect("missing-reference", resolve_picmi_kinds)
+
     app.setup_extension("sphinxcontrib.autodoc_pydantic")
     app.add_autodocumenter(GroupedPydanticModelDocumenter, override=True)
     app.add_directive_to_domain(

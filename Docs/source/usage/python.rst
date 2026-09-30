@@ -56,6 +56,7 @@ Simulation and Grid Setup
     :inherited-members: BaseModel
 
 Field solvers define the updates of electric and magnetic fields.
+Any of them is passed as :py:data:`~picmistandard.PICMI_AnySolver` to ``Simulation(solver=...)``.
 
 .. autopydantic_model:: pywarpx.picmi.ElectromagneticSolver
     :inherited-members: BaseModel
@@ -125,7 +126,7 @@ which can be used directly inside any PICMI script. The values are in SI units.
 Applied fields
 --------------
 
-Instances of the classes below need to be passed to the method `add_applied_field` of the `Simulation` class.
+Instances of the classes below need to be passed as :py:data:`~picmistandard.PICMI_AnyAppliedField` to the method `add_applied_field` of the `Simulation` class.
 
 .. autopydantic_model:: pywarpx.picmi.AnalyticInitialField
     :inherited-members: BaseModel
@@ -190,6 +191,7 @@ For instance, background plasma electrons, background plasma ions and an externa
     :inherited-members: BaseModel
 
 Particle distributions can be used for to initialize particles in a particle species.
+Any of them is passed as :py:data:`~picmistandard.PICMI_AnyDistribution` to ``Species(initial_distribution=...)``.
 
 .. autopydantic_model:: pywarpx.picmi.GaussianBunchDistribution
     :inherited-members: BaseModel
@@ -213,6 +215,7 @@ Particle distributions can be used for to initialize particles in a particle spe
     :inherited-members: BaseModel
 
 Particle layouts determine how to microscopically place macro particles in a grid cell.
+Any of them is passed as :py:data:`~picmistandard.PICMI_AnyLayout` to ``Simulation.add_species``.
 
 .. autopydantic_model:: pywarpx.picmi.GriddedLayout
     :inherited-members: BaseModel
@@ -238,6 +241,7 @@ Laser Pulses
 ------------
 
 Laser profiles can be used to initialize laser pulses in the simulation.
+Any of them is passed as :py:data:`~picmistandard.PICMI_AnyLaser` to ``Simulation.add_laser``.
 
 .. autopydantic_model:: pywarpx.picmi.GaussianLaser
     :inherited-members: BaseModel
@@ -246,6 +250,16 @@ Laser profiles can be used to initialize laser pulses in the simulation.
     :inherited-members: BaseModel
 
 Laser injectors control where to initialize laser pulses on the simulation grid.
+Any of them is passed as :py:data:`~picmistandard.PICMI_AnyLaserInjection` to ``Simulation.add_laser``.
 
 .. autopydantic_model:: pywarpx.picmi.LaserAntenna
     :inherited-members: BaseModel
+
+
+Type Aliases
+------------
+
+The types of the parameters name the classes that they accept, e.g., :py:data:`~picmistandard.PICMI_AnySolver` for a field solver.
+These `type aliases of the PICMI standard <https://picmi.readthedocs.io/en/latest/standard/types.html>`__ accept the WarpX classes of that kind, which derive from the classes of the standard:
+
+.. picmi-kinds::
