@@ -114,8 +114,10 @@ public:
     amrex::Real focal_distance;
     bool do_rotation = false;
     bool do_rotation_momenta = false;
+    bool do_crabwaist = false;
     amrex::Real rotation_angle;
     amrex::Vector<amrex::Real> rotation_axis;
+    amrex::Real crabwaist_strength;
 
     bool external_file = false; //! initialize from an openPMD file
     amrex::Real z_shift = 0.0; //! additional z offset for particle positions
