@@ -27,9 +27,9 @@ namespace ablastr::utils::serialization
     * @param[in] val a variable of type T to be serialized
     * @param[in, out] vec a reference to the vector to which the byte representation of val is appended
     */
-    template <typename T,
-        std::enable_if_t<std::is_trivially_copyable_v<T> || std::is_same_v<T, std::string>, bool> = true>
+    template <typename T>
     void put_in(const T &val, std::vector<char> &vec)
+    requires (std::is_trivially_copyable_v<T> || std::is_same_v<T, std::string>)
     {
         if constexpr (std::is_same<T, std::string>())
         {
@@ -75,9 +75,9 @@ namespace ablastr::utils::serialization
     * @param[in, out] it the iterator to a byte vector
     * @return the variable extracted from the byte array
     */
-    template <typename T,
-        std::enable_if_t<std::is_trivially_copyable_v<T> || std::is_same_v<T, std::string>, bool> = true>
+    template <typename T>
     T get_out(std::vector<char>::const_iterator &it)
+    requires (std::is_trivially_copyable_v<T> || std::is_same_v<T, std::string>)
     {
         if constexpr (std::is_same<T, std::string>())
         {
