@@ -66,12 +66,6 @@ picmistandard.register_constants(constants)
 
 def _set_refined_region_inputs(refined_regions):
     if refined_regions:
-        assert len(refined_regions) == 1, Exception(
-            "WarpX only supports one refined region."
-        )
-        assert refined_regions[0][0] == 1, Exception(
-            "The one refined region can only be level 1"
-        )
         pywarpx.amr.max_level = 1
         pywarpx.warpx.fine_tag_lo = refined_regions[0][1]
         pywarpx.warpx.fine_tag_hi = refined_regions[0][2]
@@ -351,9 +345,10 @@ class Species(picmistandard.PICMI_Species):
                     if m["iso"] is not None:
                         element = element[m["iso"][1:]]
                     if self.charge_state is not None:
-                        assert self.charge_state <= element.number, Exception(
-                            "%s charge state not valid" % self.particle_type
-                        )
+                        if self.charge_state > element.number:
+                            raise ValueError(
+                                f"{self.particle_type} charge state not valid"
+                            )
                         try:
                             element = element.ion[self.charge_state]
                         except ValueError:
@@ -366,7 +361,7 @@ class Species(picmistandard.PICMI_Species):
                             element.mass * periodictable.constants.atomic_mass_constant
                         )
                 else:
-                    raise Exception('The species "particle_type" is not known')
+                    raise ValueError('The species "particle_type" is not known')
 
         if (
             self.resampling_algorithm_delta_u is not None
@@ -466,11 +461,10 @@ class Species(picmistandard.PICMI_Species):
                     self._species_number, layout, self._species, self.density_scale, ""
                 )
             elif distributions_is_list and (layout_is_list or layout is None):
-                assert layout is None or (
-                    len(self.initial_distribution) == len(layout)
-                ), Exception(
-                    "The initial distribution and layout lists must have the same lenth"
-                )
+                if layout is not None and len(self.initial_distribution) != len(layout):
+                    raise ValueError(
+                        "The initial distribution and layout lists must have the same length"
+                    )
                 source_names = [
                     f"dist{i}" for i in range(len(self.initial_distribution))
                 ]
@@ -485,16 +479,17 @@ class Species(picmistandard.PICMI_Species):
                         source_names[i],
                     )
             else:
-                raise Exception(
+                raise ValueError(
                     "The initial distribution and layout must both be scalars or both be lists"
                 )
 
         if injection_plane_position is not None:
             if injection_plane_normal_vector is not None:
-                assert (
-                    injection_plane_normal_vector[0] == 0.0
-                    and injection_plane_normal_vector[1] == 0.0
-                ), Exception("Rigid injection can only be done along z")
+                if (
+                    injection_plane_normal_vector[0] != 0.0
+                    or injection_plane_normal_vector[1] != 0.0
+                ):
+                    raise ValueError("Rigid injection can only be done along z")
             pywarpx.particles.rigid_injected_species.append(self.name)
             self._species.rigid_advance = 1
             self._species.zinject_plane = injection_plane_position
@@ -643,15 +638,16 @@ class DensityDistributionBase(object):
                 layout.n_macroparticle_per_cell,
             )
         elif isinstance(layout, PseudoRandomLayout):
-            assert layout.n_macroparticles_per_cell is not None, Exception(
-                "WarpX only supports n_macroparticles_per_cell for the PseudoRandomLayout with this distribution"
-            )
+            if layout.n_macroparticles_per_cell is None:
+                raise ValueError(
+                    "WarpX only supports n_macroparticles_per_cell for the PseudoRandomLayout with this distribution"
+                )
             species.add_new_group_attr(source_name, "injection_style", "nrandompercell")
             species.add_new_group_attr(
                 source_name, "num_particles_per_cell", layout.n_macroparticles_per_cell
             )
         else:
-            raise Exception(
+            raise TypeError(
                 "WarpX does not support the specified layout for this distribution"
             )
 
@@ -826,9 +822,10 @@ class FluxDistributionBase(object):
 
         # --- Use specific attributes for flux injection
         species.add_new_group_attr(source_name, "injection_style", "nfluxpercell")
-        assert isinstance(layout, PseudoRandomLayout), Exception(
-            "UniformFluxDistribution only supports the PseudoRandomLayout in WarpX"
-        )
+        if not isinstance(layout, PseudoRandomLayout):
+            raise TypeError(
+                "UniformFluxDistribution only supports the PseudoRandomLayout in WarpX"
+            )
         if self.gaussian_flux_momentum_distribution:
             species.add_new_group_attr(
                 source_name, "momentum_distribution_type", "gaussianflux"
@@ -1018,7 +1015,22 @@ class BinomialSmoother(picmistandard.PICMI_BinomialSmoother):
         pywarpx.warpx.filter_npass_each_dir = n_pass
 
 
-class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
+class WarpXGridBase(object):
+    """
+    Base class of the WarpX grids, with the checks that they share.
+    """
+
+    @field_validator("refined_regions", check_fields=False)
+    @classmethod
+    def _one_refined_region_of_level_1(cls, refined_regions):
+        if len(refined_regions) > 1:
+            raise ValueError("WarpX only supports one refined region")
+        if refined_regions and refined_regions[0][0] != 1:
+            raise ValueError("The one refined region can only be level 1")
+        return refined_regions
+
+
+class CylindricalGrid(picmistandard.PICMI_CylindricalGrid, WarpXGridBase):
     """
     This assumes that WarpX was compiled with USE_RZ = TRUE
 
@@ -1114,14 +1126,6 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
         pywarpx.amr.blocking_factor_x = self.blocking_factor_x
         pywarpx.amr.blocking_factor_y = self.blocking_factor_y
 
-        assert self.lower_bound[0] >= 0.0, Exception(
-            "Lower radial boundary must be >= 0."
-        )
-        assert (
-            self.lower_boundary_conditions[0] != "periodic"
-            and self.upper_boundary_conditions[0] != "periodic"
-        ), Exception("Radial boundaries can not be periodic")
-
         pywarpx.warpx.n_rz_azimuthal_modes = self.n_azimuthal_modes
 
         # Boundary conditions
@@ -1160,7 +1164,7 @@ class CylindricalGrid(picmistandard.PICMI_CylindricalGrid):
         _set_refined_region_inputs(self.refined_regions)
 
 
-class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
+class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid, WarpXGridBase):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
     """
@@ -1263,7 +1267,7 @@ class Cartesian1DGrid(picmistandard.PICMI_Cartesian1DGrid):
         _set_refined_region_inputs(self.refined_regions)
 
 
-class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
+class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid, WarpXGridBase):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
     """
@@ -1389,7 +1393,7 @@ class Cartesian2DGrid(picmistandard.PICMI_Cartesian2DGrid):
         _set_refined_region_inputs(self.refined_regions)
 
 
-class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid):
+class Cartesian3DGrid(picmistandard.PICMI_Cartesian3DGrid, WarpXGridBase):
     """
     See `Input Parameters <https://warpx.readthedocs.io/en/latest/usage/parameters.html>`__ for more information.
     """
@@ -1544,6 +1548,10 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
         alias_generator=warpx_options(picmistandard.PICMI_ElectromagneticSolver)
     )
 
+    method: Literal["Yee", "CKC", "PSATD", "ECT"] | None = Field(
+        default=None,
+        description="The advance method used to solve Maxwell's equations. WarpX supports 'Yee', 'CKC', 'PSATD', and 'ECT'.",
+    )
     pml_ncell: int | None = Field(
         default=None, description="The depth of the PML, in number of cells"
     )
@@ -1596,15 +1604,6 @@ class ElectromagneticSolver(picmistandard.PICMI_ElectromagneticSolver):
     do_pml_j_damping: bool | None = Field(
         default=None, description="Whether to do damping of J in the PML"
     )
-
-    def model_post_init(self, context) -> None:
-        super().model_post_init(context)
-        assert self.method is None or self.method in [
-            "Yee",
-            "CKC",
-            "PSATD",
-            "ECT",
-        ], Exception("Only 'Yee', 'CKC', 'PSATD', and 'ECT' are supported")
 
     def solver_initialize_inputs(self):
         self.grid.grid_initialize_inputs()
@@ -2872,9 +2871,6 @@ class LoadAppliedField(
 
         # Always register this object as a named external field so that multiple
         # LoadAppliedField objects compose (no overwrite of global keys).
-        if not hasattr(self, "read_fields_from_path") or not self.read_fields_from_path:
-            raise ValueError("[PICMI] read_fields_from_path must be provided.")
-
         # construct particles.<fname>.read_fields_from_path as needed for WarpX input
         fname = self._next_auto_name()
         pywarpx.particles.__setattr__(
@@ -3003,8 +2999,11 @@ class FieldIonization(picmistandard.PICMI_FieldIonization):
     WarpX only has ADK ionization model implemented.
     """
 
+    model: Literal["ADK"] = Field(
+        description='Ionization model. WarpX only has the "ADK" model implemented.'
+    )
+
     def interaction_initialize_inputs(self):
-        assert self.model == "ADK", "WarpX only has ADK ionization model implemented"
         self.ionized_species._species.do_field_ionization = 1
         self.ionized_species._species.physical_element = (
             self.ionized_species.particle_type
@@ -3319,19 +3318,17 @@ class EmbeddedBoundary(
 
     @model_validator(mode="after")
     def _check_geometry(self) -> Self:
-        assert self.stl_file is None or self.implicit_function is None, (
-            "Only one between implicit_function and stl_file can be specified"
-        )
+        if self.stl_file is not None and self.implicit_function is not None:
+            raise ValueError(
+                "Only one between implicit_function and stl_file can be specified"
+            )
         if self.stl_file is None:
-            assert self.stl_scale is None, (
-                "EB can only be scaled only when using an stl file"
-            )
-            assert self.stl_center is None, (
-                "EB can only be translated only when using an stl file"
-            )
-            assert self.stl_reverse_normal is False, (
-                "EB can only be reversed only when using an stl file"
-            )
+            if self.stl_scale is not None:
+                raise ValueError("EB can only be scaled when using an stl file")
+            if self.stl_center is not None:
+                raise ValueError("EB can only be translated when using an stl file")
+            if self.stl_reverse_normal:
+                raise ValueError("EB can only be reversed when using an stl file")
         return self
 
     def embedded_boundary_initialize_inputs(self, solver):
@@ -3423,26 +3420,24 @@ class MacroscopicProperty(
 
     @model_validator(mode="after")
     def _check_parameters(self) -> Self:
-        assert (
-            sum(
-                [
-                    self.stl_file is not None,
-                    self.implicit_function is not None,
-                    self.value is not None,
-                ]
+        given = [self.stl_file, self.implicit_function, self.value]
+        if sum(value is not None for value in given) != 1:
+            raise ValueError(
+                "Exactly one of implicit_function, stl_file, and value must be specified"
             )
-            == 1
-        ), "Exactly one one of implicit_function, stl_file, and value must be specified"
         if self.stl_file is None:
-            assert self.stl_scale is None, (
-                "Material property can only be scaled only when using an stl file"
-            )
-            assert self.stl_center is None, (
-                "Material property  can only be translated only when using an stl file"
-            )
-            assert self.stl_reverse_normal is False, (
-                "Material property  can only be reversed only when using an stl file"
-            )
+            if self.stl_scale is not None:
+                raise ValueError(
+                    "Material property can only be scaled when using an stl file"
+                )
+            if self.stl_center is not None:
+                raise ValueError(
+                    "Material property can only be translated when using an stl file"
+                )
+            if self.stl_reverse_normal:
+                raise ValueError(
+                    "Material property can only be reversed when using an stl file"
+                )
         # Validate method for conductivity (sigma)
         if self.method is not None and self.name != "sigma":
             raise ValueError("Input 'method' can only be used with 'sigma'")
@@ -3510,9 +3505,8 @@ class PlasmaLens(picmistandard.PICMI_AppliedField):
 
     @model_validator(mode="after")
     def _check_strengths(self) -> Self:
-        assert (self.strengths_E is not None) or (self.strengths_B is not None), (
-            "One of strengths_E or strengths_B must be supplied"
-        )
+        if self.strengths_E is None and self.strengths_B is None:
+            raise ValueError("One of strengths_E or strengths_B must be supplied")
         return self
 
     def applied_field_initialize_inputs(self):
@@ -3846,9 +3840,10 @@ class Simulation(picmistandard.PICMI_Simulation):
         particle_shape = self.particle_shape
         for s in self.species:
             if s.particle_shape is not None:
-                assert particle_shape is None or particle_shape == s.particle_shape, (
-                    Exception("WarpX only supports one particle shape for all species")
-                )
+                if particle_shape is not None and particle_shape != s.particle_shape:
+                    raise ValueError(
+                        "WarpX only supports one particle shape for all species"
+                    )
                 # --- If this was set for any species, use that value.
                 particle_shape = s.particle_shape
 
@@ -3901,7 +3896,10 @@ class Simulation(picmistandard.PICMI_Simulation):
             )
 
         for interaction in self.interactions:
-            assert isinstance(interaction, FieldIonization)
+            if not isinstance(interaction, FieldIonization):
+                raise TypeError(
+                    f"WarpX does not support the interaction {type(interaction).__name__}"
+                )
             interaction.interaction_initialize_inputs()
 
         if self.collisions is not None:
@@ -4191,6 +4189,15 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
         default_factory=list,
         description="List of ParticleFieldDiagnostic classes to install in the simulation. Error checking is handled in the class itself.",
     )
+
+    @field_validator("particle_fields_to_plot")
+    @classmethod
+    def _unique_particle_field_names(cls, particle_fields_to_plot):
+        names = [pfd.name for pfd in particle_fields_to_plot]
+        if len(names) != len(set(names)):
+            raise ValueError("A particle fields name can not be repeated.")
+        return particle_fields_to_plot
+
     particle_fields_species: list[str] | None = Field(
         default=None,
         description="Species for which to calculate particle_fields_to_plot functions. Fields will be calculated separately for each specified species. If not passed, default is all of the available particle species.",
@@ -4293,11 +4300,7 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
             fields_to_plot.sort()
             self._diagnostic.set_or_replace_attr("fields_to_plot", fields_to_plot)
 
-        particle_fields_to_plot_names = list()
         for pfd in self.particle_fields_to_plot:
-            if pfd.name in particle_fields_to_plot_names:
-                raise Exception("A particle fields name can not be repeated.")
-            particle_fields_to_plot_names.append(pfd.name)
             self._diagnostic.__setattr__(
                 f"particle_fields.{pfd.name}(x,y,z,ux,uy,uz)", pfd.func
             )
@@ -4310,7 +4313,9 @@ class FieldDiagnostic(picmistandard.PICMI_FieldDiagnostic, WarpXDiagnosticBase):
 
         # --- Convert to a sorted list so that the order
         # --- is the same on all processors.
-        particle_fields_to_plot_names.sort()
+        particle_fields_to_plot_names = sorted(
+            pfd.name for pfd in self.particle_fields_to_plot
+        )
         self._diagnostic.particle_fields_to_plot = particle_fields_to_plot_names
         self._diagnostic.particle_fields_species = self.particle_fields_species
         self._diagnostic.plot_raw_fields = self.plot_raw_fields
