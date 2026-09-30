@@ -11,12 +11,14 @@
 #include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
+#include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
 #include <AMReX_Extension.H>
 #include <AMReX_FArrayBox.H>
 #include <AMReX_FabArray.H>
+#include <AMReX_IntVect.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MultiFab.H>
 
@@ -87,7 +89,16 @@ Filter::ApplyStencil (FArrayBox& dstfab, const FArrayBox& srcfab,
     DoFilter(tbx, src, dst, scomp, dcomp, ncomp);
 }
 
-/* \brief Apply stencil (CPU/GPU)
+/* \brief Apply stencil (GPU version)
+ *
+ * The bilinear/binomial stencil is separable, so the multi-dimensional filter
+ * is applied as a sequence of one-dimensional passes (one per dimension) that
+ * write into local scratch buffers. Compared to evaluating the full
+ * tensor-product stencil in a single kernel, this greatly reduces the number
+ * of memory accesses per cell and keeps each pass a simple, low-register
+ * kernel (better occupancy). The scratch buffers are grown just enough in the
+ * not-yet-filtered directions for the subsequent passes, so no ghost-cell
+ * communication is required between passes.
  */
 void Filter::DoFilter (const Box& tbx,
                        Array4<Real const> const& src,
@@ -101,84 +112,102 @@ void Filter::DoFilter (const Box& tbx,
     )
     Dim3 slen_local = slen;
 
-#if AMREX_SPACEDIM == 3
-    AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
-    {
-        Real d = 0.0;
+    // Note: only the first pass (reading from src) needs to pad out-of-bound
+    // accesses with zeros; subsequent passes read from scratch buffers that are
+    // sized to always be in bounds.
 
-        // Pad source array with zeros beyond ghost cells
-        // for out-of-bound accesses due to large-stencil operations
+#if AMREX_SPACEDIM == 3
+    const int rx = slen_local.x - 1;
+    const int ry = slen_local.y - 1;
+    const int rz = slen_local.z - 1;
+
+    // Scratch buffers, grown in the not-yet-filtered directions so that each
+    // subsequent pass finds its neighbors in bounds.
+    const Box xbx = amrex::grow(tbx, IntVect(0, ry, rz));
+    const Box ybx = amrex::grow(tbx, IntVect(0,  0, rz));
+    FArrayBox xfab(xbx, ncomp, The_Async_Arena());
+    FArrayBox yfab(ybx, ncomp, The_Async_Arena());
+    const Array4<Real> xtmp = xfab.array();
+    const Array4<Real> ytmp = yfab.array();
+
+    // Pass in x: read src (zero-padded), write xtmp
+    AMREX_PARALLEL_FOR_4D ( xbx, ncomp, i, j, k, n,
+    {
         const auto src_zeropad = [src] (const int jj, const int kk, const int ll, const int nn) noexcept
         {
             return src.contains(jj,kk,ll) ? src(jj,kk,ll,nn) : 0.0_rt;
         };
-
-        for         (int i2=0; i2 < slen_local.z; ++i2){
-            for     (int i1=0; i1 < slen_local.y; ++i1){
-                for (int i0=0; i0 < slen_local.x; ++i0){
-                    Real sss = s0[i0]*s1[i1]*s2[i2];
-                    d += sss*( src_zeropad(i-i0,j-i1,k-i2,scomp+n)
-                              +src_zeropad(i+i0,j-i1,k-i2,scomp+n)
-                              +src_zeropad(i-i0,j+i1,k-i2,scomp+n)
-                              +src_zeropad(i+i0,j+i1,k-i2,scomp+n)
-                              +src_zeropad(i-i0,j-i1,k+i2,scomp+n)
-                              +src_zeropad(i+i0,j-i1,k+i2,scomp+n)
-                              +src_zeropad(i-i0,j+i1,k+i2,scomp+n)
-                              +src_zeropad(i+i0,j+i1,k+i2,scomp+n));
-                }
-            }
+        Real d = 0.0;
+        for (int i0=0; i0 <= rx; ++i0) {
+            d += s0[i0]*( src_zeropad(i-i0,j,k,scomp+n) + src_zeropad(i+i0,j,k,scomp+n) );
         }
+        xtmp(i,j,k,n) = d;
+    });
 
+    // Pass in y: read xtmp (in bounds), write ytmp
+    AMREX_PARALLEL_FOR_4D ( ybx, ncomp, i, j, k, n,
+    {
+        Real d = 0.0;
+        for (int i1=0; i1 <= ry; ++i1) {
+            d += s1[i1]*( xtmp(i,j-i1,k,n) + xtmp(i,j+i1,k,n) );
+        }
+        ytmp(i,j,k,n) = d;
+    });
+
+    // Pass in z: read ytmp (in bounds), write dst
+    AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+    {
+        Real d = 0.0;
+        for (int i2=0; i2 <= rz; ++i2) {
+            d += s2[i2]*( ytmp(i,j,k-i2,n) + ytmp(i,j,k+i2,n) );
+        }
         dst(i,j,k,dcomp+n) = d;
     });
 #elif AMREX_SPACEDIM == 2
-    AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
-    {
-        Real d = 0.0;
+    const int rx = slen_local.x - 1;
+    const int ry = slen_local.y - 1;
 
-        // Pad source array with zeros beyond ghost cells
-        // for out-of-bound accesses due to large-stencil operations
+    const Box xbx = amrex::grow(tbx, IntVect(0, ry));
+    FArrayBox xfab(xbx, ncomp, The_Async_Arena());
+    const Array4<Real> xtmp = xfab.array();
+
+    // Pass in x: read src (zero-padded), write xtmp
+    AMREX_PARALLEL_FOR_4D ( xbx, ncomp, i, j, k, n,
+    {
         const auto src_zeropad = [src] (const int jj, const int kk, const int ll, const int nn) noexcept
         {
             return src.contains(jj,kk,ll) ? src(jj,kk,ll,nn) : 0.0_rt;
         };
-
-        for         (int i2=0; i2 < slen_local.z; ++i2){
-            for     (int i1=0; i1 < slen_local.y; ++i1){
-                for (int i0=0; i0 < slen_local.x; ++i0){
-                    Real sss = s0[i0]*s1[i1];
-                    d += sss*( src_zeropad(i-i0,j-i1,k,scomp+n)
-                              +src_zeropad(i+i0,j-i1,k,scomp+n)
-                              +src_zeropad(i-i0,j+i1,k,scomp+n)
-                              +src_zeropad(i+i0,j+i1,k,scomp+n));
-                }
-            }
+        Real d = 0.0;
+        for (int i0=0; i0 <= rx; ++i0) {
+            d += s0[i0]*( src_zeropad(i-i0,j,k,scomp+n) + src_zeropad(i+i0,j,k,scomp+n) );
         }
+        xtmp(i,j,k,n) = d;
+    });
 
+    // Pass in y: read xtmp (in bounds), write dst
+    AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
+    {
+        Real d = 0.0;
+        for (int i1=0; i1 <= ry; ++i1) {
+            d += s1[i1]*( xtmp(i,j-i1,k,n) + xtmp(i,j+i1,k,n) );
+        }
         dst(i,j,k,dcomp+n) = d;
     });
 #elif AMREX_SPACEDIM == 1
+    const int rx = slen_local.x - 1;
+
+    // Single pass in x: read src (zero-padded), write dst
     AMREX_PARALLEL_FOR_4D ( tbx, ncomp, i, j, k, n,
     {
-        Real d = 0.0;
-
-        // Pad source array with zeros beyond ghost cells
-        // for out-of-bound accesses due to large-stencil operations
         const auto src_zeropad = [src] (const int jj, const int kk, const int ll, const int nn) noexcept
         {
             return src.contains(jj,kk,ll) ? src(jj,kk,ll,nn) : 0.0_rt;
         };
-
-        for         (int i2=0; i2 < slen_local.z; ++i2){
-            for     (int i1=0; i1 < slen_local.y; ++i1){
-                for (int i0=0; i0 < slen_local.x; ++i0){
-                    Real sss = s0[i0];
-                    d += sss*( src_zeropad(i-i0,j,k,scomp+n)
-                              +src_zeropad(i+i0,j,k,scomp+n));
-                }
-            }
+        Real d = 0.0;
+        for (int i0=0; i0 <= rx; ++i0) {
+            d += s0[i0]*( src_zeropad(i-i0,j,k,scomp+n) + src_zeropad(i+i0,j,k,scomp+n) );
         }
-
         dst(i,j,k,dcomp+n) = d;
     });
 #endif
