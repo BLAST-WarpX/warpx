@@ -4,15 +4,28 @@ Darwin Solver
 =============
 
 Many problems in plasma physics involve self-consistent magnetic fields and inductive electric fields,
-but no electromagnetic radiation. Examples include low-frequency Alfvén and whistler waves,
-magnetized plasma instabilities, and the self-fields of slowly moving particle beams.
-For these problems, an electromagnetic PIC simulation must still resolve the propagation of light waves
-(e.g., through the CFL condition :math:`c\Delta t \lessapprox \Delta x`), even though they play no role
-in the physics of interest. Simpler electrostatic PIC simulations, on the other hand, cannot capture the
-magnetic and inductive effects.
+but no electromagnetic radiation. Examples include Alfvén and whistler waves, magnetic reconnection,
+and the self-fields of slowly moving particle beams. WarpX offers several models for such problems:
 
-The *Darwin model* :cite:p:`dw-Nielson1976` sits in between these two approaches: it removes light waves from
-Maxwell's equations while retaining the low-frequency (magnetoinductive) physics. It does so by
+* **Electromagnetic PIC** (:ref:`theory-pic`) captures all of this physics, but it must also resolve
+  light waves (e.g., :math:`c\Delta t \lessapprox \Delta x`), which is computationally restrictive.
+* **Electrostatic PIC** (:ref:`theory-electrostatic-pic`) captures charge separation and fixed-potential
+  electrodes, but not induction.
+* **Hybrid PIC** (:ref:`theory-kinetic-fluid-hybrid-model`) removes light waves by neglecting displacement
+  current. Electrons are treated as a massless fluid. This makes it the cheapest option for ion-scale physics,
+  but it cannot describe charge separation (e.g., Langmuir waves or sheaths). Because it works with
+  :math:`\boldsymbol{E}` rather than :math:`\phi`, it also cannot naturally represent biased electrodes.
+
+The *Darwin model* :cite:p:`dw-Nielson1976` retains the magnetoinductive physics of electromagnetic PIC without
+light waves, while keeping the full electrostatic field and fully kinetic electrons of electrostatic PIC.
+It is therefore suited to non-relativistic plasmas where radiation is unimportant, but charge separation,
+electron kinetics or biased electrodes matter. Whether electron time scales must be resolved depends on the
+electrostatic solver used: with an explicit solver, the time step must resolve the electron plasma frequency
+(:math:`\omega_{pe}\Delta t < 2`), while the semi-implicit
+:ref:`effective potential <theory-electrostatic-pic-effective-potential>` solver removes this restriction.
+
+
+The Darwin model removes light waves by
 decomposing the electric field into an irrotational (curl-free) and a solenoidal (divergence-free) component,
 
 .. math::
@@ -50,8 +63,8 @@ Algorithm details
     A verification test of the Darwin solver (the dispersion of Alfvén modes in a magnetized plasma) can be found in
     the :ref:`examples section <examples-magnetized-plasma-modes>`.
 
-The Darwin solver in WarpX is *semi-implicit*: at each time step, the electrostatic field is computed explicitly
-(with any of the electrostatic solvers described in :ref:`theory-electrostatic-pic`), while the inductive field is obtained
+The Darwin solver in WarpX is *semi-implicit*: at each time step, the electrostatic field is computed explicitly or
+semi-implicitly (depending on the electrostatic solver used, see :ref:`theory-electrostatic-pic`), while the inductive field is obtained
 from a single *linear* implicit solve that includes the response of the plasma. Particle positions :math:`\boldsymbol{x}` and
 the potential :math:`\phi` are defined at integer time steps, while particle momenta :math:`\boldsymbol{u}`,
 the vector potential :math:`\boldsymbol{A}` and the magnetic field :math:`\boldsymbol{B}` are defined at half-integer time steps.
