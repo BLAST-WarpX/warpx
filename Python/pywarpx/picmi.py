@@ -31,7 +31,9 @@ import pywarpx.callbacks
 from picmistandard import Expression
 
 codename = "warpx"
-picmistandard.register_codename(codename)
+# WarpX reads the options of its inputs case-insensitively (e.g., `warpx.poisson_solver`),
+# so the PICMI parameters accept the options of the standard in any case, too.
+picmistandard.register_codename(codename, case_insensitive_options=True)
 
 # dictionary to map field boundary conditions from picmistandard to WarpX
 BC_map = {
