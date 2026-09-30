@@ -2088,7 +2088,7 @@ class SemiImplicitDarwinEvolveScheme(EvolveSchemeBase):
 
 
 class HybridPICSolver(
-    picmistandard.PICMI_SolverExtension, picmistandard.PICMI_ExpressionParameters
+    picmistandard.PICMI_Solver, picmistandard.PICMI_ExpressionParameters
 ):
     """
     Hybrid-PIC solver based on Ohm's law.
@@ -2627,7 +2627,7 @@ class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
             )
 
 
-class LoadInitialFieldFromPython(picmistandard.PICMI_AppliedFieldExtension):
+class LoadInitialFieldFromPython(picmistandard.PICMI_AppliedField):
     """
     Field Initializer that takes a function handle to be registered as a callback.
     The function is expected to write the E and/or B fields into the
@@ -3474,7 +3474,7 @@ class MacroscopicProperty(
             )
 
 
-class PlasmaLens(picmistandard.PICMI_AppliedFieldExtension):
+class PlasmaLens(picmistandard.PICMI_AppliedField):
     """
     Custom class to setup a plasma lens lattice.
     The applied fields are dependent only on the transverse position.
@@ -4370,7 +4370,7 @@ class TimeAveragedFieldDiagnostic(FieldDiagnostic):
         self._diagnostic.average_start_step = self.average_start_step
 
 
-class Checkpoint(picmistandard.PICMI_DiagnosticExtension, WarpXDiagnosticBase):
+class Checkpoint(picmistandard.PICMI_Diagnostic, WarpXDiagnosticBase):
     """
     Sets up checkpointing of the simulation, allowing for later restarts
 
@@ -4886,7 +4886,7 @@ class LabFrameParticleDiagnostic(
 
 
 class ReducedDiagnostic(
-    picmistandard.PICMI_DiagnosticExtension,
+    picmistandard.PICMI_Diagnostic,
     picmistandard.PICMI_ExpressionParameters,
     WarpXDiagnosticBase,
 ):
