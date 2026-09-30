@@ -135,6 +135,7 @@ The ``warpx_`` prefix
 
 In PICMI, one adds WarpX code-specific class attributes with the prefix ``warpx_``, e.g., ``warpx_my_threshold``.
 The Python class member itself has the name without prefix, which is also the name that the methods of the class use internally, e.g., ``self.my_threshold``.
+Users can read and assign the parameter under both names, e.g., ``sim.warpx_my_threshold`` and ``sim.my_threshold``.
 The prefix is added to all parameters that a WarpX class adds to the PICMI standard class by
 
 .. code-block:: python
