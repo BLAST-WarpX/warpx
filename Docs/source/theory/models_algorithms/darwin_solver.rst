@@ -7,7 +7,7 @@ Many problems in plasma physics involve self-consistent magnetic fields and indu
 but no electromagnetic radiation. Examples include Alfvén and whistler waves, magnetic reconnection,
 and the self-fields of slowly moving particle beams. WarpX offers several models for such problems:
 
-* **Electromagnetic PIC** (:ref:`theory-pic`) captures all of this physics, but it must also resolve
+* **Electromagnetic PIC** (:ref:`theory-em-pic`) captures all of this physics, but it must also resolve
   light waves (e.g., :math:`c\Delta t \lessapprox \Delta x`), which is computationally restrictive.
 * **Electrostatic PIC** (:ref:`theory-electrostatic-pic`) captures charge separation and fixed-potential
   electrodes, but not induction.
