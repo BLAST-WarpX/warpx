@@ -59,6 +59,7 @@
 
 #include <cmath>
 #include <string>
+#include <type_traits>
 
 /**
  * \brief This class performs generic binary collisions.
@@ -195,6 +196,15 @@ public:
 
         auto& species1 = mypc->GetParticleContainerFromName(m_species_names[0]);
         auto& species2 = mypc->GetParticleContainerFromName(m_species_names[1]);
+
+        // For DSMC impact ionization, register the target species (species 2) so that impact
+        // ionization of already fully-ionized particles is skipped. This is done here rather than
+        // at construction because the target's "ionizationLevel" attribute (present when the target
+        // also undergoes field ionization) is only added once the ionization module is initialized.
+        // See WarpX discussion #6220.
+        if constexpr (std::is_same_v<CollisionFunctor, DSMCFunc>) {
+            m_binary_collision_functor.setIonizationTarget(species2);
+        }
 
         // In case of particle creation, create the necessary vectors
         const int n_product_species = m_product_species.size();
