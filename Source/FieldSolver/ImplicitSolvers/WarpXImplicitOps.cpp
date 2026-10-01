@@ -277,7 +277,7 @@ WarpX::FinishImplicitField( ablastr::fields::MultiLevelVectorField const& Field_
 }
 
 void
-WarpX::DepositMassMatrices ( )
+WarpX::DepositMassMatrices (int particle_shape)
 {
     ABLASTR_PROFILE("WarpX::DepositMassMatrices()");
 
@@ -286,7 +286,8 @@ WarpX::DepositMassMatrices ( )
         mypc->DepositMassMatrices(
             m_fields,
             lev,
-            dt[lev]
+            dt[lev],
+            particle_shape
         );
     }
 

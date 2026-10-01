@@ -58,6 +58,14 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_source.Define(m_Z);
     m_source.zero();
 
+    // Particle shape used for the magnetostatic part of the solve (current and
+    // mass matrices deposition, inductive E-field gather, and B-field gather).
+    const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
+    pp_implicit_evolve.query("ms_particle_shape", m_ms_particle_shape);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_ms_particle_shape >= 1 && m_ms_particle_shape <= WarpX::nox,
+        "implicit_evolve.ms_particle_shape must be between 1 and algo.particle_shape");
+
     // Set parameters used by `InitializeMassMatrices`
     m_use_mass_matrices = true;
     m_use_mass_matrices_pc = false;
@@ -94,14 +102,15 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     m_linear_solver->setRestartLength( m_linsol_restart_length );
     m_linear_solver->setMaxIters( m_linsol_maxits );
 
-    // Initialize the mass matrices for plasma response
-    InitializeMassMatrices();
+    // Initialize the mass matrices for plasma response (their stencil width
+    // is set by the magnetostatic particle shape)
+    InitializeMassMatrices(m_ms_particle_shape);
 
-    // The predictor velocity push in OneStep() temporarily overrides the
-    // global galerkin_interpolation flag to true, to gather with the same
-    // shape-factor order used for deposition. Skip that override, and warn,
-    // if the user has explicitly selected momentum-conserving gathering,
-    // since forcing Galerkin gathering there would silently negate that choice.
+    // The predictor velocity push in OneStep() gathers the electrostatic E-field
+    // with the Galerkin scheme, i.e. with the same shape-factor order used for the
+    // charge deposition. Skip that, and warn, if the user has explicitly selected
+    // momentum-conserving gathering, since forcing Galerkin gathering there would
+    // silently negate that choice.
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
     if (!m_predictor_use_galerkin) {
         ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
@@ -128,6 +137,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
+    amrex::Print()     << "Magnetostatic particle shape:                  " << m_ms_particle_shape << "\n";
     if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -154,15 +164,13 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
-    // the E-field was cleared during the last Poisson solve). Temporarily force
-    // Galerkin gathering for this predictor push (skipped if the user explicitly
-    // requested momentum-conserving gathering - see the warning issued in Define()).
-    const bool save_galerkin_interpolation = WarpX::galerkin_interpolation;
-    if (m_predictor_use_galerkin) { WarpX::galerkin_interpolation = true; }
-
+    // the E-field was cleared during the last Poisson solve). E is gathered with the
+    // Galerkin scheme (unless the user explicitly requested momentum-conserving gathering),
+    // with the electrostatic particle shape. B is gathered exactly as in the corrector push
+    // and the mass matrices below, i.e., with the magnetostatic particle shape.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        m_WarpX->GetPartContainer().PushP(
+        m_WarpX->GetPartContainer().PushPDarwin(
             lev,
             m_dt,
             *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
@@ -171,18 +179,17 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            MomentumPushType::Full
+            /*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
+            /*b_shape=*/m_ms_particle_shape
         );
     }
-
-    WarpX::galerkin_interpolation = save_galerkin_interpolation;
 
     // Prepare current deposition: the velocities are time centered with
     // u -> (u^{n+1/2} + u^{n-1/2}) / 2.0 (with just the ES acceleration applied
     // for the advanced velocity), and the advanced velocity is saved to u_n
     PrepareVelocitiesForCurrentDeposition();
 
-    // Accumulate current* and the mass matrices
+    // Accumulate current* and the mass matrices (with the magnetostatic shape)
     AccumulateCurrentAndMassMatrices();
 
     // Python callback insertion
@@ -220,10 +227,14 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // the acceleration due to the inductive E-field
     ClearParticleVelocities();
 
-    // Push particle velocities (E-field now only includes the inductive component)
+    // Push particle velocities (E-field now only includes the inductive component).
+    // E and B are gathered with the magnetostatic particle shape and without order
+    // reduction, as the mass matrices assume: the E gather is then the transpose of the
+    // (direct) current deposition, and B is the same as in the predictor push and the
+    // mass matrices.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        m_WarpX->GetPartContainer().PushP(
+        m_WarpX->GetPartContainer().PushPDarwin(
             lev,
             m_dt,
             *m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, lev),
@@ -232,7 +243,8 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            MomentumPushType::Full
+            /*e_shape=*/m_ms_particle_shape, /*e_galerkin=*/false,
+            /*b_shape=*/m_ms_particle_shape
         );
     }
 
@@ -336,17 +348,19 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     const int lev = 0;
 
     // Deposit the current density from all species, using the time-centered
-    // particle velocities as appropriate for the implicit push. This also
-    // resets the current MultiFabs before depositing.
+    // particle velocities as appropriate for the implicit push and the
+    // magnetostatic particle shape. This also resets the current MultiFabs
+    // before depositing.
     m_WarpX->GetPartContainer().DepositCurrent(
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev),
-        m_dt, 0.0_rt, PushType::Implicit);
+        m_dt, 0.0_rt, PushType::Implicit, m_ms_particle_shape);
 
     // Zero and accumulate the mass matrices from all species. This shares the
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
-    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices();
+    // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices(),
+    // here with the magnetostatic particle shape.
+    m_WarpX->DepositMassMatrices(m_ms_particle_shape);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete

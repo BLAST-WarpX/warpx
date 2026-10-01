@@ -2168,13 +2168,23 @@ class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
     """
     Sets up the semi-implicit Darwin evolve scheme.
 
-    linear_solver:
-        GMRESLinearSolver instance.
+    Parameters
+    ----------
+    linear_solver: GMRESLinearSolver instance
+        The linear solver used for the magnetostatic (vector potential) solve
+
+    ms_particle_shape: integer, optional
+        Order of the particle shape factors used for the magnetostatic part of
+        the solve (current and mass matrices deposition, inductive E-field gather
+        and B-field gather). Must be between 1 and the particle shape used for the
+        electrostatic part (the `particle_shape` of the Simulation).
+        Defaults to 1.
     """
 
     def __init__(
         self,
         linear_solver,
+        ms_particle_shape=None,
     ):
         if not isinstance(linear_solver, GMRESLinearSolver):
             raise TypeError(
@@ -2183,9 +2193,12 @@ class SemiImplicitDarwinEvolveScheme(picmistandard.base._ClassWithInit):
                 "linear solver to attach to, which PETScKSPLinearSolver requires)"
             )
         self.linear_solver = linear_solver
+        self.ms_particle_shape = ms_particle_shape
 
     def solver_scheme_initialize_inputs(self):
         pywarpx.algo.evolve_scheme = "semi_implicit_darwin"
+        implicit_evolve = pywarpx.warpx.get_bucket("implicit_evolve")
+        implicit_evolve.ms_particle_shape = self.ms_particle_shape
         self.linear_solver.linear_solver_initialize_inputs()
 
 

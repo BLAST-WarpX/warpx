@@ -133,12 +133,20 @@ private:
     std::unique_ptr<DarwinLinearFieldOperator> m_linear_function;
 
     /**
-     * \brief Whether the predictor velocity push in OneStep() should
-     *  temporarily override the global galerkin_interpolation flag to true.
+     * \brief Whether the predictor velocity push in OneStep() should gather
+     *  the electrostatic E-field with the Galerkin scheme.
      *  Set once in Define(); false if the user explicitly selected
      *  momentum-conserving gathering, to avoid silently overriding that choice.
      */
     bool m_predictor_use_galerkin = false;
+
+    /**
+     * \brief Order of the particle shape factors used for the magnetostatic part
+     *  of the solve: the current and mass matrices deposition, the E-field gather
+     *  in the corrector push and the B-field gather in both pushes. Must not
+     *  exceed algo.particle_shape, which is used for the electrostatic part.
+     */
+    int m_ms_particle_shape = 1;
 
     /**
      * \brief Choice of linear solver

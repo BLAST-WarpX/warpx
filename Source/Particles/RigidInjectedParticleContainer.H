@@ -99,6 +99,13 @@ public:
                         const amrex::MultiFab& Bz,
                         MomentumPushType momentum_push_type = MomentumPushType::Full) override;
 
+    //! Not supported for rigid-injected species: aborts
+    void PushPDarwin (int lev, amrex::Real dt,
+                      const amrex::MultiFab& Ex, const amrex::MultiFab& Ey,
+                      const amrex::MultiFab& Ez, const amrex::MultiFab& Bx,
+                      const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                      int e_shape, bool e_galerkin, int b_shape) override;
+
     void ReadHeader (std::istream& is) override;
 
     void WriteHeader (std::ostream& os) const override;

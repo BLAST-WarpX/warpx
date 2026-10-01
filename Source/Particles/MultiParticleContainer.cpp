@@ -77,6 +77,7 @@
 #include <fstream>
 #include <limits>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -527,7 +528,7 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
 void
 MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                                             int lev, amrex::Real dt)
+                                             int lev, amrex::Real dt, int particle_shape)
 {
     using ablastr::fields::Direction;
 
@@ -538,7 +539,7 @@ MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& 
     }
 
     for (auto& pc : allcontainers) {
-        pc->DepositMassMatrices(fields, lev, dt);
+        pc->DepositMassMatrices(fields, lev, dt, particle_shape);
     }
 }
 
@@ -558,6 +559,17 @@ MultiParticleContainer::PushP (int lev, Real dt,
 {
     for (auto& pc : allcontainers) {
         pc->PushP(lev, dt, Ex, Ey, Ez, Bx, By, Bz, momentum_push_type);
+    }
+}
+
+void
+MultiParticleContainer::PushPDarwin (int lev, Real dt,
+                                     const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
+                                     const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
+                                     int e_shape, bool e_galerkin, int b_shape)
+{
+    for (auto& pc : allcontainers) {
+        pc->PushPDarwin(lev, dt, Ex, Ey, Ez, Bx, By, Bz, e_shape, e_galerkin, b_shape);
     }
 }
 
@@ -590,7 +602,7 @@ void
 MultiParticleContainer::DepositCurrent (
     ablastr::fields::MultiLevelVectorField const & J,
     const amrex::Real dt, const amrex::Real relative_time,
-    const PushType push_type)
+    const PushType push_type, const std::optional<int> particle_shape)
 {
     // Reset the J arrays
     for (const auto& J_lev : J)
@@ -603,7 +615,7 @@ MultiParticleContainer::DepositCurrent (
     // Call the deposition kernel for each species
     for (auto& pc : allcontainers)
     {
-        pc->DepositCurrent(J, dt, relative_time, push_type);
+        pc->DepositCurrent(J, dt, relative_time, push_type, particle_shape);
     }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)

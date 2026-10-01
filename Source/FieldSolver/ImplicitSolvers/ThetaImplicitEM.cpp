@@ -59,7 +59,7 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
     m_nlsolver->Define(m_E, this);
 
     // Initialize the mass matrices for plasma response
-    if (m_use_mass_matrices) { InitializeMassMatrices(); }
+    if (m_use_mass_matrices) { InitializeMassMatrices(WarpX::nox); }
 
     const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
     if (pc_type == PreconditionerType::pc_petsc) { InitializeCurlCurlBCMasks(); }

@@ -49,6 +49,7 @@
 #include <iosfwd>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -260,9 +261,30 @@ public:
      */
     virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                                       int lev,
-                                      amrex::Real dt)
+                                      amrex::Real dt,
+                                      int particle_shape)
     {
-        amrex::ignore_unused(fields,lev,dt);
+        amrex::ignore_unused(fields,lev,dt,particle_shape);
+    }
+
+    /**
+     * \brief Push the particle momenta by dt for the semi-implicit Darwin solver.
+     *
+     * Unlike PushP, the field gather orders are set explicitly: E is gathered with
+     * shape order e_shape and, if e_galerkin is true, one order lower along each
+     * component's own direction (i.e. the Galerkin scheme on the Yee grid); B is
+     * gathered with shape order b_shape and no order reduction, which is exactly how
+     * the mass matrices gather B. The predictor and corrector velocity pushes of the
+     * Darwin scheme must rotate the velocities with the same B for their sum to be
+     * a single Boris push.
+     */
+    virtual void PushPDarwin (int lev, amrex::Real dt,
+                              const amrex::MultiFab& Ex, const amrex::MultiFab& Ey,
+                              const amrex::MultiFab& Ez, const amrex::MultiFab& Bx,
+                              const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                              int e_shape, bool e_galerkin, int b_shape)
+    {
+        amrex::ignore_unused(lev, dt, Ex, Ey, Ez, Bx, By, Bz, e_shape, e_galerkin, b_shape);
     }
 
     virtual void PostRestart () = 0;
@@ -310,10 +332,13 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void DepositCurrent (ablastr::fields::MultiLevelVectorField const & J,
                          amrex::Real dt, amrex::Real relative_time,
-                         PushType push_type = PushType::Explicit);
+                         PushType push_type = PushType::Explicit,
+                         std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit current density, sum guard values, and apply boundary conditions.
@@ -379,7 +404,8 @@ public:
                                 int depos_lev,
                                 amrex::Real dt,
                                 amrex::Real relative_time,
-                                PushType push_type);
+                                PushType push_type,
+                                int particle_shape);
     /**
      * \brief Accumulate velocity moments for matched temperature deposition using particle shapes
      *
@@ -447,7 +473,8 @@ public:
                               int thread_num,
                               int lev,
                               int depos_lev,
-                              amrex::Real dt);
+                              amrex::Real dt,
+                              int particle_shape);
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and

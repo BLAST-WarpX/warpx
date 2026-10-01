@@ -116,7 +116,14 @@ public:
      */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                               int lev,
-                              amrex::Real dt) override;
+                              amrex::Real dt,
+                              int particle_shape) override;
+
+    void PushPDarwin (int lev, amrex::Real dt,
+                      const amrex::MultiFab& Ex, const amrex::MultiFab& Ey,
+                      const amrex::MultiFab& Ez, const amrex::MultiFab& Bx,
+                      const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                      int e_shape, bool e_galerkin, int b_shape) override;
 
     /**
      * \brief Gather fields and push particles in one fused kernel.

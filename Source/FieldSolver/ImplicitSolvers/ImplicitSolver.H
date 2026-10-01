@@ -304,8 +304,11 @@ protected:
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
+     *
+     * \param[in] particle_shape order of the particle shape factors used to deposit the
+     *            current and the mass matrices; this sets the width of the mass matrices stencil
      */
-    void InitializeMassMatrices ();
+    void InitializeMassMatrices (int particle_shape);
 
     void PrintBaseImplicitSolverParameters () const;
 

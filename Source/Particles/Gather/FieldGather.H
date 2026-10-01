@@ -19,8 +19,10 @@
 /**
  * \brief Gather vector field F for a single particle
  *
- * \tparam depos_order_perp       Particle shape order in parallel direction
- * \tparam depos_order_para       Particle shape order in perpendicular direction
+ * \tparam depos_order_perp       Particle shape order along the directions perpendicular
+ *                                to each field component
+ * \tparam depos_order_para       Particle shape order along the direction of each field
+ *                                component
  *
  * \param xp,yp,zp                Particle position coordinates
  * \param Fxp,Fyp,Fzp             Vector field on particle
@@ -325,6 +327,78 @@ void doDirectGatherVectorField (
 
 #endif
 #endif
+}
+
+/**
+ * \brief Gather vector field F for a single particle, with runtime shape order
+ *
+ * \param order                   Particle shape order (1 to 4)
+ * \param reduce_para             Whether to lower the shape order by one along the direction
+ *                                of each field component. On the Yee grid this is the
+ *                                Galerkin scheme for E (see doGatherShapeN).
+ * \param xp,yp,zp                Particle position coordinates
+ * \param Fxp,Fyp,Fzp             Vector field on particle
+ * \param Fx_arr,Fy_arr,Fz_arr    Array4 of the vector field, either full array or tile
+ * \param Fx_type,Fy_type,Fz_type Index type of the vector fields
+ * \param dinv                    3D cell size inverse
+ * \param xyzmin                  The lower bounds of the domain
+ * \param lo                      Index lower bounds of domain
+ * \param n_rz_azimuthal_modes    Number of azimuthal modes when using RZ geometry
+ */
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doDirectGatherVectorField (
+                     const int order,
+                     const bool reduce_para,
+                     const amrex::ParticleReal xp,
+                     const amrex::ParticleReal yp,
+                     const amrex::ParticleReal zp,
+                     amrex::ParticleReal& Fxp,
+                     amrex::ParticleReal& Fyp,
+                     amrex::ParticleReal& Fzp,
+                     amrex::Array4<amrex::Real const> const& Fx_arr,
+                     amrex::Array4<amrex::Real const> const& Fy_arr,
+                     amrex::Array4<amrex::Real const> const& Fz_arr,
+                     const amrex::IndexType Fx_type,
+                     const amrex::IndexType Fy_type,
+                     const amrex::IndexType Fz_type,
+                     const amrex::XDim3 & dinv,
+                     const amrex::XDim3 & xyzmin,
+                     const amrex::Dim3& lo,
+                     const int n_rz_azimuthal_modes)
+{
+    if (order == 1) {
+        if (reduce_para) {
+            doDirectGatherVectorField<1,0>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        } else {
+            doDirectGatherVectorField<1,1>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        }
+    } else if (order == 2) {
+        if (reduce_para) {
+            doDirectGatherVectorField<2,1>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        } else {
+            doDirectGatherVectorField<2,2>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        }
+    } else if (order == 3) {
+        if (reduce_para) {
+            doDirectGatherVectorField<3,2>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        } else {
+            doDirectGatherVectorField<3,3>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        }
+    } else if (order == 4) {
+        if (reduce_para) {
+            doDirectGatherVectorField<4,3>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        } else {
+            doDirectGatherVectorField<4,4>(xp, yp, zp, Fxp, Fyp, Fzp, Fx_arr, Fy_arr, Fz_arr,
+                Fx_type, Fy_type, Fz_type, dinv, xyzmin, lo, n_rz_azimuthal_modes);
+        }
+    }
 }
 
 /**

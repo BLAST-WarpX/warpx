@@ -48,6 +48,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -122,9 +123,15 @@ public:
 
     /**
      * \brief Deposit mass matrices.
+     *
+     * \param[in,out] fields the field register holding the mass matrices, which are
+     *                reset before the deposition
+     * \param[in] lev mesh refinement level for the deposition
+     * \param[in] dt time step for the particle level
+     * \param[in] particle_shape order of the particle shape factors used for the deposition
     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                              int lev, amrex::Real dt);
+                              int lev, amrex::Real dt, int particle_shape);
 
     /**
     * \brief This pushes the particle positions by one time step for all the species in the
@@ -142,6 +149,16 @@ public:
                 const amrex::MultiFab& Ex, const amrex::MultiFab& Ey, const amrex::MultiFab& Ez,
                 const amrex::MultiFab& Bx, const amrex::MultiFab& By, const amrex::MultiFab& Bz,
                 MomentumPushType momentum_push_type);
+
+    /**
+    * \brief Push the particle momenta by dt for all the species with the gather
+    * orders used by the semi-implicit Darwin solver (see WarpXParticleContainer::PushPDarwin).
+    */
+    void PushPDarwin (int lev, amrex::Real dt,
+                      const amrex::MultiFab& Ex, const amrex::MultiFab& Ey,
+                      const amrex::MultiFab& Ez, const amrex::MultiFab& Bx,
+                      const amrex::MultiFab& By, const amrex::MultiFab& Bz,
+                      int e_shape, bool e_galerkin, int b_shape);
 
     /**
     * \brief This returns a MultiFAB filled with zeros. It is used to return the charge density
@@ -176,11 +193,14 @@ public:
      *                          the time of the deposition.
      * \param[in] push_type Type of particle push used with the deposition. With
      *                      PushType::Implicit the time-centered velocities are used.
+     * \param[in] particle_shape Order of the particle shape factors used for the
+     *                           deposition (defaults to algo.particle_shape).
      */
     void
     DepositCurrent (ablastr::fields::MultiLevelVectorField const& J,
                     amrex::Real dt, amrex::Real relative_time,
-                    PushType push_type = PushType::Explicit);
+                    PushType push_type = PushType::Explicit,
+                    std::optional<int> particle_shape = std::nullopt);
 
     /**
      * \brief Deposit temperature to species MFs. This is done for each

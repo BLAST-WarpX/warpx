@@ -709,7 +709,7 @@ void ImplicitSolver::SaveEoldMultifab ()
     }
 }
 
-void ImplicitSolver::InitializeMassMatrices ()
+void ImplicitSolver::InitializeMassMatrices (int particle_shape)
 {
 
     // Initializes the MassMatrices and MassMatrices_PC containers
@@ -735,7 +735,7 @@ void ImplicitSolver::InitializeMassMatrices ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const int shape = WarpX::nox;
+    const int shape = particle_shape;
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 
@@ -947,7 +947,14 @@ void ImplicitSolver::PreLinearSolve ()
 
     if (m_use_mass_matrices) {
 
-        m_WarpX->DepositMassMatrices();
+        // The mass matrices are deposited with algo.particle_shape, which must be the
+        // shape their stencil was sized for in InitializeMassMatrices
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !m_use_mass_matrices_jacobian ||
+            WarpX::current_deposition_algo != CurrentDepositionAlgo::Direct ||
+            m_ncomp_xx[0] == 1 + 2*WarpX::nox,
+            "Mass matrices stencil was not sized for algo.particle_shape");
+        m_WarpX->DepositMassMatrices(WarpX::nox);
         FinishMassMatricesDeposition();
 
         if (m_use_mass_matrices_jacobian) {
