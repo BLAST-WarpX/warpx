@@ -36,6 +36,10 @@ print("RZ per-species physical-density analysis")
 print(f"  median relative error = {median_error:.4e}")
 print(f"  maximum relative error = {max_error:.4e}")
 print(f"  axis relative error = {axis_error:.4e}")
+radial_mean_error = np.mean(relative_error, axis=0)
+print("  z-averaged relative error by radial index:")
+for ir, error in enumerate(radial_mean_error):
+    print(f"    r index {ir}: {error:.4e}")
 
 assert median_error < 1.0e-10
 assert max_error < 1.0e-8

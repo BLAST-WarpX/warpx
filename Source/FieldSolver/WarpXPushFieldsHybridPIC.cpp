@@ -342,6 +342,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         J_spec[lev][idim]->nGrowVect(), J_spec[lev][idim]->nGrowVect(),
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
+                ApplyRhofieldBoundary(lev, rho_spec[lev], PatchType::fine);
+                ApplyJfieldBoundary(lev, J_spec[lev][0], J_spec[lev][1],
+                                    J_spec[lev][2], PatchType::fine);
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after
