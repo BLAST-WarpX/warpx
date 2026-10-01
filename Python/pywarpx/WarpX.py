@@ -143,6 +143,22 @@ class WarpX(Bucket):
 
         return dims_value
 
+    @staticmethod
+    def amrex_argv(filename, argv=None):
+        """The AMReX command line that loads an inputs file.
+
+        AMReX takes the inputs file as the first argument and skips its parser
+        entirely if that argument starts with "-" (amrex::Initialize). A Jupyter
+        kernel's sys.argv is ["...launcher.py", "-f", "...json"], which would
+        hide the inputs file and every parameter in it, so only the
+        "name=value" overrides of `python run.py max_step=10` are passed on.
+        argv[0] is absolute for AMReX backtraces, as in init().
+        """
+        if argv is None:
+            argv = sys.argv
+        overrides = [arg for arg in argv[1:] if "=" in arg and not arg.startswith("-")]
+        return [sys.executable, filename] + overrides
+
     def load_inputs_file(self, filename):
         from .Geometry import geometry
 
@@ -152,7 +168,7 @@ class WarpX(Bucket):
                 f"Error: Could not find the geometry.dims in the input file '{filename}' or its included files."
             )
 
-        libwarpx.initialize(sys.argv + [filename])
+        libwarpx.initialize(self.amrex_argv(filename))
 
     def init(self, mpi_comm=None, **kw):
         # note: argv[0] needs to be an absolute path so it works with AMReX backtraces
