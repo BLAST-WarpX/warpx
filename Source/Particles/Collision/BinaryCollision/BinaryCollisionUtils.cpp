@@ -145,7 +145,7 @@ namespace BinaryCollisionUtils{
             // particle-conserving processes (e.g. elastic, excitation) default to isotropic.
             auto scattering_angle_model =
                 (process_type == ScatteringProcessType::CHARGE_EXCHANGE ||
-                 process_type == ScatteringProcessType::TWOPRODUCT_REACTION)
+                 process_type == ScatteringProcessType::TWO_PRODUCT_REACTION)
                 ? ScatteringAngleModel::Forward : ScatteringAngleModel::Isotropic;
             pp_collision_name.query_enum_case_insensitive(
                 scattering_process + "_scattering_angle_model", scattering_angle_model);

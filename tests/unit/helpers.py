@@ -99,6 +99,11 @@ def make_sim(
     #   that tests can share a GPU
     pywarpx.amrex.the_arena_init_size = 0
 
+    # WarpX::electrostatic_solver_id is a static that outlives a simulation run
+    # earlier in this process, and is only overwritten when this parameter is
+    # set; a test that uses an electrostatic solver overrides it
+    pywarpx.warpx.do_electrostatic = "none"
+
     return sim
 
 

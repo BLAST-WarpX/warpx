@@ -563,6 +563,44 @@ void ImplicitSolver::ApplyMassMatrices (
     }
 }
 
+void ImplicitSolver::AssertMassMatricesStencilNotClipped (
+    const ablastr::fields::MultiLevelVectorField& a_out,
+    const ablastr::fields::MultiLevelVectorField& a_in ) const
+{
+    // Number of components of the mass matrix S_ab, which maps a_in[b] to a_out[a]
+    const amrex::IntVect ncomp[3][3] = {{m_ncomp_xx, m_ncomp_xy, m_ncomp_xz},
+                                        {m_ncomp_yx, m_ncomp_yy, m_ncomp_yz},
+                                        {m_ncomp_zx, m_ncomp_zy, m_ncomp_zz}};
+
+    // The check does not depend on the position of the box, so use a single
+    // cell-centered cell as the valid box, as in the loops of ApplyMassMatrices
+    const amrex::Box validbox(amrex::IntVect(0), amrex::IntVect(0));
+
+    for (int lev = 0; lev < static_cast<int>(a_out.size()); ++lev) {
+        for (int a = 0; a < 3; ++a) {
+            const amrex::IntVect out_nodal = a_out[lev][a]->ixType().toIntVect();
+            const amrex::Box outb = amrex::convert(validbox, a_out[lev][a]->ixType());
+            for (int b = 0; b < 3; ++b) {
+                const amrex::IntVect in_nodal = a_in[lev][b]->ixType().toIntVect();
+                amrex::Box in_fullb = amrex::convert(validbox, a_in[lev][b]->ixType());
+                in_fullb.grow(a_in[lev][b]->nGrowVect());
+                for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+                    // Same stencil offset and extent as in ApplyMassMatrices
+                    const int offset = (out_nodal[dir] > in_nodal[dir]) ? (ncomp[a][b][dir]/2)
+                                                                        : ((ncomp[a][b][dir]-1)/2);
+                    const bool fits =
+                        (outb.smallEnd(dir) - offset >= in_fullb.smallEnd(dir)) &&
+                        (outb.bigEnd(dir) + ncomp[a][b][dir]-1-offset <= in_fullb.bigEnd(dir));
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fits,
+                        "The stencil of the mass matrices reaches beyond the guard cells "
+                        "of the field they are applied to, and would be silently clipped "
+                        "in ImplicitSolver::ApplyMassMatrices.");
+                }
+            }
+        }
+    }
+}
+
 void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 {
     BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
@@ -749,7 +787,7 @@ void ImplicitSolver::InitializeMassMatrices ()
                 "Mass matrices for Jacobian with Villasenor deposition are not yet implemented "
                 "in 3D. Use algo.current_deposition = direct.");
 #else
-            const int max_grid_crossings = ngJ[0] - shape + 1;
+            const int max_grid_crossings = ngJ[0] - shape / 2;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_grid_crossings > 0,
                 "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_grid_crossings == WarpX::particle_max_grid_crossings,

@@ -163,6 +163,10 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
     }
 
     for (auto& collision : allcollisions) {
+        // Skip collisions before their start step
+        const int start_step = collision->get_start_step();
+        if (step < start_step) { continue; }
+
         const int ndt = collision->get_ndt();
         const auto collision_stepping_mode = collision->get_collision_stepping_mode();
 
@@ -174,8 +178,9 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
                 collision->doCollisions(sub_time, dt_sub, mypc);
             }
         } else {
-            // Supercycle: run once every ndt PIC steps, with dt_collision = dt * ndt
-            if ( step % ndt == 0 ) {
+            // Supercycle: run once every ndt PIC steps (counted from start_step),
+            // with dt_collision = dt * ndt
+            if ( (step - start_step) % ndt == 0 ) {
                 collision->doCollisions(cur_time, dt*ndt, mypc);
             }
         }

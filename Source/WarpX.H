@@ -1480,7 +1480,7 @@ private:
 
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
-#if defined(AMREX_USE_CUDA)
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
     bool m_sort_particles_for_deposition = true;
 #else
     bool m_sort_particles_for_deposition = false;

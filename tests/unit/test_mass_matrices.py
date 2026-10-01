@@ -33,11 +33,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _alloc_like(sim, name, template, n_grow_extra=0):
+def _alloc_like(sim, name, template):
     """Register a zeroed vector field with the layout of vector field ``template``.
 
-    Same box arrays, staggering and guard cells (plus ``n_grow_extra``) for
-    each of the three components, so that the new field can stand in for
+    Same box arrays, staggering and guard cells for each of the three
+    components, so that the new field can stand in for
     ``template`` wherever the C++ side expects that staggering.
     """
     fields = sim.fields
@@ -50,7 +50,7 @@ def _alloc_like(sim, name, template, n_grow_extra=0):
             mf.box_array(),
             mf.dm(),
             mf.n_comp,
-            mf.n_grow_vect + n_grow_extra,
+            mf.n_grow_vect,
             0.0,
             redistribute=False,
             redistribute_on_remake=False,
@@ -95,31 +95,41 @@ def test_mass_matrices_match_push_and_deposit(particle_shape, sync_scheme):
     solvers use reconciles this, see where it is used below.
     """
     n_axes = N_AXES[pywarpx.libwarpx.geometry_dim]
-    # 8 cells and 4 cells per box (two boxes per axis), so that contributions
-    # crossing a box boundary and the periodic boundary are both exercised.
+    # Two boxes per axis, so that contributions crossing a box boundary and the
+    # periodic boundary are both exercised. The boxes must have more cells than
+    # the guard cells of rho, which the semi-implicit Darwin scheme allocates
+    # (4 at cubic order).
     # The direct deposition also makes WarpX gather with plain shape factors
     # (no Galerkin correction), which is what the mass matrices assume.
-    n_cell = [8] * n_axes
+    n_cell_per_box = 8
+    n_cell = [2 * n_cell_per_box] * n_axes
     sim = make_sim(
         n_cell=n_cell,
-        max_grid_size=4,
+        max_grid_size=n_cell_per_box,
         particle_shape=particle_shape,
         current_deposition_algo="direct",
     )
 
-    # Boilerplate: the mass matrices are only allocated by an evolve scheme that
-    # uses them.
-    # Nothing below is specific to the theta-implicit scheme, though: the mass
-    # matrix routines that the test calls directly below are shared by different
-    # implicit solvers (e.g. theta-implicit, semi-implicit Darwin), and
-    # `sync_scheme` covers what does differ between them.
-    sim.evolve_scheme = picmi.ThetaImplicitEMEvolveScheme(
-        nonlinear_solver=picmi.NewtonNonlinearSolver(
+    # The mass matrices are only allocated by an evolve scheme that uses them.
+    # The mass matrix routines that the test calls directly below are shared by
+    # the implicit solvers; each `sync_scheme` runs with the scheme it belongs
+    # to, so that the fields also have the guard cells that this scheme allocates.
+    if sync_scheme == "sync_massmatrix":
+        sim.evolve_scheme = picmi.SemiImplicitDarwinEvolveScheme(
             linear_solver=picmi.GMRESLinearSolver(),
-            use_mass_matrices_jacobian=True,
-        ),
-        theta=0.5,
-    )
+        )
+        # Darwin requires an electrostatic solver alongside the Yee solver
+        sim.solver = picmi.ElectrostaticSolver(
+            grid=sim.solver.grid, method="Multigrid", required_precision=1e-6
+        )
+    else:
+        sim.evolve_scheme = picmi.ThetaImplicitEMEvolveScheme(
+            nonlinear_solver=picmi.NewtonNonlinearSolver(
+                linear_solver=picmi.GMRESLinearSolver(),
+                use_mass_matrices_jacobian=True,
+            ),
+            theta=0.5,
+        )
 
     sim.add_species(
         picmi.Species(particle_type="electron", name="electrons"), layout=None
@@ -159,23 +169,7 @@ def test_mass_matrices_match_push_and_deposit(particle_shape, sync_scheme):
         # operator that the linear solver applies on every iteration.
         warpx.sync_mass_matrices()
 
-        # Allocate `dE` with enough guard cells, so that the stencil of the mass matrix
-        # does not get clipped. Only the summed mass matrices need more than `dE`
-        # already has: a valid cell then also carries the entries of the particles of
-        # the neighboring box, whose shape function extends outward, and the stencil
-        # reaches one cell beyond the guard cells of `J`. Applying the unsummed mass
-        # matrices, on the other hand, only ever reads `dE` within the support of the
-        # shape function of a particle of this box, i.e. within the guard cells that
-        # `dE` has; the entries that would reach further out are zero there.
-        n_grow_j = fields.get("current_fp", "x", 0).n_grow_vect
-        n_grow_e = fields.get("Efield_fp", "x", 0).n_grow_vect
-        n_grow_extra = 0
-        n_grow_extra = max(
-            0, max(n_grow_j[idir] + 1 - n_grow_e[idir] for idir in range(n_axes))
-        )
-        _alloc_like(sim, "dE", "Efield_fp", n_grow_extra=n_grow_extra)
-    else:
-        _alloc_like(sim, "dE", "Efield_fp")
+    _alloc_like(sim, "dE", "Efield_fp")
     _alloc_like(sim, "dJ", "current_fp")
 
     # The amplitude keeps the push non-relativistic: q dE dt / m is a fraction
