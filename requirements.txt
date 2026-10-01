@@ -4,9 +4,10 @@ periodictable~=1.5
 
 # PICMI
 # note: don't forget to update the version in Docs/requirements.txt, too
-picmistandard==0.34.0
-#   for development against an unreleased PICMI version, use:
-#picmistandard @ git+https://github.com/picmi-standard/picmi.git#subdirectory=PICMI_Python
+# This development branch builds against the in-progress PICMI pydantic refactoring
+# (picmi-standard/picmi#133). Restore the released pin below once it is merged & released:
+#picmistandard==0.34.0
+picmistandard @ git+https://github.com/chillenzer/picmi.git@pydantic-refactoring
 
 # optional, some used for testing:
 # yt
