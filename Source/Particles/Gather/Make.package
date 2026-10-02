@@ -1,3 +1,4 @@
+CEXE_sources += GatherFieldsOnParticle.cpp
 CEXE_sources += GetExternalFields.cpp
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/Particles/Gather
