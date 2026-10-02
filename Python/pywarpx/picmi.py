@@ -4054,6 +4054,9 @@ class Simulation(picmistandard.PICMI_Simulation):
     warpx_checkpoint_signals: list of strings
         Signals on which to write out a checkpoint
 
+    warpx_status_signals: list of strings
+        Signals on which every process that receives them immediately prints a status report
+
     warpx_synchronize_velocity: bool, default=False
         Flags whether the particle velocities are synchronized in time with
         the positions in the diagnostics. When False, the particles are
@@ -4173,6 +4176,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         self.break_signals = kw.pop("warpx_break_signals", None)
         self.checkpoint_signals = kw.pop("warpx_checkpoint_signals", None)
+        self.status_signals = kw.pop("warpx_status_signals", None)
         self.numprocs = kw.pop("warpx_numprocs", None)
 
         self.reduced_diags_path = kw.pop("warpx_reduced_diags_path", None)
@@ -4263,6 +4267,7 @@ class Simulation(picmistandard.PICMI_Simulation):
 
         pywarpx.warpx.break_signals = self.break_signals
         pywarpx.warpx.checkpoint_signals = self.checkpoint_signals
+        pywarpx.warpx.status_signals = self.status_signals
 
         pywarpx.warpx.synchronize_velocity_for_diagnostics = self.synchronize_velocity
 
