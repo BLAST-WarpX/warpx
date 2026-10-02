@@ -884,7 +884,9 @@ void WarpX::SyncCurrentAndRho ()
         SyncRho();
     }
 
-    // Reflect charge and current density over PEC boundaries, if needed.
+    // Apply the boundary conditions to the charge and current density:
+    // fold the guard cells beyond the axis (cylindrical and spherical geometry)
+    // and beyond PEC, PMC and reflecting boundaries back into the domain.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         if (m_fields.has(FieldType::rho_fp, lev)) {
@@ -919,11 +921,41 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
     );
 
     using warpx::fields::FieldType;
+    using ablastr::fields::Direction;
 
     bool const skip_lev0_coarse_patch = true;
 
     const int rho_mid = spectral_solver_fp[0]->m_spectral_index.rho_mid;
     const int rho_new = spectral_solver_fp[0]->m_spectral_index.rho_new;
+
+    // Apply the boundary conditions to rho and J after each synchronization
+    // (filter and guard cell sum): fold the guard cells beyond the axis
+    // (cylindrical geometry) and beyond PEC, PMC and reflecting boundaries
+    // back into the domain.
+    auto const apply_rho_boundary = [&] () {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_fp, lev), PatchType::fine);
+            if (lev > 0 && m_fields.has(FieldType::rho_cp, lev)) {
+                ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_cp, lev), PatchType::coarse);
+            }
+        }
+    };
+    auto const apply_J_boundary = [&] () {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            ApplyJfieldBoundary(lev,
+                m_fields.get(FieldType::current_fp, Direction{0}, lev),
+                m_fields.get(FieldType::current_fp, Direction{1}, lev),
+                m_fields.get(FieldType::current_fp, Direction{2}, lev),
+                PatchType::fine);
+            if (lev > 0) {
+                ApplyJfieldBoundary(lev,
+                    m_fields.get(FieldType::current_cp, Direction{0}, lev),
+                    m_fields.get(FieldType::current_cp, Direction{1}, lev),
+                    m_fields.get(FieldType::current_cp, Direction{2}, lev),
+                    PatchType::coarse);
+            }
+        }
+    };
 
     // Push particle from x^{n} to x^{n+1}
     //               from p^{n-1/2} to p^{n+1/2}
@@ -954,6 +986,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         mypc->DepositCharge(rho_fp, -dt[0]);
         // Filter, exchange boundary, and interpolate across levels
         SyncRho();
+        apply_rho_boundary();
         // Forward FFT of rho
         PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
     }
@@ -970,6 +1003,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
         SyncCurrent("current_fp");
+        apply_J_boundary();
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
     }
@@ -1004,6 +1038,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
         SyncCurrent("current_fp");
+        apply_J_boundary();
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
 
@@ -1012,6 +1047,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
             PSATDMoveJNewToJMid();
             mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level),  dt[0], t_deposit_current + 0.5_rt*sub_dt);
             SyncCurrent("current_fp");
+            apply_J_boundary();
             PSATDForwardTransformJ("current_fp", "current_cp");
         }
 
@@ -1031,6 +1067,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
             mypc->DepositCharge(rho_fp, t_deposit_charge);
             // Filter, exchange boundary, and interpolate across levels
             SyncRho();
+            apply_rho_boundary();
             // Forward FFT of rho
             const int rho_idx = (time_dependency_rho != TimeDependencyRho::Constant) ? rho_new : rho_mid;
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_idx);
@@ -1040,6 +1077,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
                 PSATDMoveRhoNewToRhoMid();
                 mypc->DepositCharge(rho_fp, t_deposit_charge + 0.5_rt*sub_dt);
                 SyncRho();
+                apply_rho_boundary();
                 PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
             }
         }
@@ -1459,6 +1497,10 @@ WarpX::PushParticlesandDeposit (
     if (!skip_deposition) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         // This is called after all particles have deposited their current and charge.
+        // Only the inverse volume scaling is applied here: the current and charge
+        // deposited in the guard cells beyond the axis are folded back into the
+        // domain later, together with the other boundary conditions, in
+        // ApplyJfieldBoundary/ApplyRhofieldBoundary (called from SyncCurrentAndRho).
         if (!implicit_options) {
             // Skip scaling J here for the implicit solvers: the total current is
             // accumulated from multiple containers after this call (see CumulateJ()
@@ -1485,13 +1527,6 @@ WarpX::PushParticlesandDeposit (
                 ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_buf, lev), lev-1);
             }
         }
-// #else
-        // I left this comment here as a reminder that currently the
-        // boundary handling for cartesian grids are not matching the RZ handling
-        // (done in the ApplyInverseScalingToChargeDensity function). The
-        // Cartesian grid code had to be moved from here to after the application
-        // of the filter to avoid incorrect results (moved to `SyncCurrentAndRho()`).
-        // Might this be related to issue #1943?
 #endif
         if (do_fluid_species && !implicit_options) {
             myfl->Evolve(m_fields,

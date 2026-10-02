@@ -52,12 +52,12 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     auto & warpx = WarpX::GetInstance();
     warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
 
-#ifndef WARPX_DIM_RZ
     for (int lev = 0; lev < num_levels; lev++) {
-        // Reflect density over PEC boundaries, if needed.
+        // Apply the boundary conditions: fold the density deposited in the
+        // guard cells beyond the axis (cylindrical and spherical geometry)
+        // and beyond PEC, PMC and reflecting boundaries, if needed.
         warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
     }
-#endif
     // beta is zero in lab frame
     // Todo: use simpler finite difference form with beta=0
     const std::array<Real, 3> beta = {0._rt};

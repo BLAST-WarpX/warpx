@@ -3,6 +3,7 @@
 #include "BoundaryConditions/PML.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
+#include "Utils/TextMsg.H"
 #include "WarpX_PEC.H"
 
 #include <AMReX.H>
@@ -14,7 +15,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <memory>
+#include <string>
 
 using namespace amrex;
 using namespace amrex::literals;
@@ -257,6 +260,12 @@ void WarpX::ApplyBfieldBoundary (const int lev, PatchType patch_type, Subcycling
 void WarpX::ApplyRhofieldBoundary (const int lev, MultiFab* rho,
                                    PatchType patch_type)
 {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Fold the charge deposited in the guard cells beyond the axis
+    // onto the cells above the axis.
+    FoldChargeDensityOnAxis(rho, lev);
+#endif
+
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
@@ -281,6 +290,20 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
                                  PatchType patch_type)
 {
     BL_PROFILE("WarpX::ApplyJfieldBoundary()");
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Fold the current deposited in the guard cells beyond the axis
+    // onto the cells above the axis.
+    FoldCurrentDensityOnAxis(Jx, Jy, Jz, lev);
+#endif
+
+    ApplyJfieldBoundaryOnWalls(lev, Jx, Jy, Jz, patch_type);
+}
+
+void WarpX::ApplyJfieldBoundaryOnWalls (const int lev, amrex::MultiFab* Jx,
+                                        amrex::MultiFab* Jy, amrex::MultiFab* Jz,
+                                        PatchType patch_type)
+{
     if (::isAnyBoundary<ParticleBoundaryType::Reflecting>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<ParticleBoundaryType::Thermal>(particle_boundary_lo, particle_boundary_hi) ||
         ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
@@ -387,6 +410,338 @@ WarpX::ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex
             }
 #endif
 
+        });
+    }
+}
+
+void
+WarpX::FoldChargeDensityOnAxis (amrex::MultiFab* rho, const int lev) const
+{
+    // Nothing to do if the domain does not touch the axis
+    if (Geom(lev).ProbLo(0) != 0._rt) { return; }
+
+    const amrex::IntVect ng = rho->nGrowVect();
+
+    // The MultiFab may hold several copies of the charge density side by
+    // side (e.g. rho_old and rho_new for PSATD, or a single copy for the
+    // electrostatic and hybrid solvers and for diagnostics). Each copy
+    // uses the same component layout as J: component 0 is the mode 0,
+    // and components 2*m-1 and 2*m are the real and imaginary parts of
+    // the mode m.
+    const int ncomp = rho->nComp();
+    const int ncomps_per_copy = WarpX::ncomps;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ncomp % ncomps_per_copy == 0,
+        "FoldChargeDensityOnAxis: the number of components of rho ("
+        + std::to_string(ncomp) + ") must be a multiple of the number of mode components ("
+        + std::to_string(ncomps_per_copy) + ")");
+    const int ncopies = ncomp / ncomps_per_copy;
+#if defined(WARPX_DIM_RZ)
+    const int nmodes = n_rz_azimuthal_modes;
+#endif
+
+    // Index of the first cell/node along r (the same for the fine and coarse patches)
+    const int domain_lo = Geom(lev).Domain().smallEnd(0);
+
+    // For ishift, 1 means cell centered, 0 means node centered:
+    // the mirror of the cell i across the axis is the cell -ishift-i.
+    const int ishift = (rho->ixType().nodeCentered(0) ? 0 : 1);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include the guard cells in the transverse direction;
+    // with tiling, neighboring tiles would fold the overlapping region multiple times.
+    for (amrex::MFIter mfi(*rho, false); mfi.isValid(); ++mfi)
+    {
+        // Skip boxes that don't touch the axis
+        const amrex::Box& validbox = mfi.validbox();
+        if (validbox.smallEnd(0) != domain_lo) { continue; }
+
+        amrex::Array4<amrex::Real> const& rho_arr = rho->array(mfi);
+
+        amrex::Box tb = amrex::convert(validbox, rho->ixType().toIntVect());
+#if defined(WARPX_DIM_RZ)
+        // Include the guard cells in the transverse direction (corners)
+        tb.grow(1, ng[1]);
+#endif
+
+        // Step 1: fold the guard cells at negative radius onto their mirror
+        // cells above the axis (the node on the axis, if any, is its own mirror
+        // and is left untouched).
+        amrex::Box tb_fold = tb;
+        tb_fold.setRange(0, 1-ishift, ng[0]);
+        amrex::ParallelFor(tb_fold,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+            for (int icopy = 0; icopy < ncopies; icopy++) {
+                const int ic0 = icopy*ncomps_per_copy;
+                // The mode 0 is symmetric across the axis
+                rho_arr(i,j,0,ic0) += rho_arr(-ishift-i,j,0,ic0);
+#if defined(WARPX_DIM_RZ)
+                for (int imode=1 ; imode < nmodes ; imode++) {
+                    // The mode m has parity (-1)^m across the axis
+                    rho_arr(i,j,0,ic0+2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode)*rho_arr(-ishift-i,j,0,ic0+2*imode-1));
+                    rho_arr(i,j,0,ic0+2*imode) += static_cast<amrex::Real>(std::pow(-1, imode)*rho_arr(-ishift-i,j,0,ic0+2*imode));
+                }
+#endif
+            }
+        });
+
+        // Step 2: fill the guard cells at negative radius with the image of
+        // the cells above the axis.
+        amrex::Box tb_fill = tb;
+        tb_fill.setRange(0, -ng[0], ng[0]);
+        amrex::ParallelFor(tb_fill,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+            for (int icopy = 0; icopy < ncopies; icopy++) {
+                const int ic0 = icopy*ncomps_per_copy;
+                rho_arr(i,j,0,ic0) = rho_arr(-ishift-i,j,0,ic0);
+#if defined(WARPX_DIM_RZ)
+                for (int imode=1 ; imode < nmodes ; imode++) {
+                    rho_arr(i,j,0,ic0+2*imode-1) = static_cast<amrex::Real>(std::pow(-1, imode)*rho_arr(-ishift-i,j,0,ic0+2*imode-1));
+                    rho_arr(i,j,0,ic0+2*imode) = static_cast<amrex::Real>(std::pow(-1, imode)*rho_arr(-ishift-i,j,0,ic0+2*imode));
+                }
+#endif
+            }
+        });
+    }
+}
+
+void
+WarpX::FoldCurrentDensityOnAxis (amrex::MultiFab* Jr, amrex::MultiFab* Jt, amrex::MultiFab* Jz, const int lev) const
+{
+    // Nothing to do if the domain does not touch the axis
+    if (Geom(lev).ProbLo(0) != 0._rt) { return; }
+
+    const amrex::IntVect ng = Jr->nGrowVect();
+#if defined(WARPX_DIM_RZ)
+    const int nmodes = n_rz_azimuthal_modes;
+#endif
+
+    // Index of the first cell/node along r (the same for the fine and coarse patches)
+    const int domain_lo = Geom(lev).Domain().smallEnd(0);
+
+    // For ishift, 1 means cell centered, 0 means node centered:
+    // the mirror of the cell i across the axis is the cell -ishift-i.
+    const int ishift_r = (Jr->ixType().nodeCentered(0) ? 0 : 1);
+    const int ishift_t = (Jt->ixType().nodeCentered(0) ? 0 : 1);
+    const int ishift_z = (Jz->ixType().nodeCentered(0) ? 0 : 1);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include the guard cells in the transverse direction;
+    // with tiling, neighboring tiles would fold the overlapping region multiple times.
+    for (amrex::MFIter mfi(*Jr, false); mfi.isValid(); ++mfi)
+    {
+        // Skip boxes that don't touch the axis
+        const amrex::Box& validbox = mfi.validbox();
+        if (validbox.smallEnd(0) != domain_lo) { continue; }
+
+        amrex::Array4<amrex::Real> const& Jr_arr = Jr->array(mfi);
+        amrex::Array4<amrex::Real> const& Jt_arr = Jt->array(mfi);
+        amrex::Array4<amrex::Real> const& Jz_arr = Jz->array(mfi);
+
+        amrex::Box tbr = amrex::convert(validbox, Jr->ixType().toIntVect());
+        amrex::Box tbt = amrex::convert(validbox, Jt->ixType().toIntVect());
+        amrex::Box tbz = amrex::convert(validbox, Jz->ixType().toIntVect());
+#if defined(WARPX_DIM_RZ)
+        // Include the guard cells in the transverse direction (corners)
+        tbr.grow(1, ng[1]);
+        tbt.grow(1, ng[1]);
+        tbz.grow(1, ng[1]);
+#endif
+
+        // Step 1: fold the guard cells at negative radius onto their mirror
+        // cells above the axis (the node on the axis, if any, is its own mirror
+        // and is left untouched). The parities are those of
+        // ApplyFieldBoundaryOnAxis: Jr and Jt are anti-symmetric for the
+        // mode 0, Jz is symmetric (anti-symmetric in RSPHERE), and the
+        // parity alternates with the azimuthal mode.
+        amrex::Box tbr_fold = tbr;
+        amrex::Box tbt_fold = tbt;
+        amrex::Box tbz_fold = tbz;
+        tbr_fold.setRange(0, 1-ishift_r, ng[0]);
+        tbt_fold.setRange(0, 1-ishift_t, ng[0]);
+        tbz_fold.setRange(0, 1-ishift_z, ng[0]);
+        amrex::ParallelFor(tbr_fold, tbt_fold, tbz_fold,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+            Jr_arr(i,j,0,0) -= Jr_arr(-ishift_r-i,j,0,0);
+#if defined(WARPX_DIM_RZ)
+            for (int imode=1 ; imode < nmodes ; imode++) {
+                Jr_arr(i,j,0,2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode-1));
+                Jr_arr(i,j,0,2*imode) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode));
+            }
+#endif
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+            Jt_arr(i,j,0,0) -= Jt_arr(-ishift_t-i,j,0,0);
+#if defined(WARPX_DIM_RZ)
+            for (int imode=1 ; imode < nmodes ; imode++) {
+                Jt_arr(i,j,0,2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jt_arr(-ishift_t-i,j,0,2*imode-1));
+                Jt_arr(i,j,0,2*imode) += static_cast<amrex::Real>(std::pow(-1, imode+1)*Jt_arr(-ishift_t-i,j,0,2*imode));
+            }
+#endif
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            Jz_arr(i,j,0,0) += Jz_arr(-ishift_z-i,j,0,0);
+#elif defined(WARPX_DIM_RSPHERE)
+            Jz_arr(i,j,0,0) -= Jz_arr(-ishift_z-i,j,0,0);
+#endif
+#if defined(WARPX_DIM_RZ)
+            for (int imode=1 ; imode < nmodes ; imode++) {
+                Jz_arr(i,j,0,2*imode-1) -= static_cast<amrex::Real>(std::pow(-1, imode+1)*Jz_arr(-ishift_z-i,j,0,2*imode-1));
+                Jz_arr(i,j,0,2*imode) -= static_cast<amrex::Real>(std::pow(-1, imode+1)*Jz_arr(-ishift_z-i,j,0,2*imode));
+            }
+#endif
+        });
+
+        // Step 2: fill the guard cells at negative radius with the image of
+        // the cells above the axis.
+        amrex::Box tbr_fill = tbr;
+        amrex::Box tbt_fill = tbt;
+        amrex::Box tbz_fill = tbz;
+        tbr_fill.setRange(0, -ng[0], ng[0]);
+        tbt_fill.setRange(0, -ng[0], ng[0]);
+        tbz_fill.setRange(0, -ng[0], ng[0]);
+        amrex::ParallelFor(tbr_fill, tbt_fill, tbz_fill,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+            Jr_arr(i,j,0,0) = -Jr_arr(-ishift_r-i,j,0,0);
+#if defined(WARPX_DIM_RZ)
+            for (int imode=1 ; imode < nmodes ; imode++) {
+                Jr_arr(i,j,0,2*imode-1) = static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode-1));
+                Jr_arr(i,j,0,2*imode) = static_cast<amrex::Real>(std::pow(-1, imode+1)*Jr_arr(-ishift_r-i,j,0,2*imode));
+            }
+#endif
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+            Jt_arr(i,j,0,0) = -Jt_arr(-ishift_t-i,j,0,0);
+#if defined(WARPX_DIM_RZ)
+            for (int imode=1 ; imode < nmodes ; imode++) {
+                Jt_arr(i,j,0,2*imode-1) = static_cast<amrex::Real>(std::pow(-1, imode+1)*Jt_arr(-ishift_t-i,j,0,2*imode-1));
+                Jt_arr(i,j,0,2*imode) = static_cast<amrex::Real>(std::pow(-1, imode+1)*Jt_arr(-ishift_t-i,j,0,2*imode));
+            }
+#endif
+        },
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
+        {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            Jz_arr(i,j,0,0) = Jz_arr(-ishift_z-i,j,0,0);
+#elif defined(WARPX_DIM_RSPHERE)
+            Jz_arr(i,j,0,0) = -Jz_arr(-ishift_z-i,j,0,0);
+#endif
+#if defined(WARPX_DIM_RZ)
+            for (int imode=1 ; imode < nmodes ; imode++) {
+                Jz_arr(i,j,0,2*imode-1) = -static_cast<amrex::Real>(std::pow(-1, imode+1)*Jz_arr(-ishift_z-i,j,0,2*imode-1));
+                Jz_arr(i,j,0,2*imode) = -static_cast<amrex::Real>(std::pow(-1, imode+1)*Jz_arr(-ishift_z-i,j,0,2*imode));
+            }
+#endif
+        });
+    }
+}
+
+void
+WarpX::FoldMassMatricesOnAxis (amrex::MultiFab* Sxx, amrex::MultiFab* Syy, amrex::MultiFab* Szz, const int lev) const
+{
+    // Nothing to do if the domain does not touch the axis
+    if (Geom(lev).ProbLo(0) != 0._rt) { return; }
+
+    const amrex::IntVect ng = Sxx->nGrowVect();
+    const int ncomp_rr = Sxx->nComp();
+    const int ncomp_tt = Syy->nComp();
+    const int ncomp_zz = Szz->nComp();
+
+    // Index of the first cell/node along r
+    const int domain_lo = Geom(lev).Domain().smallEnd(0);
+
+    // For ishift, 1 means cell centered, 0 means node centered:
+    // the mirror of the cell i across the axis is the cell -ishift-i.
+    const int ishift_r = (Sxx->ixType().nodeCentered(0) ? 0 : 1);
+    const int ishift_t = (Syy->ixType().nodeCentered(0) ? 0 : 1);
+    const int ishift_z = (Szz->ixType().nodeCentered(0) ? 0 : 1);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    // The false flag here is to ensure that this loop does not use tiling.
+    // The boxes are grown to include the guard cells in the transverse direction;
+    // with tiling, neighboring tiles would fold the overlapping region multiple times.
+    for (amrex::MFIter mfi(*Sxx, false); mfi.isValid(); ++mfi)
+    {
+        // Skip boxes that don't touch the axis
+        const amrex::Box& validbox = mfi.validbox();
+        if (validbox.smallEnd(0) != domain_lo) { continue; }
+
+        amrex::Array4<amrex::Real> const& Srr_arr = Sxx->array(mfi);
+        amrex::Array4<amrex::Real> const& Stt_arr = Syy->array(mfi);
+        amrex::Array4<amrex::Real> const& Szz_arr = Szz->array(mfi);
+
+        amrex::Box tbr = amrex::convert(validbox, Sxx->ixType().toIntVect());
+        amrex::Box tbt = amrex::convert(validbox, Syy->ixType().toIntVect());
+        amrex::Box tbz = amrex::convert(validbox, Szz->ixType().toIntVect());
+#if defined(WARPX_DIM_RZ)
+        // Include the guard cells in the transverse direction (corners)
+        tbr.grow(1, ng[1]);
+        tbt.grow(1, ng[1]);
+        tbz.grow(1, ng[1]);
+#endif
+
+        // Step 1: fold the guard cells at negative radius onto their mirror
+        // cells above the axis (the node on the axis, if any, is its own mirror
+        // and is left untouched). The mass matrices are symmetric across the axis.
+        amrex::Box tbr_fold = tbr;
+        amrex::Box tbt_fold = tbt;
+        amrex::Box tbz_fold = tbz;
+        tbr_fold.setRange(0, 1-ishift_r, ng[0]);
+        tbt_fold.setRange(0, 1-ishift_t, ng[0]);
+        tbz_fold.setRange(0, 1-ishift_z, ng[0]);
+        amrex::ParallelFor(tbr_fold, ncomp_rr,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            Srr_arr(i,j,0,icomp) += Srr_arr(-ishift_r-i,j,0,icomp);
+        },
+        tbt_fold, ncomp_tt,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            Stt_arr(i,j,0,icomp) += Stt_arr(-ishift_t-i,j,0,icomp);
+        },
+        tbz_fold, ncomp_zz,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            Szz_arr(i,j,0,icomp) += Szz_arr(-ishift_z-i,j,0,icomp);
+        });
+
+        // Step 2: fill the guard cells at negative radius with the image of
+        // the cells above the axis.
+        amrex::Box tbr_fill = tbr;
+        amrex::Box tbt_fill = tbt;
+        amrex::Box tbz_fill = tbz;
+        tbr_fill.setRange(0, -ng[0], ng[0]);
+        tbt_fill.setRange(0, -ng[0], ng[0]);
+        tbz_fill.setRange(0, -ng[0], ng[0]);
+        amrex::ParallelFor(tbr_fill, ncomp_rr,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            Srr_arr(i,j,0,icomp) = Srr_arr(-ishift_r-i,j,0,icomp);
+        },
+        tbt_fill, ncomp_tt,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            Stt_arr(i,j,0,icomp) = Stt_arr(-ishift_t-i,j,0,icomp);
+        },
+        tbz_fill, ncomp_zz,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        {
+            Szz_arr(i,j,0,icomp) = Szz_arr(-ishift_z-i,j,0,icomp);
         });
     }
 }

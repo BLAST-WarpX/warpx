@@ -356,6 +356,14 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
 
+    // Apply the boundary conditions to the current density (fold the guard
+    // cells beyond the axis in cylindrical geometry; the domain is periodic
+    // otherwise)
+    {
+        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
+        m_WarpX->ApplyJfieldBoundary(lev, J[0], J[1], J[2], PatchType::fine);
+    }
+
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();
 }

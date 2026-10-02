@@ -342,6 +342,13 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         J_spec[lev][idim]->nGrowVect(), J_spec[lev][idim]->nGrowVect(),
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
+                // Apply the boundary conditions to the per-species fields, as
+                // done for the totals in SyncCurrentAndRho: fold the guard cells
+                // beyond the axis (radial geometries) and beyond PEC, PMC and
+                // reflecting boundaries back into the domain.
+                ApplyRhofieldBoundary(lev, rho_spec[lev], PatchType::fine);
+                ApplyJfieldBoundary(lev,
+                    J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], PatchType::fine);
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after

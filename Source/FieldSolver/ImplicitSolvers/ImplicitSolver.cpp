@@ -1127,11 +1127,15 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
 
     // Apply BCs to MassMatrices_PC
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        m_WarpX->ApplyJfieldBoundary(lev,
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
-            PatchType::fine);
+        ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        // Fold the mass matrices deposited in the guard cells beyond the axis
+        // onto the cells above the axis. The mass matrices are symmetric
+        // across the axis, unlike the current density, hence the dedicated
+        // function (and the wall-only version of ApplyJfieldBoundary below).
+        m_WarpX->FoldMassMatricesOnAxis(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
+        m_WarpX->ApplyJfieldBoundaryOnWalls(lev, MM_PC[0], MM_PC[1], MM_PC[2], PatchType::fine);
     }
 }
 

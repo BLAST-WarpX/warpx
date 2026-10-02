@@ -669,6 +669,9 @@ class ParticleContainerWrapper(object):
 
         if sync_rho:
             libwarpx.warpx.sync_rho()
+            # fold the guard cells beyond the axis and beyond PEC, PMC and
+            # reflecting boundaries back into the domain
+            libwarpx.warpx.apply_rho_field_boundary(rho_fp, level)
 
 
 class ParticleBoundaryBufferWrapper(object):

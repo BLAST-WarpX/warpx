@@ -119,6 +119,24 @@ WarpX::AddMagnetostaticFieldLabFrame()
 
     SyncCurrent("current_fp");
 
+    // Apply the boundary conditions to the current density: fold the guard
+    // cells beyond the axis (cylindrical geometry) and beyond PEC, PMC and
+    // reflecting boundaries back into the domain.
+    for (int lev = 0; lev <= max_level; lev++) {
+        ApplyJfieldBoundary(lev,
+            m_fields.get(FieldType::current_fp, Direction{0}, lev),
+            m_fields.get(FieldType::current_fp, Direction{1}, lev),
+            m_fields.get(FieldType::current_fp, Direction{2}, lev),
+            PatchType::fine);
+        if (lev > 0) {
+            ApplyJfieldBoundary(lev,
+                m_fields.get(FieldType::current_cp, Direction{0}, lev),
+                m_fields.get(FieldType::current_cp, Direction{1}, lev),
+                m_fields.get(FieldType::current_cp, Direction{2}, lev),
+                PatchType::coarse);
+        }
+    }
+
     // set the boundary and current density potentials
     setVectorPotentialBC(m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level));
 

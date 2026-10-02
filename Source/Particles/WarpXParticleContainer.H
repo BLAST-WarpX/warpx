@@ -335,8 +335,10 @@ public:
      * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
      * \param[in] local if false, exchange the data in the guard cells after the deposition
      * \param[in] reset if true, reset all values of rho to zero
-     * \param[in] apply_boundary_and_scale_volume whether to apply boundary conditions and scale the
-     *            final density by some volume norm in cylindrical and spherical geometry
+     * \param[in] apply_boundary_and_scale_volume whether to scale the final density by the
+     *            inverse volume in cylindrical and spherical geometry, and to apply the
+     *            boundary conditions (fold the guard cells beyond the axis and beyond
+     *            PEC, PMC and reflecting boundaries back into the domain)
      * \param[in] interpolate_across_levels whether to average down from the fine patch to the coarse patch
      * \param[in] icomp component of the MultiFab where rho is deposited (old, new)
      */

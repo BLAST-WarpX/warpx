@@ -1929,13 +1929,13 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
         );
     }
 
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     if (apply_boundary_and_scale_volume)
     {
-        // Reflect density over PEC boundaries, if needed.
+        // Apply the boundary conditions: fold the density deposited in the
+        // guard cells beyond the axis (cylindrical and spherical geometry)
+        // and beyond PEC, PMC and reflecting boundaries, if needed.
         WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
     }
-#endif
 }
 
 std::unique_ptr<MultiFab>

@@ -48,6 +48,13 @@ JFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/
         auto& mypc = warpx.GetPartContainer();
         mypc.DepositCurrent(current_fp_temp, warpx.getdt(m_lev), 0.0);
 
+        // Apply the boundary conditions: fold the current deposited in the
+        // guard cells beyond the axis (cylindrical and spherical geometry)
+        // and beyond PEC, PMC and reflecting boundaries back into the domain.
+        warpx.ApplyJfieldBoundary(m_lev,
+            current_fp_temp[0][0], current_fp_temp[0][1], current_fp_temp[0][2],
+            PatchType::fine);
+
         // sum values in guard cells - note that this does not filter the
         // current density.
         for (int idim = 0; idim < 3; ++idim) {

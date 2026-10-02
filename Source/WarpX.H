@@ -594,21 +594,36 @@ public:
 #endif
 
     /**
-     * \brief If a PEC boundary conditions is used the charge
-     * density deposited in the guard cells have to be reflected back into
-     * the simulation domain. This function performs that logic.
+     * \brief Apply the boundary conditions to the charge density: the charge
+     * deposited in the guard cells beyond the axis (in cylindrical and spherical
+     * geometry) and beyond PEC, PMC and reflecting boundaries is folded back
+     * into the simulation domain, and the guard cells are then filled with the
+     * corresponding (anti)symmetric image.
      */
     void ApplyRhofieldBoundary (int lev, amrex::MultiFab* Rho,
                                 PatchType patch_type);
 
     /**
-     * \brief If a PEC boundary conditions is used the current
-     * density deposited in the guard cells have to be reflected back into
-     * the simulation domain. This function performs that logic.
+     * \brief Apply the boundary conditions to the current density: the current
+     * deposited in the guard cells beyond the axis (in cylindrical and spherical
+     * geometry) and beyond PEC, PMC and reflecting boundaries is folded back
+     * into the simulation domain, and the guard cells are then filled with the
+     * corresponding (anti)symmetric image.
      */
     void ApplyJfieldBoundary (int lev, amrex::MultiFab* Jx,
                               amrex::MultiFab* Jy, amrex::MultiFab* Jz,
                               PatchType patch_type);
+
+    /**
+     * \brief Same as ApplyJfieldBoundary, but only for the PEC, PMC and
+     * reflecting boundaries (i.e. without the folding on the axis in
+     * cylindrical and spherical geometry). Used for current-like fields whose
+     * parity across the axis differs from that of the current density
+     * (e.g. the mass matrices).
+     */
+    void ApplyJfieldBoundaryOnWalls (int lev, amrex::MultiFab* Jx,
+                                     amrex::MultiFab* Jy, amrex::MultiFab* Jz,
+                                     PatchType patch_type);
 
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
@@ -616,6 +631,38 @@ public:
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Applies the boundary conditions that are specific to the axis when in RZ.
     void ApplyFieldBoundaryOnAxis (amrex::MultiFab* Er, amrex::MultiFab* Et, amrex::MultiFab* Ez, int lev) const;
+
+    /**
+     * \brief Fold the charge density deposited in the guard cells at negative
+     * radius onto the cells above the axis, with the parity of each azimuthal
+     * mode, and then fill these guard cells with the corresponding image.
+     * The charge density must already be scaled by the inverse volume
+     * (see ApplyInverseVolumeScalingToChargeDensity), including in the
+     * guard cells at negative radius.
+     */
+    void FoldChargeDensityOnAxis (amrex::MultiFab* rho, int lev) const;
+
+    /**
+     * \brief Fold the current density deposited in the guard cells at negative
+     * radius onto the cells above the axis, with the parity of each component
+     * and azimuthal mode, and then fill these guard cells with the
+     * corresponding image.
+     * The current density must already be scaled by the inverse volume
+     * (see ApplyInverseVolumeScalingToCurrentDensity), including in the
+     * guard cells at negative radius.
+     */
+    void FoldCurrentDensityOnAxis (amrex::MultiFab* Jr, amrex::MultiFab* Jt, amrex::MultiFab* Jz, int lev) const;
+
+    /**
+     * \brief Fold the mass matrices deposited in the guard cells at negative
+     * radius onto the cells above the axis (the mass matrices are symmetric
+     * across the axis), and then fill these guard cells with the
+     * corresponding image.
+     * The mass matrices must already be scaled by the inverse volume
+     * (see ApplyInverseVolumeScalingToMassMatricesPC), including in the
+     * guard cells at negative radius.
+     */
+    void FoldMassMatricesOnAxis (amrex::MultiFab* Sxx, amrex::MultiFab* Syy, amrex::MultiFab* Szz, int lev) const;
 #endif
 
     /**

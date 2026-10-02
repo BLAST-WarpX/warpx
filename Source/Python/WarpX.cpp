@@ -219,6 +219,13 @@ void init_WarpX (py::module& m)
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
+        .def("apply_rho_field_boundary",
+            [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
+                wx.ApplyRhofieldBoundary(lev, rho, PatchType::fine);
+            },
+            py::arg("rho"), py::arg("lev"),
+            R"pbdoc(Apply the boundary conditions to a charge density: fold the guard cells beyond the axis (cylindrical and spherical geometry) and beyond PEC, PMC and reflecting boundaries back into the domain)pbdoc"
+        )
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
             [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
