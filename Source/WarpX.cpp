@@ -552,6 +552,9 @@ WarpX::WarpX ()
 
 WarpX::~WarpX ()
 {
+    // stop status reports before AMReX state is torn down
+    ablastr::utils::SignalHandling::FinalizeSignalHandling();
+
     const int nlevs_max = maxLevel() +1;
     for (int lev = 0; lev < nlevs_max; ++lev) {
         ClearLevel(lev);
@@ -680,6 +683,18 @@ WarpX::ReadParameters ()
             SignalHandling::signal_conf_requests[SignalHandling::SIGNAL_REQUESTS_CHECKPOINT][sig] = true;
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(have_checkpoint_diagnostic,
                                              "Signal handling was requested to checkpoint, but no checkpoint diagnostic is configured");
+        }
+#else
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(signals_in.empty(),
+                                         "Signal handling requested in input, but is not supported on this platform");
+#endif
+        signals_in.clear();
+
+        pp_warpx.queryarr("status_signals", signals_in);
+#if defined(__linux__) || defined(__APPLE__)
+        for (const std::string &str : signals_in) {
+            const int sig = SignalHandling::parseSignalNameToNumber(str);
+            SignalHandling::signal_conf_requests[SignalHandling::SIGNAL_REQUESTS_STATUS][sig] = true;
         }
 #else
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(signals_in.empty(),
