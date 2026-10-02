@@ -2322,6 +2322,12 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         minimum), or "cell" (adjacent-cell minimum -- one decision for all
         three E components of an index, removing the per-component half-cell
         decision offsets at the plasma/vacuum seam). Cartesian only.
+    use_conformal_eb: bool, default=False
+        If True, use the conformal (enlarged-cell technique) embedded-boundary
+        wall for the B push, with a constitutive perfect-conductor closure
+        (Ohm's-law E and the Ampere current are zeroed on covered and cut
+        edges). Requires embedded boundaries, a staggered (Yee) grid, and 3D
+        or 2D Cartesian geometry.
 
     Jx/y/z_external_function: str
         Function of space and time specifying external (non-plasma) currents.
@@ -2384,6 +2390,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         max_substep_attempts=None,
         holmstrom_vacuum_region=None,
         vacuum_seam_switch_mode=None,
+        use_conformal_eb=None,
         Jx_external_function=None,
         Jy_external_function=None,
         Jz_external_function=None,
@@ -2417,6 +2424,8 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
 
         self.holmstrom_vacuum_region = holmstrom_vacuum_region
         self.vacuum_seam_switch_mode = vacuum_seam_switch_mode
+
+        self.use_conformal_eb = use_conformal_eb
 
         self.Jx_external_function = Jx_external_function
         self.Jy_external_function = Jy_external_function
@@ -2495,6 +2504,7 @@ class HybridPICSolver(picmistandard.base._ClassWithInit):
         pywarpx.hybridpicmodel.max_substep_attempts = self.max_substep_attempts
         pywarpx.hybridpicmodel.holmstrom_vacuum_region = self.holmstrom_vacuum_region
         pywarpx.hybridpicmodel.vacuum_seam_switch_mode = self.vacuum_seam_switch_mode
+        pywarpx.hybridpicmodel.use_conformal_eb = self.use_conformal_eb
         pywarpx.hybridpicmodel.__setattr__(
             "Jx_external_grid_function(x,y,z,t)",
             pywarpx.my_constants.mangle_expression(
