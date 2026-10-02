@@ -31,9 +31,7 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
     m_E.Copy(FieldType::Efield_fp);
     m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
 
-    // Parse implicit solver parameters
-    const amrex::ParmParse pp("implicit_evolve");
-    parseNonlinearSolverParams(pp);
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -115,11 +113,12 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     return exit_status;
 }
 
-void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
-                            const WarpXSolverVec&  a_E,
-                                  amrex::Real      start_time,
-                                  int              a_nl_iter,
-                                  bool             a_from_jacobian )
+void SemiImplicitEM::ComputeRHS (WarpXSolverVec& a_RHS,
+                           const WarpXSolverVec& a_E,
+                                 amrex::Real     start_time,
+                                 int             a_nl_iter,
+                                 bool            a_from_jacobian,
+                                 const bool      update_pc)
 {
     BL_PROFILE("SemiImplicitEM::ComputeRHS()");
 
@@ -130,8 +129,17 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // Update particle positions and velocities using the current state
     // of Eg and Bg. Deposit current density at time n+1/2
-    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
+    PreRHSOp(half_time, a_nl_iter, a_from_jacobian, update_pc);
 
     // RHS = cvac^2*0.5*dt*( curl(Bg^{n+1/2}) - mu0*Jg^{n+1/2} )
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);
+
+    // Apply blanking to electric field RHS vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) {
+                a_RHS.getArrayVec()[lev][dir]->setVal(0._rt);
+            }
+        }
+    }
 }

@@ -63,11 +63,12 @@ public:
                  int          a_step,
                  bool verbose_step) override;
 
-    void ComputeRHS ( WarpXSolverVec&  a_RHS,
-                const WarpXSolverVec&  a_E,
-                      amrex::Real      start_time,
-                      int              a_nl_iter,
-                      bool             a_from_jacobian ) override;
+    void ComputeRHS (WarpXSolverVec& a_RHS,
+               const WarpXSolverVec& a_E,
+                     amrex::Real     start_time,
+                     int             a_nl_iter,
+                     bool            a_from_jacobian,
+                     const bool      update_pc = true) override;
 
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.

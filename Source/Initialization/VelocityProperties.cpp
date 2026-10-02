@@ -17,6 +17,8 @@
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_IntVect.H>
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 
 namespace {
@@ -117,20 +119,43 @@ VelocityProperties::VelocityProperties (const amrex::ParmParse& pp, std::string 
         ParseVelocityVector(pp, source_name, "maxwellian_u_mean_distribution_type", *this, geom);
     }
     else if (mom_dist_s == "parse_momentum_function") {
-        std::string str_ux_mean_function, str_uy_mean_function, str_uz_mean_function;
-        utils::parser::Store_parserString(pp, source_name, "momentum_function_ux(x,y,z)", str_ux_mean_function);
-        utils::parser::Store_parserString(pp, source_name, "momentum_function_uy(x,y,z)", str_uy_mean_function);
-        utils::parser::Store_parserString(pp, source_name, "momentum_function_uz(x,y,z)", str_uz_mean_function);
-        m_ptr_ux_mean_parser =
-            std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_ux_mean_function,{"x","y","z"}));
-        m_ptr_uy_mean_parser =
-            std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_uy_mean_function,{"x","y","z"}));
-        m_ptr_uz_mean_parser =
-            std::make_unique<amrex::Parser>(
-                utils::parser::makeParser(str_uz_mean_function,{"x","y","z"}));
-        m_type = VelParserFunctionVector;
+        // Preserve spatial parsers and optionally accept time for surface injection.
+        auto contains = [&] (std::string const& key) {
+            return pp.contains(key.c_str()) ||
+                (!source_name.empty() && pp.contains((source_name + "." + key).c_str()));
+        };
+        bool const time_dependent =
+            contains("momentum_function_ux(x,y,z,t)") ||
+            contains("momentum_function_uy(x,y,z,t)") ||
+            contains("momentum_function_uz(x,y,z,t)");
+        if (time_dependent) {
+            std::string style;
+            utils::parser::get(pp, source_name, "injection_style", style);
+            std::transform(style.begin(), style.end(), style.begin(),
+                [] (unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(style == "nfluxpercell",
+                "Time-dependent momentum functions require injection_style = NFluxPerCell.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !contains("momentum_function_ux(x,y,z)") &&
+                !contains("momentum_function_uy(x,y,z)") &&
+                !contains("momentum_function_uz(x,y,z)"),
+                "Use either (x,y,z) or (x,y,z,t) for all momentum components, not both.");
+        }
+        std::string const args = time_dependent ? "(x,y,z,t)" : "(x,y,z)";
+        amrex::Vector<std::string> const variables = time_dependent
+            ? amrex::Vector<std::string>{"x", "y", "z", "t"}
+            : amrex::Vector<std::string>{"x", "y", "z"};
+        auto make_component = [&] (std::string const& component) {
+            std::string expression;
+            std::string const key = "momentum_function_" + component + args;
+            utils::parser::Store_parserString(pp, source_name, key, expression);
+            return std::make_unique<amrex::Parser>(
+                utils::parser::makeParser(expression, variables));
+        };
+        m_ptr_ux_mean_parser = make_component("ux");
+        m_ptr_uy_mean_parser = make_component("uy");
+        m_ptr_uz_mean_parser = make_component("uz");
+        m_type = time_dependent ? VelParserFunctionVectorTime : VelParserFunctionVector;
     }
     else {
         WARPX_ABORT_WITH_MESSAGE(

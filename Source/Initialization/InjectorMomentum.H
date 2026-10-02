@@ -387,9 +387,9 @@ struct InjectorMomentumParser
     AMREX_GPU_HOST_DEVICE
     amrex::XDim3
     getMomentum (amrex::Real x, amrex::Real y, amrex::Real z,
-                 amrex::RandomEngine const&) const noexcept
+                 amrex::RandomEngine const&, amrex::Real t = 0.0) const noexcept
     {
-        return m_velocity(x,y,z);
+        return m_velocity(x,y,z,t);
     }
 
     [[nodiscard]]
@@ -485,13 +485,13 @@ struct InjectorMomentum
     AMREX_GPU_HOST_DEVICE
     amrex::XDim3
     getMomentum (amrex::Real x, amrex::Real y, amrex::Real z,
-                 amrex::RandomEngine const& engine) const noexcept
+                 amrex::RandomEngine const& engine, amrex::Real t = 0.0) const noexcept
     {
         switch (type)
         {
         case Type::parser:
         {
-            return object.parser.getMomentum(x,y,z,engine);
+            return object.parser.getMomentum(x,y,z,engine,t);
         }
         case Type::gaussian:
         {

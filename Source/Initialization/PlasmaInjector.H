@@ -67,6 +67,11 @@ public:
 
     amrex::Vector<int> num_particles_per_cell_each_dim;
 
+    // Parser for time-dependent num_particles_per_cell in NFluxPerCell injection
+    std::unique_ptr<amrex::Parser> m_ptr_num_ppc_parser;
+    amrex::ParserExecutor<4> m_num_ppc_time_parser;
+    bool m_num_ppc_time_dependent = false;
+
     // gamma * beta
     [[nodiscard]] amrex::XDim3 getMomentum (
         amrex::Real x, amrex::Real y, amrex::Real z) const noexcept;
