@@ -16,8 +16,10 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
 
+#include <cmath>
 #include <string>
 #include <sstream>
+#include <vector>
 
 #include "Utils/TextMsg.H"
 
@@ -314,5 +316,46 @@ namespace BinaryCollisionUtils{
             error_msg.str()
         );
 
+    }
+
+    ParticleUtils::BinSizeRatio
+    get_bin_size_ratio (const std::string& collision_name)
+    {
+        const amrex::ParmParse pp_collisions("collisions");
+        const amrex::ParmParse pp_collision_name(collision_name);
+        std::vector<double> ratio;
+        utils::parser::queryArrWithParser(pp_collisions, "bin_size_ratio", ratio);
+        utils::parser::queryArrWithParser(pp_collision_name, "bin_size_ratio", ratio);
+
+        ParticleUtils::BinSizeRatio bin_ratio;
+        if (ratio.empty()) { return bin_ratio; }
+
+        if (ratio.size() == 1) { ratio.resize(AMREX_SPACEDIM, ratio[0]); }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ratio.size() == AMREX_SPACEDIM,
+            "Collision " + collision_name + ": bin_size_ratio must have either 1 or "
+            + std::to_string(AMREX_SPACEDIM) + " values.");
+
+        // Relative tolerance used to check that the ratios are integers or inverse of integers
+        constexpr double tol = 1.e-6;
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            const double r = ratio[idim];
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(r > 0.,
+                "Collision " + collision_name + ": bin_size_ratio must be positive.");
+            if (r >= 1.) {
+                const auto n = static_cast<int>(std::lround(r));
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::abs(r - n) <= tol*r,
+                    "Collision " + collision_name + ": a bin_size_ratio larger than 1 must be an integer, but "
+                    + std::to_string(r) + " was given.");
+                bin_ratio.coarsen[idim] = n;
+            } else {
+                const double inv_r = 1./r;
+                const auto n = static_cast<int>(std::lround(inv_r));
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::abs(inv_r - n) <= tol*inv_r,
+                    "Collision " + collision_name + ": a bin_size_ratio smaller than 1 must be the inverse of an integer, but "
+                    + std::to_string(r) + " was given.");
+                bin_ratio.refine[idim] = n;
+            }
+        }
+        return bin_ratio;
     }
 }

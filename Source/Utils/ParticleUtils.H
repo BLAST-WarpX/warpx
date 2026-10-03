@@ -47,6 +47,46 @@ namespace ParticleUtils {
                              WarpXParticleContainer::ParticleTileType & ptile);
 
     /**
+     * \brief Size of the bins used to group particles, relative to the cell size.
+     *
+     * In each direction d, at most one of `coarsen[d]` and `refine[d]` is greater than 1.
+     * If `coarsen[d] > 1`, the bins are `coarsen[d]` cells wide in that direction;
+     * if `refine[d] > 1`, each cell is split into `refine[d]` bins in that direction.
+     *
+     * The bins form a grid aligned with the global index space of the level. A tile
+     * owns all the bins that overlap it, so that, when coarsening, the bins at the edges of
+     * a tile can be clipped (i.e. be smaller than the requested size).
+     */
+    struct BinSizeRatio
+    {
+        amrex::IntVect coarsen = amrex::IntVect::TheUnitVector();
+        amrex::IntVect refine = amrex::IntVect::TheUnitVector();
+
+        /** \brief Return the box, in the bin index space, of the bins that overlap `cell_box` */
+        [[nodiscard]] amrex::Box binBox (amrex::Box const& cell_box) const
+        {
+            return amrex::coarsen(amrex::refine(cell_box, refine), coarsen);
+        }
+    };
+
+    /**
+     * \brief Find the particles and count the particles that are in each bin of a tile.
+     * The bins are described by `bin_ratio` (see `BinSizeRatio`), and are indexed
+     * following the cells of `bin_ratio.binBox(mfi.tilebox())`.
+     * Note that this does *not* rearrange particle arrays.
+     *
+     * @param[in] geom_lev the geometry of the current refinement level.
+     * @param[in] mfi the MultiFAB iterator.
+     * @param[in] ptile the particle tile.
+     * @param[in] bin_ratio the size of the bins, relative to the cell size.
+     */
+    amrex::DenseBins<ParticleTileDataType>
+    findParticlesInEachBin (amrex::Geometry const& geom_lev,
+                            amrex::MFIter const & mfi,
+                            WarpXParticleContainer::ParticleTileType & ptile,
+                            BinSizeRatio const& bin_ratio);
+
+    /**
      * \brief Return (relativistic) collision energy assuming the target (with
      * mass M) is stationary and the projectile is approaching with the
      * the given speed and mass m. Note the use of `double` since this

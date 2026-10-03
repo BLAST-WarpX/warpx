@@ -1,0 +1,4 @@
+FILE = inputs_test_1d_charge_exchange_dsmc
+
+# Pair the particles within bins of half a cell
+neutral_to_ion.bin_size_ratio = 0.5

@@ -17,9 +17,12 @@
 #include "Particles/WarpXParticleContainer.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
+#include "Utils/WarpXConst.H"
 
 #include <AMReX_Algorithm.H>
 #include <AMReX_DenseBins.H>
+#include <AMReX_Geometry.H>
+#include <AMReX_IntVect.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
@@ -200,6 +203,10 @@ public:
             const auto multiplier_ratio = static_cast<int>(
                 m_isSameSpecies ? min_N + max_N - 1 : min_N);
 
+            // Volume of the cell where the particle production is saved
+            const amrex::ParticleReal dV_cell = m_particle_production.ok() ?
+                                                cell_volume(global_index) : amrex::ParticleReal(0.);
+
             index_type i1 = I1s + coll_idx;
             index_type i2 = I2s + coll_idx;
             // we will start from collision number = coll_idx and then add
@@ -226,7 +233,8 @@ public:
                         m_fusion_type, engine,
                         m_create_products,
                         global_index,
-                        m_particle_production);
+                        m_particle_production,
+                        dV_cell);
 
                     // Remove pair reaction weight from the colliding particles' weights
                     if (p_mask[pair_index]) {
@@ -255,8 +263,35 @@ public:
         bool m_need_product_data = false;
         bool m_isSameSpecies;
 
+        /**
+         * \brief Return the volume of the grid cell `iv` (in the global index space)
+         */
+        [[nodiscard]] AMREX_GPU_HOST_DEVICE AMREX_INLINE
+        amrex::ParticleReal cell_volume (amrex::IntVect const& iv) const
+        {
+            using namespace amrex::literals;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = m_rmin + (iv[0] - m_domain_lo_r + 0.5_prt)*m_dr;
+            return m_dV*(2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr);
+#elif defined(WARPX_DIM_RSPHERE)
+            // rr is radius at the cell center
+            amrex::ParticleReal const rr = m_rmin + (iv[0] - m_domain_lo_r + 0.5_prt)*m_dr;
+            amrex::ParticleReal const dr = m_dr;
+            return m_dV*(4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*(rr*rr + dr*dr/12._prt));
+#else
+            amrex::ignore_unused(iv);
+            return m_dV;
+#endif
+        }
+
         bool m_create_products = true;
         amrex::Array4<amrex::Real> m_particle_production;
+        // Cell size information, used to compute the particle production density
+        amrex::ParticleReal m_dV = 0;
+        amrex::Real m_rmin = 0;
+        amrex::Real m_dr = 0;
+        int m_domain_lo_r = 0;
     };
 
     [[nodiscard]] Executor executor (int const lev, amrex::MFIter const& mfi) const {
@@ -267,6 +302,11 @@ public:
             WarpX & warpx = WarpX::GetInstance();
             amrex::MultiFab * particle_production_mf = warpx.m_fields.get(m_particle_production_mf_name, lev);
             exe.m_particle_production = particle_production_mf->array(mfi);
+            amrex::Geometry const& geom = warpx.Geom(lev);
+            exe.m_dV = AMREX_D_TERM(geom.CellSize(0), *geom.CellSize(1), *geom.CellSize(2));
+            exe.m_rmin = geom.ProbLo(0);
+            exe.m_dr = geom.CellSize(0);
+            exe.m_domain_lo_r = geom.Domain().smallEnd(0);
         }
         return exe;
     }

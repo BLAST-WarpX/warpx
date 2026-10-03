@@ -3037,6 +3037,25 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
     Useful when a large PIC time step is desired but collisions require finer time resolution.
 
+.. pp:param:: <collision_name>.bin_size_ratio
+    :type: list of ``float``
+    :default: ``1``
+    :optional:
+
+    Only for pairwise collisions (``pairwisecoulomb``, ``nuclearfusion``, ``bremsstrahlung``, ``linear_breit_wheeler``, ``dsmc``, and ``linear_compton``).
+    Size of the bins within which the particles are paired for collisions, relative to the cell size of each mesh-refinement level.
+    Either one value (applied in all directions) or one value per direction can be given.
+    A value larger than 1 must be an integer ``n``: the bins are then ``n`` cells wide in that direction ("supercells").
+    A value smaller than 1 must be the inverse of an integer ``1/n``: each cell is then split into ``n`` bins in that direction ("subcells").
+    Coarsening and refinement can be mixed in different directions.
+    This can also be set for all pairwise collisions with ``collisions.bin_size_ratio``, which is overridden by the value for a specific collision.
+
+    The bins form a grid that is aligned with the global index space (i.e. bin edges are located at multiples of ``n`` cells).
+    Since particles are only paired within a single tile (or box), the bins at the edges of the tiles can be clipped, i.e. smaller than the requested size, when they are larger than one cell.
+    The actual volume of each bin is used to compute the collision rates and the densities.
+    Quantities defined on the grid (e.g. the global Debye length, or the particle production of ``nuclearfusion``) are evaluated in the cell of one of the particles of each pair.
+    Note that smaller bins increase the number of bins per tile and reduce the number of particles per bin, which should be at least a few for the collisions to be accurate.
+
 .. pp:param:: <collision_name>.start_step
     :type: ``int``
     :default: ``0``

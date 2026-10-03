@@ -82,6 +82,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_collision_iso_mixed_bins  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_collision_iso_mixed_bins  # inputs
+    "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_collision_iso_modulus_shuffle  # name
     3  # dims
     1  # nprocs
@@ -102,6 +112,16 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_3d_collision_iso_supercell  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_collision_iso_supercell  # inputs
+    "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_3d_collision_xyz  # name
     3  # dims
     1  # nprocs
@@ -118,6 +138,26 @@ add_warpx_test(
     inputs_test_rz_collision  # inputs
     "analysis_collision_rz.py diags/diag1000150"  # analysis
     "analysis_default_regression.py --path diags/diag1000150 --skip-particles"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_collision_iso_subcell  # name
+    RZ  # dims
+    2  # nprocs
+    inputs_test_rz_collision_iso_subcell  # inputs
+    "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_collision_iso_supercell  # name
+    RZ  # dims
+    2  # nprocs
+    inputs_test_rz_collision_iso_supercell  # inputs
+    "analysis_collision_3d_isotropization.py diags/diag1000100"  # analysis
+    "analysis_default_regression.py --path diags/diag1000100"  # checksum
     OFF  # dependency
 )
 

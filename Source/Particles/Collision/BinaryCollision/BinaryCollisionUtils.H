@@ -12,6 +12,7 @@
 
 #include "Particles/Collision/ScatteringProcess.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Utils/ParticleUtils.H"
 
 #include <AMReX_Math.H>
 #include <AMReX_Vector.H>
@@ -62,6 +63,22 @@ namespace BinaryCollisionUtils{
      */
     amrex::Vector<ScatteringProcess>
     parse_scattering_processes (const std::string& collision_name);
+
+    /**
+     * \brief Read the size of the bins used to pair particles in a binary collision,
+     * relative to the cell size, from ``collisions.bin_size_ratio`` and
+     * ``<collision_name>.bin_size_ratio`` (the latter takes precedence).
+     *
+     * One value per dimension is expected (a single value is applied to all dimensions).
+     * A value larger than or equal to 1 must be an integer (the bins are then this many
+     * cells wide), and a value smaller than 1 must be the inverse of an integer (each cell
+     * is then split into this many bins).
+     *
+     * @param[in] collision_name the name of the collision
+     * @return the bin size ratio
+     */
+    ParticleUtils::BinSizeRatio
+    get_bin_size_ratio (const std::string& collision_name);
 
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     CollisionType nuclear_fusion_type_to_collision_type (NuclearFusionType fusion_type)

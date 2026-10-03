@@ -8,6 +8,7 @@
 #define WARPX_PARTICLES_COLLISION_BINARYCOLLISION_H_
 
 #include "Particles/Algorithms/KineticEnergy.H"
+#include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/Collision/BinaryCollision/Bremsstrahlung/BremsstrahlungFunc.H"
 #include "Particles/Collision/BinaryCollision/Coulomb/PairWiseCoulombCollisionFunc.H"
 #include "Particles/Collision/BinaryCollision/DSMC/DSMCFunc.H"
@@ -49,6 +50,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Particles.H>
 #include <AMReX_ParticleTile.H>
+#include <AMReX_ParticleUtil.H>
 #include <AMReX_Random.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Scan.H>
@@ -104,6 +106,8 @@ public:
         m_binary_collision_functor = CollisionFunctor(collision_name, mypc, m_isSameSpecies);
 
         m_use_global_debye_length = m_binary_collision_functor.use_global_debye_length();
+
+        m_bin_ratio = BinaryCollisionUtils::get_bin_size_ratio(collision_name);
 
         const amrex::ParmParse pp_collisions("collisions");
         const amrex::ParmParse pp_collision_name(collision_name);
@@ -330,47 +334,84 @@ public:
             global_debye_length_array = global_debye_length->array(mfi);
         }
 
-        const amrex::Box tilebox = mfi.tilebox();
-
         amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
-        // dV is level-specific: cell volume at this refinement level (smaller on fine levels).
-        amrex::ParticleReal const dV = AMREX_D_TERM(geom_lev.CellSize(0), *geom_lev.CellSize(1), *geom_lev.CellSize(2));
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        auto const plo = geom_lev.ProbLoArray();
+        auto const dxi = geom_lev.InvCellSizeArray();
+        amrex::Box const domain = geom_lev.Domain();
+
+        // The particles are paired within bins. The bins form a grid aligned with the global
+        // index space of this level, and their size relative to the cell size is set by
+        // `m_bin_ratio`. When the bins are larger than the cells, the bins at the edges of the
+        // tile are clipped so that they fit within the tile.
         amrex::Box const& cbx = mfi.tilebox(amrex::IntVect::TheZeroVector()); //Cell-centered box
-#if defined(WARPX_DIM_RZ)
-        auto const lo = lbound(cbx);
-        auto const hi = ubound(cbx);
-        int const nr = hi.x - lo.x + 1;
-#endif
+        amrex::Box const bin_box = m_bin_ratio.binBox(cbx);
+        amrex::IntVect const crse = m_bin_ratio.coarsen;
+        amrex::IntVect const ref = m_bin_ratio.refine;
+        amrex::IntVect const tile_lo = cbx.smallEnd();
+        amrex::IntVect const tile_hi = cbx.bigEnd();
+        // Cell size on the grid refined by `ref`.
+        // This is level-specific (smaller on fine levels).
+        amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> dx_fine;
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            dx_fine[idim] = geom_lev.CellSize(idim)/ref[idim];
+        }
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         amrex::XDim3 const xyzmin = WarpX::LowerCorner(cbx, lev, 0._rt);
         amrex::Real const rmin = xyzmin.x;
-        auto const dr = geom_lev.CellSize(0);
 #endif
 
-        auto volume_factor = [=] AMREX_GPU_DEVICE(int i_cell) noexcept {
-#if defined(WARPX_DIM_RZ)
-            // Return the radial factor for the volume element, dV
-            // DenseBins uses x-fastest ordering: i_cell = iz * nr + ir
-            int const ri = i_cell % nr;
-            // rr is radius at the cell center
-            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
-            return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
-#elif defined(WARPX_DIM_RCYLINDER)
-            int const ri = i_cell;
-            // rr is radius at the cell center
-            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
-            return 2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr;
+        // Return the volume of the bin `i_bin` (index relative to `bin_box`),
+        // taking into account the clipping of the bins at the edges of the tile
+        auto bin_volume = [=] AMREX_GPU_DEVICE (int i_bin) noexcept -> amrex::ParticleReal {
+            amrex::IntVect const bin_iv = bin_box.atOffset(i_bin);
+            // Width of the bin in each direction
+            amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> width;
+            // Along the first direction: offset of the bin from the lower edge of the tile,
+            // and number of cells covered by the bin (on the grid refined by `ref`)
+            int offset_0 = 0;
+            int n_fine_0 = 1;
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                // Range of cells covered by the bin and the tile, on the grid refined by `ref`
+                int const tile_lo_fine = tile_lo[idim]*ref[idim];
+                int const tile_hi_fine = (tile_hi[idim] + 1)*ref[idim] - 1;
+                int const lo_fine = amrex::max(bin_iv[idim]*crse[idim], tile_lo_fine);
+                int const hi_fine = amrex::min((bin_iv[idim] + 1)*crse[idim] - 1, tile_hi_fine);
+                int const n_fine = hi_fine - lo_fine + 1;
+                width[idim] = n_fine*dx_fine[idim];
+                if (idim == 0) {
+                    offset_0 = lo_fine - tile_lo_fine;
+                    n_fine_0 = n_fine;
+                }
+            }
+            amrex::ParticleReal const dV = AMREX_D_TERM(width[0], *width[1], *width[2]);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+            // Multiply by the radial factor for the volume element
+            // rr is radius at the bin center
+            amrex::ParticleReal const rr = rmin + (offset_0 + 0.5_prt*n_fine_0)*dx_fine[0];
+            return dV*(2.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr);
 #elif defined(WARPX_DIM_RSPHERE)
-            // This needs double checking
-            int const ri = i_cell;
-            // rr is radius at the cell center
-            amrex::ParticleReal const rr = rmin + (ri + 0.5_prt)*dr;
-            return 4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*rr*rr;
+            // Multiply by the radial factor for the volume element, such that
+            // the result is the exact volume of the spherical shell
+            // rr is radius at the bin center
+            amrex::ParticleReal const rr = rmin + (offset_0 + 0.5_prt*n_fine_0)*dx_fine[0];
+            amrex::ParticleReal const dr = width[0];
+            return dV*(4.0_prt*static_cast<amrex::ParticleReal>(MathConst::pi)*(rr*rr + dr*dr/12._prt));
 #else
             // No factor is needed for Cartesian
-            amrex::ignore_unused(i_cell);
-            return 1.0_prt;
+            amrex::ignore_unused(offset_0, n_fine_0);
+            return dV;
 #endif
+        };
+
+        // Return the index of the cell that contains the particle `ip`, clamped to the tile.
+        // This is used for quantities that are defined on the grid (e.g. global Debye length).
+        auto particle_cell = [=] AMREX_GPU_DEVICE (ParticleTileDataType const& ptd,
+                                                   index_type ip) noexcept -> amrex::IntVect {
+            amrex::IntVect iv = amrex::getParticleCell(ptd, static_cast<int>(ip), plo, dxi, domain);
+            for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+                iv[idim] = amrex::min(amrex::max(iv[idim], tile_lo[idim]), tile_hi[idim]);
+            }
+            return iv;
         };
 
         if ( m_isSameSpecies ) // species_1 == species_2
@@ -378,10 +419,10 @@ public:
             // Extract particles in the tile that `mfi` points to
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
 
-            // Find the particles that are in each cell of this tile
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell);
-            ParticleBins bins_1 = findParticlesInEachCell( geom_lev, mfi, ptile_1 );
-            ABLASTR_PROFILE_VAR_STOP(prof_findParticlesInEachCell);
+            // Find the particles that are in each bin of this tile
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachBin", prof_findParticlesInEachBin);
+            ParticleBins bins_1 = findParticlesInEachBin( geom_lev, mfi, ptile_1, m_bin_ratio );
+            ABLASTR_PROFILE_VAR_STOP(prof_findParticlesInEachBin);
 
             // Loop over cells, and collide the particles in each cell
 
@@ -586,7 +627,7 @@ public:
                         // compute local density [1/m^3]
                         if (binary_collision_functor.m_computeSpeciesDensities) {
                             amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
-                                                         w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
+                                                         w1[ip]/bin_volume(bins_1_ptr[ip]));
                         }
 
                         // compute local temperature [Joules]
@@ -658,7 +699,6 @@ public:
 
                     // Use a bisection algorithm to find the index of the cell in which this pair is located
                     const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
-                    const amrex::IntVect global_index = tilebox.atOffset(i_cell);
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -668,6 +708,10 @@ public:
 
                     // collision number of the cell
                     const index_type coll_idx = ui_coll - p_coll_offsets[i_cell];
+
+                    // Cell (in the global index space) where this collision takes place,
+                    // defined as the cell of the first particle of species 1 in this pair
+                    const amrex::IntVect global_index = particle_cell(soa_1, indices_1[cell_start_1 + coll_idx]);
 
                     // Same but for the pairs
                     index_type const cell_start_pair = have_product_species?
@@ -697,7 +741,7 @@ public:
                         indices_1, indices_1,
                         soa_1, soa_1, get_position_1, get_position_1,
                         n1, n1, T1, T1, global_lamdb,
-                        q1, q1, m1, m1, dt, dV*volume_factor(i_cell), coll_idx,
+                        q1, q1, m1, m1, dt, bin_volume(i_cell), coll_idx,
                         cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);
                 }
@@ -840,11 +884,11 @@ public:
             ParticleTileType& ptile_1 = species_1.ParticlesAt(lev, mfi);
             ParticleTileType& ptile_2 = species_2.ParticlesAt(lev, mfi);
 
-            // Find the particles that are in each cell of this tile
-            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachCell", prof_findParticlesInEachCell);
-            ParticleBins bins_1 = findParticlesInEachCell( geom_lev, mfi, ptile_1 );
-            ParticleBins bins_2 = findParticlesInEachCell( geom_lev, mfi, ptile_2 );
-            ABLASTR_PROFILE_VAR_STOP(prof_findParticlesInEachCell);
+            // Find the particles that are in each bin of this tile
+            ABLASTR_PROFILE_VAR("BinaryCollision::doCollisionsWithinTile::findParticlesInEachBin", prof_findParticlesInEachBin);
+            ParticleBins bins_1 = findParticlesInEachBin( geom_lev, mfi, ptile_1, m_bin_ratio );
+            ParticleBins bins_2 = findParticlesInEachBin( geom_lev, mfi, ptile_2, m_bin_ratio );
+            ABLASTR_PROFILE_VAR_STOP(prof_findParticlesInEachBin);
 
             // Loop over cells, and collide the particles in each cell
 
@@ -1138,11 +1182,11 @@ public:
                         if (binary_collision_functor.m_computeSpeciesDensities) {
                             if (ip < np1) {
                                 amrex::Gpu::Atomic::AddNoRet(&n1_in_each_cell[bins_1_ptr[ip]],
-                                                             w1[ip]/(dV*volume_factor(bins_1_ptr[ip])));
+                                                             w1[ip]/bin_volume(bins_1_ptr[ip]));
                             }
                             if (ip < np2) {
                                 amrex::Gpu::Atomic::AddNoRet(&n2_in_each_cell[bins_2_ptr[ip]],
-                                                             w2[ip]/(dV*volume_factor(bins_2_ptr[ip])));
+                                                             w2[ip]/bin_volume(bins_2_ptr[ip]));
                             }
                         }
 
@@ -1245,7 +1289,6 @@ public:
 
                     // Use a bisection algorithm to find the index of the cell in which this pair is located
                     const int i_cell = amrex::bisect( p_coll_offsets, 0, n_cells, ui_coll );
-                    const amrex::IntVect global_index = tilebox.atOffset(i_cell);
 
                     // The particles from species1 that are in the cell `i_cell` are
                     // given by the `indices_1[cell_start_1:cell_stop_1]`
@@ -1257,6 +1300,10 @@ public:
 
                     // collision number of the cell
                     const index_type coll_idx = ui_coll - p_coll_offsets[i_cell];
+
+                    // Cell (in the global index space) where this collision takes place,
+                    // defined as the cell of the first particle of species 1 in this pair
+                    const amrex::IntVect global_index = particle_cell(soa_1, indices_1[cell_start_1 + coll_idx]);
 
                     // Same but for the pairs
                     index_type const cell_start_pair = have_product_species?
@@ -1291,7 +1338,7 @@ public:
                         indices_1, indices_2,
                         soa_1, soa_2, get_position_1, get_position_2,
                         n1, n2, T1, T2, global_lamdb,
-                        q1, q2, m1, m2, dt, dV*volume_factor(i_cell), coll_idx,
+                        q1, q2, m1, m2, dt, bin_volume(i_cell), coll_idx,
                         cell_start_pair, global_index, p_mask, p_pair_indices_1, p_pair_indices_2,
                         p_pair_reaction_weight, p_product_data, engine);
                 }
@@ -1523,6 +1570,9 @@ private:
 
     bool m_isSameSpecies;
     bool m_have_product_species;
+
+    // Size of the bins within which particles are paired, relative to the cell size
+    ParticleUtils::BinSizeRatio m_bin_ratio;
 
     ParticleShufflingMethod m_shuffling_method;
     int m_modulus_rounds;
