@@ -114,9 +114,14 @@ Theory
    :caption: THEORY
    :maxdepth: 1
    :hidden:
-   :titlesonly:
 
    theory/intro
+   theory/models_algorithms
+   theory/species_representations
+   theory/boundary_conditions
+   theory/multiphysics_extensions
+   theory/amr
+   theory/boosted_frame
 
 Development
 -----------
