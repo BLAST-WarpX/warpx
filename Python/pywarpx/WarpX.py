@@ -20,6 +20,7 @@ from .Diagnostics import diagnostics, reduced_diagnostics
 from .EB2 import eb2
 from .Geometry import geometry
 from .HybridPICModel import external_vector_potential, hybridpicmodel
+from .Hypre import hypre
 from .Interpolation import interpolation
 from .Lasers import lasers, lasers_list
 from .Particles import particles, particles_list
@@ -55,6 +56,7 @@ class WarpX(Bucket):
         argv += interpolation.attrlist()
         argv += psatd.attrlist()
         argv += eb2.attrlist()
+        argv += hypre.attrlist()
 
         argv += particles.attrlist()
         for particle in particles_list:
@@ -219,6 +221,7 @@ class WarpX(Bucket):
             external_vector_potential,
             geometry,
             hybridpicmodel,
+            hypre,
             interpolation,
             lasers,
             my_constants,

@@ -21,6 +21,18 @@ add_warpx_test(
     OFF  # dependency
 )
 
+if(WarpX_HYPRE)
+    add_warpx_test(
+        test_3d_electrostatic_sphere_lab_frame_hypre  # name
+        3  # dims
+        2  # nprocs
+        inputs_test_3d_electrostatic_sphere_lab_frame_hypre  # inputs
+        "analysis_electrostatic_sphere.py diags/diag1000030"  # analysis
+        "analysis_default_regression.py --path diags/diag1000030"  # checksum
+        OFF  # dependency
+    )
+endif()
+
 add_warpx_test(
     test_3d_electrostatic_sphere_lab_frame_mr_emass_10  # name
     3  # dims

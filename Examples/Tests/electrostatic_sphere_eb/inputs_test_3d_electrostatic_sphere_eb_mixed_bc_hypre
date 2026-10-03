@@ -1,0 +1,6 @@
+FILE = inputs_test_3d_electrostatic_sphere_eb_mixed_bc
+
+# Cap the coarsening so that the bottom solve is a large problem, i.e. so that
+# the HYPRE matrix assembled by MLEBNodeFDLaplacian is actually exercised.
+warpx.self_fields_bottom_solver = hypre
+warpx.self_fields_max_coarsening_level = 2
