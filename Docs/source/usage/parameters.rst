@@ -2168,6 +2168,14 @@ Particle initialization
     When running with Ohm's Law Hybrid Solver, this will enable temperature deposition
     in each dimension with a matched shape function and filtering used for current deposition.
     This is required when using the electron energy solver with electron-ion temperature relaxation.
+    Before filtering, the centered velocity variance uses the effective deposition
+    weights (macroparticle weight times the shape factor) to correct finite-sample
+    bias. For independent samples with a common variance, the correction is
+    :math:`N_\mathrm{eff}/(N_\mathrm{eff}-1)`, where
+    :math:`N_\mathrm{eff}=(\sum_p a_p)^2/\sum_p a_p^2`.
+    Nodes with no samples, or numerically only one effective sample, have zero
+    deposited temperature. This correction does not remove fluctuations in the
+    deposited mean velocity or physical variation within the shape support.
 
 .. pp:param:: <species>.do_qed_virtual_photons
     :type: ``boolean``

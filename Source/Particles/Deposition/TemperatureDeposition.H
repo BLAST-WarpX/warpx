@@ -29,7 +29,58 @@
 #include <AMReX_Dim3.H>
 #include <AMReX_REAL.H>
 
+#include <cmath>
+#include <limits>
+
 namespace warpx::particles::deposition {
+
+/** Normalize the weighted moments for independent, common-variance samples.
+ *
+ * With a_p = particle weight times the deposition shape, the unbiased variance
+ * is [sum a_p (v_p-vbar)^2 / W] / [1 - sum (a_p/W)^2]. The denominator reduces
+ * to (n-1)/n only for equal effective weights. A common grid-volume factor
+ * cancels, including in RZ. Empty and numerically single-sample nodes have no
+ * variance information and are explicitly reset to zero.
+ */
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+void normalizeTemperatureMoments (
+    amrex::Real sumw, amrex::Real normalized_wsq, amrex::Real sumwv2,
+    amrex::Real& mean, amrex::Real& variance, bool single_pass)
+{
+    using namespace amrex::literals;
+    // Invalid moments must remain visible to diagnostics/guards rather than
+    // being mistaken for an empty or single-sample node.
+    if (!std::isfinite(sumw) || !std::isfinite(normalized_wsq) ||
+        !std::isfinite(sumwv2) || !std::isfinite(mean)) {
+        mean = std::numeric_limits<amrex::Real>::quiet_NaN();
+        variance = mean;
+        return;
+    }
+    variance = 0._rt;
+    if (sumw > 0._rt) {
+        mean /= sumw;
+        if (!std::isfinite(mean)) {
+            variance = std::numeric_limits<amrex::Real>::quiet_NaN();
+            return;
+        }
+        const amrex::Real reliability = 1._rt - normalized_wsq;
+        constexpr amrex::Real tolerance = 32 * std::numeric_limits<amrex::Real>::epsilon();
+        if (reliability > tolerance) {
+            amrex::Real central_moment = sumwv2 / sumw;
+            if (single_pass) {
+                central_moment -= mean * mean;
+            }
+            variance = central_moment / reliability;
+            // A raw second moment can lose non-negativity through cancellation.
+            // Clamp only finite values, preserving any arithmetic failure.
+            if (std::isfinite(variance) && variance < 0._rt) {
+                variance = 0._rt;
+            }
+        }
+    } else {
+        mean = 0._rt;
+    }
+}
 
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void varianceDepositionSubKernel(
@@ -51,6 +102,9 @@ void varianceDepositionSubKernel(
     const amrex::Array4<amrex::Real> & w2x_arr,
     const amrex::Array4<amrex::Real> & w2y_arr,
     const amrex::Array4<amrex::Real> & w2z_arr,
+    const amrex::Array4<amrex::Real> & wsqx_arr,
+    const amrex::Array4<amrex::Real> & wsqy_arr,
+    const amrex::Array4<amrex::Real> & wsqz_arr,
     const amrex::Array4<amrex::Real> & vxbar_arr,
     const amrex::Array4<amrex::Real> & vybar_arr,
     const amrex::Array4<amrex::Real> & vzbar_arr,
@@ -62,7 +116,7 @@ void varianceDepositionSubKernel(
     const auto vyr = static_cast<amrex::Real>(vy);
     const auto vzr = static_cast<amrex::Real>(vz);
 
-    if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::FIRST)
+    if (pass == TemperatureDepositionPass::FIRST)
     {
         // Update sample count
         amrex::Gpu::Atomic::AddNoRet(
@@ -89,10 +143,33 @@ void varianceDepositionSubKernel(
             &vzbar_arr(izv[0], izv[1], izv[2], 0), wpz_var*vzr);
     }
 
-    if (type == TemperatureDepositionType::SINGLE_PASS || pass == TemperatureDepositionPass::SECOND)
+    // W is globally available after the first pass. Accumulating (a/W)^2
+    // instead of a^2 avoids squaring the dimensional macroparticle weight.
+    // The raw-second-moment (SINGLE_PASS) variant also needs this second
+    // traversal for its reliability correction; its moments are deposited once.
+    if (pass == TemperatureDepositionPass::SECOND)
     {
-        // For a single pass run through, the vbar arrays will be zeroed, so this should work
-        // in either case. Will be non-demeaned in 1 pass
+        if (wx_arr(ixv[0], ixv[1], ixv[2], 0) > 0.) {
+            const amrex::Real a = wpx_var / wx_arr(ixv[0], ixv[1], ixv[2], 0);
+            amrex::Gpu::Atomic::AddNoRet(&wsqx_arr(ixv[0], ixv[1], ixv[2], 0), a*a);
+        }
+        if (wy_arr(iyv[0], iyv[1], iyv[2], 0) > 0.) {
+            const amrex::Real a = wpy_var / wy_arr(iyv[0], iyv[1], iyv[2], 0);
+            amrex::Gpu::Atomic::AddNoRet(&wsqy_arr(iyv[0], iyv[1], iyv[2], 0), a*a);
+        }
+        if (wz_arr(izv[0], izv[1], izv[2], 0) > 0.) {
+            const amrex::Real a = wpz_var / wz_arr(izv[0], izv[1], izv[2], 0);
+            amrex::Gpu::Atomic::AddNoRet(&wsqz_arr(izv[0], izv[1], izv[2], 0), a*a);
+        }
+    }
+
+    if ((type == TemperatureDepositionType::SINGLE_PASS &&
+         pass == TemperatureDepositionPass::FIRST) ||
+        (type == TemperatureDepositionType::DOUBLE_PASS &&
+         pass == TemperatureDepositionPass::SECOND))
+    {
+        // SINGLE_PASS accumulates raw second moments in the first traversal.
+        // DOUBLE_PASS subtracts the globally accumulated mean in the second.
         amrex::Real vxb = 0.;
         amrex::Real vyb = 0.;
         amrex::Real vzb = 0.;
@@ -101,13 +178,13 @@ void varianceDepositionSubKernel(
         // here for double pass algorithm
         if (type == TemperatureDepositionType::DOUBLE_PASS)
         {
-            if (nx_arr(ixv[0], ixv[1], ixv[2], 0) > 0) {
+            if (wx_arr(ixv[0], ixv[1], ixv[2], 0) > 0.) {
                 vxb = vxbar_arr(ixv[0], ixv[1], ixv[2], 0)/wx_arr(ixv[0], ixv[1], ixv[2], 0);
             }
-            if (ny_arr(iyv[0], iyv[1], iyv[2], 0) > 0) {
+            if (wy_arr(iyv[0], iyv[1], iyv[2], 0) > 0.) {
                 vyb = vybar_arr(iyv[0], iyv[1], iyv[2], 0)/wy_arr(iyv[0], iyv[1], iyv[2], 0);
             }
-            if (nz_arr(izv[0], izv[1], izv[2], 0) > 0) {
+            if (wz_arr(izv[0], izv[1], izv[2], 0) > 0.) {
                 vzb = vzbar_arr(izv[0], izv[1], izv[2], 0)/wz_arr(izv[0], izv[1], izv[2], 0);
             }
 
@@ -117,7 +194,7 @@ void varianceDepositionSubKernel(
         const amrex::Real vyd = vyr - vyb;
         const amrex::Real vzd = vzr - vzb;
 
-            // Update wv2_sum
+        // Update wv2_sum
         amrex::Gpu::Atomic::AddNoRet(
             &w2x_arr(ixv[0], ixv[1], ixv[2], 0), wpx_var*vxd*vxd);
         amrex::Gpu::Atomic::AddNoRet(
@@ -135,7 +212,8 @@ void varianceDepositionSubKernel(
  * \param vx,vy,vz      The particle velocities
  * \param nx_arr,ny_arr,nz_arr Array4<int> of velocity variance sample count, either full array or tile.
  * \param wx_arr,wy_arr,wz_arr Array4 of weight sums, either full array or tile.
- * \param w2x_arr,w2y_arr,w2z_arr Array4 of weight**2 sums, either full array or tile.
+ * \param w2x_arr,w2y_arr,w2z_arr Weighted squared velocity (deviation) sums.
+ * \param wsqx_arr,wsqy_arr,wsqz_arr Sums of squared normalized effective weights.
  * \param vxbar_arr,vybar_arr,vzbar_arr Array4 of current density, either full array or tile.
  * \param varx_type,vary_type,varz_type The grid types along each direction, either NODE or CELL
  * \param type The type of deposition routine, either SINGLE_PASS or DOUBLE_PASS
@@ -168,6 +246,9 @@ void doVarianceDepositionShapeNKernel(
     const amrex::Array4<amrex::Real> & w2x_arr,
     const amrex::Array4<amrex::Real> & w2y_arr,
     const amrex::Array4<amrex::Real> & w2z_arr,
+    const amrex::Array4<amrex::Real> & wsqx_arr,
+    const amrex::Array4<amrex::Real> & wsqy_arr,
+    const amrex::Array4<amrex::Real> & wsqz_arr,
     const amrex::Array4<amrex::Real> & vxbar_arr,
     const amrex::Array4<amrex::Real> & vybar_arr,
     const amrex::Array4<amrex::Real> & vzbar_arr,
@@ -340,6 +421,7 @@ void doVarianceDepositionShapeNKernel(
             nx_arr, ny_arr, nz_arr,
             wx_arr, wy_arr, wz_arr,
             w2x_arr, w2y_arr, w2z_arr,
+            wsqx_arr, wsqy_arr, wsqz_arr,
             vxbar_arr, vybar_arr, vzbar_arr,
             type, pass
         );
@@ -361,6 +443,7 @@ void doVarianceDepositionShapeNKernel(
             nx_arr, ny_arr, nz_arr,
             wx_arr, wy_arr, wz_arr,
             w2x_arr, w2y_arr, w2z_arr,
+            wsqx_arr, wsqy_arr, wsqz_arr,
             vxbar_arr, vybar_arr, vzbar_arr,
             type, pass
         );
@@ -387,6 +470,7 @@ void doVarianceDepositionShapeNKernel(
                 nx_arr, ny_arr, nz_arr,
                 wx_arr, wy_arr, wz_arr,
                 w2x_arr, w2y_arr, w2z_arr,
+                wsqx_arr, wsqy_arr, wsqz_arr,
                 vxbar_arr, vybar_arr, vzbar_arr,
                 type, pass
             );
@@ -411,6 +495,7 @@ void doVarianceDepositionShapeNKernel(
                     nx_arr, ny_arr, nz_arr,
                     wx_arr, wy_arr, wz_arr,
                     w2x_arr, w2y_arr, w2z_arr,
+                    wsqx_arr, wsqy_arr, wsqz_arr,
                     vxbar_arr, vybar_arr, vzbar_arr,
                     type, pass
                 );
@@ -433,7 +518,8 @@ void doVarianceDepositionShapeNKernel(
  * \param varx_fab,vary_fab,varz_fab FArrayBox of variance, either full array or tile.
  * \param nx_iab,ny_iab,nz_iab IArrayBox of sample count buffer, either full array or tile.
  * \param wx_fab,wy_fab,wz_fab FArrayBox for running weights buffer, either full array or tile.
- * \param w2x_fab,w2y_fab,w2z_fab FArrayBox for weights^2 buffer, either full array or tile.
+ * \param w2x_fab,w2y_fab,w2z_fab Weighted squared velocity (deviation) buffers.
+ * \param wsqx_fab,wsqy_fab,wsqz_fab Squared normalized effective-weight buffers.
  * \param vxbar_fab,vybar_fab,vzbar_fab FArrayBox of current density, either full array or tile.
  * \param type The type of deposition routine, either SINGLE_PASS or DOUBLE_PASS
  * \param pass The pass that is occurring, either FIRST or SECOND
@@ -465,6 +551,9 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                          amrex::FArrayBox& w2x_fab,
                          amrex::FArrayBox& w2y_fab,
                          amrex::FArrayBox& w2z_fab,
+                         amrex::FArrayBox& wsqx_fab,
+                         amrex::FArrayBox& wsqy_fab,
+                         amrex::FArrayBox& wsqz_fab,
                          amrex::FArrayBox& vxbar_fab,
                          amrex::FArrayBox& vybar_fab,
                          amrex::FArrayBox& vzbar_fab,
@@ -498,6 +587,9 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     const amrex::Array4<amrex::Real> & w2x_arr = w2x_fab.array();
     const amrex::Array4<amrex::Real> & w2y_arr = w2y_fab.array();
     const amrex::Array4<amrex::Real> & w2z_arr = w2z_fab.array();
+    const amrex::Array4<amrex::Real> & wsqx_arr = wsqx_fab.array();
+    const amrex::Array4<amrex::Real> & wsqy_arr = wsqy_fab.array();
+    const amrex::Array4<amrex::Real> & wsqz_arr = wsqz_fab.array();
     const amrex::Array4<amrex::Real> & vxbar_arr = vxbar_fab.array();
     const amrex::Array4<amrex::Real> & vybar_arr = vybar_fab.array();
     const amrex::Array4<amrex::Real> & vzbar_arr = vzbar_fab.array();
@@ -526,6 +618,7 @@ void doVarianceDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                 nx_arr, ny_arr, nz_arr,
                 wx_arr, wy_arr, wz_arr,
                 w2x_arr, w2y_arr, w2z_arr,
+                wsqx_arr, wsqy_arr, wsqz_arr,
                 vxbar_arr, vybar_arr, vzbar_arr,
                 varx_type, vary_type, varz_type,
                 type, pass,
