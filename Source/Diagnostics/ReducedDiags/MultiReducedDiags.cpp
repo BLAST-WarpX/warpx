@@ -19,6 +19,7 @@
 #include "FieldReduction.H"
 #include "LoadBalanceCosts.H"
 #include "LoadBalanceEfficiency.H"
+#include "MemoryPerRank.H"
 #include "ParticleEnergy.H"
 #include "ParticleExtrema.H"
 #include "ParticleHistogram.H"
@@ -74,6 +75,7 @@ MultiReducedDiags::MultiReducedDiags ()
             {"FieldReduction",        [](CS s){return std::make_unique<FieldReduction>(s);}},
             {"LoadBalanceCosts",      [](CS s){return std::make_unique<LoadBalanceCosts>(s);}},
             {"LoadBalanceEfficiency", [](CS s){return std::make_unique<LoadBalanceEfficiency>(s);}},
+            {"MemoryPerRank",         [](CS s){return std::make_unique<MemoryPerRank>(s);}},
             {"RhoMaximum",            [](CS s){return std::make_unique<RhoMaximum>(s);}},
             {"Timestep",              [](CS s){return std::make_unique<Timestep>(s);}}
     };
