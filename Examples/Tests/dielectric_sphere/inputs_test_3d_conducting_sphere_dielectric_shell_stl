@@ -1,0 +1,36 @@
+max_step = 1
+warpx.verbose = 0
+amr.n_cell = 64 64 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+geometry.dims = 3
+geometry.prob_lo = -4.0 -4.0 -4.0
+geometry.prob_hi =  4.0  4.0  4.0
+boundary.field_lo = pec neumann neumann
+boundary.field_hi = pec neumann neumann
+boundary.potential_lo_x = 4.0
+boundary.potential_hi_x = -4.0
+warpx.const_dt = 1e-6
+
+warpx.do_electrostatic = labframe
+eb2.geom_type = stl
+# CMake supplies eb2.stl_file and shell.stl_file as absolute paths.
+eb2.stl_scale = 0.5
+eb2.stl_center = 0.0 0.0 0.0
+eb2.stl_reverse_normal = 0
+warpx.eb_potential(x,y,z,t) = "0.0"
+
+dielectrics.names = shell
+shell.stl_scale = 1.0
+shell.stl_center = 0.0 0.0 0.0
+shell.stl_reverse_normal = 0
+shell.permittivity = 5.0
+
+warpx.self_fields_required_precision = 1.e-6
+warpx.abort_on_warning_threshold = medium
+
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = phi Ex Ey Ez eb_covered dielectric_epsilon dielectric_mask
