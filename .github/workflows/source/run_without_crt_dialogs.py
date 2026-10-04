@@ -8,6 +8,12 @@
 # without ever printing the error. This sends these reports to stderr instead,
 # similar to what CPython's test suite does in test.support.SuppressCrashReport.
 #
+# Known limitation: /RTC run-time check failures (e.g., the use of an
+# uninitialized variable) do not go through the CRT report mode set here.
+# With this script, they terminate the process with exit code 0x80000003
+# (STATUS_BREAKPOINT) instead of hanging, but without printing the message.
+# Run with `python3 -X faulthandler` to at least see the Python call stack.
+#
 # Usage: python3 run_without_crt_dialogs.py <script.py> [script args ...]
 
 import ctypes

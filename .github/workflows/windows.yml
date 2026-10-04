@@ -27,24 +27,6 @@ jobs:
     - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
-    # TEMPORARY: verify that run_without_crt_dialogs.py avoids blocking dialogs
-    - name: TMP compile RTC self-test
-      shell: cmd
-      working-directory: .github/workflows/source/tmp_rtc
-      run: |
-        for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSDIR=%%i"
-        call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" x64
-        cl /nologo /LDd /MDd /Od /RTC1 rtc_test.c /Fe:rtc_test.dll
-        if errorlevel 1 exit 1
-    - name: TMP RTC self-test with wrapper
-      timeout-minutes: 2
-      working-directory: .github/workflows/source/tmp_rtc
-      run: |
-        python3 -X faulthandler ../run_without_crt_dialogs.py rtc_test.py init
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        python3 -X faulthandler ../run_without_crt_dialogs.py rtc_test.py
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        Exit 0
     - name: CCache Cache
       uses: actions/cache@v6
       # - once stored under a key, they become immutable (even if local cache path content changes)
@@ -90,7 +72,7 @@ jobs:
 
         # Debug builds would otherwise hang on a modal dialog for failed
         # assertions and run-time checks, without printing the error
-        python3 .github/workflows/source/run_without_crt_dialogs.py `
+        python3 -X faulthandler .github/workflows/source/run_without_crt_dialogs.py `
           Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
         if(!$?) { Exit $LASTEXITCODE }
 # JSON writes are currently very slow (50min) with MSVC
