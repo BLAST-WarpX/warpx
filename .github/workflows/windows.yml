@@ -67,8 +67,10 @@ jobs:
 
     - name: Enable crash dumps
       run: |
-        # Windows Error Reporting writes a minidump for crashing processes
-        $key = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps"
+        # Windows Error Reporting: no dialog, but a minidump for crashing processes
+        $wer = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting"
+        New-ItemProperty -Path $wer -Name DontShowUI -PropertyType DWord -Value 1 -Force | Out-Null
+        $key = "$wer\LocalDumps"
         if (!(Test-Path $key)) { New-Item -Path $key | Out-Null }
         New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString `
           -Value "$env:RUNNER_TEMP\crashdumps" -Force | Out-Null
@@ -163,8 +165,10 @@ jobs:
 
     - name: Enable crash dumps
       run: |
-        # Windows Error Reporting writes a minidump for crashing processes
-        $key = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps"
+        # Windows Error Reporting: no dialog, but a minidump for crashing processes
+        $wer = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting"
+        New-ItemProperty -Path $wer -Name DontShowUI -PropertyType DWord -Value 1 -Force | Out-Null
+        $key = "$wer\LocalDumps"
         if (!(Test-Path $key)) { New-Item -Path $key | Out-Null }
         New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString `
           -Value "$env:RUNNER_TEMP\crashdumps" -Force | Out-Null

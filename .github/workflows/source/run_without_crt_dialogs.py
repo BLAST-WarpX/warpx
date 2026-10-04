@@ -33,13 +33,13 @@ if sys.platform != "win32":
 if len(sys.argv) < 2:
     raise RuntimeError(f"Usage: {sys.argv[0]} <script.py> [script args ...]")
 
-# Windows error mode: no dialogs for crashes (WER) and critical errors
+# Windows error mode: no dialogs for critical errors. We do not set
+# SEM_NOGPFAULTERRORBOX, because it disables Windows Error Reporting (WER)
+# completely, including local crash dumps. Instead, disable the WER UI with
+# the registry value `DontShowUI` (see .github/workflows/windows.yml).
 SEM_FAILCRITICALERRORS = 0x0001
-SEM_NOGPFAULTERRORBOX = 0x0002
 SEM_NOOPENFILEERRORBOX = 0x8000
-ctypes.windll.kernel32.SetErrorMode(
-    SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX
-)
+ctypes.windll.kernel32.SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX)
 
 # The debug CRT (ucrtbased.dll) is shared by all /MDd modules in the process,
 # e.g., the pyAMReX and pyWarpX extension modules that are imported later.
