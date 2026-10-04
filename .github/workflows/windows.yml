@@ -27,49 +27,38 @@ jobs:
     - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
-    # TEMPORARY: which debug-CRT failures open blocking dialogs?
-    - name: TMP compile RTC test
+    # TEMPORARY: post-mortem C++ stack traces with cdb.exe via AeDebug
+    - name: TMP compile crash tests
       shell: cmd
       working-directory: .github/workflows/source/tmp_rtc
       run: |
         for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSDIR=%%i"
         call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" x64
-        cl /nologo /LDd /MDd /Od /RTC1 rtc_test.c /Fe:rtc_test.dll
+        cl /nologo /LDd /MDd /Od /Zi /RTC1 rtc_test.c /Fe:rtc_test.dll
         if errorlevel 1 exit 1
-    - name: TMP show WER settings
-      run: |
-        reg query "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /s
-        reg query "HKCU\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /s
-        query session
-        whoami
-        Exit 0
-    - name: TMP disable WER UI
-      run: |
-        reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v DontShowUI /t REG_DWORD /d 1 /f
-        if(!$?) { Exit $LASTEXITCODE }
-    - name: TMP rtc w/o wrapper, w/ DontShowUI
+    - name: TMP register cdb as post-mortem debugger
+      run: .github/workflows/source/tmp_rtc/aedebug_cdb.ps1
+    - name: TMP rtc w/ cdb post-mortem
       continue-on-error: true
-      timeout-minutes: 2
+      timeout-minutes: 3
       working-directory: .github/workflows/source/tmp_rtc
       run: |
         python3 -X faulthandler rtc_test.py rtc
         Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
+        Write-Output "=== cdb log ==="
+        Get-Content "$env:RUNNER_TEMP\aedebug_cdb.log" -ErrorAction SilentlyContinue
+        Remove-Item "$env:RUNNER_TEMP\aedebug_cdb.log" -ErrorAction SilentlyContinue
         Exit 0
-    - name: TMP assert w/o wrapper, w/ DontShowUI
+    - name: TMP segfault w/ cdb post-mortem
       continue-on-error: true
-      timeout-minutes: 2
+      timeout-minutes: 3
       working-directory: .github/workflows/source/tmp_rtc
       run: |
-        python3 -X faulthandler rtc_test.py assert
+        python3 -X faulthandler rtc_test.py segfault
         Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        Exit 0
-    - name: TMP abort w/o wrapper, w/ DontShowUI
-      continue-on-error: true
-      timeout-minutes: 2
-      working-directory: .github/workflows/source/tmp_rtc
-      run: |
-        python3 -X faulthandler rtc_test.py abort
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
+        Write-Output "=== cdb log ==="
+        Get-Content "$env:RUNNER_TEMP\aedebug_cdb.log" -ErrorAction SilentlyContinue
+        Remove-Item "$env:RUNNER_TEMP\aedebug_cdb.log" -ErrorAction SilentlyContinue
         Exit 0
     - name: CCache Cache
       uses: actions/cache@v6
@@ -128,6 +117,92 @@ jobs:
           Write-Output "=== $($_.Name) ==="
           Get-Content $_.FullName
         }
+
+  build_win_msvc_old:
+    name: TMP MSVC on development before #7076
+    runs-on: windows-latest
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    steps:
+    - uses: actions/checkout@v7
+    - name: TMP check out WarpX source of d72f49d70b (before #7076)
+      run: |
+        git fetch --no-tags --depth=1 origin d72f49d70b6a8aa5c64895e6446f1013263c81fb
+        if(!$?) { Exit $LASTEXITCODE }
+        git checkout FETCH_HEAD -- .
+        if(!$?) { Exit $LASTEXITCODE }
+        git checkout HEAD -- .github
+        if(!$?) { Exit $LASTEXITCODE }
+        git log -1 --oneline FETCH_HEAD
+        Get-Content dependencies.json
+    - name: TMP register cdb as post-mortem debugger
+      run: .github/workflows/source/tmp_rtc/aedebug_cdb.ps1
+    - uses: actions/setup-python@v7
+      with:
+        python-version: '3.x'
+    - name: CCache Cache
+      uses: actions/cache@v6
+      # - once stored under a key, they become immutable (even if local cache path content changes)
+      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
+      with:
+        path: |
+          ~/.ccache
+          ~/.cache/ccache
+        key: ccache-windows-winmsvcold-${{ hashFiles('.github/workflows/windows.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
+        restore-keys: |
+          ccache-windows-winmsvcold-${{ hashFiles('.github/workflows/windows.yml') }}-
+          ccache-windows-winmsvcold-
+    - name: Build & Install
+      env:
+        # Work-around for windows-latest GH runner issue, see
+        # https://github.com/actions/runner-images/issues/10004
+        CXXFLAGS: "/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR"
+      run: |
+        cmake -S . -B build               `
+              -DCMAKE_BUILD_TYPE=Debug    `
+              -DCMAKE_VERBOSE_MAKEFILE=ON `
+              -DWarpX_COMPUTE=NOACC       `
+              -DWarpX_OPENPMD=ON          `
+              -DWarpX_MPI=OFF             `
+              -DWarpX_PYTHON=ON
+        if(!$?) { Exit $LASTEXITCODE }
+        cmake --build build --config Debug --parallel 4
+        if(!$?) { Exit $LASTEXITCODE }
+
+        python3 -m pip install --upgrade pip
+        if(!$?) { Exit $LASTEXITCODE }
+        python3 -m pip install --upgrade build packaging setuptools[core] wheel
+        if(!$?) { Exit $LASTEXITCODE }
+        cmake --build build --config Debug --target install
+        if(!$?) { Exit $LASTEXITCODE }
+        cmake --build build --config Debug --target pip_install
+        if(!$?) { Exit $LASTEXITCODE }
+
+    - name: Test
+      timeout-minutes: 20
+      run: |
+        $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
+
+        # Debug builds would otherwise hang on a modal dialog for failed
+        # assertions and run-time checks, without printing the error
+        python3 -X faulthandler .github/workflows/source/run_without_crt_dialogs.py `
+          Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
+        if(!$?) { Exit $LASTEXITCODE }
+# JSON writes are currently very slow (50min) with MSVC
+#  --diagformat=openpmd
+    - name: Print Backtraces
+      if: ${{ failure() || cancelled() }}
+      run: |
+        Get-ChildItem -Filter "Backtrace.*" | ForEach-Object {
+          Write-Output "=== $($_.Name) ==="
+          Get-Content $_.FullName
+        }
+
+    - name: TMP print cdb log
+      if: ${{ always() }}
+      run: |
+        Get-Content "$env:RUNNER_TEMP\aedebug_cdb.log" -ErrorAction SilentlyContinue
+        Exit 0
 
   build_win_clang:
     name: Clang C++20 w/ OMP w/o MPI
