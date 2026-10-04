@@ -20,10 +20,8 @@ jobs:
   build_win_msvc:
     name: MSVC C++20 w/o MPI
     runs-on: windows-latest
-    # disabled due to issues in #5230
-    if: 0
-    #needs: check_changes
-    #if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
+    needs: check_changes
+    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
     - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
@@ -42,6 +40,10 @@ jobs:
           ccache-windows-winmsvc-${{ hashFiles('.github/workflows/windows.yml') }}-
           ccache-windows-winmsvc-
     - name: Build & Install
+      env:
+        # Work-around for windows-latest GH runner issue, see
+        # https://github.com/actions/runner-images/issues/10004
+        CXXFLAGS: "/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR"
       run: |
         cmake -S . -B build               `
               -DCMAKE_BUILD_TYPE=Debug    `
@@ -63,13 +65,51 @@ jobs:
         cmake --build build --config Debug --target pip_install
         if(!$?) { Exit $LASTEXITCODE }
 
+    - name: Enable crash dumps
+      run: |
+        # Windows Error Reporting: no dialog, but a minidump for crashing processes
+        $wer = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting"
+        New-ItemProperty -Path $wer -Name DontShowUI -PropertyType DWord -Value 1 -Force | Out-Null
+        $key = "$wer\LocalDumps"
+        if (!(Test-Path $key)) { New-Item -Path $key | Out-Null }
+        New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString `
+          -Value "$env:RUNNER_TEMP\crashdumps" -Force | Out-Null
+        New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
     - name: Test
+      timeout-minutes: 20
       run: |
         $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
 
-        python3 Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
+        # The runner's error mode (0x8003) includes SEM_NOGPFAULTERRORBOX, which
+        # child processes inherit and which disables Windows Error Reporting,
+        # including crash dumps. Keep only SEM_FAILCRITICALERRORS.
+        Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition `
+          '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint uMode);'
+        [Win32.ErrorMode]::SetErrorMode(0x0001) | Out-Null
+
+        # Debug builds would otherwise hang on a modal dialog for failed
+        # assertions and run-time checks, without printing the error
+        python3 -X faulthandler .github/workflows/source/run_without_crt_dialogs.py `
+          Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
+        if(!$?) { Exit $LASTEXITCODE }
 # JSON writes are currently very slow (50min) with MSVC
 #  --diagformat=openpmd
+    - name: Print crash stacks
+      if: ${{ failure() }}
+      timeout-minutes: 5
+      run: |
+        $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
+        Get-ChildItem "$env:RUNNER_TEMP\crashdumps" -Filter *.dmp -ErrorAction SilentlyContinue | ForEach-Object {
+          Write-Output "=== $($_.Name) ==="
+          & $cdb -z $_.FullName -lines -c ".ecxr; kpn 50; q"
+        }
+    - name: Print Backtraces
+      if: ${{ failure() || cancelled() }}
+      run: |
+        Get-ChildItem -Filter "Backtrace.*" | ForEach-Object {
+          Write-Output "=== $($_.Name) ==="
+          Get-Content $_.FullName
+        }
 
   build_win_clang:
     name: Clang C++20 w/ OMP w/o MPI
