@@ -1,0 +1,39 @@
+# base input parameters
+FILE = inputs_base_implicit_jfnk
+
+# test input parameters
+my_constants.nppcx = 8  # number of particles/cell in x
+my_constants.nppcy = 8  # number of particles/cell in y
+my_constants.nppcz = 8  # number of particles/cell in z
+
+warpx.numprocs = 2 1 1
+
+max_step = 20
+amr.n_cell = 16 16 16
+geometry.dims = 3
+geometry.prob_lo = 0.0 0.0 0.0
+geometry.prob_hi = 2.5*de0 2.5*de0 2.5*de0
+
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+
+implicit_evolve.use_mass_matrices_jacobian = false
+implicit_evolve.use_mass_matrices_pc = true
+implicit_evolve.mass_matrices_pc_width = 1
+
+newton.linear_solver = petsc_ksp
+jacobian.pc_type = pc_petsc
+pc_petsc.verbose = true
+pc_petsc.type = asm
+pc_petsc.asm_overlap = 2
+pc_petsc.sub_type = ilu
+pc_petsc.ilu_factor_levels = 2
+
+algo.current_deposition = "direct"
+
+electrons.num_particles_per_cell_each_dim = nppcx nppcy nppcz
+protons.num_particles_per_cell_each_dim = nppcx nppcy nppcz
+
+diag1.intervals = 20
+diag1.electrons.variables = x y z w ux uy uz
+diag1.protons.variables = x y z w ux uy uz

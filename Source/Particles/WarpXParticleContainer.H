@@ -260,9 +260,10 @@ public:
      */
     virtual void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
                                       int lev,
-                                      amrex::Real dt)
+                                      amrex::Real dt,
+                                      ImplicitOptions const& implicit_options)
     {
-        amrex::ignore_unused(fields,lev,dt);
+        amrex::ignore_unused(fields,lev,dt,implicit_options);
     }
 
     virtual void PostRestart () = 0;
@@ -447,7 +448,8 @@ public:
                               int thread_num,
                               int lev,
                               int depos_lev,
-                              amrex::Real dt);
+                              amrex::Real dt,
+                              ImplicitOptions const& implicit_options);
 
     // If particles start outside of the domain, ContinuousInjection
     // makes sure that they are initialized when they enter the domain, and

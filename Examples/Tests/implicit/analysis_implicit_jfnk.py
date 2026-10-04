@@ -34,8 +34,8 @@ print(f"dimensionality: {dims}")
 print(f"current deposition: {current_deposition}")
 print(f"mass matrices used for the Jacobian: {use_mass_matrices_jacobian}")
 
-field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
-particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
+field_energy = np.loadtxt("diags/reduced_files/field_energy.txt", skiprows=1)
+particle_energy = np.loadtxt("diags/reduced_files/particle_energy.txt", skiprows=1)
 
 total_energy = field_energy[:, 2] + particle_energy[:, 2]
 
@@ -77,7 +77,7 @@ if current_deposition == "villasenor":
     assert drho_rms < tolerance_rel_charge
 
 if use_mass_matrices_jacobian:
-    newton_solver = np.loadtxt("diags/newton_solver.txt", skiprows=1)
+    newton_solver = np.loadtxt("diags/reduced_files/newton_solver.txt", skiprows=1)
     num_steps = newton_solver[-1, 0]
     total_newton_iters = newton_solver[-1, 3]
     total_gmres_iters = newton_solver[-1, 7]
