@@ -4202,6 +4202,8 @@ Grid types (collocated, staggered, hybrid)
 
     Default: :pp:param:`interpolation.galerkin_scheme = 0` with collocated grids, or momentum-conserving field gathering, or when :pp:param:`algo.current_deposition = direct` ; :pp:param:`interpolation.galerkin_scheme = 1` otherwise.
 
+    With ``algo.evolve_scheme = semi_implicit_darwin``, the particle pushes of the Darwin solver do not use this parameter: the electrostatic field is always gathered with the Galerkin scheme (unless momentum-conserving field gathering is used), while the magnetic field and the inductive electric field are always gathered without it, consistent with the mass matrices.
+
     .. warning::
 
         The default behavior should not normally be changed.

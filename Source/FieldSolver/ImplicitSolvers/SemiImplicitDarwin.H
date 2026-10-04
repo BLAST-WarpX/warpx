@@ -133,8 +133,8 @@ private:
     std::unique_ptr<DarwinLinearFieldOperator> m_linear_function;
 
     /**
-     * \brief Whether the predictor velocity push in OneStep() should
-     *  temporarily override the global galerkin_interpolation flag to true.
+     * \brief Whether the predictor velocity push in OneStep() should gather
+     *  the electrostatic E-field with the Galerkin scheme.
      *  Set once in Define(); false if the user explicitly selected
      *  momentum-conserving gathering, to avoid silently overriding that choice.
      */

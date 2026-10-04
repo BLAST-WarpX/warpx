@@ -49,6 +49,7 @@
 #include <iosfwd>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -166,6 +167,21 @@ public:
     {
         return GetStructOfArrays().GetIntData(name);
     }
+};
+
+/**
+ * \brief Field gather orders for PushP, when they are set explicitly rather than from
+ * the global WarpX::nox and WarpX::galerkin_interpolation settings.
+ *
+ * E is gathered with shape order e_shape and, if e_galerkin is true, one order lower
+ * along each component's own direction (i.e. the Galerkin scheme on the Yee grid).
+ * B is gathered with shape order b_shape and no order reduction.
+ */
+struct FieldGatherOrders
+{
+    int e_shape;
+    bool e_galerkin;
+    int b_shape;
 };
 
 /**
@@ -288,6 +304,8 @@ public:
 
     ///
     /// This pushes the particle momenta by dt.
+    /// If gather_orders is set, E and B are gathered with these orders instead of
+    /// WarpX::nox and WarpX::galerkin_interpolation (see FieldGatherOrders).
     ///
     virtual void PushP (int lev, amrex::Real dt,
                         const amrex::MultiFab& Ex,
@@ -296,7 +314,8 @@ public:
                         const amrex::MultiFab& Bx,
                         const amrex::MultiFab& By,
                         const amrex::MultiFab& Bz,
-                        MomentumPushType momentum_push_type = MomentumPushType::Full) = 0;
+                        MomentumPushType momentum_push_type = MomentumPushType::Full,
+                        std::optional<FieldGatherOrders> gather_orders = std::nullopt) = 0;
 
     /**
      * \brief Deposit current density.

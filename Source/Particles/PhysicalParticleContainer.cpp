@@ -1203,7 +1203,8 @@ void
 PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
                                   const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                  MomentumPushType momentum_push_type)
+                                  MomentumPushType momentum_push_type,
+                                  std::optional<FieldGatherOrders> gather_orders)
 {
     ABLASTR_PROFILE("PhysicalParticleContainer::PushP()");
 
@@ -1247,6 +1248,9 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const bool galerkin_interpolation = WarpX::galerkin_interpolation;
             const int nox = WarpX::nox;
+            // Only used with explicitly set gather orders (split_gather below)
+            const FieldGatherOrders orders = gather_orders.value_or(
+                FieldGatherOrders{nox, galerkin_interpolation, nox});
             const int n_rz_azimuthal_modes = WarpX::n_rz_azimuthal_modes;
 
             amrex::Array4<const amrex::Real> const& ex_arr = exfab.array();
@@ -1286,9 +1290,18 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
             const int exteb_runtime_flag = getExternalEB.isNoOp() ? no_exteb : has_exteb;
 
-            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>>{},
-                               {exteb_runtime_flag},
-                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control)
+            // fused_gather: gather E and B together with the global order and Galerkin
+            // settings; split_gather: gather E and B separately with the orders given
+            // in gather_orders
+            enum gather_flags : int { fused_gather, split_gather };
+
+            const int gather_runtime_flag = gather_orders ? split_gather : fused_gather;
+
+            amrex::ParallelFor(TypeList<CompileTimeOptions<no_exteb,has_exteb>,
+                                        CompileTimeOptions<fused_gather,split_gather>>{},
+                               {exteb_runtime_flag, gather_runtime_flag},
+                               np, [=] AMREX_GPU_DEVICE (long ip, auto exteb_control,
+                                                         auto gather_control)
             {
                 amrex::ParticleReal xp, yp, zp;
                 getPosition(ip, xp, yp, zp);
@@ -1302,11 +1315,24 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
 
                 if (!t_do_not_gather){
                     // first gather E and B to the particle positions
-                    doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
-                                   ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
-                                   ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
-                                   dinv, xyzmin, lo, n_rz_azimuthal_modes,
-                                   nox, galerkin_interpolation);
+                    if (gather_control == fused_gather) {
+                        doGatherShapeN(xp, yp, zp, Exp, Eyp, Ezp, Bxp, Byp, Bzp,
+                                       ex_arr, ey_arr, ez_arr, bx_arr, by_arr, bz_arr,
+                                       ex_type, ey_type, ez_type, bx_type, by_type, bz_type,
+                                       dinv, xyzmin, lo, n_rz_azimuthal_modes,
+                                       nox, galerkin_interpolation);
+                    } else {
+                        doDirectGatherVectorField(orders.e_shape, orders.e_galerkin,
+                                                  xp, yp, zp, Exp, Eyp, Ezp,
+                                                  ex_arr, ey_arr, ez_arr,
+                                                  ex_type, ey_type, ez_type,
+                                                  dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                        doDirectGatherVectorField(orders.b_shape, false,
+                                                  xp, yp, zp, Bxp, Byp, Bzp,
+                                                  bx_arr, by_arr, bz_arr,
+                                                  bx_type, by_type, bz_type,
+                                                  dinv, xyzmin, lo, n_rz_azimuthal_modes);
+                    }
                 }
 
                 // Externally applied E and B-field in Cartesian co-ordinates
