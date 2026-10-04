@@ -219,6 +219,15 @@ void init_WarpX (py::module& m)
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
+        .def("finalize_deposited_current",
+            [](WarpX& wx, const std::string& current_fp_string){ wx.FinalizeDepositedCurrent(current_fp_string); },
+            py::arg("current_fp_string"),
+            R"pbdoc(Finalize a deposited current density: filter (if used), sum the guard cells into the valid cells and apply the boundary conditions)pbdoc"
+        )
+        .def("finalize_deposited_charge",
+            [](WarpX& wx){ wx.FinalizeDepositedCharge(); },
+            R"pbdoc(Finalize the deposited charge density rho_fp: filter (if used), sum the guard cells into the valid cells and apply the boundary conditions)pbdoc"
+        )
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         .def("apply_inverse_volume_scaling_to_charge_density",
             [](WarpX& wx, amrex::MultiFab* rho, int const lev) {

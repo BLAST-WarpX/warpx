@@ -1501,19 +1501,16 @@ void WarpXParticleContainer::DepositCurrent (
 
     DepositCurrent(current, dt, relative_time);
 
+    // Note that `current` holds a single level (the fields of level `lev`),
+    // stored at index 0.
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        warpx.ApplyInverseVolumeScalingToCurrentDensity(
-            current[lev][0], current[lev][1], current[lev][2], lev
-        );
+    warpx.ApplyInverseVolumeScalingToCurrentDensity(
+        current[0][0], current[0][1], current[0][2], lev
+    );
 #endif
 
-    // Sum guard cells
-    warpx.SyncCurrent(mf_name);
-
-    // Apply boundary conditions
-    warpx.ApplyJfieldBoundary(
-        lev, current[lev][0], current[lev][1], current[lev][2], PatchType::fine
-    );
+    // Filter (if used), sum guard cells and apply boundary conditions
+    warpx.FinalizeDepositedCurrent(current[0], lev);
 }
 
 /* \brief Charge Deposition for thread thread_num
@@ -1918,7 +1915,10 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
     }
 #endif
 
-    // Exchange guard cells
+    // Exchange guard cells and apply the boundary conditions.
+    // With local=true, this is left to the caller, which is expected to
+    // finalize rho with WarpX::FinalizeDepositedCharge (this also applies
+    // the filter, if used).
     if ( !local ) {
         // Possible performance optimization:
         // pass less than `rho->nGrowVect()` in the fifth input variable `dst_ng`
@@ -1927,15 +1927,14 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
             WarpX::do_single_precision_comms,
             m_gdb->Geom(lev).periodicity()
         );
-    }
 
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        // Reflect density over PEC boundaries, if needed.
-        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
+        if (apply_boundary_and_scale_volume)
+        {
+            // Fold the charge deposited in the guard cells beyond PEC, PMC
+            // and reflecting boundaries back into the domain, if needed.
+            WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
+        }
     }
-#endif
 }
 
 std::unique_ptr<MultiFab>

@@ -103,7 +103,9 @@ void RelativisticExplicitES::AddSpaceChargeField (
         }
     }
     // Deposit particle charge density (source of Poisson solver)
-    // The options below are identical to those in MultiParticleContainer::DepositCharge
+    // Local deposition: the guard cells are exchanged and the boundary
+    // conditions applied in FinalizeDepositedCharge below. In cylindrical and
+    // spherical geometry, the inverse volume scaling is applied here.
     bool const local = true;
     bool const reset = false;
     bool const apply_boundary_and_scale_volume = true;
@@ -115,8 +117,9 @@ void RelativisticExplicitES::AddSpaceChargeField (
     }
 
     // Apply filter, perform MPI exchange, interpolate across levels
+    // and apply boundary conditions
     const Vector<std::unique_ptr<MultiFab>> rho_buf(num_levels);
-    warpx.SyncRho(
+    warpx.FinalizeDepositedCharge(
         amrex::GetVecOfPtrs(rho),
         amrex::GetVecOfPtrs(rho_coarse),
         amrex::GetVecOfPtrs(rho_buf));

@@ -4,5 +4,6 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         WarpXEvolve.cpp
         WarpXComputeDt.cpp
+        WarpXFinalizeDeposition.cpp
     )
 endforeach()

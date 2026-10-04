@@ -839,37 +839,43 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
 void WarpX::SyncCurrentAndRho ()
 {
-    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
+
+    // The finalization of J and rho (filter, guard cell sum, boundary
+    // conditions) is defined in FinalizeDepositedCurrent/FinalizeDepositedCharge.
+    // This function only decides when it is applied in the main PIC loop,
+    // depending on the options of the PSATD solver.
 
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
     {
         if (fft_periodic_single_box)
         {
-            // With periodic single box, synchronize J and rho here,
+            // With periodic single box, finalize J and rho here,
             // even with current correction or Vay deposition
             std::string const current_fp_string = (current_deposition_algo == CurrentDepositionAlgo::Vay)
                 ? "current_fp_vay" : "current_fp";
             // TODO Replace current_cp with current_cp_vay once Vay deposition is implemented with MR
 
-            SyncCurrent(current_fp_string);
-            SyncRho();
-
+            FinalizeDepositedCurrent(current_fp_string);
+            FinalizeDepositedCharge();
         }
         else // no periodic single box
         {
-            // Without periodic single box, synchronize J and rho here,
+            // Without periodic single box, finalize J and rho here,
             // except with current correction or Vay deposition:
-            // in these cases, synchronize later (in WarpX::PushPSATD)
+            // in these cases, finalize later (in WarpX::PushPSATD)
             if (!current_correction &&
                 current_deposition_algo != CurrentDepositionAlgo::Vay)
             {
-                SyncCurrent("current_fp");
-                SyncRho();
+                FinalizeDepositedCurrent("current_fp");
+                FinalizeDepositedCharge();
             }
 
             if (current_deposition_algo == CurrentDepositionAlgo::Vay)
             {
+                // Only the filter is applied here (to the deposited field D);
+                // the guard cells of J are summed and the boundary conditions
+                // applied in WarpX::PushPSATD, once J has been computed from D.
                 // TODO This works only without mesh refinement
                 const int lev = 0;
                 if (use_filter) {
@@ -880,31 +886,8 @@ void WarpX::SyncCurrentAndRho ()
     }
     else // FDTD
     {
-        SyncCurrent("current_fp");
-        SyncRho();
-    }
-
-    // Reflect charge and current density over PEC boundaries, if needed.
-    for (int lev = 0; lev <= finest_level; ++lev)
-    {
-        if (m_fields.has(FieldType::rho_fp, lev)) {
-            ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_fp,lev), PatchType::fine);
-        }
-        ApplyJfieldBoundary(lev,
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            PatchType::fine);
-        if (lev > 0) {
-            if (m_fields.has(FieldType::rho_cp, lev)) {
-                ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_cp,lev), PatchType::coarse);
-            }
-            ApplyJfieldBoundary(lev,
-                m_fields.get(FieldType::current_cp, Direction{0}, lev),
-                m_fields.get(FieldType::current_cp, Direction{1}, lev),
-                m_fields.get(FieldType::current_cp, Direction{2}, lev),
-                PatchType::coarse);
-        }
+        FinalizeDepositedCurrent("current_fp");
+        FinalizeDepositedCharge();
     }
 }
 
@@ -952,8 +935,9 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // Deposit rho at relative time -dt
         // (dt[0] denotes the time step on mesh refinement level 0)
         mypc->DepositCharge(rho_fp, -dt[0]);
-        // Filter, exchange boundary, and interpolate across levels
-        SyncRho();
+        // Filter, exchange boundary, interpolate across levels
+        // and apply boundary conditions
+        FinalizeDepositedCharge();
         // Forward FFT of rho
         PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
     }
@@ -964,12 +948,13 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
     {
         std::string const current_string = (do_current_centering) ? "current_fp_nodal" : "current_fp";
         mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level), dt[0], -dt[0]);
-        // Synchronize J: filter, exchange boundary, and interpolate across levels.
+        // Finalize J: filter, exchange boundary, interpolate across levels
+        // and apply boundary conditions.
         // With current centering, the nodal current is deposited in 'current',
         // namely 'current_fp_nodal': SyncCurrent stores the result of its centering
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
-        SyncCurrent("current_fp");
+        FinalizeDepositedCurrent("current_fp");
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
     }
@@ -998,12 +983,13 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // (dt[0] denotes the time step on mesh refinement level 0)
         std::string const current_string = (do_current_centering) ? "current_fp_nodal" : "current_fp";
         mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level), dt[0], t_deposit_current);
-        // Synchronize J: filter, exchange boundary, and interpolate across levels.
+        // Finalize J: filter, exchange boundary, interpolate across levels
+        // and apply boundary conditions.
         // With current centering, the nodal current is deposited in 'current',
         // namely 'current_fp_nodal': SyncCurrent stores the result of its centering
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
-        SyncCurrent("current_fp");
+        FinalizeDepositedCurrent("current_fp");
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
 
@@ -1011,7 +997,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         {
             PSATDMoveJNewToJMid();
             mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level),  dt[0], t_deposit_current + 0.5_rt*sub_dt);
-            SyncCurrent("current_fp");
+            FinalizeDepositedCurrent("current_fp");
             PSATDForwardTransformJ("current_fp", "current_cp");
         }
 
@@ -1029,8 +1015,9 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
 
             // Deposit rho at relative time t_deposit_charge
             mypc->DepositCharge(rho_fp, t_deposit_charge);
-            // Filter, exchange boundary, and interpolate across levels
-            SyncRho();
+            // Filter, exchange boundary, interpolate across levels
+            // and apply boundary conditions
+            FinalizeDepositedCharge();
             // Forward FFT of rho
             const int rho_idx = (time_dependency_rho != TimeDependencyRho::Constant) ? rho_new : rho_mid;
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_idx);
@@ -1039,7 +1026,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
             {
                 PSATDMoveRhoNewToRhoMid();
                 mypc->DepositCharge(rho_fp, t_deposit_charge + 0.5_rt*sub_dt);
-                SyncRho();
+                FinalizeDepositedCharge();
                 PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
             }
         }

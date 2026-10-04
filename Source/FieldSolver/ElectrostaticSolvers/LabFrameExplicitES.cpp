@@ -48,16 +48,10 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     ExecutePythonCallback("afterdeposition");
 
     // Apply filter, perform MPI exchange, interpolate across levels
+    // and apply boundary conditions
     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
     auto & warpx = WarpX::GetInstance();
-    warpx.SyncRho( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
-
-#ifndef WARPX_DIM_RZ
-    for (int lev = 0; lev < num_levels; lev++) {
-        // Reflect density over PEC boundaries, if needed.
-        warpx.ApplyRhofieldBoundary(lev, rho_fp[lev], PatchType::fine);
-    }
-#endif
+    warpx.FinalizeDepositedCharge( rho_fp, rho_cp, amrex::GetVecOfPtrs(rho_buf) );
     // beta is zero in lab frame
     // Todo: use simpler finite difference form with beta=0
     const std::array<Real, 3> beta = {0._rt};

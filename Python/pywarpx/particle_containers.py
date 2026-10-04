@@ -650,7 +650,8 @@ class ParticleContainerWrapper(object):
         clear_rho      : bool
             If True, zero out rho_fp before deposition.
         sync_rho       : bool
-            If True, perform MPI exchange and properly set boundary cells for rho_fp.
+            If True, finalize rho_fp after the deposition: apply the filter (if used),
+            perform MPI exchange and apply the boundary conditions.
         """
         fields = libwarpx.warpx.multifab_register()
         rho_fp = fields.get("rho_fp", level=level)
@@ -668,7 +669,7 @@ class ParticleContainerWrapper(object):
             libwarpx.warpx.apply_inverse_volume_scaling_to_charge_density(rho_fp, level)
 
         if sync_rho:
-            libwarpx.warpx.sync_rho()
+            libwarpx.warpx.finalize_deposited_charge()
 
 
 class ParticleBoundaryBufferWrapper(object):

@@ -860,9 +860,10 @@ WarpX::PushPSATD (amrex::Real start_time)
             // Inverse FFT of J
             PSATDBackwardTransformJ(current_fp_string, current_cp_string);
 
-            // Synchronize J and rho
-            SyncCurrent("current_fp");
-            SyncRho();
+            // Finalize J and rho: filter, exchange boundary, interpolate
+            // across levels and apply boundary conditions
+            FinalizeDepositedCurrent("current_fp");
+            FinalizeDepositedCharge();
         }
         else if (current_deposition_algo == CurrentDepositionAlgo::Vay)
         {
@@ -882,14 +883,18 @@ WarpX::PushPSATD (amrex::Real start_time)
             }
             ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
 
-            // Synchronize J and rho (if used).
-            // Here we call SumBoundaryJ instead of SyncCurrent, because
-            // filtering has been already applied to D in OneStep_nosub,
+            // Finalize J and rho (if used).
+            // Here we call SumBoundaryJ instead of FinalizeDepositedCurrent,
+            // because filtering has been already applied to D in OneStep_nosub,
             // by calling SyncCurrentAndRho (see Evolve/WarpXEvolve.cpp).
+            // The boundary conditions are applied to J after the guard cell sum.
             // TODO This works only without mesh refinement
             const int lev = 0;
             SumBoundaryJ(current_fp, lev, Geom(lev).periodicity());
-            SyncRho();
+            ApplyJfieldBoundary(lev,
+                current_fp[lev][0], current_fp[lev][1], current_fp[lev][2],
+                PatchType::fine);
+            FinalizeDepositedCharge();
         }
 
         // FFT of J and rho (if used)

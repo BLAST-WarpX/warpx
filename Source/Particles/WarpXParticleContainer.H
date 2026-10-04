@@ -334,9 +334,13 @@ public:
      *
      * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
      * \param[in] local if false, exchange the data in the guard cells after the deposition
+     *            (and apply the boundary conditions, if apply_boundary_and_scale_volume is true);
+     *            if true, the caller is expected to finalize rho with
+     *            WarpX::FinalizeDepositedCharge
      * \param[in] reset if true, reset all values of rho to zero
-     * \param[in] apply_boundary_and_scale_volume whether to apply boundary conditions and scale the
-     *            final density by some volume norm in cylindrical and spherical geometry
+     * \param[in] apply_boundary_and_scale_volume whether to scale the deposited density by the
+     *            inverse volume in cylindrical and spherical geometry, and (if local is false)
+     *            to apply the boundary conditions
      * \param[in] interpolate_across_levels whether to average down from the fine patch to the coarse patch
      * \param[in] icomp component of the MultiFab where rho is deposited (old, new)
      */

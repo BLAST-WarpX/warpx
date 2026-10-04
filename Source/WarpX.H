@@ -690,12 +690,80 @@ public:
     void FillBoundaryAux (int lev, amrex::IntVect ng);
 
     /**
-     * \brief Synchronize J and rho:
+     * \brief Finalize J and rho in the main PIC loop:
      * filter (if used), exchange guard cells, interpolate across MR levels
-     * and apply boundary conditions.
-     * Contains separate calls to WarpX::SyncCurrent and WarpX::SyncRho.
+     * and apply boundary conditions, taking into account the options of the
+     * PSATD solver (current correction, Vay deposition) that require part of
+     * this work to be done later, in WarpX::PushPSATD.
+     * Calls WarpX::FinalizeDepositedCurrent and WarpX::FinalizeDepositedCharge.
      */
     void SyncCurrentAndRho ();
+
+    /**
+     * \brief Finalize the charge density after the particle deposition.
+     *
+     * This defines, in a single place, the sequence of operations applied to
+     * the deposited charge density before it is used by the field solvers or
+     * written by the diagnostics: filter (if used), sum the guard cells across
+     * boxes, MPI ranks and mesh-refinement levels (see WarpX::SyncRho), and
+     * apply the boundary conditions (fold the charge deposited in the guard
+     * cells beyond PEC, PMC and reflecting boundaries back into the domain,
+     * see WarpX::ApplyRhofieldBoundary).
+     *
+     * In cylindrical and spherical geometry, the inverse volume scaling
+     * (see WarpX::ApplyInverseVolumeScalingToChargeDensity) must have been
+     * applied by the deposition routine before calling this function.
+     *
+     * \param[in,out] rho_fp charge density on the fine patch of each level
+     * \param[in,out] rho_cp charge density on the coarse patch of each level (unused at level 0)
+     * \param[in,out] rho_buf charge density in the buffer region of each level (unused at level 0)
+     */
+    void FinalizeDepositedCharge (
+        const ablastr::fields::MultiLevelScalarField& rho_fp,
+        const ablastr::fields::MultiLevelScalarField& rho_cp,
+        const ablastr::fields::MultiLevelScalarField& rho_buf);
+
+    /** \brief Same as above, for the registered fields rho_fp, rho_cp and rho_buf. */
+    void FinalizeDepositedCharge ();
+
+    /**
+     * \brief Same as above, for a single MultiFab on a single level
+     * (e.g. per-species charge density, charge density of a diagnostic).
+     *
+     * \param[in,out] rho charge density
+     * \param[in] lev mesh-refinement level of rho
+     */
+    void FinalizeDepositedCharge (amrex::MultiFab& rho, int lev);
+
+    /**
+     * \brief Finalize the current density after the particle deposition.
+     *
+     * This defines, in a single place, the sequence of operations applied to
+     * the deposited current density before it is used by the field solvers or
+     * written by the diagnostics: center the current from the nodal to the
+     * staggered grid (if current centering is used), filter (if used), sum the
+     * guard cells across boxes, MPI ranks and mesh-refinement levels (see
+     * WarpX::SyncCurrent), and apply the boundary conditions (fold the current
+     * deposited in the guard cells beyond PEC, PMC and reflecting boundaries
+     * back into the domain, see WarpX::ApplyJfieldBoundary).
+     *
+     * In cylindrical and spherical geometry, the inverse volume scaling
+     * (see WarpX::ApplyInverseVolumeScalingToCurrentDensity) must have been
+     * applied by the deposition routine before calling this function.
+     *
+     * \param[in] current_fp_string name of the registered current density field
+     *            in which the particles deposited (e.g. "current_fp", "current_fp_nodal")
+     */
+    void FinalizeDepositedCurrent (const std::string& current_fp_string);
+
+    /**
+     * \brief Same as above, for a single vector field on a single level
+     * (e.g. per-species current density, current density of a diagnostic).
+     *
+     * \param[in,out] J current density (three components)
+     * \param[in] lev mesh-refinement level of J
+     */
+    void FinalizeDepositedCurrent (const ablastr::fields::VectorField& J, int lev);
 
     /**
      * \brief Apply filter and sum guard cells across MR levels.
