@@ -82,49 +82,18 @@ jobs:
       run: |
         $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
 
+        # The runner's error mode, inherited by child processes, might disable
+        # Windows Error Reporting (SEM_NOGPFAULTERRORBOX) and thus crash dumps
+        Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition `
+          '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint uMode);'
+        $prev = [Win32.ErrorMode]::SetErrorMode(0x0001)  # SEM_FAILCRITICALERRORS
+        Write-Output ("TMP: previous error mode: 0x{0:X}" -f $prev)
+
         # TEMPORARY: without the wrapper, AMReX handles CRT reports
         python3 -X faulthandler Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
         if(!$?) { Exit $LASTEXITCODE }
 # JSON writes are currently very slow (50min) with MSVC
 #  --diagformat=openpmd
-    - name: TMP CRT hook assert (prints, no dialog)
-      if: ${{ always() }}
-      continue-on-error: true
-      timeout-minutes: 2
-      run: |
-        $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
-        python3 -X faulthandler .github/workflows/source/tmp_crt/crt_hook_test.py assert
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        Exit 0
-    - name: TMP CRT hook abort (message, no hang)
-      if: ${{ always() }}
-      continue-on-error: true
-      timeout-minutes: 2
-      run: |
-        $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
-        python3 -X faulthandler .github/workflows/source/tmp_crt/crt_hook_test.py abort
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        Exit 0
-    - name: TMP CRT hook assert (opt-out, expected to hang)
-      if: ${{ always() }}
-      continue-on-error: true
-      timeout-minutes: 2
-      env:
-        AMREX_DEFAULT_INIT: "amrex.handle_crt_reports=0"
-      run: |
-        $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
-        python3 -X faulthandler .github/workflows/source/tmp_crt/crt_hook_test.py assert
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        Exit 0
-    - name: TMP CRT hook finalized (hooks removed, expected to hang)
-      if: ${{ always() }}
-      continue-on-error: true
-      timeout-minutes: 2
-      run: |
-        $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
-        python3 -X faulthandler .github/workflows/source/tmp_crt/crt_hook_test.py finalized
-        Write-Output ("exit code: {0} (0x{0:X8})" -f $LASTEXITCODE)
-        Exit 0
     - name: Print crash stacks
       if: ${{ failure() }}
       timeout-minutes: 5
@@ -209,6 +178,13 @@ jobs:
       timeout-minutes: 20
       run: |
         $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
+
+        # The runner's error mode, inherited by child processes, might disable
+        # Windows Error Reporting (SEM_NOGPFAULTERRORBOX) and thus crash dumps
+        Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition `
+          '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint uMode);'
+        $prev = [Win32.ErrorMode]::SetErrorMode(0x0001)  # SEM_FAILCRITICALERRORS
+        Write-Output ("TMP: previous error mode: 0x{0:X}" -f $prev)
 
         # TEMPORARY: without the wrapper, AMReX handles CRT reports
         python3 -X faulthandler Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
