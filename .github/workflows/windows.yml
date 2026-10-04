@@ -51,9 +51,7 @@ jobs:
               -DWarpX_COMPUTE=NOACC       `
               -DWarpX_OPENPMD=ON          `
               -DWarpX_MPI=OFF             `
-              -DWarpX_PYTHON=ON           `
-              -DWarpX_amrex_repo=https://github.com/ax3l/amrex.git `
-              -DWarpX_amrex_branch=92284e9ed2af10d57a4d8a95ea9a5173af1d651c
+              -DWarpX_PYTHON=ON
         if(!$?) { Exit $LASTEXITCODE }
         cmake --build build --config Debug --parallel 4
         if(!$?) { Exit $LASTEXITCODE }
@@ -82,112 +80,17 @@ jobs:
       run: |
         $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
 
-        # The runner's error mode, inherited by child processes, might disable
-        # Windows Error Reporting (SEM_NOGPFAULTERRORBOX) and thus crash dumps
+        # The runner's error mode (0x8003) includes SEM_NOGPFAULTERRORBOX, which
+        # child processes inherit and which disables Windows Error Reporting,
+        # including crash dumps. Keep only SEM_FAILCRITICALERRORS.
         Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition `
           '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint uMode);'
-        $prev = [Win32.ErrorMode]::SetErrorMode(0x0001)  # SEM_FAILCRITICALERRORS
-        Write-Output ("TMP: previous error mode: 0x{0:X}" -f $prev)
+        [Win32.ErrorMode]::SetErrorMode(0x0001) | Out-Null
 
-        # TEMPORARY: without the wrapper, AMReX handles CRT reports
-        python3 -X faulthandler Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
-        if(!$?) { Exit $LASTEXITCODE }
-# JSON writes are currently very slow (50min) with MSVC
-#  --diagformat=openpmd
-    - name: Print crash stacks
-      if: ${{ failure() }}
-      timeout-minutes: 5
-      run: |
-        $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
-        Get-ChildItem "$env:RUNNER_TEMP\crashdumps" -Filter *.dmp -ErrorAction SilentlyContinue | ForEach-Object {
-          Write-Output "=== $($_.Name) ==="
-          & $cdb -z $_.FullName -lines -c ".ecxr; kpn 50; q"
-        }
-    - name: Print Backtraces
-      if: ${{ failure() || cancelled() }}
-      run: |
-        Get-ChildItem -Filter "Backtrace.*" | ForEach-Object {
-          Write-Output "=== $($_.Name) ==="
-          Get-Content $_.FullName
-        }
-
-  build_win_msvc_rtc:
-    name: TMP MSVC RTC failure in WarpX
-    continue-on-error: true
-    runs-on: windows-latest
-    needs: check_changes
-    if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
-    steps:
-    - uses: actions/checkout@v7
-    - uses: actions/setup-python@v7
-      with:
-        python-version: '3.x'
-    - name: TMP inject run-time check failure
-      run: python3 .github/workflows/source/tmp_crt/patch_rtc.py
-    - name: CCache Cache
-      uses: actions/cache@v6
-      # - once stored under a key, they become immutable (even if local cache path content changes)
-      # - for a refresh the key has to change, e.g., hash of a tracked file in the key
-      with:
-        path: |
-          ~/.ccache
-          ~/.cache/ccache
-        key: ccache-windows-winmsvcrtc-${{ hashFiles('.github/workflows/windows.yml') }}-${{ hashFiles('cmake/dependencies/AMReX.cmake') }}
-        restore-keys: |
-          ccache-windows-winmsvcrtc-${{ hashFiles('.github/workflows/windows.yml') }}-
-          ccache-windows-winmsvcrtc-
-    - name: Build & Install
-      env:
-        # Work-around for windows-latest GH runner issue, see
-        # https://github.com/actions/runner-images/issues/10004
-        CXXFLAGS: "/D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR"
-      run: |
-        cmake -S . -B build               `
-              -DCMAKE_BUILD_TYPE=Debug    `
-              -DCMAKE_VERBOSE_MAKEFILE=ON `
-              -DWarpX_COMPUTE=NOACC       `
-              -DWarpX_OPENPMD=ON          `
-              -DWarpX_MPI=OFF             `
-              -DWarpX_PYTHON=ON           `
-              -DWarpX_amrex_repo=https://github.com/ax3l/amrex.git `
-              -DWarpX_amrex_branch=92284e9ed2af10d57a4d8a95ea9a5173af1d651c
-        if(!$?) { Exit $LASTEXITCODE }
-        cmake --build build --config Debug --parallel 4
-        if(!$?) { Exit $LASTEXITCODE }
-
-        python3 -m pip install --upgrade pip
-        if(!$?) { Exit $LASTEXITCODE }
-        python3 -m pip install --upgrade build packaging setuptools[core] wheel
-        if(!$?) { Exit $LASTEXITCODE }
-        cmake --build build --config Debug --target install
-        if(!$?) { Exit $LASTEXITCODE }
-        cmake --build build --config Debug --target pip_install
-        if(!$?) { Exit $LASTEXITCODE }
-
-    - name: Enable crash dumps
-      run: |
-        # Windows Error Reporting: no dialog, but a minidump for crashing processes
-        $wer = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting"
-        New-ItemProperty -Path $wer -Name DontShowUI -PropertyType DWord -Value 1 -Force | Out-Null
-        $key = "$wer\LocalDumps"
-        if (!(Test-Path $key)) { New-Item -Path $key | Out-Null }
-        New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString `
-          -Value "$env:RUNNER_TEMP\crashdumps" -Force | Out-Null
-        New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 1 -Force | Out-Null
-    - name: Test
-      timeout-minutes: 20
-      run: |
-        $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
-
-        # The runner's error mode, inherited by child processes, might disable
-        # Windows Error Reporting (SEM_NOGPFAULTERRORBOX) and thus crash dumps
-        Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition `
-          '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint uMode);'
-        $prev = [Win32.ErrorMode]::SetErrorMode(0x0001)  # SEM_FAILCRITICALERRORS
-        Write-Output ("TMP: previous error mode: 0x{0:X}" -f $prev)
-
-        # TEMPORARY: without the wrapper, AMReX handles CRT reports
-        python3 -X faulthandler Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
+        # Debug builds would otherwise hang on a modal dialog for failed
+        # assertions and run-time checks, without printing the error
+        python3 -X faulthandler .github/workflows/source/run_without_crt_dialogs.py `
+          Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
         if(!$?) { Exit $LASTEXITCODE }
 # JSON writes are currently very slow (50min) with MSVC
 #  --diagformat=openpmd
