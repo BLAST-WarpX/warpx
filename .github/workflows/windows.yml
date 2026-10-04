@@ -66,12 +66,24 @@ jobs:
         if(!$?) { Exit $LASTEXITCODE }
 
     - name: Test
+      timeout-minutes: 20
       run: |
         $env:PATH += ';C:/Program Files (x86)/WarpX/bin/'
 
-        python3 Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
+        # Debug builds would otherwise hang on a modal dialog for failed
+        # assertions and run-time checks, without printing the error
+        python3 .github/workflows/source/run_without_crt_dialogs.py `
+          Examples/Tests/gaussian_beam/inputs_test_3d_gaussian_beam_picmi.py
+        if(!$?) { Exit $LASTEXITCODE }
 # JSON writes are currently very slow (50min) with MSVC
 #  --diagformat=openpmd
+    - name: Print Backtraces
+      if: ${{ failure() || cancelled() }}
+      run: |
+        Get-ChildItem -Filter "Backtrace.*" | ForEach-Object {
+          Write-Output "=== $($_.Name) ==="
+          Get-Content $_.FullName
+        }
 
   build_win_clang:
     name: Clang C++20 w/ OMP w/o MPI
