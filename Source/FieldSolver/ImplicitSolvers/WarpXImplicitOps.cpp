@@ -56,6 +56,13 @@ WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_ti
     amrex::MultiFab::Copy(*Efield_fp[0][0], *Evec[0][0], 0, 0, ncomps, Evec[0][0]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][1], *Evec[0][1], 0, 0, ncomps, Evec[0][1]->nGrowVect());
     amrex::MultiFab::Copy(*Efield_fp[0][2], *Evec[0][2], 0, 0, ncomps, Evec[0][2]->nGrowVect());
+    if (a_E.hasPML()) {
+        const auto pml_E = m_fields.get_alldirs(FieldType::pml_E_fp, 0);
+        const auto trial_E = a_E.getPMLVec();
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*pml_E[n], *trial_E[n], 0, 0, pml_E[n]->nComp(), 0);
+        }
+    }
     FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
     ApplyEfieldBoundary(0, PatchType::fine, a_time);
 }
@@ -346,7 +353,14 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
 
     // Compute Efield_rhs in PML cells by calling EvolveEPML
     if (do_pml && pml[lev]->ok()) {
-        amrex::Abort("PML not yet implemented with implicit solvers.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(a_Erhs_vec.hasPML() && lev == 0 &&
+            patch_type == PatchType::fine, "PML requires the theta-implicit solver at level zero.");
+        const auto rhs = a_Erhs_vec.getPMLVec();
+        for (auto* field : rhs) { field->setVal(0.0); }
+        m_fdtd_solver_fp[lev]->EvolveEPML(m_fields, patch_type, lev,
+            pml[lev]->GetEBUpdateEFlag(), pml[lev]->GetMultiSigmaBox_fp(), a_dt, false, rhs);
+        pml[lev]->ApplyImplicitSigma(rhs,
+            m_fields.get_alldirs(warpx::fields::FieldType::pml_E_fp, lev), a_dt, false);
     }
 
 }
