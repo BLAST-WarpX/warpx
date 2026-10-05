@@ -664,7 +664,7 @@ void HybridPICModel::InitData (const ablastr::fields::MultiFabRegister& fields)
     // deposited density.
 
     // QDSMC: lazy-construct the fictitious-particle container and lay one
-    // particle per cell.
+    // particle per grid node.
     if (m_solve_electron_energy_equation) {
         m_qdsmc_pc = std::make_unique<QdsmcParticleContainer>(&warpx);
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
@@ -2098,7 +2098,7 @@ void HybridPICModel::AdvanceElectronEnergyQDSMC (amrex::Real const dt) const
         amrex::MultiFab       & weights_out = *warpx.m_fields.get(FieldType::hybrid_qdsmc_weights_fp, lev);
 
         // Step 2: load each QDSMC particle with V_e and (K_e * N_e, N_e) from
-        // its home cell.
+        // its home node.
         m_qdsmc_pc->SetV(lev, Vex, Vey, Vez);
         m_qdsmc_pc->SetK(lev, Ke, rho);
 
