@@ -630,6 +630,13 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const bool include_resistivity =
         solve_for_Faraday || hybrid_model->m_has_resistive_drag;
 
+    // The electron pressure term is curl-free, and is therefore left out of
+    // the Faraday solves, only when P_e is a function of n_e alone (the
+    // algebraic closure). With the electron energy equation its curl is a
+    // grad(n_e) x grad(T_e) source of B.
+    const bool include_grad_pe =
+        !solve_for_Faraday || hybrid_model->m_solve_electron_energy_equation;
+
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
@@ -848,9 +855,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 if (rho_val < rho_floor && holmstrom_vacuum_region) {
                     Er(i, j, 0) = 0._rt;
                 } else {
-                    // Get the gradient of the electron pressure if the longitudinal part of
-                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
+                    // Get the gradient of the electron pressure; see include_grad_pe above
+                    const Real grad_Pe = include_grad_pe ?
                         T_Algo::UpwardDr(Pe, coefs_r, n_coefs_r, i, j, 0, 0)
                         : 0._rt;
 
@@ -998,9 +1004,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                 if (rho_val < rho_floor && holmstrom_vacuum_region) {
                     Ez(i, j, 0) = 0._rt;
                 } else {
-                    // Get the gradient of the electron pressure if the longitudinal part of
-                    // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                    const Real grad_Pe = (!solve_for_Faraday) ?
+                    // Get the gradient of the electron pressure; see include_grad_pe above
+                    const Real grad_Pe = include_grad_pe ?
                         T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, 0, 0)
                         : 0._rt;
 
@@ -1118,6 +1123,11 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // design notes in HybridPICSolveECylindrical.
     const bool include_resistivity =
         solve_for_Faraday || hybrid_model->m_has_resistive_drag;
+
+    // Electron pressure term in the Faraday solves with the electron energy
+    // equation; see HybridPICSolveECylindrical.
+    const bool include_grad_pe =
+        !solve_for_Faraday || hybrid_model->m_solve_electron_energy_equation;
 
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
@@ -1344,9 +1354,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ex(i, j, k) = 0._rt;
             } else {
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
+                // Get the gradient of the electron pressure; see include_grad_pe above
+                const Real grad_Pe = include_grad_pe ?
                     T_Algo::UpwardDx(Pe, coefs_x, n_coefs_x, i, j, k)
                     : 0._rt;
 
@@ -1425,9 +1434,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ey(i, j, k) = 0._rt;
             } else {
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
+                // Get the gradient of the electron pressure; see include_grad_pe above
+                const Real grad_Pe = include_grad_pe ?
                     T_Algo::UpwardDy(Pe, coefs_y, n_coefs_y, i, j, k)
                     : 0._rt;
 
@@ -1504,9 +1512,8 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
             if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ez(i, j, k) = 0._rt;
             } else {
-                // Get the gradient of the electron pressure if the longitudinal part of
-                // the E-field should be included, otherwise ignore it since curl x (grad Pe) = 0
-                const Real grad_Pe = (!solve_for_Faraday) ?
+                // Get the gradient of the electron pressure; see include_grad_pe above
+                const Real grad_Pe = include_grad_pe ?
                     T_Algo::UpwardDz(Pe, coefs_z, n_coefs_z, i, j, k)
                     : 0._rt;
 

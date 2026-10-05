@@ -371,12 +371,14 @@ public:
                                std::map<std::string, amrex::MultiFab*> const * Ti_dep_by_species = nullptr) const;
 
     /**
-     * \brief Fill hybrid_electron_pressure_fp from T_e and n_e using the
-     *        ideal-gas relation Pe = n_e * k_B * T_e. Called at the end of
-     *        each QDSMC step so the existing Ohm's-law E-solver consumes
-     *        the QDSMC-updated pressure without modification.
+     * \brief Fill hybrid_electron_pressure_fp from T_e and n_e = rho/q_e using
+     *        the ideal-gas relation Pe = n_e * k_B * T_e, with the boundary
+     *        treatment grad Pe needs. Called at the end of each QDSMC step so
+     *        the existing Ohm's-law E-solver consumes the QDSMC-updated
+     *        pressure without modification, and before each B half-step push
+     *        with the charge density of that push.
      */
-    void QDSMCFillElectronPressureFromTe (int lev) const;
+    void QDSMCFillElectronPressureFromTe (int lev, amrex::MultiFab const& rho) const;
 
     /**
      * \brief Top-level orchestrator for the QDSMC electron-energy step.
