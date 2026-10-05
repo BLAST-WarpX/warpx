@@ -83,8 +83,8 @@ private:
     //! counts number of particles for all MPI ranks
     long m_valid_particles {0};
 
-    //! remember the last time @see ComputeDiags was called to count the number of steps in between (for non-integrated detectors)
-    int m_last_compute_step = 0;
+    //! initial problem-domain position used as the origin for co-moving probes
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_initial_prob_lo{};
 
     //! determines geometry of detector point distribution
     DetectorGeometry m_probe_geometry = DetectorGeometry::Point;
@@ -114,10 +114,6 @@ private:
      * Built-in function in ReducedDiags to write out test data
      */
     void WriteToFile (int step) const override;
-
-    /** Check if the probe is in the simulation domain boundary
-     */
-    bool ProbeInDomain () const;
 
     /**
      * Simple utility function to normalize the components of a "vector"

@@ -1,0 +1,4 @@
+FILE=inputs_base_3d_field_probe_line
+
+FP.z_probe = 0
+FP.z1_probe = 68e-6

@@ -32,17 +32,23 @@ FieldProbeParticleContainer::FieldProbeParticleContainer (AmrCore* amr_core)
 }
 
 void
-FieldProbeParticleContainer::AddNParticles (int lev,
-                                            amrex::Vector<amrex::ParticleReal> const & x,
-                                            amrex::Vector<amrex::ParticleReal> const & y,
-                                            amrex::Vector<amrex::ParticleReal> const & z)
+FieldProbeParticleContainer::AddNParticles (
+    int lev, amrex::Vector<amrex::ParticleReal> const& probe_x,
+    amrex::Vector<amrex::ParticleReal> const& probe_y,
+    amrex::Vector<amrex::ParticleReal> const& probe_z,
+    amrex::Vector<amrex::ParticleReal> const& storage_x,
+    amrex::Vector<amrex::ParticleReal> const& storage_y,
+    amrex::Vector<amrex::ParticleReal> const& storage_z)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(lev == 0, "AddNParticles: only lev=0 is supported yet.");
-    AMREX_ALWAYS_ASSERT(x.size() == y.size());
-    AMREX_ALWAYS_ASSERT(x.size() == z.size());
+    AMREX_ALWAYS_ASSERT(probe_x.size() == probe_y.size());
+    AMREX_ALWAYS_ASSERT(probe_x.size() == probe_z.size());
+    AMREX_ALWAYS_ASSERT(probe_x.size() == storage_x.size());
+    AMREX_ALWAYS_ASSERT(probe_x.size() == storage_y.size());
+    AMREX_ALWAYS_ASSERT(probe_x.size() == storage_z.size());
 
     // number of particles to add
-    auto const np = static_cast<int>(x.size());
+    auto const np = static_cast<int>(probe_x.size());
     if (np <= 0){
         Redistribute();
         return;
@@ -84,13 +90,13 @@ FieldProbeParticleContainer::AddNParticles (int lev,
     pinned_tile.push_back_real(FieldProbePIdx::phi, np, 0.0);
 #endif
 #if !defined (WARPX_DIM_1D_Z)
-    pinned_tile.push_back_real(FieldProbePIdx::x, x);
+    pinned_tile.push_back_real(FieldProbePIdx::x, storage_x);
 #endif
 #if defined (WARPX_DIM_3D)
-    pinned_tile.push_back_real(FieldProbePIdx::y, y);
+    pinned_tile.push_back_real(FieldProbePIdx::y, storage_y);
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    pinned_tile.push_back_real(FieldProbePIdx::z, z);
+    pinned_tile.push_back_real(FieldProbePIdx::z, storage_z);
 #endif
     pinned_tile.push_back_real(FieldProbePIdx::Ex, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::Ey, np, 0.0);
@@ -99,6 +105,9 @@ FieldProbeParticleContainer::AddNParticles (int lev,
     pinned_tile.push_back_real(FieldProbePIdx::By, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::Bz, np, 0.0);
     pinned_tile.push_back_real(FieldProbePIdx::S, np, 0.0);
+    pinned_tile.push_back_real(FieldProbePIdx::probe_x, probe_x);
+    pinned_tile.push_back_real(FieldProbePIdx::probe_y, probe_y);
+    pinned_tile.push_back_real(FieldProbePIdx::probe_z, probe_z);
 
     const auto old_np = particle_tile.numParticles();
     const auto new_np = old_np + pinned_tile.numParticles();
