@@ -5,8 +5,7 @@
 #  Rendering the Electrons Particle mesh
 #  Exporting Blueprint HDF5 files
 #
--
-  action: add_pipelines
+- action: add_pipelines
   pipelines:
     contour_pipeline:
       f0:
@@ -14,8 +13,7 @@
           field: Ey
           levels: 16
         type: contour
--
-  action: add_scenes
+- action: add_scenes
   scenes:
     ey_contour_pc:
       plots:
@@ -38,18 +36,15 @@
           color_table:
             name: "Cool to Warm Extended"
             control_points:
-            -
-              type: "alpha"
-              position: 0.0
-              alpha: 1.0
-            -
-              type: "alpha"
-              position: 0.5
-              alpha: 0.0
-            -
-              type: "alpha"
-              position: 1.0
-              alpha: 1.0
+              - type: "alpha"
+                position: 0.0
+                alpha: 1.0
+              - type: "alpha"
+                position: 0.5
+                alpha: 0.0
+              - type: "alpha"
+                position: 1.0
+                alpha: 1.0
       renders:
         r1:
           camera:
@@ -65,8 +60,7 @@
           camera:
             azimuth: 90.0
           image_prefix: "uz_pc_"
--
-  action: add_extracts
+- action: add_extracts
   extracts:
     e1:
       params:

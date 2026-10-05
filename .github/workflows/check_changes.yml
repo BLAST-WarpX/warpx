@@ -1,11 +1,9 @@
 name: Check Changes
-
 on:
   workflow_call:
     outputs:
       has_non_docs_changes:
         value: ${{ jobs.check.outputs.has_non_docs_changes }}
-
 jobs:
   check:
     name: Check changes

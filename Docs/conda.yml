@@ -1,12 +1,10 @@
 name: readthedocs
-
 channels:
   - conda-forge
   - nodefaults
-
 dependencies:
   - python
   - doxygen
   - pip
   - pip:
-    - -r requirements.txt
+      - -r requirements.txt
