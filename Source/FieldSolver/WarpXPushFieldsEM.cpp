@@ -1851,14 +1851,16 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) 
 
             // Apply the inverse volume scaling
             const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
-            for (int icomp = 0; icomp < ncomp; icomp++) {
-                if (r == 0.) {
+            if (r == 0.) {
+                for (int icomp = 0; icomp < ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
 #elif defined(WARPX_DIM_RSPHERE)
                     Rho_arr(i,j,0,icomp) /= 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
 #endif
-                } else {
+                }
+            } else {
+                for (int icomp = 0; icomp < ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
                     Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
