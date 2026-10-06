@@ -136,9 +136,23 @@ private:
      * \brief Scratch space used by apply(), allocated once in define() rather
      *  than on every GMRES iteration since every iterate of Z shares the same
      *  layout.
+     *
+     *  apply() evaluates the whole operator from a single guard-cell exchange
+     *  on m_Zscratch_*, by computing each intermediate over enough of its own
+     *  guard region to feed the next stage. Hence the staggered ghost widths,
+     *  set in define():
+     *   - m_Zscratch_* (B-staggered) is the widest, and is the only field that
+     *     is communicated;
+     *   - m_dA_* (E-staggered) holds curl(Z) out to the reach of the mass
+     *     matrix gather;
+     *   - m_chidA_* (E-staggered) holds chi curl(Z) one cell out, which is
+     *     what the final curl reads;
+     *   - m_lapZ_* (B-staggered) holds the result, valid region only.
      */
     amrex::MultiFab m_lapZ_x, m_lapZ_y, m_lapZ_z;
     amrex::MultiFab m_Zscratch_x, m_Zscratch_y, m_Zscratch_z;
+    amrex::MultiFab m_dA_x, m_dA_y, m_dA_z;
+    amrex::MultiFab m_chidA_x, m_chidA_y, m_chidA_z;
 };
 
 #endif // WARPX_DARWIN_LINEAR_FIELD_OPERATOR_H_
