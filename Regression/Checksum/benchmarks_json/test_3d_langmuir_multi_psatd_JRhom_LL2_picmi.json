@@ -1,4 +1,11 @@
 {
+  "electrons": {
+    "particle_momentum_x": 9.616928893921091e-20,
+    "particle_position_x": 2.621440000012419,
+    "particle_position_y": 2.621440000012419,
+    "particle_position_z": 2.6214399999999998,
+    "particle_weight": 128000000000.00002
+  },
   "lev=0": {
     "Bx": 87.68525073269808,
     "By": 87.68525073275138,
@@ -17,12 +24,5 @@
     "particle_position_x": 2.621440000012419,
     "particle_position_y": 2.621440000012419,
     "particle_position_z": 2.62144
-  },
-  "electrons": {
-    "particle_momentum_x": 9.616928893921091e-20,
-    "particle_position_x": 2.621440000012419,
-    "particle_position_y": 2.621440000012419,
-    "particle_position_z": 2.6214399999999998,
-    "particle_weight": 128000000000.00002
   }
 }

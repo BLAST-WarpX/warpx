@@ -51,6 +51,7 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <string>
 
 using namespace amrex::literals;
 using warpx::fields::FieldType;
@@ -1810,46 +1811,65 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) 
 
         // Rescale charge in r-z mode since the inverse volume factor was not
         // included in the charge deposition.
-        // Note that the loop is also over ncomps, which takes care of the RZ modes,
-        // as well as the old and new rho.
+        // The MultiFab may hold several copies of the charge density side by
+        // side (e.g. rho_old and rho_new for PSATD, or a single copy for the
+        // electrostatic and hybrid solvers and for diagnostics). Each copy
+        // uses the same component layout as J: component 0 is the mode 0,
+        // and components 2*m-1 and 2*m are the real and imaginary parts of
+        // the mode m.
         int const ncomp = Rho->nComp();
-        amrex::ParallelFor(tb, ncomp,
-        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/, int icomp)
+        int const ncomps_per_copy = WarpX::ncomps;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ncomp % ncomps_per_copy == 0,
+            "ApplyInverseVolumeScalingToChargeDensity: the number of components of rho ("
+            + std::to_string(ncomp) + ") must be a multiple of the number of mode components ("
+            + std::to_string(ncomps_per_copy) + ")");
+        int const ncopies = ncomp / ncomps_per_copy;
+#if defined(WARPX_DIM_RZ)
+        const int nmodes = n_rz_azimuthal_modes;
+#endif
+
+        amrex::ParallelFor(tb,
+        [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
             // Wrap the charge density deposited in the guard cells around
             // to the cells above the axis.
             // Rho is located on the boundary
             if (rmin == 0. && 1-ishift <= i && i <= ngRho[0]-ishift) {
-                int imode;
-                if (icomp == 0 || icomp == ncomp/2) {
-                    imode = 0;
+                for (int icopy = 0; icopy < ncopies; icopy++) {
+                    int const ic0 = icopy*ncomps_per_copy;
+                    // The mode 0 is symmetric across the axis
+                    Rho_arr(i,j,0,ic0) += Rho_arr(-ishift-i,j,0,ic0);
+#if defined(WARPX_DIM_RZ)
+                    for (int imode=1 ; imode < nmodes ; imode++) {
+                        // The mode m has parity (-1)^m across the axis
+                        Rho_arr(i,j,0,ic0+2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode)*Rho_arr(-ishift-i,j,0,ic0+2*imode-1));
+                        Rho_arr(i,j,0,ic0+2*imode) += static_cast<amrex::Real>(std::pow(-1, imode)*Rho_arr(-ishift-i,j,0,ic0+2*imode));
+                    }
+#endif
                 }
-                else if (icomp < ncomp/2) {
-                    imode = (icomp+1)/2;
-                }
-                else {
-                    imode = (icomp - ncomp/2 + 1)/2;
-                }
-                Rho_arr(i,j,0,icomp) -= static_cast<amrex::Real>(std::pow(-1, imode+1)*Rho_arr(-ishift-i,j,0,icomp));
             }
 
             // Apply the inverse volume scaling
             const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
             if (r == 0.) {
+                for (int icomp = 0; icomp < ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
+                    Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
 #elif defined(WARPX_DIM_RSPHERE)
-                Rho_arr(i,j,0,icomp) /= 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
+                    Rho_arr(i,j,0,icomp) /= 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_volume_factor;
 #endif
+                }
             } else {
+                for (int icomp = 0; icomp < ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
-                Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
+                    // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
+                    Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);
 #elif defined(WARPX_DIM_RSPHERE)
-                // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
-                // leaving out the highest order term
-                Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
+                    // Scale factor is 4/3*pi*((r + dr/2)**3 - (r - dr/2)**3)/dr,
+                    // leaving out the highest order term
+                    Rho_arr(i,j,0,icomp) /= 4.0_rt*MathConst::pi*r*r;
 #endif
+                }
             }
         });
     }
