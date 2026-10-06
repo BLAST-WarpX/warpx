@@ -16,10 +16,18 @@
 #include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX.H>
+#include <AMReX_AlgMG.H>
+#include <AMReX_AlgPartition.H>
+#include <AMReX_AlgVector.H>
 #include <AMReX_ParmParse.H>
+#include <AMReX_ParallelReduce.H>
+#include <AMReX_SpMatrix.H>
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
+
+#include <memory>
+#include <string>
 
 namespace MatrixPCUtils
 {
@@ -60,8 +68,8 @@ namespace MatrixPCUtils
  *
  *  This class is templated on a solution-type class T and an operator class Ops. It implements
  *  a preconditioner based on constructing and solving the sparse matrix representation of the
- *  Jacobian. Currently, it implements constructing/assembling the sparse matrix. An external
- *  library with sparse matrix solvers (for example, PETSc) is needed to apply the preconditioner.
+ *  Jacobian. With pc_petsc, PETSc applies the preconditioner to the assembled matrix. With
+ *  pc_algmg, AMReX's algebraic multigrid (AlgMG) applies it.
  *
  *  The Ops class must have the following function:
  *      + Return number of AMR levels
@@ -123,6 +131,7 @@ class MatrixPC : public Preconditioner<T,Ops>
          *      A x = b
          *  where A is the linear operator, in this case, the curl-curl operator:
          *      A x = curl (alpha * curl (x) ) + beta * x
+         *  Only available with pc_algmg; pc_petsc is applied by PETSc.
          */
         void Apply (T&, const T&) override;
 
@@ -201,10 +210,31 @@ class MatrixPC : public Preconditioner<T,Ops>
 
         int m_num_realloc = 0;
 
+        // pc_algmg: AlgMG V-cycles on the assembled matrix
+        bool m_use_algmg = false;
+        int m_algmg_max_iter = 1;
+        int m_algmg_verbose = 0;
+        std::string m_algmg_smoother = "chebyshev";
+        int m_algmg_cheby_degree = 4;
+        RT m_algmg_strong_threshold = RT(0.25);
+        int m_algmg_aggressive_levels = 0;
+        int m_algmg_max_levels = 25;
+        amrex::AlgPartition m_algmg_partition;
+        std::unique_ptr<amrex::SpMatrix<RT>> m_algmg_mat;
+        std::unique_ptr<amrex::AlgMG<RT>> m_algmg;
+        amrex::AlgVector<RT> m_algmg_x;
+        amrex::AlgVector<RT> m_algmg_b;
+
         /**
          * \brief Read parameters
          */
         void readParameters();
+
+    public: // for CUDA
+        /**
+         * \brief Build the AlgMG hierarchy from the assembled matrix
+         */
+        void setupAlgMG ();
 
     private:
 
@@ -217,6 +247,14 @@ void MatrixPC<T,Ops>::printParameters() const
     Print() << m_name << " verbose:                " << (m_verbose?"true":"false") << "\n";
     Print() << m_name << " pc_diagonal_only:       " << (m_pc_diag_only?"true":"false") << "\n";
     Print() << m_name << " include_mass_matrices:  " << (m_include_mass_matrices?"true":"false") << "\n";
+    if (m_use_algmg) {
+        Print() << m_name << " max_iter:               " << m_algmg_max_iter << "\n";
+        Print() << m_name << " smoother:               " << m_algmg_smoother << "\n";
+        Print() << m_name << " chebyshev_degree:       " << m_algmg_cheby_degree << "\n";
+        Print() << m_name << " strong_threshold:       " << m_algmg_strong_threshold << "\n";
+        Print() << m_name << " aggressive_levels:      " << m_algmg_aggressive_levels << "\n";
+        Print() << m_name << " max_levels:             " << m_algmg_max_levels << "\n";
+    }
 }
 
 template <class T, class Ops>
@@ -225,6 +263,19 @@ void MatrixPC<T,Ops>::readParameters()
     const amrex::ParmParse pp(m_name);
     pp.query("verbose", m_verbose);
     pp.query("pc_diagonal_only", m_pc_diag_only);
+
+    m_use_algmg = (m_name == amrex::getEnumNameString(PreconditionerType::pc_algmg));
+    if (m_use_algmg) {
+        pp.query("max_iter", m_algmg_max_iter);
+        pp.query("algmg_verbose", m_algmg_verbose);
+        pp.query("smoother", m_algmg_smoother);
+        pp.query("chebyshev_degree", m_algmg_cheby_degree);
+        pp.query("strong_threshold", m_algmg_strong_threshold);
+        pp.query("aggressive_levels", m_algmg_aggressive_levels);
+        pp.query("max_levels", m_algmg_max_levels);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_algmg_max_iter >= 1,
+            m_name + ".max_iter must be at least 1");
+    }
 }
 
 template <class T, class Ops>
@@ -276,6 +327,20 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
         m_include_mass_matrices = true;
     }
 
+    if (m_use_algmg) {
+        // Each process owns a contiguous range of global rows.
+        const int nprocs = ParallelDescriptor::NProcs();
+        Vector<Long> nlocal(nprocs, Long(m_ndofs_l));
+#ifdef AMREX_USE_MPI
+        ParallelAllGather::AllGather(Long(m_ndofs_l), nlocal.data(), ParallelDescriptor::Communicator());
+#endif
+        Vector<Long> rows(nprocs+1, 0);
+        for (int i = 0; i < nprocs; ++i) { rows[i+1] = rows[i] + nlocal[i]; }
+        m_algmg_partition.define(std::move(rows));
+        m_algmg_x.define(m_algmg_partition);
+        m_algmg_b.define(m_algmg_partition);
+    }
+
     m_is_defined = true;
 }
 
@@ -310,6 +375,54 @@ void MatrixPC<T,Ops>::Update ()
         ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
     }
 
+    if (m_use_algmg) { setupAlgMG(); }
+}
+
+template <class T, class Ops>
+void MatrixPC<T,Ops>::setupAlgMG ()
+{
+    BL_PROFILE("MatrixPC::setupAlgMG()");
+    using namespace amrex;
+
+    // Row-major arrays padded to m_pc_mat_nnz -> CSR; padding is dropped as
+    // invalid entries.
+    const auto n = Long(m_ndofs_l);
+    const int nc = m_pc_mat_nnz;
+    Gpu::DeviceVector<Long> cols(n*nc);
+    Gpu::DeviceVector<Long> offsets(n+1);
+    Gpu::DeviceVector<RT> vals(n*nc);
+    auto* pc = cols.data();
+    auto* po = offsets.data();
+    auto* pv = vals.data();
+    auto const* nz = m_num_nz.data();
+    auto const* ci = m_c_indices_g.data();
+    auto const* aij = m_a_ij.data();
+    ParallelFor(n+1, [=] AMREX_GPU_DEVICE (Long i)
+    {
+        po[i] = i*nc;
+        if (i < n) {
+            for (int k = 0; k < nc; ++k) {
+                const bool valid = k < nz[i];
+                pc[i*nc+k] = valid ? Long(ci[i*nc+k]) : Long(-1);
+                pv[i*nc+k] = valid ? RT(aij[i*nc+k]) : RT(0);
+            }
+        }
+    });
+    Gpu::streamSynchronize();
+
+    m_algmg.reset(); // it refers to m_algmg_mat
+    m_algmg_mat = std::make_unique<SpMatrix<RT>>();
+    m_algmg_mat->define(m_algmg_partition, pv, pc, n*nc, po, CsrSorted{false}, CsrValid{false});
+
+    m_algmg = std::make_unique<AlgMG<RT>>(*m_algmg_mat);
+    m_algmg->setVerbose(m_algmg_verbose);
+    m_algmg->setSmoother(getEnumCaseInsensitive<AlgMGSmoother>(m_algmg_smoother));
+    m_algmg->setChebyshevDegree(m_algmg_cheby_degree);
+    m_algmg->setStrongThreshold(m_algmg_strong_threshold);
+    m_algmg->setAggressiveNumLevels(m_algmg_aggressive_levels);
+    m_algmg->setMaxLevels(m_algmg_max_levels);
+    m_algmg->setFixedIter(m_algmg_max_iter);
+    m_algmg->setup();
 }
 
 template <class T, class Ops>
@@ -835,8 +948,19 @@ void MatrixPC<T,Ops>::Apply (T& a_x, const T& a_b)
         a_b.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
         "MatrixPC::Apply() - a_b must be Efield_fp type");
 
-    WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Apply() - native matrix solvers not implemented. Use with external library, eg, PETSc.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_use_algmg,
+        "MatrixPC::Apply() - only pc_algmg is applied natively; pc_petsc requires PETSc's KSP or SNES.");
 
+    a_b.copyTo(m_algmg_b.data());
+    if (m_algmg_max_iter == 1) {
+        m_algmg->precond(m_algmg_x, m_algmg_b);
+    } else {
+        // A fixed number of V-cycles keeps the preconditioner linear.
+        m_algmg_x.setVal(RT(0));
+        m_algmg->solve(m_algmg_x, m_algmg_b);
+    }
+    a_x.copyFrom(m_algmg_x.data());
 }
 
 #endif

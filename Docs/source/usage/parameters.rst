@@ -305,13 +305,13 @@ Overall simulation parameters
 
         - ``implicit_evolve.use_mass_matrices_pc`` (``bool``, default: false).
           When ``true``, the plasma response is captured in the preconditioner.
-          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, or ``pc_jacobi``).
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, ``pc_algmg``, or ``pc_jacobi``).
 
         - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 0).
-          If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
+          If using ``jacobian.pc_type = pc_petsc`` or ``pc_algmg``, this parameter specifies the width of the mass matrices included in the preconditioner.
           In most cases, a width of 1 is sufficient for good GMRES performance.
 
-        - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are three options:
+        - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. The options are:
 
           - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This preconditioner solves the following equation:
 
@@ -348,6 +348,18 @@ Overall simulation parameters
             - ``pc_petsc.ilu_factor_levels`` (``int``, default: 2)
             - ``pc_petsc.hypre_type`` (``string``, default: "euclid")
             - ``pc_petsc.euclid_factor_levels`` (``int``, default: 2)
+
+          - ``jacobian.pc_type = pc_algmg``: Use AMReX's algebraic multigrid solver (AlgMG) on the sparse matrix that ``pc_petsc`` uses.
+            It runs on CPUs and GPUs, does not require PETSc, and works with both ``newton.linear_solver`` values.
+
+            - ``pc_algmg.verbose`` (``bool``, default: true)
+            - ``pc_algmg.algmg_verbose`` (``int``, default: 0) Verbosity of the multigrid solver.
+            - ``pc_algmg.max_iter`` (``int``, default: 1) Number of V-cycles per application.
+            - ``pc_algmg.smoother`` (``string``, default: "chebyshev") One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only).
+            - ``pc_algmg.chebyshev_degree`` (``int``, default: 4)
+            - ``pc_algmg.strong_threshold`` (``float``, default: 0.25)
+            - ``pc_algmg.aggressive_levels`` (``int``, default: 0) Number of levels with aggressive coarsening.
+            - ``pc_algmg.max_levels`` (``int``, default: 25)
 
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 

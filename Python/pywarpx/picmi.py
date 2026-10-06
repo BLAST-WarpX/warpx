@@ -1920,6 +1920,60 @@ class PETScPreconditioner(PreconditionerBase):
         self.euclid_factor_levels = euclid_factor_levels
 
 
+class AlgMGPreconditioner(PreconditionerBase):
+    """
+    Sets up the AMReX algebraic multigrid (AlgMG) preconditioner used during the nonlinear solver
+
+    Parameters
+    ----------
+    verbose: bool, optional
+        Whether there is verbose output from the preconditioner
+
+    algmg_verbose: int, optional
+        Verbosity of the multigrid solver
+
+    max_iter: int, optional
+        Number of V-cycles per application, default 1
+
+    smoother: string, optional
+        One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only), default "chebyshev"
+
+    chebyshev_degree: int, optional
+        Degree of the Chebyshev smoother, default 4
+
+    strong_threshold: float, optional
+        Strength threshold for coarsening, default 0.25
+
+    aggressive_levels: int, optional
+        Number of levels with aggressive coarsening, default 0
+
+    max_levels: int, optional
+        Maximum number of multigrid levels, default 25
+    """
+
+    name = "pc_algmg"
+
+    def __init__(
+        self,
+        verbose=None,
+        algmg_verbose=None,
+        max_iter=None,
+        smoother=None,
+        chebyshev_degree=None,
+        strong_threshold=None,
+        aggressive_levels=None,
+        max_levels=None,
+    ):
+        self.verbose = verbose
+        self.algmg_verbose = algmg_verbose
+        self.max_iter = max_iter
+        self.smoother = smoother
+        self.chebyshev_degree = chebyshev_degree
+        self.strong_threshold = strong_threshold
+        self.aggressive_levels = aggressive_levels
+        self.max_levels = max_levels
+
+
 class NonlinearSolverBase(picmistandard.base._ClassWithInit):
     pass
 
@@ -1979,7 +2033,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
         When use_mass_matrices_pc is True, the width of the preconditioner mass matrices
 
     pc_type: preconditioner instance, optional
-        The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, or PETScPreconditioner
+        The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, PETScPreconditioner, or AlgMGPreconditioner
     """
 
     def __init__(
