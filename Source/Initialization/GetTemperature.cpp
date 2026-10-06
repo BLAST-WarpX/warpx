@@ -23,8 +23,8 @@ GetTemperature::GetTemperature (TemperatureProperties const& temp) noexcept
 // Constructor for three-component (vector) temperature
 GetTemperatureVector::GetTemperatureVector (TemperatureProperties const& temp) noexcept
     : m_type{temp.m_type}
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
     , m_from_file{temp.m_u_std_x_reader.get(), temp.m_u_std_y_reader.get(),
                   temp.m_u_std_z_reader.get()}
 #endif

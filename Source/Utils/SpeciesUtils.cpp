@@ -207,12 +207,30 @@ namespace SpeciesUtils {
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperatureVector getTempVec(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+#if defined(WARPX_DIM_RZ)
+            // In RZ, the momenta read from file are expressed in the cylindrical basis
+            // and are rotated using the azimuthal angle of the particle. Flux injection
+            // calls getMomentum before that angle is known, so it is not supported.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                style != "nfluxpercell" ||
+                (h_mom_temp->m_type != TempFromFileVector &&
+                 h_mom_vel->m_type != VelFromFileVector),
+                "maxwellian read_from_file momentum is not supported with "
+                "injection_style = NFluxPerCell in RZ geometry.");
+#endif
             const GetVelocityVector getVelVec(*h_mom_vel);
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumMaxwellian*)nullptr, getTempVec, getVelVec));
         } else if (mom_dist_s == "maxwell_juttner"){
             h_mom_temp = std::make_unique<TemperatureProperties>(pp_species, source_name, geom);
             const GetTemperature getTemp(*h_mom_temp);
             h_mom_vel = std::make_unique<VelocityProperties>(pp_species, source_name, geom);
+#if defined(WARPX_DIM_RZ)
+            // See the comment in the `maxwellian` branch above.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                style != "nfluxpercell" || h_mom_vel->m_type != VelFromFileVector,
+                "maxwell_juttner read_from_file momentum is not supported with "
+                "injection_style = NFluxPerCell in RZ geometry.");
+#endif
             const GetVelocityVector getVelVec(*h_mom_vel);
             // Construct InjectorMomentum with InjectorMomentumJuttner.
             h_inj_mom.reset(new InjectorMomentum((InjectorMomentumJuttner*)nullptr, getTemp, getVelVec));

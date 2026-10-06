@@ -89,8 +89,8 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             m_type = TempParserFunctionVector;
         }
         else if (u_std_dist_s == "read_from_file") {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && \
+    !defined(WARPX_DIM_RSPHERE)
             if (WarpX::gamma_boost > 1.0) {
                 WARPX_ABORT_WITH_MESSAGE(
                     "maxwellian_u_std_distribution_type = read_from_file is not "
@@ -102,10 +102,18 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dx =
                 geom.CellSizeArray();
             amrex::Box const dombox = amrex::convert(geom.Domain(), amrex::IntVect(1));
+            // In RZ, the record holds the cylindrical components of the vector
+#if defined(WARPX_DIM_RZ)
+            std::string const comp_x = "r";
+            std::string const comp_y = "t";
+#else
+            std::string const comp_x = "x";
+            std::string const comp_y = "y";
+#endif
             m_u_std_x_reader = std::make_unique<ExternalFieldReader>(
-                m_read_u_std_path, "u_std", "x", problo, dx, dombox, false);
+                m_read_u_std_path, "u_std", comp_x, problo, dx, dombox, false);
             m_u_std_y_reader = std::make_unique<ExternalFieldReader>(
-                m_read_u_std_path, "u_std", "y", problo, dx, dombox, false);
+                m_read_u_std_path, "u_std", comp_y, problo, dx, dombox, false);
             m_u_std_z_reader = std::make_unique<ExternalFieldReader>(
                 m_read_u_std_path, "u_std", "z", problo, dx, dombox, false);
             amrex::BoxArray const grids;
@@ -118,7 +126,7 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
             WARPX_ABORT_WITH_MESSAGE(
                 "maxwellian_u_std_distribution_type = read_from_file requires "
                 "WarpX built with openPMD support and is not supported in "
-                "RZ/RCYLINDER/RSPHERE geometries.");
+                "RCYLINDER/RSPHERE geometries.");
 #endif
         }
         else {
