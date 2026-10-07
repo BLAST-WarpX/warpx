@@ -62,8 +62,14 @@ namespace PEC {
                         bool split_pml_field = false);
 
     /**
-     * \brief Reflects charge density deposited over the PEC boundary back into
-     * the simulation domain.
+     * \brief Folds the charge density deposited in the guard cells back into the
+     * simulation domain at reflective boundaries, and sets the guard cells accordingly.
+     *
+     * A boundary is treated as reflective if its field boundary is PEC, PEC_Insulator
+     * or PMC, or if its particle boundary is Reflecting or Thermal. Reflecting and Thermal
+     * particle boundaries, as well as PMC field boundaries, are treated as symmetric
+     * (image charge of the same sign); otherwise, PEC and PEC_Insulator field boundaries
+     * are treated as anti-symmetric (image charge of the opposite sign).
      *
      * \param[in,out] rho                    Multifab containing the charge density
      * \param[in]     field_boundary_lo      Boundary types of the "low" field boundaries
@@ -85,8 +91,14 @@ namespace PEC {
                         int lev, PatchType patch_type, const amrex::Vector<amrex::IntVect>& ref_ratios);
 
     /**
-     * \brief Reflects current density deposited over the PEC boundary back into
-     * the simulation domain.
+     * \brief Folds the current density deposited in the guard cells back into the
+     * simulation domain at reflective boundaries, and sets the guard cells accordingly.
+     *
+     * A boundary is treated as reflective if its field boundary is PEC, PEC_Insulator
+     * or PMC, or if its particle boundary is Reflecting or Thermal. Reflecting and Thermal
+     * particle boundaries, as well as PMC field boundaries, are treated as symmetric
+     * (image charge of the same sign); otherwise, PEC and PEC_Insulator field boundaries
+     * are treated as anti-symmetric (image charge of the opposite sign).
      *
      * \param[in,out] Jx, Jy, Jz             Multifabs containing the current density
      * \param[in]     field_boundary_lo      Boundary types of the "low" field boundaries

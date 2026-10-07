@@ -594,17 +594,29 @@ public:
 #endif
 
     /**
-     * \brief If a PEC boundary conditions is used the charge
-     * density deposited in the guard cells have to be reflected back into
-     * the simulation domain. This function performs that logic.
+     * \brief Apply the domain boundary conditions to the deposited charge density.
+     *
+     * At each domain boundary that is either a PEC, PEC_Insulator or PMC field boundary,
+     * or a Reflecting or Thermal particle boundary, the charge density deposited in the
+     * guard cells is folded back into the simulation domain, and the guard cells are then
+     * filled consistently with the symmetry of the boundary
+     * (see PEC::ApplyReflectiveBoundarytoRhofield).
+     * In addition, for PEC_Insulator boundaries, rho is set to zero on the conductor part
+     * of the boundary.
      */
     void ApplyRhofieldBoundary (int lev, amrex::MultiFab* Rho,
                                 PatchType patch_type);
 
     /**
-     * \brief If a PEC boundary conditions is used the current
-     * density deposited in the guard cells have to be reflected back into
-     * the simulation domain. This function performs that logic.
+     * \brief Apply the domain boundary conditions to the deposited current density.
+     *
+     * At each domain boundary that is either a PEC, PEC_Insulator or PMC field boundary,
+     * or a Reflecting or Thermal particle boundary, the current density deposited in the
+     * guard cells is folded back into the simulation domain, and the guard cells are then
+     * filled consistently with the symmetry of the boundary
+     * (see PEC::ApplyReflectiveBoundarytoJfield).
+     * In addition, for PEC_Insulator boundaries, the components of J parallel to the
+     * boundary are set to zero on the conductor part of the boundary.
      */
     void ApplyJfieldBoundary (int lev, amrex::MultiFab* Jx,
                               amrex::MultiFab* Jy, amrex::MultiFab* Jz,
