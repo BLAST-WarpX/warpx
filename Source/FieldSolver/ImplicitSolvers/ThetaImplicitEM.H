@@ -82,7 +82,7 @@ public:
                      amrex::Real     start_time,
                      int             a_nl_iter,
                      bool            a_from_jacobian,
-                     const bool      update_pc = true) override;
+                     bool            update_pc = true) override;
 
     // This parameter is used for the time-step fraction in the PC for implicit
     // treatment of light waves in the curl-curl MLMG solver.

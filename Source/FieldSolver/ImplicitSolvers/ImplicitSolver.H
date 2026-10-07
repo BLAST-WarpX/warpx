@@ -99,12 +99,12 @@ public:
                              amrex::Real     a_time,
                              int             a_nl_iter,
                              bool            a_from_jacobian,
-                             const bool      update_pc = true) = 0;
+                             bool            update_pc = true) = 0;
 
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve (const bool update_pc = true);
+    void PreLinearSolve (bool update_pc = true);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
