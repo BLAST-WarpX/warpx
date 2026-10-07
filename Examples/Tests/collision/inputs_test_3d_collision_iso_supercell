@@ -1,0 +1,7 @@
+FILE = inputs_test_3d_collision_iso
+
+# Pair the particles within bins of 3x3x3 cells.
+# Since the boxes are 4 cells wide, the bins at the edges of the boxes are clipped.
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+collision1.bin_size_ratio = 3 3 3

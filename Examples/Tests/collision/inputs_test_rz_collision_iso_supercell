@@ -1,0 +1,5 @@
+FILE = inputs_base_rz_collision_iso
+
+# Pair the particles within bins of 3 cells along r (clipped at the edges of the
+# 4-cell-wide boxes) and half a cell along z.
+collision1.bin_size_ratio = 3 0.5

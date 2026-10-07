@@ -1,0 +1,6 @@
+FILE = inputs_test_1d_charge_exchange_dsmc
+
+# Pair the particles within bins of 3 cells.
+# Since the boxes are 8 cells wide, the bins at the edges of the boxes are clipped.
+amr.max_grid_size = 8
+neutral_to_ion.bin_size_ratio = 3

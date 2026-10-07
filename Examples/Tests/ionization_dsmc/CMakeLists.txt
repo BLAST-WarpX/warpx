@@ -42,6 +42,26 @@ add_warpx_test(
 )
 
 add_warpx_test(
+    test_1d_charge_exchange_dsmc_subcell  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_charge_exchange_dsmc_subcell  # inputs
+    "analysis_charge_exchange_dsmc_1d.py"  # analysis
+    "analysis_default_regression.py --path diags/diag"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_1d_charge_exchange_dsmc_supercell  # name
+    1  # dims
+    2  # nprocs
+    inputs_test_1d_charge_exchange_dsmc_supercell  # inputs
+    "analysis_charge_exchange_dsmc_1d.py 3"  # analysis
+    "analysis_default_regression.py --path diags/diag"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_1d_photoneutralization_dsmc  # name
     1  # dims
     2  # nprocs

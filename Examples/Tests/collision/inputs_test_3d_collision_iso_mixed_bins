@@ -1,0 +1,8 @@
+FILE = inputs_test_3d_collision_iso
+
+# Pair the particles within bins that are smaller than the cells along x,
+# larger than the cells along y (clipped at the edges of the 4-cell-wide boxes),
+# and equal to the cells along z.
+amr.max_grid_size = 4
+amr.blocking_factor = 4
+collision1.bin_size_ratio = 0.5 3 1

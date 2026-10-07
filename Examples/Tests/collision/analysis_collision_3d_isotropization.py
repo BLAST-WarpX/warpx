@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # This script tests the collision module
-# using isotropization relaxation in 3D.
+# using isotropization relaxation in 3D (and RZ).
 # Initially, electrons have different temperatures in different directions.
 # Relaxation occurs to bring the two temperatures to be
 # a final same temperature through collisions.
@@ -43,8 +43,10 @@ ds = yt.load(fn)
 ad = ds.all_data()
 vx = ad["electron", "particle_momentum_x"].to_ndarray() / m
 vy = ad["electron", "particle_momentum_y"].to_ndarray() / m
-Tx = np.mean(vx**2) * m / e
-Ty = np.mean(vy**2) * m / e
+# Use weighted averages, since the particle weights are not uniform in RZ geometry
+w = ad["electron", "particle_weight"].to_ndarray()
+Tx = np.average(vx**2, weights=w) * m / e
+Ty = np.average(vy**2, weights=w) * m / e
 
 nt = 100
 Tx0 = T_par

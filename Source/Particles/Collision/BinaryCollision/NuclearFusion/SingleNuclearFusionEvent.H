@@ -34,7 +34,7 @@
  * @param[in] m1,m2 masses
  * @param[in] w1,w2 effective weight of the colliding particles
  * @param[in] dt is the time step length between two collision calls.
- * @param[in] dV is the volume of the corresponding cell.
+ * @param[in] dV is the volume of the bin within which the particles are paired.
  * @param[in] pair_index is the index of the colliding pair
  * @param[out] p_mask is a mask that will be set to true if fusion occurs for that pair
  * @param[out] p_pair_reaction_weight stores the weight of the product particles
@@ -51,6 +51,8 @@
  * @param[in] create_products flags whether or not to create particles
  * @param[in] global_index the grid cell where the collision is taking place
  * @param[in] particle_production the particle production result array
+ * @param[in] dV_cell the volume of the grid cell `global_index`, used to compute the
+ * particle production density
  */
 template <typename index_type>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
@@ -70,7 +72,8 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
                                const amrex::RandomEngine& engine,
                                const bool create_products,
                                const amrex::IntVect global_index,
-                               const amrex::Array4<amrex::Real> & particle_production)
+                               const amrex::Array4<amrex::Real> & particle_production,
+                               const amrex::ParticleReal& dV_cell)
 {
     amrex::ParticleReal E_coll, v_coll, lab_to_COM_factor;
 
@@ -124,7 +127,7 @@ void SingleNuclearFusionEvent (const amrex::ParticleReal& u1x, const amrex::Part
 
     // Save the particle production density if requested
     if (particle_production.ok()) {
-        const amrex::Real new_products = probability*w_new/dV;
+        const amrex::Real new_products = probability*w_new/dV_cell;
         amrex::Gpu::Atomic::AddNoRet(&particle_production(global_index), new_products);
 
     }

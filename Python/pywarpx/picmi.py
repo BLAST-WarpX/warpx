@@ -3273,6 +3273,12 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         With ndt_supercycle, this acts as an offset: the collision runs on steps
         start_step, start_step + ndt_supercycle, start_step + 2*ndt_supercycle, ...
         Default is 0.
+
+    bin_size_ratio: float or list of floats, optional
+        Size of the bins within which particles are paired, relative to the
+        cell size (one value, or one value per direction). A value larger than 1
+        must be an integer (bins of several cells), and a value smaller than 1
+        must be the inverse of an integer (several bins per cell). Default is 1.
     """
 
     def __init__(
@@ -3283,6 +3289,7 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         ndt_supercycle=None,
         ndt_subcycle=None,
         start_step=None,
+        bin_size_ratio=None,
         **kw,
     ):
         self.name = name
@@ -3291,6 +3298,7 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
         self.start_step = start_step
+        self.bin_size_ratio = bin_size_ratio
 
         if "ndt" in kw:
             raise ValueError(
@@ -3308,6 +3316,7 @@ class CoulombCollisions(picmistandard.base._ClassWithInit):
         collision.ndt_supercycle = self.ndt_supercycle
         collision.ndt_subcycle = self.ndt_subcycle
         collision.start_step = self.start_step
+        collision.bin_size_ratio = self.bin_size_ratio
 
 
 class MCCCollisions(picmistandard.base._ClassWithInit):
@@ -3457,6 +3466,12 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         With ndt_supercycle, this acts as an offset: the collision runs on steps
         start_step, start_step + ndt_supercycle, start_step + 2*ndt_supercycle, ...
         Default is 0.
+
+    bin_size_ratio: float or list of floats, optional
+        Size of the bins within which particles are paired, relative to the
+        cell size (one value, or one value per direction). A value larger than 1
+        must be an integer (bins of several cells), and a value smaller than 1
+        must be the inverse of an integer (several bins per cell). Default is 1.
     """
 
     def __init__(
@@ -3468,6 +3483,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         ndt_supercycle=None,
         ndt_subcycle=None,
         start_step=None,
+        bin_size_ratio=None,
         **kw,
     ):
         self.name = name
@@ -3477,6 +3493,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         self.ndt_supercycle = ndt_supercycle
         self.ndt_subcycle = ndt_subcycle
         self.start_step = start_step
+        self.bin_size_ratio = bin_size_ratio
 
         if "ndt" in kw:
             raise ValueError(
@@ -3497,6 +3514,7 @@ class DSMCCollisions(picmistandard.base._ClassWithInit):
         collision.ndt_supercycle = self.ndt_supercycle
         collision.ndt_subcycle = self.ndt_subcycle
         collision.start_step = self.start_step
+        collision.bin_size_ratio = self.bin_size_ratio
 
         collision.scattering_processes = self.scattering_processes.keys()
         for process, kw in self.scattering_processes.items():
