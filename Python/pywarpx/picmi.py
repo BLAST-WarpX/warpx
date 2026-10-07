@@ -2581,8 +2581,9 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
     warpx_self_fields_bottom_solver: string, default='default'
         Bottom solver used by the MLMG labframe electrostatic solver. Options are
-        'default', 'smoother', 'bicgstab', 'cg', 'bicgcg', 'cgbicg', 'hypre' and
-        'petsc'. The last two require an AMReX built with HYPRE / PETSc support.
+        'default', 'smoother', 'bicgstab', 'cg', 'bicgcg', 'cgbicg', 'custom',
+        'algmg', 'hypre', and 'petsc'. The last two require an AMReX built with
+        HYPRE / PETSc support.
 
     warpx_self_fields_bottom_verbosity: integer, default=0
         Level of verbosity of the bottom solver of the labframe electrostatic

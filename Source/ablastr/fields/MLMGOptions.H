@@ -119,6 +119,8 @@ parseBottomSolver (std::string const & name)
     if (name == "cg")       { return amrex::BottomSolver::cg; }
     if (name == "bicgcg")   { return amrex::BottomSolver::bicgcg; }
     if (name == "cgbicg")   { return amrex::BottomSolver::cgbicg; }
+    if (name == "custom")   { return amrex::BottomSolver::custom; }
+    if (name == "algmg")    { return amrex::BottomSolver::algmg; }
     if (name == "hypre") {
 #if !defined(AMREX_USE_HYPRE)
         ABLASTR_ABORT_WITH_MESSAGE(
@@ -145,7 +147,7 @@ parseBottomSolver (std::string const & name)
     }
     ABLASTR_ABORT_WITH_MESSAGE(
         "Unknown bottom solver '" + name + "'. Valid options are: default, "
-        "smoother, bicgstab, cg, bicgcg, cgbicg, hypre, petsc");
+        "smoother, bicgstab, cg, bicgcg, cgbicg, hypre, petsc, custom, algmg");
     return amrex::BottomSolver::Default;
 }
 

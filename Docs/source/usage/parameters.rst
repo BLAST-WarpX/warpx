@@ -546,8 +546,12 @@ Overall simulation parameters
     The solver used by AMReX MLMG on the coarsest multigrid level ("bottom
     solve") of the electrostatic self-field solve. Options are ``default``
     (the linear operator's own default, usually BiCGStab), ``smoother``,
-    ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre`` and ``petsc``.
-    The last two require an AMReX built with HYPRE / PETSc support.
+    ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre``, ``petsc``,
+    ``custom`` and ``algmg``. ``hypre`` and ``petsc`` require an AMReX built
+    with HYPRE / PETSc support. ``custom`` uses the linear operator's own bottom
+    solver, if it provides one (falling back to ``default`` otherwise).
+    ``algmg`` uses AMReX's built-in algebraic multigrid solver; it only
+    supports single-component operators.
 
 .. pp:param:: warpx.self_fields_bottom_verbosity
     :type: ``integer``
