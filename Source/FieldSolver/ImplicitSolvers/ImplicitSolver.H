@@ -94,16 +94,17 @@ public:
      * e.g., Ebar - E^n = cvac^2*0.5*dt*(curl(Bbar) - mu0*Jbar(Ebar,Bbar))
      * Here, U = Ebar, b = E^n, and the expression on the right is RHS(U).
      */
-    virtual void ComputeRHS ( WarpXSolverVec&  a_RHS,
-                        const WarpXSolverVec&  a_E,
-                              amrex::Real      a_time,
-                              int              a_nl_iter,
-                              bool             a_from_jacobian ) = 0;
+    virtual void ComputeRHS (WarpXSolverVec& a_RHS,
+                       const WarpXSolverVec& a_E,
+                             amrex::Real     a_time,
+                             int             a_nl_iter,
+                             bool            a_from_jacobian,
+                             const bool      update_pc = true) = 0;
 
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve ();
+    void PreLinearSolve (const bool update_pc = true);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -327,10 +328,11 @@ protected:
     /**
      * \brief Perform operations needed before computing the Right Hand Side
      */
-    void PreRHSOp ( amrex::Real  a_cur_time,
-                    int          a_nl_iter,
-                    bool         a_from_jacobian,
-                    amrex::Real  a_dt_scale = amrex::Real(1.));
+    void PreRHSOp (amrex::Real a_cur_time,
+                   int         a_nl_iter,
+                   bool        a_from_jacobian,
+                   amrex::Real a_dt_scale = amrex::Real(1.),
+                   bool        update_pc = true);
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions
