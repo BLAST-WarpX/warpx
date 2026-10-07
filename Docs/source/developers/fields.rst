@@ -98,6 +98,13 @@ For E and B guard cell **exchanges**, the main functions are variants of ``amrex
 
 For the current density, the valid cells of neighboring ``MultiFabs`` are accumulated (added) rather than just copied. This is done using ``amrex::MultiFab::SumBoundary``, and mostly located in ``Source/Parallelization/WarpXSumGuardCells.H``.
 
+Finalization of the deposited charge and current densities
+-----------------------------------------------------------
+
+After the particles have deposited their charge and current, the same sequence of operations is applied to ``rho`` and ``J`` before they are used by the field solvers or written by the diagnostics: filtering (if used), summation of the guard cells across boxes, MPI ranks and mesh-refinement levels, and application of the boundary conditions (the charge and current deposited in the guard cells beyond PEC, PMC and reflecting boundaries are folded back into the domain).
+This sequence is defined in a single place, the functions ``WarpX::FinalizeDepositedCharge`` and ``WarpX::FinalizeDepositedCurrent`` (``Source/Evolve/WarpXFinalizeDeposition.cpp``), and every code path that deposits charge or current (main PIC loop, electrostatic and magnetostatic solvers, hybrid-PIC, diagnostics, Python interface) is expected to use them.
+In cylindrical and spherical geometry, the inverse volume scaling of the deposited quantities (which also folds the deposition at negative radius onto the cells above the axis) is applied by the deposition routines themselves, right after the deposition and before this sequence.
+
 Interpolations for MR
 ---------------------
 

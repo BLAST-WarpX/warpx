@@ -699,6 +699,9 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
         ablastr::utils::communication::SumBoundary(
             *rho, 0, rho->nComp(), rho->nGrowVect(), rho->nGrowVect(),
             WarpX::do_single_precision_comms, gm.periodicity());
+        // Fold the charge deposited in the guard cells beyond PEC, PMC
+        // and reflecting boundaries back into the domain, if needed.
+        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho.get(), PatchType::fine);
     }
 
     return rho;

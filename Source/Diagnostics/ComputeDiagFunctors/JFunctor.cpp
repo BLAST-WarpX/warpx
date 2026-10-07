@@ -48,11 +48,12 @@ JFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/
         auto& mypc = warpx.GetPartContainer();
         mypc.DepositCurrent(current_fp_temp, warpx.getdt(m_lev), 0.0);
 
-        // sum values in guard cells - note that this does not filter the
-        // current density.
-        for (int idim = 0; idim < 3; ++idim) {
-            current_fp_temp[0][idim]->FillBoundary(warpx.Geom(m_lev).periodicity());
-        }
+        // Apply the filtering if requested, sum the values deposited in the
+        // guard cells into the valid cells of the neighboring boxes, and
+        // apply the boundary conditions (as done for the current density
+        // used by the electromagnetic solvers, and for the charge density
+        // diagnostic).
+        warpx.FinalizeDepositedCurrent(current_fp_temp[0], m_lev);
     }
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_mf_src != nullptr, "m_mf_src can't be a nullptr.");

@@ -353,8 +353,8 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // deposition before boundary summation.
     FinishMassMatricesDeposition();
 
-    // Sync current (filter and sum boundaries)
-    m_WarpX->SyncCurrent("current_fp");
+    // Finalize current (filter, sum boundaries and apply boundary conditions)
+    m_WarpX->FinalizeDepositedCurrent("current_fp");
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();

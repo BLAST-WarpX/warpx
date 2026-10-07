@@ -39,7 +39,7 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
 
     // Deposit charge density
     // Call this with local=true since the parallel transfers will be handled
-    // by ApplyFilterandSumBoundaryRho
+    // by FinalizeDepositedCharge
 
     // Dump total rho
     if (m_species_index == -1) {
@@ -56,9 +56,9 @@ RhoFunctor::operator() ( amrex::MultiFab& mf_dst, const int dcomp, const int /*i
         rho = mypc.GetChargeDensity(m_lev, true);
     }
 
-    // Handle the parallel transfers of guard cells and
-    // apply the filtering if requested.
-    warpx.ApplyFilterandSumBoundaryRho(m_lev, m_lev, *rho, 0, rho->nComp());
+    // Apply the filtering if requested, handle the parallel transfers
+    // of guard cells and apply the boundary conditions.
+    warpx.FinalizeDepositedCharge(*rho, m_lev);
 
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
     // Apply k-space filtering when using the PSATD solver

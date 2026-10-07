@@ -328,20 +328,13 @@ void WarpX::HybridPICDepositRhoAndJ ()
 #endif
             // The per-species fields themselves are consumed directly
             // (Vs = Js/rhos, species fractions, per-species resistivity,
-            // resistive drag) and need their own guard-cell sum here;
-            // dst_ng = nGrowVect() also leaves the ghosts neighbor-
-            // consistent for the drag's particle gathers.
+            // resistive drag) and are finalized here like the totals are in
+            // SyncCurrentAndRho: filter (if used), guard-cell sum (which
+            // also leaves the ghosts neighbor-consistent for the drag's
+            // particle gathers) and boundary conditions.
             for (int lev = 0; lev <= finest_level; ++lev) {
-                ablastr::utils::communication::SumBoundary(
-                    *rho_spec[lev], 0, rho_spec[lev]->nComp(),
-                    rho_spec[lev]->nGrowVect(), rho_spec[lev]->nGrowVect(),
-                    WarpX::do_single_precision_comms, Geom(lev).periodicity());
-                for (int idim = 0; idim < 3; ++idim) {
-                    ablastr::utils::communication::SumBoundary(
-                        *J_spec[lev][idim], 0, J_spec[lev][idim]->nComp(),
-                        J_spec[lev][idim]->nGrowVect(), J_spec[lev][idim]->nGrowVect(),
-                        WarpX::do_single_precision_comms, Geom(lev).periodicity());
-                }
+                FinalizeDepositedCharge(*rho_spec[lev], lev);
+                FinalizeDepositedCurrent(J_spec[lev], lev);
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after
