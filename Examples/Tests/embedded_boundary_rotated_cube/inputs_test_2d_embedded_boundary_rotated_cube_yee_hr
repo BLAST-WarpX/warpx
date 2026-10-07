@@ -1,0 +1,6 @@
+# base input parameters
+FILE = inputs_test_2d_embedded_boundary_rotated_cube
+
+# test input parameters
+algo.maxwell_solver = yee
+amr.n_cell = 64 64
