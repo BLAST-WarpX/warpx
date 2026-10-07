@@ -269,17 +269,14 @@ Overall simulation parameters
           - ``newton.linear_solver`` (``string``, default: "gmres") Other excepted value, "petsc_ksp".
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
-          - ``newton.pc_update_newton_interval`` (``int``, default: 0)
+          - ``newton.pc_update_newton_interval`` (``int``, default: 1)
             Controls preconditioner updates within a native Newton solve. Zero updates
             only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
           - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
             Must be positive. Updates are allowed only when the zero-based simulation
             step index is divisible by this interval. Both interval conditions must
             hold. The first required linear solve always initializes the PC, including
-            after restart. These options control WarpX sparse PC assembly and PETSc KSP
-            refactorization, PC mass-matrix preparation, and suborbit PC deposition.
-            Jacobian mass-matrix updates remain independent. These options do not
-            control PETSc SNES.
+            after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
           - ``newton.diagnostic_file`` (``string``, default: None)
