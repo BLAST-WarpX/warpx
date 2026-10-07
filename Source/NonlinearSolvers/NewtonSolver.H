@@ -82,19 +82,21 @@ public:
 
     void PrintParams () const override
     {
-        amrex::Print()     << "Newton verbose:             " << (this->m_verbose?"true":"false") << "\n";
-        amrex::Print()     << "Newton max iterations:      " << m_maxits << "\n";
-        amrex::Print()     << "Newton relative tolerance:  " << m_rtol << "\n";
-        amrex::Print()     << "Newton absolute tolerance:  " << m_atol << "\n";
-        amrex::Print()     << "Newton require convergence: " << (m_require_convergence?"true":"false") << "\n";
+        amrex::Print() << "Newton verbose:             " << (this->m_verbose?"true":"false") << "\n";
+        amrex::Print() << "Newton max iterations:      " << m_maxits << "\n";
+        amrex::Print() << "Newton relative tolerance:  " << m_rtol << "\n";
+        amrex::Print() << "Newton absolute tolerance:  " << m_atol << "\n";
+        amrex::Print() << "Newton require convergence: " << (m_require_convergence?"true":"false") << "\n";
+        amrex::Print() << "Newton PC update Newton interval:    " << m_pc_update_newton_interval << "\n";
+        amrex::Print() << "Newton PC update time-step interval: " << m_pc_update_time_step_interval << "\n";
         auto linsol_name = amrex::getEnumNameString(m_linear_solver_type);
-        amrex::Print()     << "Newton linear solver:       " << linsol_name << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") verbose:            " << m_linsol_verbose_int << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
-        amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
+        amrex::Print() << "Newton linear solver:       " << linsol_name << "\n";
+        amrex::Print() << "Linear solver (" << linsol_name << ") verbose:            " << m_linsol_verbose_int << "\n";
+        amrex::Print() << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
+        amrex::Print() << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
+        amrex::Print() << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
+        amrex::Print() << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
+        amrex::Print() << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
 
         m_linear_function->printParams();
     }
@@ -130,6 +132,13 @@ private:
      * \brief Maximum iterations for the Newton solver.
      */
     int m_maxits = 100;
+
+    //! Zero updates only at iteration zero; positive values give a Newton interval.
+    int m_pc_update_newton_interval = 0;
+    //! Update on time steps whose zero-based index is divisible by this interval.
+    int m_pc_update_time_step_interval = 1;
+    //! Ensure the first required linear solve initializes the PC, including after restart.
+    mutable bool m_pc_initialized = false;
 
     /**
      * \brief Total nonlinear iterations for the diagnostic file
@@ -194,11 +203,12 @@ private:
     /**
      * \brief Compute the nonlinear residual: F(U) = U - b - R(U).
      */
-    void EvalResidual ( Vec&         a_F,
-                  const Vec&         a_U,
-                  const Vec&         a_b,
-                        amrex::Real  a_time,
-                        int          a_iter ) const;
+    void EvalResidual (Vec&        a_F,
+                 const Vec&        a_U,
+                 const Vec&        a_b,
+                       amrex::Real a_time,
+                       int         a_iter,
+                       bool        update_pc) const;
 
 };
 
@@ -286,6 +296,14 @@ void NewtonSolver<Vec,Ops>::ParseParameters ()
     pp_newton.query("absolute_tolerance",  m_atol);
     pp_newton.query("relative_tolerance",  m_rtol);
     pp_newton.query("max_iterations",      m_maxits);
+    pp_newton.query("pc_update_newton_interval", m_pc_update_newton_interval);
+    pp_newton.query("pc_update_time_step_interval", m_pc_update_time_step_interval);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_update_newton_interval >= 0,
+        "newton.pc_update_newton_interval must be nonnegative");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_update_time_step_interval > 0,
+        "newton.pc_update_time_step_interval must be positive");
     pp_newton.query("require_convergence", m_require_convergence);
     pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
     pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
@@ -339,8 +357,14 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     int linear_solver_iters = 0;
     for (iter = 0; iter <= m_maxits; iter++) {
 
+        // Determine if the pc will be updated on this interation
+        const bool pc_update_step = (a_step % m_pc_update_time_step_interval == 0);
+        const bool pc_update_iteration = (iter == 0) ||
+            (m_pc_update_newton_interval > 0 && iter % m_pc_update_newton_interval == 0);
+        const bool update_pc = !m_pc_initialized || (pc_update_step && pc_update_iteration);
+
         // Compute residual: F(U) = U - b - R(U)
-        EvalResidual(m_F, a_U, a_b, a_time, iter);
+        EvalResidual(m_F, a_U, a_b, a_time, iter, update_pc);
 
         // Compute norm of the residual
         norm_abs = m_F.norm2();
@@ -395,10 +419,15 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         }
 
         // Prepare for the linear solve
-        m_ops->PreLinearSolve();
         m_linear_function->setBaseSolution(a_U);
         m_linear_function->setBaseRHS(m_R);
-        m_linear_function->updatePreCondMat();
+        m_ops->PreLinearSolve(update_pc);
+        if (update_pc) {
+            m_linear_function->updatePreCondMat();
+            // Keep WarpX sparse assembly and cached PETSc factors on the same schedule.
+            m_linear_solver->invalidatePreconditioner();
+            m_pc_initialized = true;
+        }
 
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();
@@ -457,14 +486,15 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 }
 
 template <class Vec, class Ops>
-void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
-                                     const Vec&         a_U,
-                                     const Vec&         a_b,
-                                           amrex::Real  a_time,
-                                           int          a_iter ) const
+void NewtonSolver<Vec,Ops>::EvalResidual (Vec&        a_F,
+                                    const Vec&        a_U,
+                                    const Vec&        a_b,
+                                          amrex::Real a_time,
+                                          int         a_iter,
+                                          bool        update_pc) const
 {
     BL_PROFILE("NewtonSolver::EvalResidual()");
-    m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
+    m_ops->ComputeRHS(m_R, a_U, a_time, a_iter, false, update_pc);
 
     // Compute residual: F(U) = U - b - R(U)
     a_F.Copy(a_U);

@@ -35,9 +35,7 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
     // On a fresh start, both copies contain E^0, giving initial guess E^0.
     m_E.linComb(1.0_rt - m_theta, m_Eold, m_theta, m_E);
 
-    // Parse implicit solver parameters
-    const amrex::ParmParse pp("implicit_evolve");
-    parseNonlinearSolverParams(pp);
+    parseBaseImplicitSolverParams();
 
     // Define the nonlinear solver
     m_nlsolver->Define(m_E, this);
@@ -116,11 +114,12 @@ int SemiImplicitEM::OneStep (amrex::Real  start_time,
     return exit_status;
 }
 
-void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
-                            const WarpXSolverVec&  a_E,
-                                  amrex::Real      start_time,
-                                  int              a_nl_iter,
-                                  bool             a_from_jacobian )
+void SemiImplicitEM::ComputeRHS (WarpXSolverVec& a_RHS,
+                           const WarpXSolverVec& a_E,
+                                 amrex::Real     start_time,
+                                 int             a_nl_iter,
+                                 bool            a_from_jacobian,
+                                 const bool      update_pc)
 {
     BL_PROFILE("SemiImplicitEM::ComputeRHS()");
 
@@ -130,9 +129,18 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     m_WarpX->SetElectricFieldAndApplyBCs( a_E, half_time );
 
     // Update particle positions and velocities using the current state
-    // of E and B. Deposit current density at time n+1/2
-    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
+    // of Eg and Bg. Deposit current density at time n+1/2
+    PreRHSOp(half_time, a_nl_iter, a_from_jacobian, update_pc);
 
     // RHS = cvac^2*0.5*dt*(curl(B^{n+1/2}) - mu0*J^{n+1/2})
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);
+
+    // Apply blanking to electric field RHS vector
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        for (int dir = 0; dir < 3; ++dir) {
+            if (m_blank_electric_field[dir]) {
+                a_RHS.getArrayVec()[lev][dir]->setVal(0._rt);
+            }
+        }
+    }
 }

@@ -535,8 +535,16 @@ void KSP_impl::solve(VecType& a_Y, const VecType& a_R)
     copyVec(this->m_b->obj, a_R);
 
     if (m_linop->pcType() == PreconditionerType::pc_petsc) {
-        auto err = assemblePCMatrix(m_linop);
-        AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
+        if (m_pc_needs_update) {
+            auto err = assemblePCMatrix(m_linop);
+            AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
+            m_pc_needs_update = false;
+            // Tell PETSc NOT to reuse preconditioner - forces new factorization
+            KSPSetReusePreconditioner(m_ksp->obj, PETSC_FALSE);
+        } else {
+            // Tell PETSc to reuse the existing preconditioner factorization
+            KSPSetReusePreconditioner(m_ksp->obj, PETSC_TRUE);
+        }
     }
 
     KSPSolve(m_ksp->obj, this->m_b->obj, this->m_x->obj);

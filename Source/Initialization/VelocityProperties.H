@@ -19,7 +19,9 @@
 #include <string>
 
 /* Type of velocity initialization. Used by VelocityProperties and GetVelocityVector. */
-enum VelocityInitType {VelConstantVector, VelParserFunctionVector, VelFromFileVector};
+enum VelocityInitType {
+    VelConstantVector, VelParserFunctionVector, VelParserFunctionVectorTime, VelFromFileVector
+};
 
 /**
  * \brief Struct to store velocity properties, for use in momentum initialization.

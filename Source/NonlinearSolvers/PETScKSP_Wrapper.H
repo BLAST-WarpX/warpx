@@ -87,6 +87,9 @@ public:
         m_solver->solve(a_sol, a_rhs);
     }
 
+    //! Rebuild the PETSc matrix and preconditioner on the next linear solve.
+    void invalidatePreconditioner () override { m_solver->invalidatePreconditioner(); }
+
     //! Sets verbosity.
     void setVerbose (int v) override { m_solver->setVerbose(v); }
 

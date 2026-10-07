@@ -56,6 +56,10 @@ public:
                         RT a_tol_abs,
                         int a_its=-1) = 0;
 
+    //! Mark the preconditioner for rebuilding before the next linear solve.
+    //! Solvers without a cached preconditioner need no notification.
+    virtual void invalidatePreconditioner () {}
+
     //! Sets verbosity.
     virtual void setVerbose (int v) = 0;
 

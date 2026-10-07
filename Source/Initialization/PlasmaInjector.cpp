@@ -329,7 +329,28 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
 
 void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
 {
-    utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
+    // Check if user specified time-dependent num_particles_per_cell(x,y,z,t)
+    auto contains = [&] (std::string const& key) {
+        return pp_species.contains(key.c_str()) ||
+            (!source_name.empty() && pp_species.contains((source_name + "." + key).c_str()));
+    };
+    m_num_ppc_time_dependent = contains("num_particles_per_cell(x,y,z,t)");
+
+    if (m_num_ppc_time_dependent) {
+        // Parse time-dependent expression
+        std::string expression;
+        utils::parser::Store_parserString(pp_species, source_name,
+                                         "num_particles_per_cell(x,y,z,t)", expression);
+        amrex::Vector<std::string> const variables{"x", "y", "z", "t"};
+        m_ptr_num_ppc_parser = std::make_unique<amrex::Parser>(
+            utils::parser::makeParser(expression, variables));
+        m_num_ppc_time_parser = m_ptr_num_ppc_parser->compile<4>();
+        // Set a dummy constant value for compatibility (not used when time-dependent)
+        num_particles_per_cell_real = 1.0;
+    } else {
+        // Parse constant or spatial-only num_particles_per_cell
+        utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
+    }
 #ifdef WARPX_DIM_RZ
     if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell_real < 2*WarpX::n_rz_azimuthal_modes)) {
         ablastr::warn_manager::WMRecordWarning("Species",

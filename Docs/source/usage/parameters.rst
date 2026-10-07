@@ -269,6 +269,17 @@ Overall simulation parameters
           - ``newton.linear_solver`` (``string``, default: "gmres") Other excepted value, "petsc_ksp".
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
+          - ``newton.pc_update_newton_interval`` (``int``, default: 0)
+            Controls preconditioner updates within a native Newton solve. Zero updates
+            only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
+          - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
+            Must be positive. Updates are allowed only when the zero-based simulation
+            step index is divisible by this interval. Both interval conditions must
+            hold. The first required linear solve always initializes the PC, including
+            after restart. These options control WarpX sparse PC assembly and PETSc KSP
+            refactorization, PC mass-matrix preparation, and suborbit PC deposition.
+            Jacobian mass-matrix updates remain independent. These options do not
+            control PETSc SNES.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
           - ``newton.diagnostic_file`` (``string``, default: None)
@@ -1609,7 +1620,36 @@ Particle initialization
 
       * ``<species_name>.flux_direction`` (only used when injecting from a plane, ``-1`` or ``+1``, direction of flux relative to the plane)
 
-      * ``<species_name>.num_particles_per_cell`` (``double``)
+      * ``<species_name>.num_particles_per_cell`` (``double``): Expected number of
+        macroparticles injected per emitting cell per timestep. A constant value or
+        constant mathematical expression can be supplied.
+
+        Alternatively, specify ``<species_name>.num_particles_per_cell(x,y,z,t)``
+        to vary the expected count with position and time. The function is evaluated
+        at the cell center, rather than at each sampled particle position or the
+        exact emitting surface. Coordinates are in meters and ``t`` is the simulation
+        time in seconds, evaluated at the same timestep time as
+        ``flux_function(x,y,z,t)``.
+
+        Values must be finite and nonnegative; zero skips injection in that cell.
+        Fractional counts are handled by probabilistic rounding. Embedded-boundary
+        surface-area and refined-injection scaling are applied before rounding.
+        Counts exceeding the supported integer range are rejected.
+
+        Particle weights are normalized using the unrounded count, so changing the
+        expected macroparticle count does not change the prescribed physical flux.
+        For a planar Cartesian source, weight is proportional to flux times the
+        timestep and emitting cell area, divided by the expected count. With fixed
+        timestep and mesh, scaling a time-dependent count proportionally to the
+        flux keeps particle weights constant for a spatially uniform beam.
+        For example::
+
+            hydrogen.flux_function(x,y,z,t) = "flux0*(1+t/taub)"
+            hydrogen.num_particles_per_cell(x,y,z,t) = "ppc0*(1+t/taub)"
+
+        Here ``flux0``, ``ppc0``, and ``taub`` are user-defined constants.
+        For spatially varying functions, note that flux is evaluated at sampled
+        particle positions, whereas the count is evaluated at the cell center.
 
       * ``<species_name>.flux_tmin`` (``double``, Optional time at which the flux will be turned on. Ignored when negative.)
 
@@ -1916,6 +1956,15 @@ Particle initialization
       file. It requires additional arguments ``<species_name>.momentum_function_ux(x,y,z)``,
       ``<species_name>.momentum_function_uy(x,y,z)`` and ``<species_name>.momentum_function_uz(x,y,z)``,
       which give the distribution of each component of the momentum as a function of space.
+
+      For ``injection_style = NFluxPerCell``, time-dependent momentum is also supported:
+      supply ``momentum_function_ux(x,y,z,t)``, ``momentum_function_uy(x,y,z,t)``,
+      and ``momentum_function_uz(x,y,z,t)`` instead. All three components must use
+      the same signature. Here ``t`` is the simulation time in seconds, evaluated
+      at the same timestep time as ``flux_function(x,y,z,t)``, rather than at each
+      particle's randomized substep injection time. The functions return normalized
+      momentum (gamma times velocity divided by c), not velocity. Existing spatial
+      functions are unchanged.
 
 .. pp:param:: <species_name>.zinject_plane
     :type: ``float``

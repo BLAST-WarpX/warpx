@@ -1235,7 +1235,10 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
     const Geometry& geom = Geom(0);
     const amrex::RealBox& part_realbox = geom.ProbDomain();
 
-    const amrex::Real num_ppc_real = plasma_injector.num_particles_per_cell_real;
+    const bool num_ppc_time_dep = plasma_injector.m_num_ppc_time_dependent;
+    const amrex::Real num_ppc_const = plasma_injector.num_particles_per_cell_real;
+    amrex::ParserExecutor<4> const num_ppc_time_parser =
+        num_ppc_time_dep ? plasma_injector.m_num_ppc_time_parser : amrex::ParserExecutor<4>{};
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     const amrex::Real rmax = std::min(plasma_injector.xmax, geom.ProbDomain().hi(0));
     const amrex::Real rmin = std::max(plasma_injector.xmin, geom.ProbDomain().lo(0));
@@ -1338,6 +1341,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
         amrex::Gpu::DeviceVector<int> counts(overlap_box.numPts(), 0);
         amrex::Gpu::DeviceVector<int> offset(overlap_box.numPts());
         auto *pcounts = counts.data();
+        // Store the unrounded base count for consistent particle-weight normalization.
+        amrex::Gpu::DeviceVector<amrex::Real> base_counts(overlap_box.numPts(), 0.0_rt);
+        auto *pbase_counts = base_counts.data();
         const int flux_normal_axis = plasma_injector.flux_normal_axis;
         amrex::Box fine_overlap_box; // default Box is NOT ok().
         if (refine_injection) {
@@ -1355,8 +1361,26 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             amrex::ignore_unused(j,k);
 
             // Determine the number of macroparticles to inject in this cell (num_ppc_int)
+            // Evaluate num_particles_per_cell (constant or time-dependent)
+            amrex::Real num_ppc_real_in_this_cell;
+            if (num_ppc_time_dep) {
+                // Evaluate at cell center for time-dependent case
+                auto const cell_center = getCellCoords(overlap_corner, dx, {0.5_rt, 0.5_rt, 0.5_rt}, iv);
+                num_ppc_real_in_this_cell = num_ppc_time_parser(cell_center.x, cell_center.y, cell_center.z, t);
+            } else {
+                num_ppc_real_in_this_cell = num_ppc_const;
+            }
+            // The comparisons also reject NaN and infinity before any integer conversion.
+            if (!(num_ppc_real_in_this_cell >= 0.0_rt &&
+                  static_cast<double>(num_ppc_real_in_this_cell) <=
+                      static_cast<double>(std::numeric_limits<int>::max()))) {
+                amrex::Abort("NFluxPerCell: num_particles_per_cell must be finite, "
+                             "nonnegative, and no larger than INT_MAX.");
+                return;
+            }
+            if (num_ppc_real_in_this_cell == 0.0_rt) { return; }
+            pbase_counts[overlap_box.index(iv)] = num_ppc_real_in_this_cell;
 #ifdef AMREX_USE_EB
-            amrex::Real num_ppc_real_in_this_cell = num_ppc_real; // user input: number of macroparticles per cell
             if (inject_from_eb) {
                 // Injection from EB
                 // Skip cells that are not partially covered by the EB
@@ -1364,8 +1388,6 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 // Scale by the (normalized) area of the EB surface in this cell
                 num_ppc_real_in_this_cell *= eb_data.get<amrex::EBData_t::bndryarea>(i,j,k);
             }
-#else
-            amrex::Real const num_ppc_real_in_this_cell = num_ppc_real; // user input: number of macroparticles per cell
 #endif
             // Skip cells that do not overlap with the bounds specified by the user (xmin/xmax, ymin/ymax, zmin/zmax)
             auto lo = getCellCoords(overlap_corner, dx, {0._rt, 0._rt, 0._rt}, iv);
@@ -1378,8 +1400,21 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             if (fine_overlap_box.ok() && fine_overlap_box.contains(iv)) {
                 r = compute_area_weights(rrfac, flux_normal_axis);
             }
-            const int num_ppc_int = static_cast<int>(num_ppc_real_in_this_cell*r + amrex::Random(engine));
-            pcounts[index] = num_ppc_int;
+            // Check the area/refinement-scaled count as well. Use double precision
+            // so rounding a large float cannot exceed the integer range unnoticed.
+            double const expected_count = static_cast<double>(num_ppc_real_in_this_cell)*r;
+            if (!(expected_count >= 0.0 &&
+                  expected_count <= static_cast<double>(std::numeric_limits<int>::max()))) {
+                amrex::Abort("NFluxPerCell: area/refinement-scaled particle count "
+                             "must be finite, nonnegative, and no larger than INT_MAX.");
+                return;
+            }
+            double const rounded_count = std::floor(expected_count + amrex::Random(engine));
+            if (rounded_count > static_cast<double>(std::numeric_limits<int>::max())) {
+                amrex::Abort("NFluxPerCell: rounded particle count exceeds INT_MAX.");
+                return;
+            }
+            pcounts[index] = static_cast<int>(rounded_count);
 
             amrex::ignore_unused(j,k);
         });
@@ -1453,6 +1488,9 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
             amrex::ignore_unused(j,k);
             const amrex::IntVect iv = amrex::IntVect(AMREX_D_DECL(i, j, k));
             const auto index = overlap_box.index(iv);
+            // Includes zero-count cells and cells excluded by the injection geometry.
+            if (pcounts[index] == 0) { return; }
+            amrex::Real const num_ppc_real = pbase_counts[index];
 
             amrex::Real scale_fac;
 #ifdef AMREX_USE_EB
@@ -1510,7 +1548,8 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
 
                 // inj_mom would typically be InjectorMomentumGaussianFlux
                 XDim3 gamma_beta;
-                gamma_beta = inj_mom->getMomentum(pos.x, pos.y, pos.z, engine);
+                // Match the time used below to evaluate the injected number flux.
+                gamma_beta = inj_mom->getMomentum(pos.x, pos.y, pos.z, engine, t);
 
                 auto pu = XDim3(gamma_beta);
                 pu.x *= PhysConst::c;
