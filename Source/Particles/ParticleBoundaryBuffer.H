@@ -45,6 +45,11 @@ public:
         MultiParticleContainer& mypc, ablastr::fields::MultiLevelScalarField const& distance_to_eb,
         amrex::Real cur_time
     );
+    void gatherParticlesFromDistanceFields (
+        MultiParticleContainer& mypc,
+        std::vector<ablastr::fields::MultiLevelScalarField const*> const& distance_fields,
+        amrex::Real cur_time
+    );
 
     void redistribute ();
     void clearParticles ();

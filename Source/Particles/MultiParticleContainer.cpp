@@ -30,6 +30,7 @@
 #include "Particles/ParticleCreation/SmartUtils.H"
 #include "Particles/PhotonParticleContainer.H"
 #include "Particles/PhysicalParticleContainer.H"
+#include "Particles/ParticleSinkContainer.H"
 #include "Particles/RigidInjectedParticleContainer.H"
 #include "Particles/WarpXParticleContainer.H"
 #include "SpeciesPhysicalProperties.H"
@@ -1245,8 +1246,17 @@ void MultiParticleContainer::CheckIonizationProductSpecies()
     }
 }
 
+
 void MultiParticleContainer::ScrapeParticlesAtEB (
     ablastr::fields::MultiLevelScalarField const& distance_to_eb)
+{
+    amrex::Vector<ablastr::fields::MultiLevelScalarField const*> const distance_to_eb_list = { &distance_to_eb };
+    ScrapeParticlesAtEB(distance_to_eb_list);
+}
+
+// TODO: this is no longer called? Can use original implementation.
+void MultiParticleContainer::ScrapeParticlesAtEB (
+    amrex::Vector<ablastr::fields::MultiLevelScalarField const*> const& distance_to_eb_list)
 {
     if (WarpX::eb_particle_boundary == ParticleBoundaryType::Reflecting ||
         WarpX::eb_particle_boundary == ParticleBoundaryType::Thermal) {
@@ -1256,15 +1266,26 @@ void MultiParticleContainer::ScrapeParticlesAtEB (
             amrex::ParticleReal const uth = pc->getBoundaryThermalVelocity();
             for (int lev = 0; lev <= pc->finestLevel(); ++lev) {
                 amrex::Real const dt_lev = warpx.getdt(lev);
-                scrapeParticlesAtEB(*pc, distance_to_eb, lev,
+                scrapeParticlesAtEB(*pc, distance_to_eb_list, lev, lev,
                     ParticleBoundaryProcess::ParticleBoundaryInteraction{
                         dt_lev, mass, WarpX::eb_particle_boundary, uth});
             }
         }
+    } else if(WarpX::eb_particle_boundary == ParticleBoundaryType::None) {
+        // No particle scraping required for ParticleBoundaryType::None.
     } else {
         for (auto& pc : allcontainers) {
-            scrapeParticlesAtEB(*pc, distance_to_eb, ParticleBoundaryProcess::Absorb());
+            scrapeParticlesAtEB(*pc, distance_to_eb_list, 0, pc->finestLevel(),
+                ParticleBoundaryProcess::Absorb());
         }
+    }
+}
+
+void MultiParticleContainer::ScrapeParticlesAtEB (
+    ParticleSinkContainer const& particle_sinks)
+{
+    for (auto& pc : allcontainers) {
+        scrapeParticlesAtEB(*pc, particle_sinks, 0, pc->finestLevel());
     }
 }
 

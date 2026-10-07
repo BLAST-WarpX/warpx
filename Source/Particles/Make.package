@@ -8,6 +8,7 @@ CEXE_sources += ParticleBoundaryBuffer.cpp
 CEXE_sources += ParticleBoundaries.cpp
 CEXE_sources += SpeciesPhysicalProperties.cpp
 CEXE_sources += ExternalParticleFields.cpp
+CEXE_sources += ParticleSinkContainer.cpp
 
 include $(WARPX_HOME)/Source/Particles/Algorithms/Make.package
 include $(WARPX_HOME)/Source/Particles/Pusher/Make.package

@@ -15,4 +15,10 @@ namespace EB
     bool enabled ();
 
 } // namespace EB
+
+namespace ParticleSink
+{
+    bool enabled ();
+} // namespace ParticleSink
+
 #endif // WARPX_EB_ENABLED_H_

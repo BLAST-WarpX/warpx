@@ -12,6 +12,7 @@ foreach(D IN LISTS WarpX_DIMS)
         ParticleBoundaryBuffer.cpp
         SpeciesPhysicalProperties.cpp
         ExternalParticleFields.cpp
+        ParticleSinkContainer.cpp
     )
 endforeach()
 
