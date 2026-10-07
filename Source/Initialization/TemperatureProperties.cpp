@@ -12,8 +12,6 @@
 #include "Utils/TextMsg.H"
 #include "WarpX.H"
 
-#include <AMReX_BoxArray.H>
-#include <AMReX_DistributionMapping.H>
 #include <AMReX_IntVect.H>
 
 #include <sstream>
@@ -24,9 +22,9 @@
  *  for `maxwellian` distribution, and `theta` for `maxwell_juttner`.
  */
 TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::string const& source_name,
-                                              amrex::Geometry const& geom)
+                                              amrex::Geometry const& geom, bool allow_distributed)
 {
-    amrex::ignore_unused(geom);
+    amrex::ignore_unused(geom, allow_distributed);
 
     std::string mom_dist_s;
     utils::parser::query(pp, source_name, "momentum_distribution_type", mom_dist_s);
@@ -97,22 +95,24 @@ TemperatureProperties::TemperatureProperties (const amrex::ParmParse& pp, std::s
                     "supported in boosted-frame simulations yet.");
             }
             utils::parser::get(pp, source_name, "read_u_std_from_path", m_read_u_std_path);
+            bool distributed = allow_distributed;
+            pp.query("read_u_std_distributed", distributed);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(allow_distributed || !distributed,
+                "read_u_std_distributed = 1 is only supported for the injection styles "
+                "that inject particles cell by cell (NRandomPerCell and NUniformPerCell), "
+                "and without moving window. In the other cases, the openPMD data must be "
+                "read in full on every MPI process: set read_u_std_distributed = 0.");
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const problo =
                 geom.ProbLoArray();
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const dx =
                 geom.CellSizeArray();
             amrex::Box const dombox = amrex::convert(geom.Domain(), amrex::IntVect(1));
             m_u_std_x_reader = std::make_unique<ExternalFieldReader>(
-                m_read_u_std_path, "u_std", "x", problo, dx, dombox, false);
+                m_read_u_std_path, "u_std", "x", problo, dx, dombox, distributed);
             m_u_std_y_reader = std::make_unique<ExternalFieldReader>(
-                m_read_u_std_path, "u_std", "y", problo, dx, dombox, false);
+                m_read_u_std_path, "u_std", "y", problo, dx, dombox, distributed);
             m_u_std_z_reader = std::make_unique<ExternalFieldReader>(
-                m_read_u_std_path, "u_std", "z", problo, dx, dombox, false);
-            amrex::BoxArray const grids;
-            amrex::DistributionMapping const dmap;
-            m_u_std_x_reader->prepare(grids, dmap, amrex::IntVect(0));
-            m_u_std_y_reader->prepare(grids, dmap, amrex::IntVect(0));
-            m_u_std_z_reader->prepare(grids, dmap, amrex::IntVect(0));
+                m_read_u_std_path, "u_std", "z", problo, dx, dombox, distributed);
             m_type = TempFromFileVector;
 #else
             WARPX_ABORT_WITH_MESSAGE(

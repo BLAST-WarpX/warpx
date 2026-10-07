@@ -600,4 +600,20 @@ ExternalFieldVectorView::ExternalFieldVectorView (
         m_z_view = z_reader->getView();
     }
 }
+
+ExternalFieldVectorView::ExternalFieldVectorView (
+    ExternalFieldReader const* x_reader,
+    ExternalFieldReader const* y_reader,
+    ExternalFieldReader const* z_reader, int li)
+{
+    if (x_reader) {
+        m_x_view = x_reader->getView(li);
+    }
+    if (y_reader) {
+        m_y_view = y_reader->getView(li);
+    }
+    if (z_reader) {
+        m_z_view = z_reader->getView(li);
+    }
+}
 #endif

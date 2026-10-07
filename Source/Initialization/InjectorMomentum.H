@@ -17,16 +17,22 @@
 #include "Utils/WarpXConst.H"
 
 #include <AMReX.H>
+#include <AMReX_BoxArray.H>
 #include <AMReX_Config.H>
+#include <AMReX_DataAllocator.H>
 #include <AMReX_Dim3.H>
+#include <AMReX_DistributionMapping.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Parser.H>
 #include <AMReX_Random.H>
+#include <AMReX_Vector.H>
 
 #include <AMReX_BaseFwd.H>
 
 #include <cmath>
+#include <functional>
+#include <memory>
 #include <string>
 
 // struct whose getMomentum returns constant momentum.
@@ -238,6 +244,48 @@ struct InjectorMomentumMaxwellian
         return amrex::XDim3 {u_mean.x, u_mean.y, u_mean.z};
     }
 
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab)
+    {
+        // `get_zlab` evaluates getBulkMomentum on the host, i.e. the bulk drift
+        // that is being prepared here. It can therefore not be used for the bulk
+        // drift itself; and it cannot be used for the thermal spread either when
+        // the bulk drift is read distributedly, since the host then only holds
+        // one chunk of it.
+        std::function<amrex::Real(amrex::Real)> const no_zlab;
+        velocity.prepare(grids, dmap, ngrow, no_zlab);
+        temperature.prepare(grids, dmap, ngrow,
+                            velocity.distributed() ? no_zlab : get_zlab);
+    }
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab)
+    {
+        // See the comment about `get_zlab` in the function above.
+        std::function<amrex::Real(amrex::Real)> const no_zlab;
+        velocity.prepare(pbox, moving_dir, moving_sign, no_zlab);
+        temperature.prepare(pbox, moving_dir, moving_sign,
+                            velocity.distributed() ? no_zlab : get_zlab);
+    }
+
+    void prepare (int li)
+    {
+        velocity.prepare(li);
+        temperature.prepare(li);
+    }
+
+    [[nodiscard]] bool needPreparation () const
+    {
+        return velocity.needPreparation() || temperature.needPreparation();
+    }
+
+    [[nodiscard]] bool distributed () const
+    {
+        return velocity.distributed() || temperature.distributed();
+    }
+
 private:
     GetVelocityVector velocity;
     GetTemperatureVector temperature;
@@ -372,6 +420,33 @@ struct InjectorMomentumJuttner
         return velocity(x,y,z);
     }
 
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& /*get_zlab*/)
+    {
+        // `get_zlab` calls getBulkMomentum, i.e. the bulk drift that is being
+        // prepared here, so it must not be used for the bulk drift itself.
+        velocity.prepare(grids, dmap, ngrow, std::function<amrex::Real(amrex::Real)>{});
+    }
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& /*get_zlab*/)
+    {
+        // See the comment about `get_zlab` in the function above.
+        velocity.prepare(pbox, moving_dir, moving_sign,
+                         std::function<amrex::Real(amrex::Real)>{});
+    }
+
+    void prepare (int li)
+    {
+        velocity.prepare(li);
+    }
+
+    [[nodiscard]] bool needPreparation () const { return velocity.needPreparation(); }
+
+    [[nodiscard]] bool distributed () const { return velocity.distributed(); }
+
 private:
     GetVelocityVector velocity;
     GetTemperature temperature;
@@ -399,6 +474,33 @@ struct InjectorMomentumParser
     {
         return m_velocity(x,y,z);
     }
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& /*get_zlab*/)
+    {
+        // `get_zlab` calls getBulkMomentum, i.e. the momentum that is being
+        // prepared here, so it must not be used for the momentum itself.
+        m_velocity.prepare(grids, dmap, ngrow, std::function<amrex::Real(amrex::Real)>{});
+    }
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& /*get_zlab*/)
+    {
+        // See the comment about `get_zlab` in the function above.
+        m_velocity.prepare(pbox, moving_dir, moving_sign,
+                           std::function<amrex::Real(amrex::Real)>{});
+    }
+
+    void prepare (int li)
+    {
+        m_velocity.prepare(li);
+    }
+
+    [[nodiscard]] bool needPreparation () const { return m_velocity.needPreparation(); }
+
+    [[nodiscard]] bool distributed () const { return m_velocity.distributed(); }
 
     GetVelocityVector m_velocity;
 };
@@ -478,6 +580,20 @@ struct InjectorMomentum
     ~InjectorMomentum() = default;
 
     void clear ();
+
+    void prepare (amrex::BoxArray const& grids,
+                  amrex::DistributionMapping const& dmap,
+                  amrex::IntVect const& ngrow,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (amrex::RealBox const& pbox, int moving_dir, int moving_sign,
+                  std::function<amrex::Real(amrex::Real)> const& get_zlab);
+
+    void prepare (int li, InjectorMomentum** inj_mom);
+
+    [[nodiscard]] bool needPreparation () const;
+
+    [[nodiscard]] bool distributed () const;
 
     // call getMomentum from the object stored in the union
     // (the union is called Object, and the instance is called object).
@@ -575,6 +691,10 @@ struct InjectorMomentum
 
 private:
 
+    // Prepare the object stored in the union for reading the data of the Box
+    // whose local index is `li`.
+    void prepareObject (int li);
+
     // An instance of union Object constructs and stores any one of
     // the objects declared (constant or gaussian or parser).
     union Object {
@@ -615,6 +735,10 @@ private:
         InjectorMomentumParser parser;
     };
     Object object;
+#if defined(AMREX_USE_OMP) && !defined(AMREX_USE_GPU)
+    std::unique_ptr<void,amrex::DataDeleter> inj_mom_data;
+    amrex::Vector<InjectorMomentum*> inj_mom_omp;
+#endif
 };
 
 // In order for InjectorMomentum to be trivially copyable, its destructor

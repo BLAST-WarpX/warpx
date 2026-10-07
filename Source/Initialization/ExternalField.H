@@ -274,12 +274,23 @@ private:
  */
 struct ExternalFieldVectorView
 {
+    ExternalFieldVectorView () = default;
+
     /**
      * \brief Construct the view from the readers of the three components.
      */
     ExternalFieldVectorView (ExternalFieldReader const* x_reader,
                              ExternalFieldReader const* y_reader,
                              ExternalFieldReader const* z_reader) noexcept;
+
+    /**
+     * \brief Construct the view from the readers of the three components, for
+     * the Box whose local index is `li`. This is used when the openPMD data
+     * are distributed among MPI processes.
+     */
+    ExternalFieldVectorView (ExternalFieldReader const* x_reader,
+                             ExternalFieldReader const* y_reader,
+                             ExternalFieldReader const* z_reader, int li);
 
     //! Return the three components of the field, linearly interpolated at the
     //! given position.
