@@ -78,6 +78,7 @@ CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S $HOME/src/lapackpp -B 
 cmake --build $HOME/src/lapackpp-frontier-gpu-build --target install --parallel 16
 rm -rf $HOME/src/lapackpp-frontier-gpu-build
 
+
 # Python ######################################################################
 #
 python3 -m pip install --upgrade pip
@@ -94,11 +95,11 @@ python3 -m pip install --upgrade "cython>=3.0"
 # cupy for ROCm
 #   https://docs.cupy.dev/en/stable/install.html#building-cupy-for-rocm-from-source
 #   https://github.com/cupy/cupy/issues/7830
-CC=cc CXX=CC \
+# CC=cc CXX=CC  # not working, now via hipcc
 CUPY_INSTALL_USE_HIP=1  \
 ROCM_HOME=${ROCM_PATH}  \
 HCC_AMDGPU_TARGET=${AMREX_AMD_ARCH}  \
-  python3 -m pip install -v git+https://github.com/cupy/cupy.git@e669b994f976565bf2da4b1f82de51e10b58fbe1
+  python3 -m pip install -v git+https://github.com/cupy/cupy.git@v14.1.1
 python3 -m pip install --upgrade numpy
 python3 -m pip install --upgrade h5py
 python3 -m pip install --upgrade pandas
