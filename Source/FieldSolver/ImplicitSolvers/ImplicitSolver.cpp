@@ -1005,8 +1005,10 @@ void ImplicitSolver::PreLinearSolve (const bool update_pc)
 
     if (m_use_mass_matrices) {
 
-        m_WarpX->DepositMassMatrices(m_dt);
-        FinishMassMatricesDeposition();
+        if (m_use_mass_matrices_jacobian || update_pc) {
+            m_WarpX->DepositMassMatrices(m_dt);
+            FinishMassMatricesDeposition();
+        }
 
         if (m_use_mass_matrices_jacobian) {
             SaveE();
