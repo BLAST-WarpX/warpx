@@ -16,6 +16,8 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -53,7 +55,9 @@ void FiniteDifferenceSolver::EvolveECTRho (
     const int lev) {
 
 #if !defined(WARPX_DIM_RZ) and !defined(WARPX_DIM_RCYLINDER) and !defined(WARPX_DIM_RSPHERE) and defined(AMREX_USE_EB)
-    if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
+    if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT ||
+        (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+         WarpX::UseConformalEBSolve())) {
 
         EvolveRhoCartesianECT(Efield, edge_lengths, face_areas, ECTRhofield, lev);
 
@@ -154,6 +158,21 @@ void FiniteDifferenceSolver::EvolveRhoCartesianECT (
 #ifdef WARPX_DIM_XZ
         amrex::ignore_unused(Ey, Rhox, Rhoz, ly);
 #endif
+    }
+
+    // With cut cells at fab seams the enlarged-cell gather in the B push
+    // reads neighbor face EMFs across boxes: refresh one ghost layer so
+    // those reads see the owner-computed circulations
+    auto& warpx = WarpX::GetInstance();
+    if (warpx.ECTNeedsSeamSync()) {
+        const auto& period = warpx.Geom(lev).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+            // ECTRho components are face-centered (B staggering), so no
+            // nodal-seam reconciliation is needed: leave nodal_sync default.
+            ablastr::utils::communication::FillBoundary(
+                *ECTRhofield[idim], amrex::IntVect(1),
+                WarpX::do_single_precision_comms, period);
+        }
     }
 #else
     amrex::ignore_unused(Efield, edge_lengths, face_areas, ECTRhofield, lev);

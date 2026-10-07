@@ -22,6 +22,8 @@
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/utils/Communication.H>
+
 #include <AMReX.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -105,6 +107,14 @@ void FiniteDifferenceSolver::EvolveB (
 
         EvolveBCartesian <CartesianNodalAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
 
+    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT ||
+               (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC &&
+                WarpX::UseConformalEBSolve())) {
+        // The conformal-wall check precedes the Yee-family branch: the hybrid
+        // solver matches both, and with use_conformal_eb its B push is the
+        // enlarged-cell (ECT) update.
+        EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
+                            borrowing, lev, dt);
     } else if ((m_fdtd_algo == ElectromagneticSolverAlgo::Yee) ||
                (m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC)) {
 
@@ -113,9 +123,6 @@ void FiniteDifferenceSolver::EvolveB (
     } else if (m_fdtd_algo == ElectromagneticSolverAlgo::CKC) {
 
         EvolveBCartesian <CartesianCKCAlgorithm> ( Bfield, Efield, Gfield, lev, dt );
-    } else if (m_fdtd_algo == ElectromagneticSolverAlgo::ECT) {
-        EvolveBCartesianECT(Bfield, face_areas, area_mod, ECTRhofield, Venl, flag_info_cell,
-                            borrowing, lev, dt);
 #endif
     } else {
         WARPX_ABORT_WITH_MESSAGE("EvolveB: Unknown algorithm");
@@ -243,10 +250,22 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
     amrex::LayoutData<amrex::Real> *cost = WarpX::getCosts(lev);
 
+    auto& warpx = WarpX::GetInstance();
+    // With cut cells at fab seams (multi-box or periodic layouts), the
+    // electromotive forces contributed to Venl must scatter/gather across
+    // boxes prior to the B-field update.
+    const bool seam_sync = warpx.ECTNeedsSeamSync();
+    // The ECT solver is single-level: ComputeFaceExtensions fills the
+    // borrowing structure and the owner masks at maxLevel() only.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(lev == warpx.maxLevel(),
+        "EvolveBCartesianECT: the ECT solver does not support mesh refinement");
+
     Venl[0]->setVal(0.);
     Venl[1]->setVal(0.);
     Venl[2]->setVal(0.);
 
+    // Phase 1: assemble the enlarged-face accumulator and scatter the
+    // borrowed contributions (owner-gated when syncing across seams).
     // Loop through the grids, and over the tiles within each grid
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
@@ -260,13 +279,17 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
         for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
             // Extract field data for this grid/tile
-            Array4<Real> const &B = Bfield[idim]->array(mfi);
             Array4<Real> const &Rho = ECTRhofield[idim]->array(mfi);
             Array4<Real> const &Venl_dim = Venl[idim]->array(mfi);
 
             amrex::Array4<int> const &flag_info_cell_dim = flag_info_cell[idim]->array(mfi);
             amrex::Array4<Real> const &S = face_areas[idim]->array(mfi);
             amrex::Array4<Real> const &S_mod = area_mod[idim]->array(mfi);
+
+            amrex::Array4<int const> owner;
+            if (seam_sync) {
+                owner = warpx.GetECTFaceOwnerMask()[lev][idim]->const_array(mfi);
+            }
 
             auto & borrowing_dim = (*borrowing[idim])[mfi];
             auto * borrowing_dim_neigh_faces = borrowing_dim.neigh_faces.data();
@@ -287,6 +310,10 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
                 if (S(i, j, k) <= 0) { return; }
 
                 if (!(flag_info_cell_dim(i, j, k) == FaceInfo::extended)) { return; }
+
+                // Owner-unique assembly: faces on shared nodal planes are
+                // assembled once so the Venl sum across copies is exact
+                if (owner && owner(i, j, k) == 0) { return; }
 
                 Venl_dim(i, j, k) = Rho(i, j, k) * S(i, j, k);
                 amrex::Real rho_enl;
@@ -357,16 +384,60 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
                 }
 
-                B(i, j, k) = B(i, j, k) - dt * rho_enl;
-
             });
+
+        }
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers)
+        {
+            amrex::Gpu::synchronize();
+            wt = static_cast<amrex::Real>(amrex::second()) - wt;
+            amrex::HostDevice::Atomic::Add( &(*cost)[mfi.index()], wt);
+        }
+    }
+
+    // Phase 1.5: reduce the scattered borrowed contributions across fab
+    // seams (ghost entries and shared nodal-plane copies) to the owners,
+    // then make all copies bit-equal.
+    if (seam_sync) {
+        const auto& period = warpx.Geom(lev).periodicity();
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            ablastr::utils::communication::SumBoundary(
+                *Venl[idim], 0, 1, amrex::IntVect(1), amrex::IntVect(0),
+                WarpX::do_single_precision_comms, period);
+            Venl[idim]->OverrideSync(period);
+        }
+    }
+
+    // Phase 2: apply the B updates.
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    for (MFIter mfi(*Bfield[0]); mfi.isValid(); ++mfi) {
+
+        if (cost && WarpX::load_balance_costs_update_algo == LoadBalanceCostsUpdateAlgo::Timers) {
+            amrex::Gpu::synchronize();
+        }
+        auto wt = static_cast<amrex::Real>(amrex::second());
+
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            amrex::Array4<Real> const &B = Bfield[idim]->array(mfi);
+            amrex::Array4<Real> const &Rho = ECTRhofield[idim]->array(mfi);
+            amrex::Array4<Real> const &Venl_dim = Venl[idim]->array(mfi);
+            amrex::Array4<int> const &flag_info_cell_dim = flag_info_cell[idim]->array(mfi);
+            amrex::Array4<Real> const &S = face_areas[idim]->array(mfi);
+            amrex::Array4<Real> const &S_mod = area_mod[idim]->array(mfi);
+
+            Box const &tb = mfi.tilebox(Bfield[idim]->ixType().toIntVect());
 
             //Take care of the stable cells
             amrex::ParallelFor(tb, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
                 if (S(i, j, k) <= 0) { return; }
 
                 if (flag_info_cell_dim(i, j, k) == FaceInfo::extended) {
-                    return;
+                    // Unstable cell. The parentheses keep the historical rounding
+                    // (dt * rho_enl with rho_enl = Venl/S_mod), which makes the
+                    // single-box path bit-identical to the pre-two-phase code.
+                    B(i, j, k) = B(i, j, k) - dt * (Venl_dim(i, j, k) / S_mod(i, j, k));
                 } else if (flag_info_cell_dim(i, j, k) == FaceInfo::available
                            || flag_info_cell_dim(i, j, k) == FaceInfo::bck_stabilized) {
                     //Stable cell which hasn't been intruded

@@ -13,12 +13,20 @@
 
 #include <ablastr/warn_manager/WarnManager.H>
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/utils/Communication.H>
 
 #include <AMReX_Functional.H>
 #include <AMReX_GpuAtomic.H>
+#include <AMReX_Math.H>
 #include <AMReX_Scan.H>
 #include <AMReX_iMultiFab.H>
 #include <AMReX_MultiFab.H>
+
+#include <algorithm>
+#include <iomanip>
+#include <limits>
+#include <sstream>
+#include <string>
 
 using namespace ablastr::fields;
 
@@ -69,7 +77,143 @@ namespace
         return sums;
     }
 
+    /**
+    * \brief Check that face extensions conserved area and did not overdraft
+    * any lending face to S_mod <= 0.  The global sum of original areas S must
+    * equal sum of modified areas S_mod to within a round-off error tolerance.
+    * This routine must be called (i) before BCK correction, which overwrites
+    * `face_areas`, and (ii) after any cross-box reduction of `area_mod` by
+    * `sync_lent_areas` in `ComputeFaceExtensions`.
+    *
+    * @param[in] tag Annotation for verbose/error print statements
+    * @param[in] all_fields The field manager
+    * @param[in] owner_mask Per-direction face owner masks
+    * @param[in] max_level The maximum refinement level
+    * @param[in] verbose Integer level of verbosity for print statements
+    */
+    void CheckAreaLedger (
+        [[maybe_unused]] const std::string& tag,
+        [[maybe_unused]] const ablastr::fields::MultiFabRegister& all_fields,
+        [[maybe_unused]] const amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > >& owner_mask,
+        [[maybe_unused]] const int max_level,
+        [[maybe_unused]] const int verbose)
+    {
+#ifndef WARPX_DIM_RZ
+        using warpx::fields::FieldType;
+
+#ifdef WARPX_DIM_XZ
+        // In 2D we only need the case idim=1
+        for (int idim = 1; idim < AMREX_SPACEDIM; ++idim) {
+#elif defined(WARPX_DIM_3D)
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+#else
+            WARPX_ABORT_WITH_MESSAGE(
+                "CheckAreaLedger: Only implemented in 2D3V and 3D3V");
 #endif
+            const auto* const S_mf     = all_fields.get(FieldType::face_areas, Direction{idim}, max_level);
+            const auto* const S_mod_mf = all_fields.get(FieldType::area_mod,   Direction{idim}, max_level);
+            auto* const owner_mf = owner_mask[max_level][idim].get();
+
+            amrex::Real net;        // sum(S - S_mod)
+            amrex::Real S_max_sum;  // sum(max(S,S_mod)) to estimate roundoff error
+            amrex::Real S_mod_min;  // min(S_mod) verify no overdraft
+            {
+                amrex::ReduceOps< amrex::ReduceOpSum,
+                                  amrex::ReduceOpSum,
+                                  amrex::ReduceOpMin > reduce_ops;
+                amrex::ReduceData< amrex::Real,
+                                   amrex::Real,
+                                   amrex::Real > reduce_data(reduce_ops);
+                constexpr auto huge = std::numeric_limits<amrex::Real>::max();
+
+                for (amrex::MFIter mfi(*S_mf); mfi.isValid(); ++mfi) {
+                    amrex::Box const &box   = mfi.validbox();
+                    auto       const &S     = S_mf    ->const_array(mfi);
+                    auto       const &S_mod = S_mod_mf->const_array(mfi);
+                    auto       const &owner = owner_mf->const_array(mfi);
+
+                    reduce_ops.eval(box, reduce_data,
+                        [=] AMREX_GPU_DEVICE(int i, int j, int k)
+                        -> amrex::GpuTuple<amrex::Real, amrex::Real, amrex::Real> {
+
+                            const amrex::Real d = S(i,j,k) - S_mod(i,j,k);
+                            if (owner(i,j,k) == 0 || d == amrex::Real(0.)) {
+                                // skip non-owned faces on shared nodal planes
+                                // skip faces that neither lend nor borrow (expect S == S_mod, d == 0 exactly)
+                                return { amrex::Real(0.),
+                                         amrex::Real(0.),
+                                         huge };
+                            } else {
+                                return { d,
+                                         std::max(S(i,j,k),S_mod(i,j,k)),
+                                         S_mod(i,j,k) };
+                            }
+
+                        });
+                }
+
+                auto r = reduce_data.value();
+                net       = amrex::get<0>(r);
+                S_max_sum = amrex::get<1>(r);
+                S_mod_min = amrex::get<2>(r);
+                amrex::ParallelDescriptor::ReduceRealSum(net);
+                amrex::ParallelDescriptor::ReduceRealSum(S_max_sum);
+                amrex::ParallelDescriptor::ReduceRealMin(S_mod_min);
+            }
+
+            // Round-off error may arise from the parallel reduction or from
+            // the S -> S_mod debiting.  Worst-case estimates for each case:
+            //    error ~ releps * \sum |S - S_mod|
+            //    error ~ releps * \sum max(S_mod, S)
+            // Use the latter.  Prefactor 100x is a bit arbitrary; in practice
+            // large-N sums should have residual << tolerance.
+            constexpr auto rtol = amrex::Real(1.e2) * std::numeric_limits<amrex::Real>::epsilon();
+
+            // Perform assert checks + printout only if faces are lent.
+            // Otherwise, printing imbalance=0, residual=0, min(S_mod)=huge
+            // looks weird/confusing.
+            if (S_max_sum > amrex::Real(0.)) {
+
+                std::ostringstream msg;
+                msg << "Embedded Boundary: ECT CheckAreaLedger"
+                    << " " << tag << " (idim=" << idim << ")"
+                    << std::scientific << std::setprecision(6)
+                    << " imbalance sum(S-S_mod) = " << net
+                    << " tolerance = "              << rtol*S_max_sum;
+
+                const bool balance = amrex::Math::abs(net) <= rtol*S_max_sum;
+                if (balance) {
+                    msg << " OK.";
+                } else {
+                    msg << " exceeded, borrowed and lent area do not balance, exiting!";
+                }
+
+                msg << " Modified faces min(S_mod) = " << S_mod_min;
+
+                const bool no_overdraft = S_mod_min > amrex::Real(0.);
+                if (no_overdraft) {
+                    msg << " > 0 OK.";
+                } else {
+                    msg << " but expected > 0 for all faces, exiting!";
+                }
+
+                if (!balance || !no_overdraft ) {
+                    msg << " Try resolving embedded boundary with more cells, varying AMReX grid layout, and/or filing bug report.";
+                }
+
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(balance && no_overdraft,
+                                                 msg.str());
+
+                if (verbose >= 1) {
+                    amrex::Print() << Utils::TextMsg::Info(msg.str());
+                }
+            }
+
+        } // for(int idim)
+#endif // ifndef WARPX_DIM_RZ
+    } // void CheckAreaLedger(...)
+
+#endif // AMREX_USE_EB
 
 
     /**
@@ -552,6 +696,7 @@ WarpX::ComputeFaceExtensions ()
         throw std::runtime_error("ComputeFaceExtensions only works when EBs are enabled at runtime");
     }
 #ifdef AMREX_USE_EB
+    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     amrex::Array1D<int, 0, 2> N_ext_faces = ::CountExtFaces(m_flag_ext_face, maxLevel());
@@ -564,7 +709,95 @@ WarpX::ComputeFaceExtensions ()
 
     const auto Bfield = m_fields.get_alldirs(FieldType::Bfield_fp, maxLevel());
     ::init_borrowing(m_borrowing[maxLevel()], Bfield);
-    ComputeOneWayExtensions();
+
+    // Cross-box bookkeeping: each fab decides borrowing only for the faces it
+    // owns, but lending faces may be ghosts or non-owned copies of shared
+    // nodal planes. The lent_area must be accumulated and then reduced to
+    // owners after the 1- and 8-way passes.  Single-box non-periodic layouts
+    // skip reductions.
+    //
+    // The layout is read off the field, not off AmrMesh::boxArray(): during
+    // init from scratch, AmrMesh::MakeNewGrids calls MakeNewLevelFromScratch
+    // (-> InitLevelData -> InitializeEBGridData -> here) BEFORE SetBoxArray
+    // publishes grids[lev], so boxArray(maxLevel()) is still empty at this
+    // point and would silently skip the sync. The field's own BoxArray is
+    // always the live one.
+    m_ect_needs_seam_sync = (Bfield[0]->boxArray().size() > 1
+                             ||  Geom(maxLevel()).isAnyPeriodic());
+
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 > lent_area;
+    for (int idim = 0; idim < 3; ++idim) {
+        auto const& Bmf = *m_fields.get(FieldType::Bfield_fp, Direction{idim}, maxLevel());
+        lent_area[idim] = std::make_unique<amrex::MultiFab>(
+            Bmf.boxArray(), Bmf.DistributionMap(), 1, amrex::IntVect(1));
+        lent_area[idim]->setVal(0.0);
+    }
+
+    // Reduce the lent-area records to the owners: apply only the remote part
+    // (total minus this fab's own records, which were already subtracted
+    // directly), mark the lenders that a remote fab borrowed from, then make
+    // all copies of area_mod and of the flag fields owner-consistent and
+    // ghost-fresh for the next pass.
+    //
+    // A face is marked intruded exactly when the remote part is non-zero.
+    // Both passes record a lent area only once the borrow is known to have
+    // succeeded, so a face that a rolled-back extension had briefly taken
+    // area from contributes exactly zero here, and is neither charged nor
+    // marked. Marking between the passes is safe because FaceInfo::available
+    // and FaceInfo::intruded are both lendable, so it changes no availability
+    // decision in the pass that follows.
+    auto const sync_lent_areas = [&] () {
+        if (!m_ect_needs_seam_sync) { return; }
+        const auto& period = Geom(maxLevel()).periodicity();
+        for (int idim = 0; idim < 3; ++idim) {
+            auto& lent = *lent_area[idim];
+            amrex::MultiFab lent_local(lent.boxArray(), lent.DistributionMap(), 1,
+                                       amrex::IntVect(0));
+            amrex::MultiFab::Copy(lent_local, lent, 0, 0, 1, 0);
+            lent.SumBoundary(0, 1, lent.nGrowVect(), amrex::IntVect(0), period);
+            auto* S_mod_mf = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel());
+            auto* info_mf = m_flag_info_face[maxLevel()][idim].get();
+            for (amrex::MFIter mfi(lent); mfi.isValid(); ++mfi) {
+                const amrex::Box bx = mfi.validbox();
+                auto const& tot = lent.const_array(mfi);
+                auto const& loc = lent_local.const_array(mfi);
+                auto const& S_mod = S_mod_mf->array(mfi);
+                auto const& info = info_mf->array(mfi);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE (int i, int j, int k){
+                    const amrex::Real rem = tot(i, j, k) - loc(i, j, k);
+                    // only-touch-if-changed keeps untouched faces bit-identical
+                    if (rem != amrex::Real(0.)) {
+                        S_mod(i, j, k) -= rem;
+                        // The borrower set the intruded flag in its own copy
+                        // of this face, which is a ghost entry or a non-owned
+                        // copy of a shared nodal plane; record it here on the
+                        // owner
+                        if (info(i, j, k) == FaceInfo::available) {
+                            info(i, j, k) = FaceInfo::intruded;
+                        }
+                    }
+                });
+            }
+            S_mod_mf->OverrideSync(period);
+            S_mod_mf->FillBoundary(period);
+            // These are integer flag fields (iMultiFab); the shared-seam
+            // reconciliation between owners is done by OverrideSync above, so
+            // the ablastr comms Fill interface only needs to propagate ghosts.
+            // The iMultiFab overload has no nodal_sync option (no
+            // FillBoundaryAndSync for integers), hence the period-only call.
+            info_mf->OverrideSync(period);
+            ablastr::utils::communication::FillBoundary(*info_mf, period);
+            m_flag_ext_face[maxLevel()][idim]->OverrideSync(period);
+            ablastr::utils::communication::FillBoundary(
+                *m_flag_ext_face[maxLevel()][idim], period);
+            lent.setVal(0.0);
+        }
+    };
+
+    ComputeOneWayExtensions(lent_area);
+    sync_lent_areas();
+
+    ::CheckAreaLedger("after 1-way pass", m_fields, m_ect_face_owner_mask, maxLevel(), verbose);
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_one_way = ::CountExtFaces(m_flag_ext_face, maxLevel());
     ablastr::warn_manager::WMRecordWarning("Embedded Boundary",
@@ -577,7 +810,11 @@ WarpX::ComputeFaceExtensions ()
             ablastr::warn_manager::WarnPriority::low
     );
 
-    ComputeEightWaysExtensions();
+    ComputeEightWaysExtensions(lent_area);
+    sync_lent_areas();
+
+    ::CheckAreaLedger("after 8-way pass", m_fields, m_ect_face_owner_mask, maxLevel(), verbose);
+
     ::shrink_borrowing(m_borrowing[maxLevel()], Bfield);
 
     amrex::Array1D<int, 0, 2> N_ext_faces_after_eight_ways = ::CountExtFaces(m_flag_ext_face, maxLevel());
@@ -633,8 +870,10 @@ WarpX::ComputeFaceExtensions ()
 }
 
 void
-WarpX::ComputeOneWayExtensions ()
+WarpX::ComputeOneWayExtensions (
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& lent_area)
 {
+    amrex::ignore_unused(lent_area);
     if (!EB::enabled()) {
         throw std::runtime_error("ComputeOneWayExtensions only works when EBs are enabled at runtime");
     }
@@ -677,6 +916,9 @@ WarpX::ComputeOneWayExtensions ()
 
             auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
 
+            auto const &owner = m_ect_face_owner_mask[maxLevel()][idim]->const_array(mfi);
+            auto const &lent = lent_area[idim]->array(mfi);
+
             const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
             const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
             const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
@@ -687,6 +929,11 @@ WarpX::ComputeOneWayExtensions ()
                 const int i = cell.x;
                 const int j = cell.y;
                 const int k = cell.z;
+                // Only the owner copy of a face decides its borrowing (faces
+                // on shared nodal planes exist in two fabs)
+                if (owner(i, j, k) == 0) {
+                    return 0;
+                }
                 // If the face doesn't need to be extended break the loop
                 if (!flag_ext_face(i, j, k)) {
                     return 0;
@@ -764,6 +1011,11 @@ WarpX::ComputeOneWayExtensions ()
                                     ::SetNeigh(flag_info_face,
                                                static_cast<int>(FaceInfo::intruded),
                                                i, j, k, i_n, j_n, idim);
+                                    // Record the lent area for the cross-box reduction
+                                    // (the lender may live in a ghost entry or a non-owned
+                                    // copy of a shared nodal plane)
+                                    amrex::Gpu::Atomic::AddNoRet(
+                                        ::GetNeighPtr(lent, i, j, k, i_n, j_n, idim), S_ext);
                                     // Add the area to the intruding face.
                                     S_mod(i, j, k) = S(i, j, k) + S_ext;
                                     flag_ext_face(i, j, k) = false;
@@ -793,8 +1045,10 @@ WarpX::ComputeOneWayExtensions ()
 
 
 void
-WarpX::ComputeEightWaysExtensions ()
+WarpX::ComputeEightWaysExtensions (
+    std::array< std::unique_ptr<amrex::MultiFab>, 3 >& lent_area)
 {
+    amrex::ignore_unused(lent_area);
     if (!EB::enabled()) {
         throw std::runtime_error("ComputeEightWaysExtensions only works when EBs are enabled at runtime");
     }
@@ -838,6 +1092,9 @@ WarpX::ComputeEightWaysExtensions ()
 
             auto const &S_mod = m_fields.get(FieldType::area_mod, Direction{idim}, maxLevel())->array(mfi);
 
+            auto const &owner = m_ect_face_owner_mask[maxLevel()][idim]->const_array(mfi);
+            auto const &lent = lent_area[idim]->array(mfi);
+
             const auto &lx = m_fields.get(FieldType::edge_lengths, Direction{0}, maxLevel())->array(mfi);
             const auto &ly = m_fields.get(FieldType::edge_lengths, Direction{1}, maxLevel())->array(mfi);
             const auto &lz = m_fields.get(FieldType::edge_lengths, Direction{2}, maxLevel())->array(mfi);
@@ -848,6 +1105,10 @@ WarpX::ComputeEightWaysExtensions ()
                 const int i = cell.x;
                 const int j = cell.y;
                 const int k = cell.z;
+                // Only the owner copy of a face decides its borrowing
+                if (owner(i, j, k) == 0) {
+                    return 0;
+                }
                 // If the face doesn't need to be extended break the loop
                 if (!flag_ext_face(i, j, k)) {
                     return 0;
@@ -987,6 +1248,24 @@ WarpX::ComputeEightWaysExtensions ()
                             }
                             count = 0;
                             S_mod(i, j, k) = S(i, j, k);
+                        } else {
+                            // Record the lent areas for the cross-box reduction, now that
+                            // the extension is known to have fully succeeded. Restoring
+                            // S_mod above is enough within this fab, but a lender owned by
+                            // another fab only ever learns of the borrow through this
+                            // ledger: its owner is charged the reduced remote total in
+                            // sync_lent_areas, and the local restore lands in a ghost entry
+                            // that OverrideSync then discards. Recording here rather than
+                            // adding and subtracting per patch also keeps the ledger of a
+                            // rolled-back face exactly zero, so it is neither charged nor
+                            // marked intruded on its owner.
+                            for (int n = 0; n < count; n++) {
+                                auto const vec =
+                                    FaceInfoBox::uint8_to_inds(borrowing_neigh_faces[ps + n]);
+                                amrex::Gpu::Atomic::AddNoRet(
+                                    ::GetNeighPtr(lent, i, j, k, vec(0), vec(1), idim),
+                                    borrowing_area[ps + n]);
+                            }
                         }
                         // The recorded size has to match the entries actually written, since
                         // the solver reads `borrowing_size` entries starting at
