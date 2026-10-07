@@ -112,6 +112,7 @@ class CMakeBuild(build_ext):
             "-DWarpX_COMPUTE=" + WARPX_COMPUTE,
             "-DWarpX_MPI:BOOL=" + WARPX_MPI,
             "-DWarpX_EB:BOOL=" + WARPX_EB,
+            "-DWarpX_HYPRE:BOOL=" + WARPX_HYPRE,
             "-DWarpX_PETSC:BOOL=" + WARPX_PETSC,
             "-DWarpX_OPENPMD:BOOL=" + WARPX_OPENPMD,
             "-DWarpX_PRECISION=" + WARPX_PRECISION,
@@ -223,6 +224,7 @@ env = os.environ.copy()
 WARPX_COMPUTE = env.pop("WARPX_COMPUTE", "OMP")
 WARPX_MPI = env.pop("WARPX_MPI", "OFF")
 WARPX_EB = env.pop("WARPX_EB", "ON")
+WARPX_HYPRE = env.pop("WARPX_HYPRE", "OFF")
 WARPX_PETSC = env.pop("WARPX_PETSC", "OFF")
 WARPX_OPENPMD = env.pop("WARPX_OPENPMD", "ON")
 WARPX_PRECISION = env.pop("WARPX_PRECISION", "DOUBLE")
@@ -273,6 +275,12 @@ if WARPX_EB.upper() in ["1", "ON", "TRUE", "YES"]:
     WARPX_EB = "ON"
 else:
     WARPX_EB = "OFF"
+
+# HYPRE solvers via AMReX
+if WARPX_HYPRE.upper() in ["1", "ON", "TRUE", "YES"]:
+    WARPX_HYPRE = "ON"
+else:
+    WARPX_HYPRE = "OFF"
 
 # PETSc linear/nonlinear solvers via AMReX
 if WARPX_PETSC.upper() in ["1", "ON", "TRUE", "YES"]:
