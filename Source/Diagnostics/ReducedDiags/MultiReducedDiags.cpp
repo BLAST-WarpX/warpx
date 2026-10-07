@@ -7,6 +7,7 @@
 #include "MultiReducedDiags.H"
 
 #include "BeamRelevant.H"
+#include "ChargeFluxEB.H"
 #include "ChargeOnEB.H"
 #include "ColliderRelevant.H"
 #include "DifferentialLuminosity.H"
@@ -56,6 +57,7 @@ MultiReducedDiags::MultiReducedDiags ()
     const auto reduced_diags_dictionary =
         std::map<std::string, std::function<std::unique_ptr<ReducedDiags>(CS)>>{
             {"BeamRelevant",          [](CS s){return std::make_unique<BeamRelevant>(s);}},
+            {"ChargeFluxEB",          [](CS s){return std::make_unique<ChargeFluxEB>(s);}},
             {"ChargeOnEB",            [](CS s){return std::make_unique<ChargeOnEB>(s);}},
             {"ColliderRelevant",      [](CS s){return std::make_unique<ColliderRelevant>(s);}},
             {"DifferentialLuminosity",[](CS s){return std::make_unique<DifferentialLuminosity>(s);}},
