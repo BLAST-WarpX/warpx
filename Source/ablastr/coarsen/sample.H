@@ -66,15 +66,15 @@ namespace ablastr::coarsen::sample
         int np[3], idx_min[3];
 
         // Compute number of points
-        for ( int l = 0; l < 3; ++l ) {
-            if ( cr[l] == 1 ) { np[l] = 1+amrex::Math::abs(sf[l]-sc[l]); // no coarsening
-            } else {            np[l] = 2-sf[l]; }
+        for ( int n = 0; n < 3; ++n ) {
+            if ( cr[n] == 1 ) { np[n] = 1+amrex::Math::abs(sf[n]-sc[n]); // no coarsening
+            } else {            np[n] = 2-sf[n]; }
         }
 
         // Compute starting indices of source array (fine)
-        for ( int l = 0; l < 3; ++l ) {
-            if ( cr[l] == 1 ) { idx_min[l] = ic[l]-sc[l]*(1-sf[l]); // no coarsening
-            } else {            idx_min[l] = ic[l]*cr[l]+static_cast<int>(cr[l]/2)*(1-sc[l])-(1-sf[l]); }
+        for ( int n = 0; n < 3; ++n ) {
+            if ( cr[n] == 1 ) { idx_min[n] = ic[n]-sc[n]*(1-sf[n]); // no coarsening
+            } else {            idx_min[n] = ic[n]*cr[n]+static_cast<int>(cr[n]/2)*(1-sc[n])-(1-sf[n]); }
         }
 
         // Auxiliary integer variables

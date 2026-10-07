@@ -71,22 +71,22 @@ namespace ablastr::coarsen::average
         int np[3], idx_min[3];
 
         // Compute number of points
-        for (int l = 0; l < 3; ++l) {
-            if (cr[l] == 1) {
-                np[l] = 1; // no coarsening
+        for (int n = 0; n < 3; ++n) {
+            if (cr[n] == 1) {
+                np[n] = 1; // no coarsening
             } else {
-                np[l] = cr[l] * (1 - sf[l]) * (1 - sc[l])        // cell-centered
-                        + (2 * (cr[l] - 1) + 1) * sf[l] * sc[l]; // nodal
+                np[n] = cr[n] * (1 - sf[n]) * (1 - sc[n])        // cell-centered
+                        + (2 * (cr[n] - 1) + 1) * sf[n] * sc[n]; // nodal
             }
         }
 
         // Compute starting indices of source array (fine)
-        for (int l = 0; l < 3; ++l) {
-            if (cr[l] == 1) {
-                idx_min[l] = ic[l]; // no coarsening
+        for (int n = 0; n < 3; ++n) {
+            if (cr[n] == 1) {
+                idx_min[n] = ic[n]; // no coarsening
             } else {
-                idx_min[l] = ic[l] * cr[l] * (1 - sf[l]) * (1 - sc[l])      // cell-centered
-                             + (ic[l] * cr[l] - cr[l] + 1) * sf[l] * sc[l]; // nodal
+                idx_min[n] = ic[n] * cr[n] * (1 - sf[n]) * (1 - sc[n])      // cell-centered
+                             + (ic[n] * cr[n] - cr[n] + 1) * sf[n] * sc[n]; // nodal
             }
         }
 
