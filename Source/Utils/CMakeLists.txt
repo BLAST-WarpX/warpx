@@ -5,6 +5,7 @@ foreach(D IN LISTS WarpX_DIMS)
         Interpolate.cpp
         ParticleUtils.cpp
         SpeciesUtils.cpp
+        SystemMemoryGuard.cpp
         WarpXMovingWindow.cpp
         WarpXUtil.cpp
         WarpXVersion.cpp
@@ -13,3 +14,7 @@ endforeach()
 
 add_subdirectory(Logo)
 add_subdirectory(Parser)
+
+if(BUILD_TESTING)
+    add_subdirectory(Tests)
+endif()
