@@ -169,11 +169,12 @@ void ThetaImplicitEM::FinishStep (const amrex::Real start_time, const int a_step
     // m_Eold is at t_{n}
 }
 
-void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
-                             const WarpXSolverVec&  a_E,
-                                   amrex::Real      start_time,
-                                   int              a_nl_iter,
-                                   bool             a_from_jacobian )
+void ThetaImplicitEM::ComputeRHS (WarpXSolverVec& a_RHS,
+                            const WarpXSolverVec& a_E,
+                                  amrex::Real     start_time,
+                                  int             a_nl_iter,
+                                  bool            a_from_jacobian,
+                                  const bool      update_pc)
 {
     BL_PROFILE("ThetaImplicitEM::ComputeRHS()");
 
@@ -185,7 +186,7 @@ void ThetaImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
     // of E and B. Deposit current density at time n+1/2
     const amrex::Real theta_time = start_time + m_theta*m_dt;
     const amrex::Real dt_scale = 1.0_rt/m_nsubsteps;
-    PreRHSOp( theta_time, a_nl_iter, a_from_jacobian, dt_scale );
+    PreRHSOp(theta_time, a_nl_iter, a_from_jacobian, dt_scale, update_pc);
 
     // RHS = cvac^2*m_theta*dt*(curl(B^{n+theta}) - mu0*J^{n+1/2})
     m_WarpX->ImplicitComputeRHSE(m_theta*m_dt, a_RHS);

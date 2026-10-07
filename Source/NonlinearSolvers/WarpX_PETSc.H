@@ -147,6 +147,9 @@ class KSP_impl : public PETScSolver_impl
         //! Set max iters
         void setMaxIters(int);
 
+        //! Rebuild the PETSc matrix and preconditioner on the next linear solve.
+        void invalidatePreconditioner () { m_pc_needs_update = true; }
+
         //! Solve
         void solve(VecType&, const VecType&);
 
@@ -172,6 +175,9 @@ class KSP_impl : public PETScSolver_impl
         LinOpType* m_linop = nullptr;
 
     private:
+
+        //! Whether the PETSc preconditioner matrix needs reassembly.
+        bool m_pc_needs_update = true;
 
         //! absolute tolerance
         amrex::Real m_atol = 1e-12;
