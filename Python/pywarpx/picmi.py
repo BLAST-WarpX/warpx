@@ -853,7 +853,7 @@ class UniformFluxDistribution(
         flux = self.flux
         if density_scale is not None:
             # self.flux is a string (picmistandard stores it as an expression)
-            flux = "{}*({})".format(density_scale, flux)
+            flux = f"({density_scale})*({flux})"
         species.add_new_group_attr(source_name, "flux", flux)
 
 
