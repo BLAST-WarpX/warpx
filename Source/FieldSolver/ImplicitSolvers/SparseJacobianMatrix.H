@@ -212,7 +212,6 @@ private:
     bool m_is_defined = false;
     bool m_is_remapped = false;
     bool m_verbose = true;
-    bool m_pc_diag_only = false;
     bool m_include_mass_matrices = false;
 
     int m_ndofs_l = 0;

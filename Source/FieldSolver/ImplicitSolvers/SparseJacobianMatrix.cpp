@@ -30,20 +30,15 @@ void SparseJacobianMatrix::readParameters ()
 {
     const amrex::ParmParse pp("precon_mat");
     pp.query("verbose", m_verbose);
-    pp.query("pc_diagonal_only", m_pc_diag_only);
 
-    // Backward compatibility: pc_petsc.verbose and pc_petsc.pc_diagonal_only
-    // were read by the old MatrixPC class (renamed to ExternLibPC).
+    // Backward compatibility: pc_petsc.verbose was read by the old MatrixPC
+    // class (renamed to ExternLibPC).
     const amrex::ParmParse pp_old("pc_petsc");
     bool backward_bool;
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !pp_old.query("verbose", backward_bool),
         "pc_petsc.verbose is no longer supported. "
         "Use precon_mat.verbose instead.");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        !pp_old.query("pc_diagonal_only", backward_bool),
-        "pc_petsc.pc_diagonal_only is no longer supported. "
-        "Use precon_mat.pc_diagonal_only instead.");
 }
 
 void SparseJacobianMatrix::printParameters () const
@@ -51,8 +46,6 @@ void SparseJacobianMatrix::printParameters () const
     using namespace amrex;
     Print() << "precon_mat verbose:              "
             << (m_verbose ? "true" : "false") << "\n";
-    Print() << "precon_mat pc_diagonal_only:     "
-            << (m_pc_diag_only ? "true" : "false") << "\n";
     Print() << "precon_mat include_mass_matrices: "
             << (m_include_mass_matrices ? "true" : "false") << "\n";
 }
