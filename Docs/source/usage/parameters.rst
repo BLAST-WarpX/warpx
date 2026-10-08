@@ -274,8 +274,12 @@ Overall simulation parameters
             only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
           - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
             Must be positive. Updates are allowed only when the zero-based simulation
-            step index is divisible by this interval. Both interval conditions must
-            hold. The first required linear solve always initializes the PC, including
+            step index is divisible by this interval. For native Newton, both interval
+            conditions must hold. PETSc SNES uses only this time-step interval: on
+            update steps it retains PC updates within the nonlinear solve, while on
+            skipped steps it reuses the PC, including the PETSc factorization.
+            ``newton.pc_update_newton_interval`` does not apply to PETSc SNES.
+            The first required linear solve always initializes the PC, including
             after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)

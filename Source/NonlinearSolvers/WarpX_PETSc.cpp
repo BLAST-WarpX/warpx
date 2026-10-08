@@ -107,7 +107,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     copyVec(a_F, context->m_F);
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
-    if (!context->m_fd_jac_comput) {
+    if (!context->m_fd_jac_comput && context->updatePC()) {
         dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
     }
     PetscFunctionReturn(PETSC_SUCCESS);
@@ -133,7 +133,7 @@ PetscErrorCode JacobianFunction( SNES a_solver,
     PCType pctype;
     PCGetType(pc, &pctype);
 
-    if (strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
+    if (context->updatePC() && strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
         copyVec(context->m_U, a_U);
         auto err = context->assemblePCMatrix(context->m_linop.get());
         AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
@@ -599,6 +599,11 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
             "petsc_snes uses PETSc KSP as the linear solver.");
     }
 
+    pp_newton.query("pc_update_time_step_interval", m_pc_update_time_step_interval);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_update_time_step_interval > 0,
+        "newton.pc_update_time_step_interval must be positive");
+
     const amrex::ParmParse pp_gmres("gmres");
     pp_gmres.query("verbose_int",         m_verbose_l);
     pp_gmres.query("absolute_tolerance",  m_atol_l);
@@ -723,15 +728,17 @@ SNES_impl::~SNES_impl() { }
 
 void SNES_impl::printParams () const
 {
-    amrex::Print()     << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
-    amrex::Print()     << "SNES_impl max iterations:      " << m_maxits << "\n";
-    amrex::Print()     << "SNES_impl require convergence: " << (m_require_convergence?"true":"false") << "\n";
-    amrex::Print()     << "SNES_impl relative tolerance:  " << m_rtol << "\n";
-    amrex::Print()     << "SNES_impl absolute tolerance:  " << m_atol << "\n";
-    amrex::Print()     << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
-    amrex::Print()     << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
-    amrex::Print()     << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
-    amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(this->m_pc_type) << "\n";
+    amrex::Print() << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
+    amrex::Print() << "SNES_impl max iterations:      " << m_maxits << "\n";
+    amrex::Print() << "SNES_impl require convergence: " << (m_require_convergence?"true":"false") << "\n";
+    amrex::Print() << "SNES_impl PC update time-step interval: "
+                   << m_pc_update_time_step_interval << "\n";
+    amrex::Print() << "SNES_impl relative tolerance:  " << m_rtol << "\n";
+    amrex::Print() << "SNES_impl absolute tolerance:  " << m_atol << "\n";
+    amrex::Print() << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
+    amrex::Print() << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
+    amrex::Print() << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
+    amrex::Print() << "Preconditioner type:      " << amrex::getEnumNameString(this->m_pc_type) << "\n";
 
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->printParams();
 }
@@ -809,6 +816,11 @@ void SNES_impl::solve (VecType& a_U,
     m_time = a_time;
     m_iter = 0;
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTime(a_time);
+    m_update_pc = !m_pc_initialized || (a_step % m_pc_update_time_step_interval == 0);
+    m_rhs_first_call = true;
+    // Keep PETSc factorization reuse on the same time-step schedule as PC assembly.
+    SNESSetLagPreconditioner(m_snes->obj, m_update_pc ? 1 : -1);
+    SNESSetLagPreconditionerPersists(m_snes->obj, PETSC_TRUE);
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTimeStep(a_dt);
 
     copyVec(this->m_x->obj, a_U);
@@ -818,6 +830,8 @@ void SNES_impl::solve (VecType& a_U,
 
     SNESGetIterationNumber(m_snes->obj, &m_niters);
     SNESGetLinearSolveIterations(m_snes->obj, &m_niters_l);
+    // Do not regard an iteration-0 early exit as having initialized the PC.
+    if (m_update_pc && m_niters_l > 0) { m_pc_initialized = true; }
 
     KSP ksp;
     SNESGetKSP(m_snes->obj, &ksp);
@@ -849,10 +863,13 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
     AMREX_ALWAYS_ASSERT(isDefined());
 
     if (m_fd_jac_comput) {
-        m_op->ComputeRHS( a_F, a_U, m_time, m_iter, !m_rhs_first_call);
+        const bool from_jacobian = !m_rhs_first_call;
+        const bool update_pc_for_residual = m_update_pc && !from_jacobian;
+        m_op->ComputeRHS(a_F, a_U, m_time, m_iter, from_jacobian,
+                         update_pc_for_residual);
         m_rhs_first_call = false;
     } else {
-        m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
+        m_op->ComputeRHS(a_F, a_U, m_time, m_iter, false, m_update_pc);
         m_iter++;
     }
 
