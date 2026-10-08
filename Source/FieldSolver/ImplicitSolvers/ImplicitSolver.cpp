@@ -216,7 +216,7 @@ int ImplicitSolver::OneStep (const amrex::Real  start_time,
 
         while (true) {
 
-            if (m_nsubsteps > 1 and verbose_step) {
+            if (m_nsubsteps > 1) {
                 amrex::Print() << "ImplicitSolver::OneStep: starting substep " << isubstep+1 << " of " << m_nsubsteps << "\n";
             }
 
