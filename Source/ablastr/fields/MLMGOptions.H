@@ -83,7 +83,7 @@ struct MLMGOptions
     int agglomeration = -1;
 
     /** Box size below which MLMG agglomerates the coarse multigrid levels
-     *  (AMReX defaults: 32 in 3D, 16 in 2D, 8 in 1D)
+     *  (AMReX defaults: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU)
      */
     int agglomeration_grid_size = -1;
 
@@ -94,7 +94,7 @@ struct MLMGOptions
     int consolidation = -1;
 
     /** Box size below which MLMG consolidates the coarse multigrid levels onto
-     *  fewer MPI ranks (AMReX defaults: 32 in 3D, 16 in 2D, 8 in 1D)
+     *  fewer MPI ranks (AMReX defaults: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU)
      */
     int consolidation_grid_size = -1;
 

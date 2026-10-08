@@ -2609,7 +2609,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
     warpx_self_fields_agglomeration_grid_size: integer, optional
         Box size below which MLMG agglomerates the coarse multigrid levels
-        (AMReX defaults: 32 in 3D, 16 in 2D, 8 in 1D)
+        (AMReX defaults: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU)
 
     warpx_self_fields_consolidation: bool, optional
         Whether MLMG may redistribute the coarse multigrid levels onto a subset
@@ -2617,7 +2617,7 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
 
     warpx_self_fields_consolidation_grid_size: integer, optional
         Box size below which MLMG consolidates the coarse multigrid levels onto
-        fewer MPI ranks (AMReX defaults: 32 in 3D, 16 in 2D, 8 in 1D)
+        fewer MPI ranks (AMReX defaults: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU)
 
     warpx_magnetostatic: bool, default=False
         Whether to also solve for self-consistent magnetic fields from currents.

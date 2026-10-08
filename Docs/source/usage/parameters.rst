@@ -608,7 +608,7 @@ Overall simulation parameters
 
 .. pp:param:: warpx.self_fields_agglomeration_grid_size
     :type: ``integer``
-    :default: 32 in 3D, 16 in 2D, 8 in 1D (AMReX defaults)
+    :default: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU (AMReX defaults)
 
     Box size below which AMReX MLMG agglomerates the coarse multigrid levels of
     the electrostatic self-field solve. Increasing this makes agglomeration
@@ -626,7 +626,7 @@ Overall simulation parameters
 
 .. pp:param:: warpx.self_fields_consolidation_grid_size
     :type: ``integer``
-    :default: 32 in 3D, 16 in 2D, 8 in 1D (AMReX defaults)
+    :default: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU (AMReX defaults)
 
     Box size below which AMReX MLMG consolidates the coarse multigrid levels of
     the electrostatic self-field solve onto fewer MPI ranks. Only used if
