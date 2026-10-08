@@ -233,6 +233,25 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
     m_linear_function->define(m_F, m_ops, m_pc_type);
     this->m_usePC = m_linear_function->usePreconditioner();
 
+    const PreconditionerType pc_type = GetPreconditionerType();
+    if (pc_type == PreconditionerType::pc_jacobi) {
+        if (m_pc_update_time_step_interval > 1) {
+        // Jacobi reads MassMatrices_PC directly. A scheduled PC update can
+        // clear these coefficients during residual evaluation, then leave
+        // them unfinished if Newton converges before PreLinearSolve().
+        // Restrict Newton update intervals when lagging across time steps.
+        // This does not cover convergence at iteration 0 on an update step.
+        // The underlying issue is that suborbit particles deposit their PC
+        // contributions during residual evaluation. A future PR will move
+        // this deposition to PreLinearSolve(), removing the need for this
+        // restriction.
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                m_pc_update_newton_interval == 0,
+                "newton.pc_update_newton_interval must be 0 when using "
+                "pc_type = pc_jacobi and pc_update_time_step_interval > 1.");
+        }
+    }
+
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
         m_linear_solver = std::make_unique<AMReXGMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
     } else if (m_linear_solver_type == LinearSolverType::petsc_ksp) {
