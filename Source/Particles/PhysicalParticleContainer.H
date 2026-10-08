@@ -111,6 +111,9 @@ public:
                  MomentumPushType momentum_push_type=MomentumPushType::Full,
                  ImplicitOptions const * implicit_options = nullptr) override;
 
+    void DepositChargeComponent (
+        ablastr::fields::MultiFabRegister& fields, int lev, int rho_comp) override;
+
     /**
      * \brief Deposit mass matrices.
      */
@@ -341,6 +344,17 @@ public:
     void resample (
         const amrex::Vector<amrex::Geometry>& geom, int timestep, bool verbose=true) final;
 
+    [[nodiscard]] bool doParticleSplitting () const final
+    {
+        return do_resampling && m_resampler.isParticleSplitting();
+    }
+
+    /** Split and add Esirkepov current on child virtual segments only. Does not reset J. */
+    void splitAndDepositRemappingCurrent (
+        ablastr::fields::MultiLevelVectorField const& J,
+        const amrex::Vector<amrex::Geometry>& geom,
+        int timestep, amrex::Real dt, bool verbose, bool deposit_virtual_j) final;
+
 #ifdef WARPX_QED
     //Functions decleared in WarpXParticleContainer.H
     //containers for which QED processes could be relevant
@@ -464,6 +478,9 @@ protected:
     bool impose_t_lab_from_file = false;
 
     Resampling m_resampler;
+
+    /** If false, split children but do not deposit remapping current. */
+    bool m_do_remapping_current = true;
 
     // Inject particles during the whole simulation
     void ContinuousInjection (const amrex::RealBox& injection_box) override;

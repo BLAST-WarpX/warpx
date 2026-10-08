@@ -718,6 +718,51 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 }
 
 void
+LaserParticleContainer::DepositChargeComponent (
+    ablastr::fields::MultiFabRegister& fields, int lev, int rho_comp)
+{
+    using warpx::fields::FieldType;
+
+    ABLASTR_PROFILE("LaserParticleContainer::DepositChargeComponent()");
+
+    if (!m_enabled || do_not_deposit || !fields.has(FieldType::rho_fp, lev)) { return; }
+
+    const bool has_buffer = fields.has_vector(FieldType::current_buf, lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+    {
+#ifdef AMREX_USE_OMP
+        int const thread_num = omp_get_thread_num();
+#else
+        int const thread_num = 0;
+#endif
+
+        for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+        {
+            const auto& wp = pti.GetAttribs(PIdx::w);
+            const long np  = pti.numParticles();
+
+            long np_to_deposit = np;
+            if (lev > 0 && m_deposit_on_main_grid && has_buffer) {
+                np_to_deposit = 0;
+            }
+
+            int* AMREX_RESTRICT ion_lev = nullptr;
+            amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
+            DepositCharge(pti, wp, ion_lev, rho, rho_comp, 0,
+                          np_to_deposit, thread_num, lev, lev);
+            if (has_buffer) {
+                amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
+                DepositCharge(pti, wp, ion_lev, crho, rho_comp, np_to_deposit,
+                              np-np_to_deposit, thread_num, lev, lev-1);
+            }
+        }
+    }
+}
+
+void
 LaserParticleContainer::PostRestart ()
 {
     if (!m_enabled) { return; }

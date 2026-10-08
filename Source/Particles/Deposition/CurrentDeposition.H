@@ -696,6 +696,12 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
  * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
  * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ * \param xp_old_data Optional stored old x positions. When non-null (Cartesian),
+ *        Esirkepov uses these as the segment start instead of reconstructing from velocity.
+ * \param yp_old_data Optional stored old y positions. When non-null (Cartesian),
+ *        Esirkepov uses these as the segment start instead of reconstructing from velocity.
+ * \param zp_old_data Optional stored old z positions. When non-null (Cartesian),
+ *        Esirkepov uses these as the segment start instead of reconstructing from velocity.
  */
 template <int depos_order>
 void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
@@ -716,7 +722,10 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   amrex::Real q,
                                   [[maybe_unused]] int n_rz_azimuthal_modes,
                                   const amrex::Array4<const int>& reduced_particle_shape_mask,
-                                  bool enable_reduced_shape
+                                  bool enable_reduced_shape,
+                                  [[maybe_unused]] const amrex::ParticleReal * const xp_old_data = nullptr,
+                                  [[maybe_unused]] const amrex::ParticleReal * const yp_old_data = nullptr,
+                                  [[maybe_unused]] const amrex::ParticleReal * const zp_old_data = nullptr
                                   )
 {
     using namespace amrex;
@@ -814,19 +823,37 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #else
 #if !defined(WARPX_DIM_1D_Z)
             // Keep these double to avoid bug in single precision
-            double const x_new = (xp - xyzmin.x + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv)*dinv.x;
-            double const x_old = x_new - dt*dinv.x*uxp[ip]*gaminv;
+            double x_new, x_old;
+            if (xp_old_data) {
+                x_new = (xp - xyzmin.x)*dinv.x;
+                x_old = (xp_old_data[ip] - xyzmin.x)*dinv.x;
+            } else {
+                x_new = (xp - xyzmin.x + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv)*dinv.x;
+                x_old = x_new - dt*dinv.x*uxp[ip]*gaminv;
+            }
 #endif
 #endif
 #if defined(WARPX_DIM_3D)
             // Keep these double to avoid bug in single precision
-            double const y_new = (yp - xyzmin.y + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv)*dinv.y;
-            double const y_old = y_new - dt*dinv.y*uyp[ip]*gaminv;
+            double y_new, y_old;
+            if (yp_old_data) {
+                y_new = (yp - xyzmin.y)*dinv.y;
+                y_old = (yp_old_data[ip] - xyzmin.y)*dinv.y;
+            } else {
+                y_new = (yp - xyzmin.y + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv)*dinv.y;
+                y_old = y_new - dt*dinv.y*uyp[ip]*gaminv;
+            }
 #endif
 #if !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             // Keep these double to avoid bug in single precision
-            double const z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
-            double const z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
+            double z_new, z_old;
+            if (zp_old_data) {
+                z_new = (zp - xyzmin.z)*dinv.z;
+                z_old = (zp_old_data[ip] - xyzmin.z)*dinv.z;
+            } else {
+                z_new = (zp - xyzmin.z + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv)*dinv.z;
+                z_old = z_new - dt*dinv.z*uzp[ip]*gaminv;
+            }
 #endif
 
             // Check whether the particle is close to the EB at the old and new position

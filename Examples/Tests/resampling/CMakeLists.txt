@@ -30,3 +30,12 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1000008"  # checksum
     OFF  # dependency
 )
+add_warpx_test(
+    test_2d_particle_splitting  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_particle_splitting  # inputs
+    "analysis_particle_splitting.py diags/diag1"  # analysis
+    "analysis_default_regression.py --path diags/diag1"  # checksum
+    OFF  # dependency
+)
