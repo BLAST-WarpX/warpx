@@ -7,6 +7,7 @@
 #include "JFunctor.H"
 
 #include "Fields.H"
+#include "Parallelization/WarpXSumGuardCells.H"
 #include "Particles/MultiParticleContainer.H"
 #include "WarpX.H"
 
@@ -51,7 +52,8 @@ JFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buffer*/
         // sum values in guard cells - note that this does not filter the
         // current density.
         for (int idim = 0; idim < 3; ++idim) {
-            current_fp_temp[0][idim]->FillBoundary(warpx.Geom(m_lev).periodicity());
+            auto& J = *current_fp_temp[0][idim];
+            WarpXSumGuardCells(J, warpx.Geom(m_lev).periodicity(), J.nGrowVect());
         }
     }
 
