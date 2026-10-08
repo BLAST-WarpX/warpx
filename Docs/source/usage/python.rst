@@ -84,9 +84,15 @@ There are several support classes use to specify components of the evolve scheme
 
 .. autoclass:: pywarpx.picmi.PETScKSPLinearSolver
 
+.. autoclass:: pywarpx.picmi.WeightedJacobiLinearSolver
+
+.. autoclass:: pywarpx.picmi.ChebyshevLinearSolver
+
 .. autoclass:: pywarpx.picmi.CurlCurlMLMGPreconditioner
 
 .. autoclass:: pywarpx.picmi.JacobiPreconditioner
+
+.. autoclass:: pywarpx.picmi.ChebyshevPreconditioner
 
 .. autoclass:: pywarpx.picmi.PETScPreconditioner
 

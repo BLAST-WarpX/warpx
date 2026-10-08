@@ -1714,6 +1714,132 @@ class PETScKSPLinearSolver(LinearSolverBase):
             nonlinear_solver.linear_solver = "petsc_ksp"
 
 
+class WeightedJacobiLinearSolver(LinearSolverBase):
+    """
+    Sets up the weighted Jacobi linear solver for the implicit Newton nonlinear solver
+
+    Parameters
+    ----------
+    verbose_int: integer, default=2
+        Level of verbosity of output
+
+    max_iterations: integer, default=1000
+        Maximum number of iterations
+
+    relative_tolerance: float, default=1.e-4
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, default=0.
+        Absolute tolerance of the convergence
+
+    use_pcmat: bool, default=True
+        Whether to iterate on the assembled preconditioner matrix
+        instead of matrix-free evaluations of the Jacobian
+
+    omega: float, optional
+        Relaxation factor. Setting it turns off adaptive_omega.
+
+    adaptive_omega: bool, default=True
+        Whether to reduce the relaxation factor when the residual increases
+    """
+
+    def __init__(
+        self,
+        verbose_int=None,
+        absolute_tolerance=None,
+        relative_tolerance=None,
+        max_iterations=None,
+        use_pcmat=None,
+        omega=None,
+        adaptive_omega=None,
+    ):
+        self.verbose_int = verbose_int
+        self.absolute_tolerance = absolute_tolerance
+        self.relative_tolerance = relative_tolerance
+        self.max_iterations = max_iterations
+        self.use_pcmat = use_pcmat
+        self.omega = omega
+        self.adaptive_omega = adaptive_omega
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "weighted_jacobi"
+        weighted_jacobi = pywarpx.warpx.get_bucket("weighted_jacobi")
+        weighted_jacobi.verbose_int = self.verbose_int
+        weighted_jacobi.absolute_tolerance = self.absolute_tolerance
+        weighted_jacobi.relative_tolerance = self.relative_tolerance
+        weighted_jacobi.max_iterations = self.max_iterations
+        weighted_jacobi.use_pcmat = self.use_pcmat
+        weighted_jacobi.omega = self.omega
+        weighted_jacobi.adaptive_omega = self.adaptive_omega
+
+
+class ChebyshevLinearSolver(LinearSolverBase):
+    """
+    Sets up the Chebyshev linear solver for the implicit Newton nonlinear solver
+
+    Parameters
+    ----------
+    verbose_int: integer, default=2
+        Level of verbosity of output
+
+    max_iterations: integer, default=1000
+        Maximum number of iterations
+
+    relative_tolerance: float, default=1.e-4
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, default=0.
+        Absolute tolerance of the convergence
+
+    use_pcmat: bool, default=True
+        Whether to iterate on the assembled preconditioner matrix
+        instead of matrix-free evaluations of the Jacobian
+
+    power_iterations: integer, default=20
+        Number of power-method iterations used to estimate the largest eigenvalue
+
+    lambda_min: float, default=1.
+        Lower bound of the eigenvalues
+
+    lambda_max: float, optional
+        Upper bound of the eigenvalues. Estimated with the power method if not set.
+    """
+
+    def __init__(
+        self,
+        verbose_int=None,
+        absolute_tolerance=None,
+        relative_tolerance=None,
+        max_iterations=None,
+        use_pcmat=None,
+        power_iterations=None,
+        lambda_min=None,
+        lambda_max=None,
+    ):
+        self.verbose_int = verbose_int
+        self.absolute_tolerance = absolute_tolerance
+        self.relative_tolerance = relative_tolerance
+        self.max_iterations = max_iterations
+        self.use_pcmat = use_pcmat
+        self.power_iterations = power_iterations
+        self.lambda_min = lambda_min
+        self.lambda_max = lambda_max
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "chebyshev"
+        chebyshev = pywarpx.warpx.get_bucket("chebyshev")
+        chebyshev.verbose_int = self.verbose_int
+        chebyshev.absolute_tolerance = self.absolute_tolerance
+        chebyshev.relative_tolerance = self.relative_tolerance
+        chebyshev.max_iterations = self.max_iterations
+        chebyshev.use_pcmat = self.use_pcmat
+        chebyshev.power_iterations = self.power_iterations
+        chebyshev.lambda_min = self.lambda_min
+        chebyshev.lambda_max = self.lambda_max
+
+
 class PreconditionerBase(picmistandard.base._ClassWithInit):
     # Name of the WarpX preconditioner type, set by subclasses.
     name = None
@@ -1844,7 +1970,7 @@ class DarwinMLMGPreconditioner(PreconditionerBase):
 
 class JacobiPreconditioner(PreconditionerBase):
     """
-    Sets up the point Jacobi preconditioner used during the nonlinear solver
+    Sets up the weighted Jacobi preconditioner used during the nonlinear solver
 
     Parameters
     ----------
@@ -1859,6 +1985,12 @@ class JacobiPreconditioner(PreconditionerBase):
 
     absolute_tolerance: float, optional
         Absoluate tolerence of the convergence
+
+    omega: float, optional
+        Relaxation factor. Setting it turns off adaptive_omega.
+
+    adaptive_omega: bool, optional
+        Whether to reduce the relaxation factor when the residual increases
     """
 
     name = "pc_jacobi"
@@ -1869,11 +2001,64 @@ class JacobiPreconditioner(PreconditionerBase):
         max_iter=None,
         relative_tolerance=None,
         absolute_tolerance=None,
+        omega=None,
+        adaptive_omega=None,
     ):
         self.verbose = verbose
         self.max_iter = max_iter
         self.relative_tolerance = relative_tolerance
         self.absolute_tolerance = absolute_tolerance
+        self.omega = omega
+        self.adaptive_omega = adaptive_omega
+
+
+class ChebyshevPreconditioner(PreconditionerBase):
+    """
+    Sets up the Chebyshev preconditioner used during the nonlinear solver
+
+    Parameters
+    ----------
+    verbose: bool, optional
+        Whether there is verbose output from the solver
+
+    max_iter: int, optional
+        Maximum number of iterations
+
+    relative_tolerance: float, optional
+        Relative tolerance of the convergence
+
+    absolute_tolerance: float, optional
+        Absolute tolerance of the convergence
+
+    power_iterations: int, optional
+        Number of power-method iterations used to estimate the largest eigenvalue
+
+    lambda_min: float, optional
+        Lower bound of the eigenvalues
+
+    lambda_max: float, optional
+        Upper bound of the eigenvalues. Estimated with the power method if not set.
+    """
+
+    name = "pc_chebyshev"
+
+    def __init__(
+        self,
+        verbose=None,
+        max_iter=None,
+        relative_tolerance=None,
+        absolute_tolerance=None,
+        power_iterations=None,
+        lambda_min=None,
+        lambda_max=None,
+    ):
+        self.verbose = verbose
+        self.max_iter = max_iter
+        self.relative_tolerance = relative_tolerance
+        self.absolute_tolerance = absolute_tolerance
+        self.power_iterations = power_iterations
+        self.lambda_min = lambda_min
+        self.lambda_max = lambda_max
 
 
 class PETScPreconditioner(PreconditionerBase):
@@ -1979,7 +2164,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
         When use_mass_matrices_pc is True, the width of the preconditioner mass matrices
 
     pc_type: preconditioner instance, optional
-        The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, or PETScPreconditioner
+        The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, ChebyshevPreconditioner, or PETScPreconditioner
     """
 
     def __init__(
