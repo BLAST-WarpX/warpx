@@ -2580,14 +2580,13 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         Level of verbosity for the labframe electrostatic solver
 
     warpx_self_fields_bottom_solver: string, default='default'
-        Bottom solver used by the MLMG labframe electrostatic solver. Options are
+        Bottom solver used by the MLMG electrostatic solver. Options are
         'default', 'smoother', 'bicgstab', 'cg', 'bicgcg', 'cgbicg', 'custom',
         'algmg', 'hypre', and 'petsc'. The last two require an AMReX built with
         HYPRE / PETSc support.
 
     warpx_self_fields_bottom_verbosity: integer, default=0
-        Level of verbosity of the bottom solver of the labframe electrostatic
-        solver
+        Level of verbosity of the bottom solver of the electrostatic solvers
 
     warpx_self_fields_bottom_max_iters: integer, optional
         Maximum number of bottom solver iterations (AMReX default: 200)
@@ -2731,6 +2730,28 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         pywarpx.warpx.dt_update_interval = self.dt_update_interval
         pywarpx.warpx.max_dt = self.max_dt
 
+        # MLMG bottom solve and coarsening options
+        pywarpx.warpx.self_fields_bottom_solver = self.self_fields_bottom_solver
+        pywarpx.warpx.self_fields_bottom_verbosity = self.self_fields_bottom_verbosity
+        pywarpx.warpx.self_fields_bottom_max_iters = self.self_fields_bottom_max_iters
+        pywarpx.warpx.self_fields_bottom_relative_tolerance = (
+            self.self_fields_bottom_relative_tolerance
+        )
+        pywarpx.warpx.self_fields_bottom_absolute_tolerance = (
+            self.self_fields_bottom_absolute_tolerance
+        )
+        pywarpx.warpx.self_fields_max_coarsening_level = (
+            self.self_fields_max_coarsening_level
+        )
+        pywarpx.warpx.self_fields_agglomeration = self.self_fields_agglomeration
+        pywarpx.warpx.self_fields_agglomeration_grid_size = (
+            self.self_fields_agglomeration_grid_size
+        )
+        pywarpx.warpx.self_fields_consolidation = self.self_fields_consolidation
+        pywarpx.warpx.self_fields_consolidation_grid_size = (
+            self.self_fields_consolidation_grid_size
+        )
+
         if self.relativistic:
             pywarpx.warpx.do_electrostatic = "relativistic"
         else:
@@ -2753,30 +2774,6 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
             pywarpx.warpx.self_fields_absolute_tolerance = self.absolute_tolerance
             pywarpx.warpx.self_fields_max_iters = self.maximum_iterations
             pywarpx.warpx.self_fields_verbosity = self.self_fields_verbosity
-            pywarpx.warpx.self_fields_bottom_solver = self.self_fields_bottom_solver
-            pywarpx.warpx.self_fields_bottom_verbosity = (
-                self.self_fields_bottom_verbosity
-            )
-            pywarpx.warpx.self_fields_bottom_max_iters = (
-                self.self_fields_bottom_max_iters
-            )
-            pywarpx.warpx.self_fields_bottom_relative_tolerance = (
-                self.self_fields_bottom_relative_tolerance
-            )
-            pywarpx.warpx.self_fields_bottom_absolute_tolerance = (
-                self.self_fields_bottom_absolute_tolerance
-            )
-            pywarpx.warpx.self_fields_max_coarsening_level = (
-                self.self_fields_max_coarsening_level
-            )
-            pywarpx.warpx.self_fields_agglomeration = self.self_fields_agglomeration
-            pywarpx.warpx.self_fields_agglomeration_grid_size = (
-                self.self_fields_agglomeration_grid_size
-            )
-            pywarpx.warpx.self_fields_consolidation = self.self_fields_consolidation
-            pywarpx.warpx.self_fields_consolidation_grid_size = (
-                self.self_fields_consolidation_grid_size
-            )
             # Explicit magnetostatic solver parameters (if provided)
             pywarpx.warpx.magnetostatic_solver_required_precision = (
                 self.magnetostatic_required_precision
