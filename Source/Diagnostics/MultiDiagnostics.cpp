@@ -4,6 +4,7 @@
 #include "Diagnostics/FullDiagnostics.H"
 #include "Diagnostics/BoundaryScrapingDiagnostics.H"
 #include "Utils/TextMsg.H"
+#include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/warn_manager/WarnManager.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX.H>
@@ -88,6 +89,8 @@ MultiDiagnostics::DoComputeAndPack (int step, bool force_flush)
 void
 MultiDiagnostics::FilterComputePackFlush (int step, bool force_flush, bool BackTransform)
 {
+    ABLASTR_PROFILE_GPU_SYNC("MultiDiagnostics::FilterComputePackFlush()");
+
     int i = 0;
     for (auto& diag : alldiags){
         if (BackTransform) {
@@ -106,6 +109,8 @@ MultiDiagnostics::FilterComputePackFlush (int step, bool force_flush, bool BackT
 void
 MultiDiagnostics::FilterComputePackFlushLastTimestep (int step)
 {
+    ABLASTR_PROFILE_GPU_SYNC("MultiDiagnostics::FilterComputePackFlushLastTimestep()");
+
     for (auto& diag : alldiags){
         if (diag->DoDumpLastTimestep()){
             constexpr bool force_flush = true;

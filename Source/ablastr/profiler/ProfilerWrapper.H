@@ -17,4 +17,11 @@
 #define ABLASTR_PROFILE_VAR_STOP(vname) BL_PROFILE_VAR_STOP(vname)
 #define ABLASTR_PROFILE_REGION(rname) BL_PROFILE_REGION(rname)
 
+// Variants that synchronize the GPU stream at the timer boundaries, so that the
+// timers measure the GPU work launched inside them (aliases of the above on CPU)
+#define ABLASTR_PROFILE_GPU_SYNC(fname) BL_PROFILE_GPU_SYNC(fname)
+#define ABLASTR_PROFILE_VAR_GPU_SYNC(fname, vname) BL_PROFILE_VAR_GPU_SYNC(fname, vname)
+#define ABLASTR_PROFILE_VAR_NS_GPU_SYNC(fname, vname) BL_PROFILE_VAR_NS_GPU_SYNC(fname, vname)
+#define ABLASTR_PROFILE_REGION_GPU_SYNC(rname) BL_PROFILE_REGION_GPU_SYNC(rname)
+
 #endif // ABLASTR_PROFILERWRAPPER_H_

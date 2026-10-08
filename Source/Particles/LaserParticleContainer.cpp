@@ -569,7 +569,7 @@ LaserParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     using warpx::fields::FieldType;
 
     ABLASTR_PROFILE("LaserParticleContainer::Evolve()");
-    ABLASTR_PROFILE_VAR_NS("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
+    ABLASTR_PROFILE_VAR_NS_GPU_SYNC("LaserParticleContainer::Evolve::ParticlePush", blp_pp);
 
     if (!m_enabled) { return; }
 

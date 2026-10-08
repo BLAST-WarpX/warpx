@@ -2100,6 +2100,12 @@ WarpX::BackwardCompatibility ()
     );
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_warpx.query("do_device_synchronize", backward_bool),
+        "warpx.do_device_synchronize is not supported anymore. "
+        "Please use the AMReX option tiny_profiler.device_synchronize_around_region instead."
+    );
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !pp_warpx.query("do_pml", backward_int),
         "do_pml is not supported anymore. Please use boundary.field_lo and boundary.field_hi"
         " to set the boundary conditions."

@@ -10,7 +10,6 @@
 #include "BoundaryConditions/FieldBoundaries.H"
 #include "Particles/ParticleBoundaries.H"
 #include "Utils/Parser/ParserUtils.H"
-#include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
@@ -58,25 +57,6 @@ namespace {
         auto pp_amrex = amrex::ParmParse{"amrex"};
         std::string omp_threads = "nosmt"; // AMReX's default: system
         pp_amrex.queryAdd("omp_threads", omp_threads);
-    }
-
-    void set_device_synchronization ()
-    {
-        //See https://github.com/AMReX-Codes/amrex/pull/3763
-        auto warpx_do_device_synchronize = amrex_use_gpu;
-
-        auto pp_warpx = amrex::ParmParse{"warpx"};
-        pp_warpx.query("do_device_synchronize", warpx_do_device_synchronize);
-        bool do_device_synchronize = warpx_do_device_synchronize;
-
-        auto pp_tiny_profiler = amrex::ParmParse{"tiny_profiler"};
-        if (pp_tiny_profiler.queryAdd("device_synchronize_around_region", do_device_synchronize) )
-        {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-                do_device_synchronize == warpx_do_device_synchronize,
-                "tiny_profiler.device_synchronize_around_region overrides warpx.do_device_synchronize.");
-        }
-
     }
 
     void apply_workaround_for_warpx_numprocs ()
@@ -182,7 +162,6 @@ namespace {
         override_default_the_arena_is_managed();
         override_default_omp_threads();
         apply_workaround_for_warpx_numprocs();
-        set_device_synchronization();
         override_default_tiling_option_for_particles();
         set_periodicity_according_to_boundary_types();
     }

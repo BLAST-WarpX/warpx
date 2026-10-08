@@ -501,7 +501,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
     using warpx::fields::FieldType;
 
     ABLASTR_PROFILE("PhysicalParticleContainer::Evolve()");
-    ABLASTR_PROFILE_VAR_NS("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg);
+    ABLASTR_PROFILE_VAR_NS_GPU_SYNC("PhysicalParticleContainer::Evolve::GatherAndPush", blp_fg);
 
     BL_ASSERT(OnSameGrids(lev, *fields.get(FieldType::current_fp, Direction{0}, lev)));
 
@@ -1205,7 +1205,7 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                                   const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
                                   MomentumPushType momentum_push_type)
 {
-    ABLASTR_PROFILE("PhysicalParticleContainer::PushP()");
+    ABLASTR_PROFILE_GPU_SYNC("PhysicalParticleContainer::PushP()");
 
     if (do_not_push) { return; }
 

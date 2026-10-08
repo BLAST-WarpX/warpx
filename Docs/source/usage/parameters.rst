@@ -4322,14 +4322,6 @@ Additional parameters
     Note that if Perfectly Matched Layers (PML) are used, synchronization of the ``E`` and ``B`` fields
     is performed at every timestep regardless of this parameter.
 
-.. pp:param:: warpx.do_device_synchronize
-    :type: ``bool``
-    :default: ``1``
-    :optional:
-
-    When running in an accelerated platform, whether to call a ``amrex::Gpu::synchronize()`` around profiling regions.
-    This allows the profiler to give meaningful timers, but (hardly) slows down the simulation.
-
 .. pp:param:: warpx.sort_intervals
     :type: ``string``
     :default: s: ``-1`` on CPU; ``4`` on GPU

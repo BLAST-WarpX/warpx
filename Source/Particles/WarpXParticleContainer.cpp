@@ -504,7 +504,8 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             direct_current_dep_kernel);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::EsirkepovCurrentDepKernel",
             esirkepov_current_dep_kernel);
-    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit);
+    ABLASTR_PROFILE_VAR_NS_GPU_SYNC("WarpXParticleContainer::DepositCurrent::CurrentDeposition",
+            blp_deposit);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate);
 
     // Get tile box where current is deposited.
