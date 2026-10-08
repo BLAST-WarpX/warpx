@@ -1156,6 +1156,14 @@ WarpX::OneStep_sub1 (Real cur_time)
 
     bool const skip_lev0_coarse_patch = true;
 
+    // buffers are only allocated with warpx.n_current_deposition_buffer > 0
+    const ablastr::fields::MultiLevelVectorField J_buf = m_fields.has_vector(FieldType::current_buf, fine_lev) ?
+        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch) :
+        ablastr::fields::MultiLevelVectorField{static_cast<size_t>(finest_level+1)};
+    const ablastr::fields::MultiLevelScalarField rho_buf = m_fields.has(FieldType::rho_buf, fine_lev) ?
+        m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch) :
+        ablastr::fields::MultiLevelScalarField{static_cast<size_t>(finest_level+1)};
+
     // i) Push particles and fields on the fine patch (first fine step)
     PushParticlesandDeposit(fine_lev, cur_time, SubcyclingHalf::FirstHalf);
     RestrictCurrentFromFineToCoarsePatch(
@@ -1206,16 +1214,14 @@ WarpX::OneStep_sub1 (Real cur_time)
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
-        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch), coarse_lev);
+        J_buf, coarse_lev);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
-        m_fields.has(FieldType::rho_cp, finest_level) &&
-        m_fields.has(FieldType::rho_buf, finest_level)) {
+        m_fields.has(FieldType::rho_cp, finest_level)) {
         AddRhoFromFineLevelandSumBoundary(
             m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
             m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
-            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch),
-            coarse_lev, 0, ncomps);
+            rho_buf, coarse_lev, 0, ncomps);
     }
 
     EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time);
@@ -1289,17 +1295,14 @@ WarpX::OneStep_sub1 (Real cur_time)
     AddCurrentFromFineLevelandSumBoundary(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
-        m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch),
-        coarse_lev);
+        J_buf, coarse_lev);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
-        m_fields.has(FieldType::rho_cp, finest_level) &&
-        m_fields.has(FieldType::rho_buf, finest_level)) {
+        m_fields.has(FieldType::rho_cp, finest_level)) {
         AddRhoFromFineLevelandSumBoundary(
             m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
             m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
-            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch),
-            coarse_lev, ncomps, ncomps);
+            rho_buf, coarse_lev, ncomps, ncomps);
     }
 
     EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time + 0.5_rt * dt[fine_lev]);
