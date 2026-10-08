@@ -505,9 +505,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
         species.add_new_group_attr(source_name, "npart", layout.n_macroparticles)
 
         # --- Total number of real particles
-        species.add_new_group_attr(source_name, "npart_real", self.n_physical_particles)
+        n_physical_particles = self.n_physical_particles
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "npart_real", density_scale)
+            n_physical_particles *= density_scale
+        species.add_new_group_attr(source_name, "npart_real", n_physical_particles)
 
         # --- The PICMI standard doesn't yet have a way of specifying these values.
         # --- They should default to the size of the domain. They are not typically
@@ -742,9 +743,10 @@ class UniformDistribution(
 
         # --- Only constant density is supported by this class
         species.add_new_group_attr(source_name, "profile", "constant")
-        species.add_new_group_attr(source_name, "density", self.density)
+        density = self.density
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "density", density_scale)
+            density *= density_scale
+        species.add_new_group_attr(source_name, "density", density)
 
 
 class FluxDistributionBase(object):
@@ -816,8 +818,6 @@ class AnalyticFluxDistribution(
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
-        if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
         expression = pywarpx.my_constants.mangle_expression(self.flux, self.mangle_dict)
         if density_scale is None:
             species.add_new_group_attr(
@@ -850,9 +850,11 @@ class UniformFluxDistribution(
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "constant")
-        species.add_new_group_attr(source_name, "flux", self.flux)
+        flux = self.flux
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
+            # self.flux is a string (picmistandard stores it as an expression)
+            flux = "{}*({})".format(density_scale, flux)
+        species.add_new_group_attr(source_name, "flux", flux)
 
 
 class AnalyticDistribution(
