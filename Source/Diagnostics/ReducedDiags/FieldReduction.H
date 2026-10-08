@@ -157,7 +157,7 @@ public:
         {
             // Make the box cell centered in preparation for the interpolation (and to avoid
             // including ghost cells in the calculation)
-            const amrex::Box& box = enclosedCells(mfi.nodaltilebox());
+            const amrex::Box& box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const auto& arrEx = Ex[mfi].array();
             const auto& arrEy = Ey[mfi].array();
             const auto& arrEz = Ez[mfi].array();

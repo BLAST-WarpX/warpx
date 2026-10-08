@@ -31,7 +31,7 @@ public:
     MatrixSolverOps& operator= (MatrixSolverOps&&) noexcept = delete;
 
     /** \brief Update internal state for a new linearization point. */
-    virtual void Update (const T& a_U) = 0;
+    virtual void Update () = 0;
 
     /** x[i] = b[i] / diag(A)[i] */
     virtual void InitialGuess (T& a_x, const T& a_b) = 0;

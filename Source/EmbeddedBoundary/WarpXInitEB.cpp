@@ -85,6 +85,7 @@ WarpX::InitEB ()
     BL_PROFILE("InitEB");
 
     const amrex::ParmParse pp_warpx("warpx");
+    pp_warpx.query("build_eb_data_per_level", m_build_eb_data_per_level);
     std::string impf;
     pp_warpx.query("eb_implicit_function", impf);
     if (! impf.empty()) {
@@ -97,7 +98,16 @@ WarpX::InitEB ()
          // number (e.g., maxLevel()+20) for multigrid solvers.  Because the coarse
          // level has only 1/8 of the cells on the fine level, the memory usage should
          // not be an issue.
-        amrex::EB2::Build(gshop, Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        if (m_build_eb_data_per_level) {
+            // Build the EB data independently at each mesh-refinement level's own resolution.
+            for (int ilev = 0; ilev <= maxLevel(); ++ilev) {
+                amrex::EB2::Build(gshop, Geom(ilev), 0, 20);
+                m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+            }
+        } else {
+            // Build the EB data once at the finest level and coarsen it for coarser levels.
+            amrex::EB2::Build(gshop, Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        }
     } else {
         amrex::ParmParse pp_eb2("eb2");
         if (!pp_eb2.contains("geom_type")) {
@@ -105,7 +115,16 @@ WarpX::InitEB ()
             pp_eb2.add("geom_type", geom_type); // use all_regular by default
         }
         // See the comment above on amrex::EB2::Build for the hard-wired number 20.
-        amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        if (m_build_eb_data_per_level) {
+            // Build the EB data independently at each mesh-refinement level's own resolution.
+            for (int ilev = 0; ilev <= maxLevel(); ++ilev) {
+                amrex::EB2::Build(Geom(ilev), 0, 20);
+                m_eb_index_space.push_back(&(amrex::EB2::IndexSpace::top()));
+            }
+        } else {
+            // Build the EB data once at the finest level and coarsen it for coarser levels.
+            amrex::EB2::Build(Geom(maxLevel()), maxLevel(), maxLevel()+20);
+        }
     }
 #endif
 }
@@ -119,9 +138,9 @@ WarpX::ComputeDistanceToEB ()
 #ifdef AMREX_USE_EB
     BL_PROFILE("ComputeDistanceToEB");
     using warpx::fields::FieldType;
-    const amrex::EB2::IndexSpace& eb_is = amrex::EB2::IndexSpace::top();
     for (int lev=0; lev<=maxLevel(); lev++) {
-        const amrex::EB2::Level& eb_level = eb_is.getLevel(Geom(lev));
+        auto const* eb_index_space = GetEBIndexSpace(lev);
+        const amrex::EB2::Level& eb_level = eb_index_space->getLevel(Geom(lev));
         auto const eb_fact = fieldEBFactory(lev);
         amrex::FillSignedDistance(*m_fields.get(FieldType::distance_to_eb, lev), eb_level, eb_fact, 1);
     }

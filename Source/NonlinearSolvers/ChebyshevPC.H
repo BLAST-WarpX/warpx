@@ -55,7 +55,7 @@ public:
 
     void Define (const T&, Ops*) override;
 
-    void Update (const T& a_U) override;
+    void Update () override;
 
     void Apply (T&, const T&) override;
 
@@ -125,7 +125,7 @@ void ChebyshevPC<T,Ops>::Define (const T& a_U,
 }
 
 template <class T, class Ops>
-void ChebyshevPC<T,Ops>::Update (const T& a_U)
+void ChebyshevPC<T,Ops>::Update ()
 {
     BL_PROFILE("ChebyshevPC::Update()");
     using namespace amrex;
@@ -134,7 +134,7 @@ void ChebyshevPC<T,Ops>::Update (const T& a_U)
         IsDefined(),
         "ChebyshevPC::Update() called on undefined object");
 
-    m_solver.Update(a_U);
+    m_solver.Update();
 }
 
 template <class T, class Ops>

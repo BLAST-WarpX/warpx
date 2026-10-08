@@ -8,9 +8,12 @@
 #define WARPX_PARTICLEBOUNDARYPROCESS_H_
 
 #include "EmbeddedBoundary/DistanceToEB.H"
+#include "Initialization/SampleGaussianFluxDistribution.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/Pusher/UpdatePosition.H"
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/WarpXAlgorithmSelection.H"
+#include "Utils/WarpXConst.H"
 
 #include <ablastr/particles/NodalFieldGather.H>
 
@@ -53,19 +56,29 @@ struct Absorb {
     }
 };
 
-/** \brief Specular reflection off the embedded boundary.
+/** \brief Particle interaction with the embedded boundary, for the
+ *         ``Reflecting`` and ``Thermal`` values of ``boundary.particle_eb``.
  *
  *  For each particle that has crossed into the EB (distance_to_eb < 0), this functor:
  *   - Bisects along the particle trajectory to find the contact point on
  *     the EB surface (where distance_to_eb = 0).
  *   - Computes the surface normal at the exact contact point.
- *   - Performs specular reflection on the momentum: u_new = u - 2*(u . n)*n.
- *   - Advances the particle from the contact point with the reflected
+ *   - Sets the new velocity of the particle, depending on m_boundary_type:
+ *     - Reflecting: specular reflection, u_new = u - 2*(u . n)*n.
+ *     - Thermal: re-emission from a wall Maxwellian (fully accommodating
+ *       diffuse wall): a half-Maxwellian flux distribution along the
+ *       (outward, into the domain) normal, and a full Maxwellian in the
+ *       tangential plane, with thermal speed m_uth (same convention as the
+ *       domain thermal particle boundary, see
+ *       ApplyParticleBoundaries::thermalize_boundary_particle).
+ *   - Advances the particle from the contact point with the new
  *     velocity for the remaining fraction of the timestep.
  */
-struct Reflect {
+struct ParticleBoundaryInteraction {
     amrex::Real m_dt;
     amrex::ParticleReal m_mass;
+    ParticleBoundaryType m_boundary_type;
+    amrex::ParticleReal m_uth = amrex::ParticleReal(0.);
 
     template <typename PData>
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -75,7 +88,7 @@ struct Reflect {
                      amrex::Array4<const amrex::Real> const& distance_to_eb,
                      amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& plo,
                      amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dxi,
-                     amrex::RandomEngine const& /*engine*/) const noexcept
+                     amrex::RandomEngine const& engine) const noexcept
     {
         using namespace amrex::literals;
 
@@ -83,7 +96,7 @@ struct Reflect {
         amrex::ParticleReal const uy = ptd.m_rdata[PIdx::uy][i];
         amrex::ParticleReal const uz = ptd.m_rdata[PIdx::uz][i];
 
-        // Find the point of contat with the EB surface
+        // Find the point of contact with the EB surface
         // Bisect along trajectory to find the fraction of dt
         // to walk backward from end-of-step to reach distance_to_eb = 0.
         amrex::Real const dt = m_dt;
@@ -105,26 +118,52 @@ struct Reflect {
         UpdatePosition(x_c, y_c, z_c, ux, uy, uz, -dt_fraction * dt, mass);
 
         // Compute the surface normal vector at the contact point, in 3D
-        // Cartesian coordinates (as is the velocity below).
+        // Cartesian coordinates (as is the velocity below). The normal
+        // points away from the EB solid, into the domain (gas region).
         auto const n3d = DistanceToEB::interp_normal(x_c, y_c, z_c, plo, dxi, distance_to_eb);
         amrex::ParticleReal const n3d_x = n3d[0];
         amrex::ParticleReal const n3d_y = n3d[1];
         amrex::ParticleReal const n3d_z = n3d[2];
 
-        // Specular reflection: u_refl = u - 2 (u.n) n
-        amrex::ParticleReal const u_dot_n = ux*n3d_x + uy*n3d_y + uz*n3d_z;
-        amrex::ParticleReal const ux_refl = ux - 2.0_prt * u_dot_n * n3d_x;
-        amrex::ParticleReal const uy_refl = uy - 2.0_prt * u_dot_n * n3d_y;
-        amrex::ParticleReal const uz_refl = uz - 2.0_prt * u_dot_n * n3d_z;
-        // Store reflected velocity
-        ptd.m_rdata[PIdx::ux][i] = ux_refl;
-        ptd.m_rdata[PIdx::uy][i] = uy_refl;
-        ptd.m_rdata[PIdx::uz][i] = uz_refl;
+        amrex::ParticleReal ux_new = 0._prt, uy_new = 0._prt, uz_new = 0._prt;
+        if (m_boundary_type == ParticleBoundaryType::Thermal) {
+            // Re-emit the particle in the (half-Maxwellian normal, full
+            // Maxwellian tangential) wall distribution. First draw an
+            // isotropic Maxwellian velocity in 3D, then replace the component
+            // along the normal by a (positive) half-Maxwellian flux velocity,
+            // directed into the domain along n3d. Since n3d is a unit vector,
+            // subtracting the current normal projection (u_iso . n3d) and
+            // adding u_flux leaves the tangential components untouched.
+            auto const cc = static_cast<amrex::ParticleReal>(PhysConst::c);
+            amrex::ParticleReal const ux_iso =
+                cc * static_cast<amrex::ParticleReal>(amrex::RandomNormal(0._rt, m_uth, engine));
+            amrex::ParticleReal const uy_iso =
+                cc * static_cast<amrex::ParticleReal>(amrex::RandomNormal(0._rt, m_uth, engine));
+            amrex::ParticleReal const uz_iso =
+                cc * static_cast<amrex::ParticleReal>(amrex::RandomNormal(0._rt, m_uth, engine));
+            amrex::ParticleReal const u_flux = cc * static_cast<amrex::ParticleReal>(
+                generateGaussianFluxDist(0._rt, m_uth, engine));
+            amrex::ParticleReal const u_iso_dot_n = ux_iso*n3d_x + uy_iso*n3d_y + uz_iso*n3d_z;
+            ux_new = ux_iso + (u_flux - u_iso_dot_n)*n3d_x;
+            uy_new = uy_iso + (u_flux - u_iso_dot_n)*n3d_y;
+            uz_new = uz_iso + (u_flux - u_iso_dot_n)*n3d_z;
+        } else {
+            // Specular reflection: u_refl = u - 2 (u.n) n
+            amrex::ParticleReal const u_dot_n = ux*n3d_x + uy*n3d_y + uz*n3d_z;
+            ux_new = ux - 2.0_prt * u_dot_n * n3d_x;
+            uy_new = uy - 2.0_prt * u_dot_n * n3d_y;
+            uz_new = uz - 2.0_prt * u_dot_n * n3d_z;
+        }
 
-        // Advance from the contact point, with the reflected velocity,
-        // for the remaining fraction of the timestep
+        // Store the new velocity
+        ptd.m_rdata[PIdx::ux][i] = ux_new;
+        ptd.m_rdata[PIdx::uy][i] = uy_new;
+        ptd.m_rdata[PIdx::uz][i] = uz_new;
+
+        // Advance from the contact point, with the new velocity, for the
+        // remaining fraction of the timestep.
         amrex::ParticleReal x_new = x_c, y_new = y_c, z_new = z_c;
-        UpdatePosition(x_new, y_new, z_new, ux_refl, uy_refl, uz_refl,
+        UpdatePosition(x_new, y_new, z_new, ux_new, uy_new, uz_new,
                        dt_fraction * dt, mass);
         // SetParticlePosition handles the conversion to the stored
         // (reduced-dimension) coordinates.

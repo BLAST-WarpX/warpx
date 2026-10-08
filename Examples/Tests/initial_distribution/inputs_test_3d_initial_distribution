@@ -29,7 +29,7 @@ algo.particle_shape = 1
 #################################
 ############ PLASMA #############
 #################################
-particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_drift maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser
+particles.species_names = gaussian maxwell_boltzmann maxwell_juttner maxwell_juttner_drift maxwell_juttner_low_theta beam maxwell_juttner_parser velocity_constant velocity_parser uniform gaussian_parser gaussian_momentum_from_file
 particles.rigid_injected_species = beam
 
 gaussian.charge                     = -q_e
@@ -188,6 +188,18 @@ gaussian_parser.ux_std_function(x,y,z) = "0.2*abs(z)"
 gaussian_parser.uy_std_function(x,y,z) = "0.21*abs(z)"
 gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
 
+gaussian_momentum_from_file.charge                     = -q_e
+gaussian_momentum_from_file.mass                       = m_e
+gaussian_momentum_from_file.injection_style            = "NRandomPerCell"
+gaussian_momentum_from_file.num_particles_per_cell     = 1000
+gaussian_momentum_from_file.profile                    = constant
+gaussian_momentum_from_file.density                    = 1.0e21
+gaussian_momentum_from_file.momentum_distribution_type = "maxwellian"
+gaussian_momentum_from_file.maxwellian_u_mean_distribution_type = "read_from_file"
+gaussian_momentum_from_file.read_u_mean_from_path = "../test_3d_initial_distribution_prepare/example-u-mean.h5"
+gaussian_momentum_from_file.maxwellian_u_std_distribution_type = "read_from_file"
+gaussian_momentum_from_file.read_u_std_from_path = "../test_3d_initial_distribution_prepare/example-u-std.h5"
+
 #################################
 ########## DIAGNOSTIC ###########
 #################################
@@ -201,6 +213,7 @@ gaussian_parser.uz_std_function(x,y,z) = "0.22*abs(z)"
 # 8 for cuboid in momentum space
 # 10 for maxwell-juttner with low theta (Gaussian fallback)
 # 11 for maxwell-juttner with constant diagonal bulk drift
+# 12 for maxwellian with mean and standard deviation from openPMD files
 warpx.reduced_diags_names              = h1x h1y h1z h2x h2y h2z h3 h3_filtered h4x h4y h4z bmmntr h5_neg h5_pos h6 h6uy h7 h7uy_pos h7uy_neg h8x h8y h8z h9x h9y h9z h10 h11
 
 h1x.type                                 = ParticleHistogram
@@ -465,3 +478,4 @@ bmmntr.species                           = beam
 diagnostics.diags_names = diag1
 diag1.intervals = 1000
 diag1.diag_type = Full
+diag1.format = openpmd

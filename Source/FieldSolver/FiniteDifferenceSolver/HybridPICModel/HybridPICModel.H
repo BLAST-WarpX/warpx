@@ -33,10 +33,23 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_DistributionMapping.H>
+#include <AMReX_Enum.H>
 
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
+
+/** Sampling of the density that decides the vacuum-seam treatment of the
+ *  generalized Ohm's law: the holmstrom vacuum branch when
+ *  hybrid_pic_model.holmstrom_vacuum_region is on and the density-floor
+ *  selection of the guarded Hall term otherwise. Node and Cell are
+ *  vacuum-favoring and supported in Cartesian geometry only. */
+AMREX_ENUM(VacuumSeamSwitchMode,
+    Edge, /**< legacy per-component edge average; the E components of a cell can take inconsistent branches at the plasma/vacuum seam */
+    Node, /**< minimum over the component's edge-endpoint nodes */
+    Cell  /**< minimum over the component's adjacent cells of the node-averaged density: a single decision for all three components of an index */
+);
 
 /**
  * \brief This class contains the parameters needed to evaluate hybrid field
@@ -186,23 +199,63 @@ public:
 
     /**
      * \brief
-     * Function to calculate the electron pressure using the simulation charge
-     * density. Used in the Ohm's law solver (kinetic-fluid hybrid model).
+     * Function to calculate the electron pressure, and the closure's electron
+     * temperature alongside it, from the simulation charge density. Used in the
+     * Ohm's law solver (kinetic-fluid hybrid model).
+     *
+     * \param[in] floor_density if true, evaluate the closure on the floored
+     *            density max(n_e, n_floor) instead of the raw n_e, so T_e
+     *            flattens to T_e0 (n_floor/n0)^(gamma-1) below the floor rather
+     *            than decaying towards zero with n_e. The QDSMC electron-energy
+     *            equation needs that flattened state from its seed: it is the
+     *            transport's zero-gradient state (K_e uniform, floored halo
+     *            included), whereas a halo whose T_e decays to ~0 acts as an
+     *            absorbing K_e = 0 boundary. Off by default, leaving the
+     *            algebraic closure path evaluated on the raw density.
      */
-    void CalculateElectronPressure () const;
-    void CalculateElectronPressure (int lev) const;
+    void CalculateElectronPressure (bool floor_density = false) const;
+    void CalculateElectronPressure (int lev, bool floor_density = false) const;
+
+    /**
+     * \brief Compute the electron fluid velocity V_e on the grid from the
+     * deposited ion current and the plasma current: V_e = (J_i - J_plasma)/rho,
+     * with rho floored at m_n_floor * q_e. Used by the resistive-drag operator.
+     */
+    void CalculateElectronFluidVelocity () const;
+    void CalculateElectronFluidVelocity (int lev) const;
+
+    /**
+     * \brief Compute the per-species ion bulk velocity Vs = Js/rhos on the
+     * grid for every charged, depositing species. Output is stored in
+     * Vs_fp_{species} (face-staggered like J). Used by the resistive-drag
+     * operator to apply a velocity-independent shift
+     * (V_s - V_e)(1 - exp(-nu dt)), gathered at each particle's position,
+     * leaving the thermal moment intact.
+     */
+    void CalculateIonFluidVelocity () const;
+    void CalculateIonFluidVelocity (int lev) const;
 
     /**
      * \brief Fill the electron pressure multifab given the kinetic particle
      * charge density (and assumption of quasi-neutrality) using the user
-     * specified electron equation of state.
+     * specified electron equation of state. The closure's electron temperature,
+     * T_e = T0 (n_e/n0)^(gamma-1), is filled at the same time (P_e = n_e T_e
+     * is formed from it). That T_e is diagnostic-only on this path: with
+     * solve_electron_energy_equation on, this function is not called and
+     * T_e is owned by the QDSMC entropy transport, which fills Te/Pe at
+     * this same point in the field loop.
      *
      * \param[out] Pe_field scalar electron pressure MultiFab at a given level
+     * \param[out] Te_field scalar electron temperature MultiFab (in Kelvin) at a given level
      * \param[in] rho_field scalar ion charge density Multifab at a given level
+     * \param[in] floor_density evaluate the closure at max(rho, q_e n_floor)
+     *            instead of rho
      */
     void FillElectronPressureMF (
         amrex::MultiFab& Pe_field,
-        amrex::MultiFab const& rho_field ) const;
+        amrex::MultiFab& Te_field,
+        amrex::MultiFab const& rho_field,
+        bool floor_density = false ) const;
 
     /**
      * \brief Fill the nodal V_e = -(J_plasma - J_i) / (q_e n_e) MultiFabs by
@@ -218,8 +271,10 @@ public:
 
     /**
      * \brief Fill the nodal K_e = T_e * n_e^(1-gamma) * (k_B / q_e) MultiFab
-     *        from the current T_e and rho_fp_temp (= rho at n+1/2). Cells with
-     *        rho <= rho_floor are left at 0.
+     *        from the current T_e and rho_fp_temp (= rho at n+1/2), using the
+     *        floored density max(n_e, n_floor) so below-floor (halo) cells
+     *        carry a valid K_e instead of acting as an absorbing K_e = 0
+     *        boundary.
      *
      *        Reads hybrid_electron_temperature_fp (T_e in K) and
      *        hybrid_rho_fp_temp; writes hybrid_entropy_fp.
@@ -230,9 +285,10 @@ public:
      * \brief After the QDSMC scatter, recover T_e^{n+1} from
      *           T_e = (deposited K*N) / (deposited N) / n_e^(1-gamma)
      *                 / (k_B / q_e)
-     *        using rho at n+1 (rho_fp), the deposited entropy field
-     *        (hybrid_entropy_fp), and the deposited weight field
-     *        (hybrid_qdsmc_weights_fp).
+     *        using the floored density max(n_e, n_floor) from rho at n+1
+     *        (rho_fp), the deposited entropy field (hybrid_entropy_fp), and
+     *        the deposited weight field (hybrid_qdsmc_weights_fp). Cells that
+     *        received no deposited weight keep their previous T_e.
      *
      *        Writes hybrid_electron_temperature_fp.
      */
@@ -289,12 +345,13 @@ public:
      * \brief Ion-heating operator: a stochastic drag-diffusion applied to
      *        every ion. It delivers both electron-ion energy channels:
      *
-     *   dv_p = -nu_ei (v_p - u_e) dt + sqrt(2 D dt) R,   D = D_qei + D_redir,
+     *   dv_p = -nu_ei (v_p - u_i) dt + sqrt(2 D dt) R,   D = D_qei + D_redir,
      *
      * with R a unit-variance Gaussian vector. The Q_ei conjugate (when
-     * m_include_temperature_relaxation) supplies the drag toward the electron
-     * fluid u_e and the thermal diffusion D_qei = nu_ei k_B T_e / m_i, relaxing
-     * the ions toward a Maxwellian at T_e (T_i -> T_e at rate 2 nu_ei). The
+     * m_include_temperature_relaxation) acts about the ion bulk u_i and supplies
+     * thermal diffusion D_qei = nu_ei k_B T_e / m_i, relaxing the ions toward a
+     * Maxwellian at T_e (T_i -> T_e at rate 2 nu_ei) without changing the ion
+     * bulk momentum. The
      * Te-threshold Joule redirection (when \c redirect_E is non-null) supplies
      * an additional pure-diffusion heating sig_redir^2 = E_s/m_i that injects,
      * in expectation, the redirected electron energy per cell. Either or both
@@ -339,8 +396,66 @@ public:
      */
     void AdvanceElectronEnergyQDSMC (amrex::Real dt) const;
 
+    /**
+     * \brief Compute the per-species resistive friction added to Ohm's-law E
+     *        alongside the global +eta_global * J term:
+     *
+     *           F_d(i,j,k) = Sigma_s [ eta_s_per * rho_s * rho / rho_sum
+     *                                  * (V_s_d - V_e_d) ]
+     *
+     *        summed over charged species that have a per-species
+     *        resistivity parser registered. The total friction term that
+     *        Ohm's law sees becomes
+     *
+     *           E_friction = +eta_global * J + F
+     *                      = +e * Sigma_s Z_s * (eta_global + eta_s_per) * n_s
+     *                                       * (V_s - V_e)
+     *
+     *        i.e. effectively eta_s_eff = eta_global + eta_s_per per species.
+     *
+     *        Because V_e = (J_i - J_plasma)/rho and the subcycled B-field
+     *        integration re-evaluates J_plasma from the live B at every
+     *        stage, F is stored in two parts so that its J_plasma response
+     *        stays live inside the substep loop while the slow, per-step
+     *        moments (V_s, J_i, rho_s, T_e) stay lagged:
+     *
+     *          hybrid_eta_overlay_coef_fp:
+     *              eta_coef = Sigma_s max(eta_s_per, 0) * max(rho_s, 0) / rho_sum,
+     *              the lagged per-species resistivity coefficient that the
+     *              E-solve multiplies by the live plasma current, exactly
+     *              like the global eta;
+     *          hybrid_eta_overlay_fp:
+     *              F - eta_coef * J_plasma, the ion-drift remainder, frozen
+     *              like the deposited ion moments themselves.
+     *
+     *        The E-solve applies overlay_d + eta_coef_d * J_d, which equals
+     *        F exactly at the J_plasma this function was called with and
+     *        responds dissipatively (like +eta*J) as J_plasma evolves
+     *        through the substeps. Applying F as a fixed vector instead
+     *        would act as a constant source over the half-step: in high-eta
+     *        regions it would keep driving B long after the current it was
+     *        computed from has relaxed, anti-damping the whistler modes the
+     *        friction is meant to damp and collapsing the adaptive substep
+     *        size at plasma-vacuum interfaces.
+     *
+     *        Outputs are the registered hybrid_eta_overlay_fp and
+     *        hybrid_eta_overlay_coef_fp fields at the Jx/Jy/Jz staggering
+     *        (== E component staggering). Returns early when
+     *        m_has_per_species_eta is false (the fields are then not
+     *        allocated). Called from HybridPICEvolveFields before each
+     *        half-step B-advance, so each half integrates about the most
+     *        recent J_plasma linearization point.
+     */
+    void ComputeResistiveOverlay () const;
+    void ComputeResistiveOverlay (int lev) const;
+
     /** Check if rkf45 should be used */
     [[nodiscard]] bool DoRKF45(int step) const { return m_rkf45_intervals.contains(step); }
+
+    /** True after HybridPICInitializeRhoJandB() completes for this model.
+     *  Preserve the initialized state across repeated Evolve() calls, while
+     *  allowing the first deposition on a newly constructed restart instance. */
+    bool m_evolve_initialized = false;
 
     // Declare variables to hold hybrid-PIC model parameters
     /** Number of substeps to take when evolving B (also used as initial substep
@@ -363,7 +478,11 @@ public:
 
     bool m_holmstrom_vacuum_region = false;
 
-    /** Electron temperature in eV */
+    /** Density sampling for the vacuum-seam decision, see VacuumSeamSwitchMode. */
+    VacuumSeamSwitchMode m_vacuum_seam_switch_mode = VacuumSeamSwitchMode::Edge;
+
+    /** Electron temperature: read from the input in eV, converted to
+     * k_B T_e in J at the end of ReadParameters. */
     amrex::Real m_elec_temp;
     /** Reference electron density */
     amrex::Real m_n0_ref = 1.0;
@@ -384,12 +503,15 @@ public:
 
     /** Resistive electron-heating source on T_e (see Phys. Plasmas 31, 012902 (2024), Eq. 12),
      * computed per cell as
-     *     S_e = Sigma_s nu_{s,e} n_s m_s |dV|^2,
-     *         nu_{s,e} = Z_s e^2 eta n_e / m_s,   dV = J_plasma / (e n_e),
-     * from the nodal plasma current, the per-species charge densities and
-     * the Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
-     * eta J^2 in single species. Only consulted when
-     * m_solve_electron_energy_equation is also true. */
+     *     S_e = Sigma_s nu_{s,e} n_s m_s |V_s - V_e|^2,
+     *         nu_{s,e} = Z_s e^2 eta n_e / m_s,
+     * from the gridded Vs_fp_s, Ve_fp, rho_fp(_s) fields and the
+     * Ohm's-law eta parser. Single bool: on or off. Reduces exactly to
+     * eta J^2 in single species; resolves inter-species drift-dispersion
+     * heating in multispecies. Orthogonal to whether HybridResistiveDrag
+     * is registered on ions (that controls particle dynamics, not the
+     * T_e source). Only consulted when m_solve_electron_energy_equation
+     * is also true. */
     bool m_include_joule_heating = false;
 
     /** Te-threshold Joule redirection. When active, the eta*J^2 Joule source in
@@ -421,12 +543,6 @@ public:
     std::unique_ptr<amrex::Parser> m_nu_ei_parser;
     amrex::ParserExecutor<4> m_nu_ei;
 
-    /** Density floor used when dividing by the deposited QDSMC weight to
-     * recover K_e^{n+1} from (K*N) / N. Avoids divide-by-zero in cells
-     * that no QDSMC particle reached during the push. Defaults to the
-     * same floor as the rest of the hybrid solver. */
-    amrex::Real m_qdsmc_n_floor = 1.0;
-
     /** Plasma density floor - if n < n_floor it will be set to n_floor */
     amrex::Real m_n_floor = 1.0;
 
@@ -436,6 +552,55 @@ public:
     amrex::ParserExecutor<3> m_eta;
     bool m_resistivity_has_J_dependence = false;
 
+    /** Per-species resistivity overlay (see Phys. Plasmas 31, 012902 (2024), Eq. 10).
+     *  Optional. For any charged species {spec} for which the user provides
+     *
+     *      hybrid_pic_model.plasma_resistivity_{spec}(rho_s,rho,Te,J,J_s,B,t) = "..."
+     *
+     *  the parser is compiled and stored here. The total per-species
+     *  effective resistivity used by Ohm's law, the Joule-heating source,
+     *  and the resistive-drag operator is
+     *
+     *      eta_s_eff = eta_global(rho, |J|, t)              [the global m_eta]
+     *                + eta_per_species_s(rho_s, rho, Te,    [this map]
+     *                                    |J|, |J_s|, |B|, t)
+     *
+     *  so the global parser remains the shared anomalous (e.g. Chodura)
+     *  layer and the per-species parser overlays species-resolved physics
+     *  (e.g. classical Spitzer with Z^2 scaling). Species without a
+     *  per-species parser registered fall back to the global parser only.
+     *  Parser variables, in order, are:
+     *    rho_s : per-species charge density        (C/m^3)
+     *    rho   : total plasma charge density       (C/m^3)
+     *    Te    : electron temperature              (Kelvin)
+     *    J     : |J_plasma|                        (A/m^2)
+     *    J_s   : |J_{species}|                     (A/m^2)
+     *    B     : |B|                               (Tesla)
+     *    t     : time                              (seconds)
+     */
+    std::map<std::string, std::unique_ptr<amrex::Parser>> m_per_species_resistivity_parser;
+    std::map<std::string, amrex::ParserExecutor<7>>       m_eta_per_species;
+    /** True if at least one species has a registered per-species
+     *  resistivity parser. Set in ReadParameters (so AllocateLevelMFs can
+     *  gate the overlay fields); the parsers are compiled in InitData. */
+    bool m_has_per_species_eta = false;
+
+    /** True when a hybrid_resistive_drag collision is present in the input
+     *  deck. Set in ReadParameters. When true, the resistive terms of Ohm's
+     *  law (eta*J and the per-species overlay) are included in EVERY E-solve,
+     *  including the particle-push field: the drag supplies the
+     *  species-resolved -R_s half of the electron-ion friction and the
+     *  resistive push-field E supplies the +(rho_s/rho) Sum_t R_t half; only
+     *  their sum conserves momentum. */
+    bool m_has_resistive_drag = false;
+
+    /** Names of the species that have a hybrid_resistive_drag collision
+     *  registered. Filled in ReadParameters; InitData requires this to cover
+     *  every charged species when the drag is used at all (a species without
+     *  the drag would feel the resistive push-field force with no
+     *  compensating friction). */
+    std::set<std::string> m_resistive_drag_species;
+
     /** False until the first AdvanceElectronEnergyQDSMC of the run has
      *  filled hybrid_current_fp_plasma. On later steps J_plasma is already
      *  valid from the previous step's final E-solve (B is unchanged in
@@ -443,13 +608,21 @@ public:
      *  because it is a lazily-set cache flag inside a const call chain. */
     mutable bool m_qdsmc_J_plasma_valid = false;
 
-    /** True when the per-species deposited charge densities rho_fp_{spec}
-     *  are needed, i.e. when the electron-energy equation is solved (its
-     *  Joule and Q_ei sources read the per-species charge densities).
-     *  Gates their allocation and the per-species deposition path in
-     *  HybridPICDepositRhoAndJ; when false, the deposition falls back to
-     *  the single-pass MultiParticleContainer path with zero extra cost.
+    /** True when the gridded fluid velocities Ve_fp / Vs_fp_{spec} are
+     *  needed, i.e. when a per-species resistivity parser is registered,
+     *  a hybrid_resistive_drag collision is present, or electron-ion thermal
+     *  relaxation is enabled in the input deck.
+     *  Gates their allocation and the once-per-step
+     *  CalculateElectronFluidVelocity / CalculateIonFluidVelocity calls.
      *  Set in ReadParameters. */
+    bool m_need_fluid_velocities = false;
+
+    /** True when the per-species deposited fields current_fp_{spec} /
+     *  rho_fp_{spec} are needed, i.e. when m_need_fluid_velocities is true
+     *  or the electron-energy equation is solved (its Joule and Q_ei
+     *  sources read the per-species charge densities). Gates their
+     *  allocation and the per-species deposition path in
+     *  HybridPICDepositRhoAndJ. Set in ReadParameters. */
     bool m_need_per_species_fields = false;
 
     /** Plasma hyper-resisitivity */
@@ -498,23 +671,6 @@ public:
      *  because its lifetime is tied to the electron-energy equation that
      *  the hybrid model is responsible for. */
     std::unique_ptr<QdsmcParticleContainer> m_qdsmc_pc;
-};
-
-/**
- * \brief
- * This struct contains only static functions to compute the electron pressure
- * using the particle density at a given point and the user provided reference
- * density and temperatures.
- */
-struct ElectronPressure {
-
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static amrex::Real get_pressure (amrex::Real const n0,
-                                     amrex::Real const T0,
-                                     amrex::Real const gamma,
-                                     amrex::Real const rho) {
-        return n0 * T0 * std::pow((rho/PhysConst::q_e)/n0, gamma);
-    }
 };
 
 #endif // WARPX_HYBRIDPICMODEL_H_

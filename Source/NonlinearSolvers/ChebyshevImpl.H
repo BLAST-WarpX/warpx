@@ -57,10 +57,11 @@ public:
      */
     void Define (MatrixSolverOps<T>* a_ops, const std::string& a_pp_prefix);
 
-    /** \brief Update matrix ops and estimate eigenvalues if needed. */
-    void Update (const T& a_U);
+    /** \brief Update matrix ops. */
+    void Update ();
 
-    /** \brief Solve A x = b using Chebyshev iteration. */
+    /** \brief Solve A x = b using Chebyshev iteration.
+     *         Estimates the eigenvalue bounds on the first call if needed. */
     void Solve (T& a_x, const T& a_b);
 
     void printParameters (const std::string& a_name) const;
@@ -78,7 +79,7 @@ public:
 private:
 
     /** \brief Estimate the largest eigenvalue of D^{-1} A via power method. */
-    void EstimateLargestEigenvalue (const T& a_ref);
+    void EstimateLargestEigenvalue ();
 
     bool m_is_defined = false;
     std::string m_name = "chebyshev";
@@ -135,38 +136,22 @@ void ChebyshevImpl<T>::Define (MatrixSolverOps<T>* a_ops,
 }
 
 template <class T>
-void ChebyshevImpl<T>::Update (const T& a_U)
+void ChebyshevImpl<T>::Update ()
 {
-    m_ops->Update(a_U);
-
-    if (!m_work_defined) {
-        m_x_old.Define(a_U);
-        m_w1.Define(a_U);
-        m_w2.Define(a_U);
-        m_work_defined = true;
-    }
-
-    if (!m_eigenvalues_estimated) {
-        EstimateLargestEigenvalue(a_U);
-    }
+    m_ops->Update();
 }
 
 template <class T>
-void ChebyshevImpl<T>::EstimateLargestEigenvalue (const T& a_ref)
+void ChebyshevImpl<T>::EstimateLargestEigenvalue ()
 {
     using namespace amrex;
 
     // Power method: repeatedly compute v = D^{-1} A v, normalize
     // Uses m_w1, m_w2 as work vectors
 
-    // Initialize v for power iteration (use m_w1)
-    m_w1.Copy(a_ref);
-    RT vnorm = m_w1.norm2();
-    if (vnorm < RT(1.0e-30)) {
-        // a_ref is zero (e.g. initial E=0); seed with ones instead
-        m_w1.setVal(RT(1.0));
-        vnorm = m_w1.norm2();
-    }
+    // Initialize v for power iteration (use m_w1) with a constant vector
+    m_w1.setVal(RT(1.0));
+    const RT vnorm = m_w1.norm2();
     m_w1.scale(RT(1.0) / vnorm);
 
     RT lambda_est = RT(0);
@@ -234,6 +219,17 @@ void ChebyshevImpl<T>::Solve (T& a_x, const T& a_b)
                     << " (rel.)\n";
         }
         return;
+    }
+
+    // Work vectors and eigenvalue bounds are set up on the first solve
+    if (!m_work_defined) {
+        m_x_old.Define(a_b);
+        m_w1.Define(a_b);
+        m_w2.Define(a_b);
+        m_work_defined = true;
+    }
+    if (!m_eigenvalues_estimated) {
+        EstimateLargestEigenvalue();
     }
 
     // Chebyshev parameters from eigenvalue bounds of D^{-1} A

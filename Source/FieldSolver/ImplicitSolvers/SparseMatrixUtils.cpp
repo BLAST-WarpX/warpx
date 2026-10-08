@@ -38,7 +38,7 @@ void SparseMatrixUtils::BuildExtendedDOFVector (
         });
     amrex::Gpu::streamSynchronize();
 
-    const auto* dofs = a_V.getDOFsObject().get();
+    const auto* dofs = WarpXSolverVec::getDOFsObject().get();
     const auto& dofs_mfarrvec = dofs->m_array;
     const auto& data_mfarrvec = a_V.getArrayVec();
 

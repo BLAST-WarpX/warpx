@@ -60,7 +60,7 @@ public:
     void Define (MatrixSolverOps<T>* a_ops, const std::string& a_pp_prefix);
 
     /** \brief Update matrix ops and re-estimate omega if adaptive. */
-    void Update (const T& a_U);
+    void Update ();
 
     /** \brief Solve A x = b using weighted Jacobi iteration. */
     void Solve (T& a_x, const T& a_b);
@@ -124,9 +124,9 @@ void WeightedJacobiImpl<T>::Define (MatrixSolverOps<T>* a_ops,
 }
 
 template <class T>
-void WeightedJacobiImpl<T>::Update (const T& a_U)
+void WeightedJacobiImpl<T>::Update ()
 {
-    m_matrix_ops->Update(a_U);
+    m_matrix_ops->Update();
 
     if (m_adaptive_omega) {
         m_omega = m_matrix_ops->EstimateOmega();

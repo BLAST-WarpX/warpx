@@ -365,7 +365,8 @@ PhysicalParticleContainer::PhysicalParticleContainer (AmrCore* amr_core, int isp
     m_boundary_conditions.Set_reflect_all_velocities(flag);
 
     // currently supports only isotropic thermal distribution
-    // same distribution is applied to all boundaries
+    // same distribution is applied to all boundaries (the domain faces and,
+    // when boundary.particle_eb = thermal, the embedded boundary)
     const amrex::ParmParse pp_species_boundary("boundary." + species_name);
     if (WarpX::isAnyParticleBoundaryThermal()) {
         amrex::Real boundary_uth = 0;
@@ -1733,13 +1734,14 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
                          blp_resample_actual);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_synchronization);
-    const amrex::Real global_numparts = TotalNumberOfParticles();
+    amrex::Real global_numparts = TotalNumberOfParticles();
     ABLASTR_PROFILE_VAR_STOP(blp_resample_synchronization);
 
     ABLASTR_PROFILE_VAR_START(blp_resample_actual);
     if (m_resampler.triggered(timestep, global_numparts))
     {
         Redistribute();
+        global_numparts = TotalNumberOfParticles();
         for (int lev = 0; lev <= maxLevel(); lev++)
         {
             for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
@@ -1749,10 +1751,15 @@ void PhysicalParticleContainer::resample (const amrex::Vector<amrex::Geometry>& 
         }
         deleteInvalidParticles();
         if (verbose) {
+            const amrex::Long new_global_numparts = TotalNumberOfParticles();
             amrex::Print() << Utils::TextMsg::Info(
                 "Resampled " + species_name + " at step " + std::to_string(timestep)
                 + ": macroparticle count decreased by "
-                + std::to_string(static_cast<int>(global_numparts - TotalNumberOfParticles()))
+                + std::to_string(static_cast<int>(global_numparts - new_global_numparts))
+                + " from "
+                + std::to_string(static_cast<int>(global_numparts))
+                + " to "
+                + std::to_string(new_global_numparts)
             );
         }
     }
@@ -2137,7 +2144,13 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
         amrex::MultiFab*  vbary_mf = local_temperature_arrays->get("vbar", Direction{1}, lev);
         amrex::MultiFab*  vbarz_mf = local_temperature_arrays->get("vbar", Direction{2}, lev);
 
-        // Normalize variance after accumulating sums cell by cell
+        // Normalize variance after accumulating sums cell by cell.
+        // Use tilebox(ixType, nGrow) so each component is converted to its
+        // staggered index type (and grown). growntilebox(ixType) treats the
+        // IntVect as extra ghost growth, not an index-type conversion, and can
+        // miss valid staggered points at grid boundaries.
+        const bool single_pass = (depos_type == TemperatureDepositionType::SINGLE_PASS);
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -2159,12 +2172,12 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
             amrex::Array4<amrex::Real> const& vybar_arr = vbary_mf->array(mfi);
             amrex::Array4<amrex::Real> const& vzbar_arr = vbarz_mf->array(mfi);
 
-            const amrex::Box& tbx  = mfi.growntilebox( T_vf[lev][0]->ixType().toIntVect() );
-            const amrex::Box& tby  = mfi.growntilebox( T_vf[lev][1]->ixType().toIntVect() );
-            const amrex::Box& tbz  = mfi.growntilebox( T_vf[lev][2]->ixType().toIntVect() );
-
-
-            const bool single_pass = (depos_type == warpx::particles::deposition::TemperatureDepositionType::SINGLE_PASS);
+            const amrex::Box tbx = mfi.tilebox(T_vf[lev][0]->ixType().toIntVect(),
+                                               T_vf[lev][0]->nGrowVect());
+            const amrex::Box tby = mfi.tilebox(T_vf[lev][1]->ixType().toIntVect(),
+                                               T_vf[lev][1]->nGrowVect());
+            const amrex::Box tbz = mfi.tilebox(T_vf[lev][2]->ixType().toIntVect(),
+                                               T_vf[lev][2]->nGrowVect());
 
             // Update Mean and Variance values after running through weight deposition loop
             amrex::ParallelFor(tbx, tby, tbz,
@@ -2210,7 +2223,6 @@ PhysicalParticleContainer::AccumulateVelocitiesAndComputeTemperature (
                         }
                     }
                 });
-
         }
 
         amrex::Gpu::streamSynchronize();

@@ -35,7 +35,7 @@ then
 fi
 
 # optimize CUDA compilation for A100
-export AMREX_CUDA_ARCH=8.0
+export CUDAARCHS=80
 
 # compiler environment hints
 export CXX=$(which g++)

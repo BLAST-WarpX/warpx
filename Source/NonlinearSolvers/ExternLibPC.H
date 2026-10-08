@@ -46,7 +46,7 @@ class ExternLibPC : public Preconditioner<T,Ops>
 
         void Define (const T&, Ops*) override;
 
-        void Update (const T& a_U) override;
+        void Update () override;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS.
@@ -111,7 +111,7 @@ void ExternLibPC<T,Ops>::Define ( const T& a_U,
 }
 
 template <class T, class Ops>
-void ExternLibPC<T,Ops>::Update (const T& a_U)
+void ExternLibPC<T,Ops>::Update ()
 {
     BL_PROFILE("ExternLibPC::Update()");
 
@@ -119,7 +119,7 @@ void ExternLibPC<T,Ops>::Update (const T& a_U)
         IsDefined(),
         "ExternLibPC::Update() called on undefined object");
 
-    m_ops->AssemblePCMatrix(a_U);
+    m_ops->AssemblePCMatrix();
 
     if (m_verbose) {
         amrex::Print() << "Updated " << m_name

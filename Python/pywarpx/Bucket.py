@@ -5,6 +5,8 @@
 #
 # License: BSD-3-Clause-LBNL
 
+import copy
+
 import numpy as np
 
 
@@ -17,11 +19,39 @@ class Bucket(object):
     def __init__(self, instancename, **defaults):
         self._localsetattr("instancename", instancename)
         self._localsetattr("argvattrs", {})
-        for name, value in defaults.items():
-            self.add_new_attr(name, value)
+        # pristine snapshot for set_default_attrs(): deep-copied, so that
+        # mutating a mutable default (e.g. appending to species_names) cannot
+        # change it
+        self._localsetattr("_defaults", copy.deepcopy(defaults))
+        self.set_default_attrs()
 
     def _localsetattr(self, name, value):
         object.__setattr__(self, name, value)
+
+    def set_default_attrs(self):
+        """Set the attributes given at construction time to their defaults.
+
+        The defaults are deep-copied, so that mutable defaults (e.g.
+        ``species_names=[]``) are never shared between calls.
+        """
+        for name, value in copy.deepcopy(self._defaults).items():
+            self.add_new_attr(name, value)
+
+    def clear(self):
+        """Reset this bucket to its construction-time defaults.
+
+        This is used by :meth:`pywarpx.WarpX.finalize` so that a second simulation
+        in the same Python process starts from a clean input deck.
+        """
+        self.argvattrs.clear()
+
+        # drop instance attributes (prefix: "_", see `add_new_attr`) that were
+        # added after construction
+        for name in list(vars(self)):
+            if name.startswith("_") and name != "_defaults":
+                object.__delattr__(self, name)
+
+        self.set_default_attrs()
 
     def add_new_attr(self, name, value):
         """Names starting with "_" are made instance attributes.

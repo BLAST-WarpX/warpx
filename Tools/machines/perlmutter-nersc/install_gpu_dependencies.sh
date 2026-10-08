@@ -40,6 +40,10 @@ python3 -m pip uninstall -qq -y pywarpx
 python3 -m pip uninstall -qq -y warpx
 python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 
 # General extra dependencies ##################################################
 #
@@ -67,33 +71,33 @@ cd $HOME/src/boost-temp/boost_1_82_0
 cd -
 rm -rf $HOME/src/boost-temp
 
-# c-blosc (I/O compression)
-if [ -d $HOME/src/c-blosc ]
+# c-blosc2 (I/O compression)
+if [ -d $HOME/src/c-blosc2 ]
 then
-  cd $HOME/src/c-blosc
-  git fetch --prune
-  git checkout v1.21.1
+  cd $HOME/src/c-blosc2
+  git fetch --prune --tags
+  git checkout v2.23.1
   cd -
 else
-  git clone -b v1.21.1 https://github.com/Blosc/c-blosc.git $HOME/src/c-blosc
+  git clone -b v2.23.1 https://github.com/Blosc/c-blosc2.git $HOME/src/c-blosc2
 fi
-rm -rf $HOME/src/c-blosc-pm-gpu-build
-cmake -S $HOME/src/c-blosc -B ${build_dir}/c-blosc-pm-gpu-build -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc-1.21.1
-cmake --build ${build_dir}/c-blosc-pm-gpu-build --target install --parallel ${PARALLEL}
-rm -rf ${build_dir}/c-blosc-pm-gpu-build
+rm -rf $HOME/src/c-blosc2-pm-gpu-build
+cmake -S $HOME/src/c-blosc2 -B ${build_dir}/c-blosc2-pm-gpu-build -DBUILD_STATIC=OFF -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXAMPLES=OFF -DDEACTIVATE_AVX2=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/c-blosc2-2.23.1
+cmake --build ${build_dir}/c-blosc2-pm-gpu-build --target install --parallel ${PARALLEL}
+rm -rf ${build_dir}/c-blosc2-pm-gpu-build
 
 # ADIOS2
 if [ -d $HOME/src/adios2 ]
 then
   cd $HOME/src/adios2
-  git fetch --prune
-  git checkout v2.10.2
+  git fetch --prune --tags
+  git checkout v2.12.1
   cd -
 else
-  git clone -b v2.10.2 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
+  git clone -b v2.12.1 https://github.com/ornladios/ADIOS2.git $HOME/src/adios2
 fi
 rm -rf $HOME/src/adios2-pm-gpu-build
-cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-gpu-build -DADIOS2_USE_Blosc=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.10.2
+cmake -S $HOME/src/adios2 -B ${build_dir}/adios2-pm-gpu-build -DADIOS2_USE_Blosc2=ON -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_Python=OFF -DADIOS2_USE_ZeroMQ=OFF -DCMAKE_INSTALL_PREFIX=${SW_DIR}/adios2-2.12.1
 cmake --build ${build_dir}/adios2-pm-gpu-build --target install -j ${PARALLEL}
 rm -rf ${build_dir}/adios2-pm-gpu-build
 
@@ -101,7 +105,7 @@ rm -rf ${build_dir}/adios2-pm-gpu-build
 if [ -d $HOME/src/blaspp ]
 then
   cd $HOME/src/blaspp
-  git fetch --prune
+  git fetch --prune --tags
   git checkout v2024.05.31
   cd -
 else
@@ -116,7 +120,7 @@ rm -rf ${build_dir}/blaspp-pm-gpu-build
 if [ -d $HOME/src/lapackpp ]
 then
   cd $HOME/src/lapackpp
-  git fetch --prune
+  git fetch --prune --tags
   git checkout v2024.05.31
   cd -
 else
@@ -131,7 +135,6 @@ rm -rf ${build_dir}/lapackpp-pm-gpu-build
 #
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade virtualenv
-python3 -m pip cache purge
 rm -rf ${SW_DIR}/venvs/warpx-gpu
 python3 -m venv ${SW_DIR}/venvs/warpx-gpu
 source ${SW_DIR}/venvs/warpx-gpu/bin/activate
@@ -150,9 +153,9 @@ python3 -m pip install --upgrade matplotlib
 python3 -m pip install --upgrade yt
 # install or update WarpX dependencies
 python3 -m pip install --upgrade -r $HOME/src/warpx/requirements.txt
-python3 -m pip install --upgrade cupy-cuda12x  # CUDA 12 compatible wheel
+python3 -m pip install --upgrade cupy-cuda13x  # CUDA 13 compatible wheel
 # optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-python3 -m pip install --upgrade torch  # CUDA 12 compatible wheel
+python3 -m pip install --upgrade torch --index-url https://download.pytorch.org/whl/cu132  # CUDA 13.2 compatible wheel
 python3 -m pip install --upgrade optimas[all]
 python3 -m pip install --upgrade lasy
 

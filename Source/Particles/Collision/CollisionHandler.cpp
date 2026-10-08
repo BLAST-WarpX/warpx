@@ -9,6 +9,7 @@
 #include "Particles/Collision/BackgroundMCC/BackgroundMCCCollision.H"
 #include "Particles/Collision/PulsedDecay/PulsedDecay.H"
 #include "Particles/Collision/BackgroundStopping/BackgroundStopping.H"
+#include "Particles/Collision/HybridResistiveDrag/HybridResistiveDrag.H"
 #include "Particles/Collision/BinaryCollision/BinaryCollision.H"
 #include "Particles/Collision/BinaryCollision/Bremsstrahlung/BremsstrahlungFunc.H"
 #include "Particles/Collision/BinaryCollision/Bremsstrahlung/PhotonCreationFunc.H"
@@ -69,6 +70,9 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
         else if (type == "background_stopping") {
             allcollisions[i] = std::make_unique<BackgroundStopping>(collision_names[i]);
         }
+        else if (type == "hybrid_resistive_drag") {
+            allcollisions[i] = std::make_unique<HybridResistiveDrag>(collision_names[i]);
+        }
         else if (type == "dsmc") {
             allcollisions[i] =
                 std::make_unique<BinaryCollision<DSMCFunc, SplitAndScatterFunc>>(
@@ -111,6 +115,14 @@ CollisionHandler::CollisionHandler(MultiParticleContainer const * const mypc)
 
 }
 
+/* \brief Allocate any data needed for the collision */
+void CollisionHandler::AllocData ()
+{
+    for (auto& collision : allcollisions) {
+        collision->AllocData();
+    }
+}
+
 /** Perform all collisions
  *
  * @param step Current iteration
@@ -151,6 +163,10 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
     }
 
     for (auto& collision : allcollisions) {
+        // Skip collisions before their start step
+        const int start_step = collision->get_start_step();
+        if (step < start_step) { continue; }
+
         const int ndt = collision->get_ndt();
         const auto collision_stepping_mode = collision->get_collision_stepping_mode();
 
@@ -162,8 +178,9 @@ void CollisionHandler::doCollisions ( int step, amrex::Real cur_time, amrex::Rea
                 collision->doCollisions(sub_time, dt_sub, mypc);
             }
         } else {
-            // Supercycle: run once every ndt PIC steps, with dt_collision = dt * ndt
-            if ( step % ndt == 0 ) {
+            // Supercycle: run once every ndt PIC steps (counted from start_step),
+            // with dt_collision = dt * ndt
+            if ( (step - start_step) % ndt == 0 ) {
                 collision->doCollisions(cur_time, dt*ndt, mypc);
             }
         }

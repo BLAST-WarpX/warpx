@@ -61,6 +61,7 @@
 #include <AMReX_Array.H>
 #include <AMReX_Config.H>
 #ifdef AMREX_USE_EB
+#   include <AMReX_EB2.H>
 #   include <AMReX_EBFabFactory.H>
 #endif
 #include <AMReX_GpuContainers.H>
@@ -140,17 +141,18 @@ public:
     // Functions used by implicit solvers
     //
     void SyncMassMatricesPC ();
+    void SyncMassMatrices ();
     void SaveParticlesAtImplicitStepStart ();
     void FinishImplicitParticleUpdate (amrex::Real a_time);
     void SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_time );
     void UpdateMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
                                           amrex::Real a_thetadt, amrex::Real start_time );
-    void SpectralSourceFreeFieldAdvance ( amrex::Real start_time);
-    void FinishMagneticFieldAndApplyBCs ( ablastr::fields::MultiLevelVectorField const& a_Bn,
-                                          amrex::Real a_theta, amrex::Real a_time );
-    void FinishImplicitField ( const ablastr::fields::MultiLevelVectorField& Field_fp,
-                               const ablastr::fields::MultiLevelVectorField& Field_n,
-                               amrex::Real theta );
+    void SpectralSourceFreeFieldAdvance (amrex::Real start_time);
+    void FinishElectricFieldAndApplyBCs (amrex::Real a_theta, amrex::Real a_time);
+    void FinishMagneticFieldAndApplyBCs (amrex::Real a_theta, amrex::Real a_time);
+    void FinishImplicitField (const ablastr::fields::MultiLevelVectorField& Field_fp,
+                              const ablastr::fields::MultiLevelVectorField& Field_n,
+                              amrex::Real theta);
     void DepositMassMatrices ();
     void ImplicitComputeRHSE (         amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
     void ImplicitComputeRHSE (int lev, amrex::Real dt, WarpXSolverVec& a_Erhs_vec);
@@ -160,6 +162,8 @@ public:
     MultiFluidContainer& GetFluidContainer () { return *myfl; }
     ElectrostaticSolver& GetElectrostaticSolver () {return *m_electrostatic_solver;}
     [[nodiscard]] HybridPICModel * get_pointer_HybridPICModel () const { return m_hybrid_pic_model.get(); }
+    /** Return the implicit solver, or nullptr when the evolve scheme is explicit */
+    [[nodiscard]] ImplicitSolver * get_pointer_ImplicitSolver () const { return m_implicit_solver.get(); }
     MultiDiagnostics& GetMultiDiags () {return *multi_diags;}
     ParticleBoundaryBuffer& GetParticleBoundaryBuffer () { return *m_particle_boundary_buffer; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag() { return m_eb_update_E; }
@@ -277,6 +281,10 @@ public:
 
     //! Maximum number of allowed grid crossings for particles
     static int particle_max_grid_crossings;
+
+    //! Maximum number of allowed grid crossings for particles when using mass matrices for Jacobian
+    //! The Villasenor deposition requires this value at compile time for arrays used in the routine
+    static constexpr int villasenor_mass_matrices_max_grid_crossings = 3;
 
     //! Order of finite centering of fields (from staggered grid to nodal grid), along x
     static int field_centering_nox;
@@ -429,10 +437,9 @@ public:
     /**
      * Determine the simulation timestep from the time step limiters
      */
-    amrex::Real ParticleGridSpeedMax ();
     amrex::Real GlobalPlasmaFrequencyMax ();
     amrex::Real GlobalCyclotronFrequencyMax ();
-    void ApplyDtLimiters ();
+    void ApplyDtLimiters (int step);
 
     /** Print main PIC parameters to stdout */
     void PrintMainPICparameters ();
@@ -774,6 +781,24 @@ public:
         bool const step_after_start = (step >= start_moving_window_step);
         return do_moving_window && step_before_end && step_after_start;
     }
+    /** Physical distance the moving window travels in a single step of size dt
+     *
+     * Used every step in MoveWindow() to advance moving_window_x.
+     *
+     * @param dt time step size
+     */
+    static amrex::Real MovingWindowShiftPerStep (amrex::Real dt);
+    /** Number of cells by which the moving window has shifted past domain_lo
+     *
+     * The moving window position is continuous, but the domain and fields can
+     * only be shifted by an integer number of cells; this truncates the
+     * physical displacement to the grid, matching the alignment used in
+     * MoveWindow().
+     *
+     * @param displacement physical distance between the moving window and a reference point
+     * @param cell_size cell size in the moving window direction
+     */
+    static int NumCellsShifted (amrex::Real displacement, amrex::Real cell_size);
     static int moving_window_dir;
     static amrex::Real moving_window_v;
     static bool fft_do_time_averaging;
@@ -809,7 +834,7 @@ public:
     [[nodiscard]] amrex::IntVect get_numprocs() const {return numprocs;}
 
     /** Electrostatic solve call */
-    void ComputeSpaceChargeField (bool reset_E_field, bool reset_B_field);
+    void ComputeSpaceChargeField (bool reset_E_field, bool reset_B_field, bool verbose_step);
 
     // Magnetostatic Solver Interface
     MagnetostaticSolver::VectorPoissonBoundaryHandler m_vector_poisson_boundary_handler;
@@ -987,6 +1012,16 @@ public:
     //! This function is called in amrex::AmrCore::InitFromScratch.
     void PostProcessBaseGrids (amrex::BoxArray& ba0) const final;
 
+#ifdef AMREX_USE_EB
+    amrex::EB2::IndexSpace const* GetEBIndexSpace (int lev) const {
+        // If EB data was built separately for each mesh-refinement level, return the one for
+        // this level; otherwise return the single global EB data (built at the finest level
+        // and coarsened for coarser levels).
+        return (m_build_eb_data_per_level && lev < m_eb_index_space.size())
+            ? m_eb_index_space[lev] : &(amrex::EB2::IndexSpace::top());
+    }
+#endif
+
 protected:
 
     /**
@@ -1080,7 +1115,8 @@ private:
     void OneStep (
         amrex::Real a_cur_time,
         amrex::Real a_dt,
-        int a_step
+        int a_step,
+        bool verbose_step
     );
 
     void OneStep_nosub (
@@ -1207,7 +1243,9 @@ private:
     amrex::Vector<amrex::Real> dt;
     // How often to update the timestep when using adaptive timestepping
     ablastr::utils::text::IntervalsParser m_dt_update_interval;
+    ablastr::utils::text::IntervalsParser m_dt_update_write_interval;
     std::string m_dt_update_diagnostic_file;
+    void WriteDtUpdateFileHeader ();
 
     bool m_safe_guard_cells = false;
 
@@ -1261,10 +1299,12 @@ private:
      */
     amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
 
-    /** EB: for every mesh face flag_info_face contains a:
-     *          * 0 if the face needs to be extended
-     *          * 1 if the face is large enough to lend area to other faces
-     *          * 2 if the face is actually intruded by other face
+    /** EB: for every mesh face flag_info_face contains one of the FaceInfo::Flag values:
+     *          * FaceInfo::extended if the face needs to be extended
+     *          * FaceInfo::available if the face is large enough to lend area to other faces
+     *          * FaceInfo::intruded if the face is actually intruded by other face
+     *          * FaceInfo::bck_stabilized if the face could not be extended and was stabilized
+     *            with the BCK correction instead
      * It is initialized in WarpX::MarkExtensionCells
      * This is only used for the ECT solver.*/
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>, 3 > > m_flag_info_face;
@@ -1440,7 +1480,7 @@ private:
 
 
     //! If true, particles will be sorted in the order x -> y -> z -> ppc for faster deposition
-#if defined(AMREX_USE_CUDA)
+#if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
     bool m_sort_particles_for_deposition = true;
 #else
     bool m_sort_particles_for_deposition = false;
@@ -1657,6 +1697,15 @@ private:
      *        is set in WarpX::ReadParameters().
      */
     bool m_collisions_split_momentum_push;
+
+#ifdef AMREX_USE_EB
+    /** Whether to build the EB data separately for each mesh-refinement level (true, default),
+     *  instead of building it once at the finest level and coarsening it down for coarser levels.
+     *  Set via the runtime parameter "warpx.build_eb_data_per_level".
+     */
+    bool m_build_eb_data_per_level = true;
+    amrex::Vector<amrex::EB2::IndexSpace const*> m_eb_index_space;
+#endif
 };
 
 #endif

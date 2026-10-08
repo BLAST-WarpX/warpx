@@ -118,6 +118,9 @@ bibtex_default_style = "warpxbibstyle"
 #
 source_suffix = [".rst", ".md"]
 
+# Resolve MyST's Markdown cross-references against Sphinx's standard labels.
+myst_ref_domains = ["std"]
+
 # The master toctree document.
 master_doc = "index"
 

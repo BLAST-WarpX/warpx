@@ -138,7 +138,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb  # inputs
-    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_implicit_jfnk.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
@@ -158,7 +158,7 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb_filtered  # inputs
-    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_implicit_jfnk.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     OFF  # dependency
 )
@@ -168,8 +168,18 @@ add_warpx_test(
     2  # dims
     2  # nprocs
     inputs_test_2d_theta_implicit_jfnk_vandb_picmi.py  # inputs
-    "analysis_vandb_jfnk_2d.py diags/diag1000020"  # analysis
+    "analysis_implicit_jfnk.py diags/diag1000020"  # analysis
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_3d_theta_implicit_jfnk_direct  # name
+    3  # dims
+    2  # nprocs
+    inputs_test_3d_theta_implicit_jfnk_direct  # inputs
+    "analysis_implicit_jfnk.py diags/diag1000010"  # analysis
+    "analysis_default_regression.py --path diags/diag1000010"  # checksum
     OFF  # dependency
 )
 

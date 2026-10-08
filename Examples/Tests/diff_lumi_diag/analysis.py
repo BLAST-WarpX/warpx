@@ -18,7 +18,8 @@ with open(filename) as f:
     E_bin = np.array(list(map(float, re.findall("=(.*?)\(", line))))
 data = np.loadtxt(filename)
 dE_bin = E_bin[1] - E_bin[0]
-dL_dE_sim = data[-1, 2:]  # Differential luminosity at the end of the simulation
+dL_dE_sim = data[-1, 2:-1]  # Differential luminosity at the end of the simulation
+L_sim = data[-1, -1]  # Total luminosity at the end of the simulation
 
 # Beam parameters
 N = 1.2e10
@@ -37,6 +38,7 @@ dL_dE_th = (
     / (2 * (2 * np.pi) ** 1.5 * sigma_x * sigma_y * sigma_E)
     * np.exp(-((E_bin - 2 * E_beam) ** 2) / (2 * sigma_E**2))
 )
+L_th = N**2 / (4 * np.pi * sigma_x * sigma_y)
 
 # Extract the 2D differential luminosity from the file
 series = OpenPMDTimeSeries("./diags/reducedfiles/DifferentialLuminosity2d_beam1_beam2/")
@@ -63,22 +65,30 @@ print("test_name", test_name)
 if "leptons" in test_name:
     tol1 = 0.02
     tol2 = 0.04
+    tol3 = 0.002
 elif "photons" in test_name:
     # In the photons case, the particles are
     # initialized from a density distribution ;
-    # tolerance is larger due to lower particle statistics
+    # tol1 and tol2 are larger due to lower particle statistics
     tol1 = 0.021
     tol2 = 0.06
+    tol3 = 0.0002
 
 # Check that the 1D diagnostic and analytical result match
 error1 = abs(dL_dE_sim - dL_dE_th).max() / abs(dL_dE_th).max()
-print("Relative error: ", error1)
+print("Differential luminosity relative error: ", error1)
 print("Tolerance: ", tol1)
 
 # Check that the 2D and 1D diagnostics match
 error2 = abs(d2L_dE1_dE2_sim - d2L_dE1_dE2_th).max() / abs(d2L_dE1_dE2_th).max()
-print("Relative error: ", error2)
+print("Relative error between 2D and 1D diff lumi diags: ", error2)
 print("Tolerance: ", tol2)
+
+# Check that the total luminosity and analytical result match
+error3 = abs(L_sim - L_th) / abs(L_th)
+print("Total luminosity relative error: ", error3)
+print("Tolerance: ", tol3)
 
 assert error1 < tol1
 assert error2 < tol2
+assert error3 < tol3

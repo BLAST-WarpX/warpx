@@ -3,6 +3,7 @@
 
 #include "ChebyshevPC.H"  // IWYU pragma: export
 #include "CurlCurlMLMGPC.H"  // IWYU pragma: export
+#include "DarwinMLMGPC.H"  // IWYU pragma: export
 #include "ExternLibPC.H"  // IWYU pragma: export
 #include "JacobiPC.H"  // IWYU pragma: export
 #include "PreconditionerTypes.H"  // IWYU pragma: export

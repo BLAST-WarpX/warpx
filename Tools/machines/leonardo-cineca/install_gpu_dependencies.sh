@@ -22,6 +22,10 @@ SW_DIR="$HOME/sw"
 rm -rf ${SW_DIR}
 mkdir -p ${SW_DIR}
 
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 
 # General extra dependencies ##################################################
 #
@@ -80,7 +84,6 @@ rm -rf ${SW_DIR}/venvs/warpx
 python3 -m venv ${SW_DIR}/venvs/warpx
 source ${SW_DIR}/venvs/warpx/bin/activate
 python3 -m ensurepip --upgrade
-python3 -m pip cache purge
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging

@@ -50,6 +50,30 @@ using namespace amrex::literals;
 // matching order-1 (linear) nodal weights, so a marker at rest reproduces
 // its cell values exactly.
 
+namespace
+{
+    /** Return the physical volume represented by a QDSMC marker. */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real
+    qdsmc_physical_volume (
+        amrex::Real r,
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& dx)
+    {
+        amrex::Real vol = 1.0_rt;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            vol *= dx[d];
+        }
+#if defined(WARPX_DIM_RZ)
+        // The midpoint expression is the exact annular volume for every
+        // cell-centered marker, including the first radial cell at r = dr/2.
+        vol *= 2.0_rt * MathConst::pi * amrex::Math::abs(r);
+#else
+        amrex::ignore_unused(r);
+#endif
+        return vol;
+    }
+}
+
 
 QdsmcParticleContainer::QdsmcParticleContainer (amrex::AmrCore* amr_core)
     : amrex::ParticleContainerPureSoA<QdsmcPIdx::nattribs, 0>(amr_core->GetParGDB())
@@ -271,12 +295,7 @@ QdsmcParticleContainer::SetK (int lev,
     auto & warpx = WarpX::GetInstance();
     auto const plo = warpx.Geom(lev).ProbLoArray();
     auto const dxi = warpx.Geom(lev).InvCellSizeArray();
-    auto const * dx_arr = warpx.Geom(lev).CellSize();
-
-    amrex::Real cell_volume = 1.0_rt;
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-        cell_volume *= dx_arr[d];
-    }
+    auto const dx = warpx.Geom(lev).CellSizeArray();
 
     for (iterator pti(*this, lev); pti.isValid(); ++pti)
     {
@@ -299,17 +318,17 @@ QdsmcParticleContainer::SetK (int lev,
 
         amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
         {
-            // Linear gathers of the nodal charge density and entropy at the
-            // marker's home position; the marker then carries the electron
-            // count N of its cell and the matching entropy content K*N.
+            // Carry the extensive electron count N = n_e * cell_volume and the
+            // matching entropy content K*N. This conserves entropy when a
+            // marker moves across RZ cells with different physical volumes.
             amrex::Real const n_p = ablastr::particles::doGatherScalarFieldNodal(
                 x_node[ip], y_node[ip], z_node[ip], rho_arr, dxi, plo)
-                * cell_volume / PhysConst::q_e;
+                / PhysConst::q_e;
             amrex::Real const k_p = ablastr::particles::doGatherScalarFieldNodal(
                 x_node[ip], y_node[ip], z_node[ip], K_arr, dxi, plo);
 
-            np_real[ip] = n_p;
-            entropy[ip] = k_p * n_p;
+            np_real[ip] = n_p * qdsmc_physical_volume(x_node[ip], dx);
+            entropy[ip] = k_p * np_real[ip];
         });
     }
 
@@ -573,12 +592,8 @@ QdsmcParticleContainer::DepositField (int lev, amrex::MultiFab & Field)
 {
     ABLASTR_PROFILE("QdsmcParticleContainer::DepositField()");
 
-    // np_real carries the electron count n_e * V_cell; the 1/V_cell scale
-    // makes the deposited field an electron (number) density.
-    auto const * dx_arr = WarpX::GetInstance().Geom(lev).CellSize();
-    amrex::Real cell_volume = 1.0_rt;
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-        cell_volume *= dx_arr[d];
-    }
-    DepositScalar(lev, QdsmcPIdx::np_real, 1.0_rt / cell_volume, Field);
+    // np_real carries the extensive electron count N_e = n_e * V_phys.
+    // Deposit it without a second volume normalization; QDSMCUpdateTe uses
+    // the deposited entropy and count as an extensive ratio.
+    DepositScalar(lev, QdsmcPIdx::np_real, 1.0_rt, Field);
 }

@@ -6,8 +6,96 @@
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 
+#include <AMReX_GpuAtomic.H>
+#include <AMReX_GpuContainers.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Print.H>
+
+#include <sstream>
+
 using namespace amrex;
 using namespace amrex::literals;
+
+void ImplicitSolver::FinishImplicitParticleUpdate (
+    amrex::Real const time,
+    int const step)
+{
+    m_WarpX->FinishImplicitParticleUpdate(time);
+
+    std::map<std::string, amrex::Long> local_suborbit_counts;
+    for (auto const& pc : m_WarpX->GetPartContainer()) {
+        if (!pc->HasiAttrib("nsuborbits")) { continue; }
+
+        amrex::Gpu::Buffer<amrex::Long> suborbit_count({0});
+        amrex::Long* const suborbit_count_ptr = suborbit_count.data();
+
+        for (int lev = 0; lev <= m_WarpX->finestLevel(); ++lev) {
+#ifdef AMREX_USE_OMP
+#pragma omp parallel
+#endif
+            {
+                for (WarpXParIter pti(*pc, lev); pti.isValid(); ++pti) {
+                    int const* const nsuborbits =
+                        pti.GetiAttribs("nsuborbits").dataPtr();
+                    long const np = pti.numParticles();
+                    int const suborbit_warning_threshold = m_suborbit_warning_threshold;
+                    amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (long ip)
+                    {
+                        if (nsuborbits[ip] >= suborbit_warning_threshold) {
+                            amrex::Gpu::Atomic::Add(
+                                suborbit_count_ptr, amrex::Long(1));
+                        }
+                    });
+                }
+            }
+        }
+
+        local_suborbit_counts[pc->getName()] =
+            *(suborbit_count.copyToHost());
+    }
+
+    AccumulateSuborbitStatistics(local_suborbit_counts, step);
+}
+
+void ImplicitSolver::AccumulateSuborbitStatistics (
+    std::map<std::string, amrex::Long> const& local_suborbit_counts,
+    int const step)
+{
+    if (m_suborbit_statistics_start_step < 0) {
+        m_suborbit_statistics_start_step = step+1;
+    }
+    for (auto const& [species, local_count] : local_suborbit_counts) {
+        m_accumulated_suborbit_counts[species] += local_count;
+    }
+
+    if ((step+1) % m_suborbit_statistics_interval != 0) { return; }
+
+    std::stringstream statistics_msg;
+    amrex::Long global_total = 0;
+    bool have_statistics = false;
+    if (amrex::ParallelDescriptor::IOProcessor()) {
+        statistics_msg << "During steps "
+                       << m_suborbit_statistics_start_step << "-" << step+1
+                       << ", particles requiring " << m_suborbit_warning_threshold
+                       << " or more suborbits by species:\n";
+    }
+    for (auto& [species, local_count] : m_accumulated_suborbit_counts) {
+        amrex::Long global_count = local_count;
+        amrex::ParallelDescriptor::ReduceLongSum(global_count);
+        if (amrex::ParallelDescriptor::IOProcessor() && global_count > 0) {
+            statistics_msg << "  " << species << ": " << global_count << "\n";
+            global_total += global_count;
+            have_statistics = true;
+        }
+        local_count = 0;
+    }
+    if (amrex::ParallelDescriptor::IOProcessor() && have_statistics) {
+        statistics_msg << "  total: " << global_total;
+        amrex::Print() << "\nSuborbit particle statistics:\n"
+                       << statistics_msg.str() << "\n\n";
+    }
+    m_suborbit_statistics_start_step = step+2;
+}
 
 void ImplicitSolver::CreateParticleAttributes () const
 {
@@ -477,6 +565,44 @@ void ImplicitSolver::ApplyMassMatrices (
     }
 }
 
+void ImplicitSolver::AssertMassMatricesStencilNotClipped (
+    const ablastr::fields::MultiLevelVectorField& a_out,
+    const ablastr::fields::MultiLevelVectorField& a_in ) const
+{
+    // Number of components of the mass matrix S_ab, which maps a_in[b] to a_out[a]
+    const amrex::IntVect ncomp[3][3] = {{m_ncomp_xx, m_ncomp_xy, m_ncomp_xz},
+                                        {m_ncomp_yx, m_ncomp_yy, m_ncomp_yz},
+                                        {m_ncomp_zx, m_ncomp_zy, m_ncomp_zz}};
+
+    // The check does not depend on the position of the box, so use a single
+    // cell-centered cell as the valid box, as in the loops of ApplyMassMatrices
+    const amrex::Box validbox(amrex::IntVect(0), amrex::IntVect(0));
+
+    for (int lev = 0; lev < static_cast<int>(a_out.size()); ++lev) {
+        for (int a = 0; a < 3; ++a) {
+            const amrex::IntVect out_nodal = a_out[lev][a]->ixType().toIntVect();
+            const amrex::Box outb = amrex::convert(validbox, a_out[lev][a]->ixType());
+            for (int b = 0; b < 3; ++b) {
+                const amrex::IntVect in_nodal = a_in[lev][b]->ixType().toIntVect();
+                amrex::Box in_fullb = amrex::convert(validbox, a_in[lev][b]->ixType());
+                in_fullb.grow(a_in[lev][b]->nGrowVect());
+                for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+                    // Same stencil offset and extent as in ApplyMassMatrices
+                    const int offset = (out_nodal[dir] > in_nodal[dir]) ? (ncomp[a][b][dir]/2)
+                                                                        : ((ncomp[a][b][dir]-1)/2);
+                    const bool fits =
+                        (outb.smallEnd(dir) - offset >= in_fullb.smallEnd(dir)) &&
+                        (outb.bigEnd(dir) + ncomp[a][b][dir]-1-offset <= in_fullb.bigEnd(dir));
+                    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fits,
+                        "The stencil of the mass matrices reaches beyond the guard cells "
+                        "of the field they are applied to, and would be silently clipped "
+                        "in ImplicitSolver::ApplyMassMatrices.");
+                }
+            }
+        }
+    }
+}
+
 void ImplicitSolver::ComputeJfromMassMatrices (const bool  a_J_from_MM_only)
 {
     BL_PROFILE("ImplicitSolver::ComputeJfromMassMatrices()");
@@ -533,6 +659,8 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         pp.query("particle_tolerance", m_particle_tolerance);
         pp.query("particle_suborbits", m_particle_suborbits);
         pp.query("print_unconverged_particle_details", m_print_unconverged_particle_details);
+        pp.query("suborbit_warning_threshold", m_suborbit_warning_threshold);
+        pp.query("suborbit_statistics_interval", m_suborbit_statistics_interval);
         pp.query("use_mass_matrices_jacobian", m_use_mass_matrices_jacobian);
         pp.query("use_mass_matrices_pc", m_use_mass_matrices_pc);
         if (m_use_mass_matrices_jacobian || m_use_mass_matrices_pc) {
@@ -545,20 +673,8 @@ void ImplicitSolver::parseNonlinearSolverParams ( const amrex::ParmParse&  pp )
         }
         if (m_use_mass_matrices_pc) {
             m_mass_matrices_pc_width = 0;
-#if AMREX_SPACEDIM != 3
             pp.query("mass_matrices_pc_width", m_mass_matrices_pc_width);
-#endif
         }
-#if defined(WARPX_DIM_RSPHERE)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices,
-            "Using mass matrices is not setup for DIM = RSPHERE!");
-#endif
-#if defined(WARPX_DIM_3D)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            !m_use_mass_matrices_jacobian,
-            "Using mass matrices for jacobian can not be used for DIM = 3");
-#endif
         if ( (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor ||
               WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) &&
              (WarpX::nox < 2) ) {
@@ -676,14 +792,20 @@ void ImplicitSolver::InitializeMassMatrices ()
             }
         }
         else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-#ifndef WARPX_DIM_3D
-            const int max_crossings = ngJ[0] - shape + 1;
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings > 0,
+#ifdef WARPX_DIM_3D
+            WARPX_ABORT_WITH_MESSAGE(
+                "Mass matrices for Jacobian with Villasenor deposition are not yet implemented "
+                "in 3D. Use algo.current_deposition = direct.");
+#else
+            const int max_grid_crossings = ngJ[0] - shape / 2;
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_grid_crossings > 0,
                 "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings > 0.");
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings == m_WarpX->particle_max_grid_crossings,
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_grid_crossings == WarpX::particle_max_grid_crossings,
                 "Guard cells for J are not consistent with particle_max_grid_crossings.");
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(max_crossings <= 2,
-                "Mass Matrices for Jacobian with Villasenor deposition requires particles.max_grid_crossings <= 2.");
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                max_grid_crossings <= WarpX::villasenor_mass_matrices_max_grid_crossings,
+                "Mass matrices for the Jacobian with Villasenor deposition support "
+                "particles.max_grid_crossings <= WarpX::villasenor_mass_matrices_max_grid_crossings.");
 #endif
             // Comment on direction-dependent number of mass matrices components
             // set below for charge-conserving Villasenor deposition:
@@ -692,47 +814,47 @@ void ImplicitSolver::InitializeMassMatrices ()
             // 1 + 2*shape       (both comps nodal)
 #if defined(WARPX_DIM_1D_Z)
             // x and y are nodal, z is centered
-            m_ncomp_xx[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_xy[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_yx[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_yz[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zy[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zz[0] = 1 + 2*(shape-1) + 2*max_crossings;
+            m_ncomp_xx[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_xy[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yx[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yz[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zy[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zz[0] = 1 + 2*(shape-1) + 2*max_grid_crossings;
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // x is centered, y and z are nodal
-            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_crossings;
-            m_ncomp_xy[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_yx[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_yz[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zy[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_zz[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_grid_crossings;
+            m_ncomp_xy[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yx[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yz[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zy[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zz[0] = 1 + 2*shape + 2*max_grid_crossings;
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // dir = 0: x is centered, y and z are nodal
-            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_crossings;
-            m_ncomp_xy[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_xz[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_yx[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_yy[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_yz[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_zx[0] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zy[0] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_zz[0] = 1 + 2*shape + 2*max_crossings;
+            m_ncomp_xx[0] = 1 + 2*(shape-1) + 2*max_grid_crossings;
+            m_ncomp_xy[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_xz[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yx[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yy[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yz[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zx[0] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zy[0] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zz[0] = 1 + 2*shape + 2*max_grid_crossings;
             // dir = 1: x and y are nodal, z is centered
-            m_ncomp_xx[1] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_xy[1] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_xz[1] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_yx[1] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_yy[1] = 1 + 2*shape + 2*max_crossings;
-            m_ncomp_yz[1] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zx[1] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zy[1] = 0 + 2*shape + 2*max_crossings;
-            m_ncomp_zz[1] = 1 + 2*(shape-1) + 2*max_crossings;
+            m_ncomp_xx[1] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_xy[1] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_xz[1] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yx[1] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yy[1] = 1 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_yz[1] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zx[1] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zy[1] = 0 + 2*shape + 2*max_grid_crossings;
+            m_ncomp_zz[1] = 1 + 2*(shape-1) + 2*max_grid_crossings;
 #endif
             for (int dir=0; dir<AMREX_SPACEDIM; dir++) {
                 Nc_tot_xx *= m_ncomp_xx[dir];
@@ -847,9 +969,9 @@ void ImplicitSolver::PreLinearSolve ()
     if (m_use_mass_matrices) {
 
         m_WarpX->DepositMassMatrices();
+        FinishMassMatricesDeposition();
 
         if (m_use_mass_matrices_jacobian) {
-            FinishMassMatrices();
             SaveE();
         }
 
@@ -948,6 +1070,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     const int diag_comp_xx = (AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2])-1)/2;
     const int diag_comp_yy = (AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2])-1)/2;
     const int diag_comp_zz = (AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2])-1)/2;
+    int MM_ncomp_xx[3] = {1, 1, 1};
+    int MM_ncomp_yy[3] = {1, 1, 1};
+    int MM_ncomp_zz[3] = {1, 1, 1};
     int MM_PC_ncomp_xx[3] = {1, 1, 1};
     int MM_PC_ncomp_yy[3] = {1, 1, 1};
     int MM_PC_ncomp_zz[3] = {1, 1, 1};
@@ -955,6 +1080,9 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
     int MM_PC_width_yy[3] = {0, 0, 0};
     int MM_PC_width_zz[3] = {0, 0, 0};
     for (int dir = 0; dir < AMREX_SPACEDIM; dir++) {
+        MM_ncomp_xx[dir]     = m_ncomp_xx[dir];
+        MM_ncomp_yy[dir]     = m_ncomp_yy[dir];
+        MM_ncomp_zz[dir]     = m_ncomp_zz[dir];
         MM_PC_ncomp_xx[dir]  = m_ncomp_pc_xx[dir];
         MM_PC_ncomp_yy[dir]  = m_ncomp_pc_yy[dir];
         MM_PC_ncomp_zz[dir]  = m_ncomp_pc_zz[dir];
@@ -962,7 +1090,6 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
         MM_PC_width_yy[dir]  = (m_ncomp_pc_yy[dir] - 1)/2;
         MM_PC_width_zz[dir]  = (m_ncomp_pc_zz[dir] - 1)/2;
     }
-
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
 
         const amrex::MultiFab* MM_xx = m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev);
@@ -970,28 +1097,45 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
         const amrex::MultiFab* MM_zz = m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev);
         ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
 
-        // Below is general for 1D and 2D. It works for 3D because for now we limit width = 0 in 3D.
 
         const int diag_comp_pc_xx = (MM_PC[0]->nComp() - 1)/2;
-        for (int comp1 = 0; comp1 < MM_PC_ncomp_xx[1]; comp1++) {
-            const int jj0 = comp1 - MM_PC_width_xx[1]; // -2 -1, 0, 1, 2
-            const int mm_comp_start    = diag_comp_xx    - MM_PC_width_xx[0] + m_ncomp_xx[0]*jj0;
-            const int mm_pc_comp_start = diag_comp_pc_xx - MM_PC_width_xx[0] + m_ncomp_pc_xx[0]*jj0;
-            amrex::MultiFab::Add(*MM_PC[0], *MM_xx, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_xx[0], MM_xx->nGrowVect());
+        for (int comp2 = 0; comp2 < MM_PC_ncomp_xx[2]; comp2++) {
+            const int kk0 = comp2 - MM_PC_width_xx[2];
+            for (int comp1 = 0; comp1 < MM_PC_ncomp_xx[1]; comp1++) {
+                const int jj0 = comp1 - MM_PC_width_xx[1]; // -2 -1, 0, 1, 2
+                const int mm_comp_start    = diag_comp_xx    - MM_PC_width_xx[0]
+                                           + MM_ncomp_xx[0]*(jj0 + MM_ncomp_xx[1]*kk0);
+                const int mm_pc_comp_start = diag_comp_pc_xx - MM_PC_width_xx[0]
+                                           + MM_PC_ncomp_xx[0]*(jj0 + MM_PC_ncomp_xx[1]*kk0);
+                amrex::MultiFab::Add(*MM_PC[0], *MM_xx, mm_comp_start, mm_pc_comp_start,
+                                     MM_PC_ncomp_xx[0], MM_xx->nGrowVect());
+            }
         }
         const int diag_comp_pc_yy = (MM_PC[1]->nComp() - 1)/2;
-        for (int comp1 = 0; comp1 < MM_PC_ncomp_yy[1]; comp1++) {
-            const int jj0 = comp1 - MM_PC_width_yy[1]; // -2 -1, 0, 1, 2
-            const int mm_comp_start    = diag_comp_yy    - MM_PC_width_yy[0] + m_ncomp_yy[0]*jj0;
-            const int mm_pc_comp_start = diag_comp_pc_yy - MM_PC_width_yy[0] + m_ncomp_pc_yy[0]*jj0;
-            amrex::MultiFab::Add(*MM_PC[1], *MM_yy, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_yy[0], MM_yy->nGrowVect());
+        for (int comp2 = 0; comp2 < MM_PC_ncomp_yy[2]; comp2++) {
+            const int kk0 = comp2 - MM_PC_width_yy[2];
+            for (int comp1 = 0; comp1 < MM_PC_ncomp_yy[1]; comp1++) {
+                const int jj0 = comp1 - MM_PC_width_yy[1]; // -2 -1, 0, 1, 2
+                const int mm_comp_start    = diag_comp_yy    - MM_PC_width_yy[0]
+                                           + MM_ncomp_yy[0]*(jj0 + MM_ncomp_yy[1]*kk0);
+                const int mm_pc_comp_start = diag_comp_pc_yy - MM_PC_width_yy[0]
+                                           + MM_PC_ncomp_yy[0]*(jj0 + MM_PC_ncomp_yy[1]*kk0);
+                amrex::MultiFab::Add(*MM_PC[1], *MM_yy, mm_comp_start, mm_pc_comp_start,
+                                     MM_PC_ncomp_yy[0], MM_yy->nGrowVect());
+            }
         }
         const int diag_comp_pc_zz = (MM_PC[2]->nComp() - 1)/2;
-        for (int comp1 = 0; comp1 < MM_PC_ncomp_zz[1]; comp1++) {
-            const int jj0 = comp1 - MM_PC_width_zz[1]; // -2 -1, 0, 1, 2
-            const int mm_comp_start    = diag_comp_zz    - MM_PC_width_zz[0] + m_ncomp_zz[0]*jj0;
-            const int mm_pc_comp_start = diag_comp_pc_zz - MM_PC_width_zz[0] + m_ncomp_pc_zz[0]*jj0;
-            amrex::MultiFab::Add(*MM_PC[2], *MM_zz, mm_comp_start, mm_pc_comp_start, m_ncomp_pc_zz[0], MM_zz->nGrowVect());
+        for (int comp2 = 0; comp2 < MM_PC_ncomp_zz[2]; comp2++) {
+            const int kk0 = comp2 - MM_PC_width_zz[2];
+            for (int comp1 = 0; comp1 < MM_PC_ncomp_zz[1]; comp1++) {
+                const int jj0 = comp1 - MM_PC_width_zz[1]; // -2 -1, 0, 1, 2
+                const int mm_comp_start    = diag_comp_zz    - MM_PC_width_zz[0]
+                                           + MM_ncomp_zz[0]*(jj0 + MM_ncomp_zz[1]*kk0);
+                const int mm_pc_comp_start = diag_comp_pc_zz - MM_PC_width_zz[0]
+                                           + MM_PC_ncomp_zz[0]*(jj0 + MM_PC_ncomp_zz[1]*kk0);
+                amrex::MultiFab::Add(*MM_PC[2], *MM_zz, mm_comp_start, mm_pc_comp_start,
+                                     MM_PC_ncomp_zz[0], MM_zz->nGrowVect());
+            }
         }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
@@ -1046,23 +1190,64 @@ void ImplicitSolver::SetMassMatricesForPC ( const amrex::Real a_theta_dt )
 
 }
 
-void ImplicitSolver::FinishMassMatrices ()
+namespace
 {
-    BL_PROFILE("ImplicitSolver::FinishMassMatrices()");
+    /**
+     * \brief Fill the upper half of the stencil of a diagonal mass matrix at cell (i,j,k)
+     *        from its deposited lower half.
+     *
+     * The diagonal mass matrices (i.e. Sxx, Syy, Szz) are symmetric:
+     * S(iv, d) = S(iv + d, -d), where d = (ii,jj,kk)
+     * is the stencil offset of the E node from the J node, stored as component of S
+     * c = (ii + width[0]) + ncomp[0]*((jj + width[1]) + ncomp[1]*(kk + width[2])).
+     * The deposition kernels in MassMatricesDeposition.H only deposit the lower half of the
+     * stencil (ii + jj + kk < 0, or ii + jj + kk == 0 with jj <= 0); the upper half is copied
+     * here. The components written (upper half) are disjoint from the components read (lower
+     * half), so the copy can be done in place and the iterations over cells are independent
+     * (see issue #7097).
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    void FoldMassMatrix (int i, int j, int k,
+                         amrex::Array4<amrex::Real> const& S, amrex::Box const& Sb,
+                         amrex::GpuArray<int,3> const& ncomp, amrex::GpuArray<int,3> const& width)
+    {
+        amrex::ignore_unused(j, k);
+        const int ncomp_tot = ncomp[0]*ncomp[1]*ncomp[2];
+        const amrex::IntVect iv_dst(AMREX_D_DECL(i,j,k));
+        // Loop over the storage indices (c0,c1,c2) in S; (ii,jj,kk) is the corresponding
+        // offset of the E node from the J node; each can go from -width[dir] to +width[dir]
+        for (int c2 = 0; c2 < ncomp[2]; ++c2) {
+            const int kk = c2 - width[2];
+            for (int c1 = 0; c1 < ncomp[1]; ++c1) {
+                const int jj = c1 - width[1];
+                for (int c0 = 0; c0 < ncomp[0]; ++c0) {
+                    const int ii = c0 - width[0];
+                    // Skip the lower half (already written by the deposition kernel); the upper
+                    // half (not yet written) is filled in by symmetry below
+                    const int sum = ii + jj + kk;
+                    if (sum < 0 || (sum == 0 && jj <= 0)) { continue; }
+                    // Mirror entry to copy from: S(iv_dst, d) = S(iv_dst + d, -d)
+                    const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,kk));
+                    // Skip if the mirror node is outside this box (nothing to copy from)
+                    if (!Sb.contains(iv_src)) { continue; }
+                    const int dst_comp = c0 + ncomp[0]*(c1 + ncomp[1]*c2);
+                    // Copy from the component of offset -d
+                    S(iv_dst, dst_comp) = S(iv_src, ncomp_tot - 1 - dst_comp);
+                }
+            }
+        }
+    }
+}
 
-    // The MM deposit routine takes advantage of symmetry for the diagonal mass
-    // matrices to only deposit roughly half of the values. The remainder are
-    // computed via copy here in this routine.
+void ImplicitSolver::FinishMassMatricesDeposition ()
+{
+    BL_PROFILE("ImplicitSolver::FinishMassMatricesDeposition()");
 
-#if AMREX_SPACEDIM < 3
-    using ablastr::fields::Direction;
+    // The MM deposit routines take advantage of symmetry for the diagonal mass
+    // matrices to only deposit half of the values. The remainder are computed
+    // via copy here in this routine (see FoldMassMatrix).
+
     using warpx::fields::FieldType;
-
-#if AMREX_SPACEDIM > 1
-    const int ncomp_tot_xx = AMREX_D_TERM(m_ncomp_xx[0],*m_ncomp_xx[1],*m_ncomp_xx[2]);
-    const int ncomp_tot_yy = AMREX_D_TERM(m_ncomp_yy[0],*m_ncomp_yy[1],*m_ncomp_yy[2]);
-    const int ncomp_tot_zz = AMREX_D_TERM(m_ncomp_zz[0],*m_ncomp_zz[1],*m_ncomp_zz[2]);
-#endif
 
     amrex::GpuArray<int,3> ncomp_xx = {1,1,1};
     amrex::GpuArray<int,3> ncomp_yy = {1,1,1};
@@ -1103,139 +1288,24 @@ void ImplicitSolver::FinishMassMatrices ()
             Sbz.grow(SZ[2]->nGrowVect());
             Sby.grow(SY[1]->nGrowVect());
 
-#if AMREX_SPACEDIM == 1
             amrex::ParallelFor( Sbx, Sby, Sbz,
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
-                // Sxx(i,d + n) = Sxx(i + n,d - n), where d = Sxx_width[0]
-                const int width = amrex::min(Sxx_width[0],Sbx.bigEnd(0)-i);
-                for (int n = 1; n <= width; ++n) {
-                    const int dst_comp = Sxx_width[0] + n;
-                    const int src_comp = Sxx_width[0] - n;
-                    Sxx(i,j,k,dst_comp) = Sxx(i + n,j,k,src_comp);
-                }
+                FoldMassMatrix(i, j, k, Sxx, Sbx, ncomp_xx, Sxx_width);
             },
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
-                // Syy(i,d + n) = Syy(i + n,d - n), where d = Syy_width[0]
-                const int width = std::min(Syy_width[0], Sby.bigEnd(0) - i);
-                for (int n = 1; n <= width; n++) {
-                    const int dst_comp = Syy_width[0] + n;
-                    const int src_comp = Syy_width[0] - n;
-                    Syy(i,j,k,dst_comp) = Syy(i + n,j,k,src_comp);
-                }
+                FoldMassMatrix(i, j, k, Syy, Sby, ncomp_yy, Syy_width);
             },
 
                 [=] AMREX_GPU_DEVICE (int i, int j, int k)
             {
-                // Szz(i,d + n) = Szz(i + n,d - n), where d = Szz_width[0]
-                const int width_zz = std::min(Szz_width[0],Sbz.bigEnd(0) - i);
-                for (int n = 1; n <= width_zz; n++) {
-                    const int dst_comp = Szz_width[0] + n;
-                    const int src_comp = Szz_width[0] - n;
-                    Szz(i,j,k,dst_comp) = Szz(i + n,j,k,src_comp);
-                }
+                FoldMassMatrix(i, j, k, Szz, Sbz, ncomp_zz, Szz_width);
             });
-
-#elif AMREX_SPACEDIM == 2
-            // In-place fold of the mass matrices: for every (ncomp_x, ncomp_y)
-            // combination, the components written at iv_dst are disjoint from
-            // the components read at any i-offset source, so iterations of the
-            // vectorized i loop are independent, as required by ParallelFor
-            // (see issue #7097). Reads across j rely on the serial ascending j
-            // loop on CPU and must not be reordered.
-            amrex::ParallelFor( Sbx, Sby, Sbz,
-
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ignore_unused(k);
-                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
-
-                const int row_start = amrex::max(0,ncomp_xx[1] - ncomp_xx[0]);
-
-                for (int m = row_start; m < ncomp_xx[1]; ++m) {
-                    const int jj = m - Sxx_width[1];
-
-                    const int above_diag = (m > Sxx_width[1]) ? 1 : 0;
-                    const int width0 = amrex::min(m + above_diag - row_start + 1, ncomp_xx[0]);
-
-                    for (int n = 0; n < width0; ++n) {
-                        const int ii = Sxx_width[0] - n;
-
-                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
-                        if (!Sbx.contains(iv_src)) { continue; }
-
-                        const int dst_comp = ncomp_xx[0]*(m + 1) - (n + 1);
-                        const int src_comp = ncomp_tot_xx - 1 - dst_comp;
-
-                        Sxx(iv_dst,dst_comp) = Sxx(iv_src,src_comp);
-                    }
-
-                }
-
-            },
-
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ignore_unused(k);
-                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
-
-                const int row_start = 1;
-
-                for (int m = row_start; m < ncomp_yy[1]; m++) {
-                    const int jj = m - Syy_width[1];
-
-                    const int above_diag = (m > Syy_width[1]) ? 1 : 0;
-                    const int width0 = std::min(m + above_diag - row_start + 1, ncomp_yy[0]);
-
-                    for (int n = 0; n < width0; n++) {
-                        const int ii = Syy_width[0] - n;
-
-                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
-                        if (!Sby.contains(iv_src)) { continue; }
-
-                        const int dst_comp = ncomp_yy[0]*(m + 1) - (n + 1);
-                        const int src_comp = ncomp_tot_yy - 1 - dst_comp;
-
-                        Syy(iv_dst,dst_comp) = Syy(iv_src,src_comp);
-                    }
-                }
-
-            },
-
-                [=] AMREX_GPU_DEVICE (int i, int j, int k)
-            {
-                ignore_unused(k);
-                const amrex::IntVect iv_dst = amrex::IntVect(AMREX_D_DECL(i,j,k));
-
-                const int row_start = std::max(0,ncomp_zz[1] - ncomp_zz[0]);
-
-                for (int m = row_start; m < ncomp_zz[1]; m++) {
-                    const int jj = m - Szz_width[1];
-
-                    const int above_diag = (m > Szz_width[1]) ? 1 : 0;
-                    const int width0 = std::min(m - row_start + above_diag + 1, ncomp_zz[0]);
-
-                    for (int n = 0; n < width0; n++) {
-                        const int ii = Szz_width[0] - n;
-
-                        const amrex::IntVect iv_src = iv_dst + amrex::IntVect(AMREX_D_DECL(ii,jj,0));
-                        if (!Sbz.contains(iv_src)) { continue; }
-
-                        const int dst_comp = ncomp_zz[0]*(m + 1) - (n + 1);
-                        const int src_comp = ncomp_tot_zz - 1 - dst_comp;
-
-                        Szz(iv_dst,dst_comp) = Szz(iv_src,src_comp);
-                    }
-                }
-
-            });
-#endif
         }
     }
-#endif
 }
 
 void ImplicitSolver::PrintBaseImplicitSolverParameters () const
@@ -1243,7 +1313,11 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
     amrex::Print() << "max particle iterations:             " << m_max_particle_iterations << "\n";
     amrex::Print() << "particle relative tolerance:         " << m_particle_tolerance << "\n";
     amrex::Print() << "use particle suborbits:              " << (m_particle_suborbits ? "true":"false") << "\n";
-    amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    if (m_particle_suborbits) {
+        amrex::Print() << "suborbit warning threshold:          " << m_suborbit_warning_threshold << "\n";
+        amrex::Print() << "suborbit statistics interval:        " << m_suborbit_statistics_interval << "\n";
+        amrex::Print() << "print unconverged particle details:  " << (m_print_unconverged_particle_details ? "true":"false") << "\n";
+    }
     amrex::Print() << "Nonlinear solver type:               " << amrex::getEnumNameString(m_nlsolver_type) << "\n";
     if ( (m_nlsolver_type == NonlinearSolverType::newton)
       || (m_nlsolver_type == NonlinearSolverType::petsc_snes) ) {
@@ -1270,17 +1344,23 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
     }
 }
 
-void ImplicitSolver::AssemblePCMatrix (const WarpXSolverVec& a_U)
+void ImplicitSolver::AssemblePCMatrix ()
 {
     BL_PROFILE("ImplicitSolver::AssemblePCMatrix()");
+
+    // The DOF object is shared by every solver vector.
+    const auto* dofs = WarpXSolverVec::getDOFsObject().get();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        dofs != nullptr,
+        "ImplicitSolver::AssemblePCMatrix() DOF object is a nullptr");
 
     // Lazy initialization on first call
     if (!m_sparse_jacobian) {
         InitializePCMatrixFields();
         m_sparse_jacobian = std::make_unique<SparseJacobianMatrix>();
         m_sparse_jacobian->Define(
-            static_cast<int>(a_U.nDOF_local()),
-            static_cast<int>(a_U.nDOF_global()));
+            static_cast<int>(dofs->m_nDoFs_l),
+            static_cast<int>(dofs->m_nDoFs_g));
     }
 
     // Gather geometry
@@ -1308,7 +1388,7 @@ void ImplicitSolver::AssemblePCMatrix (const WarpXSolverVec& a_U)
     const Real theta_dt = GetThetaForPC() * m_dt;
 
     m_sparse_jacobian->Update(
-        a_U.getDOFsObject().get(),
+        dofs,
         geom,
         theta_dt,
         bc_masks,

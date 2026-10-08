@@ -1321,6 +1321,20 @@ WarpX::SyncMassMatricesPC ()
 }
 
 void
+WarpX::SyncMassMatrices ()
+{
+    ABLASTR_PROFILE("WarpX::SyncMassMatrices()");
+
+    for (int lev = finest_level; lev >= 0; --lev)
+    {
+        auto const& period = Geom(lev).periodicity();
+        SumBoundaryJ(m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_X, lev), lev, period);
+        SumBoundaryJ(m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_Y, lev), lev, period);
+        SumBoundaryJ(m_fields.get_mr_levels_alldirs(FieldType::MassMatrices_Z, lev), lev, period);
+    }
+}
+
+void
 WarpX::SyncRho () {
     bool const skip_lev0_coarse_patch = true;
     const ablastr::fields::MultiLevelScalarField rho_fp = m_fields.has(FieldType::rho_fp, 0) ?

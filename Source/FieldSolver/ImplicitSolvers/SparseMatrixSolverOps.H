@@ -39,7 +39,7 @@ public:
     /** \brief Set the Ops pointer and cache geometry. */
     void Define (Ops* a_ops);
 
-    void Update (const T& a_U) override;
+    void Update () override;
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
@@ -81,13 +81,13 @@ void SparseMatrixSolverOps<T,Ops>::Define (Ops* a_ops)
 }
 
 template <class T, class Ops>
-void SparseMatrixSolverOps<T,Ops>::Update (const T& a_U)
+void SparseMatrixSolverOps<T,Ops>::Update ()
 {
-    m_ops->AssemblePCMatrix(a_U);
+    m_ops->AssemblePCMatrix();
     const auto* sp = m_ops->GetSparseJacobian();
     if (!sp->IsRemapped()) {
         auto* sp_nc = const_cast<SparseJacobianMatrix*>(sp);
-        sp_nc->RemapColumns(a_U.getDOFsObject().get());
+        sp_nc->RemapColumns(T::getDOFsObject().get());
     }
 }
 

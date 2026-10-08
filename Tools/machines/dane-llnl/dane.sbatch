@@ -6,14 +6,14 @@
 #SBATCH -A <allocation ID>
 
 #SBATCH -J WarpX
-#SBATCH -q pbatch
+#SBATCH -p pbatch
 #SBATCH --qos=normal
 #SBATCH --license=lustre1,lustre2
 #SBATCH --export=ALL
 #SBATCH -e error.txt
 #SBATCH -o output.txt
 # one MPI rank per half-socket (see below)
-#SBATCH --tasks-per-node=2
+#SBATCH --ntasks-per-node=2
 # request all logical (virtual) cores per half-socket
 #SBATCH --cpus-per-task=112
 
@@ -36,4 +36,8 @@ export OMP_NUM_THREADS=112
 
 EXE="<path/to/executable>"  # e.g. ./warpx
 
+date
+
 srun --cpu_bind=cores -n $(( ${SLURM_JOB_NUM_NODES} * ${WARPX_NMPI_PER_NODE} )) ${EXE} <input file>
+
+date

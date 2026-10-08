@@ -75,13 +75,13 @@ public:
         m_solver.Define(m_matrix_ops.get(), "weighted_jacobi");
     }
 
-    void update (const Vec& a_U) override
+    void update () override
     {
         if (!m_use_pcmat) {
             m_matrix_ops->SetPCFactor(
                 static_cast<RT>(m_linop->getOps()->GetMassMatrixDiagScale()));
         }
-        m_solver.Update(a_U);
+        m_solver.Update();
     }
 
     void solve (Vec& a_sol, Vec const& a_rhs,

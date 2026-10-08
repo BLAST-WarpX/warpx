@@ -35,7 +35,7 @@ WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
     const ParmParse pp_species_name(species_name);
     SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser, geom);
     SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
-        h_mom_temp, h_mom_vel);
+        h_mom_temp, h_mom_vel, geom);
     if (h_inj_rho) {
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>

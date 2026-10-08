@@ -47,14 +47,18 @@ spack install
 
 # Python ##########################################################
 #
-python -m pip install --user --upgrade pandas
-python -m pip install --user --upgrade matplotlib
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
+python3 -m pip install --user --upgrade pandas
+python3 -m pip install --user --upgrade matplotlib
 # optional
-#python -m pip install --user --upgrade yt
+#python3 -m pip install --user --upgrade yt
 
 # install or update WarpX dependencies
-python -m pip install --user --upgrade picmistandard==0.34.0
-python -m pip install --user --upgrade lasy
+python3 -m pip install --user --upgrade picmistandard==0.34.0
+python3 -m pip install --user --upgrade lasy
 
 # optional: for optimas (based on libEnsemble & ax->botorch->gpytorch->pytorch)
-# python -m pip install --user --upgrade -r $WORK/src/warpx/Tools/optimas/requirements.txt
+# python3 -m pip install --user --upgrade -r $WORK/src/warpx/Tools/optimas/requirements.txt

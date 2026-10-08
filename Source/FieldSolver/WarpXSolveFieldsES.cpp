@@ -13,7 +13,8 @@
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 
-void WarpX::ComputeSpaceChargeField (bool const reset_E_field, bool const reset_B_field)
+void WarpX::ComputeSpaceChargeField (bool const reset_E_field, bool const reset_B_field,
+                                     bool const verbose_step)
 {
     ABLASTR_PROFILE("WarpX::ComputeSpaceChargeField");
     using ablastr::fields::Direction;
@@ -32,5 +33,5 @@ void WarpX::ComputeSpaceChargeField (bool const reset_E_field, bool const reset_
     }
 
     m_electrostatic_solver->ComputeSpaceChargeField(
-        m_fields, *mypc, myfl.get(), max_level );
+        m_fields, *mypc, myfl.get(), max_level, verbose_step);
 }

@@ -33,7 +33,8 @@ public:
         ablastr::fields::MultiFabRegister& fields,
         MultiParticleContainer& mpc,
         MultiFluidContainer* mfl,
-        int max_level) override;
+        int max_level,
+        bool verbose_step) override;
 
     void ComputeSigma (
         ablastr::fields::MultiLevelScalarField const& rho_fp
@@ -42,7 +43,8 @@ public:
     void computePhi (
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
-        ablastr::fields::MultiLevelVectorField const& efield
+        ablastr::fields::MultiLevelVectorField const& efield,
+        int verbosity
     );
 
     /**

@@ -104,6 +104,7 @@ private:
         mlmg.setVerbose(m_verbose);
         mlmg.setBottomVerbose(m_bottom_verbose);
         mlmg.setConvergenceNormType(amrex::MLMGNormType::greater);
+        mlmg.setNoGpuSync(true);
         mlmg.solve({m_solution[lev].get()}, {m_source[lev].get()}, m_rtol, m_atol);
     }
 

@@ -59,7 +59,7 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         void Define (const T&, Ops*) override;
 
-        void Update (const T& a_U) override;
+        void Update () override;
 
         /**
          * \brief Solve A x = b via damped Jacobi iteration.
@@ -135,7 +135,7 @@ void JacobiPC<T,Ops>::Define ( const T& a_U,
 }
 
 template <class T, class Ops>
-void JacobiPC<T,Ops>::Update (const T& a_U)
+void JacobiPC<T,Ops>::Update ()
 {
     BL_PROFILE("JacobiPC::Update()");
     using namespace amrex;
@@ -144,7 +144,7 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
         IsDefined(),
         "JacobiPC::Update() called on undefined object" );
 
-    m_solver.Update(a_U);
+    m_solver.Update();
 
     if (m_solver.isVerbose()) {
         const bool use_csr = (m_ops->GetThetaForPC() > Real(0.0));

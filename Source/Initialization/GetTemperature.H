@@ -9,7 +9,10 @@
 #ifndef WARPX_GET_TEMPERATURE_H_
 #define WARPX_GET_TEMPERATURE_H_
 
+#include "ExternalField.H"
 #include "TemperatureProperties.H"
+
+#include <AMReX.H>
 
 /**
  * \brief Get temperature at a point on the grid
@@ -76,6 +79,10 @@ struct GetTemperatureVector
 
     amrex::Real m_ux_std{0}, m_uy_std{0}, m_uz_std{0};
     amrex::ParserExecutor<3> m_ux_std_parser, m_uy_std_parser, m_uz_std_parser;
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    ExternalFieldVectorView m_from_file;
+#endif
     /**
      * \brief Construct the functor with information provided by temp
      *
@@ -108,6 +115,13 @@ struct GetTemperatureVector
             {
                 return amrex::XDim3{m_ux_std_parser(x,y,z), m_uy_std_parser(x,y,z), m_uz_std_parser(x,y,z)};
             }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            case (TempFromFileVector):
+            {
+                return m_from_file.getValue(x, y, z);
+            }
+#endif
             default:
             {
                 amrex::Abort("Get initial temperature: unknown type");

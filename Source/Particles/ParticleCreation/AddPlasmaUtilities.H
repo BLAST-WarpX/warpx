@@ -17,34 +17,11 @@
 
 #include <AMReX_Array.H>
 #include <AMReX_Box.H>
+#include <AMReX_Dim3.H>
 #include <AMReX_GpuContainers.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 #include <AMReX_RealBox.H>
-
-struct PDim3 {
-    amrex::ParticleReal x, y, z;
-
-    AMREX_GPU_HOST_DEVICE
-    explicit
-    PDim3(const amrex::XDim3& a):
-        x{static_cast<amrex::ParticleReal>(a.x)},
-        y{static_cast<amrex::ParticleReal>(a.y)},
-        z{static_cast<amrex::ParticleReal>(a.z)}
-    {}
-
-    AMREX_GPU_HOST_DEVICE
-    ~PDim3() = default;
-
-    AMREX_GPU_HOST_DEVICE
-    PDim3(PDim3 const &)            = default;
-    AMREX_GPU_HOST_DEVICE
-    PDim3& operator=(PDim3 const &) = default;
-    AMREX_GPU_HOST_DEVICE
-    PDim3(PDim3&&)                  = default;
-    AMREX_GPU_HOST_DEVICE
-    PDim3& operator=(PDim3&&)       = default;
-};
 
 /*
   Finds the overlap region between the given tile_realbox and part_realbox, returning true
@@ -157,7 +134,7 @@ amrex::Real compute_scale_fac_area_eb (
  * */
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 void rotate_momentum_eb (
-    PDim3 & pu,
+    amrex::XDim3 & pu,
     AMREX_D_DECL(const amrex::Real n0,
                  const amrex::Real n1,
                  const amrex::Real n2))

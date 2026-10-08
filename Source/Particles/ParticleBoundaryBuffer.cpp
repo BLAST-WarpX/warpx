@@ -332,12 +332,11 @@ void ParticleBoundaryBuffer::redistribute () {
 
 const std::vector<std::string>& ParticleBoundaryBuffer::getSpeciesNames() const
 {
-    static bool initialized = false;
-    if (!initialized)
+    if (!m_species_names_initialized)
     {
         const amrex::ParmParse pp_particles("particles");
         pp_particles.queryarr("species_names", m_species_names);
-        initialized = true;
+        m_species_names_initialized = true;
     }
     return m_species_names;
 }
@@ -518,7 +517,7 @@ void ParticleBoundaryBuffer::gatherParticlesFromEmbeddedBoundaries (
                 for (PIter pti(pc, lev); pti.isValid(); ++pti) {
                     auto phiarr = (*distance_to_eb[lev])[pti].array();  // signed distance function
                     auto index = std::make_pair(pti.index(), pti.LocalTileIndex());
-                    if (plevel.find(index) == plevel.end()) { continue; }
+                    if (!plevel.contains(index)) { continue; }
 
                     const auto getPosition = GetParticlePosition<PIdx>(pti);
                     auto &ptile_buffer = species_buffer.DefineAndReturnParticleTile(lev, pti.index(),

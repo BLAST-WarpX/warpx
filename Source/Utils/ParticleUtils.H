@@ -8,14 +8,21 @@
 #define WARPX_PARTICLE_UTILS_H_
 
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/ScatteringUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_GpuBuffer.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
 #include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
+
+#include <array>
+#include <cmath>
 
 namespace ParticleUtils {
 
@@ -182,29 +189,98 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate a random unit vector with isotropic distribution,
-     * following the method described in equations (27)-(31) of
-     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
+     * \brief Rotate a vector by polar angle theta and azimuthal angle phi, with theta measured from
+     *        the original vector. The magnitude of the vector is preserved.
+     *
+     * @tparam T floating-point type of the vector components and angles
+     * @param[in,out] ux x-component of the vector
+     * @param[in,out] uy y-component of the vector
+     * @param[in,out] uz z-component of the vector
+     * @param[in] phi azimuthal angle phi in [0, 2pi)
+     * @param[in] costh cosine of polar angle theta; must be in [-1, 1]
+     */
+    template <typename T>
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void rotateVector (T& ux, T& uy, T& uz, T phi, T costh)
+    {
+        AMREX_ASSERT(costh >= -T(1) && costh <= T(1));
+        const T cosph = std::cos(phi);
+        const T sinph = std::sin(phi);
+        const T sinth = std::sqrt(std::max(T(0), T(1) - costh*costh));
+
+        const T ux0 = ux;
+        const T uy0 = uy;
+        const T uz0 = uz;
+        const T u = std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
+        const T uperp = std::sqrt(ux0*ux0 + uy0*uy0);
+
+        if (uperp == T(0)) {
+            ux = u*sinth*cosph;
+            uy = u*sinth*sinph;
+            uz = uz0*costh;
+        }
+        else {
+            const T nx = ux0/uperp;
+            const T ny = uy0/uperp;
+            ux = uz0*nx*sinth*cosph - u*ny*sinth*sinph + ux0*costh;
+            uy = uz0*ny*sinth*cosph + u*nx*sinth*sinph + uy0*costh;
+            uz = -uperp*sinth*cosph + uz0*costh;
+        }
+    }
+
+    /**
+     * \brief Generate a random angle with isotropic or anisotropic distribution.
+     *
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy center-of-mass collision energy in eV
+     * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosTheta (
+        amrex::RandomEngine const& engine,
+        ScatteringAngleModel scattering_angle_model,
+        ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+        amrex::ParticleReal const collision_energy,
+        int* const energy_range_status)
+    {
+        using namespace amrex::literals;
+        amrex::ParticleReal cos_theta = 1.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Backward) {
+            cos_theta = -1.0_prt;
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
+            cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Legendre) {
+            cos_theta = ScatteringUtils::sampleCosTheta(anisotropic_coefficients, collision_energy, amrex::Random(engine), energy_range_status);
+        }
+        return cos_theta;
+    }
+
+    /**
+     * \brief Generate a random unit vector with isotropic distribution.
      *
      * @param[out] x x-component of the random unit vector
      * @param[out] y y-component of the random unit vector
      * @param[out] z z-component of the random unit vector
-     * @param[in] engine the random-engine
+     * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
-                           amrex::ParticleReal& z, amrex::RandomEngine const& engine )
+                           amrex::ParticleReal& z, amrex::RandomEngine const& engine)
     {
         using namespace amrex::literals;
 
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
         x = sin_theta * std::cos(phi);
         y = sin_theta * std::sin(phi);
         z = cos_theta;
     }
-
 
     /** \brief Function to perform scattering of a particle that results in a
      * random velocity vector with given magnitude. This is used in isotropic
@@ -218,7 +294,7 @@ namespace ParticleUtils {
     void RandomizeVelocity ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
                              amrex::ParticleReal& uz,
                              const amrex::ParticleReal vp,
-                             amrex::RandomEngine const& engine )
+                             amrex::RandomEngine const& engine)
     {
         amrex::ParticleReal x, y, z;
         // generate random unit vector for the new velocity direction
@@ -237,12 +313,27 @@ namespace ParticleUtils {
      * \result true if the point with within the boundary, otherwise false
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
-    bool containsInclusive (amrex::RealBox const& tilebox, amrex::XDim3 const point) {
+    bool containsInclusive (amrex::RealBox const& tilebox,
+                            [[maybe_unused]]amrex::Real x,
+                            [[maybe_unused]]amrex::Real y,
+                            [[maybe_unused]]amrex::Real z) {
         const auto *const xlo = tilebox.lo();
         const auto *const xhi = tilebox.hi();
-        return  AMREX_D_TERM((xlo[0] <= point.x) && (point.x <= xhi[0]),
-                          && (xlo[1] <= point.y) && (point.y <= xhi[1]),
-                          && (xlo[2] <= point.z) && (point.z <= xhi[2]));
+#if defined(WARPX_DIM_3D)
+        const amrex::Real px = x;
+        const amrex::Real py = y;
+        const amrex::Real pz = z;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        const amrex::Real px = x;
+        const amrex::Real py = z;
+#elif defined(WARPX_DIM_1D_Z)
+        const amrex::Real px = z;
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::Real px = x;
+#endif
+        return  AMREX_D_TERM((xlo[0] <= px) && (px <= xhi[0]),
+                          && (xlo[1] <= py) && (py <= xhi[1]),
+                          && (xlo[2] <= pz) && (pz <= xhi[2]));
     }
 
     /* \brief Crops the position at the specified boundary if do_cropping is true, 1D version
@@ -580,6 +671,109 @@ namespace ParticleUtils {
             }
         }
     };
+
+    /**
+     * \brief Check if particle position (for gather/deposit) is within the local nodal field domain
+     *
+     * \param xp_n    Particle x position at time n
+     * \param yp_n    Particle y position at time n
+     * \param zp_n    Particle z position at time n
+     * \param xp_nph  Particle x position at time n+1/2
+     * \param yp_nph  Particle y position at time n+1/2
+     * \param zp_nph  Particle z position at time n+1/2
+     * \param dinv    3D cell size inverse
+     * \param xyzmin  Physical lower bounds of domain
+     * \param lo      Index lower bounds of domain
+     * \param nodal_lo  Lower nodal field domain bounds
+     * \param nodal_hi  Upper nodal field domain bounds
+     * \return true if particle position is within bounds, false otherwise
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    bool isImplicitParticlePositionInBounds (
+        amrex::ParticleReal const xp_n,
+        amrex::ParticleReal const yp_n,
+        amrex::ParticleReal const zp_n,
+        amrex::ParticleReal const xp_nph,
+        amrex::ParticleReal const yp_nph,
+        amrex::ParticleReal const zp_nph,
+        amrex::XDim3 const & dinv,
+        amrex::XDim3 const & xyzmin,
+        amrex::Dim3 const & lo,
+        amrex::Dim3 const & nodal_lo,
+        amrex::Dim3 const & nodal_hi)
+    {
+        using namespace amrex::literals;
+        [[maybe_unused]] amrex::ParticleReal const xp_np1 = 2.0_prt*xp_nph - xp_n;
+        [[maybe_unused]] amrex::ParticleReal const yp_np1 = 2.0_prt*yp_nph - yp_n;
+        [[maybe_unused]] amrex::ParticleReal const zp_np1 = 2.0_prt*zp_nph - zp_n;
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        double const x_new = lo.x + (std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1) - xyzmin.x)*dinv.x;
+#elif defined(WARPX_DIM_RSPHERE)
+        double const x_new = lo.x +
+            (std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1) - xyzmin.x)*dinv.x;
+#elif !defined(WARPX_DIM_1D_Z)
+        double const x_new = lo.x + (xp_np1 - xyzmin.x)*dinv.x;
+#endif
+#if !defined(WARPX_DIM_1D_Z)
+        bool const x_in_bounds = x_new >= nodal_lo.x && x_new <= nodal_hi.x;
+#else
+        bool const x_in_bounds = true;
+#endif
+
+#if defined(WARPX_DIM_3D)
+        double const y_new = lo.y + (yp_np1 - xyzmin.y)*dinv.y;
+        bool const y_in_bounds = y_new >= nodal_lo.y && y_new <= nodal_hi.y;
+#else
+        bool const y_in_bounds = true;
+#endif
+
+#if defined(WARPX_DIM_3D)
+        double const z_new = lo.z + (zp_np1 - xyzmin.z)*dinv.z;
+        bool const z_in_bounds = z_new >= nodal_lo.z && z_new <= nodal_hi.z;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        double const z_new = lo.y + (zp_np1 - xyzmin.z)*dinv.z;
+        bool const z_in_bounds = z_new >= nodal_lo.y && z_new <= nodal_hi.y;
+#elif defined(WARPX_DIM_1D_Z)
+        double const z_new = lo.x + (zp_np1 - xyzmin.z)*dinv.z;
+        bool const z_in_bounds = z_new >= nodal_lo.x && z_new <= nodal_hi.x;
+#else
+        bool const z_in_bounds = true;
+#endif
+
+        return x_in_bounds && y_in_bounds && z_in_bounds;
+    }
+
+    /**
+     * \brief Check for grid crossing errors after Villasenor mass matrix deposition and abort if any found
+     *
+     * \param grid_crossing_error_count  Buffer containing three error counts in x, y, z order
+     * \param max_grid_crossings  Maximum allowed crossings per direction
+     */
+    AMREX_INLINE
+    void CheckGridCrossingErrors (amrex::Gpu::Buffer<int>& grid_crossing_error_count,
+                                  const int max_grid_crossings)
+    {
+        const int* h_errors = grid_crossing_error_count.copyToHost();
+        const int h_error_x = h_errors[0];
+        const int h_error_y = h_errors[1];
+        const int h_error_z = h_errors[2];
+        if (h_error_x > 0 || h_error_y > 0 || h_error_z > 0) {
+            std::string error_msg = "Villasenor mass matrix deposition error: particles exceeded max_grid_crossings.\n";
+            if (h_error_x > 0) {
+                error_msg += "  X-direction: " + std::to_string(h_error_x) + " particles\n";
+            }
+            if (h_error_y > 0) {
+                error_msg += "  Y-direction: " + std::to_string(h_error_y) + " particles\n";
+            }
+            if (h_error_z > 0) {
+                error_msg += "  Z-direction: " + std::to_string(h_error_z) + " particles\n";
+            }
+            error_msg += "Consider decreasing time step or increasing particles.max_grid_crossings (current: " +
+                         std::to_string(max_grid_crossings) + ")";
+            WARPX_ABORT_WITH_MESSAGE(error_msg);
+        }
+    }
 }
 
 #endif // WARPX_PARTICLE_UTILS_H_

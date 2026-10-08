@@ -30,3 +30,13 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/field_diags"  # checksum
     OFF  # dependency
 )
+
+add_warpx_test(
+    test_2d_ohm_solver_electron_energy_vacuum_picmi  # name
+    2  # dims
+    2  # nprocs
+    "inputs_test_2d_ohm_solver_electron_energy_picmi.py --case vacuum --test"  # inputs
+    "analysis_vacuum.py"  # analysis
+    "analysis_default_regression.py --path diags/field_diags"  # checksum
+    OFF  # dependency
+)

@@ -11,6 +11,8 @@ trigger:
     exclude:
     - 'Docs/**'
     - 'Tools/machines/**'
+    - '*.rst'
+    - '*.md'
     - '**/*.rst'
     - '**/*.md'
 pr:
@@ -20,6 +22,8 @@ pr:
     exclude:
     - 'Docs/**'
     - 'Tools/machines/**'
+    - '*.rst'
+    - '*.md'
     - '**/*.rst'
     - '**/*.md'
 
@@ -41,19 +45,24 @@ jobs:
     matrix:
       # 1D Cartesian, Cylindrical, Spherical
       1d:
+        CDASH_BUILD_NAME: CPU-1D
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;RCYLINDER;RSPHERE' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 2D
       cartesian_2d:
+        CDASH_BUILD_NAME: CPU-2D
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=2 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cartesian 3D
       cartesian_3d:
+        CDASH_BUILD_NAME: CPU-3D
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
       # Cylindrical RZ
       cylindrical_rz:
+        CDASH_BUILD_NAME: CPU-RZ
         WARPX_CMAKE_FLAGS: -DWarpX_DIMS=RZ -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
         WARPX_RZ_FFT: 'TRUE'
       # single precision
       #single_precision:
+      #  CDASH_BUILD_NAME: CPU-All-SP
       #  WARPX_CMAKE_FLAGS: -DWarpX_DIMS='1;2;3;RZ' -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PRECISION=SINGLE
       #  WARPX_RZ_FFT: 'TRUE'
 
@@ -85,7 +94,7 @@ jobs:
     displayName: 'Cache Ccache Objects'
 
   - bash: |
-      set -o nounset errexit pipefail
+      set -euo pipefail
       cat /proc/cpuinfo | grep "model name" | sort -u
       df -h
       echo 'Acquire::Retries "3";' | sudo tee /etc/apt/apt.conf.d/80-retries
@@ -95,7 +104,7 @@ jobs:
         libfftw3-dev libfftw3-mpi-dev libhdf5-openmpi-dev pkg-config make \
         python3 python3-pandas python3-pip python3-venv python3-setuptools libblas-dev liblapack-dev libsuperlu-dev libsuperlu-dist-dev
       ccache --set-config=max_size=1G
-      ccache --set-config=compression=1
+      ccache --set-config=compression=true
       ccache --set-config=compression_level=10
       ccache -z
       python3 -m pip install --upgrade pip
@@ -119,7 +128,13 @@ jobs:
       #  #python3 -m pip install --upgrade openpmd-api
       #fi
       if [[ "${WARPX_CMAKE_FLAGS}" == *"-DWarpX_PETSC=ON"* ]]; then
-         git clone --depth 1 --shallow-submodules -b release https://gitlab.com/petsc/petsc.git petsc
+         git init petsc
+         git -C petsc remote add origin https://gitlab.com/petsc/petsc.git
+         if ! git -C petsc fetch --depth 1 origin release; then
+            echo "PETSc GitLab fetch failed; trying the official GitHub mirror."
+            git -C petsc fetch --depth 1 https://github.com/petsc/petsc.git release
+         fi
+         git -C petsc checkout -b release FETCH_HEAD
          cd petsc
          ./configure                        \
              --prefix=/usr                  \
@@ -172,15 +187,17 @@ jobs:
 
   - bash: |
       # set options
-      set -o nounset errexit pipefail
+      set -euo pipefail
       # display disk space usage
       df -h
       # configure
       export AMReX_CMAKE_FLAGS="-DAMReX_ASSERTIONS=ON -DAMReX_TESTING=ON"
       export WARPX_TEST_FLAGS="-DWarpX_TEST_CLEANUP=ON -DWarpX_TEST_FPETRAP=ON -DWarpX_BACKTRACE_INFO=ON"
-      cmake -S . -B build    \
-        ${AMReX_CMAKE_FLAGS} \
-        ${WARPX_CMAKE_FLAGS} \
+      cmake -S . -B build                    \
+        -DBUILDNAME="${CDASH_BUILD_NAME}"    \
+        -DSITE=Azure                         \
+        ${AMReX_CMAKE_FLAGS}                 \
+        ${WARPX_CMAKE_FLAGS}                 \
         ${WARPX_TEST_FLAGS}
       # build
       cmake --build build -j 2
@@ -195,7 +212,7 @@ jobs:
 
   - bash: |
       # set options
-      set -o nounset errexit pipefail
+      set -euo pipefail
       # allow oversubscription for Open MPI 4 and 5
       export OMPI_MCA_rmaps_base_oversubscribe=1
       export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
@@ -213,7 +230,7 @@ jobs:
 
   - bash: |
       # set options
-      set -o nounset errexit pipefail
+      set -euo pipefail
       # find and print backtrace
       find build/bin/ -type f -name "Backtrace*" \
         -exec echo -e "\nBacktrace\n---------\n{}\n---------" \; \

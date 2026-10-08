@@ -290,8 +290,18 @@ void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs
         WarpX& warpx = WarpX::GetInstance();
         auto geom = warpx.Geom(0);
         if (geom.ProbLo(0) == 0){
-            lobc[adim][0] = LinOpBCType::Neumann;
-            dirichlet_flag[adim][0] = false;
+#if defined(WARPX_DIM_RZ)
+            // For the m=0 mode, regularity on the axis requires A_r = A_t = 0
+            // there, which is also the boundary condition that goes with the
+            // -1/r^2 term of the vector Laplacian (see setAlpha below). A_z has
+            // no such term and keeps a Neumann axis.
+            const bool axis_dirichlet = (adim < 2);
+#else
+            const bool axis_dirichlet = false;
+#endif
+            lobc[adim][0] = axis_dirichlet ? LinOpBCType::Dirichlet
+                                           : LinOpBCType::Neumann;
+            dirichlet_flag[adim][0] = axis_dirichlet;
             dim_start = 1;
 
             // handle the r_max boundary explicitly

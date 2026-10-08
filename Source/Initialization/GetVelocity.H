@@ -8,7 +8,12 @@
 #ifndef WARPX_GET_VELOCITY_H_
 #define WARPX_GET_VELOCITY_H_
 
+#include "ExternalField.H"
 #include "VelocityProperties.H"
+
+#include <AMReX.H>
+#include <AMReX_Dim3.H>
+#include <AMReX_REAL.H>
 
 /** Get the bulk drift momentum vector at a point on the grid
  *
@@ -26,6 +31,12 @@ struct GetVelocityVector
     amrex::Real m_ux_mean{0}, m_uy_mean{0}, m_uz_mean{0};
     /** Velocity parser function, if m_type == VelParserFunctionVector */
     amrex::ParserExecutor<3> m_ux_mean_parser, m_uy_mean_parser, m_uz_mean_parser;
+
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    ExternalFieldVectorView m_from_file;
+#endif
+
     /**
      * \brief Construct the functor with information provided by vel
      *
@@ -58,6 +69,13 @@ struct GetVelocityVector
             {
                 return amrex::XDim3{ m_ux_mean_parser(x,y,z), m_uy_mean_parser(x,y,z), m_uz_mean_parser(x,y,z) };
             }
+#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
+    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+            case (VelFromFileVector):
+            {
+                return m_from_file.getValue(x, y, z);
+            }
+#endif
             default:
             {
                 amrex::Abort("Get initial velocity: unknown type");

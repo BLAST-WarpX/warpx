@@ -58,7 +58,7 @@ public:
                  const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* a_bcoefs,
                  int a_num_amr_levels);
 
-    void Update (const T& a_U) override;
+    void Update () override {}
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
@@ -75,6 +75,15 @@ public:
     void SetPCFactor (RT a_pc_factor) override { m_pc_factor = a_pc_factor; }
 
 private:
+
+    /** \brief Define the matvec workspace on first use. */
+    void defineWork (const T& a_x)
+    {
+        if (!m_work_defined) {
+            m_Jx.Define(a_x);
+            m_work_defined = true;
+        }
+    }
 
     bool m_is_defined = false;
     bool m_work_defined = false;
@@ -99,15 +108,6 @@ void MFMatrixSolverOps<T>::Define (
     m_bcoefs = a_bcoefs;
     m_num_amr_levels = a_num_amr_levels;
     m_is_defined = true;
-}
-
-template <class T>
-void MFMatrixSolverOps<T>::Update (const T& a_U)
-{
-    if (!m_work_defined) {
-        m_Jx.Define(a_U);
-        m_work_defined = true;
-    }
 }
 
 template <class T>
@@ -155,6 +155,7 @@ void MFMatrixSolverOps<T>::JacobiSweep (T& a_x, const T& a_b, RT a_omega)
     using namespace amrex;
 
     // Compute Jx = J * x using the matrix-free product
+    defineWork(a_x);
     m_matvec(m_Jx, a_x);
 
     auto& x_mfarrvec = a_x.getArrayVec();
@@ -212,6 +213,7 @@ template <class T>
 auto MFMatrixSolverOps<T>::ResidualNorm (const T& a_x, const T& a_b) -> RT
 {
     // Compute Jx = J * x
+    defineWork(a_x);
     m_matvec(m_Jx, a_x);
 
     // Compute ||b - Jx||_2 by reusing m_Jx as workspace

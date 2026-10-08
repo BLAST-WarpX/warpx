@@ -38,7 +38,7 @@ public:
     /** \brief Set the Ops pointer and read mass matrix coefficients. */
     void Define (Ops* a_ops);
 
-    void Update (const T& a_U) override;
+    void Update () override;
     void InitialGuess (T& a_x, const T& a_b) override;
     void JacobiSweep (T& a_x, const T& a_b, RT a_omega) override;
     [[nodiscard]] RT ResidualNorm (const T& a_x, const T& a_b) override;
@@ -82,13 +82,12 @@ void MultiFabMatrixSolverOps<T,Ops>::Define (Ops* a_ops)
 }
 
 template <class T, class Ops>
-void MultiFabMatrixSolverOps<T,Ops>::Update (const T& a_U)
+void MultiFabMatrixSolverOps<T,Ops>::Update ()
 {
     using namespace amrex;
 
     if (m_bcoefs == nullptr || m_work_defined) { return; }
 
-    auto& u_mfarrvec = a_U.getArrayVec();
     m_work.resize(m_num_amr_levels);
     m_x_ghost.resize(m_num_amr_levels);
 
@@ -106,18 +105,15 @@ void MultiFabMatrixSolverOps<T,Ops>::Update (const T& a_U)
         }
     }
 
+    // The mass matrices have the same grid layout as the solver vector
     const IntVect nghost(m_stencil_width);
     for (int n = 0; n < m_num_amr_levels; n++) {
         for (int dim = 0; dim < 3; dim++) {
-            m_work[n][dim].define(
-                u_mfarrvec[n][dim]->boxArray(),
-                u_mfarrvec[n][dim]->DistributionMap(),
-                1, 0);
+            const auto& ba = (*m_bcoefs)[n][dim]->boxArray();
+            const auto& dm = (*m_bcoefs)[n][dim]->DistributionMap();
+            m_work[n][dim].define(ba, dm, 1, 0);
             if (m_has_offdiag) {
-                m_x_ghost[n][dim].define(
-                    u_mfarrvec[n][dim]->boxArray(),
-                    u_mfarrvec[n][dim]->DistributionMap(),
-                    1, nghost);
+                m_x_ghost[n][dim].define(ba, dm, 1, nghost);
             }
         }
     }
