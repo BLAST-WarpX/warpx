@@ -798,7 +798,7 @@ void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
                 for (int idx = 0; idx < npts; ++idx) {
                     const int gdof = gdof_h[idx];
                     if (gdof < 0) { continue; }
-                    if (global_to_ext.find(gdof) != global_to_ext.end()) {
+                    if (global_to_ext.contains(gdof)) {
                         continue;
                     }
                     // Recover (i,j,k) from flat index for the owned-cell check.
