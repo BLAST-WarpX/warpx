@@ -436,7 +436,7 @@ WarpX::PSATDForwardTransformG ()
         if (spectral_solver_cp[lev])
         {
             if (m_fields.has(FieldType::G_cp, lev)) {
-                spectral_solver_fp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::G_cp, lev), Idx.G);
+                spectral_solver_cp[lev]->ForwardTransform(lev, *m_fields.get(FieldType::G_cp, lev), Idx.G);
             }
         }
     }
@@ -465,9 +465,9 @@ WarpX::PSATDBackwardTransformG ()
             if (m_fields.has(FieldType::G_cp, lev)) {
                 amrex::MultiFab* G_cp = m_fields.get(FieldType::G_cp, lev);
 #ifdef WARPX_DIM_RZ
-                spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G);
+                spectral_solver_cp[lev]->BackwardTransform(lev, *G_cp, Idx.G);
 #else
-                spectral_solver_fp[lev]->BackwardTransform(lev, *G_cp, Idx.G, m_fill_guards_fields);
+                spectral_solver_cp[lev]->BackwardTransform(lev, *G_cp, Idx.G, m_fill_guards_fields);
 #endif
             }
         }
@@ -1270,7 +1270,8 @@ WarpX::DampFieldsInGuards(const int lev,
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for (amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            // No tiling: each iteration damps the guard cells of the whole fab
+            for (amrex::MFIter mfi(*Efield[0]); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& Ex_arr = Efield[0]->array(mfi);
                 amrex::Array4<amrex::Real> const& Ey_arr = Efield[1]->array(mfi);
@@ -1364,7 +1365,8 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for (amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            // No tiling: each iteration damps the guard cells of the whole fab
+            for (amrex::MFIter mfi(*mf); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& mf_arr = mf->array(mfi);
 
