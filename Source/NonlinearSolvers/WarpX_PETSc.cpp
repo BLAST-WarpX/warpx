@@ -730,10 +730,10 @@ void SNES_impl::setTolerances( const amrex::Real a_rtol,
     if (a_its > 0) { m_maxits = a_its; }
     if (a_its_l > 0) { m_maxits_l = a_its_l; }
 
-    if (isDefined()) {
+    if (m_snes->obj != nullptr) {
         SNESSetTolerances( m_snes->obj,
-                           m_rtol,
                            m_atol,
+                           m_rtol,
                            m_stol,
                            (a_its > 0 ? a_its : PETSC_CURRENT),
                            PETSC_CURRENT );
@@ -743,7 +743,7 @@ void SNES_impl::setTolerances( const amrex::Real a_rtol,
                           m_rtol_l,
                           m_atol_l,
                           PETSC_CURRENT,
-                          (a_its > 0 ? a_its : PETSC_CURRENT) );
+                          (a_its_l > 0 ? a_its_l : PETSC_CURRENT) );
     }
 }
 
@@ -752,7 +752,7 @@ void SNES_impl::setMaxIters(const int a_its, const int a_its_l )
     BL_PROFILE("SNES_impl::setMaxIters()");
     m_maxits = a_its;
     m_maxits_l = a_its_l;
-    if (isDefined()) {
+    if (m_snes->obj != nullptr) {
         SNESSetTolerances( m_snes->obj,
                            PETSC_CURRENT,
                            PETSC_CURRENT,
@@ -765,7 +765,7 @@ void SNES_impl::setMaxIters(const int a_its, const int a_its_l )
                           PETSC_CURRENT,
                           PETSC_CURRENT,
                           PETSC_CURRENT,
-                          a_its );
+                          a_its_l );
     }
 }
 
@@ -783,15 +783,17 @@ void SNES_impl::solve (VecType& a_U,
 {
     BL_PROFILE("SNES_impl::solve()");
     AMREX_ALWAYS_ASSERT(isDefined());
-    amrex::ignore_unused(a_dt);
+    amrex::ignore_unused(a_step);
 
     m_time = a_time;
-    m_iter = a_step;
+    m_iter = 0;
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTime(a_time);
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTimeStep(a_dt);
 
     copyVec(this->m_x->obj, a_U);
     copyVec(this->m_b->obj, a_B);
     SNESSolve(m_snes->obj, this->m_b->obj, this->m_x->obj);
+    copyVec(a_U, this->m_x->obj);
 
     SNESGetIterationNumber(m_snes->obj, &m_niters);
     SNESGetLinearSolveIterations(m_snes->obj, &m_niters_l);
@@ -828,6 +830,7 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
         m_rhs_first_call = false;
     } else {
         m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
+        m_iter++;
     }
 
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseSolution(a_U);

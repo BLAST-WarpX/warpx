@@ -325,7 +325,7 @@ class SNES_impl : public PETScSolver_impl
 
         //! Simulation time
         mutable amrex::Real m_time = 0.0;
-        //! Simulation time iter
+        //! Newton iteration index of the next residual evaluation
         mutable int m_iter = 0;
 
         //! Total nonlinear iterations for the diagnostic file
