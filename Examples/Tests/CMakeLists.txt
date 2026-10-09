@@ -2,6 +2,7 @@
 #
 
 add_subdirectory(accelerator_lattice)
+add_subdirectory(epsilon_r)
 add_subdirectory(boosted_diags)
 add_subdirectory(boundaries)
 add_subdirectory(btd_rz)
