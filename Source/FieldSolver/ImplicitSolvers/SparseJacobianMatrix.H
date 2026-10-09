@@ -59,6 +59,8 @@ namespace SparseJacobianMatrixUtil
      * \brief Diagonal entry of a_alpha * curl curl for the field component a_dir
      *        at (i,j,k).
      *
+     * \param[in] i,j,k      grid indices
+     * \param[in] a_dir      field component (0, 1, 2)
      * \param[in] a_alpha    scaling factor
      * \param[in] a_dxi      inverse cell sizes
      * \param[in] a_bc_mask  curl-curl boundary mask of the field component
@@ -78,7 +80,7 @@ namespace SparseJacobianMatrixUtil
             * a_bc_mask(i,j,k,0);
 #elif defined(WARPX_DIM_RCYLINDER)
         if (a_dir == 0) { return 0.0_rt; }
-        const amrex::Real i_real = static_cast<amrex::Real>(i);
+        const auto i_real = static_cast<amrex::Real>(i);
         const amrex::Real gf = (a_dir == 1)
             ? i_real / (i_real - 0.5_rt) + i_real / (i_real + 0.5_rt)
             : 2.0_rt;
@@ -97,7 +99,7 @@ namespace SparseJacobianMatrixUtil
                 * a_bc_mask(i,j,k,0);
         }
 #if defined(WARPX_DIM_RZ)
-        const amrex::Real i_real = static_cast<amrex::Real>(i);
+        const auto i_real = static_cast<amrex::Real>(i);
         const amrex::Real gf = i_real / (i_real - 0.5_rt)
                              + i_real / (i_real + 0.5_rt);
 #else
