@@ -9,6 +9,8 @@
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "Preconditioner.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 #include <AMReX.H>
 #include <AMReX_Config.H>
 #include <AMReX_REAL.H>
@@ -615,6 +617,16 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_pc_update_time_step_interval > 0,
         "newton.pc_update_time_step_interval must be positive");
+    pp_newton.query("require_convergence", m_require_convergence);
+
+    // The linear solver is always PETSc's KSP
+    std::string linear_solver = "petsc_ksp";
+    pp_newton.query("linear_solver", linear_solver);
+    if (linear_solver != "petsc_ksp") {
+        ablastr::warn_manager::WMRecordWarning("PETSc SNES",
+            "newton.linear_solver = " + linear_solver + " is ignored; "
+            "petsc_snes uses PETSc KSP as the linear solver.");
+    }
 
     const amrex::ParmParse pp_gmres("gmres");
     pp_gmres.query("verbose_int",         m_verbose_l);
@@ -657,7 +669,7 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     SNESSetType( m_snes->obj, SNESNEWTONLS );
     SNESLineSearch linesearch;
     SNESGetLineSearch( m_snes->obj, &linesearch );
-    SNESLineSearchSetType( linesearch, SNESLINESEARCHBASIC );
+    SNESLineSearchSetType( linesearch, SNESLINESEARCHNONE );
     SNESSetFunction(m_snes->obj, nullptr, RHSFunction, this);
     SNESSetApplicationContext(m_snes->obj, this);
     SNESSetUpdate(m_snes->obj, PreLinearSolveFunction);
@@ -742,18 +754,19 @@ SNES_impl::~SNES_impl() { }
 
 void SNES_impl::printParams () const
 {
-    amrex::Print() << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
-    amrex::Print() << "SNES_impl max iterations:      " << m_maxits << "\n";
-    amrex::Print() << "SNES_impl PC update Newton interval:    "
-                   << m_pc_update_newton_interval << "\n";
-    amrex::Print() << "SNES_impl PC update time-step interval: "
-                   << m_pc_update_time_step_interval << "\n";
-    amrex::Print() << "SNES_impl relative tolerance:  " << m_rtol << "\n";
-    amrex::Print() << "SNES_impl absolute tolerance:  " << m_atol << "\n";
-    amrex::Print() << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
-    amrex::Print() << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
-    amrex::Print() << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
-    amrex::Print() << "Preconditioner type:      " << amrex::getEnumNameString(this->m_pc_type) << "\n";
+    amrex::Print()     << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
+    amrex::Print()     << "SNES_impl max iterations:      " << m_maxits << "\n";
+    amrex::Print()     << "SNES_impl require convergence: " << (m_require_convergence?"true":"false") << "\n";
+    amrex::Print()     << "SNES_impl PC update Newton interval:    "
+                       << m_pc_update_newton_interval << "\n";
+    amrex::Print()     << "SNES_impl PC update time-step interval: "
+                       << m_pc_update_time_step_interval << "\n";
+    amrex::Print()     << "SNES_impl relative tolerance:  " << m_rtol << "\n";
+    amrex::Print()     << "SNES_impl absolute tolerance:  " << m_atol << "\n";
+    amrex::Print()     << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
+    amrex::Print()     << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
+    amrex::Print()     << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
+    amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(this->m_pc_type) << "\n";
 
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->printParams();
 }
@@ -849,6 +862,8 @@ void SNES_impl::solve (VecType& a_U,
     SNESConvergedReason reason;
     SNESGetConvergedReason( m_snes->obj, &reason );
     m_status = (int)reason;
+    // Reaching the maximum number of iterations is a failure only if convergence is required
+    if (reason == SNES_DIVERGED_MAX_IT && !m_require_convergence) { m_status = 0; }
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
 
     const char* conv_reason;

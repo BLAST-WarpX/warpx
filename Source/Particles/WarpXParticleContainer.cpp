@@ -2392,12 +2392,13 @@ WarpXParticleContainer::CalculateNuei(amrex::MultiFab & species_nuei,
                 amrex::Real const g12sq_norm = g12sq*PhysConst::inv_c2;
                 amrex::Real constexpr b0_factor = PhysConst::q_e/
                                                   (2.0_rt*MathConst::pi*PhysConst::epsilon_0*m_e_J)*PhysConst::q_e; // [m]
-                amrex::Real const mu = PhysConst::m_e*rimass/(PhysConst::m_e + rimass);
-                amrex::Real const b0 = b0_factor*Zi/(mu*g12sq_norm + 2.0_rt*EF/m_e_J); // [m]
+                // reduced mass normalized by m_e, as b0_factor and bqm_factor are
+                amrex::Real const mu_norm = rimass/(PhysConst::m_e + rimass);
+                amrex::Real const b0 = b0_factor*Zi/(mu_norm*g12sq_norm + 2.0_rt*EF/m_e_J); // [m]
 
                 // set the Coulomb logarithm
                 amrex::Real constexpr bqm_factor = PhysConst::hbar/(2.0_rt*PhysConst::m_e*PhysConst::c); // [m]
-                amrex::Real const bmin_qm = bqm_factor/(mu*std::sqrt(g12sq_norm));
+                amrex::Real const bmin_qm = bqm_factor/(mu_norm*std::sqrt(g12sq_norm));
                 amrex::Real const bmin = std::max(b0/2.0_rt, bmin_qm); // b90 = b0/2.0
                 amrex::Real const Clog = std::max(2.0_rt, 0.5_rt*std::log(1.0_rt + LDe*LDe/bmin/bmin));
 

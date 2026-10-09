@@ -1270,7 +1270,8 @@ WarpX::DampFieldsInGuards(const int lev,
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for (amrex::MFIter mfi(*Efield[0], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            // No tiling: each iteration damps the guard cells of the whole fab
+            for (amrex::MFIter mfi(*Efield[0]); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& Ex_arr = Efield[0]->array(mfi);
                 amrex::Array4<amrex::Real> const& Ey_arr = Efield[1]->array(mfi);
@@ -1364,7 +1365,8 @@ void WarpX::DampFieldsInGuards(const int lev, amrex::MultiFab* mf)
             if (iside == 0 && WarpX::field_boundary_lo[dampdir] != FieldBoundaryType::Damped) { continue; }
             if (iside == 1 && WarpX::field_boundary_hi[dampdir] != FieldBoundaryType::Damped) { continue; }
 
-            for (amrex::MFIter mfi(*mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+            // No tiling: each iteration damps the guard cells of the whole fab
+            for (amrex::MFIter mfi(*mf); mfi.isValid(); ++mfi)
             {
                 amrex::Array4<amrex::Real> const& mf_arr = mf->array(mfi);
 

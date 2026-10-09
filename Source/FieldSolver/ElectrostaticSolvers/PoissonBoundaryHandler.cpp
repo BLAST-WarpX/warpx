@@ -55,7 +55,11 @@ void PoissonBoundaryHandler::ReadParameters()
 void PoissonBoundaryHandler::DefinePhiBCs (const amrex::Geometry& geom)
 {
 #ifdef WARPX_DIM_RZ
+    // r is handled here only if the domain includes the axis
+    int dim_start = 0;
     if (geom.ProbLo(0) == 0){
+        dim_start = 1;
+        has_non_periodic = true; // r is never periodic
         lobc[0] = LinOpBCType::Neumann;
         dirichlet_flag[0] = false;
 
@@ -75,7 +79,6 @@ void PoissonBoundaryHandler::DefinePhiBCs (const amrex::Geometry& geom)
             );
         }
     }
-    const int dim_start = 1;
 #else
     const int dim_start = 0;
     amrex::ignore_unused(geom);
