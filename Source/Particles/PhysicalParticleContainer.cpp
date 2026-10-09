@@ -85,6 +85,7 @@
 #include <AMReX_ParticleContainerBase.H>
 #include <AMReX_AmrParticles.H>
 #include <AMReX_ParticleTile.H>
+#include <AMReX_ParticleTransformation.H>
 #include <AMReX_Print.H>
 #include <AMReX_Random.H>
 #include <AMReX_SPACE.H>
@@ -105,6 +106,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdlib>
 #include <limits>
 #include <map>
@@ -999,204 +1001,106 @@ void
 PhysicalParticleContainer::SplitParticles (int lev)
 {
     PhysicalParticleContainer pctmp_split(&WarpX::GetInstance());
-    RealVector psplit_x, psplit_y, psplit_z, psplit_w;
-    RealVector psplit_ux, psplit_uy, psplit_uz;
-    long np_split_to_add = 0;
-    long np_split;
-    if(split_type==0)
-    {
-        np_split = amrex::Math::powi<AMREX_SPACEDIM>(2);
-    } else {
-        np_split = 2*AMREX_SPACEDIM;
+    // Children retain user-defined attributes and implicit saved-state data.
+    // Match the layout before defining tiles or redistributing the children.
+    const auto real_names = GetRealSoANames();
+    const auto int_names = GetIntSoANames();
+    for (int c = 0; c < NumRuntimeRealComps(); ++c) {
+        pctmp_split.AddRealComp(real_names[NArrayReal + c]);
     }
+    for (int c = 0; c < NumRuntimeIntComps(); ++c) {
+        pctmp_split.AddIntComp(int_names[NArrayInt + c]);
+    }
+    pctmp_split.AllocData();
 
-    // Loop over particle interator
-    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
-    {
-        const auto GetPosition = GetParticlePosition<PIdx>(pti);
-
-        const amrex::Vector<int> ppc_nd = plasma_injectors[0]->num_particles_per_cell_each_dim;
-        const std::array<Real,3>& dx = WarpX::CellSize(lev);
-        amrex::Vector<Real> split_offset = {dx[0]/2._rt,
-                                            dx[1]/2._rt,
-                                            dx[2]/2._rt};
-        if (ppc_nd[0] > 0){
-            // offset for split particles is computed as a function of cell size
-            // and number of particles per cell, so that a uniform distribution
-            // before splitting results in a uniform distribution after splitting
-            split_offset[0] /= ppc_nd[0];
-            split_offset[1] /= ppc_nd[1];
-            split_offset[2] /= ppc_nd[2];
-        }
-        // particle Struct Of Arrays data
-        auto& attribs = pti.GetAttribs();
-        auto& wp  = attribs[PIdx::w ];
-        auto& uxp = attribs[PIdx::ux];
-        auto& uyp = attribs[PIdx::uy];
-        auto& uzp = attribs[PIdx::uz];
-
-        ParticleTileType& ptile = ParticlesAt(lev, pti);
-        auto& soa = ptile.GetStructOfArrays();
-        uint64_t * const AMREX_RESTRICT idcpu = soa.GetIdCPUData().data();
-
-        const long np = pti.numParticles();
-        for(int i=0; i<np; i++){
-            ParticleReal xp, yp, zp;
-            GetPosition(i, xp, yp, zp);
-            if (idcpu[i] == LongParticleIds::DoSplitParticleID){
-                // If particle is tagged, split it and put the
-                // split particles in local arrays psplit_x etc.
-                np_split_to_add += np_split;
-#if defined(WARPX_DIM_1D_Z)
-                // Split particle in two along z axis
-                // 2 particles in 1d, split_type doesn't matter? Discuss with Remi
-                for (int ishift = -1; ishift < 2; ishift +=2 ){
-                    // Add one particle with offset in z
-                    psplit_x.push_back( xp );
-                    psplit_y.push_back( yp );
-                    psplit_z.push_back( zp + ishift*split_offset[2] );
-                    psplit_ux.push_back( uxp[i] );
-                    psplit_uy.push_back( uyp[i] );
-                    psplit_uz.push_back( uzp[i] );
-                    psplit_w.push_back( wp[i]/np_split );
-                }
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                // Split particle in two along x axis
-                // 2 particles in 1d, split_type doesn't matter? Discuss with Remi
-                for (int ishift = -1; ishift < 2; ishift +=2 ){
-                    // Add one particle with offset in x
-                    psplit_x.push_back( xp + ishift*split_offset[0] );
-                    psplit_y.push_back( yp );
-                    psplit_x.push_back( zp );
-                    psplit_ux.push_back( uxp[i] );
-                    psplit_uy.push_back( uyp[i] );
-                    psplit_uz.push_back( uzp[i] );
-                    psplit_w.push_back( wp[i]/np_split );
-                }
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                if (split_type==0){
-                    // Split particle in two along each diagonals
-                    // 4 particles in 2d
-                    for (int ishift = -1; ishift < 2; ishift +=2 ){
-                        for (int kshift = -1; kshift < 2; kshift +=2 ){
-                            // Add one particle with offset in x and z
-                            psplit_x.push_back( xp + ishift*split_offset[0] );
-                            psplit_y.push_back( yp );
-                            psplit_z.push_back( zp + kshift*split_offset[2] );
-                            psplit_ux.push_back( uxp[i] );
-                            psplit_uy.push_back( uyp[i] );
-                            psplit_uz.push_back( uzp[i] );
-                            psplit_w.push_back( wp[i]/np_split );
-                        }
-                    }
-                } else {
-                    // Split particle in two along each axis
-                    // 4 particles in 2d
-                    for (int ishift = -1; ishift < 2; ishift +=2 ){
-                        // Add one particle with offset in x
-                        psplit_x.push_back( xp + ishift*split_offset[0] );
-                        psplit_y.push_back( yp );
-                        psplit_z.push_back( zp );
-                        psplit_ux.push_back( uxp[i] );
-                        psplit_uy.push_back( uyp[i] );
-                        psplit_uz.push_back( uzp[i] );
-                        psplit_w.push_back( wp[i]/np_split );
-                        // Add one particle with offset in z
-                        psplit_x.push_back( xp );
-                        psplit_y.push_back( yp );
-                        psplit_z.push_back( zp + ishift*split_offset[2] );
-                        psplit_ux.push_back( uxp[i] );
-                        psplit_uy.push_back( uyp[i] );
-                        psplit_uz.push_back( uzp[i] );
-                        psplit_w.push_back( wp[i]/np_split );
-                    }
-                }
-#elif defined(WARPX_DIM_3D)
-                if (split_type==0){
-                    // Split particle in two along each diagonals
-                    // 8 particles in 3d
-                    for (int ishift = -1; ishift < 2; ishift +=2 ){
-                        for (int jshift = -1; jshift < 2; jshift +=2 ){
-                            for (int kshift = -1; kshift < 2; kshift +=2 ){
-                                // Add one particle with offset in x, y and z
-                                psplit_x.push_back( xp + ishift*split_offset[0] );
-                                psplit_y.push_back( yp + jshift*split_offset[1] );
-                                psplit_z.push_back( zp + kshift*split_offset[2] );
-                                psplit_ux.push_back( uxp[i] );
-                                psplit_uy.push_back( uyp[i] );
-                                psplit_uz.push_back( uzp[i] );
-                                psplit_w.push_back( wp[i]/np_split );
-                            }
-                        }
-                    }
-                } else {
-                    // Split particle in two along each axis
-                    // 6 particles in 3d
-                    for (int ishift = -1; ishift < 2; ishift +=2 ){
-                        // Add one particle with offset in x
-                        psplit_x.push_back( xp + ishift*split_offset[0] );
-                        psplit_y.push_back( yp );
-                        psplit_z.push_back( zp );
-                        psplit_ux.push_back( uxp[i] );
-                        psplit_uy.push_back( uyp[i] );
-                        psplit_uz.push_back( uzp[i] );
-                        psplit_w.push_back( wp[i]/np_split );
-                        // Add one particle with offset in y
-                        psplit_x.push_back( xp );
-                        psplit_y.push_back( yp + ishift*split_offset[1] );
-                        psplit_z.push_back( zp );
-                        psplit_ux.push_back( uxp[i] );
-                        psplit_uy.push_back( uyp[i] );
-                        psplit_uz.push_back( uzp[i] );
-                        psplit_w.push_back( wp[i]/np_split );
-                        // Add one particle with offset in z
-                        psplit_x.push_back( xp );
-                        psplit_y.push_back( yp );
-                        psplit_z.push_back( zp + ishift*split_offset[2] );
-                        psplit_ux.push_back( uxp[i] );
-                        psplit_uy.push_back( uyp[i] );
-                        psplit_uz.push_back( uzp[i] );
-                        psplit_w.push_back( wp[i]/np_split );
-                    }
-                }
-#endif
-                // invalidate the particle
-                idcpu[i] = amrex::ParticleIdCpus::Invalid;
+    const bool diagonal = split_type == 0;
+    const int num_children = diagonal ? (1 << AMREX_SPACEDIM) : 2*AMREX_SPACEDIM;
+    const auto& dx = WarpX::CellSize(lev);
+    amrex::GpuArray<amrex::Real, 3> split_offset{dx[0]/2, dx[1]/2, dx[2]/2};
+    // Non-gridded injection has no per-axis particle count.
+    if (!plasma_injectors.empty()) {
+        const auto& ppc = plasma_injectors[0]->num_particles_per_cell_each_dim;
+        if (ppc.size() == 3) {
+            for (int d = 0; d < 3; ++d) {
+                if (ppc[d] > 0) { split_offset[d] /= ppc[d]; }
             }
         }
     }
-    // Add local arrays psplit_x etc. to the temporary
-    // particle container pctmp_split. Split particles
-    // are tagged with p.id()=NoSplitParticleID so that
-    // they are not re-split when entering a higher level
-    // AddNParticles calls Redistribute, so that particles
-    // in pctmp_split are in the proper grids and tiles
-    const amrex::Vector<ParticleReal> xp(psplit_x.data(), psplit_x.data() + np_split_to_add);
-    const amrex::Vector<ParticleReal> yp(psplit_y.data(), psplit_y.data() + np_split_to_add);
-    const amrex::Vector<ParticleReal> zp(psplit_z.data(), psplit_z.data() + np_split_to_add);
-    const amrex::Vector<ParticleReal> uxp(psplit_ux.data(), psplit_ux.data() + np_split_to_add);
-    const amrex::Vector<ParticleReal> uyp(psplit_uy.data(), psplit_uy.data() + np_split_to_add);
-    const amrex::Vector<ParticleReal> uzp(psplit_uz.data(), psplit_uz.data() + np_split_to_add);
-    const amrex::Vector<ParticleReal> wp(psplit_w.data(), psplit_w.data() + np_split_to_add);
+    const int cpu = amrex::ParallelDescriptor::MyProc();
 
-    amrex::Vector<amrex::Vector<ParticleReal>> attr;
-    attr.push_back(wp);
-    const amrex::Vector<amrex::Vector<int>> attr_int{};
-    pctmp_split.AddNParticles(lev,
-                              np_split_to_add,
-                              xp,
-                              yp,
-                              zp,
-                              uxp,
-                              uyp,
-                              uzp,
-                              1,
-                              attr,
-                              0, attr_int,
-                              1, LongParticleIds::NoSplitParticleID);
-    // Copy particles from tmp to current particle container
+    // Position setters use the iterator interface, which exposes mutable SoA
+    // storage through a const view. The destination is a tile, not an iterator.
+    struct TileView {
+        ParticleTileType* tile;
+        [[nodiscard]] auto& GetStructOfArrays () const { return tile->GetStructOfArrays(); }
+    };
+    for (WarpXParIter pti(*this, lev); pti.isValid(); ++pti)
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            pti.numParticles() <= std::numeric_limits<int>::max(),
+            "Too many particles in one tile to split");
+        const int np = static_cast<int>(pti.numParticles());
+        if (np == 0) { continue; }
+        auto& src_tile = pti.GetParticleTile();
+        auto* idcpu = src_tile.GetStructOfArrays().GetIdCPUData().data();
+        amrex::Gpu::DeviceVector<int> offsets(np);
+        auto* offsets_data = offsets.data();
+        const int num_parents = amrex::Scan::PrefixSum<int>(np,
+            [=] AMREX_GPU_DEVICE (int i) -> int {
+                return amrex::ConstParticleIDWrapper{idcpu[i]} == LongParticleIds::DoSplitParticleID;
+            },
+            [=] AMREX_GPU_DEVICE (int i, int offset) { offsets_data[i] = offset; },
+            amrex::Scan::Type::exclusive, amrex::Scan::retSum);
+        if (num_parents == 0) { continue; }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            num_parents <= std::numeric_limits<int>::max()/num_children,
+            "Too many split particles in one tile");
+
+        auto& dst_tile = pctmp_split.DefineAndReturnParticleTile(
+            lev, pti.index(), pti.LocalTileIndex());
+        dst_tile.resize(static_cast<std::size_t>(num_parents)*num_children);
+        const auto src = src_tile.getParticleTileData();
+        const auto dst = dst_tile.getParticleTileData();
+        const auto GetPosition = GetParticlePosition<PIdx>(src_tile);
+        const auto SetPosition = SetParticlePosition<PIdx>(TileView{&dst_tile});
+        amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE (int i) {
+            if (amrex::ConstParticleIDWrapper{idcpu[i]} != LongParticleIds::DoSplitParticleID) {
+                return;
+            }
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(i, xp, yp, zp);
+            for (int child = 0; child < num_children; ++child) {
+                amrex::GpuArray<amrex::Real, 3> shift{0, 0, 0};
+                for (int axis = 0; axis < AMREX_SPACEDIM; ++axis) {
+#if defined(WARPX_DIM_1D_Z)
+                    const int d = 2;
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+                    const int d = 2*axis;
+#else
+                    const int d = axis;
+#endif
+                    if (diagonal) {
+                        const int sign = ((child >> (AMREX_SPACEDIM-1-axis)) & 1) ? 1 : -1;
+                        shift[d] = sign*split_offset[d];
+                    } else if (child % AMREX_SPACEDIM == axis) {
+                        shift[d] = (child < AMREX_SPACEDIM ? -1 : 1)*split_offset[d];
+                    }
+                }
+                const int j = offsets_data[i]*num_children + child;
+                amrex::copyParticle(dst, src, i, j);
+                SetPosition(j, xp + shift[0], yp + shift[1], zp + shift[2]);
+                dst.m_rdata[PIdx::w][j] = src.m_rdata[PIdx::w][i]/num_children;
+                dst.m_idcpu[j] = amrex::SetParticleIDandCPU(LongParticleIds::NoSplitParticleID, cpu);
+            }
+            idcpu[i] = amrex::ParticleIdCpus::Invalid;
+        });
+        // Keep offsets and tile views alive until child generation completes.
+        amrex::Gpu::streamSynchronize();
+    }
+    // Displacements can put children on another grid, rank, or AMR level.
+    pctmp_split.Redistribute();
     constexpr bool local_flag = true;
-    addParticles(pctmp_split,local_flag);
+    addParticles(pctmp_split, local_flag);
 }
 
 void
