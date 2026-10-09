@@ -49,10 +49,9 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
 
         void Define ( const Vec& a_U, Ops* a_op ) override
         {
-            // Defaults that differ from the native Newton solver
+            // The linear solver is always PETSc's KSP
             NewtonSolverParams params;
             params.linear_solver_type = LinearSolverType::petsc_ksp;
-            params.pc_type = PreconditionerType::pc_petsc;
             params.Parse();
 
             this->m_verbose = params.verbose;

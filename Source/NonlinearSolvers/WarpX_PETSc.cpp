@@ -335,6 +335,16 @@ void PETScSolver_impl::setOptions()
 
 }
 
+void PETScSolver_impl::setRestartLength(int a_restart_length) const
+{
+    PetscBool restart_specified;
+    PetscOptionsHasName( NULL, NULL, "-ksp_gmres_restart", &restart_specified );
+    if (!restart_specified) {
+        const std::string valstr = std::to_string(a_restart_length);
+        PetscOptionsSetValue( NULL, "-ksp_gmres_restart", valstr.c_str());
+    }
+}
+
 // Apply Jacobian operator
 void PETScSolver_impl::applyOp( VecType& a_F,
                                 const VecType& a_U,
@@ -624,6 +634,8 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op, const NewtonSolverParam
     m_atol_l = a_params.linsol_atol;
     m_rtol_l = a_params.linsol_rtol;
     m_maxits_l = a_params.linsol_maxits;
+    m_restart_length_l = a_params.linsol_restart_length;
+    setRestartLength(m_restart_length_l);
 
     this->m_pc_type = a_params.pc_type;
 
@@ -753,6 +765,7 @@ void SNES_impl::printParams () const
                        << m_pc_update_time_step_interval << "\n";
     amrex::Print()     << "SNES_impl relative tolerance:  " << m_rtol << "\n";
     amrex::Print()     << "SNES_impl absolute tolerance:  " << m_atol << "\n";
+    amrex::Print()     << "KSP (SNES_impl) restart length:     " << m_restart_length_l << "\n";
     amrex::Print()     << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
     amrex::Print()     << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
     amrex::Print()     << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";

@@ -97,13 +97,16 @@ class PETScSolver_impl
         bool m_is_defined = false;
 
         //! Preconditioner type
-        PreconditionerType m_pc_type = PreconditionerType::pc_petsc;
+        PreconditionerType m_pc_type = PreconditionerType::none;
 
         // Return the PC type
         PreconditionerType getPreconditionerType () const
         {
             return m_pc_type;
         }
+
+        //! Set the GMRES restart length, unless it is given as a PETSc option
+        void setRestartLength(int) const;
 
     protected:
 
@@ -338,6 +341,8 @@ class SNES_impl : public PETScSolver_impl
         amrex::Real m_rtol_l = 1e-4;
         //! maximum iterations
         int m_maxits_l = 1000;
+        //! GMRES restart length
+        int m_restart_length_l = 30;
 
         //! number of iterations for recent most solve
         mutable int m_niters = -1;
