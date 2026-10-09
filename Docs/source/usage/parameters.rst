@@ -294,10 +294,7 @@ Overall simulation parameters
           - ``gmres.absolute_tolerance`` (``float``, default: 0.0)
 
         - ``implicit_evolve.nonlinear_solver = petsc_snes``: Use a PS-JFNK method with the PETSc SNES solver. Requires WarpX to be compiled with PETSc (``WarpX_PETSC=ON``).
-          The ``newton`` and ``gmres`` parameters listed above apply, with the following differences:
-
-          - ``newton.linear_solver`` is not used. The linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES).
-          - ``gmres.restart_length`` is not used.
+          The ``newton`` and ``gmres`` parameters listed above apply, except that ``newton.linear_solver`` is not used: the linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES).
 
           PETSc options given on the command line (for example, ``-snes_view``) are passed to the PETSc solver.
 
