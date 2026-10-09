@@ -643,11 +643,11 @@ PEC_Insulator::ApplyPEC_InsulatortoField (
 
             amrex::IntVectND<3> is_normal_to_boundary{0, 0, 0};
 
-#if (defined WARPX_DIM_XZ) || (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
             // For 2D : for icomp==1, (Fy in XZ, Ftheta in RZ),
             //          icomp=1 is not normal to x or z boundary
             is_normal_to_boundary[2*idim] = 1;
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
             // For 1D : icomp=0 and icomp=1 (Fx and Fy are not normal to the z boundary)
             is_normal_to_boundary[2] = 1;
 #else

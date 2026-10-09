@@ -8,7 +8,7 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "EmbeddedBoundary/Enabled.H"
@@ -63,7 +63,7 @@ WarpX::DampPML (const int lev, PatchType patch_type)
     if (!do_pml) { return; }
 
     ABLASTR_PROFILE("WarpX::DampPML()");
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
     if (pml_rz[lev]) {
         using ablastr::fields::Direction;
         using warpx::fields::FieldType;

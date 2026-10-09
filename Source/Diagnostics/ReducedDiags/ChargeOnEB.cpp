@@ -36,12 +36,12 @@ ChargeOnEB::ChargeOnEB (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // Only 3D is working for now
-#if !(defined WARPX_DIM_3D)
+#if !defined(WARPX_DIM_3D)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
         "ChargeOnEB reduced diagnostics only works in 3D");
 #endif
 
-#if !(defined AMREX_USE_EB)
+#if !defined(AMREX_USE_EB)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
         "ChargeOnEB reduced diagnostics only works when compiling with EB support");
 #endif
@@ -95,7 +95,7 @@ void ChargeOnEB::ComputeDiags (const int step)
     if (!EB::enabled()) {
         throw std::runtime_error("ChargeOnEB::ComputeDiags only works when EBs are enabled at runtime");
     }
-#if ((defined WARPX_DIM_3D) && (defined AMREX_USE_EB))
+#if (defined(WARPX_DIM_3D) && defined(AMREX_USE_EB))
     using ablastr::fields::Direction;
 
     // get a reference to WarpX instance
