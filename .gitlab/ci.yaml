@@ -75,6 +75,8 @@ NVIDIA-H100:
     - |
       GPU_TESTS=(
         test_1d_langmuir_multi
+        test_2d_langmuir_multi_mr_direct
+        test_2d_langmuir_multi_mr_direct_shared_mem
         test_2d_refined_injection
         test_3d_laser_acceleration_btd
         test_rcylinder_langmuir_multi
@@ -134,6 +136,8 @@ AMD-MI300:
     - |
       GPU_TESTS=(
         test_1d_langmuir_multi
+        test_2d_langmuir_multi_mr_direct
+        test_2d_langmuir_multi_mr_direct_shared_mem
         test_2d_refined_injection
         test_3d_laser_acceleration_btd
         test_rcylinder_langmuir_multi
