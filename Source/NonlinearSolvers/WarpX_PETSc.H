@@ -22,6 +22,7 @@
 // forward declarations
 class WarpXSolverVec;
 class ImplicitSolver;
+struct NonlinearSolverParams;
 struct NewtonSolverParams;
 // end of forward declarations
 
@@ -219,7 +220,8 @@ class SNES_impl : public PETScSolver_impl
     public:
 
         //! Constructor
-        SNES_impl (const VecType&, TIType*, const NewtonSolverParams&);
+        SNES_impl (const VecType&, TIType*,
+                   const NonlinearSolverParams&, const NewtonSolverParams&);
 
         //! Destructor
         ~SNES_impl() override;
@@ -229,13 +231,6 @@ class SNES_impl : public PETScSolver_impl
         {
             return (this->m_is_defined && (m_op != nullptr) && (this->m_linop != nullptr));
         }
-
-        //! Set tolerances
-        void setTolerances(amrex::Real, amrex::Real, int,
-                           amrex::Real, amrex::Real, int);
-
-        //! Set max iters
-        void setMaxIters(int, int);
 
         //! Solve the system
         void solve(VecType&, const VecType&, amrex::Real, amrex::Real, int) const;
@@ -258,18 +253,7 @@ class SNES_impl : public PETScSolver_impl
         //! Set verbosity
         void setVerbose(bool);
 
-        //! Get parameters
-        AMREX_FORCE_INLINE
-        void getSolverParams ( amrex::Real&  a_rtol,
-                               amrex::Real&  a_atol,
-                               int&          a_maxits ) const
-        {
-            a_rtol = m_rtol;
-            a_atol = m_atol;
-            a_maxits = m_maxits;
-        }
-
-        //! Print parameters
+        //! Print parameters of the linear operator
         void printParams () const;
 
         AMREX_FORCE_INLINE
@@ -311,38 +295,23 @@ class SNES_impl : public PETScSolver_impl
 
     private:
 
-        //! Newton-iteration interval for PC updates
-        int m_pc_update_newton_interval = 1;
-        //! Time-step interval for PC updates
-        int m_pc_update_time_step_interval = 1;
+        //! Set the SNES and KSP tolerances and maximum iterations from the input parameters
+        void setTolerances();
+
+        //! Input parameters common to all nonlinear solvers
+        const NonlinearSolverParams& m_params;
+        //! Input parameters of the Newton-type solvers
+        const NewtonSolverParams& m_newton_params;
+
         //! Ensure the first linear solve initializes the PC, including after restart.
         mutable bool m_pc_initialized = false;
         //! PC update decision for the current nonlinear iteration.
         mutable bool m_update_pc = true;
 
-        //! absolute tolerance
-        amrex::Real m_atol = 0.;
-        //! relative tolerance
-        amrex::Real m_rtol = 1e-6;
         //! step tolerance
         amrex::Real m_stol = 1e-16;
-        //! maximum iterations
-        int m_maxits= 100;
-        //! whether reaching the maximum iterations is a failure
-        bool m_require_convergence = true;
         //! verbosity
         bool m_verbose = true;
-        //! verbosity for linear solver
-        int m_verbose_l = 2;
-
-        //! absolute tolerance
-        amrex::Real m_atol_l = 0.;
-        //! relative tolerance
-        amrex::Real m_rtol_l = 1e-4;
-        //! maximum iterations
-        int m_maxits_l = 1000;
-        //! GMRES restart length
-        int m_restart_length_l = 30;
 
         //! number of iterations for recent most solve
         mutable int m_niters = -1;

@@ -8,6 +8,7 @@
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "NewtonSolverParams.H"
+#include "NonlinearSolver.H"
 #include "Preconditioner.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
@@ -248,6 +249,74 @@ PetscErrorCode printKSPResidual(KSP a_ksp, PetscInt a_n, PetscReal a_rnorm, void
 }
 
 //! Constructor
+//! Create the PETSc solution and right-hand-side vectors of a solver
+void createVectors( PETScSolver_impl& a_solver, const std::string& a_name )
+{
+    amrex::ignore_unused(a_name);
+    VecCreate(PETSC_COMM_WORLD, &a_solver.m_x->obj);
+#ifdef AMREX_USE_GPU
+#ifdef AMREX_USE_CUDA
+    VecSetType(a_solver.m_x->obj, VECCUDA);
+#elif defined AMREX_USE_HIP
+    VecSetType(a_solver.m_x->obj, VECHIP);
+#else
+    WARPX_ABORT_WITH_MESSAGE(a_name + " - not yet implemented for non-CUDA/HIP architectures");
+#endif
+#else
+    VecSetType(a_solver.m_x->obj, VECSTANDARD);
+#endif
+    VecSetSizes(a_solver.m_x->obj, a_solver.m_ndofs_l, a_solver.m_ndofs_g);
+    VecSetFromOptions(a_solver.m_x->obj);
+    VecDuplicate(a_solver.m_x->obj, &a_solver.m_b->obj);
+}
+
+/** Set up the PC of a KSP: the native PC through PETSc's PCShell interface, or a
+ *  PETSc PC with its sparse matrix. Returns the matrix from which the PC is built. */
+Mat setupPC( KSP a_ksp, PETScSolver_impl& a_solver, const std::string& a_name )
+{
+    PC pc;
+    KSPGetPC(a_ksp, &pc);
+    KSPSetPCSide(a_ksp, PC_RIGHT);
+    if (a_solver.m_pc_type != PreconditionerType::pc_petsc) {
+        // use native implementation (or no PC, if
+        // native PC is turned off)
+        PCSetType(pc, PCSHELL);
+        PCShellSetApply(pc, applyNativePC);
+        PCShellSetContext(pc, &a_solver);
+        amrex::Print() << a_name << ": Using native preconditioner through PETSc's PCShell interface.\n";
+        return a_solver.m_A->obj;
+    }
+
+    // use PETSc options and implementation for PC
+    PCSetFromOptions(pc);
+    PCType pctype;
+    PCGetType(pc, &pctype);
+    amrex::Print() << a_name << ": Using PETSc preconditioner - " << pctype << ".\n";
+    // set up the PC sparse matrix
+    MatCreate( PETSC_COMM_WORLD, &a_solver.m_P->obj );
+    MatSetSizes( a_solver.m_P->obj,
+                 a_solver.m_ndofs_l, a_solver.m_ndofs_l,
+                 PETSC_DETERMINE, PETSC_DETERMINE );
+#if defined AMREX_USE_GPU
+#if defined AMREX_USE_CUDA
+    MatSetType( a_solver.m_P->obj, MATAIJCUSPARSE);
+#elif defined AMREX_USE_HIP
+    MatSetType( a_solver.m_P->obj, MATAIJHIPSPARSE);
+#else
+    WARPX_ABORT_WITH_MESSAGE(a_name + " - not yet implemented for non-CUDA/HIP architectures");
+#endif
+#else
+    MatSetType( a_solver.m_P->obj, MATAIJ );
+    MatMPIAIJSetPreallocation( a_solver.m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
+                                                  1 /*a_ops->numPCMatBands()-1*/, NULL);
+#endif
+    MatSetOption(a_solver.m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
+    MatSetOption(a_solver.m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
+    MatSetUp(a_solver.m_P->obj);
+    MatSetFromOptions(a_solver.m_P->obj);
+    return a_solver.m_P->obj;
+}
+
 PETScSolver_impl::PETScSolver_impl()
 {
     m_A = std::make_unique<MatObj>();
@@ -443,21 +512,7 @@ void KSP_impl::createObjects(const VecType& a_vec)
     this->m_ndofs_g = this->m_U.nDOF_global();
 
     // create vectors
-    VecCreate(PETSC_COMM_WORLD, &this->m_x->obj);
-#ifdef AMREX_USE_GPU
-#ifdef AMREX_USE_CUDA
-    VecSetType(this->m_x->obj, VECCUDA);
-#elif defined AMREX_USE_HIP
-    VecSetType(this->m_x->obj, VECHIP);
-#else
-    WARPX_ABORT_WITH_MESSAGE("KSP_impl::createObjects() - not yet implemented for non-CUDA/HIP architectures");
-#endif
-#else
-    VecSetType(this->m_x->obj, VECSTANDARD);
-#endif
-    VecSetSizes(this->m_x->obj, this->m_ndofs_l, this->m_ndofs_g);
-    VecSetFromOptions(this->m_x->obj);
-    VecDuplicate(this->m_x->obj, &this->m_b->obj);
+    createVectors(*this, "KSP_impl");
 
     // create matrix operator
     MatCreateShell( PETSC_COMM_WORLD,
@@ -473,50 +528,10 @@ void KSP_impl::createObjects(const VecType& a_vec)
 
     // create KSP and PC object
     KSPCreate( PETSC_COMM_WORLD, &m_ksp->obj );
-    PC pc;
-    KSPGetPC(m_ksp->obj, &pc);
-    KSPSetPCSide(m_ksp->obj, PC_RIGHT);
     this->m_pc_type = m_linop->pcType();
     // set PETSc options from WarpX inputs
     setOptions();
-    if (this->m_pc_type != PreconditionerType::pc_petsc) {
-        // use native implementation (or no PC, if
-        // native PC is turned off)
-        PCSetType(pc, PCSHELL);
-        PCShellSetApply(pc, applyNativePC);
-        PCShellSetContext(pc, this);
-        amrex::Print() << "KSP_impl: Using native preconditioner through PETSc's PCShell interface.\n";
-        KSPSetOperators( m_ksp->obj, this->m_A->obj, this->m_A->obj );
-    } else {
-        // use PETSc options and implementation for PC
-        PCSetFromOptions(pc);
-        PCType pctype;
-        PCGetType(pc, &pctype);
-        amrex::Print() << "KSP_impl: Using PETSc preconditioner - " << pctype << ".\n";
-        // set up the PC sparse matrix
-        MatCreate( PETSC_COMM_WORLD, &this->m_P->obj );
-        MatSetSizes( this->m_P->obj,
-                     this->m_ndofs_l, this->m_ndofs_l,
-                     PETSC_DETERMINE, PETSC_DETERMINE );
-#if defined AMREX_USE_GPU
-#if defined AMREX_USE_CUDA
-        MatSetType( this->m_P->obj, MATAIJCUSPARSE);
-#elif defined AMREX_USE_HIP
-        MatSetType( this->m_P->obj, MATAIJHIPSPARSE);
-#else
-        WARPX_ABORT_WITH_MESSAGE("KSP_impl::createObjects() - not yet implemented for non-CUDA/HIP architectures");
-#endif
-#else
-        MatSetType( this->m_P->obj, MATAIJ );
-        MatMPIAIJSetPreallocation( this->m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
-                                                   1 /*a_ops->numPCMatBands()-1*/, NULL);
-#endif
-        MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
-        MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
-        MatSetUp(this->m_P->obj);
-        MatSetFromOptions(this->m_P->obj);
-        KSPSetOperators( m_ksp->obj, this->m_A->obj, this->m_P->obj );
-    }
+    KSPSetOperators( m_ksp->obj, this->m_A->obj, setupPC(m_ksp->obj, *this, "KSP_impl") );
     KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
     KSPSetNormType( m_ksp->obj, KSP_NORM_UNPRECONDITIONED );
     if (m_verbose > 1) {
@@ -610,34 +625,17 @@ void KSP_impl::setVerbose(int a_v)
     }
 }
 
-SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op, const NewtonSolverParams& a_params)
+SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op,
+                     const NonlinearSolverParams& a_params,
+                     const NewtonSolverParams& a_newton_params)
+    : m_params(a_params), m_newton_params(a_newton_params)
 {
     BL_PROFILE("SNES_impl::SNES_impl()");
     amrex::Print() << "SNES_impl: Initialized PETSc's SNES solver.\n";
 
-    m_verbose = a_params.verbose;
-    m_atol = a_params.atol;
-    m_rtol = a_params.rtol;
-    m_maxits = a_params.maxits;
-    m_pc_update_newton_interval = a_params.pc_update_newton_interval;
-    m_pc_update_time_step_interval = a_params.pc_update_time_step_interval;
-    m_require_convergence = a_params.require_convergence;
-
-    // The linear solver is always PETSc's KSP
-    if (a_params.linear_solver_type != LinearSolverType::petsc_ksp) {
-        ablastr::warn_manager::WMRecordWarning("PETSc SNES",
-            "newton.linear_solver = " + amrex::getEnumNameString(a_params.linear_solver_type) +
-            " is ignored; petsc_snes uses PETSc KSP as the linear solver.");
-    }
-
-    m_verbose_l = a_params.linsol_verbose_int;
-    m_atol_l = a_params.linsol_atol;
-    m_rtol_l = a_params.linsol_rtol;
-    m_maxits_l = a_params.linsol_maxits;
-    m_restart_length_l = a_params.linsol_restart_length;
-    setRestartLength(m_restart_length_l);
-
-    this->m_pc_type = a_params.pc_type;
+    m_verbose = m_params.verbose;
+    setRestartLength(m_newton_params.linsol_restart_length);
+    this->m_pc_type = m_newton_params.pc_type;
 
     this->m_U.Define(a_vec);
     m_F.Define(a_vec);
@@ -652,20 +650,7 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op, const NewtonSolverParam
 
     m_snes = std::make_unique<SNESObj>();
 
-    VecCreate(PETSC_COMM_WORLD, &this->m_x->obj);
-#if defined AMREX_USE_GPU
-#if defined AMREX_USE_CUDA
-    VecSetType(this->m_x->obj, VECCUDA);
-#elif defined AMREX_USE_HIP
-    VecSetType(this->m_x->obj, VECHIP);
-#else
-    WARPX_ABORT_WITH_MESSAGE("SNES_impl::SNES_impl() - not yet implemented for non-CUDA/HIP architectures");
-#endif
-#else
-    VecSetType(this->m_x->obj, VECSTANDARD);
-#endif
-    VecSetSizes(this->m_x->obj, this->m_ndofs_l, this->m_ndofs_g);
-    VecDuplicate(this->m_x->obj, &this->m_b->obj);
+    createVectors(*this, "SNES_impl");
 
     SNESCreate(PETSC_COMM_WORLD, &m_snes->obj);
     SNESSetType( m_snes->obj, SNESNEWTONLS );
@@ -689,56 +674,16 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op, const NewtonSolverParam
 
     KSP ksp;
     SNESGetKSP(m_snes->obj, &ksp);
-    PC pc;
-    KSPGetPC(ksp, &pc);
-    KSPSetPCSide(ksp, PC_RIGHT);
     // set PETSc options from WarpX inputs
     setOptions();
-    if (this->m_pc_type != PreconditionerType::pc_petsc) {
-        // use native implementation (or no PC, if
-        // native PC is turned off)
-        PCSetType(pc, PCSHELL);
-        PCShellSetApply(pc, applyNativePC);
-        PCShellSetContext(pc, this);
-        amrex::Print() << "SNES_impl: Using native preconditioner through PETSc's PCShell interface.\n";
-        SNESSetJacobian(m_snes->obj, this->m_A->obj, this->m_A->obj, JacobianFunction, this);
-    } else {
-        // use PETSc options and implementation for PC
-        PCSetFromOptions(pc);
-        PCType pctype;
-        PCGetType(pc, &pctype);
-        amrex::Print() << "SNES_impl: Using PETSc preconditioner - " << pctype << ".\n";
-        // set up the PC sparse matrix
-        MatCreate( PETSC_COMM_WORLD, &this->m_P->obj );
-        MatSetSizes( this->m_P->obj,
-                     this->m_ndofs_l, this->m_ndofs_l,
-                     PETSC_DETERMINE, PETSC_DETERMINE );
-#if defined AMREX_USE_GPU
-#if defined AMREX_USE_CUDA
-        MatSetType( this->m_P->obj, MATAIJCUSPARSE);
-#elif defined AMREX_USE_HIP
-        MatSetType( this->m_P->obj, MATAIJHIPSPARSE);
-#else
-        WARPX_ABORT_WITH_MESSAGE("SNES_impl::SNES_impl() - not yet implemented for non-CUDA/HIP architectures");
-#endif
-#else
-        MatSetType( this->m_P->obj, MATAIJ );
-        MatMPIAIJSetPreallocation( this->m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
-                                                   1 /*a_ops->numPCMatBands()-1*/, NULL);
-#endif
-        MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
-        MatSetOption(this->m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
-        MatSetUp(this->m_P->obj);
-        SNESSetJacobian(m_snes->obj, this->m_A->obj, this->m_P->obj, JacobianFunction, this);
-    }
+    SNESSetJacobian(m_snes->obj, this->m_A->obj, setupPC(ksp, *this, "SNES_impl"),
+                    JacobianFunction, this);
 
-    setTolerances(m_rtol, m_atol, m_maxits, m_rtol_l, m_atol_l, m_maxits_l);
-    setMaxIters(m_maxits, m_maxits_l);
+    setTolerances();
     if (m_verbose) {
         SNESMonitorSet(m_snes->obj, printSNESResidual, NULL,NULL );
     }
-    if (m_verbose_l > 1) {
-        SNESGetKSP(m_snes->obj, &ksp);
+    if (m_newton_params.linsol_verbose_int > 1) {
         KSPMonitorSet( ksp, printKSPResidual, NULL, NULL );
     }
 
@@ -756,76 +701,25 @@ SNES_impl::~SNES_impl() { }
 
 void SNES_impl::printParams () const
 {
-    amrex::Print()     << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
-    amrex::Print()     << "SNES_impl max iterations:      " << m_maxits << "\n";
-    amrex::Print()     << "SNES_impl require convergence: " << (m_require_convergence?"true":"false") << "\n";
-    amrex::Print()     << "SNES_impl PC update Newton interval:    "
-                       << m_pc_update_newton_interval << "\n";
-    amrex::Print()     << "SNES_impl PC update time-step interval: "
-                       << m_pc_update_time_step_interval << "\n";
-    amrex::Print()     << "SNES_impl relative tolerance:  " << m_rtol << "\n";
-    amrex::Print()     << "SNES_impl absolute tolerance:  " << m_atol << "\n";
-    amrex::Print()     << "KSP (SNES_impl) restart length:     " << m_restart_length_l << "\n";
-    amrex::Print()     << "KSP (SNES_impl) max iterations:     " << m_maxits_l << "\n";
-    amrex::Print()     << "KSP (SNES_impl) relative tolerance: " << m_rtol_l << "\n";
-    amrex::Print()     << "KSP (SNES_impl) absolute tolerance: " << m_atol_l << "\n";
-    amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(this->m_pc_type) << "\n";
-
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->printParams();
 }
 
-void SNES_impl::setTolerances( const amrex::Real a_rtol,
-                               const amrex::Real a_atol,
-                               const int  a_its,
-                               const amrex::Real a_rtol_l,
-                               const amrex::Real a_atol_l,
-                               const int a_its_l )
+void SNES_impl::setTolerances()
 {
     BL_PROFILE("SNES_impl::setTolerances()");
-    m_atol = a_atol;
-    m_rtol = a_rtol;
-    m_atol_l = a_atol_l;
-    m_rtol_l = a_rtol_l;
-    if (a_its > 0) { m_maxits = a_its; }
-    if (a_its_l > 0) { m_maxits_l = a_its_l; }
-
-    if (m_snes->obj != nullptr) {
-        SNESSetTolerances( m_snes->obj,
-                           m_atol,
-                           m_rtol,
-                           m_stol,
-                           (a_its > 0 ? a_its : PETSC_CURRENT),
-                           PETSC_CURRENT );
-        KSP ksp;
-        SNESGetKSP(m_snes->obj, &ksp);
-        KSPSetTolerances( ksp,
-                          m_rtol_l,
-                          m_atol_l,
-                          PETSC_CURRENT,
-                          (a_its_l > 0 ? a_its_l : PETSC_CURRENT) );
-    }
-}
-
-void SNES_impl::setMaxIters(const int a_its, const int a_its_l )
-{
-    BL_PROFILE("SNES_impl::setMaxIters()");
-    m_maxits = a_its;
-    m_maxits_l = a_its_l;
-    if (m_snes->obj != nullptr) {
-        SNESSetTolerances( m_snes->obj,
-                           PETSC_CURRENT,
-                           PETSC_CURRENT,
-                           PETSC_CURRENT,
-                           a_its,
-                           PETSC_CURRENT );
-        KSP ksp;
-        SNESGetKSP(m_snes->obj, &ksp);
-        KSPSetTolerances( ksp,
-                          PETSC_CURRENT,
-                          PETSC_CURRENT,
-                          PETSC_CURRENT,
-                          a_its_l );
-    }
+    SNESSetTolerances( m_snes->obj,
+                       m_params.atol,
+                       m_params.rtol,
+                       m_stol,
+                       m_params.maxits,
+                       PETSC_CURRENT );
+    KSP ksp;
+    SNESGetKSP(m_snes->obj, &ksp);
+    KSPSetTolerances( ksp,
+                      m_newton_params.linsol_rtol,
+                      m_newton_params.linsol_atol,
+                      PETSC_CURRENT,
+                      m_newton_params.linsol_maxits );
 }
 
 bool SNES_impl::usePC() const
@@ -866,7 +760,7 @@ void SNES_impl::solve (VecType& a_U,
     SNESGetConvergedReason( m_snes->obj, &reason );
     m_status = (int)reason;
     // Reaching the maximum number of iterations is a failure only if convergence is required
-    if (reason == SNES_DIVERGED_MAX_IT && !m_require_convergence) { m_status = 0; }
+    if (reason == SNES_DIVERGED_MAX_IT && !m_params.require_convergence) { m_status = 0; }
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
 
     const char* conv_reason;
@@ -894,10 +788,7 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
 
     if (!from_jacobian) {
         // Same PC update schedule as the native Newton solver
-        const bool pc_update_step = (m_step % m_pc_update_time_step_interval == 0);
-        const bool pc_update_iteration = (m_iter == 0) ||
-            (m_pc_update_newton_interval > 0 && m_iter % m_pc_update_newton_interval == 0);
-        m_update_pc = !m_pc_initialized || (pc_update_step && pc_update_iteration);
+        m_update_pc = m_newton_params.UpdatePC(m_step, m_iter, m_pc_initialized);
     }
 
     m_op->ComputeRHS(a_F, a_U, m_time, m_iter, from_jacobian,
