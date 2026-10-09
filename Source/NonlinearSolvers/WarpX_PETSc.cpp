@@ -105,9 +105,20 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     copyVec(a_F, context->m_F);
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
-    if (!context->m_fd_jac_comput && context->updatePC()) {
-        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
-    }
+    PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+//! Called at the start of each nonlinear iteration, before the Jacobian is computed
+PetscErrorCode PreLinearSolveFunction( SNES a_solver, PetscInt a_iter )
+{
+    PetscFunctionBeginUser;
+    BL_PROFILE("warpx_petsc::PreLinearSolveFunction()");
+    amrex::ignore_unused(a_iter);
+
+    void* ctxt = nullptr;
+    SNESGetApplicationContext(a_solver, &ctxt);
+    static_cast<SNES_impl*>(ctxt)->preLinearSolve();
+
     PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -124,18 +135,28 @@ PetscErrorCode JacobianFunction( SNES a_solver,
     amrex::ignore_unused(a_P);
 
     SNES_impl *context = (SNES_impl*) ctxt;
-    KSP lin_solver;
-    SNESGetKSP(a_solver, &lin_solver);
-    PC pc;
-    KSPGetPC(lin_solver, &pc);
-    PCType pctype;
-    PCGetType(pc, &pctype);
+    const bool update_pc = context->updatePC();
 
-    if (context->updatePC() && strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
-        copyVec(context->m_U, a_U);
-        auto err = context->assemblePCMatrix(context->m_linop.get());
-        AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
+    if (update_pc) {
+        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
+
+        KSP lin_solver;
+        SNESGetKSP(a_solver, &lin_solver);
+        PC pc;
+        KSPGetPC(lin_solver, &pc);
+        PCType pctype;
+        PCGetType(pc, &pctype);
+
+        if (strcmp(pctype,PCNONE) && strcmp(pctype,PCSHELL)) {
+            copyVec(context->m_U, a_U);
+            auto err = context->assemblePCMatrix(context->m_linop.get());
+            AMREX_ALWAYS_ASSERT(err == PETSC_SUCCESS);
+        }
+        context->setPCInitialized();
     }
+
+    // Rebuild or reuse the PETSc preconditioner in the linear solve that follows
+    SNESSetLagPreconditioner(a_solver, update_pc ? 1 : -1);
 
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -586,6 +607,10 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     pp_newton.query("absolute_tolerance",  m_atol);
     pp_newton.query("relative_tolerance",  m_rtol);
     pp_newton.query("max_iterations",      m_maxits);
+    pp_newton.query("pc_update_newton_interval", m_pc_update_newton_interval);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_update_newton_interval >= 0,
+        "newton.pc_update_newton_interval must be nonnegative");
     pp_newton.query("pc_update_time_step_interval", m_pc_update_time_step_interval);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_pc_update_time_step_interval > 0,
@@ -634,6 +659,8 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
     SNESGetLineSearch( m_snes->obj, &linesearch );
     SNESLineSearchSetType( linesearch, SNESLINESEARCHBASIC );
     SNESSetFunction(m_snes->obj, nullptr, RHSFunction, this);
+    SNESSetApplicationContext(m_snes->obj, this);
+    SNESSetUpdate(m_snes->obj, PreLinearSolveFunction);
 
     MatCreateShell( PETSC_COMM_WORLD,
                     this->m_ndofs_l,
@@ -717,6 +744,8 @@ void SNES_impl::printParams () const
 {
     amrex::Print() << "SNES_impl verbose:             " << (m_verbose?"true":"false") << "\n";
     amrex::Print() << "SNES_impl max iterations:      " << m_maxits << "\n";
+    amrex::Print() << "SNES_impl PC update Newton interval:    "
+                   << m_pc_update_newton_interval << "\n";
     amrex::Print() << "SNES_impl PC update time-step interval: "
                    << m_pc_update_time_step_interval << "\n";
     amrex::Print() << "SNES_impl relative tolerance:  " << m_rtol << "\n";
@@ -797,15 +826,11 @@ void SNES_impl::solve (VecType& a_U,
 {
     BL_PROFILE("SNES_impl::solve()");
     AMREX_ALWAYS_ASSERT(isDefined());
-    amrex::ignore_unused(a_step);
 
     m_time = a_time;
+    m_step = a_step;
     m_iter = 0;
-    m_update_pc = !m_pc_initialized || (a_step % m_pc_update_time_step_interval == 0);
     m_rhs_first_call = true;
-    // Keep PETSc factorization reuse on the same time-step schedule as PC assembly.
-    SNESSetLagPreconditioner(m_snes->obj, m_update_pc ? 1 : -1);
-    SNESSetLagPreconditionerPersists(m_snes->obj, PETSC_TRUE);
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTime(a_time);
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->curTimeStep(a_dt);
 
@@ -816,8 +841,6 @@ void SNES_impl::solve (VecType& a_U,
 
     SNESGetIterationNumber(m_snes->obj, &m_niters);
     SNESGetLinearSolveIterations(m_snes->obj, &m_niters_l);
-    // Do not regard an iteration-0 early exit as having initialized the PC.
-    if (m_update_pc && m_niters_l > 0) { m_pc_initialized = true; }
 
     KSP ksp;
     SNESGetKSP(m_snes->obj, &ksp);
@@ -846,19 +869,33 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
     BL_PROFILE("SNES_impl::computeRHS()");
     AMREX_ALWAYS_ASSERT(isDefined());
 
-    if (m_fd_jac_comput) {
-        const bool from_jacobian = !m_rhs_first_call;
-        const bool update_pc_for_residual = m_update_pc && !from_jacobian;
-        m_op->ComputeRHS(a_F, a_U, m_time, m_iter, from_jacobian,
-                         update_pc_for_residual);
-        m_rhs_first_call = false;
-    } else {
-        m_op->ComputeRHS(a_F, a_U, m_time, m_iter, false, m_update_pc);
-        m_iter++;
+    // With -snes_fd, evaluations after the first one of a solve are part of
+    // the finite-difference Jacobian
+    const bool from_jacobian = m_fd_jac_comput && !m_rhs_first_call;
+    m_rhs_first_call = false;
+
+    if (!from_jacobian) {
+        // Same PC update schedule as the native Newton solver
+        const bool pc_update_step = (m_step % m_pc_update_time_step_interval == 0);
+        const bool pc_update_iteration = (m_iter == 0) ||
+            (m_pc_update_newton_interval > 0 && m_iter % m_pc_update_newton_interval == 0);
+        m_update_pc = !m_pc_initialized || (pc_update_step && pc_update_iteration);
     }
 
-    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseSolution(a_U);
-    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseRHS(a_F);
+    m_op->ComputeRHS(a_F, a_U, m_time, m_iter, from_jacobian,
+                     m_update_pc && !from_jacobian);
+    if (!from_jacobian) { m_iter++; }
+}
+
+void SNES_impl::preLinearSolve()
+{
+    BL_PROFILE("SNES_impl::preLinearSolve()");
+    AMREX_ALWAYS_ASSERT(isDefined());
+
+    // m_U and m_F hold the current iterate and its RHS from the last residual evaluation
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseSolution(this->m_U);
+    dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseRHS(m_F);
+    m_op->PreLinearSolve(m_update_pc);
 }
 
 void SNES_impl::setVerbose(bool a_v)

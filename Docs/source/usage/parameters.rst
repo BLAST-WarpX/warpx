@@ -270,15 +270,14 @@ Overall simulation parameters
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
           - ``newton.pc_update_newton_interval`` (``int``, default: 1)
-            Controls preconditioner updates within a native Newton solve. Zero updates
+            Controls preconditioner updates within a nonlinear solve. Zero updates
             only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
           - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
             Must be positive. Updates are allowed only when the zero-based simulation
-            step index is divisible by this interval. For native Newton, both interval
-            conditions must hold. PETSc SNES uses only this time-step interval: on
-            update steps it retains PC updates within the nonlinear solve, while on
-            skipped steps it reuses the PC, including the PETSc factorization.
-            ``newton.pc_update_newton_interval`` does not apply to PETSc SNES.
+            step index is divisible by this interval. Both interval conditions must
+            hold for the preconditioner to be updated; otherwise it is reused, including
+            the PETSc factorization. The same schedule applies to the native Newton
+            solver and to PETSc SNES.
             The first required linear solve always initializes the PC, including
             after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)

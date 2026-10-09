@@ -239,10 +239,16 @@ class SNES_impl : public PETScSolver_impl
         //! Evaluate the RHS
         void computeRHS(VecType&, const VecType&);
 
+        //! Prepare for the linear solve at the current iterate
+        void preLinearSolve();
+
+        //! Record that the PC has been set up
+        void setPCInitialized() const { m_pc_initialized = true; }
+
         //! Returns if a preconditioner is being used
         [[nodiscard]] bool usePC() const;
 
-        //! Whether PC updates are enabled for the current nonlinear solve.
+        //! Whether the PC is updated at the current nonlinear iteration.
         [[nodiscard]] bool updatePC() const { return m_update_pc; }
 
         //! Set verbosity
@@ -301,11 +307,13 @@ class SNES_impl : public PETScSolver_impl
 
     private:
 
-        //! Time-step interval for PC updates; SNES does not use the Newton interval.
+        //! Newton-iteration interval for PC updates
+        int m_pc_update_newton_interval = 1;
+        //! Time-step interval for PC updates
         int m_pc_update_time_step_interval = 1;
         //! Ensure the first linear solve initializes the PC, including after restart.
         mutable bool m_pc_initialized = false;
-        //! Fixed PC update decision for all nonlinear evaluations in one solve.
+        //! PC update decision for the current nonlinear iteration.
         mutable bool m_update_pc = true;
 
         //! absolute tolerance
@@ -341,6 +349,8 @@ class SNES_impl : public PETScSolver_impl
 
         //! Simulation time
         mutable amrex::Real m_time = 0.0;
+        //! Time step index
+        mutable int m_step = 0;
         //! Newton iteration index of the next residual evaluation
         mutable int m_iter = 0;
 
