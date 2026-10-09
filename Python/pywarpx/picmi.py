@@ -542,9 +542,10 @@ class GaussianBunchDistribution(picmistandard.PICMI_GaussianBunchDistribution):
         species.add_new_group_attr(source_name, "npart", layout.n_macroparticles)
 
         # --- Total number of real particles
-        species.add_new_group_attr(source_name, "npart_real", self.n_physical_particles)
+        n_physical_particles = self.n_physical_particles
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "npart_real", density_scale)
+            n_physical_particles *= density_scale
+        species.add_new_group_attr(source_name, "npart_real", n_physical_particles)
 
         # --- The PICMI standard doesn't yet have a way of specifying these values.
         # --- They should default to the size of the domain. They are not typically
@@ -782,9 +783,10 @@ class UniformDistribution(
 
         # --- Only constant density is supported by this class
         species.add_new_group_attr(source_name, "profile", "constant")
-        species.add_new_group_attr(source_name, "density", self.density)
+        density = self.density
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "density", density_scale)
+            density *= density_scale
+        species.add_new_group_attr(source_name, "density", density)
 
 
 class FluxDistributionBase(object):
@@ -851,8 +853,6 @@ class AnalyticFluxDistribution(
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "parse_flux_function")
-        if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
         expression = pywarpx.my_constants.mangle_expression(
             self.flux, self._mangle_dict
         )
@@ -887,9 +887,11 @@ class UniformFluxDistribution(
 
     def initialize_flux_profile_func(self, species, density_scale, source_name):
         species.add_new_group_attr(source_name, "flux_profile", "constant")
-        species.add_new_group_attr(source_name, "flux", self.flux)
+        flux = self.flux
         if density_scale is not None:
-            species.add_new_group_attr(source_name, "flux", density_scale)
+            # self.flux is a string (picmistandard stores it as an expression)
+            flux = f"({density_scale})*({flux})"
+        species.add_new_group_attr(source_name, "flux", flux)
 
 
 class AnalyticDistribution(
@@ -2385,6 +2387,62 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         default=None,
         description="Level of verbosity for the labframe electrostatic solver (default 2)",
     )
+    # MLMG bottom solver parameters
+    self_fields_bottom_solver: (
+        Literal[
+            "default",
+            "smoother",
+            "bicgstab",
+            "cg",
+            "bicgcg",
+            "cgbicg",
+            "custom",
+            "algmg",
+            "hypre",
+            "petsc",
+        ]
+        | None
+    ) = Field(
+        default=None,
+        description="Bottom solver used by the MLMG electrostatic solver. 'hypre' and 'petsc' require an AMReX built with HYPRE / PETSc support. (default 'default')",
+    )
+    self_fields_bottom_verbosity: int | None = Field(
+        default=None,
+        description="Level of verbosity of the bottom solver of the electrostatic solvers (default 0)",
+    )
+    self_fields_bottom_max_iters: int | None = Field(
+        default=None,
+        description="Maximum number of bottom solver iterations (AMReX default: 200)",
+    )
+    self_fields_bottom_relative_tolerance: float | None = Field(
+        default=None,
+        description="Relative tolerance of the bottom solve (AMReX default: 1e-4)",
+    )
+    self_fields_bottom_absolute_tolerance: float | None = Field(
+        default=None,
+        description="Absolute tolerance of the bottom solve (AMReX default: unused)",
+    )
+    self_fields_max_coarsening_level: int | None = Field(
+        default=None,
+        description="Maximum number of MLMG coarsening levels (AMReX default: 30). Lowering this leaves a larger problem to the bottom solver.",
+    )
+    # MLMG coarse level distribution parameters
+    self_fields_agglomeration: bool | None = Field(
+        default=None,
+        description="Whether MLMG may gather the coarse multigrid levels onto a single box owned by a single MPI rank (AMReX default: True). Agglomeration avoids very small boxes at coarse levels, but it serializes those levels including the bottom solve, leaving the other ranks idle.",
+    )
+    self_fields_agglomeration_grid_size: int | None = Field(
+        default=None,
+        description="Box size below which MLMG agglomerates the coarse multigrid levels (AMReX defaults: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU)",
+    )
+    self_fields_consolidation: bool | None = Field(
+        default=None,
+        description="Whether MLMG may redistribute the coarse multigrid levels onto a subset of the MPI ranks (AMReX default: True)",
+    )
+    self_fields_consolidation_grid_size: int | None = Field(
+        default=None,
+        description="Box size below which MLMG consolidates the coarse multigrid levels onto fewer MPI ranks (AMReX defaults: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU)",
+    )
     magnetostatic: bool = Field(
         default=False,
         description="Whether to also solve for self-consistent magnetic fields from currents.",
@@ -2445,6 +2503,28 @@ class ElectrostaticSolver(picmistandard.PICMI_ElectrostaticSolver):
         pywarpx.warpx.cfl = self.cfl
         pywarpx.warpx.dt_update_interval = self.dt_update_interval
         pywarpx.warpx.max_dt = self.max_dt
+
+        # MLMG bottom solve and coarsening options
+        pywarpx.warpx.self_fields_bottom_solver = self.self_fields_bottom_solver
+        pywarpx.warpx.self_fields_bottom_verbosity = self.self_fields_bottom_verbosity
+        pywarpx.warpx.self_fields_bottom_max_iters = self.self_fields_bottom_max_iters
+        pywarpx.warpx.self_fields_bottom_relative_tolerance = (
+            self.self_fields_bottom_relative_tolerance
+        )
+        pywarpx.warpx.self_fields_bottom_absolute_tolerance = (
+            self.self_fields_bottom_absolute_tolerance
+        )
+        pywarpx.warpx.self_fields_max_coarsening_level = (
+            self.self_fields_max_coarsening_level
+        )
+        pywarpx.warpx.self_fields_agglomeration = self.self_fields_agglomeration
+        pywarpx.warpx.self_fields_agglomeration_grid_size = (
+            self.self_fields_agglomeration_grid_size
+        )
+        pywarpx.warpx.self_fields_consolidation = self.self_fields_consolidation
+        pywarpx.warpx.self_fields_consolidation_grid_size = (
+            self.self_fields_consolidation_grid_size
+        )
 
         if self.relativistic:
             pywarpx.warpx.do_electrostatic = "relativistic"

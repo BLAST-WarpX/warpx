@@ -267,6 +267,9 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
     for (auto* mg : {m_poisson_mg.get(),
                       m_helmholtz_mg[0].get(), m_helmholtz_mg[1].get(), m_helmholtz_mg[2].get()}) {
         mg->setFixedIter(m_max_iter);
+        // A Krylov bottom solver stops on a tolerance, making the preconditioner
+        // nonlinear; smoothing keeps it a fixed linear operator, as GMRES requires.
+        mg->setBottomSolver(BottomSolver::smoother);
         mg->setVerbose(static_cast<int>(m_verbose));
         mg->setBottomVerbose(static_cast<int>(m_bottom_verbose));
     }

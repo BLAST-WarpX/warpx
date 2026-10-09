@@ -202,8 +202,8 @@ void FiniteDifferenceSolver::EvolveFCylindrical (
                             + m * Et( i, j, 0, 2*m )/r
                             + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 2*m-1) ); // Real part
                         F(i, j, 0, 2*m  ) += dt *(
-                            - rho(i, j, 0, rho_shift + 2*m-1) * inv_epsilon0
-                            + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m-1)
+                            - rho(i, j, 0, rho_shift + 2*m  ) * inv_epsilon0
+                            + T_Algo::DownwardDrr_over_r(Er, r, dr, coefs_r, n_coefs_r, i, j, 0, 2*m  )
                             - m * Et( i, j, 0, 2*m-1 )/r
                             + T_Algo::DownwardDz(Ez, coefs_z, n_coefs_z, i, j, 0, 2*m  ) ); // Imaginary part
                     }

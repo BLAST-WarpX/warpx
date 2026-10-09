@@ -302,10 +302,14 @@ WarpX::ApplyDtLimiters (int const step)
     }
 
     // Update dt
-    dt[max_level] = dt_new;
+    for (int lev = 0; lev <= max_level; ++lev) {
+        dt[lev] = dt_new;
+    }
 
-    for (int lev = max_level-1; lev >= 0; --lev) {
-        dt[lev] = dt[lev+1] * refRatio(lev)[0];
+    if (m_do_subcycling) {
+        for (int lev = max_level-1; lev >= 0; --lev) {
+            dt[lev] = dt[lev+1] * refRatio(lev)[0];
+        }
     }
 
     // Write diagnostics if requested
