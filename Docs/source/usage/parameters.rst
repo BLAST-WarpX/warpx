@@ -287,7 +287,6 @@ Overall simulation parameters
 
           - ``newton.linear_solver`` is not used. The linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES).
           - ``gmres.restart_length`` is not used.
-          - ``jacobian.pc_type`` (see below) defaults to ``pc_petsc``.
 
           PETSc options given on the command line (for example, ``-snes_view``) are passed to the PETSc solver.
 
