@@ -1,4 +1,13 @@
 {
+  "ele_schwinger": {
+    "particle_momentum_x": 3.695301335661867e-12,
+    "particle_momentum_y": 1.0868696459770461e-26,
+    "particle_momentum_z": 2.8810249733308265e-12,
+    "particle_position_x": 0.00028800000000000006,
+    "particle_position_y": 0.000216,
+    "particle_position_z": 0.0002540000004700524,
+    "particle_weight": 63968.698937700814
+  },
   "lev=0": {
     "Bx": 10.282332458788613,
     "By": 1707847966720000.0,
@@ -9,15 +18,6 @@
     "jx": 354749197616543.3,
     "jy": 0.0,
     "jz": 8899048833947625.0
-  },
-  "ele_schwinger": {
-    "particle_momentum_x": 3.695301335661867e-12,
-    "particle_momentum_y": 1.0868696459770461e-26,
-    "particle_momentum_z": 2.8810249733308265e-12,
-    "particle_position_x": 0.00028800000000000006,
-    "particle_position_y": 0.000216,
-    "particle_position_z": 0.0002540000004700524,
-    "particle_weight": 63968.698937700814
   },
   "pos_schwinger": {
     "particle_momentum_x": 3.695301335661867e-12,

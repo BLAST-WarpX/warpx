@@ -14,6 +14,7 @@
 #include "WarpX.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
+#include <ablastr/warn_manager/WarnManager.H>
 
 #include <AMReX_Array4.H>
 #include <AMReX_Config.H>
@@ -47,6 +48,16 @@ FieldEnergy::FieldEnergy (const std::string& rd_name)
     constexpr int noutputs = 3; // total energy, E-field energy and B-field energy
     // resize data array
     m_data.resize(noutputs*nLevel, 0.0_rt);
+
+    if (WarpX::GetInstance().evolve_scheme == EvolveScheme::Semi_Implicit_Darwin)
+    {
+        ablastr::warn_manager::WMRecordWarning(
+            "Diagnostics",
+            "With the semi-implicit Darwin scheme, the FieldEnergy diagnostic "
+            "only includes the electrostatic component of the E-field in the "
+            "E-field energy; the inductive component (E = -dA/dt) is not included.",
+            ablastr::warn_manager::WarnPriority::low);
+    }
 
     if (amrex::ParallelDescriptor::IOProcessor())
     {
