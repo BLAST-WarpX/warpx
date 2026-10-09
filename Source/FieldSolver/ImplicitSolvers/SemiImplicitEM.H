@@ -21,11 +21,11 @@
  *  is advanced in the standard explicit leap-frog manner (hence semi-implicit).
  *
  *  The time stencil is
- *  Eg^{n+1} = Eg^n + c^2*dt*( curlBg^{n+1/2} - mu0*Jg^{n+1/2} )
- *  Bg^{n+3/2} = Bg^{n+1/2} - dt*curlEg^{n+1}
+ *  E^{n+1}   = E^n + c^2*dt*(curlB^{n+1/2} - mu0*J^{n+1/2})
+ *  B^{n+3/2} = B^{n+1/2} - dt*curlE^{n+1}
  *  xp^{n+1} = xp^n + dt*up^{n+1/2}/(0.5(gammap^n + gammap^{n+1}))
  *  up^{n+1} = up^n + dt*qp/mp*(Ep^{n+1/2} + up^{n+1/2}/gammap^{n+1/2} x Bp^{n+1/2})
- *  where f^{n+1/2} = (f^{n+1} + f^n)/2.0, for all but Bg, which lives at half steps
+ *  where f^{n+1/2} = (f^{n+1} + f^n)/2.0, for all but B, which lives at half steps
  *
  *  This algorithm is approximately energy conserving. It is exactly energy conserving
  *  using a non-standard definition for the magnetic field energy. The advantage of
@@ -57,10 +57,15 @@ public:
 
     void PrintParameters () const override;
 
-    int OneStep (amrex::Real  start_time,
-                 amrex::Real  a_dt,
+    void SetupStep (amrex::Real start_time) override;
+
+    int DoSolve (amrex::Real  start_time,
                  int          a_step,
                  bool verbose_step) override;
+
+    void ResetStep (amrex::Real start_time) override;
+
+    void FinishStep (amrex::Real start_time, int a_step) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
@@ -76,9 +81,23 @@ public:
 private:
 
     /**
-     * \brief Solver vectors for E and Eold
+     * \brief Electric-field vectors for the nonlinear solve from n to n+1.
+     * m_E holds the iterate for E^{n+1/2}, initialized from the previous
+     * midpoint E^{n-1/2} (E^0 on a fresh start). After the solve, E^{n+1/2}
+     * is retained as the initial guess for the next nonlinear solve.
+     * m_Eold holds E^n throughout the step as the nonlinear solver's reference
+     * state. The separate E_old MultiFab also holds E^n for field finishing,
+     * diagnostics, and checkpointing alongside Efield_fp at E^{n+1}.
      */
     WarpXSolverVec m_E, m_Eold;
+
+    /**
+     * \brief m_E_save saves the value in m_E before the nonlinear solve (at n - 1/2).
+     * This is needed when substepping since the nonlinear solver updates m_E
+     * in place. If the solver fails, the data in m_E is corrupted. The saved value in m_E_save
+     * is used to reconstitute m_E for the initial value of the new substep.
+     */
+    WarpXSolverVec m_E_save;
 
 };
 

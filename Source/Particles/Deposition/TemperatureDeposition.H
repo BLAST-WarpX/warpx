@@ -329,9 +329,9 @@ void doVarianceDepositionShapeNKernel(
         const amrex::Real wpy_var = static_cast<amrex::Real>(wp)*sz_jy[iz];
         const amrex::Real wpz_var = static_cast<amrex::Real>(wp)*sz_jz[iz];
 
-        const amrex::IntVectND<3> ixv{lo.z+l_jx+iz, 0, 0};
-        const amrex::IntVectND<3> iyv{lo.z+l_jy+iz, 0, 0};
-        const amrex::IntVectND<3> izv{lo.z+l_jz+iz, 0, 0};
+        const amrex::IntVectND<3> ixv{lo.x+l_jx+iz, 0, 0};
+        const amrex::IntVectND<3> iyv{lo.x+l_jy+iz, 0, 0};
+        const amrex::IntVectND<3> izv{lo.x+l_jz+iz, 0, 0};
 
         varianceDepositionSubKernel(
             vx, vy, vz,
@@ -372,9 +372,9 @@ void doVarianceDepositionShapeNKernel(
             const amrex::Real wpy_var = wp*sx_jy[ix]*sz_jy[iz];
             const amrex::Real wpz_var = wp*sx_jz[ix]*sz_jz[iz];
 
-            const amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.z+l_jx+iz, 0};
-            const amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.z+l_jy+iz, 0};
-            const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.z+l_jz+iz, 0};
+            const amrex::IntVectND<3> ixv{lo.x+j_jx+ix, lo.y+l_jx+iz, 0};
+            const amrex::IntVectND<3> iyv{lo.x+j_jy+ix, lo.y+l_jy+iz, 0};
+            const amrex::IntVectND<3> izv{lo.x+j_jz+ix, lo.y+l_jz+iz, 0};
 
             varianceDepositionSubKernel(
 #if defined(WARPX_DIM_RZ)

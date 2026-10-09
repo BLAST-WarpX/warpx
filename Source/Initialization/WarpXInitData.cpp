@@ -610,6 +610,8 @@ WarpX::PrintMainPICparameters ()
     // Print guard cells number
     amrex::Print() << "Guard cells           | - ng_alloc_J  = " << guard_cells.ng_alloc_J << "\n";
     amrex::Print() << " (allocated for J)    | \n";
+    amrex::Print() << "Guard cells           | - ng_alloc_EB = " << guard_cells.ng_alloc_EB << "\n";
+    amrex::Print() << " (allocated for E/B)  | \n";
     // Print type of particle pusher
     if (particle_pusher_algo == ParticlePusherAlgo::Vay){
       amrex::Print() << "Particle Pusher:      | Vay \n";

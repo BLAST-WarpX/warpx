@@ -163,9 +163,15 @@ jobs:
     runs-on: ubuntu-24.04
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
-    #env:
-    #  # For NVHPC, Ninja is slower than the default:
-    #  CMAKE_GENERATOR: Ninja
+    env:
+      # nvc++ defaults to -tp=host, but GH runners mix Intel and AMD CPUs
+      # of different generations: pin the x86-64-v3 (AVX2) baseline they
+      # all support, for reproducible builds and ccache hits
+      CXXFLAGS: "-tp=x86-64-v3"
+      # host side of sources compiled as CUDA (-ccbin=nvc++)
+      CUDAFLAGS: "-Xcompiler=-tp=x86-64-v3"
+      # For NVHPC, Ninja is slower than the default:
+      #CMAKE_GENERATOR: Ninja
     steps:
     - name: Free More Disk Space
       uses: ax3l/free-disk-space@main
@@ -180,7 +186,7 @@ jobs:
     - uses: actions/checkout@v7
     - name: Dependencies
       run: |
-        .github/workflows/dependencies/nvhpc.sh 25.1
+        .github/workflows/dependencies/nvhpc.sh 26.5
     - name: CCache Cache
       uses: actions/cache@v6
       with:
@@ -196,7 +202,7 @@ jobs:
         ccache -z
 
         source /etc/profile.d/modules.sh
-        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/25.1
+        module load /opt/nvidia/hpc_sdk/modulefiles/nvhpc/26.5
         which nvcc || echo "nvcc not in PATH!"
         which nvc++ || echo "nvc++ not in PATH!"
         which nvc || echo "nvc not in PATH!"

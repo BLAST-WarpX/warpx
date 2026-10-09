@@ -37,6 +37,8 @@ public:
 
     [[nodiscard]] int get_ndt() const { return m_ndt; }
 
+    [[nodiscard]] int get_start_step() const { return m_start_step; }
+
     [[nodiscard]] CollisionSteppingMode get_collision_stepping_mode() const
         { return m_collision_stepping_mode; }
 
@@ -47,6 +49,7 @@ protected:
     std::string m_collision_name;
     amrex::Vector<std::string> m_species_names;
     int m_ndt = 1;
+    int m_start_step = 0;
     CollisionSteppingMode m_collision_stepping_mode = CollisionSteppingMode::Supercycle;
 
     bool m_use_global_debye_length = false;

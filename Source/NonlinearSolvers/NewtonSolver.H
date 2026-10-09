@@ -418,7 +418,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     if (norm_rel > m_rtol and norm_abs > m_atol and m_rtol > 0.) {
         std::stringstream convergenceMsg;
         convergenceMsg << "Newton solver failed to converge after " << iter <<
-                          " iterations. Relative norm is " << norm_rel <<
+                          " iterations at step " << a_step <<
+                          ". Relative norm is " << norm_rel <<
                           " and the relative tolerance is " << m_rtol <<
                           ". Absolute norm is " << norm_abs <<
                           " and the absolute tolerance is " << m_atol;

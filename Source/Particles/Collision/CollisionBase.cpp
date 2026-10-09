@@ -52,6 +52,13 @@ CollisionBase::CollisionBase (const std::string& collision_name) :
         m_ndt = ndt_supercycle;
         m_collision_stepping_mode = CollisionSteppingMode::Supercycle;
     }
+
+    // first PIC step on which the collision is applied
+    utils::parser::queryWithParser(pp_collision_name, "start_step", m_start_step);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_start_step >= 0,
+        "<collision_name>.start_step must be >= 0."
+    );
 }
 
 void
