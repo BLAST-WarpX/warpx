@@ -1970,7 +1970,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
         implicit_evolve.max_particle_iterations = self.max_particle_iterations
         implicit_evolve.particle_tolerance = self.particle_tolerance
         implicit_evolve.particle_suborbits = self.particle_suborbits
-        implicit_evolve.print_unconverged_particle_detail = (
+        implicit_evolve.print_unconverged_particle_details = (
             self.print_unconverged_particle_detail
         )
         implicit_evolve.use_mass_matrices_jacobian = self.use_mass_matrices_jacobian
