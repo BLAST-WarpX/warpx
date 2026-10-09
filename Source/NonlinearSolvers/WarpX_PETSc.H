@@ -300,6 +300,8 @@ class SNES_impl : public PETScSolver_impl
         amrex::Real m_stol = 1e-16;
         //! maximum iterations
         int m_maxits= 100;
+        //! whether reaching the maximum iterations is a failure
+        bool m_require_convergence = true;
         //! verbosity
         bool m_verbose = true;
         //! verbosity for linear solver

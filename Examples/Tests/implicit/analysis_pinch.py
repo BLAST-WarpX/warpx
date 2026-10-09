@@ -9,7 +9,6 @@
 # and script `inputs_test_1d_theta_implicit_planar_pinch_substeps`.
 # and script `inputs_test_2d_theta_implicit_planar_pinch`.
 # and script `inputs_test_2d_theta_implicit_planar_pinch_petsc_snes`.
-# and script `inputs_test_2d_semi_implicit_planar_pinch_petsc_snes`.
 # and script `inputs_test_rcylinder_theta_implicit_dynamic_pinch`.
 # and script `inputs_test_rz_theta_implicit_dynamic_pinch`.
 # This simulates a planar pinch using the theta-implicit solver with
@@ -59,11 +58,7 @@ else:
 dE = Efields + Eplasma + dE_poynting
 rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
-if "semi_implicit" in test_name:
-    # The semi-implicit scheme does not conserve energy to machine precision
-    rel_net_energy_tol = 4.8e-4
-else:
-    rel_net_energy_tol = 3.0e-12
+rel_net_energy_tol = 3.0e-12
 print(f"max relative delta energy : {max_rel_net_energy}")
 print(f"relative delta energy tolerance : {rel_net_energy_tol}")
 assert max_rel_net_energy < rel_net_energy_tol
