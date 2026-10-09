@@ -172,6 +172,8 @@ WarpX::Evolve (int numsteps)
 
         // Check and clear signal flags and asynchronously broadcast them from process 0
         SignalHandling::CheckSignals();
+        // Step reported by status signals, same as in "STEP N starts" below
+        SignalHandling::SetCurrentStep(step + 1);
 
         multi_diags->NewIteration();
 
@@ -393,6 +395,7 @@ WarpX::Evolve (int numsteps)
             break;
         }
     } // End loop on time steps
+    SignalHandling::SetLastCompletedStep(istep[0]);
 
     // This if statement is needed for PICMI, which allows the Evolve routine to be
     // called multiple times, otherwise diagnostics will be done at every call,

@@ -720,6 +720,38 @@ We follow the same naming, but remove the ``SIG`` prefix, e.g., the WarpX signal
     handle by outputting a checkpoint at the next timestep. A
     diagnostic of type ``checkpoint`` must be configured.
 
+.. pp:param:: warpx.status_signals
+    :type: array of ``string``, separated by spaces
+    :optional:
+
+    A list of signal names or numbers that the simulation should
+    handle by immediately printing a one-line status report to stdout.
+    This is useful to inspect a running simulation, e.g., one that seems to hang.
+
+    Unlike the other signal actions, this is not coordinated by MPI rank 0 and does not wait for the next timestep:
+    every process that receives the signal reports itself, even if it is stuck.
+    For example, ``kill -USR1 <pid>`` reports only the process with that process ID, while ``scancel --signal=USR1 <jobid>`` reports all processes of a Slurm job.
+    A report looks like this:
+
+    .. code-block:: text
+
+       SIGNAL STATUS: rank=3 step=1201 section="WarpX::Evolve::step" cpu_mem_rss=1.234GiB gpu_mem_used=60.112GiB gpu_mem_total=79.647GiB gpu_arena_used=12.345GiB
+
+    The fields are:
+
+    * ``rank``: the MPI rank of the process
+    * ``step``: the step that is currently computed, as in the ``STEP N starts ...`` output.
+      Outside of the time loop, e.g., in the final diagnostics or between ``sim.step()`` calls in Python, this is ``last_step``, the last completed step, or ``n/a`` before the first step.
+    * ``section``: the innermost active profiler section, as recorded by ``BL_PROFILE``.
+      This requires an AMReX build with ``AMReX_TINY_PROFILE=ON`` (the default in WarpX).
+    * ``cpu_mem_rss``: the resident set size (RSS) of the process in host memory
+    * ``gpu_mem_used`` and ``gpu_mem_total`` (GPU builds only): the used and total memory of the GPU of this process, as reported by the GPU driver.
+      This includes memory used by all processes that share the GPU, and memory that AMReX reserved for its memory pool (by default, 3/4 of the GPU memory, see ``amrex.the_arena_init_size``)
+    * ``gpu_arena_used`` (GPU builds only): the memory that is actually in use in the main AMReX memory arena
+
+    Values that cannot be determined on a platform are reported as ``n/a``.
+    The profiler section and the memory arena usage are read without synchronizing with the simulation, so they are a best-effort snapshot.
+
 .. note::
 
    Certain signals are only available on specific platforms, please see the links above for details.
@@ -731,6 +763,7 @@ We follow the same naming, but remove the ``SIG`` prefix, e.g., the WarpX signal
    The signals ``KILL`` and ``STOP`` cannot be used.
 
    The ``FPE`` and ``ILL`` signals should not be overwritten in WarpX, as they are `controlled by AMReX <https://amrex-codes.github.io/amrex/docs_html/Debugging.html#breaking-into-debuggers>`__ for :ref:`debug workflows that catch invalid floating-point operations <debugging_warpx>`.
+   The signals ``SEGV``, ``BUS``, ``ILL`` and ``FPE`` cannot be used, since they signal faults in the program itself.
 .. tip::
 
    For example, the following logic can be added to `Slurm batch scripts <https://docs.gwdg.de/doku.php?id=en:services:application_services:high_performance_computing:running_jobs_slurm:signals>`__ (`signal name to number mapping here <https://en.wikipedia.org/wiki/Signal_(IPC)#Default_action>`__) to gracefully shut down 6 min prior to walltime.
