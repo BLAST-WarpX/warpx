@@ -255,6 +255,10 @@ public:
         ablastr::fields::MultiFabRegister& fields,
         int lev, amrex::Real t, amrex::Real dt);
 
+    /** \brief Reset the particle data to the values at the start of the step
+     */
+    virtual void ResetImplicitParticleData (int lev);
+
     /**
      * \brief virtual function to deposit mass matrices for charged particles
      */

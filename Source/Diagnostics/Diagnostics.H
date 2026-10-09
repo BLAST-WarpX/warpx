@@ -327,6 +327,8 @@ protected:
     amrex::Vector<int> m_rho_per_species_index;
     /** Array of species indices that dump temperature per species */
     amrex::Vector<int> m_T_per_species_index;
+    /** Array of species indices that dump part_per_cell per species */
+    amrex::Vector<int> m_part_per_cell_per_species_index;
     /** Vector of particle buffer vectors for each snapshot */
     amrex::Vector< amrex::Vector<std::unique_ptr<WarpXParticleContainer::Base> > > m_particles_buffer;
     /** Vector of pointers to functors to compute particle output per species*/

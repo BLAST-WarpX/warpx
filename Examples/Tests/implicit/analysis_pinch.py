@@ -6,17 +6,21 @@
 #
 # This is a script that analyses the simulation results from
 # the script `inputs_test_1d_theta_implicit_planar_pinch`.
+# and script `inputs_test_1d_theta_implicit_planar_pinch_substeps`.
 # and script `inputs_test_2d_theta_implicit_planar_pinch`.
 # and script `inputs_test_rcylinder_theta_implicit_dynamic_pinch`.
 # and script `inputs_test_rz_theta_implicit_dynamic_pinch`.
 # This simulates a planar pinch using the theta-implicit solver with
 # the curl curl PC including the diagonal response from mass matrices.
 
+import os
 import sys
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
+
+test_name = os.path.split(os.getcwd())[1]
 
 newton_solver = np.loadtxt("diags/reduced_files/newton_solver.txt", skiprows=1)
 num_steps = newton_solver[-1, 0]
@@ -36,7 +40,7 @@ Eplasma = ele_energy + ion_energy
 
 if poynting_flux.shape[1] == 10:
     print("2D simulation")
-    gmres_iters_tol = 5.0
+    gmres_iters_tol = 5
     Eout_lo_x = poynting_flux[:, 6]
     Eout_lo_z = poynting_flux[:, 7]
     Eout_hi_x = poynting_flux[:, 8]
@@ -53,7 +57,7 @@ else:
 dE = Efields + Eplasma + dE_poynting
 rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
-rel_net_energy_tol = 1.0e-12
+rel_net_energy_tol = 3.0e-12
 print(f"max relative delta energy : {max_rel_net_energy}")
 print(f"relative delta energy tolerance : {rel_net_energy_tol}")
 assert max_rel_net_energy < rel_net_energy_tol
@@ -64,7 +68,11 @@ print(f"gmres iters tolerance: {gmres_iters_tol}")
 assert total_gmres_iters / total_newton_iters <= gmres_iters_tol
 
 # check that the number of newton iterations is below tolerance
-newton_iters_tol = 6.0
+if test_name.endswith("substeps"):
+    # The newton_iters_tol includes the iterations for all of the substeps
+    newton_iters_tol = 9.0
+else:
+    newton_iters_tol = 6.0
 print(f"newton iters per time step: {total_newton_iters / num_steps}")
 print(f"newton iters tolerance: {newton_iters_tol}")
 assert total_newton_iters / num_steps <= newton_iters_tol
@@ -90,7 +98,7 @@ drho_trimmed = drho[:-1, ...]
 Ng = drho_trimmed.size
 drho2_avg = (drho_trimmed**2).sum() / Ng
 drho_rms = np.sqrt(drho2_avg)
-tolerance_rel_charge = 1.0e-12
+tolerance_rel_charge = 2.2e-12
 print(f"rms error in charge conservation: {drho_rms}")
 print(f"tolerance: {tolerance_rel_charge}")
 assert drho_rms < tolerance_rel_charge

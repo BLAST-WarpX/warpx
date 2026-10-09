@@ -79,10 +79,10 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
         computePhiTriDiagonal(rho_fp, phi_fp);
 #else
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
-        int const verbosity = verbose_step ? self_fields_verbosity : 0;
-        computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
-                   self_fields_absolute_tolerance, self_fields_max_iters,
-                   verbosity, is_igf_2d_slices, Efield_fp);
+        ablastr::fields::MLMGOptions mlmg_options = m_mlmg_options;
+        mlmg_options.verbosity = verbose_step ? m_mlmg_options.verbosity : 0;
+        computePhi(rho_fp, phi_fp, beta, mlmg_options, is_igf_2d_slices,
+                   Efield_fp);
 #endif
 
     }
@@ -217,7 +217,7 @@ void LabFrameExplicitES::computePhiTriDiagonal (
                 // so set the upper boundary to zero to force a value.
                 phi1d_arr(nx_full_domain,0,0) = 0.;
             } else {
-                phi1d_arr(nx_full_domain,0,0) = (rho1d_arr(nx_full_domain,0,0) - (-1._rt)*phi1d_arr(nx_full_domain-1,0,0))/diag;
+                phi1d_arr(nx_full_domain,0,0) = (rho1d_arr(nx_full_domain,0,0) - (-2._rt)*phi1d_arr(nx_full_domain-1,0,0))/diag;
             }
 
         }

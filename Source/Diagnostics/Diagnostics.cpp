@@ -328,6 +328,29 @@ Diagnostics::BaseReadParameters ()
                 + ".fields_to_plot does not match any species"
             );
         }
+        if (var.starts_with("part_per_cell_")) {
+            // Extract species name from the string part_per_cell_<species_name>
+            const std::string species = var.substr(std::string_view("part_per_cell_").size());
+            // Boolean used to check if species name was misspelled
+            bool species_name_is_wrong = true;
+            // Loop over all species
+            for (int i = 0, n = int(m_all_species_names.size()); i < n; i++) {
+                // Check if species name extracted from the string part_per_cell_<species_name>
+                // matches any of the species in the simulation
+                if (species == m_all_species_names[i]) {
+                    // Store species index: will be used in PartPerCellFunctor to dump
+                    // part_per_cell for this species
+                    m_part_per_cell_per_species_index.push_back(i);
+                    species_name_is_wrong = false;
+                }
+            }
+            // If species name was misspelled, abort with error message
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !species_name_is_wrong,
+                "Input error: string " + var + " in " + m_diag_name
+                + ".fields_to_plot does not match any species"
+            );
+        }
 
         // Check if m_varnames contains a string of the form T_<species_name>
         if (var.starts_with("Tx_") || var.starts_with("Ty_") || var.starts_with("Tz_")) {

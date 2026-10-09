@@ -8,6 +8,8 @@
 #define WARPX_PARTICLE_UTILS_H_
 
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/ScatteringUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
@@ -20,6 +22,7 @@
 #include <AMReX_BaseFwd.H>
 
 #include <array>
+#include <cmath>
 
 namespace ParticleUtils {
 
@@ -226,29 +229,58 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate a random unit vector with isotropic distribution,
-     * following the method described in equations (27)-(31) of
-     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
+     * \brief Generate a random angle with isotropic or anisotropic distribution.
+     *
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy center-of-mass collision energy in eV
+     * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosTheta (
+        amrex::RandomEngine const& engine,
+        ScatteringAngleModel scattering_angle_model,
+        ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+        amrex::ParticleReal const collision_energy,
+        int* const energy_range_status)
+    {
+        using namespace amrex::literals;
+        amrex::ParticleReal cos_theta = 1.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Backward) {
+            cos_theta = -1.0_prt;
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
+            cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Legendre) {
+            cos_theta = ScatteringUtils::sampleCosTheta(anisotropic_coefficients, collision_energy, amrex::Random(engine), energy_range_status);
+        }
+        return cos_theta;
+    }
+
+    /**
+     * \brief Generate a random unit vector with isotropic distribution.
      *
      * @param[out] x x-component of the random unit vector
      * @param[out] y y-component of the random unit vector
      * @param[out] z z-component of the random unit vector
-     * @param[in] engine the random-engine
+     * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
-                           amrex::ParticleReal& z, amrex::RandomEngine const& engine )
+                           amrex::ParticleReal& z, amrex::RandomEngine const& engine)
     {
         using namespace amrex::literals;
 
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
         x = sin_theta * std::cos(phi);
         y = sin_theta * std::sin(phi);
         z = cos_theta;
     }
-
 
     /** \brief Function to perform scattering of a particle that results in a
      * random velocity vector with given magnitude. This is used in isotropic
@@ -262,7 +294,7 @@ namespace ParticleUtils {
     void RandomizeVelocity ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
                              amrex::ParticleReal& uz,
                              const amrex::ParticleReal vp,
-                             amrex::RandomEngine const& engine )
+                             amrex::RandomEngine const& engine)
     {
         amrex::ParticleReal x, y, z;
         // generate random unit vector for the new velocity direction

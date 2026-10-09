@@ -309,6 +309,7 @@ Overall simulation parameters
 
         - ``implicit_evolve.use_mass_matrices_jacobian`` (``bool``, default: false).
           When ``true``, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
+          In 3D, this option is currently only implemented for ``algo.current_deposition = direct``.
 
           - ``implicit_evolve.skip_particle_picard_init`` (``bool``, default: false).
             When ``true`` and ``implicit_evolve.use_mass_matrices_jacobian = true``, the full Picard update of the particles is skipped on the initial Newton step, and only a single iteration is performed.
@@ -550,6 +551,99 @@ Overall simulation parameters
     MLMG iteration, so the most efficient value is problem-dependent.
 
     Must be greater than zero when specified.
+
+.. pp:param:: warpx.self_fields_bottom_solver
+    :type: ``string``
+    :default: ``default``
+
+    The solver used by AMReX MLMG on the coarsest multigrid level ("bottom
+    solve") of the electrostatic self-field solve. Options are ``default``
+    (the linear operator's own default, usually BiCGStab), ``smoother``,
+    ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre``, ``petsc``,
+    ``custom`` and ``algmg``. ``hypre`` and ``petsc`` require an AMReX built
+    with HYPRE / PETSc support. ``custom`` uses the linear operator's own bottom
+    solver, if it provides one (falling back to ``default`` otherwise).
+    ``algmg`` uses AMReX's built-in algebraic multigrid solver; it only
+    supports single-component operators.
+
+.. pp:param:: warpx.self_fields_bottom_verbosity
+    :type: ``integer``
+    :default: 0
+
+    The verbosity of the bottom solver used in the electrostatic self-field
+    MLMG solve. Setting this to 1 or higher prints the number of bottom solver
+    iterations, which is useful to assess whether the bottom solve is a
+    bottleneck.
+
+.. pp:param:: warpx.self_fields_bottom_max_iters
+    :type: ``integer``
+    :default: 200 (AMReX default)
+
+    Maximum number of iterations of the bottom solver in the electrostatic
+    self-field MLMG solve. MLMG tolerates an inexact bottom solve, so capping
+    this can be an effective way to reduce the cost of the bottom solve.
+
+.. pp:param:: warpx.self_fields_bottom_relative_tolerance
+    :type: ``float``
+    :default: 1e-4 (AMReX default)
+
+    Relative tolerance to which the bottom solve of the electrostatic
+    self-field MLMG solve is converged.
+
+.. pp:param:: warpx.self_fields_bottom_absolute_tolerance
+    :type: ``float``
+    :default: unused (AMReX default)
+
+    Absolute tolerance to which the bottom solve of the electrostatic
+    self-field MLMG solve is converged.
+
+.. pp:param:: warpx.self_fields_max_coarsening_level
+    :type: ``integer``
+    :default: 30 (AMReX default)
+
+    Maximum number of multigrid coarsening levels used in the electrostatic
+    self-field MLMG solve. Setting this to a low value leaves a larger problem
+    to the bottom solver; setting it to 0 turns MLMG into a single-level solve
+    performed entirely by the bottom solver.
+
+.. pp:param:: warpx.self_fields_agglomeration
+    :type: ``bool``
+    :default: 1 (AMReX default)
+
+    Whether AMReX MLMG may gather the coarse multigrid levels of the
+    electrostatic self-field solve onto a single box, which is then owned by a
+    single MPI rank.
+
+    Agglomeration avoids very small boxes at coarse levels, but it also
+    serializes those levels: one rank performs all the work from the
+    agglomerated level down to and including the bottom solve, while the
+    remaining ranks wait.
+
+.. pp:param:: warpx.self_fields_agglomeration_grid_size
+    :type: ``integer``
+    :default: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU (AMReX defaults)
+
+    Box size below which AMReX MLMG agglomerates the coarse multigrid levels of
+    the electrostatic self-field solve. Increasing this makes agglomeration
+    happen at a finer level, decreasing it delays agglomeration to coarser
+    levels. Only used if ``warpx.self_fields_agglomeration`` is enabled.
+
+.. pp:param:: warpx.self_fields_consolidation
+    :type: ``bool``
+    :default: 1 (AMReX default)
+
+    Whether AMReX MLMG may redistribute the coarse multigrid levels of the
+    electrostatic self-field solve onto a subset of the MPI ranks. Like
+    agglomeration, this reduces the number of ranks participating in the coarse
+    levels and can serialize them.
+
+.. pp:param:: warpx.self_fields_consolidation_grid_size
+    :type: ``integer``
+    :default: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU (AMReX defaults)
+
+    Box size below which AMReX MLMG consolidates the coarse multigrid levels of
+    the electrostatic self-field solve onto fewer MPI ranks. Only used if
+    ``warpx.self_fields_consolidation`` is enabled.
 
 .. pp:param:: warpx.magnetostatic_solver_required_precision
     :type: ``float``
@@ -3012,6 +3106,10 @@ Details about the collision models can be found in the :ref:`theory section <mul
     In these four cases, only one species name should be given.
     If using ``linear_breit_wheeler`` these should be two photon species.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
+    If using two-product ``nuclearfusion`` with ``scattering_angle_model = legendre``, consider the reaction to be ordered as ``A + B -> C + D``.
+    The first entry in ``species`` must be the incident reactant ``A``, and the second must be the target reactant ``B``.
+    The scattering angle is measured between the momenta of ``A`` and ``C`` in the center-of-momentum frame.
+    For example, T(d,n)He4 corresponds to ``d + T -> n + He4``, so ``species`` must list the deuterium species first and the tritium species second.
 
 .. pp:param:: <collision_name>.product_species
     :type: ``strings``
@@ -3019,11 +3117,14 @@ Details about the collision models can be found in the :ref:`theory section <mul
     Only for ``dsmc``, ``linear_breit_wheeler``, ``nuclearfusion``, and ``bremsstrahlung``.
     The name(s) of the species in which to add the new macroparticles created by the reaction.
     If using ``dsmc`` with ionization reactions, the first species in this list must be an electron.
-    If using ``dsmc`` with ``charge_exchange`` and ``twoproduct_reaction``, the order of the ``product_species`` should match the order of the species in :pp:param:`<collision_name>.species`.
+    If using ``dsmc`` with ``charge_exchange`` and ``two_product_reaction``, the order of the ``product_species`` should match the order of the species in :pp:param:`<collision_name>.species`.
     If using ``linear_breit_wheeler`` these should be two species: one of electrons and one of positrons.
     If using ``bremsstrahlung``, the product species must be of type photon.
     If using ``linear_compton``, these should be two species: first, a photon species, and second, a lepton species, in this exact order.
     If using ``pulsed_decay``, the sum of the product species charges and mass must equal those of the parent species.
+    If using two-product ``nuclearfusion`` with ``scattering_angle_model = legendre``, consider the reaction to be ordered as ``A + B -> C + D``, as described for :pp:param:`<collision_name>.species`.
+    The first entry in ``product_species`` must be product ``C``, and the second must be product ``D``.
+    For example, T(d,n)He4 corresponds to ``d + T -> n + He4``, so ``product_species`` must list the neutron first and helium4 second.
 
 .. pp:param:: <collision_name>.ndt_supercycle
     :type: ``int``
@@ -3041,6 +3142,16 @@ Details about the collision models can be found in the :ref:`theory section <mul
     The effective collision time step is ``dt_collision = dt_PIC / ndt_subcycle``.
     Must be >= 1. Mutually exclusive with ``ndt_supercycle``.
     Useful when a large PIC time step is desired but collisions require finer time resolution.
+
+.. pp:param:: <collision_name>.start_step
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    First time step on which the collision is applied. Must be >= 0.
+    When used with ``ndt_supercycle``, this acts as an offset: the collision is executed
+    on steps ``start_step``, ``start_step + ndt_supercycle``, ``start_step + 2*ndt_supercycle``, etc.
+    When used with ``ndt_subcycle``, the collision is subcycled on every step starting from ``start_step``.
 
 .. pp:param:: <collision_name>.cumulative_scattering_angle_model
     :type: ``string``
@@ -3120,10 +3231,43 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :optional:
 
     Only for ``nuclearfusion``. The scattering angle for the products of the fusion reaction.
-    The possible values are ``isotropic``, ``forward`` and ``backward``.
+    The possible values are ``isotropic``, ``forward``, ``backward``, and ``legendre``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products are emitted in the same direction as the reactant (in the center of mass frame).
     With ``backward``, the scattering angle is set to :math:`\pi`, i.e. the products are emitted in the opposite direction of the reactant (in the center of mass frame).
+    With ``legendre``, the scattering angle is drawn from the anisotropic distribution represented by a Legendre expansion of the differential cross section of the fusion reaction.
+    For a two-product reaction written as ``A + B -> C + D``, the anisotropic distribution gives the angle between the momenta of the incident reactant ``A`` and product ``C`` in the center-of-momentum frame.
+    Therefore, :pp:param:`<collision_name>.species` must be ordered as ``A B``, and :pp:param:`<collision_name>.product_species` must be ordered as ``C D``.
+    See :cite:t:`param-VanDeWeteringPRE2025` for a discussion of the importance of anisotropic scattering for nuclear fusion reactions.
+
+.. pp:param:: <collision_name>.legendre_angular_distribution_coefficients
+    :type: ``string``
+    :optional:
+
+    Only for ``nuclearfusion``.
+    Path to an energy-dependent table of Legendre coefficients used by the ``legendre`` scattering angle model.
+    Each nonempty row contains a center-of-mass energy in eV followed by all coefficients from order zero upward.
+    The zeroth-order coefficient and at least one higher-order coefficient are required.
+    At least two rows are required, and their energies must be strictly increasing.
+    For two-product fusion written as ``A + B -> C + D``, these coefficients describe the angle between the momenta of the incident reactant ``A`` and product ``C`` in the center-of-momentum frame.
+    Example coefficient tables are available in the `WarpX data repository <https://github.com/BLAST-WarpX/warpx-data/tree/master/nuclear_fusion>`__.
+
+.. pp:param:: <collision_name>.legendre_angular_distribution_coefficients_format
+    :type: ``string``
+
+    Format of :pp:param:`<collision_name>.legendre_angular_distribution_coefficients`.
+    This parameter is required when a coefficient table is specified.
+    ``ENDF`` selects the orthonormal Legendre coefficients defined by the ENDF-6 format :cite:p:`param-BrownENDF2023`, which WarpX uses as given.
+    ``IAEA`` selects the non-orthonormal coefficients tabulated by :cite:t:`param-DrosgOtukaIAEA2015`.
+    WarpX converts every IAEA coefficient before use according to
+
+    .. math::
+
+       L_l^{\mathrm{ENDF}} = \frac{L_l^{\mathrm{IAEA}}/L_0^{\mathrm{IAEA}}}{2l+1}.
+
+    The value is case-insensitive.
+    The zeroth-order IAEA coefficient must be nonzero in every row.
+    Example coefficient tables are available in the `WarpX data repository <https://github.com/BLAST-WarpX/warpx-data/tree/master/nuclear_fusion>`__.
 
 .. pp:param:: <collision_name>.create_products
     :type: ``bool``
@@ -3215,7 +3359,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: ``strings`` separated by spaces
 
     Only for ``dsmc`` and ``background_mcc``. The scattering processes that should be
-    included. Available options are ``elasticX``, ``excitationX``, ``twoproduct_reaction`` and ``charge_exchange``
+    included. Available options are ``elasticX``, ``excitationX``, ``two_product_reaction`` and ``charge_exchange``
     for ions and ``elasticX``, ``excitationX`` and ``ionization`` for electrons.
     Multiple elastic and excitation events can be included, corresponding e.g. to
     excitation to different levels or to several elastic channels (with different
@@ -3224,7 +3368,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     a path to a cross-section data file must also be given. We use
     ``<scattering_process>`` as a placeholder going forward.
 
-    For ``elasticX``, ``excitationX``, ``charge_exchange`` and ``twoproduct_reaction``, the
+    For ``elasticX``, ``excitationX``, ``charge_exchange`` and ``two_product_reaction``, the
     angular distribution is controlled by the per-process
     :pp:param:`<collision_name>.<scattering_process>_scattering_angle_model` argument.
 
@@ -3243,7 +3387,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     Only for ``dsmc`` and ``background_mcc``. The energy cost of the process, in eV. It is
     required for ``excitationX`` and ``ionization``, optional for ``charge_exchange`` and
-    ``twoproduct_reaction`` (which may impose a fixed energy loss, defaulting to 0), and
+    ``two_product_reaction`` (which may impose a fixed energy loss, defaulting to 0), and
     ignored for ``elasticX`` processes (which have no energy cost).
 
 .. pp:param:: <collision_name>.<scattering_process>_scattering_angle_model
@@ -3251,11 +3395,11 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :optional:
 
     Only for ``dsmc`` and ``background_mcc``, and only for ``elasticX``, ``excitationX``,
-    ``charge_exchange`` and ``twoproduct_reaction``.
+    ``charge_exchange`` and ``two_product_reaction``.
     The model used to determine the scattering angle of the products
     in the center-of-mass frame. The possible values are ``isotropic``, ``forward`` and ``backward``.
     The default is ``isotropic`` for ``elasticX`` and ``excitationX``, and ``forward`` for
-    ``charge_exchange`` and ``twoproduct_reaction``.
+    ``charge_exchange`` and ``two_product_reaction``.
     With ``isotropic``, the scattering angle is drawn from an isotropic distribution.
     With ``forward``, the scattering angle is set to zero, i.e. the products keep the same direction
     as the incident particle (in the center of mass frame).
@@ -4304,13 +4448,14 @@ Additional parameters
 
 .. pp:param:: warpx.sort_particles_for_deposition
     :type: ``bool``
-    :default: ``true`` for the CUDA backend, otherwise ``false``
+    :default: ``true`` for the CUDA and HIP backends, otherwise ``false``
     :optional:
 
     This option controls the type of sorting used if particle sorting is turned on, i.e. if ``sort_intervals`` is not ``<=0``.
     If ``true``, particles will be sorted by cell to optimize deposition with many particles per cell, in the order x -> y -> z -> ppc.
     If ``false``, particles will be sorted by bin, using the ``sort_bin_size`` parameter below, in the order ppc -> x -> y -> z.
-    ``true`` is recommend for best performance on NVIDIA GPUs, especially if there are many particles per cell.
+    ``true`` is recommended for best performance on NVIDIA and AMD GPUs, especially if
+    there are many particles per cell.
 
 .. pp:param:: warpx.sort_idx_type
     :type: list of ``int``
@@ -4587,7 +4732,7 @@ In-situ capabilities can be used by turning on Sensei or Ascent (provided they a
     :optional:
 
     Fields written to output.
-    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>`` and ``T_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
+    Possible scalar fields: ``part_per_cell`` ``rho`` ``phi`` ``F`` ``part_per_grid`` ``proc_num`` ``divE`` ``divB`` ``eb_covered`` ``rho_<species_name>``, ``T_<species_name>``, and ``part_per_cell_<species_name>``, where ``<species_name>`` must match the name of one of the available particle species.
     ``T_<species_name>`` is the temperature in eV (only valid for non-relativistic plasmas, since the code relies on the equipartition theorem to extract the temperature).
     With the hybrid-PIC solver (:pp:param:`algo.maxwell_solver` = ``hybrid``), the scalar fields ``Te`` (electron temperature in K: implied by the electron-pressure closure, or the evolved state variable when :pp:param:`hybrid_pic_model.solve_electron_energy_equation` is on) and ``Pe`` (electron pressure in Pa, as used in the Ohm's-law E-field solve) are also available.
     ``eb_covered`` is a number between 0 and 1 that indicates the fraction of the cell that is covered by the embedded boundary.
@@ -5395,6 +5540,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         * ``<reduced_diags_name>.value_function(t,x,y,z,ux,uy,uz,w)`` (``string``) optional
             Users can provide an expression for the weight used to calculate the number of particles
             per cell associated with the selected abscissa and ordinate functions and/or the filter function.
+            If not specified, the particle weight ``w`` is used.
             ``t`` represents the physical time in seconds during the simulation.
             ``x, y, z`` represent particle positions in the unit of meter.
             ``ux, uy, uz`` represent particle velocities in the unit of

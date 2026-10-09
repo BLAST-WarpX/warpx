@@ -87,7 +87,7 @@ Conda provides a convenient way to install dependencies across Linux, macOS, and
 
       .. code-block:: bash
 
-         conda create -n warpx-cpu-mpich-dev -c conda-forge blaspp boost ccache cmake compilers git lapackpp "openpmd-api=*=mpi_mpich*" openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt "fftw=*=mpi_mpich*" pkg-config matplotlib mamba mpich mpi4py ninja pip virtualenv wheel
+         conda create -n warpx-cpu-mpich-dev -c conda-forge blaspp libboost-devel ccache cmake compilers git lapackpp "openpmd-api=*=mpi_mpich*" openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt "fftw=*=mpi_mpich*" pkg-config matplotlib mamba mpich mpi4py ninja pip virtualenv wheel
          conda activate warpx-cpu-mpich-dev
 
          # compile WarpX with -DWarpX_MPI=ON
@@ -97,7 +97,7 @@ Conda provides a convenient way to install dependencies across Linux, macOS, and
 
       .. code-block:: bash
 
-         conda create -n warpx-cpu-dev -c conda-forge blaspp boost ccache cmake compilers git lapackpp openpmd-api openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt fftw pkg-config matplotlib mamba ninja pip virtualenv wheel
+         conda create -n warpx-cpu-dev -c conda-forge blaspp libboost-devel ccache cmake compilers git lapackpp openpmd-api openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt fftw pkg-config matplotlib mamba ninja pip virtualenv wheel
          conda activate warpx-cpu-dev
 
          # compile WarpX with -DWarpX_MPI=OFF
