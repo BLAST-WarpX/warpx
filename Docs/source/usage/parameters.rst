@@ -249,7 +249,7 @@ Overall simulation parameters
         - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
 
       - **Nonlinear solvers:**
-        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are ``picard`` and ``newton``.
+        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are ``picard``, ``newton``, and ``petsc_snes``.
 
         - ``implicit_evolve.nonlinear_solver`` (``string``, default: None)
 
@@ -282,8 +282,17 @@ Overall simulation parameters
           - ``gmres.relative_tolerance`` (``float``, default: 1.0e-4)
           - ``gmres.absolute_tolerance`` (``float``, default: 0.0)
 
+        - ``implicit_evolve.nonlinear_solver = petsc_snes``: Use a PS-JFNK method with the PETSc SNES solver. Requires WarpX to be compiled with PETSc (``WarpX_PETSC=ON``).
+          The ``newton`` and ``gmres`` parameters listed above apply, with the following differences:
+
+          - ``newton.linear_solver`` is not used. The linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES).
+          - ``gmres.restart_length`` is not used.
+          - ``jacobian.pc_type`` (see below) defaults to ``pc_petsc``.
+
+          PETSc options given on the command line (for example, ``-snes_view``) are passed to the PETSc solver.
+
       - **PS-JFNK solver specific options:**
-        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
+        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton`` or ``petsc_snes``) has a variety of additional parameters and options.
 
         - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
 
