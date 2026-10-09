@@ -2672,6 +2672,238 @@ class LaserAntenna(picmistandard.PICMI_LaserAntenna):
             ) / constants.c
 
 
+class PrescribedCurrentDrive(picmistandard.PICMI_Extension):
+    """
+    One rectangular region of the WarpX impressed-current antenna.
+
+    This is a WarpX-specific extension (not part of the PICMI standard).
+    Maps to ``warpx.current_injection.pair_N.drive.*``.
+
+    Parameters
+    ----------
+    lower_bound: sequence of 3 floats
+        Lower corner of the drive box ``[xlo, ylo, zlo]`` in meters.
+        In 2D XZ geometry the y-bounds are required but ignored.
+    upper_bound: sequence of 3 floats
+        Upper corner of the drive box ``[xhi, yhi, zhi]`` in meters.
+    area: float, optional
+        Cross-sectional area ``A`` [m^2] used to form ``J = sign * I(t) / A``.
+        It may be omitted only for a radial RZ drive (``direction=0``), which
+        uses a conserved-total-current profile.
+    direction: {0, 1, 2}, default=0
+        Injected current density component (0 = x, 1 = y, 2 = z).
+    sign: {+1, -1}, default=+1
+        Sign of the local impressed current. This reverses its vector; it does
+        not define a circuit return terminal.
+    file: str, optional
+        Per-region two-column waveform file (``t [s]``, ``I [A]``). Overrides
+        the global file set on ``PrescribedCurrentInjection`` when given.
+    """
+
+    lower_bound: list[float]
+    upper_bound: list[float]
+    area: float | None = None
+    direction: int = 0
+    sign: int = 1
+    file: str | None = None
+
+    @model_validator(mode="after")
+    def _check_parameters(self) -> Self:
+        if len(self.lower_bound) != 3 or len(self.upper_bound) != 3:
+            raise ValueError(
+                "PrescribedCurrentDrive lower_bound and upper_bound must each "
+                "have three components [x, y, z]."
+            )
+        if self.direction not in (0, 1, 2):
+            raise ValueError("PrescribedCurrentDrive direction must be 0, 1, or 2.")
+        if self.sign not in (1, -1):
+            raise ValueError("PrescribedCurrentDrive sign must be +1 or -1.")
+        if self.area is not None and self.area <= 0.0:
+            raise ValueError("PrescribedCurrentDrive area must be > 0.")
+        return self
+
+
+class PrescribedCurrentInjection(picmistandard.PICMI_Extension):
+    """
+    WarpX-specific PICMI interface for a file-driven impressed-current antenna.
+
+    Deposits a user waveform ``I(t)`` as current density
+    ``J = sign * I(t) / A`` on one or more rectangular regions via
+    ``PrescribedCurrentParticleContainer`` (``warpx.current_injection.*``).
+
+    Opposite-weight particle pairs deposit both the current and the
+    polarization charge required by continuity. This is a local antenna
+    source, not a paired-terminal or through-current model. It is unsupported
+    in Hybrid-PIC. This class is **not** part of the PICMI standard; add it
+    with ``Simulation.add_prescribed_current_injection``.
+
+    Example::
+
+        drive = picmi.PrescribedCurrentDrive(
+            lower_bound=[-0.01, -0.14, 0.09],
+            upper_bound=[0.01, -0.10, 0.15],
+            area=2.565e-3,
+            direction=0,
+            sign=1,
+        )
+        current = picmi.PrescribedCurrentInjection(
+            drives=[drive],
+            file="current_profile.txt",
+        )
+        sim.add_prescribed_current_injection(current)
+
+    Parameters
+    ----------
+    drives: list of PrescribedCurrentDrive
+        One or more independent antenna regions. Drive boxes may overlap; each
+        retains its own waveform, direction, area, and sign. A negative sign
+        reverses one region's current and does not create a return path.
+    file: str, optional
+        Global two-column waveform file (``t [s]``, ``I [A]``) used by every
+        drive that does not set its own ``file``. Required if any drive omits
+        ``file``.
+    """
+
+    drives: list[PrescribedCurrentDrive]
+    file: str | None = None
+
+    @model_validator(mode="after")
+    def _check_parameters(self) -> Self:
+        if len(self.drives) < 1:
+            raise ValueError(
+                "PrescribedCurrentInjection requires at least one antenna region."
+            )
+        for i, drive in enumerate(self.drives):
+            if not isinstance(drive, PrescribedCurrentDrive):
+                raise TypeError(
+                    f"drives[{i}] must be a PrescribedCurrentDrive, got "
+                    f"{type(drive)!r}."
+                )
+        if self.file is None and any(d.file is None for d in self.drives):
+            raise ValueError(
+                "PrescribedCurrentInjection: set file=... globally or provide "
+                "file= on every PrescribedCurrentDrive."
+            )
+        return self
+
+    def initialize_inputs(self):
+        """Map this object onto ``warpx.current_injection.*`` input keys."""
+        pywarpx.warpx.current_injection = 1
+        pywarpx.warpx.__setattr__("current_injection.type", "antenna")
+        if self.file is not None:
+            pywarpx.warpx.__setattr__("current_injection.file", self.file)
+
+        pywarpx.warpx.__setattr__("current_injection.n_pairs", len(self.drives))
+
+        for n, drive in enumerate(self.drives):
+            base = f"current_injection.pair_{n}"
+            if drive.file is not None:
+                pywarpx.warpx.__setattr__(f"{base}.file", drive.file)
+            pywarpx.warpx.__setattr__(f"{base}.drive.xlo", drive.lower_bound[0])
+            pywarpx.warpx.__setattr__(f"{base}.drive.xhi", drive.upper_bound[0])
+            pywarpx.warpx.__setattr__(f"{base}.drive.ylo", drive.lower_bound[1])
+            pywarpx.warpx.__setattr__(f"{base}.drive.yhi", drive.upper_bound[1])
+            pywarpx.warpx.__setattr__(f"{base}.drive.zlo", drive.lower_bound[2])
+            pywarpx.warpx.__setattr__(f"{base}.drive.zhi", drive.upper_bound[2])
+            if drive.area is not None:
+                pywarpx.warpx.__setattr__(f"{base}.drive.A", drive.area)
+            pywarpx.warpx.__setattr__(f"{base}.drive.dir", drive.direction)
+            pywarpx.warpx.__setattr__(f"{base}.drive.sign", drive.sign)
+
+
+class CurrentControlledPort(picmistandard.PICMI_Extension):
+    """A waveform-driven pair of internal current-terminal surfaces.
+
+    This WarpX extension constrains the magnetic circulation on every
+    cross-section between two coordinate-aligned terminal surfaces with
+    matching transverse bounds. In a
+    fully kinetic Maxwell solve this controls total Ampere current, including
+    particle, macroscopic, and displacement current. In Hybrid-PIC it controls
+    ion plus electron-fluid current. Both terminals may be internal and their
+    surfaces may cross plasma, macroscopic material, or an EB object, provided
+    the surrounding Ampere contour remains in field-carrying cells.
+
+    Parameters
+    ----------
+    direction: {0, 1, 2}
+        Current-axis direction. 2D XZ supports 0 (x) and 2 (z), and interprets
+        the waveform as A/m. RZ supports 0 (radial) and 2 (axial).
+    terminal_0_lower_bound, terminal_0_upper_bound: sequence of 3 floats
+        Bounds of the first terminal. The two coordinates in ``direction``
+        must be equal, making this a zero-thickness surface.
+    terminal_1_lower_bound, terminal_1_upper_bound: sequence of 3 floats
+        Bounds of the second terminal. Transverse bounds must currently match
+        terminal 0. Positive current flows from terminal 0 to terminal 1.
+    file: str
+        Two-column waveform file (time [s], current [A]).
+    current_scale: float, default=1.0
+        Positive factor applied to every current sample. This is useful when
+        several ports share one waveform but carry different current fractions.
+    """
+
+    direction: int
+    terminal_0_lower_bound: list[float]
+    terminal_0_upper_bound: list[float]
+    terminal_1_lower_bound: list[float]
+    terminal_1_upper_bound: list[float]
+    file: str
+    current_scale: float = 1.0
+
+    @model_validator(mode="after")
+    def _check_parameters(self) -> Self:
+        bounds = (
+            self.terminal_0_lower_bound,
+            self.terminal_0_upper_bound,
+            self.terminal_1_lower_bound,
+            self.terminal_1_upper_bound,
+        )
+        if self.direction not in (0, 1, 2):
+            raise ValueError("CurrentControlledPort direction must be 0, 1, or 2.")
+        if any(len(bound) != 3 for bound in bounds):
+            raise ValueError("Every CurrentControlledPort bound must have 3 entries.")
+        if not self.file:
+            raise ValueError("CurrentControlledPort file is required.")
+        if not np.isfinite(self.current_scale) or self.current_scale <= 0.0:
+            raise ValueError("CurrentControlledPort current_scale must be positive.")
+        if (
+            self.terminal_0_lower_bound[self.direction]
+            != self.terminal_0_upper_bound[self.direction]
+            or self.terminal_1_lower_bound[self.direction]
+            != self.terminal_1_upper_bound[self.direction]
+        ):
+            raise ValueError("Each current terminal must have zero axial thickness.")
+        if (
+            self.terminal_0_lower_bound[self.direction]
+            == self.terminal_1_lower_bound[self.direction]
+        ):
+            raise ValueError(
+                "The two current terminals must be at different positions."
+            )
+        for idir in range(3):
+            if idir == self.direction:
+                continue
+            if (
+                self.terminal_0_lower_bound[idir] != self.terminal_1_lower_bound[idir]
+                or self.terminal_0_upper_bound[idir]
+                != self.terminal_1_upper_bound[idir]
+            ):
+                raise ValueError(
+                    "CurrentControlledPort terminal transverse bounds must match."
+                )
+        return self
+
+    def initialize_inputs(self, prefix="current_controlled_port"):
+        pywarpx.warpx.current_controlled_port = 1
+        pywarpx.warpx.__setattr__(f"{prefix}.file", self.file)
+        pywarpx.warpx.__setattr__(f"{prefix}.direction", self.direction)
+        pywarpx.warpx.__setattr__(f"{prefix}.current_scale", self.current_scale)
+        for index in (0, 1):
+            lower = getattr(self, f"terminal_{index}_lower_bound")
+            upper = getattr(self, f"terminal_{index}_upper_bound")
+            pywarpx.warpx.__setattr__(f"{prefix}.terminal_{index}.lower_bound", lower)
+            pywarpx.warpx.__setattr__(f"{prefix}.terminal_{index}.upper_bound", upper)
+
+
 class LoadInitialField(picmistandard.PICMI_LoadGriddedField):
     """
     Field Initializer that loads the initial field from a file.
@@ -3834,6 +4066,15 @@ class Simulation(picmistandard.PICMI_Simulation):
         description="Macroscopic material properties added with add_macroscopic_property",
     )
 
+    prescribed_current_injections: list[PrescribedCurrentInjection] = Field(
+        default_factory=list,
+        description="Impressed-current antennas added with add_prescribed_current_injection.",
+    )
+    current_controlled_ports: list[CurrentControlledPort] = Field(
+        default_factory=list,
+        description="Paired current terminals added with add_current_controlled_port.",
+    )
+
     # --- Runtime state (not user inputs).
     _inputs_initialized: bool = PrivateAttr(default=False)
     _warpx_initialized: bool = PrivateAttr(default=False)
@@ -3845,6 +4086,39 @@ class Simulation(picmistandard.PICMI_Simulation):
                 "This Simulation was finalized. Create new PICMI objects to "
                 "set up another simulation."
             )
+
+    def add_prescribed_current_injection(self, injection):
+        """
+        Add a WarpX impressed-current antenna object to the simulation.
+
+        Parameters
+        ----------
+        injection: PrescribedCurrentInjection
+            File-driven local antenna configuration.
+        """
+        if not isinstance(injection, PrescribedCurrentInjection):
+            raise TypeError(
+                "add_prescribed_current_injection expects a "
+                "PrescribedCurrentInjection instance."
+            )
+        if self.prescribed_current_injections:
+            raise ValueError(
+                "Only one PrescribedCurrentInjection can be added to a Simulation; "
+                "put all antenna regions in its drives list."
+            )
+        self.prescribed_current_injections.append(injection)
+
+    def add_current_controlled_port(self, port):
+        """Add a WarpX paired current-controlled port.
+
+        Multiple ports must have correction regions separated by more than one
+        grid cell.
+        """
+        if not isinstance(port, CurrentControlledPort):
+            raise TypeError(
+                "add_current_controlled_port expects a CurrentControlledPort instance."
+            )
+        self.current_controlled_ports.append(port)
 
     def initialize_inputs(self):
         self._check_not_finalized()
@@ -3928,7 +4202,9 @@ class Simulation(picmistandard.PICMI_Simulation):
                 particle_shape = s.particle_shape
 
         if particle_shape is not None and (
-            len(self.species) > 0 or len(self.lasers) > 0
+            len(self.species) > 0
+            or len(self.lasers) > 0
+            or len(self.prescribed_current_injections) > 0
         ):
             if isinstance(particle_shape, str):
                 interpolation_order = {
@@ -3997,6 +4273,21 @@ class Simulation(picmistandard.PICMI_Simulation):
             self.laser_injection_methods[i].laser_antenna_initialize_inputs(
                 self.lasers[i]
             )
+
+        for prescribed_current in self.prescribed_current_injections:
+            prescribed_current.initialize_inputs()
+
+        if len(self.current_controlled_ports) == 1:
+            self.current_controlled_ports[0].initialize_inputs()
+        elif self.current_controlled_ports:
+            pywarpx.warpx.current_controlled_port = 1
+            pywarpx.warpx.__setattr__(
+                "current_controlled_port.n_ports", len(self.current_controlled_ports)
+            )
+            for index, current_port in enumerate(self.current_controlled_ports):
+                current_port.initialize_inputs(
+                    prefix=f"current_controlled_port.port_{index}"
+                )
 
         for applied_field in self.applied_fields:
             applied_field.applied_field_initialize_inputs()

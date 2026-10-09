@@ -18,6 +18,7 @@
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "EmbeddedBoundary/WarpXFaceInfoBox.H"
+#include "FieldSolver/CurrentControlledPort.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/ElectrostaticSolvers/LabFrameExplicitES.H"
 #include "FieldSolver/ElectrostaticSolvers/RelativisticExplicitES.H"
@@ -40,6 +41,7 @@
 #include "Initialization/WarpXInit.H"
 #include "Particles/ParticleBoundaries.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/PrescribedCurrentParticleContainer.H"
 #include "Fluids/MultiFluidContainer.H"
 #include "Fluids/WarpXFluidContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
@@ -48,6 +50,7 @@
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/WarpXUtil.H"
+#include "Utils/Parser/ParserUtils.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolverLibrary.H"
 
@@ -96,6 +99,7 @@
 #include <limits>
 #include <optional>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -431,6 +435,49 @@ WarpX::WarpX ()
         m_hybrid_pic_model = std::make_unique<HybridPICModel>();
     }
 
+    if (CurrentControlledPort::is_enabled()) {
+        amrex::ParmParse const parser("warpx");
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::HybridPIC) {
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                !m_hybrid_pic_model->m_has_external_current &&
+                    !m_hybrid_pic_model->m_add_external_fields,
+                "Hybrid-PIC current-controlled ports cannot currently be "
+                "combined with analytic external current or split external "
+                "fields.");
+        }
+#ifdef WARPX_DIM_3D
+        std::array<amrex::Real, 3> const minimum_port_gap{
+            geom[0].CellSize(0), geom[0].CellSize(1), geom[0].CellSize(2)};
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        std::array<amrex::Real, 3> const minimum_port_gap{
+            geom[0].CellSize(0), 0.0_rt, geom[0].CellSize(1)};
+#else
+        std::array<amrex::Real, 3> const minimum_port_gap{};
+#endif
+        int number_of_ports = 1;
+        bool const indexed_ports =
+            parser.query("current_controlled_port.n_ports", number_of_ports);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            number_of_ports >= 1,
+            "warpx.current_controlled_port.n_ports must be at least one.");
+        for (int port_index = 0; port_index < number_of_ports; ++port_index) {
+            std::string const prefix =
+                indexed_ports
+                    ? "current_controlled_port.port_" +
+                          std::to_string(port_index)
+                    : "current_controlled_port";
+            auto port = std::make_unique<CurrentControlledPort>(prefix);
+            for (auto const& existing_port : m_current_controlled_ports) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    !port->correction_region_overlaps(*existing_port,
+                                                      minimum_port_gap),
+                    "Current-controlled port correction regions must be "
+                    "separated by more than one grid cell.");
+            }
+            m_current_controlled_ports.push_back(std::move(port));
+        }
+    }
+
     current_buffer_masks.resize(nlevs_max);
     gather_buffer_masks.resize(nlevs_max);
 
@@ -452,7 +499,7 @@ WarpX::WarpX ()
         m_macroscopic_properties = std::make_unique<MacroscopicProperties>();
     }
 
-    // Set default values for particle and cell weights for costs update;
+    // Set default values for particle and cell weights for costs update.
     // Default values listed here for the case AMREX_USE_GPU are determined
     // from single-GPU tests on Summit.
     if (costs_heuristic_cells_wt<=0. && costs_heuristic_particles_wt<=0.
@@ -556,6 +603,26 @@ WarpX::~WarpX ()
     for (int lev = 0; lev < nlevs_max; ++lev) {
         ClearLevel(lev);
     }
+}
+
+std::array<amrex::Real, 3>
+WarpX::GetCurrentControlledPortStatus () const
+{
+    if (m_current_controlled_ports.empty()) {
+        return {0.0_rt, 0.0_rt, 0.0_rt};
+    }
+    return m_current_controlled_ports.front()->status();
+}
+
+std::vector<std::array<amrex::Real, 3>>
+WarpX::GetCurrentControlledPortStatuses () const
+{
+    std::vector<std::array<amrex::Real, 3>> result;
+    result.reserve(m_current_controlled_ports.size());
+    for (auto const& port : m_current_controlled_ports) {
+        result.push_back(port->status());
+    }
+    return result;
 }
 
 void
@@ -1489,7 +1556,8 @@ WarpX::ReadParameters ()
 
         std::vector<std::string> sort_intervals_string_vec = {"-1"};
         int particle_shape;
-        if (!species_names.empty() || !lasers_names.empty()) {
+        if (!species_names.empty() || !lasers_names.empty()
+            || PrescribedCurrentParticleContainer::is_enabled()) {
             if (utils::parser::queryWithParser(pp_algo, "particle_shape", particle_shape)){
                 WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                     (particle_shape >= 1) && (particle_shape <=4),

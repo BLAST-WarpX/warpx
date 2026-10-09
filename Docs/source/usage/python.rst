@@ -146,6 +146,20 @@ Instances of the classes below need to be passed as :py:data:`~picmistandard.PIC
 .. autopydantic_model:: pywarpx.picmi.Mirror
     :inherited-members: BaseModel
 
+Externally driven currents
+--------------------------
+
+WarpX-specific PICMI classes for the box impressed-current antenna and paired
+current-controlled ports.  They are passed to
+``Simulation.add_prescribed_current_injection`` and
+``Simulation.add_current_controlled_port``, respectively.
+
+.. autoclass:: pywarpx.picmi.PrescribedCurrentDrive
+
+.. autoclass:: pywarpx.picmi.PrescribedCurrentInjection
+
+.. autoclass:: pywarpx.picmi.CurrentControlledPort
+
 Diagnostics
 -----------
 
