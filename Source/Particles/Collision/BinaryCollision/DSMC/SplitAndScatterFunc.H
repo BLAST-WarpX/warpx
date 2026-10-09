@@ -298,7 +298,7 @@ public:
             }
 
             // Next perform all product-producing collisions
-            else if ((process_type == ScatteringProcessType::TWOPRODUCT_REACTION) ||
+            else if ((process_type == ScatteringProcessType::TWO_PRODUCT_REACTION) ||
                      (process_type == ScatteringProcessType::CHARGE_EXCHANGE))
             {
                 // create a copy of the first product species at the location of the first reactant species
