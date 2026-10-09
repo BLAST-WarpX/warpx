@@ -357,6 +357,19 @@ namespace
 
 }
 
+amrex::Real
+WarpX::MovingWindowShiftPerStep (const amrex::Real dt)
+{
+    return (moving_window_v - WarpX::beta_boost * PhysConst::c)
+        / (1._rt - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt;
+}
+
+int
+WarpX::NumCellsShifted (const amrex::Real displacement, const amrex::Real cell_size)
+{
+    return static_cast<int>(displacement / cell_size);
+}
+
 int
 WarpX::MoveWindow (const int step, bool move_j)
 {
@@ -377,7 +390,7 @@ WarpX::MoveWindow (const int step, bool move_j)
 
     // Update the continuous position of the moving window,
     // and of the plasma injection
-    moving_window_x += (moving_window_v - WarpX::beta_boost * PhysConst::c)/(1 - moving_window_v * WarpX::beta_boost / PhysConst::c) * dt[0];
+    moving_window_x += MovingWindowShiftPerStep(dt[0]);
     const int dir = moving_window_dir;
 
     // Update current injection position for all containers
@@ -393,7 +406,7 @@ WarpX::MoveWindow (const int step, bool move_j)
     const amrex::Real* current_lo = geom[0].ProbLo();
     const amrex::Real* current_hi = geom[0].ProbHi();
     const amrex::Real* cdx = geom[0].CellSize();
-    const int num_shift_base = static_cast<int>((moving_window_x - current_lo[dir]) / cdx[dir]);
+    const int num_shift_base = NumCellsShifted(moving_window_x - current_lo[dir], cdx[dir]);
 
     if (num_shift_base == 0) { return 0; }
 
@@ -420,8 +433,8 @@ WarpX::MoveWindow (const int step, bool move_j)
             new_slice_lo[i] = current_slice_lo[i];
             new_slice_hi[i] = current_slice_hi[i];
         }
-        const int num_shift_base_slice = static_cast<int> ((moving_window_x -
-                                   current_slice_lo[dir]) / cdx[dir]);
+        const int num_shift_base_slice =
+            NumCellsShifted(moving_window_x - current_slice_lo[dir], cdx[dir]);
         new_slice_lo[dir] = current_slice_lo[dir] + num_shift_base_slice*cdx[dir];
         new_slice_hi[dir] = current_slice_hi[dir] + num_shift_base_slice*cdx[dir];
         slice_realbox.setLo(new_slice_lo);

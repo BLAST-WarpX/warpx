@@ -367,9 +367,10 @@ void FiniteDifferenceSolver::EvolveBCartesianECT (
 
                 if (flag_info_cell_dim(i, j, k) == FaceInfo::extended) {
                     return;
-                }
-                else if (flag_info_cell_dim(i, j, k) == FaceInfo::available) {
+                } else if (flag_info_cell_dim(i, j, k) == FaceInfo::available
+                           || flag_info_cell_dim(i, j, k) == FaceInfo::bck_stabilized) {
                     //Stable cell which hasn't been intruded
+                    //or unstable cell with area increased following Benkler-Chavannes-Kuster method
                     B(i, j, k) = B(i, j, k) - dt * Rho(i, j, k);
                 } else if (flag_info_cell_dim(i, j, k) == FaceInfo::intruded) {
                     //Stable cell which has been intruded

@@ -217,7 +217,6 @@ PhysicalParticleContainer::AddParticles (int lev)
             const amrex::Vector<amrex::Vector<int>> attr_int;
             AddNParticles(lev, 1, xp, yp, zp, uxp, uyp, uzp,
                           1, attr, 0, attr_int, 0);
-            return;
         }
 
         if (plasma_injector->add_multiple_particles) {
@@ -1481,7 +1480,7 @@ PhysicalParticleContainer::AddPlasmaFlux (PlasmaInjector const& plasma_injector,
                 auto r = XDim3{0.0_rt,0.0_rt,0.0_rt};
 #ifdef AMREX_USE_EB
                 if (inject_from_eb) {
-                    auto const& pt = eb_data.randomPointOnEB(i,j,k,engine);
+                    auto const& pt = eb_data.randomPointOnEB(i,j,k,engine,dx);
 #if defined(WARPX_DIM_3D)
                     pos.x = overlap_corner[0] + (iv[0] + 0.5_rt + pt[0])*dx[0];
                     pos.y = overlap_corner[1] + (iv[1] + 0.5_rt + pt[1])*dx[1];

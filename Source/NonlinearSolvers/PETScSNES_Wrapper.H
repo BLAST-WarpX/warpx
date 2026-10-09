@@ -63,8 +63,12 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
                     const Vec& a_b,
                     RT a_time,
                     RT a_dt,
-                    int a_step)  const override
+                    int a_step,
+                    bool verbose_step)  const override
         {
+
+            bool const verbose = verbose_step ? this->m_verbose : 0;
+            m_solver->setVerbose(verbose);
             m_solver->solve(a_U, a_b, a_time, a_dt, a_step);
             this->m_exit_status = m_solver->getStatus();
 

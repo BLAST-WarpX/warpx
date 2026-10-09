@@ -104,7 +104,7 @@ class MatrixPC : public Preconditioner<T,Ops>
         /**
          * \brief Update the preconditioner
          */
-        void Update (const T& a_U) override;
+        void Update () override;
 
         /**
          * \brief Assemble the matrix
@@ -114,7 +114,7 @@ class MatrixPC : public Preconditioner<T,Ops>
          * non-zero elements (return value is difference in current number
          * of nonzero elements and the desired number).
          */
-        int Assemble (const T& a_U);
+        int Assemble ();
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS
@@ -185,6 +185,7 @@ class MatrixPC : public Preconditioner<T,Ops>
 
         int m_ndofs_l = 0;
         int m_ndofs_g = 0;
+
         bool m_pc_diag_only = false;
         int m_pc_mat_nnz = 1;
         bool m_include_mass_matrices = false;
@@ -247,9 +248,6 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
     // read preconditioner parameters
     readParameters();
 
-    // a_U is not needed
-    amrex::ignore_unused(a_U);
-
     // Set number of AMR levels and create geometry, grids, and
     // distribution mapping vectors.
     m_num_amr_levels = m_ops->numAMRLevels();
@@ -282,7 +280,7 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
 }
 
 template <class T, class Ops>
-void MatrixPC<T,Ops>::Update (const T& a_U)
+void MatrixPC<T,Ops>::Update ()
 {
     BL_PROFILE("MatrixPC::Update()");
     using namespace amrex;
@@ -293,7 +291,7 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
 
     while(true) {
 
-        auto nnz_diff = Assemble(a_U);
+        auto nnz_diff = Assemble();
         AMREX_ALWAYS_ASSERT(nnz_diff >= 0);
         if (nnz_diff) {
 
@@ -315,7 +313,7 @@ void MatrixPC<T,Ops>::Update (const T& a_U)
 }
 
 template <class T, class Ops>
-int MatrixPC<T,Ops>::Assemble (const T& a_U)
+int MatrixPC<T,Ops>::Assemble ()
 {
     // Assemble the sparse matrix representation of the preconditioner
     //      A = curl (alpha * curl []) + M
@@ -347,11 +345,8 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                        << "alpha = " << alpha << "\n";
     }
 
-    // Get DOF object from a_U
-    const auto& dofs_obj = a_U.getDOFsObject();
-    const auto& dofs_mfarrvec = dofs_obj->m_array;
-    AMREX_ALWAYS_ASSERT(m_ndofs_l == dofs_obj->m_nDoFs_l);
-    AMREX_ALWAYS_ASSERT(m_ndofs_g == dofs_obj->m_nDoFs_g);
+    // The DOF object is shared by every solver vector.
+    const auto& dofs_mfarrvec = T::getDOFsObject()->m_array;
 
     m_r_indices_g.clear();
     m_num_nz.clear();
@@ -761,7 +756,7 @@ int MatrixPC<T,Ops>::Assemble (const T& a_U)
                 // from -MM_width[2] to +MM_width[2], is stored as components of m_bcoefs[dir=0] (mass matrices).
                 // Similarly for Jy/Ey (m_bcoefs[dir=1]) and Jz/Ez (m_bcoefs[dir=2]).
                 // The mapping to the components is given by:
-                // mm_comp = i0 + MM_width[0] + MM_comp[0]*(j0 + MM_width[1]) + (MM_comp[0] + MM_comp[1])*(k0 + MM_width[2])
+                // mm_comp = i0 + MM_width[0] + MM_comp[0]*(j0 + MM_width[1]) + MM_comp[0]*MM_comp[1]*(k0 + MM_width[2])
                 if (m_include_mass_matrices) {
 
                     auto sigma_ii_arr = (*m_bcoefs)[lev][dir]->const_array(mfi);

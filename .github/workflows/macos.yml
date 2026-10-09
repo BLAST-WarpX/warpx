@@ -46,8 +46,6 @@ jobs:
         brew install open-mpi
         brew install pkg-config
         set -e
-        brew tap openpmd/openpmd
-        brew trust openpmd/openpmd
         brew uninstall cmake  # https://github.com/actions/runner-images/issues/12912
         brew install openpmd/openpmd/openpmd-api
     - name: install pip dependencies

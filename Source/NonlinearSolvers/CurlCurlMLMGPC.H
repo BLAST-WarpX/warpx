@@ -81,7 +81,7 @@ class CurlCurlMLMGPC : public Preconditioner<T,Ops>
         /**
          * \brief Update the preconditioner
          */
-        void Update (const T& a_U) override;
+        void Update () override;
 
         /**
          * \brief Apply (solve) the preconditioner given a RHS
@@ -237,6 +237,9 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     // Construct the MLMG solver
     m_solver = std::make_unique<MLMGT<MFArr>>(*m_curl_curl);
     m_solver->setFixedIter(m_max_iter);
+    // A Krylov bottom solver stops on a tolerance, making the preconditioner
+    // nonlinear; smoothing keeps it a fixed linear operator, as GMRES requires.
+    m_solver->setBottomSolver(BottomSolver::smoother);
     m_solver->setVerbose(static_cast<int>(m_verbose));
     m_solver->setBottomVerbose(static_cast<int>(m_bottom_verbose));
 
@@ -247,7 +250,7 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
 }
 
 template <class T, class Ops>
-void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
+void CurlCurlMLMGPC<T,Ops>::Update ()
 {
     BL_PROFILE("CurlCurlMLMGPC::Update()");
     using namespace amrex;
@@ -255,9 +258,6 @@ void CurlCurlMLMGPC<T,Ops>::Update (const T& a_U)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "CurlCurlMLMGPC::Update() called on undefined object" );
-
-    // a_U is not needed for a linear operator
-    amrex::ignore_unused(a_U);
 
     // set the alpha coefficient for the curl-curl op
     const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;

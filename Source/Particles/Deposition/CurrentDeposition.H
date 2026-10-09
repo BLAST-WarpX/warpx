@@ -24,6 +24,7 @@
 #include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Dim3.H>
+#include <AMReX_GpuAtomic.H>
 #include <AMReX_REAL.H>
 
 /**
@@ -365,6 +366,7 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  *        The only difference from doDepositionShapeN is in how the particle gamma
  *        is calculated.
  * \tparam depos_order deposition order
+ * \param xp_n,yp_n,zp_n  Pointer to arrays of particle position at time level n.
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp_n,uyp_n,uzp_n  Pointer to arrays of particle momentum at time n.
@@ -380,9 +382,15 @@ void doDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param nodal_lo      Lower nodal field domain bounds.
+ * \param nodal_hi      Upper nodal field domain bounds.
+ * \param position_error_count Device error counter for position checking.
  */
 template <int depos_order>
-void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
+void doDepositionShapeNImplicit([[maybe_unused]] const amrex::ParticleReal * const xp_n,
+                                [[maybe_unused]] const amrex::ParticleReal * const yp_n,
+                                [[maybe_unused]] const amrex::ParticleReal * const zp_n,
+                                const GetParticlePosition<PIdx>& GetPosition,
                                 const amrex::ParticleReal * const wp,
                                 const amrex::ParticleReal * const uxp_n,
                                 const amrex::ParticleReal * const uyp_n,
@@ -399,7 +407,10 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
                                 const amrex::XDim3 & xyzmin,
                                 const amrex::Dim3 lo,
                                 const amrex::Real q,
-                                [[maybe_unused]]const int n_rz_azimuthal_modes)
+                                [[maybe_unused]]const int n_rz_azimuthal_modes,
+                                const amrex::Dim3 nodal_lo,
+                                const amrex::Dim3 nodal_hi,
+                                int* const position_error_count)
 {
     using namespace amrex::literals;
 
@@ -421,8 +432,20 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
     amrex::For(
             np_to_deposit,
             [=] AMREX_GPU_DEVICE (long ip) {
-            amrex::ParticleReal xp, yp, zp;
-            GetPosition(ip, xp, yp, zp);
+            amrex::ParticleReal xp_nph, yp_nph, zp_nph;
+            GetPosition(ip, xp_nph, yp_nph, zp_nph);
+
+            amrex::ParticleReal const xp_n_value = (xp_n ? xp_n[ip] : 0._prt);
+            amrex::ParticleReal const yp_n_value = (yp_n ? yp_n[ip] : 0._prt);
+            amrex::ParticleReal const zp_n_value = (zp_n ? zp_n[ip] : 0._prt);
+
+            if (!ParticleUtils::isImplicitParticlePositionInBounds(
+                    xp_n_value, yp_n_value, zp_n_value, xp_nph, yp_nph, zp_nph,
+                    dinv, xyzmin, lo, nodal_lo, nodal_hi))
+            {
+                amrex::Gpu::Atomic::Add(position_error_count, 1);
+                return;
+            }
 
             // Compute inverse Lorentz factor, the average of gamma at time levels n and n+1
             const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n[ip], uyp_n[ip], uzp_n[ip],
@@ -438,7 +461,7 @@ void doDepositionShapeNImplicit(const GetParticlePosition<PIdx>& GetPosition,
             }
 
             const amrex::Real relative_time = 0._rt;
-            doDepositionShapeNKernel<depos_order>(xp, yp, zp, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
+            doDepositionShapeNKernel<depos_order>(xp_nph, yp_nph, zp_nph, wq, vx, vy, vz, jx_arr, jy_arr, jz_arr,
                                                   jx_type, jy_type, jz_type,
                                                   relative_time, dinv, xyzmin,
                                                   invvol, lo, n_rz_azimuthal_modes);
@@ -1115,6 +1138,9 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param lo           Index lower bounds of domain.
  * \param q            species charge.
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param nodal_lo              Lower nodal field domain bounds.
+ * \param nodal_hi              Upper nodal field domain bounds.
+ * \param position_error_count  Device error counter for position checking.
  */
 template <int depos_order>
 void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n,
@@ -1140,7 +1166,10 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
                                                  const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                                  const amrex::Dim3 lo,
                                                  const amrex::Real q,
-                                                 [[maybe_unused]] const int n_rz_azimuthal_modes)
+                                                 [[maybe_unused]] const int n_rz_azimuthal_modes,
+                                                 const amrex::Dim3 nodal_lo,
+                                                 const amrex::Dim3 nodal_hi,
+                                                 int* const position_error_count)
 {
     using namespace amrex;
 
@@ -1180,6 +1209,14 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 
             ParticleReal xp_nph, yp_nph, zp_nph;
             GetPosition(ip, xp_nph, yp_nph, zp_nph);
+
+            if (!ParticleUtils::isImplicitParticlePositionInBounds(
+                    xp_n[ip], yp_n[ip], zp_n[ip], xp_nph, yp_nph, zp_nph,
+                    dinv, xyzmin, lo, nodal_lo, nodal_hi))
+            {
+                amrex::Gpu::Atomic::Add(position_error_count, 1);
+                return;
+            }
 
 #if !defined(WARPX_DIM_1D_Z)
             ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n[ip];
@@ -1474,6 +1511,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
 #endif
         }
     );
+
 }
 
 /**
@@ -1664,10 +1702,6 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 7) ...
-
     // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirY_sign = static_cast<double>(dyp < 0. ? -1. : 1.);
@@ -1845,10 +1879,6 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 5) ...
-
     // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
@@ -2009,10 +2039,6 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     const int cell_crossings_z = std::abs(k_new-k_old);
     num_segments += cell_crossings_z;
 
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
-
     // compute the initial cell location used to find the cell crossings.
     const auto dirZ_sign = static_cast<double>(dzp < 0. ? -1. : 1.);
     double Zcell = static_cast<double>(k_old) + shift + 0.5*(1.-dirZ_sign);
@@ -2087,10 +2113,6 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     const auto i_new = static_cast<int>(x_new-shift);
     const int cell_crossings_x = std::abs(i_new-i_old);
     num_segments += cell_crossings_x;
-
-    // need to assert that the number of cell crossings in each direction
-    // is within the range permitted by the number of guard cells
-    // e.g., if (num_segments > 3) ...
 
     // compute the initial cell location used to find the cell crossings.
     const auto dirX_sign = static_cast<double>(dxp < 0. ? -1. : 1.);
@@ -2252,6 +2274,7 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                                           lo, invvol, n_rz_azimuthal_modes);
 
     });
+
 }
 
 /**
@@ -2281,6 +2304,9 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
  * \param lo                    Index lower bounds of domain.
  * \param q                     species charge.
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
+ * \param nodal_lo              Lower nodal field domain bounds.
+ * \param nodal_hi              Upper nodal field domain bounds.
+ * \param position_error_count  Device error counter for position checking.
  */
 template <int depos_order>
 void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::ParticleReal * const xp_n_data,
@@ -2306,7 +2332,10 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                            const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                            const amrex::Dim3 lo,
                                            const amrex::Real q,
-                                           [[maybe_unused]] const int n_rz_azimuthal_modes)
+                                           [[maybe_unused]] const int n_rz_azimuthal_modes,
+                                           const amrex::Dim3 nodal_lo,
+                                           const amrex::Dim3 nodal_hi,
+                                           int* const position_error_count)
 {
     using namespace amrex::literals;
 
@@ -2348,6 +2377,14 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
             amrex::ParticleReal const yp_n = (yp_n_data ? yp_n_data[ip] : 0._prt);
             amrex::ParticleReal const zp_n = (zp_n_data ? zp_n_data[ip] : 0._prt);
 
+            if (!ParticleUtils::isImplicitParticlePositionInBounds(
+                    xp_n, yp_n, zp_n, xp_nph, yp_nph, zp_nph,
+                    dinv, xyzmin, lo, nodal_lo, nodal_hi))
+            {
+                amrex::Gpu::Atomic::Add(position_error_count, 1);
+                return;
+            }
+
             amrex::ParticleReal const xp_np1 = 2._prt*xp_nph - xp_n;
             amrex::ParticleReal const yp_np1 = 2._prt*yp_nph - yp_n;
             amrex::ParticleReal const zp_np1 = 2._prt*zp_nph - zp_n;
@@ -2360,6 +2397,7 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
                                                           lo, invvol, n_rz_azimuthal_modes);
 
     });
+
 }
 
 /**

@@ -39,12 +39,14 @@ public:
      * \param mpc Reference to multi-particle container
      * \param mfl Pointer to multi-fluid container
      * \param max_level Maximum level of mesh refinement
+     * \param verbose_step Whether to be verbose on this step
      */
     void ComputeSpaceChargeField (
         ablastr::fields::MultiFabRegister& fields,
         MultiParticleContainer& mpc,
         MultiFluidContainer* mfl,
-        int max_level) override;
+        int max_level,
+        bool verbose_step) override;
 
     /**
      * Compute the charge density of the species paricle container, pc,
@@ -53,11 +55,13 @@ public:
      * \param[in] pc particle container for the selected species
      * \param[in] Efield_fp Efield updated to include potential computed for selected species charge density as source
      * \param[in] Bfield_fp Bfield updated to include potential computed for selected species charge density as source
+     * \param[in] verbosity Level of verbosity
      */
     void AddSpaceChargeField (
         WarpXParticleContainer& pc,
         ablastr::fields::MultiLevelVectorField& Efield_fp,
-        ablastr::fields::MultiLevelVectorField& Bfield_fp
+        ablastr::fields::MultiLevelVectorField& Bfield_fp,
+        int verbosity
     );
 
     /** Compute the potential `phi` by solving the Poisson equation with the

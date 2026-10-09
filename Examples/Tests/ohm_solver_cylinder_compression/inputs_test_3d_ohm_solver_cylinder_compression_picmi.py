@@ -298,7 +298,7 @@ class PlasmaCylinderCompression(object):
         # Add field loader callback
         B_ext = picmi.LoadInitialFieldFromPython(
             load_from_python=self.load_fields,
-            warpx_do_divb_cleaning_external=True,
+            warpx_do_initial_div_cleaning=True,
             load_B=True,
             load_E=False,
         )

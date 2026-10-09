@@ -106,7 +106,7 @@ PetscErrorCode RHSFunction( SNES a_solver, Vec a_U, Vec a_F, void* ctxt)
     VecAXPBY(a_F, 1.0, -1.0, a_U);
 
     if (!context->m_fd_jac_comput) {
-        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat(context->m_U);
+        dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(context->m_linop.get())->updatePreCondMat();
     }
     PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -818,15 +818,14 @@ void SNES_impl::solve (VecType& a_U,
     m_total_linsol_iters += m_niters_l;
 }
 
-void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U) const
+void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
 {
     BL_PROFILE("SNES_impl::computeRHS()");
     AMREX_ALWAYS_ASSERT(isDefined());
 
     if (m_fd_jac_comput) {
-        static bool first_call = true;
-        m_op->ComputeRHS( a_F, a_U, m_time, m_iter, !first_call);
-        first_call = false;
+        m_op->ComputeRHS( a_F, a_U, m_time, m_iter, !m_rhs_first_call);
+        m_rhs_first_call = false;
     } else {
         m_op->ComputeRHS( a_F, a_U, m_time, m_iter, false);
     }
