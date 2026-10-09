@@ -8,6 +8,9 @@ normalized momentum components with which WarpX particles should be initialized
 
 import numpy as np
 import openpmd_api as io
+from scipy.constants import c as clight
+from scipy.constants import electron_mass as m_e
+from scipy.constants import elementary_charge as q_e
 
 # Define u_mean and u_std as functions of x, y, z, using numpy syntax
 # - Define the grid
@@ -28,6 +31,8 @@ uz_mean_data = 0.14 * z
 # Define temperature in eV to correspond above isotropic thermal spread u_std = 0.2 * |z|
 # temperature [eV] = u_std^2 * m_e * c^2 / q_e
 temperature_in_eV_data = 20439.95 * z**2
+
+temperature_in_eV_data_MJ = (1.0 + np.heaviside(x, 0)) * m_e * clight**2 / q_e
 
 grid_spacing = np.array(
     [
@@ -105,4 +110,10 @@ write_scalar_mesh_file(
     "example-temperature-in-eV.h5",
     "temperature_in_eV",
     temperature_in_eV_data,
+)
+
+write_scalar_mesh_file(
+    "example-temperature-in-eV-MJ.h5",
+    "temperature_in_eV",
+    temperature_in_eV_data_MJ,
 )

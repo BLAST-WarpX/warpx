@@ -190,56 +190,64 @@ print("Relative beam charge difference:", charge_error)
 assert charge_error < tolerance
 
 # =============================================
-# maxwell-juttner with temperature from parser
+# maxwell-juttner with temperature from parser (h5_neg/h5_pos folders) or read from file (h14_neg/h14_pos folders)
 # =============================================
 
-# load data
-bin_value, bin_data_neg = read_reduced_diags_histogram("h5_neg.txt")[2:]
-bin_data_pos = read_reduced_diags_histogram("h5_pos.txt")[3]
+for i in [5, 14]:
+    # load data
+    bin_value, bin_data_neg = read_reduced_diags_histogram(f"h{i}_neg.txt")[2:]
 
-# parameters of theory
-# _neg denotes where x<0, _pos where x>0
-theta_neg = 1.0
-theta_pos = 2.0
-K2_neg = scs.kn(2, 1.0 / theta_neg)
-K2_pos = scs.kn(2, 1.0 / theta_pos)
-n = 1.0e21
-V = 8.0 / 2  # because each of these are for half the domain
-db = 0.22
+    bin_data_pos = read_reduced_diags_histogram(f"h{i}_pos.txt")[3]
 
-# compute the analytical solution for each half of the domain
-f_neg = (
-    n
-    * V
-    * db
-    * bin_value**2
-    * np.sqrt(1.0 - 1.0 / bin_value**2)
-    / (theta_neg * K2_neg)
-    * np.exp(-bin_value / theta_neg)
-)
-f_neg_peak = np.amax(f_neg)
-f_pos = (
-    n
-    * V
-    * db
-    * bin_value**2
-    * np.sqrt(1.0 - 1.0 / bin_value**2)
-    / (theta_pos * K2_pos)
-    * np.exp(-bin_value / theta_pos)
-)
-f_pos_peak = np.amax(f_pos)
-f_peak = max(f_neg_peak, f_pos_peak)
+    # parameters of theory
+    # _neg denotes where x < 0, _pos where x > 0
+    theta_neg = 1.0
+    theta_pos = 2.0
 
-# compute error
-f5_error = (
-    np.sum(np.abs(f_neg - bin_data_neg) + np.abs(f_pos - bin_data_pos))
-    / bin_value.size
-    / f_peak
-)
+    K2_neg = scs.kn(2, 1.0 / theta_neg)
+    K2_pos = scs.kn(2, 1.0 / theta_pos)
 
-print("Maxwell-Juttner parser temperature difference:", f5_error)
+    n = 1.0e21
+    V = 8.0 / 2  # each histogram is for half the domain
+    db = 0.22
 
-assert f5_error < tolerance
+    # compute the analytical solution for each half of the domain
+    f_neg = (
+        n
+        * V
+        * db
+        * bin_value**2
+        * np.sqrt(1.0 - 1.0 / bin_value**2)
+        / (theta_neg * K2_neg)
+        * np.exp(-bin_value / theta_neg)
+    )
+
+    f_pos = (
+        n
+        * V
+        * db
+        * bin_value**2
+        * np.sqrt(1.0 - 1.0 / bin_value**2)
+        / (theta_pos * K2_pos)
+        * np.exp(-bin_value / theta_pos)
+    )
+
+    # common normalization
+    f_peak = max(np.amax(f_neg), np.amax(f_pos))
+
+    # compute error
+    error = (
+        np.sum(np.abs(f_neg - bin_data_neg) + np.abs(f_pos - bin_data_pos))
+        / bin_value.size
+        / f_peak
+    )
+
+    if i == 5:
+        print("Maxwell-Juttner parser temperature difference:", error)
+    elif i == 14:
+        print("Maxwell-Juttner read from file temperature difference:", error)
+    assert error < tolerance
+
 
 # =================================================
 # maxwell-juttner with a constant asymmetric bulk drift

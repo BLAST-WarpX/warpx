@@ -8,6 +8,7 @@
 # the script `inputs_test_1d_theta_implicit_planar_pinch`.
 # and script `inputs_test_1d_theta_implicit_planar_pinch_substeps`.
 # and script `inputs_test_2d_theta_implicit_planar_pinch`.
+# and script `inputs_test_2d_theta_implicit_planar_pinch_petsc_snes`.
 # and script `inputs_test_rcylinder_theta_implicit_dynamic_pinch`.
 # and script `inputs_test_rz_theta_implicit_dynamic_pinch`.
 # This simulates a planar pinch using the theta-implicit solver with
