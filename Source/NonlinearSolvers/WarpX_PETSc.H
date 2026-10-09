@@ -22,6 +22,7 @@
 // forward declarations
 class WarpXSolverVec;
 class ImplicitSolver;
+struct NewtonSolverParams;
 // end of forward declarations
 
 /* \brief Implementations of linear and nonlinear solvers using PETSc
@@ -215,7 +216,7 @@ class SNES_impl : public PETScSolver_impl
     public:
 
         //! Constructor
-        SNES_impl (const VecType&, TIType*);
+        SNES_impl (const VecType&, TIType*, const NewtonSolverParams&);
 
         //! Destructor
         ~SNES_impl() override;

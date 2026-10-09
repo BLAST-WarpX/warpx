@@ -8,6 +8,7 @@
 #define NEWTON_SOLVER_H_
 
 #include "LinearSolverLibrary.H"
+#include "NewtonSolverParams.H"
 #include "NonlinearSolver.H"
 #include "JacobianFunctionMF.H"
 #include "Preconditioner.H"
@@ -309,41 +310,28 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::ParseParameters ()
 {
-    const amrex::ParmParse pp_newton("newton");
-    pp_newton.query("verbose",             this->m_verbose);
-    pp_newton.query("linear_solver",       m_linear_solver_type);
-    pp_newton.query("absolute_tolerance",  m_atol);
-    pp_newton.query("relative_tolerance",  m_rtol);
-    pp_newton.query("max_iterations",      m_maxits);
-    pp_newton.query("pc_update_newton_interval", m_pc_update_newton_interval);
-    pp_newton.query("pc_update_time_step_interval", m_pc_update_time_step_interval);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_pc_update_newton_interval >= 0,
-        "newton.pc_update_newton_interval must be nonnegative");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_pc_update_time_step_interval > 0,
-        "newton.pc_update_time_step_interval must be positive");
-    pp_newton.query("require_convergence", m_require_convergence);
-    pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
-    pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
+    NewtonSolverParams params;
+    params.Parse();
 
-    const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
-    pp_l.query("verbose_int",         m_linsol_verbose_int);
-    pp_l.query("restart_length",      m_linsol_restart_length);
-    pp_l.query("absolute_tolerance",  m_linsol_atol);
-    pp_l.query("relative_tolerance",  m_linsol_rtol);
-    pp_l.query("max_iterations",      m_linsol_maxits);
+    this->m_verbose = params.verbose;
+    this->m_diagnostic_file = params.diagnostic_file;
+    this->m_diagnostic_interval = params.diagnostic_interval;
 
-    /* backward compatibility */
-    const amrex::ParmParse pp_gmres("gmres");
-    pp_gmres.query("verbose_int",         m_linsol_verbose_int);
-    pp_gmres.query("restart_length",      m_linsol_restart_length);
-    pp_gmres.query("absolute_tolerance",  m_linsol_atol);
-    pp_gmres.query("relative_tolerance",  m_linsol_rtol);
-    pp_gmres.query("max_iterations",      m_linsol_maxits);
+    m_atol = params.atol;
+    m_rtol = params.rtol;
+    m_maxits = params.maxits;
+    m_require_convergence = params.require_convergence;
+    m_pc_update_newton_interval = params.pc_update_newton_interval;
+    m_pc_update_time_step_interval = params.pc_update_time_step_interval;
 
-    const amrex::ParmParse pp_jac("jacobian");
-    pp_jac.query("pc_type", m_pc_type);
+    m_linear_solver_type = params.linear_solver_type;
+    m_linsol_verbose_int = params.linsol_verbose_int;
+    m_linsol_restart_length = params.linsol_restart_length;
+    m_linsol_atol = params.linsol_atol;
+    m_linsol_rtol = params.linsol_rtol;
+    m_linsol_maxits = params.linsol_maxits;
+
+    m_pc_type = params.pc_type;
 }
 
 template <class Vec, class Ops>

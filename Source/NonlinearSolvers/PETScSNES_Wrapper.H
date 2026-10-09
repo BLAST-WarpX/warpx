@@ -8,6 +8,7 @@
 #ifndef PETSC_SNES_WRAPPER_H_
 #define PETSC_SNES_WRAPPER_H_
 
+#include "NewtonSolverParams.H"
 #include "NonlinearSolver.H"
 #include "WarpX_PETSc.H"
 
@@ -48,12 +49,17 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
 
         void Define ( const Vec& a_U, Ops* a_op ) override
         {
-            m_solver = std::make_unique<warpx_petsc::SNES_impl>(a_U, a_op);
+            // Defaults that differ from the native Newton solver
+            NewtonSolverParams params;
+            params.linear_solver_type = LinearSolverType::petsc_ksp;
+            params.pc_type = PreconditionerType::pc_petsc;
+            params.Parse();
 
-            const amrex::ParmParse pp_newton("newton");
-            pp_newton.query("verbose",             this->m_verbose);
-            pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
-            pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
+            this->m_verbose = params.verbose;
+            this->m_diagnostic_file = params.diagnostic_file;
+            this->m_diagnostic_interval = params.diagnostic_interval;
+
+            m_solver = std::make_unique<warpx_petsc::SNES_impl>(a_U, a_op, params);
 
             this->m_is_defined = m_solver->isDefined();
             this->m_usePC = m_solver->usePC();

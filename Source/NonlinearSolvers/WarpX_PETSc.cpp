@@ -7,6 +7,7 @@
 
 #include "FieldSolver/ImplicitSolvers/ImplicitSolver.H"
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
+#include "NewtonSolverParams.H"
 #include "Preconditioner.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
@@ -599,43 +600,32 @@ void KSP_impl::setVerbose(int a_v)
     }
 }
 
-SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op)
+SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op, const NewtonSolverParams& a_params)
 {
     BL_PROFILE("SNES_impl::SNES_impl()");
     amrex::Print() << "SNES_impl: Initialized PETSc's SNES solver.\n";
 
-    const amrex::ParmParse pp_newton("newton");
-    pp_newton.query("verbose",             m_verbose);
-    pp_newton.query("absolute_tolerance",  m_atol);
-    pp_newton.query("relative_tolerance",  m_rtol);
-    pp_newton.query("max_iterations",      m_maxits);
-    pp_newton.query("pc_update_newton_interval", m_pc_update_newton_interval);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_pc_update_newton_interval >= 0,
-        "newton.pc_update_newton_interval must be nonnegative");
-    pp_newton.query("pc_update_time_step_interval", m_pc_update_time_step_interval);
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_pc_update_time_step_interval > 0,
-        "newton.pc_update_time_step_interval must be positive");
-    pp_newton.query("require_convergence", m_require_convergence);
+    m_verbose = a_params.verbose;
+    m_atol = a_params.atol;
+    m_rtol = a_params.rtol;
+    m_maxits = a_params.maxits;
+    m_pc_update_newton_interval = a_params.pc_update_newton_interval;
+    m_pc_update_time_step_interval = a_params.pc_update_time_step_interval;
+    m_require_convergence = a_params.require_convergence;
 
     // The linear solver is always PETSc's KSP
-    std::string linear_solver = "petsc_ksp";
-    pp_newton.query("linear_solver", linear_solver);
-    if (linear_solver != "petsc_ksp") {
+    if (a_params.linear_solver_type != LinearSolverType::petsc_ksp) {
         ablastr::warn_manager::WMRecordWarning("PETSc SNES",
-            "newton.linear_solver = " + linear_solver + " is ignored; "
-            "petsc_snes uses PETSc KSP as the linear solver.");
+            "newton.linear_solver = " + amrex::getEnumNameString(a_params.linear_solver_type) +
+            " is ignored; petsc_snes uses PETSc KSP as the linear solver.");
     }
 
-    const amrex::ParmParse pp_gmres("gmres");
-    pp_gmres.query("verbose_int",         m_verbose_l);
-    pp_gmres.query("absolute_tolerance",  m_atol_l);
-    pp_gmres.query("relative_tolerance",  m_rtol_l);
-    pp_gmres.query("max_iterations",      m_maxits_l);
+    m_verbose_l = a_params.linsol_verbose_int;
+    m_atol_l = a_params.linsol_atol;
+    m_rtol_l = a_params.linsol_rtol;
+    m_maxits_l = a_params.linsol_maxits;
 
-    const amrex::ParmParse pp_jac("jacobian");
-    pp_jac.query("pc_type", this->m_pc_type);
+    this->m_pc_type = a_params.pc_type;
 
     this->m_U.Define(a_vec);
     m_F.Define(a_vec);
