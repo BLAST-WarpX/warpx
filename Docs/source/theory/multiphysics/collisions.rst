@@ -59,17 +59,18 @@ Pulsed Decay
 
 This collision module can be used to have a parent species decay into two product
 species with a user-defined decay rate. Mathematically, it solves the following
-rate equations on a cell-by-cell basis:
+rate equations on a particle basis:
 
     .. math::
 
        \begin{aligned}
-        \frac{dn_1}{dt} &= -\nu(t)n_1, \\
-        \frac{dn_A}{dt} &= +\nu(t)n_1 = \frac{dn_B}{dt}, \\
+        \frac{dW_1}{dt} &= -\nu(t)W_1, \\
+        \frac{dW_A}{dt} &= +\nu(t)W_1 = \frac{dW_B}{dt}, \\
        \end{aligned}
 
-where :math:`n_1` is the parent species density, :math:`n_A` and :math:`n_B` are the product species densities,
-and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
+where :math:`W_1` is the weight of the parent species macroparticle, :math:`W_A` and :math:`W_B` are the weights of the product species, and :math:`\nu(x,y,z,t)` is the user-specified decay rate.
+The weight of the product species is apportioned into macroparticles with fixed weight.
+That fixed weight may not divide exactly into the product species weight so the number of product macroparticles is randomly rounded up so that on average the weight of the new macroparticles will be correct.
 
 This can be used, for example, to represent ionization of a parent species by an externally applied laser pulse.
 

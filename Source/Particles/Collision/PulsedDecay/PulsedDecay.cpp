@@ -10,6 +10,7 @@
 
 #include "Particles/Collision/BinaryCollision/BinaryCollisionUtils.H"
 #include "Particles/ParticleCreation/SmartCopy.H"
+#include "Particles/Pusher/GetAndSetPosition.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/ParticleUtils.H"
@@ -179,95 +180,45 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             // Extract species 1 particles in the grid tile that `mfi` points to
             ParticleTileType& ptile_1 = species1.ParticlesAt(lev, mfi);
 
-            // Find the particles that are in each cell of this tile
-            amrex::Geometry const& geom_lev = WarpX::GetInstance().Geom(lev);
-            ParticleBins bins_1 = ParticleUtils::findParticlesInEachCell( geom_lev, mfi, ptile_1 );
+            const auto getPosition1 = GetParticlePosition<PIdx>(ptile_1);
 
-            // Compute/store total weight of species 1 in each cell
-            auto soa_1 = ptile_1.getParticleTileData();
-            const int n_cells = static_cast<int>(bins_1.numBins());
             const auto np1 = ptile_1.numParticles();
-            amrex::Gpu::DeviceVector<amrex::ParticleReal> wtot1_vec(n_cells, 0.0_prt);
-            index_type const* AMREX_RESTRICT bins_1_ptr = bins_1.binsPtr();
-            amrex::ParticleReal* AMREX_RESTRICT wtot1_in_each_cell = wtot1_vec.dataPtr();
+            auto soa_1 = ptile_1.getParticleTileData();
             amrex::ParticleReal* AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
             uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
-            // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
-            amrex::For( np1,
-                [=] AMREX_GPU_DEVICE (int ip) noexcept
+            // The number of new particle pairs to add for each species 1 particle
+            amrex::Gpu::DeviceVector<int> new_particles(np1, 0);
+            int * new_particles_ptr = new_particles.dataPtr();
+
+            amrex::ParallelForRNG(np1,
+                [=] AMREX_GPU_DEVICE (int ip, amrex::RandomEngine const& engine) noexcept
                 {
                     if (idcpu1[ip] == amrex::ParticleIdCpus::Invalid) { return; }
 
-                    amrex::Gpu::Atomic::AddNoRet(&wtot1_in_each_cell[bins_1_ptr[ip]], w1[ip]);
+                    amrex::ParticleReal xp, yp, zp;
+                    getPosition1(ip, xp, yp, zp);
+
+                    const amrex::ParticleReal nu_izn = nu_func(xp, yp, zp, cur_time);
+                    const amrex::ParticleReal product = w1[ip]*(-std::expm1(-nu_izn*dt));
+
+                    // Compute number of products macro particles to create
+                    // Since fixed_product_weight will likely not divide exactly into product,
+                    // Randomly round the number of macroparticles up.
+                    const amrex::ParticleReal num_expected = product/fixed_product_weight;
+                    const int num_macro_particles = static_cast<int>(std::floor(num_expected + amrex::Random(engine)));
+
+                    // Subtract the product weight from the source macroparticle.
+                    w1[ip] -= product;
+                    new_particles_ptr[ip] = num_macro_particles;
                 }
             );
 
-            // Create DeviceVector to store the number of products to create per cell
-            amrex::Gpu::DeviceVector<index_type> num_products_vec(n_cells, 0);
-            index_type* AMREX_RESTRICT p_counts = num_products_vec.dataPtr();
+            // Compute number of particles to add and the offset array
+            amrex::Gpu::DeviceVector<index_type> offsets(np1);
+            const index_type total_new = amrex::Scan::ExclusiveSum(np1, new_particles.dataPtr(), offsets.dataPtr());
 
-            // Get grid information needed to compute physical cell center coordinates
-            const amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
-            const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0.0_rt);
-#if AMREX_SPACEDIM > 1
-            const amrex::IntVect len = box.length();
-#endif
-            const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx = geom_lev.CellSizeArray();
-
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
-                {
-                    const amrex::ParticleReal wtot1 = wtot1_in_each_cell[i_cell];
-                    if (wtot1 == 0.0_prt) { return; }
-
-                    // DenseBins uses x-fastest ordering:
-                    // 2D: i_cell = iz * nx + ix
-                    // 3D: i_cell = (iz * ny + iy) * nx + ix
-
-                    // Get physical coordinates at cell center.
-                    amrex::XDim3 xyz_cc = {0.0_rt, 0.0_rt, 0.0_rt};
-                    const amrex::Real half = 0.5_rt;
-#if   defined(WARPX_DIM_1D_Z)
-                    xyz_cc.z = xyzmin.z + (i_cell + half)*dx[0];
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                    xyz_cc.x = xyzmin.x + (i_cell + half)*dx[0];
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-                    const int ix = i_cell % len[0];
-                    const int iz = i_cell / len[0];
-                    xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
-                    xyz_cc.z = xyzmin.z + (iz + half)*dx[1];
-#elif defined(WARPX_DIM_3D)
-                    const int ix = i_cell % len[0];
-                    const int iy = (i_cell / len[0]) % len[1];
-                    const int iz = i_cell / (len[0] * len[1]);
-                    xyz_cc.x = xyzmin.x + (ix + half)*dx[0];
-                    xyz_cc.y = xyzmin.y + (iy + half)*dx[1];
-                    xyz_cc.z = xyzmin.z + (iz + half)*dx[2];
-#endif
-
-                    // Compute total weight of products to create in this cell
-                    const amrex::ParticleReal nu_izn = nu_func(xyz_cc.x, xyz_cc.y, xyz_cc.z, cur_time);
-                    const amrex::ParticleReal total_product = wtot1*(1.0_prt - std::exp(-nu_izn*dt));
-
-                    // Compute number of products macro particles to create in this cell
-                    const amrex::ParticleReal num_expected = total_product/fixed_product_weight;
-                    int num_macro_particles = static_cast<int>(std::floor(num_expected + amrex::Random(engine)));
-
-                    // Do not permit total product weight to exceed wtot1
-                    if (num_macro_particles*fixed_product_weight > wtot1) {
-                        num_macro_particles--;
-                    }
-
-                    p_counts[i_cell] += num_macro_particles;
-                }
-            );
-
-            // Compute offset array and allocate memory for the produced species
-            amrex::Gpu::DeviceVector<index_type> offsets(n_cells);
-            const index_type total_new = amrex::Scan::ExclusiveSum(n_cells, num_products_vec.dataPtr(), offsets.dataPtr());
-
-            // Resize product species arrays
+            // Resize product species arrays to make space for new particles
             ParticleTileType& ptileA = productA.ParticlesAt(lev, mfi);
             ParticleTileType& ptileB = productB.ParticlesAt(lev, mfi);
             const index_type old_npA = ptileA.numParticles();
@@ -292,10 +243,6 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
 #endif
 
             const index_type* AMREX_RESTRICT offsets_ptr = offsets.dataPtr();
-            const index_type* AMREX_RESTRICT nprod_cell_ptr = num_products_vec.dataPtr();
-
-            index_type const* AMREX_RESTRICT cell_offsets_1 = bins_1.offsetsPtr();
-            index_type const* AMREX_RESTRICT indices_1 = bins_1.permutationPtr();
 
             amrex::ParticleReal* AMREX_RESTRICT wA  = soa_productA.m_rdata[PIdx::w];
             amrex::ParticleReal* AMREX_RESTRICT uAx = soa_productA.m_rdata[PIdx::ux];
@@ -307,54 +254,16 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             amrex::ParticleReal* AMREX_RESTRICT uBy = soa_productB.m_rdata[PIdx::uy];
             amrex::ParticleReal* AMREX_RESTRICT uBz = soa_productB.m_rdata[PIdx::uz];
 
-            amrex::ParallelForRNG( n_cells,
-                [=] AMREX_GPU_DEVICE (int i_cell, amrex::RandomEngine const& engine) noexcept
+            amrex::ParallelForRNG(np1,
+                [=] AMREX_GPU_DEVICE (int ip, amrex::RandomEngine const& engine) noexcept
                 {
-                    const index_type num_products_in_cell = nprod_cell_ptr[i_cell];
-                    if (num_products_in_cell == 0) { return; }
-
-                    const index_type start = offsets_ptr[i_cell];
-
                     auto const& CopyAF = *CopyAPtr;
                     auto const& CopyBF = *CopyBPtr;
 
-                    // The particles from species1 that are in the cell `i_cell` are
-                    // given by the `indices_1[cell_start_1:cell_stop_1]`
-                    const index_type cell_start_1 = cell_offsets_1[i_cell];
-                    const index_type cell_stop_1  = cell_offsets_1[i_cell+1];
-                    const index_type num_in_cell = cell_stop_1 - cell_start_1;
+                    for (int j = 0; j < new_particles_ptr[ip]; ++j) {
 
-                    const amrex::ParticleReal wpAB = fixed_product_weight;
-
-                    for (index_type j = 0; j < num_products_in_cell; ++j) {
-
-                        const index_type new_idx = start + j;
-                        const index_type ip_A = old_npA + new_idx;
-                        const index_type ip_B = old_npB + new_idx;
-
-                        // Get a random particle index from species 1 in this cell
-                        auto k = static_cast<index_type>(amrex::Random(engine) * amrex::Real(num_in_cell));
-
-                        // Probe until a valid particle is found (should always be at least one)
-                        index_type ip  = -1;
-                        for (index_type t = 0; t < num_in_cell; ++t) {
-                            const index_type cand_k = (k + t) % num_in_cell;
-                            const index_type idx = cell_start_1 + cand_k;
-                            const index_type cand_ip = indices_1[idx];
-                            if (idcpu1[cand_ip] != amrex::ParticleIdCpus::Invalid) {
-                                k  = cand_k;
-                                ip = cand_ip;
-                                break;
-                            }
-                        }
-                        AMREX_IF_ON_DEVICE((
-                            AMREX_DEVICE_ASSERT(ip >= 0);
-                        ))
-                        AMREX_IF_ON_HOST((
-                            if (ip < 0) {
-                                amrex::Abort("Error in PulsedDecay: valid species 1 particle not found!");
-                            }
-                        ))
+                        const index_type ip_A = old_npA + offsets_ptr[ip] + j;
+                        const index_type ip_B = old_npB + offsets_ptr[ip] + j;
 
                         // Create product particles at position of particle from species 1
                         CopyAF(*soaA_ptr, soa_1, ip, static_cast<int>(ip_A), engine);
@@ -371,24 +280,12 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
                         uBz[ip_B] += VtB_z*RandomNormal(0_prt, 1.0_prt, engine);
 
                         // Set the weight of the product particles
-                        wA[ip_A] = wpAB;
-                        wB[ip_B] = wpAB;
+                        wA[ip_A] = fixed_product_weight;
+                        wB[ip_B] = fixed_product_weight;
 
                         // Remove product weight from species 1
-                        amrex::ParticleReal wp_remaining = wpAB;
-                        for (index_type t = 0; t < num_in_cell; ++t) {
-                            const index_type k2 = (k + t) % num_in_cell;
-                            const index_type idx2 = cell_start_1 + k2;
-                            const index_type ip2 = indices_1[idx2];
-
-                            if (idcpu1[ip2] == amrex::ParticleIdCpus::Invalid) { continue; }
-
-                            const amrex::ParticleReal wp_remove = amrex::min(wp_remaining, w1[ip2]);
-                            BinaryCollisionUtils::remove_weight_from_colliding_particle(
-                                w1[ip2], idcpu1[ip2], wp_remove);
-
-                            wp_remaining -= wp_remove;
-                            if (wp_remaining <= 0.0_prt) { break; }
+                        if (w1[ip] <= 0.0_prt) {
+                            idcpu1[ip] = amrex::ParticleIdCpus::Invalid;
                         }
 
                     }

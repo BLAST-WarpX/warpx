@@ -3450,6 +3450,7 @@ Details about the collision models can be found in the :ref:`theory section <mul
     :type: `float`
 
     Fixed particle weight of product species (only for ``pulsed_decay``).
+    All of the product particles will be given this weight.
     Can be estimated as :math:`n_{\text{target}}dV/N_{ppc}`, where :math:`n_{\text{target}}` is the target density of the product species, :math:`dV` is the cell volume, and :math:`N_{ppc}` is the target number of particle per cell for each product species.
 
 .. pp:param:: <collision_name>.productA_temperature_eV
