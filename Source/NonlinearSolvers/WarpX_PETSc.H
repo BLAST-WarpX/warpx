@@ -263,10 +263,10 @@ class SNES_impl : public PETScSolver_impl
         auto numTotalIters() const { return m_total_iters; }
 
         AMREX_FORCE_INLINE
-        auto normAbs() const { return -1.0; /* absolute norm is not tracked */}
+        auto normAbs() const { return m_norm; }
 
         AMREX_FORCE_INLINE
-        auto normRel() const { return m_norm; }
+        auto normRel() const { return m_norm_rel; }
 
         AMREX_FORCE_INLINE
         auto numLinIters() const { return m_niters_l; }
@@ -319,8 +319,10 @@ class SNES_impl : public PETScSolver_impl
         mutable int m_niters_l = -1;
         //! status for recent most solve
         mutable int m_status = -1;
-        //! residual norm (relative) for recent most solve
+        //! residual norm (absolute) for recent most solve
         mutable amrex::Real m_norm = DBL_MAX;
+        //! residual norm relative to the initial one for recent most solve
+        mutable amrex::Real m_norm_rel = DBL_MAX;
         //! residual norm (relative) for recent most linear solve
         mutable amrex::Real m_norm_lin = DBL_MAX;
 

@@ -659,6 +659,8 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op,
     SNESLineSearchSetType( linesearch, SNESLINESEARCHNONE );
     SNESSetFunction(m_snes->obj, nullptr, RHSFunction, this);
     SNESSetApplicationContext(m_snes->obj, this);
+    // Keep the residual norms of each solve; the first one gives the relative norm
+    SNESSetConvergenceHistory(m_snes->obj, nullptr, nullptr, PETSC_DECIDE, PETSC_TRUE);
     SNESSetUpdate(m_snes->obj, PreLinearSolveFunction);
 
     MatCreateShell( PETSC_COMM_WORLD,
@@ -762,6 +764,13 @@ void SNES_impl::solve (VecType& a_U,
     // Reaching the maximum number of iterations is a failure only if convergence is required
     if (reason == SNES_DIVERGED_MAX_IT && !m_params.require_convergence) { m_status = 0; }
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
+
+    // Norm relative to the initial residual norm, as in the native Newton solver
+    PetscReal* norm_history = nullptr;
+    PetscInt num_norms = 0;
+    SNESGetConvergenceHistory(m_snes->obj, &norm_history, nullptr, &num_norms);
+    const amrex::Real norm0 = (num_norms > 0 && norm_history[0] > 0.) ? norm_history[0] : 1.0;
+    m_norm_rel = m_norm/norm0;
 
     const char* conv_reason;
     SNESGetConvergedReasonString(m_snes->obj, &conv_reason);
