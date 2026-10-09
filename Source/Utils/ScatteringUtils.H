@@ -146,12 +146,12 @@ namespace ScatteringUtils {
             // Keeping only three orders avoids a temporary array in this GPU device routine.
             amrex::ParticleReal P_l_minus_one = 1.0_prt;
             amrex::ParticleReal P_l = mu;
-            for (int ell = 1; ell <= l_max; ++ell) {
-                auto const l_prt = static_cast<amrex::ParticleReal>(ell);
+            for (int l = 1; l <= l_max; ++l) {
+                auto const l_prt = static_cast<amrex::ParticleReal>(l);
                 // Use Bonnet's recurrence for the next Legendre polynomial:
                 // (l + 1) P_{l+1}(mu) = (2l + 1) mu P_l(mu) - l P_{l-1}(mu).
                 amrex::ParticleReal const P_l_plus_one = ((2.0_prt * l_prt + 1.0_prt) * mu * P_l - l_prt * P_l_minus_one) / (l_prt + 1.0_prt);
-                amrex::ParticleReal const coefficient = a_coefficient_table.getCoefficient(a_energy, ell);
+                amrex::ParticleReal const coefficient = a_coefficient_table.getCoefficient(a_energy, l);
 
                 // Accumulate the PDF and its integral.
                 // The identity integral(P_l dmu) = (P_{l+1} - P_{l-1}) / (2l + 1) gives the CDF term.
