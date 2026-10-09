@@ -1,0 +1,7 @@
+FILE = inputs_test_2d_proton_boron_fusion
+
+PBF1.shuffling_method = modulus
+PBF2.shuffling_method = modulus
+PBF3.shuffling_method = modulus
+PBF4.shuffling_method = modulus
+PBF5.shuffling_method = modulus

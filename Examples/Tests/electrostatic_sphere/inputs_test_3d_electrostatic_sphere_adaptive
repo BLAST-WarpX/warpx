@@ -1,4 +1,4 @@
-stop_time = 60e-6
+max_step = 40
 warpx.cfl = 0.2
 warpx.dt_update_interval = 10
 warpx.dt_update_diagnostic_file = diags/reducedfiles/dt_updates.txt

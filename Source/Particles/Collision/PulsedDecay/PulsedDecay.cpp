@@ -193,7 +193,8 @@ PulsedDecay::doCollisions (amrex::Real cur_time, amrex::Real dt, MultiParticleCo
             amrex::ParticleReal* AMREX_RESTRICT w1 = soa_1.m_rdata[PIdx::w];
             uint64_t* AMREX_RESTRICT idcpu1 = soa_1.m_idcpu;
 
-            amrex::ParallelFor( np1,
+            // amrex::For: iterations scatter-add into shared per-cell sums (no SIMD pragma, see issue #7097)
+            amrex::For( np1,
                 [=] AMREX_GPU_DEVICE (int ip) noexcept
                 {
                     if (idcpu1[ip] == amrex::ParticleIdCpus::Invalid) { return; }

@@ -72,7 +72,7 @@ class JacobiPC : public Preconditioner<T,Ops>
 
         void Define (const T&, Ops*) override;
 
-        void Update (const T& a_U) override;
+        void Update () override;
 
         /**
          * \brief Solve (I + M) x = b via damped Jacobi iteration
@@ -109,6 +109,13 @@ class JacobiPC : public Preconditioner<T,Ops>
         Ops* m_ops = nullptr;
 
         int m_num_amr_levels = 0;
+
+        /**
+         * \brief Grid layout of the solver vector, cached in Define() so that
+         *  Update() can allocate its scratch without being handed a vector.
+         */
+        amrex::Vector<amrex::Array<amrex::BoxArray,3>> m_grids;
+        amrex::Vector<amrex::Array<amrex::DistributionMapping,3>> m_dmap;
 
         const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
 
@@ -269,13 +276,25 @@ void JacobiPC<T,Ops>::Define ( const T& a_U,
     m_num_amr_levels = m_ops->numAMRLevels();
     m_bcoefs = m_ops->GetMassMatricesCoeff();
 
+    // Save the grid layout of the solver vector. This is then used in
+    // `Update` to allocate temporary MultiFabs
+    const auto& u_mfarrvec = a_U.getArrayVec();
+    m_grids.resize(m_num_amr_levels);
+    m_dmap.resize(m_num_amr_levels);
+    for (int n = 0; n < m_num_amr_levels; n++) {
+        for (int dim = 0; dim < 3; dim++) {
+            m_grids[n][dim] = u_mfarrvec[n][dim]->boxArray();
+            m_dmap[n][dim]  = u_mfarrvec[n][dim]->DistributionMap();
+        }
+    }
+
     readParameters();
 
     m_is_defined = true;
 }
 
 template <class T, class Ops>
-void JacobiPC<T,Ops>::Update (const T& a_U)
+void JacobiPC<T,Ops>::Update ()
 {
     BL_PROFILE("JacobiPC::Update()");
     using namespace amrex;
@@ -285,7 +304,6 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
         "JacobiPC::Update() called on undefined object" );
 
     if (m_bcoefs != nullptr && !m_work_defined) {
-        auto& u_mfarrvec = a_U.getArrayVec();
         m_work.resize(m_num_amr_levels);
         m_x_ghost.resize(m_num_amr_levels);
 
@@ -307,15 +325,10 @@ void JacobiPC<T,Ops>::Update (const T& a_U)
         const amrex::IntVect nghost(m_stencil_width);
         for (int n = 0; n < m_num_amr_levels; n++) {
             for (int dim = 0; dim < 3; dim++) {
-                m_work[n][dim].define(
-                    u_mfarrvec[n][dim]->boxArray(),
-                    u_mfarrvec[n][dim]->DistributionMap(),
-                    1, 0);
+                m_work[n][dim].define(m_grids[n][dim], m_dmap[n][dim], 1, 0);
                 if (m_has_offdiag) {
-                    m_x_ghost[n][dim].define(
-                        u_mfarrvec[n][dim]->boxArray(),
-                        u_mfarrvec[n][dim]->DistributionMap(),
-                        1, nghost);
+                    m_x_ghost[n][dim].define(m_grids[n][dim], m_dmap[n][dim],
+                                             1, nghost);
                 }
             }
         }

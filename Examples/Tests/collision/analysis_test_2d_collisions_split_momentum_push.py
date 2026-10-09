@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import constants
 
-sys.path.append("../../../../warpx/Tools/Parser/")
+sys.path.append("../../../Tools/Parser/")
 from input_file_parser import parse_input_file
 
 

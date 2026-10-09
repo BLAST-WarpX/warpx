@@ -185,6 +185,9 @@ FlushFormatCheckpoint::WriteToFile (
             }
 #endif
         }
+
+        warpx.m_fields.write_checkpoints(lev, amrex::MultiFabFileFullPrefix(lev, checkpointname, default_level_prefix, ""));
+
     }
 
     CheckpointParticles(checkpointname, particle_diags);

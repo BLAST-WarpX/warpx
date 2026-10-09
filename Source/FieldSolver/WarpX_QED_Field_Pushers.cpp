@@ -16,6 +16,7 @@
 #ifdef AMREX_USE_SENSEI_INSITU
 #   include <AMReX_AmrMeshInSituBridge.H>
 #endif
+#include <AMReX_Arena.H>
 #include <AMReX_Array4.H>
 #include <AMReX_Box.H>
 #include <AMReX_Config.H>
@@ -23,7 +24,6 @@
 #include <AMReX_GpuAtomic.H>
 #include <AMReX_GpuControl.H>
 #include <AMReX_GpuDevice.H>
-#include <AMReX_GpuElixir.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IndexType.H>
@@ -145,17 +145,15 @@ WarpX::Hybrid_QED_Push (int lev, PatchType patch_type, amrex::Real a_dt)
         const Box& gey = amrex::grow(tey,1);
         const Box& gez = amrex::grow(tez,1);
 
-        // Temporary arrays for electric field, protected by Elixir on GPU
-        FArrayBox tmpEx_fab(gex,1);
-        const Elixir tmpEx_eli = tmpEx_fab.elixir();
+        // Temporary arrays for electric field, allocated on the async arena
+        // so that the memory stays valid until the GPU kernels below complete
+        FArrayBox tmpEx_fab(gex,1,amrex::The_Async_Arena());
         auto const& tmpEx = tmpEx_fab.array();
 
-        FArrayBox tmpEy_fab(gey,1);
-        const Elixir tmpEy_eli = tmpEy_fab.elixir();
+        FArrayBox tmpEy_fab(gey,1,amrex::The_Async_Arena());
         auto const& tmpEy = tmpEy_fab.array();
 
-        FArrayBox tmpEz_fab(gez,1);
-        const Elixir tmpEz_eli = tmpEz_fab.elixir();
+        FArrayBox tmpEz_fab(gez,1,amrex::The_Async_Arena());
         auto const& tmpEz = tmpEz_fab.array();
 
         // Copy electric field to temporary arrays

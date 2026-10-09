@@ -25,7 +25,8 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     ablastr::fields::MultiFabRegister& fields,
     MultiParticleContainer& mpc,
     MultiFluidContainer* mfl,
-    int max_level)
+    int max_level,
+    bool verbose_step)
 {
     using ablastr::fields::MultiLevelScalarField;
     using ablastr::fields::MultiLevelVectorField;
@@ -38,11 +39,13 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
     const MultiLevelScalarField phi_fp = fields.get_mr_levels(FieldType::phi_fp, max_level);
     const MultiLevelVectorField Efield_fp = fields.get_mr_levels_alldirs(FieldType::Efield_fp, max_level);
 
+    ExecutePythonCallback("beforedeposition");
     mpc.DepositCharge(rho_fp, 0.0_rt);
     if (mfl) {
         const int lev = 0;
         mfl->DepositCharge(fields, *rho_fp[lev], lev);
     }
+    ExecutePythonCallback("afterdeposition");
 
     // Apply filter, perform MPI exchange, interpolate across levels
     const Vector<std::unique_ptr<MultiFab> > rho_buf(num_levels);
@@ -72,12 +75,14 @@ void LabFrameExplicitES::ComputeSpaceChargeField (
 
 #if defined(WARPX_DIM_1D_Z)
         // Use the tridiag solver with 1D
+        amrex::ignore_unused(verbose_step);
         computePhiTriDiagonal(rho_fp, phi_fp);
 #else
         // Use the AMREX MLMG or the FFT (IGF) solver otherwise
-        computePhi(rho_fp, phi_fp, beta, self_fields_required_precision,
-                   self_fields_absolute_tolerance, self_fields_max_iters,
-                   self_fields_verbosity, is_igf_2d_slices, Efield_fp);
+        ablastr::fields::MLMGOptions mlmg_options = m_mlmg_options;
+        mlmg_options.verbosity = verbose_step ? m_mlmg_options.verbosity : 0;
+        computePhi(rho_fp, phi_fp, beta, mlmg_options, is_igf_2d_slices,
+                   Efield_fp);
 #endif
 
     }
@@ -212,7 +217,7 @@ void LabFrameExplicitES::computePhiTriDiagonal (
                 // so set the upper boundary to zero to force a value.
                 phi1d_arr(nx_full_domain,0,0) = 0.;
             } else {
-                phi1d_arr(nx_full_domain,0,0) = (rho1d_arr(nx_full_domain,0,0) - (-1._rt)*phi1d_arr(nx_full_domain-1,0,0))/diag;
+                phi1d_arr(nx_full_domain,0,0) = (rho1d_arr(nx_full_domain,0,0) - (-2._rt)*phi1d_arr(nx_full_domain-1,0,0))/diag;
             }
 
         }

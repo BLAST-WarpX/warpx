@@ -4,6 +4,7 @@
  *
  * Authors: Roelof Groenewald (TAE Technologies)
  *          S. Eric Clark (Helion Energy)
+ *          Prabhat Kumar (Helion Energy)
  *
  * License: BSD-3-Clause-LBNL
  */
@@ -27,6 +28,77 @@
 
 using namespace amrex;
 using warpx::fields::FieldType;
+
+#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+namespace
+{
+    /** Endpoint-min nodal decision density for vacuum_seam_switch_mode =
+     *  "node": the minimum nodal rho over the staggered component's edge
+     *  endpoints (the same nodes the legacy edge average reads).
+     *  Vacuum-favoring: the unguarded Hall branch runs only where every
+     *  endpoint is above the floor. */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real NodalSwitchRho (
+        amrex::Array4<amrex::Real const> const& rho,
+        amrex::GpuArray<int,3> const& stag,
+        int i, int j, int k)
+    {
+        const int ni = (stag[0] == 0) ? 2 : 1;
+        const int nj = (stag[1] == 0) ? 2 : 1;
+        const int nk = (stag[2] == 0) ? 2 : 1;
+        amrex::Real r = rho(i, j, k);
+        for (int kk = 0; kk < nk; ++kk) {
+        for (int jj = 0; jj < nj; ++jj) {
+        for (int ii = 0; ii < ni; ++ii) {
+            r = amrex::min(r, rho(i+ii, j+jj, k+kk));
+        }}}
+        return r;
+    }
+
+    /** Adjacent-cell decision density for vacuum_seam_switch_mode = "cell":
+     *  the minimum over the component's adjacent cells of the node-averaged
+     *  rho -- one piecewise-constant-per-cell decision for all three E
+     *  components, reflection- and C4-equivariant, vacuum-favoring like
+     *  "node". */
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    amrex::Real CellSwitchRho (
+        amrex::Array4<amrex::Real const> const& rho,
+        amrex::GpuArray<int,3> const& stag,
+        int i, int j, int k)
+    {
+        using namespace amrex::literals;
+        int off_lo[3] = {0, 0, 0};
+        int span[3] = {1, 1, 1};
+        int const ic[3] = {i, j, k};
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            off_lo[d] = (stag[d] == 1) ? -1 : 0;
+            span[d] = 2;
+        }
+        // Running minimum over the adjacent cells: max() is the identity
+        // element for min (no cell average can exceed it), not an overflow
+        // guard. The outer loops visit every cell that touches this E
+        // component (two per direction where the component is nodal, one
+        // where it is cell-centered); the inner loops form each cell's
+        // node-averaged rho (sum/cnt, cnt = 2^AMREX_SPACEDIM); the result is
+        // the minimum of those cell averages -- vacuum-favoring.
+        amrex::Real rho_cell_min = std::numeric_limits<amrex::Real>::max();
+        for (int ok = off_lo[2]; ok <= 0; ++ok) {
+        for (int oj = off_lo[1]; oj <= 0; ++oj) {
+        for (int oi = off_lo[0]; oi <= 0; ++oi) {
+            amrex::Real sum = 0.0_rt;
+            int cnt = 0;
+            for (int kk = 0; kk < span[2]; ++kk) {
+            for (int jj = 0; jj < span[1]; ++jj) {
+            for (int ii = 0; ii < span[0]; ++ii) {
+                sum += rho(ic[0]+oi+ii, ic[1]+oj+jj, ic[2]+ok+kk);
+                cnt += 1;
+            }}}
+            rho_cell_min = amrex::min(rho_cell_min, sum/static_cast<amrex::Real>(cnt));
+        }}}
+        return rho_cell_min;
+    }
+}
+#endif
 
 void FiniteDifferenceSolver::CalculateCurrentAmpere (
     ablastr::fields::VectorField & Jfield,
@@ -546,6 +618,18 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
+    // With the resistive-drag collision active, the resistive terms belong
+    // in every E-solve, including the one that builds the particle-push
+    // field: the drag (-R_s on each species) and the resistive E
+    // (+(rho_s/rho) Sum_t R_t via the Lorentz force) are the two halves of
+    // the electron-ion friction, and only their sum conserves momentum.
+    // Without the drag they are excluded from the push field, which is
+    // exactly equivalent for a global eta (the two halves cancel per
+    // species, pointwise). The hyper-resistive term is numerical dissipation
+    // with no drag back-reaction and stays in the Faraday solves only.
+    const bool include_resistivity =
+        solve_for_Faraday || hybrid_model->m_has_resistive_drag;
+
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
@@ -590,6 +674,20 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     // by the nodal mesh.
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
+
+    // Per-species resistive friction added to Ohm's-law E alongside
+    // +eta_global J, as the frozen ion-drift remainder plus the lagged
+    // coefficient times the live plasma current (see
+    // HybridPICModel::ComputeResistiveOverlay, which fills the registered
+    // hybrid_eta_overlay_fp / hybrid_eta_overlay_coef_fp fields read here).
+    // The fields are not allocated when no per-species parser is registered.
+    const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
+    ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
+    ablastr::fields::VectorField eta_coef_mf = {nullptr, nullptr, nullptr};
+    if (has_eta_overlay) {
+        eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+        eta_coef_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
+    }
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -693,6 +791,17 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
         Array4<Real> const& Br = Bfield[0]->array(mfi);
         Array4<Real> const& Btheta = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        // Default-constructed (never indexed) unless has_eta_overlay.
+        Array4<Real const> eta_overlay_r, eta_overlay_t, eta_overlay_z;
+        Array4<Real const> eta_coef_r, eta_coef_t, eta_coef_z;
+        if (has_eta_overlay) {
+            eta_overlay_r = eta_overlay_mf[0]->const_array(mfi);
+            eta_overlay_t = eta_overlay_mf[1]->const_array(mfi);
+            eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+            eta_coef_r = eta_coef_mf[0]->const_array(mfi);
+            eta_coef_t = eta_coef_mf[1]->const_array(mfi);
+            eta_coef_z = eta_coef_mf[2]->const_array(mfi);
+        }
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -754,8 +863,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Er(i, j, 0) = (enE_r - grad_Pe) / rho_val_limited;
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // Resistive terms; see include_resistivity above.
+                if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -766,8 +875,15 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
+                    // Per-species resistive friction (Phys. Plasmas 31, 012902 (2024)):
+                    // frozen ion-drift remainder plus the lagged coefficient
+                    // times the live plasma current.
+                    if (has_eta_overlay) {
+                        Er(i, j, 0) += eta_overlay_r(i, j, 0)
+                                       + eta_coef_r(i, j, 0) * Jr(i, j, 0);
+                    }
 
-                    if (include_hyper_resistivity_term) {
+                    if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                         // Interpolate B field to appropriate staggering to match E field
                         Real btot_val = 0._rt;
@@ -825,8 +941,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Etheta(i, j, 0) = (enE_t - grad_Pe) / rho_val_limited;
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // Resistive terms; see include_resistivity above.
+                if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if(resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -837,8 +953,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
+                    if (has_eta_overlay) {
+                        Etheta(i, j, 0) += eta_overlay_t(i, j, 0)
+                                           + eta_coef_t(i, j, 0) * Jtheta(i, j, 0);
+                    }
 
-                    if (include_hyper_resistivity_term) {
+                    if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                         // Interpolate B field to appropriate staggering to match E field
                         Real btot_val = 0._rt;
@@ -893,8 +1013,8 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     Ez(i, j, 0) = (enE_z - grad_Pe) / rho_val_limited;
                 }
 
-                // Add resistivity only if E field value is used to update B
-                if (solve_for_Faraday) {
+                // Resistive terms; see include_resistivity above.
+                if (include_resistivity) {
                     Real jtot_val = 0._rt;
                     if (resistivity_has_J_dependence) {
                         // Interpolate current to appropriate staggering to match E field
@@ -905,8 +1025,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                     }
 
                     Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
+                    if (has_eta_overlay) {
+                        Ez(i, j, 0) += eta_overlay_z(i, j, 0)
+                                       + eta_coef_z(i, j, 0) * Jz(i, j, 0);
+                    }
 
-                    if (include_hyper_resistivity_term) {
+                    if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                         // Interpolate B field to appropriate staggering to match E field
                         Real btot_val = 0._rt;
@@ -990,9 +1114,20 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
 
+    // Resistive terms in the push field when the drag is active; see the
+    // design notes in HybridPICSolveECylindrical.
+    const bool include_resistivity =
+        solve_for_Faraday || hybrid_model->m_has_resistive_drag;
+
     const bool include_external_fields = hybrid_model->m_add_external_fields;
 
     const bool holmstrom_vacuum_region = hybrid_model->m_holmstrom_vacuum_region;
+    // Decision-density sampling for the vacuum seam (VacuumSeamSwitchMode):
+    // Edge is the legacy per-component average; Node and Cell give one
+    // decision field for all three E components. The decision drives the
+    // holmstrom vacuum branch when that treatment is on and the
+    // density-floor selection of the guarded Hall term otherwise.
+    const VacuumSeamSwitchMode switch_mode = hybrid_model->m_vacuum_seam_switch_mode;
 
     auto & warpx = WarpX::GetInstance();
     const amrex::Real t_new = warpx.gett_new(lev);
@@ -1034,6 +1169,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     // by the nodal mesh.
     auto const& ba = convert(rhofield.boxArray(), IntVect::TheNodeVector());
     MultiFab enE_nodal_mf(ba, rhofield.DistributionMap(), 3, IntVect::TheZeroVector());
+
+    // Per-species resistive friction added to Ohm's-law E alongside
+    // +eta_global J: frozen ion-drift remainder plus lagged coefficient
+    // times the live plasma current (see HybridPICSolveECylindrical and
+    // HybridPICModel::ComputeResistiveOverlay). Not allocated when no
+    // per-species parser is registered.
+    const bool has_eta_overlay = hybrid_model->m_has_per_species_eta;
+    ablastr::fields::VectorField eta_overlay_mf = {nullptr, nullptr, nullptr};
+    ablastr::fields::VectorField eta_coef_mf = {nullptr, nullptr, nullptr};
+    if (has_eta_overlay) {
+        eta_overlay_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_fp", lev);
+        eta_coef_mf = warpx.m_fields.get_alldirs("hybrid_eta_overlay_coef_fp", lev);
+    }
 
     // Loop through the grids, and over the tiles within each grid for the
     // initial, nodal calculation of E
@@ -1137,6 +1285,17 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
         Array4<Real> const& Bx = Bfield[0]->array(mfi);
         Array4<Real> const& By = Bfield[1]->array(mfi);
         Array4<Real> const& Bz = Bfield[2]->array(mfi);
+        // Default-constructed (never indexed) unless has_eta_overlay.
+        Array4<Real const> eta_overlay_x, eta_overlay_y, eta_overlay_z;
+        Array4<Real const> eta_coef_x, eta_coef_y, eta_coef_z;
+        if (has_eta_overlay) {
+            eta_overlay_x = eta_overlay_mf[0]->const_array(mfi);
+            eta_overlay_y = eta_overlay_mf[1]->const_array(mfi);
+            eta_overlay_z = eta_overlay_mf[2]->const_array(mfi);
+            eta_coef_x = eta_coef_mf[0]->const_array(mfi);
+            eta_coef_y = eta_coef_mf[1]->const_array(mfi);
+            eta_coef_z = eta_coef_mf[2]->const_array(mfi);
+        }
 
         // Extract structures indicating where the fields
         // should be updated, given the position of the embedded boundaries
@@ -1175,8 +1334,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ex_stag, coarsen, i, j, k, 0);
+            // The physics keeps rho_val; only the vacuum-seam decision
+            // (holmstrom branch or guarded-floor selection) resamples.
+            const Real rho_dec =
+                (switch_mode == VacuumSeamSwitchMode::Node) ? NodalSwitchRho(rho, Ex_stag, i, j, k) :
+                (switch_mode == VacuumSeamSwitchMode::Cell) ? CellSwitchRho(rho, Ex_stag, i, j, k) :
+                rho_val;
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ex(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1188,14 +1353,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 const auto enE_x = Interp(enE, nodal, Ex_stag, coarsen, i, j, k, 0);
 
-                // safety condition since we divide by rho
-                const auto rho_val_limited = std::max(rho_val, rho_floor);
+                // Floor selection follows the vacuum-seam decision: a
+                // vacuum-decided component divides by the floor, a
+                // plasma-decided one by rho_val (still floored for division
+                // safety). At mode 0 rho_dec == rho_val and this reduces to
+                // the legacy max(rho_val, rho_floor).
+                const auto rho_val_limited = (rho_dec < rho_floor)
+                    ? rho_floor : std::max(rho_val, rho_floor);
 
                 Ex(i, j, k) = (enE_x - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
+            // Resistive terms; see include_resistivity above.
+            if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1206,8 +1376,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
+                // Per-species resistive friction: frozen ion-drift remainder
+                // plus the lagged coefficient times the live plasma current.
+                if (has_eta_overlay) {
+                    Ex(i, j, k) += eta_overlay_x(i, j, k)
+                                   + eta_coef_x(i, j, k) * Jx(i, j, k);
+                }
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1239,8 +1415,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ey_stag, coarsen, i, j, k, 0);
+            // The physics keeps rho_val; only the vacuum-seam decision
+            // (holmstrom branch or guarded-floor selection) resamples.
+            const Real rho_dec =
+                (switch_mode == VacuumSeamSwitchMode::Node) ? NodalSwitchRho(rho, Ey_stag, i, j, k) :
+                (switch_mode == VacuumSeamSwitchMode::Cell) ? CellSwitchRho(rho, Ey_stag, i, j, k) :
+                rho_val;
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ey(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1252,14 +1434,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 const auto enE_y = Interp(enE, nodal, Ey_stag, coarsen, i, j, k, 1);
 
-                // safety condition since we divide by rho
-                const auto rho_val_limited = std::max(rho_val, rho_floor);
+                // Floor selection follows the vacuum-seam decision: a
+                // vacuum-decided component divides by the floor, a
+                // plasma-decided one by rho_val (still floored for division
+                // safety). At mode 0 rho_dec == rho_val and this reduces to
+                // the legacy max(rho_val, rho_floor).
+                const auto rho_val_limited = (rho_dec < rho_floor)
+                    ? rho_floor : std::max(rho_val, rho_floor);
 
                 Ey(i, j, k) = (enE_y - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
+            // Resistive terms; see include_resistivity above.
+            if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1270,8 +1457,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
+                if (has_eta_overlay) {
+                    Ey(i, j, k) += eta_overlay_y(i, j, k)
+                                   + eta_coef_y(i, j, k) * Jy(i, j, k);
+                }
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;
@@ -1303,8 +1494,14 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
 
             // Interpolate to get the appropriate charge density in space
             const Real rho_val = Interp(rho, nodal, Ez_stag, coarsen, i, j, k, 0);
+            // The physics keeps rho_val; only the vacuum-seam decision
+            // (holmstrom branch or guarded-floor selection) resamples.
+            const Real rho_dec =
+                (switch_mode == VacuumSeamSwitchMode::Node) ? NodalSwitchRho(rho, Ez_stag, i, j, k) :
+                (switch_mode == VacuumSeamSwitchMode::Cell) ? CellSwitchRho(rho, Ez_stag, i, j, k) :
+                rho_val;
 
-            if (rho_val < rho_floor && holmstrom_vacuum_region) {
+            if (rho_dec < rho_floor && holmstrom_vacuum_region) {
                 Ez(i, j, k) = 0._rt;
             } else {
                 // Get the gradient of the electron pressure if the longitudinal part of
@@ -1316,14 +1513,19 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 // interpolate the nodal neE values to the Yee grid
                 const auto enE_z = Interp(enE, nodal, Ez_stag, coarsen, i, j, k, 2);
 
-                // safety condition since we divide by rho
-                const auto rho_val_limited = std::max(rho_val, rho_floor);
+                // Floor selection follows the vacuum-seam decision: a
+                // vacuum-decided component divides by the floor, a
+                // plasma-decided one by rho_val (still floored for division
+                // safety). At mode 0 rho_dec == rho_val and this reduces to
+                // the legacy max(rho_val, rho_floor).
+                const auto rho_val_limited = (rho_dec < rho_floor)
+                    ? rho_floor : std::max(rho_val, rho_floor);
 
                 Ez(i, j, k) = (enE_z - grad_Pe) / rho_val_limited;
             }
 
-            // Add resistivity only if E field value is used to update B
-            if (solve_for_Faraday) {
+            // Resistive terms; see include_resistivity above.
+            if (include_resistivity) {
                 Real jtot_val = 0._rt;
                 if (resistivity_has_J_dependence) {
                     // Interpolate current to appropriate staggering to match E field
@@ -1334,8 +1536,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                 }
 
                 Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
+                if (has_eta_overlay) {
+                    Ez(i, j, k) += eta_overlay_z(i, j, k)
+                                   + eta_coef_z(i, j, k) * Jz(i, j, k);
+                }
 
-                if (include_hyper_resistivity_term) {
+                if (include_hyper_resistivity_term && solve_for_Faraday) {
 
                     // Interpolate B field to appropriate staggering to match E field
                     Real btot_val = 0._rt;

@@ -108,7 +108,7 @@ The ``elastic`` option uses isotropic scattering, i.e., with a differential
 cross section that is independent of angle.
 This scattering process as well as the ones below that relate to it, are all
 performed in the center-of-momentum (COM) frame. Designating the COM velocity of
-the particle as :math:`\vec{u}_c` and its labframe velocity as :math:`\vec{u}_l`,
+the particle as :math:`\boldsymbol{u}_c` and its labframe velocity as :math:`\boldsymbol{u}_l`,
 the transformation from lab frame to COM frame is done with a general Lorentz
 boost (see function ``ParticleUtils::doLorentzTransform()``):
 
@@ -135,14 +135,14 @@ where :math:`\gamma` is the Lorentz factor of the relative speed between the lab
 
     .. math::
 
-        \vec{v}^{COM} = \frac{m \vec{u_c}}{\gamma_u m + M}
+        \boldsymbol{v}^{COM} = \frac{m \boldsymbol{u}_c}{\gamma_u m + M}
 
 The particle velocity in the COM frame is then isotropically scattered using the function ``ParticleUtils::RandomizeVelocity()``. After the direction of the velocity vector has been appropriately changed, it is transformed back to the lab frame with the reversed Lorentz transform as was done above followed by the reverse Galilean transformation using the starting neutral velocity.
 
 Back scattering
 ^^^^^^^^^^^^^^^
 
-The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\vec{u}_c`.
+The process is the same as for elastic scattering above except the scattering angle is fixed at :math:`\pi`, meaning the particle velocity in the COM frame is updated to :math:`-\boldsymbol{u}_c`.
 
 Excitation
 ^^^^^^^^^^

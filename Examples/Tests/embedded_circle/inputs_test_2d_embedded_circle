@@ -78,8 +78,9 @@ coll_ar_ions.type = background_mcc
 coll_ar_ions.species = ar_ions
 coll_ar_ions.background_density = 2.15e+23
 coll_ar_ions.background_temperature = 450
-coll_ar_ions.scattering_processes = back elastic charge_exchange
-coll_ar_ions.back_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/ion_back_scatter.dat
+coll_ar_ions.scattering_processes = elastic_back elastic charge_exchange
+coll_ar_ions.elastic_back_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/ion_back_scatter.dat
+coll_ar_ions.elastic_back_scattering_angle_model = backward
 coll_ar_ions.elastic_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/ion_scattering.dat
 coll_ar_ions.charge_exchange_cross_section = ../../../../warpx-data/MCC_cross_sections/Ar/charge_exchange.dat
 

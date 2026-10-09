@@ -39,11 +39,11 @@ alias getNode="salloc -N 1 -t 1:00:00 --qos=es_debug --partition=es1 --constrain
 alias runNode="srun -N 1 -t 1:00:00 --qos=es_debug --partition=es1 --constraint=es1_v100 --gres=gpu:1 --cpus-per-task=4 -A $proj"
 
 # optimize CUDA compilation for 1080 Ti (deprecated)
-#export AMREX_CUDA_ARCH=6.1
+#export CUDAARCHS=61
 # optimize CUDA compilation for V100
-export AMREX_CUDA_ARCH=7.0
+export CUDAARCHS=70
 # optimize CUDA compilation for 2080 Ti
-#export AMREX_CUDA_ARCH=7.5
+#export CUDAARCHS=75
 
 # compiler environment hints
 export CXX=$(which g++)

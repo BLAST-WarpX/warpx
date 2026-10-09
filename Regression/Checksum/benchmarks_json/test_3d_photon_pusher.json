@@ -10,6 +10,54 @@
     "jy": 0.0,
     "jz": 0.0
   },
+  "p_dn_1": {
+    "particle_momentum_x": 2.7309245344552504e-22,
+    "particle_momentum_y": 2.7309245344552504e-22,
+    "particle_momentum_z": 2.7309245344552504e-22,
+    "particle_position_x": 2.6041666666666684e-07,
+    "particle_position_y": 2.6041666666666684e-07,
+    "particle_position_z": 2.6041666666666684e-07
+  },
+  "p_dn_10": {
+    "particle_momentum_x": 2.7309245344552497e-21,
+    "particle_momentum_y": 2.7309245344552497e-21,
+    "particle_momentum_z": 2.7309245344552497e-21,
+    "particle_position_x": 2.6041666666666684e-07,
+    "particle_position_y": 2.6041666666666684e-07,
+    "particle_position_z": 2.6041666666666684e-07
+  },
+  "p_dp_1": {
+    "particle_momentum_x": 2.7309245344552504e-22,
+    "particle_momentum_y": 2.7309245344552504e-22,
+    "particle_momentum_z": 2.7309245344552504e-22,
+    "particle_position_x": 2.6041666666666684e-07,
+    "particle_position_y": 2.6041666666666684e-07,
+    "particle_position_z": 2.6041666666666684e-07
+  },
+  "p_dp_10": {
+    "particle_momentum_x": 2.7309245344552497e-21,
+    "particle_momentum_y": 2.7309245344552497e-21,
+    "particle_momentum_z": 2.7309245344552497e-21,
+    "particle_position_x": 2.6041666666666684e-07,
+    "particle_position_y": 2.6041666666666684e-07,
+    "particle_position_z": 2.6041666666666684e-07
+  },
+  "p_xn_1": {
+    "particle_momentum_x": 2.7309245344552504e-22,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 4.510548978043957e-07,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0
+  },
+  "p_xn_10": {
+    "particle_momentum_x": 2.7309245344552497e-21,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 0.0,
+    "particle_position_x": 4.510548978043957e-07,
+    "particle_position_y": 0.0,
+    "particle_position_z": 0.0
+  },
   "p_xp_1": {
     "particle_momentum_x": 2.7309245344552504e-22,
     "particle_momentum_y": 0.0,
@@ -26,73 +74,17 @@
     "particle_position_y": 0.0,
     "particle_position_z": 0.0
   },
-  "p_xn_1": {
-    "particle_momentum_x": 2.7309245344552504e-22,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
-    "particle_position_x": 4.510548978043957e-07,
-    "particle_position_y": 0.0,
-    "particle_position_z": 0.0
-  },
-  "p_zn_1": {
+  "p_yn_1": {
     "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 2.7309245344552504e-22,
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_position_z": 4.510548978043957e-07
-  },
-  "p_dn_10": {
-    "particle_momentum_x": 2.7309245344552497e-21,
-    "particle_momentum_y": 2.7309245344552497e-21,
-    "particle_momentum_z": 2.7309245344552497e-21,
-    "particle_position_x": 2.6041666666666684e-07,
-    "particle_position_y": 2.6041666666666684e-07,
-    "particle_position_z": 2.6041666666666684e-07
-  },
-  "p_dn_1": {
-    "particle_momentum_x": 2.7309245344552504e-22,
     "particle_momentum_y": 2.7309245344552504e-22,
-    "particle_momentum_z": 2.7309245344552504e-22,
-    "particle_position_x": 2.6041666666666684e-07,
-    "particle_position_y": 2.6041666666666684e-07,
-    "particle_position_z": 2.6041666666666684e-07
-  },
-  "p_xn_10": {
-    "particle_momentum_x": 2.7309245344552497e-21,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 0.0,
-    "particle_position_x": 4.510548978043957e-07,
-    "particle_position_y": 0.0,
-    "particle_position_z": 0.0
-  },
-  "p_yn_10": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 2.7309245344552497e-21,
     "particle_momentum_z": 0.0,
     "particle_position_x": 0.0,
     "particle_position_y": 4.510548978043957e-07,
     "particle_position_z": 0.0
   },
-  "p_zn_10": {
+  "p_yn_10": {
     "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 2.7309245344552497e-21,
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_position_z": 4.510548978043957e-07
-  },
-  "p_zp_1": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 0.0,
-    "particle_momentum_z": 2.7309245344552504e-22,
-    "particle_position_x": 0.0,
-    "particle_position_y": 0.0,
-    "particle_position_z": 4.510548978043957e-07
-  },
-  "p_yn_1": {
-    "particle_momentum_x": 0.0,
-    "particle_momentum_y": 2.7309245344552504e-22,
+    "particle_momentum_y": 2.7309245344552497e-21,
     "particle_momentum_z": 0.0,
     "particle_position_x": 0.0,
     "particle_position_y": 4.510548978043957e-07,
@@ -114,7 +106,15 @@
     "particle_position_y": 4.510548978043957e-07,
     "particle_position_z": 0.0
   },
-  "p_zp_10": {
+  "p_zn_1": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
+    "particle_momentum_z": 2.7309245344552504e-22,
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 4.510548978043957e-07
+  },
+  "p_zn_10": {
     "particle_momentum_x": 0.0,
     "particle_momentum_y": 0.0,
     "particle_momentum_z": 2.7309245344552497e-21,
@@ -122,20 +122,20 @@
     "particle_position_y": 0.0,
     "particle_position_z": 4.510548978043957e-07
   },
-  "p_dp_1": {
-    "particle_momentum_x": 2.7309245344552504e-22,
-    "particle_momentum_y": 2.7309245344552504e-22,
+  "p_zp_1": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
     "particle_momentum_z": 2.7309245344552504e-22,
-    "particle_position_x": 2.6041666666666684e-07,
-    "particle_position_y": 2.6041666666666684e-07,
-    "particle_position_z": 2.6041666666666684e-07
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 4.510548978043957e-07
   },
-  "p_dp_10": {
-    "particle_momentum_x": 2.7309245344552497e-21,
-    "particle_momentum_y": 2.7309245344552497e-21,
+  "p_zp_10": {
+    "particle_momentum_x": 0.0,
+    "particle_momentum_y": 0.0,
     "particle_momentum_z": 2.7309245344552497e-21,
-    "particle_position_x": 2.6041666666666684e-07,
-    "particle_position_y": 2.6041666666666684e-07,
-    "particle_position_z": 2.6041666666666684e-07
+    "particle_position_x": 0.0,
+    "particle_position_y": 0.0,
+    "particle_position_z": 4.510548978043957e-07
   }
 }

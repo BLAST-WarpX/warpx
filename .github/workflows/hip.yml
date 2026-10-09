@@ -67,7 +67,9 @@ jobs:
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
-        python3 -m pip install *.whl
+        # install pywarpx with the dependency wheels built above (also works if a dependency
+        # is given by URL, e.g., an in-development PICMI version)
+        python3 -m pip install --find-links . pywarpx-*.whl
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -123,7 +125,9 @@ jobs:
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_2d/lib/site-packages/pywarpx/
         python3 -m pip wheel .
-        python3 -m pip install *.whl
+        # install pywarpx with the dependency wheels built above (also works if a dependency
+        # is given by URL, e.g., an in-development PICMI version)
+        python3 -m pip install --find-links . pywarpx-*.whl
 
         ccache -s
         du -hs ~/.cache/ccache

@@ -47,7 +47,7 @@ JdispFunctor::operator() (amrex::MultiFab& mf_dst, int dcomp, const int /*i_buff
 
     //if (!hybrid_pic_model) {
         // To finish this implementation, we need to implement a method to
-        // calculate (∇ x B).
+        // calculate (curl(B)).
 
         // Skeleton for future implementation for solvers other than HybridPIC.
         // Get curlB multifab

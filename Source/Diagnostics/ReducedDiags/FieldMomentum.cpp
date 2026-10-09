@@ -153,7 +153,7 @@ void FieldMomentum::ComputeDiags (int step)
         // and compute sum over cells of (E x B) components
         for (amrex::MFIter mfi(Ex, TilingIfNotGPU()); mfi.isValid(); ++mfi)
         {
-            const amrex::Box & box = enclosedCells(mfi.nodaltilebox());
+            const amrex::Box & box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const amrex::Array4<const amrex::Real> & Ex_arr = Ex[mfi].array();
             const amrex::Array4<const amrex::Real> & Ey_arr = Ey[mfi].array();
             const amrex::Array4<const amrex::Real> & Ez_arr = Ez[mfi].array();

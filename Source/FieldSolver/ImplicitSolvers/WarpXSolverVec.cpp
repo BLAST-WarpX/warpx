@@ -29,11 +29,11 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         !IsDefined(),
         "WarpXSolverVec::Define() called on already defined WarpXSolverVec");
 
-    // Define static member pointer to WarpX
-    if (!m_warpx_ptr_defined) {
-        m_WarpX = a_WarpX;
-        m_warpx_ptr_defined = true;
-    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        a_WarpX != nullptr,
+        "WarpXSolverVec::Define() called with a nullptr WarpX instance");
+
+    m_WarpX = a_WarpX;
 
     m_num_amr_levels = 1;
 
@@ -50,9 +50,9 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_array_type = FieldType::vector_potential_fp;
     }
     else if (m_vector_type_name!="none") {
-        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name
-                    +"is not a valid option for array type used in Definining"
-                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp,"
+        WARPX_ABORT_WITH_MESSAGE(a_vector_type_name+" "
+                    +"is not a valid option for array type used in Definining "
+                    +"a WarpXSolverVec. Valid array types are: Efield_fp, Bfield_fp, "
                     +"and vector_potential_fp_nodal");
     }
 
@@ -60,8 +60,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_scalar_type = FieldType::phi_fp;
     }
     else if (m_scalar_type_name!="none") {
-        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name
-                    +"is not a valid option for scalar type used in Definining"
+        WARPX_ABORT_WITH_MESSAGE(a_scalar_type_name+" "
+                    +"is not a valid option for scalar type used in Definining "
                     +"a WarpXSolverVec. Valid scalar types are: phi_fp");
     }
 

@@ -35,7 +35,7 @@ WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
     const ParmParse pp_species_name(species_name);
     SpeciesUtils::parseDensity(species_name, "", h_inj_rho, density_parser, geom);
     SpeciesUtils::parseMomentum(species_name, "", "none", h_inj_mom,
-        h_mom_temp, h_mom_vel);
+        h_mom_temp, h_mom_vel, geom);
     if (h_inj_rho) {
 #ifdef AMREX_USE_GPU
         d_inj_rho = static_cast<InjectorDensity*>
@@ -372,6 +372,11 @@ void WarpXFluidContainer::ApplyBcFluidsAndComms (ablastr::fields::MultiFabRegist
         //Grow the tilebox
         tile_box.grow(1);
 
+        // In-place update: iterations write only the two outermost boundary
+        // planes (domain end +/- 1) and read two cells inward (+/- 2), so the
+        // written and read index sets are disjoint and the iterations are
+        // independent, as required by ParallelFor. A +/- 1 stencil would break
+        // this and require amrex::For (see issue #7097).
         amrex::ParallelFor(tile_box,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
@@ -810,7 +815,7 @@ void WarpXFluidContainer::AdvectivePush_Muscl (ablastr::fields::MultiFabRegister
 #elif defined(WARPX_DIM_1D_Z)
                     set_U_edges_to_zero(U_minus_z, U_plus_z, i, j, k, box_z, 2);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                    set_U_edges_to_zero(U_minus_x, U_plus_x, i, j, k, box_x, 2);
+                    set_U_edges_to_zero(U_minus_x, U_plus_x, i, j, k, box_x, 0);
 #endif
                 }
             }

@@ -211,8 +211,12 @@ void ParticleHistogram::ComputeDiags (int step)
 
                 long const np = pti.numParticles();
 
-                //Flag particles that need to be copied if they cross the z_slice
-                amrex::ParallelFor(np,
+                //Flag particles that need to be copied if they cross the z_slice.
+                // amrex::For: iterations accumulate into shared histogram bins;
+                // in serial (non-OpenMP) builds HostDevice::Atomic::Add is a plain
+                // +=, which is unsafe under the SIMD pragma of ParallelFor
+                // (see issue #7097)
+                amrex::For(np,
                    [=] AMREX_GPU_DEVICE(int i)
                 {
                     amrex::ParticleReal x, y, z;

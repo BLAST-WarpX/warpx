@@ -165,8 +165,10 @@ void BackgroundStopping::doBackgroundStoppingOnElectronsWithinTile (WarpXParIter
         [=] AMREX_GPU_HOST_DEVICE (long ip)
         {
 
+            // The background density and temperature parsers take Cartesian
+            // coordinates as arguments, in all geometries.
             amrex::ParticleReal x, y, z;
-            GetPosition.AsStored(ip, x, y, z);
+            GetPosition(ip, x, y, z);
             amrex::ParticleReal const n_e = n_e_func(x, y, z, t);
             amrex::ParticleReal const T_e = T_e_func(x, y, z, t)*PhysConst::kb;
 
@@ -240,8 +242,10 @@ void BackgroundStopping::doBackgroundStoppingOnIonsWithinTile (WarpXParIter& pti
         [=] AMREX_GPU_HOST_DEVICE (long ip)
         {
 
+            // The background density and temperature parsers take Cartesian
+            // coordinates as arguments, in all geometries.
             amrex::ParticleReal x, y, z;
-            GetPosition.AsStored(ip, x, y, z);
+            GetPosition(ip, x, y, z);
             amrex::ParticleReal const n_i = n_i_func(x, y, z, t);
             amrex::ParticleReal const T_i = T_i_func(x, y, z, t)*PhysConst::kb;
 

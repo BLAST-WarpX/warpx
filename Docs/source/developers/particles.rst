@@ -36,7 +36,9 @@ A typical loop over particles reads:
       }
   }
 
-The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` to perform operations on all particles in a portable way. The innermost loop in the code snippet above could look like:
+The innermost step ``[MY INNER LOOP]`` typically calls ``amrex::ParallelFor`` or ``amrex::For`` to perform operations on all particles in a portable way.
+``amrex::ParallelFor`` may only be used when the loop iterations are independent of each other. Kernels in which particles scatter-add into shared grid cells (e.g., deposition, histogram bins, etc.) must use ``amrex::For`` instead (see :ref:`Developers: Portability <developers-portability>`).
+The innermost loop in the code snippet above could look like:
 
 .. code-block:: cpp
 
@@ -83,7 +85,7 @@ Main functions
 
 .. doxygenfunction:: PhysicalParticleContainer::PushPX
 
-.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time)
+.. doxygenfunction:: WarpXParticleContainer::DepositCurrent(ablastr::fields::MultiLevelVectorField const &J, amrex::Real dt, amrex::Real relative_time, PushType push_type)
 
 .. note::
    The current deposition is used both by ``PhysicalParticleContainer`` and ``LaserParticleContainer``, so it is in the parent class ``WarpXParticleContainer``.
@@ -112,8 +114,8 @@ The data structures for those are either pre-described at compile-time (CT) or r
 Attribute name        ``int``/``real``  Description                         Where When Notes
 ====================  ================  ==================================  ===== ==== ======================
 ``position_x/y/z``    ``real``          Particle position.                  SoA   CT
-``weight``            ``real``          Particle position.                  SoA   CT
-``momentum_x/y/z``    ``real``          Particle position.                  SoA   CT
+``weight``            ``real``          Particle weight.                    SoA   CT
+``momentum_x/y/z``    ``real``          Particle momentum.                  SoA   CT
 ``id``                ``amrex::Long``   CPU-local particle index            SoA   CT   First 40 bytes of
                                         where the particle was created.                idcpu
 ``cpu``               ``int``           CPU index where the particle        SoA   CT   Last 24 bytes of idcpu

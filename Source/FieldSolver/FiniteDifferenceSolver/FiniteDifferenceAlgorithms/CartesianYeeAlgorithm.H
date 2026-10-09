@@ -244,6 +244,172 @@ struct CartesianYeeAlgorithm {
 #endif
     }
 
+    /**
+     * Perform fourth derivative along x on a cell-centered grid, from a cell-centered field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dxxxx (
+        T_Field const& F,
+        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if (defined WARPX_DIM_1D_Z)
+        amrex::ignore_unused(F, coefs_x, i, j, k, ncomp);
+        return 0._rt; // 1D Cartesian: derivative along x is 0
+#else
+        amrex::Real const inv_dx4 = amrex::Math::powi<4>(coefs_x[0]);
+        return inv_dx4*( F(i-2,j,k,ncomp) - 4._rt*F(i-1,j,k,ncomp) + 6._rt*F(i,j,k,ncomp)
+                          - 4._rt*F(i+1,j,k,ncomp) + F(i+2,j,k,ncomp) );
+#endif
+    }
+
+    /**
+     * Perform fourth derivative along y on a cell-centered grid, from a cell-centered field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dyyyy (
+        T_Field const& F,
+        amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if defined WARPX_DIM_3D
+        amrex::Real const inv_dy4 = amrex::Math::powi<4>(coefs_y[0]);
+        return inv_dy4*( F(i,j-2,k,ncomp) - 4._rt*F(i,j-1,k,ncomp) + 6._rt*F(i,j,k,ncomp)
+                          - 4._rt*F(i,j+1,k,ncomp) + F(i,j+2,k,ncomp) );
+#else
+        amrex::ignore_unused(F, coefs_y, i, j, k, ncomp);
+        return 0._rt; // 1D and 2D Cartesian: derivative along y is 0
+#endif
+    }
+
+    /**
+     * Perform fourth derivative along z on a cell-centered field `F`*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dzzzz (
+        T_Field const& F,
+        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+        amrex::Real const inv_dz4 = amrex::Math::powi<4>(coefs_z[0]);
+#if defined WARPX_DIM_3D
+        return inv_dz4*( F(i,j,k-2,ncomp) - 4._rt*F(i,j,k-1,ncomp) + 6._rt*F(i,j,k,ncomp)
+                          - 4._rt*F(i,j,k+1,ncomp) + F(i,j,k+2,ncomp) );
+#elif (defined WARPX_DIM_XZ)
+        return inv_dz4*( F(i,j-2,k,ncomp) - 4._rt*F(i,j-1,k,ncomp) + 6._rt*F(i,j,k,ncomp)
+                          - 4._rt*F(i,j+1,k,ncomp) + F(i,j+2,k,ncomp) );
+#elif (defined WARPX_DIM_1D_Z)
+        return inv_dz4*( F(i-2,j,k,ncomp) - 4._rt*F(i-1,j,k,ncomp) + 6._rt*F(i,j,k,ncomp)
+                          - 4._rt*F(i+1,j,k,ncomp) + F(i+2,j,k,ncomp) );
+#endif
+    }
+
+    /**
+     * Perform mixed fourth derivative d^4/(dx^2 dy^2) on a cell-centered grid, from a
+     * cell-centered field `F` (only nonzero in 3D)*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dxxyy (
+        T_Field const& F,
+        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if defined WARPX_DIM_3D
+        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
+        amrex::Real const inv_dy2 = coefs_y[0]*coefs_y[0];
+        amrex::Real result = 0._rt;
+        for (int di = -1; di <= 1; ++di) {
+            amrex::Real const cx = (di == 0) ? -2._rt : 1._rt;
+            for (int dj = -1; dj <= 1; ++dj) {
+                amrex::Real const cy = (dj == 0) ? -2._rt : 1._rt;
+                result += cx*cy*F(i+di,j+dj,k,ncomp);
+            }
+        }
+        return inv_dx2*inv_dy2*result;
+#else
+        amrex::ignore_unused(F, coefs_x, coefs_y, i, j, k, ncomp);
+        return 0._rt;
+#endif
+    }
+
+    /**
+     * Perform mixed fourth derivative d^4/(dy^2 dz^2) on a cell-centered grid, from a
+     * cell-centered field `F` (only nonzero in 3D)*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dyyzz (
+        T_Field const& F,
+        amrex::Real const * const coefs_y, int const /*n_coefs_y*/,
+        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if defined WARPX_DIM_3D
+        amrex::Real const inv_dy2 = coefs_y[0]*coefs_y[0];
+        amrex::Real const inv_dz2 = coefs_z[0]*coefs_z[0];
+        amrex::Real result = 0._rt;
+        for (int dj = -1; dj <= 1; ++dj) {
+            amrex::Real const cy = (dj == 0) ? -2._rt : 1._rt;
+            for (int dk = -1; dk <= 1; ++dk) {
+                amrex::Real const cz = (dk == 0) ? -2._rt : 1._rt;
+                result += cy*cz*F(i,j+dj,k+dk,ncomp);
+            }
+        }
+        return inv_dy2*inv_dz2*result;
+#else
+        amrex::ignore_unused(F, coefs_y, coefs_z, i, j, k, ncomp);
+        return 0._rt;
+#endif
+    }
+
+    /**
+     * Perform mixed fourth derivative d^4/(dx^2 dz^2) on a cell-centered grid, from a
+     * cell-centered field `F` (nonzero in XZ and 3D; zero in 1D)*/
+    template< typename T_Field>
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real Dxxzz (
+        T_Field const& F,
+        amrex::Real const * const coefs_x, int const /*n_coefs_x*/,
+        amrex::Real const * const coefs_z, int const /*n_coefs_z*/,
+        int const i, int const j, int const k, int const ncomp=0 ) {
+
+        using namespace amrex;
+#if defined WARPX_DIM_3D
+        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
+        amrex::Real const inv_dz2 = coefs_z[0]*coefs_z[0];
+        amrex::Real result = 0._rt;
+        for (int di = -1; di <= 1; ++di) {
+            amrex::Real const cx = (di == 0) ? -2._rt : 1._rt;
+            for (int dk = -1; dk <= 1; ++dk) {
+                amrex::Real const cz = (dk == 0) ? -2._rt : 1._rt;
+                result += cx*cz*F(i+di,j,k+dk,ncomp);
+            }
+        }
+        return inv_dx2*inv_dz2*result;
+#elif (defined WARPX_DIM_XZ)
+        // In XZ, x maps to the i index and z maps to the j index
+        amrex::Real const inv_dx2 = coefs_x[0]*coefs_x[0];
+        amrex::Real const inv_dz2 = coefs_z[0]*coefs_z[0];
+        amrex::Real result = 0._rt;
+        for (int di = -1; di <= 1; ++di) {
+            amrex::Real const cx = (di == 0) ? -2._rt : 1._rt;
+            for (int dj = -1; dj <= 1; ++dj) {
+                amrex::Real const cz = (dj == 0) ? -2._rt : 1._rt;
+                result += cx*cz*F(i+di,j+dj,k,ncomp);
+            }
+        }
+        return inv_dx2*inv_dz2*result;
+#else
+        amrex::ignore_unused(F, coefs_x, coefs_z, i, j, k, ncomp);
+        return 0._rt;
+#endif
+    }
+
 };
 
 #endif // WARPX_FINITE_DIFFERENCE_ALGORITHM_CARTESIAN_YEE_H_

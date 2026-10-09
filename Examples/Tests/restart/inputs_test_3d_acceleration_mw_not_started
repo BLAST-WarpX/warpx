@@ -1,0 +1,8 @@
+FILE = inputs_base_3d_mw
+
+# The window does not start until step 8, i.e. it has not yet become active
+# by the time the checkpoint at step 5 is written (start_moving_window_step
+# > current_step at restart). This covers the complementary edge case to
+# inputs_test_3d_acceleration_mw_start_stop: InitBaseData() must leave the bounds unshifted
+# at restart, and the window must still start on schedule at step 8.
+warpx.start_moving_window_step = 8

@@ -17,10 +17,12 @@ public:
      * \param[in] lev level of multifab. Used for averaging in rz.
      * \param[in] crse_ratio for interpolating field values from simulation MultiFabs
                   to the output diagnostic MultiFab mf_dst.
+     * \param[in] species_index Index of species to dump part_per_cell per species. This argument
+     *                          is optional and defaults to -1 (dump total rho)
      * \param[in] ncomp Number of component of mf_src to cell-center in dst multifab.
      */
     PartPerCellFunctor(const amrex::MultiFab* mf_src, int lev,
-                       amrex::IntVect crse_ratio, int ncomp=1);
+                       amrex::IntVect crse_ratio, int species_index=-1, int ncomp=1);
 
     /** \brief Compute the number of particles per cell directly into mf_dst.
      *
@@ -31,6 +33,9 @@ public:
     void operator()(amrex::MultiFab& mf_dst, int dcomp, int /*i_buffer=0*/) const override;
 private:
     int m_lev; /**< level on which mf_src is defined */
+
+    // Species index to dump part_per_cell per species
+    int m_species_index;
 };
 
 #endif // WARPX_PARTPERCELLFUNCTOR_H_

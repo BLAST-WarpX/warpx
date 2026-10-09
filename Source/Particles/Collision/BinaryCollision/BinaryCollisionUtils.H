@@ -127,9 +127,8 @@ namespace BinaryCollisionUtils{
         using namespace amrex::literals;
         using namespace amrex::Math;
 
-        constexpr double c = PhysConst::c;
+        constexpr auto c = PhysConst::c_v<double>;
         constexpr auto c2 = PhysConst::c2_v<double>;
-        constexpr double inv_c = 1./PhysConst::c;
 
         // Cast input parameters to double before computing collision properties
         // This is needed to avoid errors when using single-precision particles
@@ -145,53 +144,54 @@ namespace BinaryCollisionUtils{
         const double m1_sq = m1_dbl*m1_dbl;
         const double m2_sq = m2_dbl*m2_dbl;
 
-        // Square norm of the total (sum between the two particles) momenta in the lab frame
-        const double p_total_sq = powi<2>(p1x_dbl + p2x_dbl) + powi<2>(p1y_dbl + p2y_dbl) + powi<2>(p1z_dbl + p2z_dbl);
+        const double p1_sq = p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl;
+        const double p2_sq = p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl;
+        const double p1_dot_p2 = p1x_dbl*p2x_dbl + p1y_dbl*p2y_dbl + p1z_dbl*p2z_dbl;
 
-        // Total energy in the lab frame
+        // Total energy of each particle in the lab frame.
         // Note the use of `double` for energy since this calculation is prone to error with single precision.
-        const double E1_lab = std::sqrt( m1_sq * c2 + p1x_dbl*p1x_dbl + p1y_dbl*p1y_dbl + p1z_dbl*p1z_dbl ) * c;
-        const double E2_lab = std::sqrt( m2_sq * c2 + p2x_dbl*p2x_dbl + p2y_dbl*p2y_dbl + p2z_dbl*p2z_dbl ) * c;
-        const double E_lab = E1_lab + E2_lab;
-        // Total energy squared in the center of mass frame, calculated using the Lorentz invariance
-        // of the four-momentum norm
-        const double E_star_sq = E_lab*E_lab - c2*p_total_sq;
+        const double E1_lab = std::sqrt( m1_sq * c2 + p1_sq ) * c;
+        const double E2_lab = std::sqrt( m2_sq * c2 + p2_sq ) * c;
 
-        // Kinetic energy in the center of mass frame
+        // Compute the kinetic energy in the COM frame, and the squared momentum of each
+        // particle in the COM frame, in a way that avoids catastrophic cancellation
+        // for low-energy collisions.
+        //
+        // Starting from the Lorentz-invariant
+        //     E_star^2 = E_lab^2 - c^2 p_total^2 = (E1 + E2)^2 - c^2 (p1 + p2)^2
+        // and expanding using E_i^2 = m_i^2 c^4 + c^2 p_i^2, one gets
+        //     E_star^2 = m1^2 c^4 + m2^2 c^4 + 2 ( E1 E2 - c^2 p1.p2 )
+        // and therefore
+        //     E_star^2 - (m1 + m2)^2 c^4 = 2 ( E1 E2 - m1 m2 c^4 - c^2 p1.p2 ).
+        //
+        // Compute E1 E2 - m1 m2 c^4 without cancellation by using
+        //     E1 E2 - m1 m2 c^4 = m2 c^2 KE1 + m1 c^2 KE2 + KE1 KE2,
+        // where KE_i = E_i - m_i c^2 is itself evaluated without cancellation.
+        const double KE1_lab = p1_sq * c2 / (E1_lab + m1_dbl * c2);
+        const double KE2_lab = p2_sq * c2 / (E2_lab + m2_dbl * c2);
+        const double E1E2_minus_m1m2c4 = m2_dbl * c2 * KE1_lab + m1_dbl * c2 * KE2_lab + KE1_lab * KE2_lab;
+
+        // s_minus_threshold = E_star^2 - (m1 + m2)^2 c^4, in J^2.
+        // Floor roundoff negative values to keep the squared COM momentum non-negative.
+        const double s_minus_threshold = amrex::max(2.0 * (E1E2_minus_m1m2c4 - c2 * p1_dot_p2), 0.0);
+        const double m_sum_c2 = (m1_dbl + m2_dbl) * c2;
+        const double E_star_sq = m_sum_c2 * m_sum_c2 + s_minus_threshold;
         const double E_star = std::sqrt(E_star_sq);
 
-        // Cast back to chosen precision for output
-        E_kin_COM = static_cast<amrex::ParticleReal>(E_star - (m1_dbl + m2_dbl)*c2);
+        // Compute E_star - (m1 + m2)c^2 in factored form to avoid cancellation.
+        // For two massless particles E_kin_COM is E_star directly.
+        E_kin_COM = (E_star == 0.0) ? 0.0_prt :  static_cast<amrex::ParticleReal>(s_minus_threshold / (E_star + m_sum_c2));
 
-        // Find the norm of the momentum of each particles in the center of mass frame
-        // This is done by solving the following system (in the COM frame)
-        // E_1^2 = p^2 c^2 + m_1^2 c^4  (for the first particle)
-        // E_2^2 = p^2 c^2 + m_2^2 c^4  (for the second particle ; same p since we are in the COM frame)
-        // to find the expression of the p as a function of E = E_1 + E_2.
-        // Here is an abbreviation derivation:
-        // - By summing the above equations
-        // E^2 = E_1^2 + E_2^2 + 2 E_1 E_2 = 2 p^2 c^2 + (m_1^2 + m_2^2) c^4 + 2 E_1 E_2
-        // - Rearranging and squaring
-        // ( E^2 - 2 p^2 c^2 - (m_1^2 + m_2^2) c^4 )^2 = 4 E_1^2 E_2^2 = 4 (p^2 c^2 + m_1^2 c^4) (p^2 c^2 + m_2^2 c^4)
-        // - By rearranging, we get:
-        // p^2 = E^2/4c^2 - (m_1^2 + m_2^2)c^2/2 + (m_1^2-m_2^2)^2 c^6/4E^2
-        double p_star_sq;
-        if (m1_dbl + m2_dbl == 0) {
-            p_star_sq = powi<2>( 0.5 * E_star * inv_c );
-        } else {
-            // The expression below is specifically written in a form that avoids returning
-            // small negative numbers due to machine precision errors, for low-energy particles
-            const double E_ratio = E_star/((m1_dbl + m2_dbl)*c2);
-            p_star_sq = m1_dbl*m2_dbl*c2 * ( powi<2>(E_ratio) - 1.0 )
-                + powi<2>(m1_dbl - m2_dbl)*c2/4.0 * powi<2>( E_ratio - 1.0/E_ratio);
-        }
+        // Find the squared COM momentum from the factored Kallen form, obtaining
+        // both numerator factors from s_minus_threshold without cancellation.
+        double const p_star_sq = (E_star == 0) ? 0.0 : s_minus_threshold * (s_minus_threshold + 4.0 * m1_dbl * m2_dbl * c2 * c2) / (4.0 * E_star_sq * c2);
 
         // Energy of each particle in the center of mass frame
         const double E1_star = std::sqrt(m1_sq*c2 + p_star_sq) * c;
         const double E2_star = std::sqrt(m2_sq*c2 + p_star_sq) * c;
 
         // relative velocity in the center of mass frame, cast back to chosen precision
-        v_rel_COM = PhysConst::c * static_cast<amrex::ParticleReal>(std::sqrt(p_star_sq) * c * (1.0/E1_star + 1.0/E2_star));
+        v_rel_COM = static_cast<amrex::ParticleReal>(std::sqrt(p_star_sq) * c2 * (1.0/E1_star + 1.0/E2_star));
 
         // Cross sections and relative velocity are computed in the center of mass frame.
         // On the other hand, the particle densities (weight over volume) in the lab frame are used.

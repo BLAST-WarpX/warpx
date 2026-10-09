@@ -62,7 +62,8 @@ public:
                   const Vec&,
                         amrex::Real,
                         amrex::Real,
-                        int) const = 0;
+                        int,
+                        bool) const = 0;
 
     /**
      * \brief Return the nonlinear solver exit status.

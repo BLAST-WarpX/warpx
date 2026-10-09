@@ -30,6 +30,8 @@ jobs:
       run: .github/workflows/source/hasEOLwhiteSpace
     - name: Check test input files
       run: .github/workflows/source/check_inputs.py
+    - name: Check default analysis links
+      run: .github/workflows/source/check_analysis_file_type.py
     - name: Doxygen
       run: |
         sudo apt update

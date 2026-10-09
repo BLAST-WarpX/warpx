@@ -130,8 +130,10 @@ QuantumSynchrotronEngine::get_default_ctrl() const
 {
     namespace pxr_qs = picsar::multi_physics::phys::quantum_sync;
     return PicsarQuantumSyncCtrl{
-        pxr_qs::default_dndt_lookup_table_params<amrex::ParticleReal>,
-        pxr_qs::default_photon_emission_lookup_table_params<amrex::ParticleReal>
+        .dndt_params =
+            pxr_qs::default_dndt_lookup_table_params<amrex::ParticleReal>,
+        .phot_em_params =
+            pxr_qs::default_photon_emission_lookup_table_params<amrex::ParticleReal>
     };
 }
 

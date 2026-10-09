@@ -15,8 +15,12 @@
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_INT.H>
 #include <AMReX_REAL.H>
 #include <AMReX_LO_BCTYPES.H>
+
+#include <map>
+#include <string>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -58,12 +62,21 @@ public:
 
     bool DoParticleSuborbits () const { return m_particle_suborbits; }
 
+    virtual void SetupStep(amrex::Real /* start_time */) {}
+
+    virtual int DoSolve(amrex::Real a_start_time, int a_step, bool verbose_step) = 0;
+
+    virtual void ResetStep(amrex::Real /* start_time */) {}
+
+    virtual void FinishStep(amrex::Real /* a_start_time */, int /* a_step */) {}
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
-    virtual int OneStep (amrex::Real  a_time,
+    virtual int OneStep (amrex::Real  start_time,
                          amrex::Real  a_dt,
-                         int          a_step) = 0;
+                         int          a_step,
+                         bool verbose_step);
 
     //
     // the following routines are called by the linear and nonlinear solvers
@@ -134,12 +147,47 @@ public:
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
 
+    /**
+     * \brief Apply deposited mass matrices to a vector field.
+     * Computes a_out += a_scale * S * (a_in - a_in_ref) [+ a_baseline],
+     * where S is the mass matrix, accumulating into a_out.
+     * If a_in_ref is null, a_in is used directly.
+     * If a_baseline is null, no baseline term is added.
+     * If a_zero_out_first is true, a_out is set to zero before accumulating,
+     * so that it holds the result of this operation only; otherwise the result
+     * is added on top of the existing contents of a_out.
+     */
+    void ApplyMassMatrices (
+        ablastr::fields::MultiLevelVectorField& a_out,
+        const ablastr::fields::MultiLevelVectorField& a_in,
+        const ablastr::fields::MultiLevelVectorField* a_in_ref = nullptr,
+        const ablastr::fields::MultiLevelVectorField* a_baseline = nullptr,
+        amrex::Real a_scale = 1.0,
+        bool a_zero_out_first = false );
+
+    /**
+     * \brief Assert that ApplyMassMatrices(a_out, a_in, ...) reads a_in over the
+     * full stencil of the mass matrices, for every valid cell of a_out.
+     * ApplyMassMatrices silently clips the stencil at the edge of the guard
+     * cells of a_in. This is harmless when the mass matrices have not been
+     * summed over their guard cells, since the entries beyond the guard cells
+     * of a_in are then zero, but not when they have been (e.g. semi-implicit Darwin).
+     */
+    void AssertMassMatricesStencilNotClipped (
+        const ablastr::fields::MultiLevelVectorField& a_out,
+        const ablastr::fields::MultiLevelVectorField& a_in ) const;
+
     void ComputeJfromMassMatrices (bool a_J_from_MM_only);
 
     /**
      * \brief Finish filling the mass matrices after deposit
      */
-    void FinishMassMatrices ();
+    void FinishMassMatricesDeposition ();
+
+    /**
+     * \brief Finish the implicit particle update after the converged time-centered solve
+     */
+    void FinishImplicitParticleUpdate (amrex::Real time, int step);
 
 protected:
 
@@ -159,6 +207,11 @@ protected:
      * \brief Time step
      */
     mutable amrex::Real m_dt = 0.0;
+
+    /**
+     * \brief Number of substeps
+     */
+    int m_nsubsteps = 1;
 
     /**
      * \brief Time-biasing parameter for fields used on RHS to advance system.
@@ -188,6 +241,15 @@ protected:
      * m_max_particle_iterations iterations
      */
     bool m_particle_suborbits = false;
+
+    int m_suborbit_warning_threshold = 5;
+    int m_suborbit_statistics_interval = 100;
+    std::map<std::string, amrex::Long> m_accumulated_suborbit_counts;
+    int m_suborbit_statistics_start_step = -1;
+
+    void AccumulateSuborbitStatistics (
+        std::map<std::string, amrex::Long> const& local_suborbit_counts,
+        int step);
 
     /**
      * \brief whether the details of unconverged particles are printed out during
@@ -251,6 +313,8 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
+    void CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src);
+
     void SaveEoldMultifab ();
 
     /**
@@ -265,7 +329,8 @@ protected:
      */
     void PreRHSOp ( amrex::Real  a_cur_time,
                     int          a_nl_iter,
-                    bool         a_from_jacobian );
+                    bool         a_from_jacobian,
+                    amrex::Real  a_dt_scale = amrex::Real(1.));
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions

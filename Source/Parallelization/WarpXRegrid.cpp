@@ -212,7 +212,8 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         if (eb_enabled) {
 #ifdef AMREX_USE_EB
             int const max_guard = guard_cells.ng_FieldSolver.max();
-            m_field_factory[lev] = amrex::makeEBFabFactory(Geom(lev), ba, dm,
+            auto const* eb_index_space = GetEBIndexSpace(lev);
+            m_field_factory[lev] = amrex::makeEBFabFactory(eb_index_space, Geom(lev), ba, dm,
                                                            {max_guard, max_guard, max_guard},
                                                            amrex::EBSupport::full);
 #endif

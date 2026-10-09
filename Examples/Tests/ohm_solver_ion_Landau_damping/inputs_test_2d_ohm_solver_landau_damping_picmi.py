@@ -227,7 +227,21 @@ class IonLandauDamping(object):
                 name="diag1",
                 grid=self.grid,
                 period=100,
-                data_list=["Bx", "By", "Bz", "Ex", "Ey", "Ez", "Jx", "Jy", "Jz"],
+                # Te/Pe exercise the hybrid-PIC electron temperature/pressure
+                # diagnostics (Te is the closure-implied temperature).
+                data_list=[
+                    "Bx",
+                    "By",
+                    "Bz",
+                    "Ex",
+                    "Ey",
+                    "Ez",
+                    "Jx",
+                    "Jy",
+                    "Jz",
+                    "Te",
+                    "Pe",
+                ],
             )
             simulation.add_diagnostic(field_diag)
 
