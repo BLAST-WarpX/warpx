@@ -1,5 +1,6 @@
 #include "ImplicitSolver.H"
 #include "SparseJacobianMatrix.H"
+#include "SparseMatrixUtils.H"
 #include "Fields.H"
 #include "NonlinearSolvers/LinearSolverLibrary.H"
 #include "WarpX.H"
@@ -1344,6 +1345,34 @@ void ImplicitSolver::PrintBaseImplicitSolverParameters () const
     }
 }
 
+const Vector<Array<MultiFab*,3>>* ImplicitSolver::GetCurlCurlDiag ()
+{
+    using warpx::fields::FieldType;
+
+    if (GetThetaForPC() <= 0.0_rt) { return nullptr; }
+
+    if (m_curlcurl_diag_mfarrvec.empty()) {
+        if (!m_pc_matrix_fields_initialized) {
+            InitializePCMatrixFields();
+            m_pc_matrix_fields_initialized = true;
+        }
+        m_curlcurl_diag.resize(m_num_amr_levels);
+        m_curlcurl_diag_mfarrvec.resize(m_num_amr_levels);
+        for (int lev = 0; lev < m_num_amr_levels; lev++) {
+            const ablastr::fields::VectorField E = m_WarpX->m_fields.get_alldirs(FieldType::Efield_fp, lev);
+            for (int dir = 0; dir < 3; dir++) {
+                m_curlcurl_diag[lev][dir] = std::make_unique<MultiFab>(
+                    E[dir]->boxArray(), E[dir]->DistributionMap(), 1, 0);
+                SparseMatrixUtils::FillCurlCurlDiag(
+                    *m_curlcurl_diag[lev][dir], dir, GetGeometry(lev), GetCurl2BCmask(lev, dir));
+                m_curlcurl_diag_mfarrvec[lev][dir] = m_curlcurl_diag[lev][dir].get();
+            }
+        }
+    }
+
+    return &m_curlcurl_diag_mfarrvec;
+}
+
 void ImplicitSolver::AssemblePCMatrix ()
 {
     BL_PROFILE("ImplicitSolver::AssemblePCMatrix()");
@@ -1355,8 +1384,11 @@ void ImplicitSolver::AssemblePCMatrix ()
         "ImplicitSolver::AssemblePCMatrix() DOF object is a nullptr");
 
     // Lazy initialization on first call
-    if (!m_sparse_jacobian) {
+    if (!m_pc_matrix_fields_initialized) {
         InitializePCMatrixFields();
+        m_pc_matrix_fields_initialized = true;
+    }
+    if (!m_sparse_jacobian) {
         m_sparse_jacobian = std::make_unique<SparseJacobianMatrix>();
         m_sparse_jacobian->Define(
             static_cast<int>(dofs->m_nDoFs_l),

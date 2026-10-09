@@ -304,9 +304,8 @@ int SparseJacobianMatrix::Assemble (
                         if (dir != 2) {
                             {
                                 const int cidx_g_rhs = dof_arr(i,j,k,1);
-                                const Real val = 2.0_rt * alpha
-                                    * dxi[0]*dxi[0]
-                                    * BC_mask_Edir_arr(i,j,k,0);
+                                const Real val = SparseJacobianMatrixUtil::curlCurlDiag(
+                                    i, j, k, dir, alpha, dxi, BC_mask_Edir_arr);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -345,16 +344,8 @@ int SparseJacobianMatrix::Assemble (
                                 static_cast<Real>(i);
                             {
                                 const int cidx_g_rhs = dof_arr(i,j,k,1);
-                                Real gf = 1.0_rt;
-                                if (dir == 1) {
-                                    gf = i_real / (i_real - 0.5_rt)
-                                       + i_real / (i_real + 0.5_rt);
-                                } else if (dir == 2) {
-                                    gf = 2.0_rt;
-                                }
-                                const Real val = gf * alpha
-                                    * dxi[0]*dxi[0]
-                                    * BC_mask_Edir_arr(i,j,k,0);
+                                const Real val = SparseJacobianMatrixUtil::curlCurlDiag(
+                                    i, j, k, dir, alpha, dxi, BC_mask_Edir_arr);
                                 auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                     cidx_g_rhs, val,
                                     &c_indices_g_ptr[ridx_l*nnz_max],
@@ -408,30 +399,8 @@ int SparseJacobianMatrix::Assemble (
 #endif
                         {
                             const int cidx_g_rhs = dof_arr(i,j,k,1);
-                            Real val = 0.0_rt;
-                            if (dir == 0) {
-                                val = 2.0_rt * alpha
-                                    * dxi[1]*dxi[1]
-                                    * BC_mask_Edir_arr(i,j,k,0);
-                            } else if (dir == 2) {
-                                val = 2.0_rt * alpha
-                                    * dxi[0]*dxi[0]
-                                    * BC_mask_Edir_arr(i,j,k,0);
-                            } else if (dir == 1) {
-#if defined(WARPX_DIM_RZ)
-                                const Real gf =
-                                    i_real / (i_real - 0.5_rt)
-                                    + i_real / (i_real + 0.5_rt);
-#else
-                                const Real gf = 2.0_rt;
-#endif
-                                val = gf * alpha
-                                    * dxi[0]*dxi[0]
-                                    * BC_mask_Edir_arr(i,j,k,0)
-                                    + 2.0_rt * alpha
-                                    * dxi[1]*dxi[1]
-                                    * BC_mask_Edir_arr(i,j,k,2);
-                            }
+                            const Real val = SparseJacobianMatrixUtil::curlCurlDiag(
+                                i, j, k, dir, alpha, dxi, BC_mask_Edir_arr);
                             auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                 cidx_g_rhs, val,
                                 &c_indices_g_ptr[ridx_l*nnz_max],
@@ -605,11 +574,8 @@ int SparseJacobianMatrix::Assemble (
                         const IntVect ic(AMREX_D_DECL(i,j,k));
                         {
                             const int cidx_g_rhs = dof_arrays[0](ic,1);
-                            const Real val = 2.0_rt * alpha
-                                * (dxi[dvec[1]]*dxi[dvec[1]]
-                                    * BC_mask_Edir_arr(i,j,k,0)
-                                 + dxi[dvec[2]]*dxi[dvec[2]]
-                                    * BC_mask_Edir_arr(i,j,k,3));
+                            const Real val = SparseJacobianMatrixUtil::curlCurlDiag(
+                                i, j, k, dir, alpha, dxi, BC_mask_Edir_arr);
                             auto flag = SparseJacobianMatrixUtil::insertOrAdd(
                                 cidx_g_rhs, val,
                                 &c_indices_g_ptr[ridx_l*nnz_max],

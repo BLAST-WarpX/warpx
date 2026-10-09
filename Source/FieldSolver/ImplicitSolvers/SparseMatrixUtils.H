@@ -11,6 +11,7 @@
 
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuContainers.H>
+#include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 #include <AMReX_Vector.H>
 
@@ -59,6 +60,20 @@ namespace SparseMatrixUtils
      */
     void CopyFromLocalDOFVector (WarpXSolverVec& a_V,
                                  const amrex::Gpu::DeviceVector<amrex::Real>& a_local);
+
+    /**
+     * \brief Fill a MultiFab with the diagonal of the curl-curl operator
+     *        (without the (c*theta*dt)^2 factor) for one field component.
+     *
+     * \param[out] a_diag     MultiFab on the grid of the field component
+     * \param[in]  a_dir      field component (0, 1, 2)
+     * \param[in]  a_geom     geometry of the AMR level
+     * \param[in]  a_bc_mask  curl-curl boundary mask of the field component
+     */
+    void FillCurlCurlDiag (amrex::MultiFab& a_diag,
+                           int a_dir,
+                           const amrex::Geometry& a_geom,
+                           const amrex::MultiFab* a_bc_mask);
 }
 
 #endif

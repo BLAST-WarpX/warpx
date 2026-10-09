@@ -295,6 +295,7 @@ Overall simulation parameters
             When ``true``, the solver iterates on the assembled matrix that is also used by ``jacobian.pc_type = pc_jacobi`` and ``pc_chebyshev`` (see below), with the plasma response included if ``implicit_evolve.use_mass_matrices_pc = true``.
             This matrix approximates the Jacobian, so more nonlinear iterations may be needed.
             When ``false``, the solver uses matrix-free evaluations of the Jacobian.
+            Its diagonal is then taken as the identity, plus the diagonal of the curl curl operator for ``theta_implicit_em``, plus the diagonal of the mass matrices if ``implicit_evolve.use_mass_matrices_jacobian = true``.
           - ``weighted_jacobi.omega`` (``float``, default: Gershgorin estimate from the assembled matrix, or 1.0 if ``use_pcmat = false``) Relaxation factor.
             Setting it turns off ``weighted_jacobi.adaptive_omega``.
           - ``weighted_jacobi.adaptive_omega`` (``bool``, default: true)

@@ -66,9 +66,10 @@ public:
                 linop->apply(y, x);
             };
             auto* bcoefs = ops->GetMassMatricesJacDiag();
+            auto* curlcurl_diag = ops->GetCurlCurlDiag();
             const int n_levels = ops->numAMRLevels();
             auto mf_ops = std::make_unique<MFMatrixSolverOps<Vec>>();
-            mf_ops->Define(std::move(matvec), bcoefs, n_levels);
+            mf_ops->Define(std::move(matvec), bcoefs, curlcurl_diag, n_levels);
             m_matrix_ops = std::move(mf_ops);
         }
 
@@ -80,6 +81,8 @@ public:
         if (!m_use_pcmat) {
             m_matrix_ops->SetPCFactor(
                 static_cast<RT>(m_linop->getOps()->GetMassMatrixDiagScale()));
+            m_matrix_ops->SetCurlCurlFactor(
+                static_cast<RT>(m_linop->getOps()->GetCurlCurlDiagScale()));
         }
         m_solver.Update();
     }

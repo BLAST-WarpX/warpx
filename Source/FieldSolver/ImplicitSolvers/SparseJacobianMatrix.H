@@ -54,6 +54,75 @@ namespace SparseJacobianMatrixUtil
         }
         return true;
     }
+
+    /**
+     * \brief Diagonal entry of a_alpha * curl curl for the field component a_dir
+     *        at (i,j,k).
+     *
+     * \param[in] a_alpha    scaling factor
+     * \param[in] a_dxi      inverse cell sizes
+     * \param[in] a_bc_mask  curl-curl boundary mask of the field component
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real curlCurlDiag (const int i, const int j, const int k,
+                              const int a_dir,
+                              const amrex::Real a_alpha,
+                              const amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>& a_dxi,
+                              const amrex::Array4<const amrex::Real>& a_bc_mask)
+    {
+        using namespace amrex::literals;
+#if defined(WARPX_DIM_1D_Z)
+        if (a_dir == 2) { return 0.0_rt; }
+        return 2.0_rt * a_alpha
+            * a_dxi[0]*a_dxi[0]
+            * a_bc_mask(i,j,k,0);
+#elif defined(WARPX_DIM_RCYLINDER)
+        if (a_dir == 0) { return 0.0_rt; }
+        const amrex::Real i_real = static_cast<amrex::Real>(i);
+        const amrex::Real gf = (a_dir == 1)
+            ? i_real / (i_real - 0.5_rt) + i_real / (i_real + 0.5_rt)
+            : 2.0_rt;
+        return gf * a_alpha
+            * a_dxi[0]*a_dxi[0]
+            * a_bc_mask(i,j,k,0);
+#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
+        if (a_dir == 0) {
+            return 2.0_rt * a_alpha
+                * a_dxi[1]*a_dxi[1]
+                * a_bc_mask(i,j,k,0);
+        }
+        if (a_dir == 2) {
+            return 2.0_rt * a_alpha
+                * a_dxi[0]*a_dxi[0]
+                * a_bc_mask(i,j,k,0);
+        }
+#if defined(WARPX_DIM_RZ)
+        const amrex::Real i_real = static_cast<amrex::Real>(i);
+        const amrex::Real gf = i_real / (i_real - 0.5_rt)
+                             + i_real / (i_real + 0.5_rt);
+#else
+        const amrex::Real gf = 2.0_rt;
+#endif
+        return gf * a_alpha
+            * a_dxi[0]*a_dxi[0]
+            * a_bc_mask(i,j,k,0)
+            + 2.0_rt * a_alpha
+            * a_dxi[1]*a_dxi[1]
+            * a_bc_mask(i,j,k,2);
+#elif defined(WARPX_DIM_3D)
+        const int tdir1 = (a_dir + 1) % 3;
+        const int tdir2 = (a_dir + 2) % 3;
+        return 2.0_rt * a_alpha
+            * (a_dxi[tdir1]*a_dxi[tdir1]
+                * a_bc_mask(i,j,k,0)
+             + a_dxi[tdir2]*a_dxi[tdir2]
+                * a_bc_mask(i,j,k,3));
+#else
+        // 1D spherical geometry is electrostatic
+        amrex::ignore_unused(i, j, k, a_dir, a_alpha, a_dxi, a_bc_mask);
+        return 0.0_rt;
+#endif
+    }
 }
 
 /**
