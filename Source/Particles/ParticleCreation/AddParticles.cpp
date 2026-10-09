@@ -217,7 +217,6 @@ PhysicalParticleContainer::AddParticles (int lev)
             const amrex::Vector<amrex::Vector<int>> attr_int;
             AddNParticles(lev, 1, xp, yp, zp, uxp, uyp, uzp,
                           1, attr, 0, attr_int, 0);
-            return;
         }
 
         if (plasma_injector->add_multiple_particles) {

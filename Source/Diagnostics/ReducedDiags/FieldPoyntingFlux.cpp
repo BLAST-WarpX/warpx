@@ -202,7 +202,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux (amrex::Real dt)
         amrex::Real flux = 0._rt;
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) reduction(+:flux)
 #endif
         // Loop over boxes, interpolate E,B data to cell face centers
         // and compute sum over cells of (E x B) components

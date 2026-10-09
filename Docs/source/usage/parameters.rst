@@ -5539,6 +5539,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         * ``<reduced_diags_name>.value_function(t,x,y,z,ux,uy,uz,w)`` (``string``) optional
             Users can provide an expression for the weight used to calculate the number of particles
             per cell associated with the selected abscissa and ordinate functions and/or the filter function.
+            If not specified, the particle weight ``w`` is used.
             ``t`` represents the physical time in seconds during the simulation.
             ``x, y, z`` represent particle positions in the unit of meter.
             ``ux, uy, uz`` represent particle velocities in the unit of
