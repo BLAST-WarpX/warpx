@@ -51,6 +51,9 @@ class WarpX;
  *  scalar field. For example, the array size 3 field can be used for the vector potential A
  *  and the scalar field can be used for the scalar potential phi, which is the full state of
  *  unknowns for a Darwin electromagnetic model.
+ *  For theta-implicit PML, the vector also owns the exterior split electric
+ *  fields. These participate in all vector algebra and norms, but are not
+ *  supported by the flat-array/PETSc interface.
  */
 class WarpXSolverVec
 {
@@ -108,6 +111,12 @@ public:
                                        amrex::IntVect::TheZeroVector() );
             }
         }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                amrex::MultiFab::Copy(*m_pml_vec[n], *a_solver_vec.m_pml_vec[n],
+                                     0, 0, m_pml_vec[n]->nComp(), 0);
+            }
+        }
     }
 
     // Prohibit Copy assignment operator
@@ -120,6 +129,8 @@ public:
         if (this != &a_solver_vec) {
             m_array_vec = std::move(a_solver_vec.m_array_vec);
             m_scalar_vec = std::move(a_solver_vec.m_scalar_vec);
+            m_pml_vec = std::move(a_solver_vec.m_pml_vec);
+            m_pml_dot_mask = std::move(a_solver_vec.m_pml_dot_mask);
             m_array_type = a_solver_vec.m_array_type;
             m_scalar_type = a_solver_vec.m_scalar_type;
             m_vector_type_name = a_solver_vec.m_vector_type_name;
@@ -146,6 +157,11 @@ public:
                 m_scalar_vec[lev]->plus(*(a_solver_vec.getScalarVec()[lev]), 0, 1, 0);
             }
         }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                m_pml_vec[n]->plus(*a_solver_vec.m_pml_vec[n], 0, m_pml_vec[n]->nComp(), 0);
+            }
+        }
     }
 
     inline
@@ -161,6 +177,11 @@ public:
             }
             if (m_scalar_type != warpx::fields::FieldType::None) {
                 m_scalar_vec[lev]->minus(*(a_solver_vec.getScalarVec()[lev]), 0, 1, 0);
+            }
+        }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                m_pml_vec[n]->minus(*a_solver_vec.m_pml_vec[n], 0, m_pml_vec[n]->nComp(), 0);
             }
         }
     }
@@ -189,6 +210,12 @@ public:
                                                              0, 1, 0);
             }
         }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                amrex::MultiFab::LinComb(*m_pml_vec[n], a, *X.m_pml_vec[n], 0,
+                                        b, *Y.m_pml_vec[n], 0, 0, m_pml_vec[n]->nComp(), 0);
+            }
+        }
     }
 
     /**
@@ -208,6 +235,12 @@ public:
             if (m_scalar_type != warpx::fields::FieldType::None) {
                 amrex::MultiFab::Saxpy( *m_scalar_vec[lev], a, *X.getScalarVec()[lev],
                                         0, 0, 1, amrex::IntVect::TheZeroVector() );
+            }
+        }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                amrex::MultiFab::Saxpy(*m_pml_vec[n], a, *X.m_pml_vec[n],
+                                      0, 0, m_pml_vec[n]->nComp(), 0);
             }
         }
     }
@@ -231,6 +264,11 @@ public:
                 m_scalar_vec[lev]->mult(a_a, 0, 1);
             }
         }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                m_pml_vec[n]->mult(a_a);
+            }
+        }
     }
 
     inline
@@ -252,6 +290,11 @@ public:
                 m_scalar_vec[lev]->setVal(a_val);
             }
         }
+        for (int n = 0; n < 3; ++n) {
+            if (m_pml_vec[n]) {
+                m_pml_vec[n]->setVal(a_val);
+            }
+        }
     }
 
     inline
@@ -267,7 +310,8 @@ public:
     {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             a_solver_vec.getArrayVecType()==m_array_type &&
-            a_solver_vec.getScalarVecType()==m_scalar_type,
+            a_solver_vec.getScalarVecType()==m_scalar_type &&
+            a_solver_vec.hasPML()==hasPML(),
             "WarpXSolverVec::function(X) called with WarpXSolverVec X of different type");
     }
 
@@ -283,6 +327,13 @@ public:
     [[nodiscard]] const ablastr::fields::MultiLevelScalarField& getScalarVec() const {return m_scalar_vec;}
     ablastr::fields::MultiLevelScalarField& getScalarVec() {return m_scalar_vec;}
 
+    // Exterior PML split electric fields are part of the nonlinear unknown.
+    [[nodiscard]] bool hasPML () const { return m_pml_vec[0] != nullptr; }
+    [[nodiscard]] ablastr::fields::VectorField getPMLVec () const
+    {
+        return {m_pml_vec[0].get(), m_pml_vec[1].get(), m_pml_vec[2].get()};
+    }
+
     // solver vector types are type warpx::fields::FieldType
     [[nodiscard]] warpx::fields::FieldType getArrayVecType () const { return m_array_type; }
     [[nodiscard]] warpx::fields::FieldType getScalarVecType () const { return m_scalar_type; }
@@ -294,6 +345,8 @@ public:
     // vector sizes
     [[nodiscard]] amrex::Long nDOF_local  () const
     {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!hasPML(),
+            "Flat-array degrees of freedom are not implemented for implicit PML.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             (m_dofs != nullptr),
             "WarpXSolverVec::nDOF_local() DOF object is a nullptr");
@@ -301,6 +354,8 @@ public:
     }
     [[nodiscard]] amrex::Long nDOF_global () const
     {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!hasPML(),
+            "Flat-array degrees of freedom are not implemented for implicit PML.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             (m_dofs != nullptr),
             "WarpXSolverVec::nDOF_global() DOF object is a nullptr");
@@ -326,6 +381,9 @@ private:
 
     ablastr::fields::MultiLevelVectorField m_array_vec;
     ablastr::fields::MultiLevelScalarField m_scalar_vec;
+
+    std::array<std::unique_ptr<amrex::MultiFab>, 3> m_pml_vec;
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> m_pml_dot_mask;
 
     warpx::fields::FieldType m_array_type = warpx::fields::FieldType::None;
     warpx::fields::FieldType m_scalar_type = warpx::fields::FieldType::None;

@@ -14,6 +14,9 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include <array>
+#include <memory>
+
 /** @file
  *  Theta-implicit electromagnetic time solver class. This is a fully implicit
  *  algorithm where both the fields and particles are treated implicitly.
@@ -116,6 +119,8 @@ private:
      * diagnostics, and checkpointing alongside Efield_fp at E^{n+1}.
      */
     WarpXSolverVec m_E, m_Eold;
+    // Magnetic PML state is restored before every residual/Jacobian evaluation.
+    std::array<std::unique_ptr<amrex::MultiFab>, 3> m_pml_Bold;
 
     /**
      * \brief m_E_save saves the value in m_E before the nonlinear solve (at n - 1/2).

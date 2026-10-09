@@ -84,6 +84,27 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         }
     }
 
+    if (m_array_type == FieldType::Efield_fp &&
+        m_WarpX->evolve_scheme == EvolveScheme::Theta_Implicit_EM &&
+        m_WarpX->m_fields.has_vector(FieldType::pml_E_fp, 0)) {
+        const auto pml_E = m_WarpX->m_fields.get_alldirs(FieldType::pml_E_fp, 0);
+        for (int n = 0; n < 3; ++n) {
+            m_pml_vec[n] = std::make_unique<amrex::MultiFab>(
+                pml_E[n]->boxArray(), pml_E[n]->DistributionMap(), pml_E[n]->nComp(), 0);
+            m_pml_dot_mask[n] = pml_E[n]->OwnerMask(m_WarpX->Geom(0).periodicity());
+            // The regular grid owns nodes on the regular/PML interface. Exchange
+            // overwrites these PML values, so they must not enter solver norms.
+            const auto domain = amrex::convert(m_WarpX->Geom(0).Domain(), pml_E[n]->ixType());
+            for (amrex::MFIter mfi(*m_pml_dot_mask[n]); mfi.isValid(); ++mfi) {
+                const auto box = mfi.validbox() & domain;
+                const auto mask = m_pml_dot_mask[n]->array(mfi);
+                amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE (int i, int j, int k) {
+                    mask(i,j,k) = 0;
+                });
+            }
+        }
+    }
+
     // Define the scalar data container
     if (m_scalar_type != FieldType::None) {
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -102,7 +123,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         m_array_type != FieldType::None ||
         m_scalar_type != FieldType::None,
         "WarpXSolverVec cannot be defined with both array and scalar vecs FieldType::None");
-    if (m_dofs == nullptr) {
+    // Flat-array numbering is only needed by solvers without the PML extension.
+    if (m_dofs == nullptr && !hasPML()) {
         m_dofs = std::make_unique<WarpXSolverDOF>();
         m_dofs->Define(m_WarpX, m_num_amr_levels, m_vector_type_name, m_scalar_type_name);
         amrex::ExecOnFinalize([p=&m_dofs] () { p->reset(); });
@@ -137,10 +159,19 @@ void WarpXSolverVec::Copy ( warpx::fields::FieldType  a_array_type,
                                    amrex::IntVect::TheZeroVector() );
         }
     }
+    if (hasPML()) {
+        const auto pml_E = m_WarpX->m_fields.get_alldirs(FieldType::pml_E_fp, 0);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*m_pml_vec[n], *pml_E[n], 0, 0, pml_E[n]->nComp(), 0);
+        }
+    }
+
 }
 
 void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
 {
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!hasPML(),
+        "Flat-array vector packing is not implemented for implicit PML.");
     BL_PROFILE("WarpXSolverVec::copyFrom");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
@@ -192,6 +223,8 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
 
 void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
 {
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!hasPML(),
+        "Flat-array vector packing is not implemented for implicit PML.");
     BL_PROFILE("WarpXSolverVec::copyTo");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
@@ -262,6 +295,12 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
                                               *m_scalar_vec[lev], 0,
                                               *a_X.getScalarVec()[lev], 0, 1, 0, local);
             result += rtmp;
+        }
+    }
+    for (int n = 0; n < 3; ++n) {
+        if (m_pml_vec[n]) {
+            result += amrex::MultiFab::Dot(*m_pml_dot_mask[n], *m_pml_vec[n], 0,
+                *a_X.m_pml_vec[n], 0, m_pml_vec[n]->nComp(), 0, local);
         }
     }
     amrex::ParallelAllReduce::Sum(result, amrex::ParallelContext::CommunicatorSub());
