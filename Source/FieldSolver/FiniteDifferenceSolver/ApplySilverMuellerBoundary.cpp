@@ -42,9 +42,13 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_lo,
     amrex::Array<FieldBoundaryType,AMREX_SPACEDIM> field_boundary_hi) {
 
+#if defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(Efield,Bfield,domain_box,dt,field_boundary_lo,field_boundary_hi);
+#else
+
     using ablastr::fields::Direction;
 
-#if defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RCYLINDER)
     amrex::ignore_unused(field_boundary_lo);
 #endif
 
@@ -57,7 +61,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     // Ensure that we are using the cells the domain
     domain_box.enclosedCells();
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
     // Calculate relevant coefficients
     amrex::Real const cdt = PhysConst::c*dt;
     amrex::Real const cdt_over_dr = cdt*m_h_stencil_coefs_r[0];
@@ -70,11 +74,9 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     amrex::Real const coef2_z = 2._rt*cdt_over_dz/(1._rt + cdt_over_dz) / PhysConst::c;
 #endif
 
-#if !defined(WARPX_DIM_RSPHERE)
     // Extract stencil coefficients
     Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
     auto const n_coefs_z = static_cast<int>(m_h_stencil_coefs_z.size());
-#endif
 
     // Extract cylindrical specific parameters
     Real const dr = m_dr;
@@ -95,9 +97,7 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
     // since we grow the tiles by one guard cell after creating them.
     for ( MFIter mfi(*Efield[Direction{0}], false); mfi.isValid(); ++mfi ) {
         // Extract field data for this grid/tile
-#if !defined(WARPX_DIM_RSPHERE)
         Array4<Real> const& Er = Efield[Direction{0}]->array(mfi);
-#endif
         Array4<Real> const& Etheta = Efield[Direction{1}]->array(mfi);
         Array4<Real> const& Ez = Efield[Direction{2}]->array(mfi);
 #if defined(WARPX_DIM_RZ)
@@ -156,13 +156,6 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                     }
                 }
 #endif
-#if defined(WARPX_DIM_RSPHERE)
-                // At the +r boundary (innermost guard cell)
-                if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
-                    // Mode 0
-                    Btheta(i,j,0,0) = coef1_r*Btheta(i,j,0,0) - coef2_r*Ez(i,j,0,0);
-                }
-#else
                 // At the +r boundary (innermost guard cell)
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
                     // Mode 0
@@ -179,19 +172,10 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                     }
 #endif
                 }
-#endif
 
             },
             [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/){
 
-#if defined(WARPX_DIM_RSPHERE)
-                // At the +r boundary (innermost guard cell)
-                if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
-                    Real const r = rmin + (i + 0.5_rt)*dr; // r on nodal point (Bz is cell-centered in r)
-                    // Mode 0
-                    Bz(i,j,0,0) = coef1_r*Bz(i,j,0,0) + coef2_r*Etheta(i,j,0,0) - coef3_r*Etheta(i,j,0,0)/r;
-                }
-#else
                 // At the +r boundary (innermost guard cell)
                 if ( apply_hi_r && (i==domain_box.bigEnd(0)+1) ){
                     Real const r = rmin + (i + 0.5_rt)*dr; // r on nodal point (Bz is cell-centered in r)
@@ -208,7 +192,6 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
                     }
 #endif
                 }
-#endif
 
             }
         );
@@ -390,5 +373,6 @@ void FiniteDifferenceSolver::ApplySilverMuellerBoundary (
         );
 
     }
+#endif
 #endif
 }

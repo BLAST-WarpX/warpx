@@ -1237,10 +1237,11 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
             const amrex::ParticleReal Ex_external_particle = m_E_external_particle[0];
             const amrex::ParticleReal Ey_external_particle = m_E_external_particle[1];
             const amrex::ParticleReal Ez_external_particle = m_E_external_particle[2];
+#if !defined(WARPX_DIM_RSPHERE)
             const amrex::ParticleReal Bx_external_particle = m_B_external_particle[0];
             const amrex::ParticleReal By_external_particle = m_B_external_particle[1];
             const amrex::ParticleReal Bz_external_particle = m_B_external_particle[2];
-
+#endif
             const amrex::XDim3 xyzmin = WarpX::LowerCorner(box, lev, 0._rt);
 
             const Dim3 lo = lbound(box);
@@ -1296,9 +1297,15 @@ PhysicalParticleContainer::PushP (int lev, Real dt,
                 amrex::ParticleReal Exp = Ex_external_particle;
                 amrex::ParticleReal Eyp = Ey_external_particle;
                 amrex::ParticleReal Ezp = Ez_external_particle;
+#if defined(WARPX_DIM_RSPHERE)
+                amrex::ParticleReal Bxp = 0._prt;
+                amrex::ParticleReal Byp = 0._prt;
+                amrex::ParticleReal Bzp = 0._prt;
+#else
                 amrex::ParticleReal Bxp = Bx_external_particle;
                 amrex::ParticleReal Byp = By_external_particle;
                 amrex::ParticleReal Bzp = Bz_external_particle;
+#endif
 
                 if (!t_do_not_gather){
                     // first gather E and B to the particle positions
