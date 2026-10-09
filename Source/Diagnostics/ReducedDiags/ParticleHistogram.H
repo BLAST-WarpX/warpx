@@ -28,7 +28,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ParticleHistogram(const std::string& rd_name);
+    explicit ParticleHistogram(const std::string& rd_name);
 
     /// normalization type
     int m_norm;

@@ -212,7 +212,8 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         if (eb_enabled) {
 #ifdef AMREX_USE_EB
             int const max_guard = guard_cells.ng_FieldSolver.max();
-            m_field_factory[lev] = amrex::makeEBFabFactory(Geom(lev), ba, dm,
+            auto const* eb_index_space = GetEBIndexSpace(lev);
+            m_field_factory[lev] = amrex::makeEBFabFactory(eb_index_space, Geom(lev), ba, dm,
                                                            {max_guard, max_guard, max_guard},
                                                            amrex::EBSupport::full);
 #endif
@@ -233,6 +234,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 #   ifdef WARPX_DIM_RZ
                 if ( !fft_periodic_single_box ) {
                     realspace_ba.grow(1, ngEB[1]); // add guard cells only in z
+                }
+                if (field_boundary_hi[0] == FieldBoundaryType::PML && !do_pml_in_domain) {
+                    // Extend region that is solved for to include the guard cells
+                    // which is where the PML boundary is applied.
+                    realspace_ba.growHi(0, pml_ncell);
                 }
                 AllocLevelSpectralSolverRZ(spectral_solver_fp,
                                            lev,
@@ -273,6 +279,11 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
 
 #   ifdef WARPX_DIM_RZ
                     c_realspace_ba.grow(1, ngEB[1]); // add guard cells only in z
+                    if (field_boundary_hi[0] == FieldBoundaryType::PML && !do_pml_in_domain) {
+                        // Extend region that is solved for to include the guard cells
+                        // which is where the PML boundary is applied.
+                        c_realspace_ba.growHi(0, pml_ncell);
+                    }
                     AllocLevelSpectralSolverRZ(spectral_solver_cp,
                                                lev,
                                                c_realspace_ba,

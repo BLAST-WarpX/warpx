@@ -5,7 +5,10 @@
 # --- provides an example of how an external Poisson solver can be
 # --- used for the field solve step.
 
+from typing import Literal
+
 import numpy as np
+from pydantic import ConfigDict
 from scipy.sparse import csc_matrix
 from scipy.sparse import linalg as sla
 
@@ -59,21 +62,33 @@ number_per_cell_each_dim = [32, 16]
 
 
 class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
-    def __init__(self, grid, **kwargs):
-        """Direct solver for the Poisson equation using superLU. This solver is
-        useful for pseudo 1D cases i.e. diode simulations with small x extent.
+    """Direct solver for the Poisson equation using superLU. This solver is
+    useful for pseudo 1D cases i.e. diode simulations with small x extent.
 
-        Arguments:
-            grid (picmi.Cartesian2DGrid): Instance of the grid on which the
-            solver will be installed.
-        """
-        super(PoissonSolverPseudo1D, self).__init__(
-            grid=grid,
-            method=kwargs.pop("method", "Multigrid"),
-            required_precision=1,
-            **kwargs,
-        )
-        self.time_sum = 0.0
+    The grid (picmi.Cartesian2DGrid) is the instance of the grid on which the
+    solver will be installed.
+    """
+
+    # NumPy and SciPy types in the runtime state of the solver
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # Different defaults than the WarpX solver
+    method: Literal["FFT", "Multigrid"] | None = "Multigrid"
+    required_precision: float | None = 1.0
+
+    # Runtime state of the solver
+    right_voltage: float | str | None = None
+    nx: int | None = None
+    nz: int | None = None
+    dx: float | None = None
+    dz: float | None = None
+    nxguardphi: int | None = None
+    nzguardphi: int | None = None
+    phi: np.ndarray | None = None
+    nxsolve: int | None = None
+    nzsolve: int | None = None
+    lu: sla.SuperLU | None = None
+    rho_data: np.ndarray | None = None
 
     def solver_initialize_inputs(self):
         """Grab geometrical quantities from the grid."""
@@ -98,8 +113,6 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
         if not np.isclose(self.dx, self.dz):
             raise RuntimeError("Direct solver requires dx = dz.")
 
-        self.nxguardrho = 2
-        self.nzguardrho = 2
         self.nxguardphi = 1
         self.nzguardphi = 1
 
@@ -158,8 +171,7 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
         Poisson's equation."""
 
         # get rho from WarpX
-        rho_wrapper = sim.fields.get("rho_fp", level=0)
-        self.rho_data = rho_wrapper[(), ()]
+        self.rho_data = sim.fields.get("rho_fp", level=0)[...]
 
         self.solve()
 
@@ -175,12 +187,7 @@ class PoissonSolverPseudo1D(picmi.ElectrostaticSolver):
         )
         left_voltage = 0.0
 
-        rho = (
-            -self.rho_data[
-                self.nxguardrho : -self.nxguardrho, self.nzguardrho : -self.nzguardrho
-            ]
-            / constants.ep0
-        )
+        rho = -self.rho_data / constants.ep0
 
         # Construct b vector
         nx, nz = np.shape(rho)
@@ -270,7 +277,10 @@ mcc_ions = picmi.MCCCollisions(
     background_temperature=T_INERT,
     scattering_processes={
         "elastic": {"cross_section": cross_sec_direc + "ion_scattering.dat"},
-        "back": {"cross_section": cross_sec_direc + "ion_back_scatter.dat"},
+        "elastic_back": {
+            "cross_section": cross_sec_direc + "ion_back_scatter.dat",
+            "scattering_angle_model": "backward",
+        },
         # 'charge_exchange' : {
         #    'cross_section' : cross_sec_direc+'charge_exchange.dat'
         # }
@@ -349,4 +359,4 @@ sim.add_diagnostic(field_diag)
 sim.step(max_steps)
 
 # confirm that the external solver was run
-assert hasattr(solver, "phi")
+assert solver.phi is not None

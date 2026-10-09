@@ -1,0 +1,11 @@
+# Basic `dependabot.yml` file with minimum configuration for package managers.
+# Reference: https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-version-updates.
+
+version: 2
+updates:
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "development"

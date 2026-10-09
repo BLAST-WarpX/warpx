@@ -8,6 +8,7 @@
 #ifndef WARPX_PAIRWISE_COULOMB_COLLISION_FUNC_H_
 #define WARPX_PAIRWISE_COULOMB_COLLISION_FUNC_H_
 
+#include "Particles/Collision/CollisionFuncBase.H"
 #include "ElasticCollisionPerez.H"
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -24,6 +25,7 @@
  *        ElasticCollisionPerez. It also reads and contains the Coulomb logarithm.
  */
 class PairWiseCoulombCollisionFunc
+    : public CollisionFuncBase
 {
     // Define shortcuts for frequently-used type names
     using ParticleType = WarpXParticleContainer::ParticleType;
@@ -68,7 +70,22 @@ public:
             m_exe.m_computeSpeciesTemperatures = true;
         }
 
+        std::string scattering_model_str = "BOBYLEV";
+        pp_collision_name.query("cumulative_scattering_angle_model", scattering_model_str);
+
+        if (scattering_model_str == "NANBU") {
+            m_scattering_model = NANBU;
+        }
+        else if (scattering_model_str == "BOBYLEV") {
+            m_scattering_model = BOBYLEV;
+        }
+        else {
+            WARPX_ABORT_WITH_MESSAGE(
+            "PairWiseCoulombCollisionFunc: Unknown cumulative_scattering_angle_model = " + scattering_model_str);
+        }
+
         m_exe.m_isSameSpecies = m_isSameSpecies;
+        m_exe.m_scattering_model = m_scattering_model;
 
     }
 
@@ -105,7 +122,8 @@ public:
             amrex::ParticleReal const  q1, amrex::ParticleReal const  q2,
             amrex::ParticleReal const  m1, amrex::ParticleReal const  m2,
             amrex::Real const  dt, amrex::Real const dV, index_type coll_idx,
-            index_type const /*cell_start_pair*/, index_type* /*p_mask*/,
+            index_type const /*cell_start_pair*/, amrex::IntVect const /*global_index*/,
+            index_type* /*p_mask*/,
             index_type* /*p_pair_indices_1*/, index_type* /*p_pair_indices_2*/,
             amrex::ParticleReal* /*p_pair_reaction_weight*/,
             amrex::ParticleReal* /*p_product_data*/,
@@ -117,19 +135,21 @@ public:
                     I1s, I1e, I2s, I2e, I1, I2,
                     soa_1, soa_2, n1, n2, T1, T2,
                     q1, q2, m1, m2,
-                    dt, global_lamdb, m_CoulombLog, dV, engine, m_isSameSpecies, coll_idx);
+                    dt, global_lamdb, m_scattering_model, m_CoulombLog,
+                    dV, engine, m_isSameSpecies, coll_idx);
         }
 
         amrex::ParticleReal m_CoulombLog;
+        CumulativeScatteringModel m_scattering_model;
         bool m_computeSpeciesDensities = true;
         bool m_computeSpeciesTemperatures = false;
         bool m_need_product_data = false;
         bool m_isSameSpecies;
     };
 
-    [[nodiscard]] Executor const& executor () const { return m_exe; }
+    [[nodiscard]] Executor const& executor (int const /*lev*/, amrex::MFIter const& /*mfi*/) const { return m_exe; }
 
-    bool use_global_debye_length() { return m_use_global_debye_length; }
+    [[nodiscard]] bool use_global_debye_length() const { return m_use_global_debye_length; }
 
 private:
     amrex::ParticleReal m_CoulombLog;
@@ -138,6 +158,7 @@ private:
     Executor m_exe;
 
     bool m_use_global_debye_length = false;
+    CumulativeScatteringModel m_scattering_model;
 
 };
 

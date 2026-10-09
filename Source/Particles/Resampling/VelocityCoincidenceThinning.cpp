@@ -73,7 +73,7 @@ void VelocityCoincidenceThinning::operator() (
 #if defined(WARPX_DIM_XZ) || defined(WARPX_DIM_3D)
     auto * const AMREX_RESTRICT x = soa.GetRealData(PIdx::x).data();
 #elif defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    auto * const AMREX_RESTRICT x = soa.GetRealData(PIdx::x).data(); // rename to PIdx::r after PR #4667
+    auto * const AMREX_RESTRICT x = soa.GetRealData(PIdx::r).data();
 #endif
 #if defined(WARPX_DIM_3D)
     auto * const AMREX_RESTRICT y = soa.GetRealData(PIdx::y).data();
@@ -112,7 +112,7 @@ void VelocityCoincidenceThinning::operator() (
     amrex::Gpu::DeviceVector<int> sorted_indices(n_parts_in_tile);
     auto* sorted_indices_data = sorted_indices.data();
 
-    constexpr auto c2 = PhysConst::c * PhysConst::c;
+    constexpr auto c2 = PhysConst::c2;
 
     auto velocityBinCalculator = VelocityBinCalculator();
     velocityBinCalculator.velocity_grid_type = m_velocity_grid_type;

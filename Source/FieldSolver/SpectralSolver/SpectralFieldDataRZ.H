@@ -29,9 +29,6 @@ class SpectralFieldDataRZ
         // the local MPI rank)
         using FFTplans = amrex::LayoutData<ablastr::math::anyfft::VendorFFTPlan>;
 
-        // Similarly, define the Hankel transformers and filter for each box.
-        using MultiSpectralHankelTransformer = amrex::LayoutData<SpectralHankelTransformer>;
-
         using BinomialFilter = amrex::LayoutData<SpectralBinomialFilter>;
 
         SpectralFieldDataRZ (int lev,
@@ -102,8 +99,8 @@ class SpectralFieldDataRZ
                           int field_index2, int field_index3);
 
         // Returns an array that holds the kr for all of the modes
-        HankelTransform::RealVector const & getKrArray (amrex::MFIter const & mfi) const {
-            return multi_spectral_hankel_transformer[mfi].getKrArray();
+        HankelTransform::RealVector const & getKrArray () const {
+            return spectral_hankel_transformer.getKrArray();
         }
 
         //! `fields` stores fields in spectral space, as multicomponent FabArray
@@ -127,7 +124,7 @@ class SpectralFieldDataRZ
         // Correcting "shift" factors when performing FFT from/to
         // a cell-centered grid in real space, instead of a nodal grid
         SpectralShiftFactor zshift_FFTfromCell, zshift_FFTtoCell;
-        MultiSpectralHankelTransformer multi_spectral_hankel_transformer;
+        SpectralHankelTransformer spectral_hankel_transformer;
         BinomialFilter binomialfilter;
 
 };

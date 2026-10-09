@@ -30,13 +30,13 @@ jobs:
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -94,13 +94,13 @@ jobs:
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       shell: bash
       run: |
         .github/workflows/dependencies/dpcpp.sh
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}

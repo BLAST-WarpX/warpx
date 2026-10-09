@@ -18,7 +18,7 @@ struct ScaleFields
     amrex::Real m_vz_ave_boosted;
     amrex::Real m_v_boost;
 
-    ScaleFields(bool do_scale) noexcept
+    explicit ScaleFields(bool do_scale) noexcept
         : m_do_scale(do_scale)
     {}
 

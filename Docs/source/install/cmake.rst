@@ -87,7 +87,7 @@ Conda provides a convenient way to install dependencies across Linux, macOS, and
 
       .. code-block:: bash
 
-         conda create -n warpx-cpu-mpich-dev -c conda-forge blaspp boost ccache cmake compilers git lapackpp "openpmd-api=*=mpi_mpich*" openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt "fftw=*=mpi_mpich*" pkg-config matplotlib mamba mpich mpi4py ninja pip virtualenv wheel
+         conda create -n warpx-cpu-mpich-dev -c conda-forge blaspp libboost-devel ccache cmake compilers git lapackpp "openpmd-api=*=mpi_mpich*" openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt "fftw=*=mpi_mpich*" pkg-config matplotlib mamba mpich mpi4py ninja pip virtualenv wheel
          conda activate warpx-cpu-mpich-dev
 
          # compile WarpX with -DWarpX_MPI=ON
@@ -97,7 +97,7 @@ Conda provides a convenient way to install dependencies across Linux, macOS, and
 
       .. code-block:: bash
 
-         conda create -n warpx-cpu-dev -c conda-forge blaspp boost ccache cmake compilers git lapackpp openpmd-api openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt fftw pkg-config matplotlib mamba ninja pip virtualenv wheel
+         conda create -n warpx-cpu-dev -c conda-forge blaspp libboost-devel ccache cmake compilers git lapackpp openpmd-api openpmd-viewer packaging pytest python python-build make numpy pandas scipy setuptools yt fftw pkg-config matplotlib mamba ninja pip virtualenv wheel
          conda activate warpx-cpu-dev
 
          # compile WarpX with -DWarpX_MPI=OFF
@@ -193,7 +193,6 @@ Brew can be used to install dependencies on Linux and macOS.
 .. code-block:: bash
 
    brew update
-   brew tap openpmd/openpmd
    brew install adios2      # for openPMD
    brew install ccache
    brew install cmake
@@ -206,7 +205,7 @@ Brew can be used to install dependencies on Linux and macOS.
    brew install pkg-config  # for fftw
    brew install open-mpi
    brew install openblas    # for PSATD in RZ
-   brew install openpmd-api # for openPMD
+   brew install openpmd/openpmd/openpmd-api # for openPMD
 
 If you also want to compile with PSATD in RZ, you need to manually install BLAS++ and LAPACK++:
 
@@ -312,6 +311,8 @@ For example, this builds WarpX in all geometries, enables Python bindings and Nv
 
    cmake -S . -B build -DWarpX_DIMS="1;2;3;RZ;RCYLINDER;RSPHERE" -DWarpX_COMPUTE=CUDA
 
+On a machine without a visible GPU, e.g. an HPC login node, additionally select the GPU architecture to compile for (see :ref:`building-cmake-gpu-archs`).
+
 
 An executable WarpX binary with the current compile-time options encoded in its file name will be created in ``build/bin/``.
 Note that you need separate binaries to run 1D, 2D, 3D, RZ, RCYLINDER, RSPHERE geometry inputs scripts.
@@ -411,6 +412,37 @@ We also support adding `additional compiler flags via environment variables <htt
    Now call ``cmake -S . -B build`` (+ further options) again to re-initialize the build configuration.
 
 
+.. _building-cmake-gpu-archs:
+
+Select GPU Architectures
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+For Nvidia GPUs, WarpX uses the standard CMake interface to select the CUDA architectures to compile for.
+By default, we select ``native``, i.e., CMake detects the architecture of the GPU(s) visible on the machine that runs ``cmake`` and WarpX is built exactly for those.
+
+If no GPU is visible at configuration time (a typical situation on HPC login nodes, in containers and in CI) then configuration stops with an error and you need to select the architecture explicitly, either as a CMake option:
+
+.. code-block:: bash
+
+   cmake -S . -B build -DWarpX_COMPUTE=CUDA -DCMAKE_CUDA_ARCHITECTURES=80
+
+or as an `environment variable <https://cmake.org/cmake/help/latest/envvar/CUDAARCHS.html>`__, which is what our :ref:`HPC profiles <install-hpc>` do:
+
+.. code-block:: bash
+
+   export CUDAARCHS=80
+
+Architectures are written as integers, e.g., ``80`` for A100 (compute capability 8.0) and ``90`` for H100.
+`Multiple architectures <https://cmake.org/cmake/help/latest/prop_tgt/CUDA_ARCHITECTURES.html>`__ are separated by semicolons (``"80;90"``), and the special values ``native``, ``all`` and ``all-major`` are supported as well.
+
+.. note::
+
+   The older AMReX-specific spellings ``-DAMReX_CUDA_ARCH=8.0`` and ``export AMREX_CUDA_ARCH=8.0`` still work, but are deprecated and warn.
+   They are translated to the CMake variables above, including their historical value formats (``Auto``, ``Common``, ``Volta``, ``8.0``, ``7.0+PTX``, whitespace-separated lists).
+
+For AMD GPUs, select the architecture with ``-DAMReX_AMD_ARCH=gfx90a`` or ``export AMREX_AMD_ARCH=gfx90a``.
+
+
 CMake
 ^^^^^
 
@@ -418,6 +450,7 @@ CMake
 CMake Option                  Default & Values                             Description
 ============================= ============================================ ===========================================================
 ``CMAKE_BUILD_TYPE``          RelWithDebInfo/**Release**/Debug             `Type of build, symbols & optimizations <https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html>`__
+``CMAKE_CUDA_ARCHITECTURES``  **native**/all/all-major/``80``/...          `Nvidia GPU architectures to compile for <https://cmake.org/cmake/help/latest/prop_tgt/CUDA_ARCHITECTURES.html>`__ (``WarpX_COMPUTE=CUDA``)
 ``CMAKE_INSTALL_PREFIX``      system-dependent path                        `Install path prefix <https://cmake.org/cmake/help/latest/variable/CMAKE_INSTALL_PREFIX.html>`__
 ``CMAKE_VERBOSE_MAKEFILE``    ON/**OFF**                                   `Print all compiler commands to the terminal during build <https://cmake.org/cmake/help/latest/variable/CMAKE_VERBOSE_MAKEFILE.html>`__
 ``WarpX_APP``                 **ON**/OFF                                   Build the WarpX executable application
@@ -515,6 +548,7 @@ Environment variables can be used to control the build step:
 Environment Variable          Default & Values                             Description
 ============================= ============================================ ================================================================
 ``WARPX_COMPUTE``             NOACC/**OMP**/CUDA/SYCL/HIP                  On-node, accelerated computing backend
+``CUDAARCHS``                 **native**/all/all-major/``80``/...          Nvidia GPU architectures to compile for (see :ref:`building-cmake-gpu-archs`)
 ``WARPX_DIMS``                ``"1;2;3;RZ;RCYLINDER;RSPHERE"``             Simulation dimensionalities (semicolon-separated list)
 ``WARPX_EB``                  **ON**/OFF                                   Embedded boundary support (not supported in RZ, RCYLINDER, and RSPHERE yet)
 ``WARPX_PETSC``               ON/**OFF**                                   PETSc linear/nonlinear solvers via AMReX

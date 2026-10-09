@@ -7,6 +7,7 @@
 #ifndef WARPX_PARTICLES_COLLISION_UPDATE_MOMENTUM_PEREZ_ELASTIC_H_
 #define WARPX_PARTICLES_COLLISION_UPDATE_MOMENTUM_PEREZ_ELASTIC_H_
 
+#include "Utils/ParticleUtils.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_Math.H>
@@ -14,6 +15,61 @@
 
 #include <cmath>  // isnan() isinf()
 #include <limits> // numeric_limits<float>::min()
+
+enum CumulativeScatteringModel
+{
+    NANBU,
+    BOBYLEV
+};
+
+/* \brief Helper function to sample cosine of scattering angle from Nanbu's
+ *        cumulative scattering distribution. See PhysRevE.55.4642 (1997).
+ *        @param[in] s12 is the distribution variance
+ *        @param[in] engine is a random number engine.
+ */
+
+template <typename T_PR>
+AMREX_GPU_HOST_DEVICE AMREX_INLINE
+T_PR SampleNanbu (
+    T_PR const s12,
+    amrex::RandomEngine const& engine )
+{
+    using namespace amrex::literals;
+
+    T_PR r = amrex::Random(engine);
+
+    T_PR cosXs;
+    if ( s12 <= T_PR(0.1) )
+    {
+        while ( true )
+        {
+            cosXs = T_PR(1.0) + s12 * std::log(r);
+            // Avoid the bug when r is too small such that cosXs < -1
+            if ( cosXs >= T_PR(-1.0) ) { break; }
+            r = amrex::Random(engine);
+        }
+    }
+    else if ( s12 > T_PR(0.1) && s12 <= T_PR(3.0) )
+    {
+        T_PR const Ainv = static_cast<T_PR>(
+            0.0056958 + 0.9560202*s12 - 0.508139*s12*s12 +
+            0.47913906*s12*s12*s12 - 0.12788975*s12*s12*s12*s12 + 0.02389567*s12*s12*s12*s12*s12);
+        cosXs = Ainv * std::log( std::exp(T_PR(-1.0)/Ainv) +
+                T_PR(2.0) * r * std::sinh(T_PR(1.0)/Ainv) );
+    }
+    else if ( s12 > T_PR(3.0) && s12 <= T_PR(6.0) )
+    {
+        T_PR const A = T_PR(3.0) * std::exp(-s12);
+        cosXs = T_PR(1.0)/A * std::log( std::exp(-A) +
+                T_PR(2.0) * r * std::sinh(A) );
+    }
+    else
+    {
+        cosXs = T_PR(2.0) * r - T_PR(1.0);
+    }
+
+    return cosXs;
+}
 
 /* \brief Update particle velocities according to
  *        F. Perez et al., Phys.Plasmas.19.083104 (2012),
@@ -23,6 +79,7 @@
  *        otherwise L will be calculated based on the algorithm.
  *        @param[in] n12 = max(w1,w2)*min(N1,N2)/dV is the effective density used for s12
  *        @param[in] sigma_max is the maximum cross section based on mfp = atomic spacing
+ *        @param[in] scattering_model is the model used to obtain the scattering angle
  *        used for the normalized scattering length s12 (see Sec. II.C of Perez et al.)
  *        To see if there are nan or inf updated velocities,
  *        compile with USE_ASSERTION=TRUE.
@@ -40,10 +97,11 @@ void UpdateMomentumPerezElastic (
     T_PR const q2, T_PR const m2, T_PR const w2,
     T_PR const n12, T_PR const sigma_max,
     T_PR const L, T_PR const bmax,
+    CumulativeScatteringModel const scattering_model,
     T_R const dt, amrex::RandomEngine const& engine )
 {
 
-    T_PR constexpr inv_c2 = T_PR(1.0) / ( PhysConst::c * PhysConst::c );
+    auto constexpr inv_c2 = PhysConst::inv_c2_v<T_PR>;
 
     // Compute Lorentz factor gamma
     T_PR const gb1sq = (u1x*u1x + u1y*u1y + u1z*u1z)*inv_c2;
@@ -119,13 +177,11 @@ void UpdateMomentumPerezElastic (
         T_PR const b0 = amrex::Math::abs(q1*q2) /
                         (T_PR(2.0)*MathConst::pi*PhysConst::epsilon_0*muRst*vrelst*vrelst_invar);
 
-
         // Compute the Coulomb log lnLmd first
         T_PR lnLmd;
         if ( L > T_PR(0.0) ) { lnLmd = L; }
         else
         {
-
             // Compute the minimum impact parameter from quantum: bqm = lDB/(4*pi) = hbar/(2*p1sm)
             // See NRL formulary. Also see "An introduction to the physics of the Coulomb logarithm,
             // with emphasis on quantum-mechanical effects", J. Plasma Phys. vol. 85 (2019). by J.A. Krommes.
@@ -154,85 +210,26 @@ void UpdateMomentumPerezElastic (
     // Only modify momenta if s12 is non-zero
     if (s12 > std::numeric_limits<T_PR>::min()) {
 
-        // Get random numbers
-        T_PR r = amrex::Random(engine);
-
-        // Compute scattering angle
-        T_PR cosXs;
-        T_PR sinXs;
-        if ( s12 <= T_PR(0.1) )
-        {
-            while ( true )
-            {
-                cosXs = T_PR(1.0) + s12 * std::log(r);
-                // Avoid the bug when r is too small such that cosXs < -1
-                if ( cosXs >= T_PR(-1.0) ) { break; }
-                r = amrex::Random(engine);
-            }
+        T_PR cosXs = T_PR(0.0);
+        if (scattering_model == NANBU) {
+            // Obtain scattering angle by sampling from Nanbu's distibution
+            cosXs = SampleNanbu(s12, engine);
         }
-        else if ( s12 > T_PR(0.1) && s12 <= T_PR(3.0) )
-        {
-            T_PR const Ainv = static_cast<T_PR>(
-                0.0056958 + 0.9560202*s12 - 0.508139*s12*s12 +
-                0.47913906*s12*s12*s12 - 0.12788975*s12*s12*s12*s12 + 0.02389567*s12*s12*s12*s12*s12);
-            cosXs = Ainv * std::log( std::exp(T_PR(-1.0)/Ainv) +
-                    T_PR(2.0) * r * std::sinh(T_PR(1.0)/Ainv) );
+        else if (scattering_model == BOBYLEV) {
+            // Obtain scattering angle from Bobylev's delta function distribution
+            cosXs = T_PR(1.0) - std::min(s12,T_PR(2.0));
         }
-        else if ( s12 > T_PR(3.0) && s12 <= T_PR(6.0) )
-        {
-            T_PR const A = T_PR(3.0) * std::exp(-s12);
-            cosXs = T_PR(1.0)/A * std::log( std::exp(-A) +
-                    T_PR(2.0) * r * std::sinh(A) );
-        }
-        else
-        {
-            cosXs = T_PR(2.0) * r - T_PR(1.0);
-        }
-        sinXs = std::sqrt(T_PR(1.0) - cosXs*cosXs);
 
         // Get random azimuthal angle
         T_PR const phis = amrex::Random(engine) * T_PR(2.0) * MathConst::pi;
-        T_PR const cosphis = std::cos(phis);
-        T_PR const sinphis = std::sin(phis);
 
-        // Compute post-collision momenta pfs in COM
-        T_PR p1fsx;
-        T_PR p1fsy;
-        T_PR p1fsz;
-        // p1sp is the p1s perpendicular
-        T_PR p1sp = std::sqrt( p1sx*p1sx + p1sy*p1sy );
-        // Make sure p1sp is not almost zero
-        if ( p1sp > std::numeric_limits<T_PR>::min() )
-        {
-            p1fsx = ( p1sx*p1sz/p1sp ) * sinXs*cosphis +
-                    ( p1sy*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sx           ) * cosXs;
-            p1fsy = ( p1sy*p1sz/p1sp ) * sinXs*cosphis +
-                    (-p1sx*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sy           ) * cosXs;
-            p1fsz = (-p1sp           ) * sinXs*cosphis +
-                    ( T_PR(0.0)      ) * sinXs*sinphis +
-                    ( p1sz           ) * cosXs;
-            // Note a negative sign is different from
-            // Eq. (12) in Perez's paper,
-            // but they are the same due to the random nature of phis.
-        }
-        else
-        {
-            // If the previous p1sp is almost zero
-            // x->y  y->z  z->x
-            // This set is equivalent to the one in Nanbu's paper
-            p1sp = std::sqrt( p1sy*p1sy + p1sz*p1sz );
-            p1fsy = ( p1sy*p1sx/p1sp ) * sinXs*cosphis +
-                    ( p1sz*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sy           ) * cosXs;
-            p1fsz = ( p1sz*p1sx/p1sp ) * sinXs*cosphis +
-                    (-p1sy*p1sm/p1sp ) * sinXs*sinphis +
-                    ( p1sz           ) * cosXs;
-            p1fsx = (-p1sp           ) * sinXs*cosphis +
-                    ( T_PR(0.0)      ) * sinXs*sinphis +
-                    ( p1sx           ) * cosXs;
-        }
+        // Compute post-collision momenta pfs in COM: rotate the pre-collision
+        // momentum of particle 1 by the scattering angle Xs and azimuthal angle phis
+        // (Eq. (12) in Perez's paper). The magnitude is preserved in the COM frame.
+        T_PR p1fsx = p1sx;
+        T_PR p1fsy = p1sy;
+        T_PR p1fsz = p1sz;
+        ParticleUtils::rotateVector(p1fsx, p1fsy, p1fsz, phis, cosXs);
 
         T_PR const p2fsx = -p1fsx;
         T_PR const p2fsy = -p1fsy;
@@ -253,7 +250,7 @@ void UpdateMomentumPerezElastic (
         T_PR const p2fz = p2fsz + vcz * factor2;
 
         // Rejection method
-        r = amrex::Random(engine);
+        T_PR r = amrex::Random(engine);
         if ( w2 > r*amrex::max(w1, w2) )
         {
             u1x  = p1fx / m1;

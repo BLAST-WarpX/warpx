@@ -86,6 +86,7 @@ ionsB.uz_th = sqrt(TB*q_e/m_c12)/clight
 #################################
 collisions.collision_names = collision1 collisionA collisionB
 collisions.correct_energy_momentum = 1
+collisions.energy_correction_sort_by_weight = true
 collision1.species = ionsA ionsB
 collision1.CoulombLog = 10.0
 collisionA.species = ionsA ionsA

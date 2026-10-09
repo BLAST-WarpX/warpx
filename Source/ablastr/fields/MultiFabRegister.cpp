@@ -10,18 +10,40 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_MakeType.H>
+#include <AMReX_VisMF.H>
 
 #include <array>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 
 namespace ablastr::fields
 {
+    // Direction: implicit conversion from strings, e.g., in MultiFabRegister::get(name, "x", level)
+    static_assert(std::is_convertible_v<char const *, Direction>);
+    static_assert(std::is_convertible_v<std::string, Direction>);
+    static_assert(std::is_convertible_v<std::string_view, Direction>);
+    // Direction: a char must not promote silently to Direction (int), e.g., 'x' -> 120
+    static_assert(!std::is_constructible_v<Direction, char>);
+    // Direction: a literal nullptr must fail at compile time
+    static_assert(!std::is_constructible_v<Direction, std::nullptr_t>);
+    // Direction: string constructors are constexpr, so these also fail to compile if they recurse
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    static_assert(int{Direction{"r"}} == int{Direction::r});
+    static_assert(int{Direction{std::string_view{"theta"}}} == int{Direction::theta});
+#endif
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ) || defined(WARPX_DIM_1D_Z)
+    static_assert(int{Direction{"x"}} == int{Direction::x});
+    static_assert(int{Direction{std::string_view{"y"}}} == int{Direction::y});
+#endif
+
     amrex::MultiFab*
     MultiFabRegister::internal_alloc_init (
         std::string const & name,
@@ -32,7 +54,8 @@ namespace ablastr::fields
         amrex::IntVect const & ngrow,
         std::optional<amrex::Real const> initial_value,
         bool remake,
-        bool redistribute_on_remake
+        bool redistribute_on_remake,
+        bool checkpoint_restart
     )
     {
         // checks
@@ -53,6 +76,7 @@ namespace ablastr::fields
                 level,
                 remake,
                 redistribute_on_remake,
+                checkpoint_restart,
                 ""   // we own the memory
             }
         );
@@ -82,7 +106,8 @@ namespace ablastr::fields
         amrex::IntVect const & ngrow,
         std::optional<amrex::Real const> initial_value,
         bool remake,
-        bool redistribute_on_remake
+        bool redistribute_on_remake,
+        bool checkpoint_restart
     )
     {
         // checks
@@ -107,6 +132,7 @@ namespace ablastr::fields
                 level,
                 remake,
                 redistribute_on_remake,
+                checkpoint_restart,
                 ""   // we own the memory
             }
         );
@@ -165,6 +191,7 @@ namespace ablastr::fields
                 level,
                 alias.m_remake,
                 alias.m_redistribute_on_remake,
+                alias.m_checkpoint_restart,
                 internal_alias_name
             }
 
@@ -225,6 +252,7 @@ namespace ablastr::fields
                 level,
                 alias.m_remake,
                 alias.m_redistribute_on_remake,
+                alias.m_checkpoint_restart,
                 internal_alias_name
             }
         );
@@ -299,6 +327,52 @@ namespace ablastr::fields
         }
     }
 
+    void
+    MultiFabRegister::write_checkpoints (
+        int level,
+        const std::string & dir
+    )
+    {
+        for (auto & element : m_mf_register )
+        {
+            MultiFabOwner const & mf_owner = element.second;
+
+            if (mf_owner.m_checkpoint_restart && mf_owner.m_level == level && !mf_owner.is_alias()) {
+                // write MultiFabs to checkpoint directory
+                // only owning MultiFabs are written out
+                const amrex::MultiFab & mf = mf_owner.m_mf;
+                const std::string & name = element.first;
+                amrex::VisMF::Write(mf, dir + name);
+            }
+        }
+    }
+
+    void
+    MultiFabRegister::read_restarts (
+        int level,
+        const std::string & dir
+    )
+    {
+        for (auto & element : m_mf_register )
+        {
+            MultiFabOwner & mf_owner = element.second;
+
+            if (mf_owner.m_checkpoint_restart && mf_owner.m_level == level && !mf_owner.is_alias()) {
+                // read MultiFabs from checkpoint directory
+                // only owning MultiFabs are read in
+                amrex::MultiFab & mf = mf_owner.m_mf;
+                const std::string & name = element.first;
+                if (!amrex::VisMF::Exist(dir + name)) {
+                    // The checkpoint predates this field being flagged (or was
+                    // written by a run that did not flag it): keep the runtime
+                    // initialization instead of failing the whole restart.
+                    continue;
+                }
+                amrex::VisMF::Read(mf, dir + name);
+            }
+        }
+    }
+
     bool
     MultiFabRegister::internal_has (
         std::string const & name,
@@ -307,7 +381,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, level);
 
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -319,7 +393,7 @@ namespace ablastr::fields
     {
         std::string const internal_name = mf_name(name, dir, level);
 
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     bool
@@ -343,7 +417,7 @@ namespace ablastr::fields
         std::string const & internal_name
     )
     {
-        return m_mf_register.count(internal_name) > 0;
+        return m_mf_register.contains(internal_name);
     }
 
     amrex::MultiFab*
@@ -351,7 +425,7 @@ namespace ablastr::fields
         std::string const & internal_name
     )
     {
-        if (m_mf_register.count(internal_name) == 0) {
+        if (!m_mf_register.contains(internal_name)) {
             throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab & mf = m_mf_register.at(internal_name).m_mf;
@@ -364,7 +438,7 @@ namespace ablastr::fields
         std::string const & internal_name
     ) const
     {
-        if (m_mf_register.count(internal_name) == 0) {
+        if (!m_mf_register.contains(internal_name)) {
             throw std::runtime_error("MultiFabRegister::get name does not exist in register: " + internal_name);
         }
         amrex::MultiFab const & mf = m_mf_register.at(internal_name).m_mf;

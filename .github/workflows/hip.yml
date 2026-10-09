@@ -26,12 +26,12 @@ jobs:
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       shell: bash
       run: .github/workflows/dependencies/hip.sh 6.3.2
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -67,7 +67,9 @@ jobs:
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_sp/lib/site-packages/pywarpx/
         python3 -m pip wheel .
-        python3 -m pip install *.whl
+        # install pywarpx with the dependency wheels built above (also works if a dependency
+        # is given by URL, e.g., an in-development PICMI version)
+        python3 -m pip install --find-links . pywarpx-*.whl
 
         ccache -s
         du -hs ~/.cache/ccache
@@ -81,12 +83,12 @@ jobs:
     needs: check_changes
     if: ${{ github.event.pull_request.draft == false && needs.check_changes.outputs.has_non_docs_changes == 'true' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: install dependencies
       shell: bash
       run: .github/workflows/dependencies/hip.sh 6.3.2
     - name: CCache Cache
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ~/.cache/ccache
         key: ccache-${{ github.workflow }}-${{ github.job }}-git-${{ github.sha }}
@@ -123,7 +125,9 @@ jobs:
         export WARPX_MPI=OFF
         export PYWARPX_LIB_DIR=$PWD/build_2d/lib/site-packages/pywarpx/
         python3 -m pip wheel .
-        python3 -m pip install *.whl
+        # install pywarpx with the dependency wheels built above (also works if a dependency
+        # is given by URL, e.g., an in-development PICMI version)
+        python3 -m pip install --find-links . pywarpx-*.whl
 
         ccache -s
         du -hs ~/.cache/ccache

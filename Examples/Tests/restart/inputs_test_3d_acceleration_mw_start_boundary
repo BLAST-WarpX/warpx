@@ -1,0 +1,8 @@
+FILE = inputs_base_3d_mw
+
+# start_moving_window_step is left at its default (0), and only
+# end_moving_window_step is set, i.e. the window is active from the very
+# first step and stops at step 4 (exclusive), well before the checkpoint
+# at step 5. Restart must preserve the shifts from steps 1-3, even though
+# start_moving_window_step defaults to 0 and the window has already stopped.
+warpx.end_moving_window_step = 4

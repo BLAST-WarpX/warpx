@@ -28,7 +28,7 @@
 // struct whose getDensity returns constant density.
 struct InjectorDensityConstant
 {
-    InjectorDensityConstant (amrex::Real a_rho) noexcept : m_rho(a_rho) {}
+    explicit InjectorDensityConstant (amrex::Real a_rho) noexcept : m_rho(a_rho) {}
 
     [[nodiscard]]
     AMREX_GPU_HOST_DEVICE
@@ -45,7 +45,7 @@ private:
 // struct whose getDensity returns local density computed from parser.
 struct InjectorDensityParser
 {
-    InjectorDensityParser (amrex::ParserExecutor<3> const& a_parser) noexcept
+    explicit InjectorDensityParser (amrex::ParserExecutor<3> const& a_parser) noexcept
         : m_parser(a_parser) {}
 
     [[nodiscard]]
@@ -62,7 +62,8 @@ struct InjectorDensityParser
 // struct whose getDensity returns density from file.
 struct InjectorDensityFromFile
 {
-    InjectorDensityFromFile (std::string const& a_file_name, amrex::Geometry const& a_geom, bool a_distributed);
+    InjectorDensityFromFile (std::string const& a_file_name, std::string const& a_F_name,
+                             amrex::Geometry const& a_geom, bool a_distributed);
 
     void clear ();
 
@@ -135,9 +136,10 @@ struct InjectorDensity
 
     // This constructor stores a InjectorDensityFromFile in union object.
     InjectorDensity (InjectorDensityFromFile* t, std::string const& a_file_name,
-                     amrex::Geometry const& a_geom, bool a_distributed)
+                     std::string const& a_F_name, amrex::Geometry const& a_geom,
+                     bool a_distributed)
         : type(Type::fromfile),
-          object(t,a_file_name,a_geom,a_distributed)
+          object(t,a_file_name,a_F_name,a_geom,a_distributed)
     { }
 
     // Explicitly prevent the compiler from generating copy constructors
@@ -207,8 +209,9 @@ private:
         Object (InjectorDensityParser*, amrex::ParserExecutor<3> const& a_parser) noexcept
             : parser(a_parser) {}
         Object (InjectorDensityFromFile*, std::string const& a_file_name,
-                amrex::Geometry const& a_geom, bool a_distributed)
-            : fromfile(a_file_name, a_geom, a_distributed) {}
+                std::string const& a_F_name, amrex::Geometry const& a_geom,
+                bool a_distributed)
+            : fromfile(a_file_name, a_F_name, a_geom, a_distributed) {}
         InjectorDensityConstant   constant;
         InjectorDensityParser     parser;
         InjectorDensityFromFile   fromfile;

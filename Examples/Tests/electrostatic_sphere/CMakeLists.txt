@@ -46,8 +46,8 @@ add_warpx_test(
     3  # dims
     2  # nprocs
     inputs_test_3d_electrostatic_sphere_adaptive  # inputs
-    "analysis_electrostatic_sphere.py diags/diag1000054"  # analysis
-    "analysis_default_regression.py --path diags/diag1000054"  # checksum
+    "analysis_electrostatic_sphere.py diags/diag1000040"  # analysis
+    "analysis_default_regression.py --path diags/diag1000040"  # checksum
     OFF  # dependency
 )
 

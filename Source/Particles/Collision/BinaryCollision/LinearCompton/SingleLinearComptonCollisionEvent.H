@@ -60,8 +60,8 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
                                        const amrex::RandomEngine& engine)
 {
     using namespace amrex::literals;
-    constexpr amrex::ParticleReal inv_c = 1._prt / PhysConst::c;
-    constexpr amrex::ParticleReal inv_c_sq = inv_c * inv_c;
+    constexpr auto inv_c = PhysConst::inv_c_v<amrex::ParticleReal>;
+    constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
 
     const amrex::ParticleReal w_min = amrex::min(w1, w2);
     const amrex::ParticleReal w_max = amrex::max(w1, w2);
@@ -71,7 +71,7 @@ void SingleLinearComptonCollisionEvent (const amrex::ParticleReal& u1x, const am
     // The cross-section is computed in the rest frame of the lepton.
 
     // Lepton's Lorentz factor
-    const amrex::ParticleReal gamma_lepton = std::sqrt(1._prt + (u2x*u2x + u2y*u2y + u2z*u2z)*inv_c_sq);
+    const amrex::ParticleReal gamma_lepton = std::sqrt(1._prt + (u2x*u2x + u2y*u2y + u2z*u2z)*inv_c2);
     // Photon's normalized momentum in the lab frame
     amrex::ParticleReal const u1_norm = std::sqrt(u1x*u1x + u1y*u1y + u1z*u1z);
     // Photon's normalized momentum in the rest frame of the lepton

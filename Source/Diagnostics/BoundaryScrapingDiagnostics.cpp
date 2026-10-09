@@ -65,7 +65,7 @@ BoundaryScrapingDiagnostics::ReadParameters ()
     const amrex::ParmParse pp_diag_name(m_diag_name);
     std::vector<std::string> intervals_string_vec = {"0"};
     pp_diag_name.queryarr("intervals", intervals_string_vec);
-    m_intervals = utils::parser::IntervalsParser(intervals_string_vec);
+    m_intervals = ablastr::utils::text::IntervalsParser(intervals_string_vec);
 
 }
 

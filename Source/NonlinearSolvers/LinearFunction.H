@@ -34,14 +34,31 @@ class LinearFunction
         LinearFunction(LinearFunction&&) noexcept = default;
         LinearFunction& operator=(LinearFunction&&) noexcept = default;
 
-        //! apply the linear function on a given vector of type T
-        virtual void apply ( T& a_dF, const T& a_dU ) = 0;
+        /**
+         * \brief Apply the linear operator A represented by this
+         *        LinearFunction object on a given vector of type T,
+         *        i.e., compute its action a_Ax = A(a_x).
+         *
+         * \param a_Ax result of applying the operator, i.e., A(a_x).
+         * \param a_x  vector the operator is applied to.
+         */
+        virtual void apply ( T& a_Ax, const T& a_x ) = 0;
 
-        //! apply the preconditioner on a given vector of type T
+        /**
+         * \brief Apply the preconditioner on a given vector of type T,
+         *        i.e., solve P(a_U) = a_X for a_U, where P is an
+         *        approximation of the linear operator A represented by
+         *        this LinearFunction object (so a_U is an approximation
+         *        of the solution of A(a_U) = a_X). If there is no
+         *        preconditioner, P = I and a_U is a copy of a_X.
+         *
+         * \param a_U result of applying the preconditioner, i.e., P^{-1}(a_X).
+         * \param a_X vector the preconditioner is applied to.
+         */
         virtual void precond ( T& a_U, const T& a_X ) = 0;
 
         //! update preconditioner
-        virtual void updatePreCondMat ( const T&  a_X ) = 0;
+        virtual void updatePreCondMat () = 0;
 
         //! get sparse matrix representation of preconditioner
         virtual void getPCMatrix( amrex::Gpu::DeviceVector<int>&,
@@ -57,10 +74,10 @@ class LinearFunction
         }
 
         //! make LHS vector
-        virtual T makeVecLHS () const = 0;
+        [[nodiscard]] virtual T makeVecLHS () const = 0;
 
         //! make RHS vector
-        virtual T makeVecRHS () const = 0;
+        [[nodiscard]] virtual T makeVecRHS () const = 0;
 
         //! vector copy operation
         inline void assign( T& a_Z, const T& a_U ) {
@@ -113,7 +130,7 @@ class LinearFunction
         virtual void define( const T&, Ops*, const PreconditionerType& ) = 0;
 
         //! returns the preconditioner type
-        virtual PreconditionerType pcType () const = 0;
+        [[nodiscard]] virtual PreconditionerType pcType () const = 0;
 
     protected:
 

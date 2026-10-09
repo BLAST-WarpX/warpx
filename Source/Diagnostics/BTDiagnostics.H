@@ -11,7 +11,7 @@
 #include "Diagnostics/ComputeDiagFunctors/ComputeDiagFunctor.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/Parser/IntervalsParser.H"
+#include "Utils/Parser/BTDIntervalsParser.H"
 
 #include <AMReX_Box.H>
 #include <AMReX_Geometry.H>

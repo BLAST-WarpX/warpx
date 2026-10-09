@@ -69,7 +69,7 @@ warpx.synchronize_velocity_for_diagnostics = 1
 diagnostics.diags_names = diag1 openpmd
 diag1.intervals = 200
 diag1.diag_type = Full
-diag1.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_protons
+diag1.additional_fields_to_plot = rho rho_electrons rho_protons
 
 diag1.particle_fields_to_plot = z uz uz_filt zuz jz
 diag1.particle_fields_species = electrons protons photons
@@ -85,7 +85,7 @@ openpmd.format = openpmd
 openpmd.openpmd_backend = h5
 openpmd.intervals = 200
 openpmd.diag_type = Full
-openpmd.fields_to_plot = Ex Ey Ez Bx By Bz jx jy jz rho rho_electrons rho_protons
+openpmd.additional_fields_to_plot = rho rho_electrons rho_protons
 
 openpmd.particle_fields_to_plot = z uz uz_filt zuz jz
 openpmd.particle_fields_species = electrons protons photons

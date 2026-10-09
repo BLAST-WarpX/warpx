@@ -7,7 +7,7 @@
 #ifndef WARPX_RESAMPLING_TRIGGER_H_
 #define WARPX_RESAMPLING_TRIGGER_H_
 
-#include "Utils/Parser/IntervalsParser.H"
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX_REAL.H>
 
@@ -33,7 +33,7 @@ public:
      * \brief Constructor of the ResamplingTrigger class. Reads the resampling trigger parameters
      * from the input file.
      */
-    ResamplingTrigger (const std::string& species_name);
+    explicit ResamplingTrigger (const std::string& species_name);
 
     /**
      * \brief A method that returns true if resampling should be done for the considered species
@@ -54,7 +54,7 @@ public:
 private:
     // Intervals that define predetermined timesteps at which resampling is performed for all
     // species.
-    utils::parser::IntervalsParser m_resampling_intervals;
+    ablastr::utils::text::IntervalsParser m_resampling_intervals;
 
     // Average number of particles per cell above which resampling is performed for a given species
     amrex::Real m_max_avg_ppc = std::numeric_limits<amrex::Real>::max();

@@ -23,7 +23,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags name
      */
-    Timestep (const std::string& rd_name);
+    explicit Timestep (const std::string& rd_name);
 
     /**
      * This function gets the current physical timestep of the simulation at all refinement levels.

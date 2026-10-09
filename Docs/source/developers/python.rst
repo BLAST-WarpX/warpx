@@ -11,10 +11,10 @@ The two layers are described below.
 Input parameters
 ----------------
 
-In a C++ input file, each of the parameters has a prefix, for example ``geometry`` in ``geometry.prob_lo``.
+In a C++ input file, each of the parameters has a prefix, for example ``geometry`` in :pp:param:`geometry.prob_lo`.
 For each of these prefixes, an instance of a Python class is created and the parameters saved as attributes.
 This construction is used since the lines in the input file look very much like a Python assignment statement,
-assigning attributes of class instances, for example ``geometry.dims = 3``.
+assigning attributes of class instances, for example :pp:param:`geometry.dims = 3`.
 
 Many of the prefix instances are predefined, for instance ``geometry`` is created in the file ``Python/pywarpx/Geometry.py``.
 In that case, ``geometry`` is an instance of the class ``Bucket`` (specified in ``Python/pywarpx/Bucket.py``),
@@ -24,7 +24,7 @@ Most of the instances are instances of the ``Bucket`` class.
 There are exceptions, such as ``constants`` and ``diagnostics`` where extra processing is needed.
 
 There can also be instances created as needed.
-For example, for the particle species, an instance is created for each species listed in ``particles.species_names``.
+For example, for the particle species, an instance is created for each species listed in :pp:param:`particles.species_names`.
 This gives a place to hold the parameters for the species, e.g., ``electrons.mass``.
 
 The instances are then used to generate the input parameters.
@@ -42,7 +42,7 @@ This is as if all of the input parameters had been specified on the command line
 If Python is only used as a prepocessor to generate the input file, the list are the strings that are written out to create the
 input file.
 
-There are two input parameters that do not have prefixes, ``max_step`` and ``stop_time``.
+There are two input parameters that do not have prefixes, :pp:param:`max_step` and :pp:param:`stop_time`.
 These are handled via keyword arguments in the ``WarpX.create_argv_list`` method.
 
 Conversion from PICMI
@@ -79,5 +79,5 @@ The initialization happens when either the ``write_input_file`` method is called
 After ``initialize_inputs`` is finished, the attributes of the prefix instances have been filled in, and the process described
 above happens, where the prefix instances are looped over to generate the list of input parameter strings (that is either written
 out to a file or passed in as ``argv``).
-The two parameters that do not have a prefix, ``max_step`` and ``stop_time``, are passed into the ``warpx`` method as keyword
+The two parameters that do not have a prefix, :pp:param:`max_step` and :pp:param:`stop_time`, are passed into the ``warpx`` method as keyword
 arguments.

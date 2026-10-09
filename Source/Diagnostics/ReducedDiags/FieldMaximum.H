@@ -24,7 +24,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    FieldMaximum(const std::string& rd_name);
+    explicit FieldMaximum(const std::string& rd_name);
 
     /**
      * This function computes the maximum value of Ex, Ey, Ez, |E|, Bx, By, Bz and |B|

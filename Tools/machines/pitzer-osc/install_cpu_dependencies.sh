@@ -29,6 +29,10 @@ python3 -m pip uninstall -qq -y pywarpx
 python3 -m pip uninstall -qq -y warpx
 python3 -m pip uninstall -qqq -y mpi4py 2>/dev/null || true
 
+# clean out caches, e.g., depending on old system modules
+python3 -m pip cache purge || true
+rm -rf ${HOME}/.cupy/kernel_cache ${HOME}/.nv/ComputeCache ${HOME}/.cache/numba ${HOME}/.triton
+
 # General extra dependencies ##################################################
 #
 SRC_DIR="${HOME}/src"
@@ -60,7 +64,7 @@ CXX=$(which CC) cmake -S ${SRC_DIR}/blaspp \
   -B ${build_dir}/blaspp-pitzer-cpu-build \
   -Duse_openmp=ON \
   -Dgpu_backend=OFF \
-  -DCMAKE_CXX_STANDARD=17 \
+  -DCMAKE_CXX_STANDARD=20 \
   -DCMAKE_INSTALL_PREFIX=${SW_DIR}/blaspp-2024.05.31
 cmake --build ${build_dir}/blaspp-pitzer-cpu-build --target install --parallel 16
 rm -rf ${build_dir}/blaspp-pitzer-cpu-build
@@ -77,7 +81,7 @@ fi
 rm -rf ${build_dir}/lapackpp-pitzer-cpu-build
 CXX=$(which CC) CXXFLAGS="-DLAPACK_FORTRAN_ADD_" cmake -S ${SRC_DIR}/lapackpp \
   -B ${build_dir}/lapackpp-pitzer-cpu-build \
-  -DCMAKE_CXX_STANDARD=17 \
+  -DCMAKE_CXX_STANDARD=20 \
   -Dbuild_tests=OFF \
   -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
   -DCMAKE_INSTALL_PREFIX=${SW_DIR}/lapackpp-2024.05.31
@@ -135,7 +139,6 @@ rm -rf ${SW_DIR}/venvs/${VENV_NAME}
 python3 -m venv ${SW_DIR}/venvs/${VENV_NAME}
 source ${SW_DIR}/venvs/${VENV_NAME}/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip cache purge
 python3 -m pip install --upgrade build
 python3 -m pip install --upgrade packaging
 python3 -m pip install --upgrade wheel

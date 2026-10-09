@@ -11,7 +11,7 @@
 #include <AMReX_FArrayBox.H>
 
 /**
- * \brief Interpolation function called within WarpX::UpdateAuxilaryDataSameType
+ * \brief Interpolation function called within WarpX::UpdateAuxiliaryDataSameType
  * with electromagnetic solver to interpolate data from the coarse and fine grids to the fine aux grid,
  * assuming that all grids have the same staggering (either collocated or staggered).
  *
@@ -84,7 +84,7 @@ void warpx_interp (int j, int k, int l,
 }
 
 /**
- * \brief Interpolation function called within WarpX::UpdateAuxilaryDataStagToNodal
+ * \brief Interpolation function called within WarpX::UpdateAuxiliaryDataStagToNodal
  * to interpolate data from the coarse and fine grids to the fine aux grid,
  * with momentum-conserving field gathering, hence between grids with different staggering,
  * and assuming that the aux grid is collocated.
@@ -239,7 +239,7 @@ void warpx_interp (int j, int k, int l,
 }
 
 /**
- * \brief Interpolation function called within WarpX::UpdateAuxilaryDataStagToNodal
+ * \brief Interpolation function called within WarpX::UpdateAuxiliaryDataStagToNodal
  * to interpolate data from the coarse and fine grids to the fine aux grid,
  * with momentum-conserving field gathering, hence between grids with different staggering,
  * and assuming that the aux grid is collocated.

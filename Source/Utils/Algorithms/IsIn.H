@@ -51,7 +51,7 @@ namespace utils::algorithms
                const std::vector<TE>& elems)
     {
         return std::any_of(elems.begin(), elems.end(),
-            [&](const auto elem){return is_in(vect, elem);});
+            [&](const auto& elem){return is_in(vect, elem);});
     }
 }
 

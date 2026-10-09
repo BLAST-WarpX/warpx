@@ -4,13 +4,7 @@ import numpy as np
 from scipy.constants import epsilon_0
 
 sys.path.append("../../../Tools/Parser/")
-from input_file_parser import parse_input_file
-
-
-def _get_input_bool(input_dict, key, expected_value):
-    """Extract a boolean from input_dict, checking if key exists and matches expected_value."""
-    value = input_dict.get(key)
-    return value is not None and value[0] == expected_value
+from input_file_parser import input_has_value, parse_input_file
 
 
 def check_charge_conservation(data):
@@ -18,15 +12,15 @@ def check_charge_conservation(data):
     # These flags determine whether the charge conservation check should run
     # and whether tolerances need to be relaxed.
     input_dict = parse_input_file("./warpx_used_inputs")
-    geometry_dims_rz = _get_input_bool(input_dict, "geometry.dims", "RZ")
-    current_correction = _get_input_bool(input_dict, "psatd.current_correction", "1")
-    current_deposition_vay = _get_input_bool(
+    geometry_dims_rz = input_has_value(input_dict, "geometry.dims", "RZ")
+    current_correction = input_has_value(input_dict, "psatd.current_correction", "1")
+    current_deposition_vay = input_has_value(
         input_dict, "algo.current_deposition", "vay"
     )
-    current_deposition_esirkepov = _get_input_bool(
+    current_deposition_esirkepov = input_has_value(
         input_dict, "algo.current_deposition", "esirkepov"
     )
-    maxwell_solver_psatd = _get_input_bool(input_dict, "algo.maxwell_solver", "psatd")
+    maxwell_solver_psatd = input_has_value(input_dict, "algo.maxwell_solver", "psatd")
 
     # Decide whether to perform the charge conservation check. We check with
     # current correction, Vay current deposition, and Esirkepov current deposition.

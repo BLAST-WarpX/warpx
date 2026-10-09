@@ -13,6 +13,7 @@
 #include "Fluids/MultiFluidContainer.H"
 #include "Particles/MultiParticleContainer.H"
 
+#include <ablastr/fields/MLMGOptions.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX_Array.H>
 
@@ -25,7 +26,7 @@ class ElectrostaticSolver
 {
 public:
     ElectrostaticSolver() = default;
-    ElectrostaticSolver( int nlevs_max );
+    explicit ElectrostaticSolver( int nlevs_max );
 
     virtual ~ElectrostaticSolver();
 
@@ -52,7 +53,8 @@ public:
         ablastr::fields::MultiFabRegister& fields,
         MultiParticleContainer& mpc,
         MultiFluidContainer* mfl,
-        int max_level) = 0;
+        int max_level,
+        bool verbose_step) = 0;
 
     /**
      * \brief Set Dirichlet boundary conditions for the electrostatic solver.
@@ -69,20 +71,17 @@ public:
 
     /**
      * Compute the potential `phi` by solving the Poisson equation with `rho` as
-     * a source, assuming that the source moves at a constant speed \f$\vec{\beta}\f$.
+     * a source, assuming that the source moves at a constant speed \f$\boldsymbol{\beta}\f$.
      * This uses the amrex solver.
      * More specifically, this solves the equation
      *  \f[
-     *      \vec{\nabla}^2 r \phi - (\vec{\beta}\cdot\vec{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
+     *      \nabla^2 r \phi - (\boldsymbol{\beta}\cdot\boldsymbol{\nabla})^2 r \phi = -\frac{r \rho}{\epsilon_0}
      *  \f]
      * \param[in] rho The charge density for a given species (relativistic solver)
      *                               or total charge density (labframe solver)
      * \param[out] phi The potential to be computed by this function
      * \param[in] beta Represents the velocity of the source of `phi`
-     * \param[in] required_precision The relative convergence threshold for the MLMG solver
-     * \param[in] absolute_tolerance The absolute convergence threshold for the MLMG solver
-     * \param[in] max_iters The maximum number of iterations allowed for the MLMG solver
-     * \param[in] verbosity The verbosity setting for the MLMG solver
+     * \param[in] mlmg_options Settings for the MLMG solve, @see ablastr::fields::MLMGOptions
      * \param[in] is_igf_2d_slices boolean to select between fully 3D Poisson solver and quasi-3D, i.e. one 2D Poisson solve on every z slice (default: false)
      * \param[out] efield The electric field corresponding to the calculated phi (only used with embedded boundaries)
      */
@@ -90,10 +89,7 @@ public:
         ablastr::fields::MultiLevelScalarField const& rho,
         ablastr::fields::MultiLevelScalarField const& phi,
         std::array<amrex::Real, 3> beta,
-        amrex::Real required_precision,
-        amrex::Real absolute_tolerance,
-        int max_iters,
-        int verbosity,
+        ablastr::fields::MLMGOptions const & mlmg_options,
         bool is_igf_2d_slices,
         std::optional<ablastr::fields::MultiLevelVectorField> efield = std::nullopt // only used for EB
     ) const;
@@ -102,11 +98,11 @@ public:
      * \brief Compute the electric field that corresponds to `phi`, and
      *        add it to the set of MultiFab `E`.
      * The electric field is calculated by assuming that the source that
-     * produces the `phi` potential is moving with a constant speed \f$\vec{\beta}\f$:
+     * produces the `phi` potential is moving with a constant speed \f$\boldsymbol{\beta}\f$:
      * \f[
-     *     \vec{E} = -\vec{\nabla}\phi + \vec{\beta}(\vec{\beta} \cdot \vec{\nabla}\phi)
+     *     \boldsymbol{E} = -\boldsymbol{\nabla}\phi + \boldsymbol{\beta}(\boldsymbol{\beta} \cdot \boldsymbol{\nabla}\phi)
      * \f]
-     * (where the second term represent the term \f$\partial_t \vec{A}\f$, in
+     * (where the second term represent the term \f$\partial_t \boldsymbol{A}\f$, in
      *     the case of a moving source)
      *
      * \param[inout] E Electric field on the grid
@@ -123,13 +119,13 @@ public:
      * \brief Compute the magnetic field that corresponds to `phi`, and
      *        add it to the set of MultiFab `B`.
      *The magnetic field is calculated by assuming that the source that
-     *produces the `phi` potential is moving with a constant speed \f$\vec{\beta}\f$:
+     *produces the `phi` potential is moving with a constant speed \f$\boldsymbol{\beta}\f$:
      *\f[
-     *    \vec{B} = -\frac{1}{c}\vec{\beta}\times\vec{\nabla}\phi
+     *    \boldsymbol{B} = -\frac{1}{c}\boldsymbol{\beta}\times\boldsymbol{\nabla}\phi
      *\f]
-     *(this represents the term \f$\vec{\nabla} \times \vec{A}\f$, in the case of a moving source)
+     *(this represents the term \f$\boldsymbol{\nabla} \times \boldsymbol{A}\f$, in the case of a moving source)
      *
-     *\param[inout] B Electric field on the grid
+     *\param[inout] B Magnetic field on the grid
      *\param[in] phi The potential from which to compute the electric field
      *\param[in] beta Represents the velocity of the source of `phi`
      */
@@ -145,17 +141,10 @@ public:
     /** Boundary handler object to set potential for EB and on the domain boundary */
     std::unique_ptr<PoissonBoundaryHandler> m_poisson_boundary_handler;
 
-    /** Parameters for MLMG Poisson solve */
-    amrex::Real self_fields_required_precision = 1e-11;
-    amrex::Real self_fields_absolute_tolerance = 0.0;
-    /** Limit on number of MLMG iterations */
-    int self_fields_max_iters = 200;
-    /** Verbosity for the MLMG solver.
-     *  0 : no verbosity
-     *  1 : timing and convergence at the end of MLMG
-     *  2 : convergence progress at every MLMG iteration
+    /** Parameters of the MLMG Poisson solve, set from the `warpx.self_fields_*`
+     *  input parameters
      */
-    int self_fields_verbosity = 2;
+    ablastr::fields::MLMGOptions m_mlmg_options;
 
     /** Parameters for FFT Poisson solver aka IGF */
     // 0: full 3D, 1: many 2D z-slices (quasi-3D)

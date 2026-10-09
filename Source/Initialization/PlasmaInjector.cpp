@@ -52,6 +52,17 @@ using namespace amrex::literals;
 
 PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::Geometry& geom, const std::string& src_name):
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    // Default radial_numpercell_power is uniform number of particles per cell
+    radial_numpercell_power{0._rt},
+#endif
+    // Unlimited boundaries
+    xmin{std::numeric_limits<amrex::Real>::lowest()},
+    xmax{std::numeric_limits<amrex::Real>::max()},
+    ymin{std::numeric_limits<amrex::Real>::lowest()},
+    ymax{std::numeric_limits<amrex::Real>::max()},
+    zmin{std::numeric_limits<amrex::Real>::lowest()},
+    zmax{std::numeric_limits<amrex::Real>::max()},
     species_id{ispecies}, species_name{name}, source_name{src_name}, m_geom(geom)
 {
 
@@ -67,21 +78,10 @@ PlasmaInjector::PlasmaInjector (int ispecies, const std::string& name,
     const amrex::ParmParse pp_species(species_name);
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Default radial_numpercell_power is uniform number of particles per cell
-    radial_numpercell_power = 0._rt;
     utils::parser::queryWithParser(pp_species, source_name, "radial_numpercell_power", radial_numpercell_power);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(radial_numpercell_power > -1.,
         "The radial_numpercell_power must be greater than -1");
 #endif
-
-    // Unlimited boundaries
-    xmin = std::numeric_limits<amrex::Real>::lowest();
-    ymin = std::numeric_limits<amrex::Real>::lowest();
-    zmin = std::numeric_limits<amrex::Real>::lowest();
-
-    xmax = std::numeric_limits<amrex::Real>::max();
-    ymax = std::numeric_limits<amrex::Real>::max();
-    zmax = std::numeric_limits<amrex::Real>::max();
 
     // NOTE: When periodic boundaries are used, default injection range is set to mother grid dimensions.
     if( geom.isPeriodic(0) ) {
@@ -238,21 +238,19 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
     utils::parser::queryWithParser(pp_species, source_name, "y_cut", y_cut);
     utils::parser::queryWithParser(pp_species, source_name, "z_cut", z_cut);
 
-    const bool q_tot_is_specified = pp_species.contains("q_tot");
-    const bool N_tot_is_specified = pp_species.contains("npart_real");
+    // these also look for <species>.<source>.<name>
+    const bool q_tot_is_specified =
+        utils::parser::queryWithParser(pp_species, source_name, "q_tot", q_tot);
+    const bool N_tot_is_specified =
+        utils::parser::queryWithParser(pp_species, source_name, "npart_real", N_tot);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( q_tot_is_specified != N_tot_is_specified,
         "Error: Exactly one between q_tot and npart_real have to be specified.");
-    if(q_tot_is_specified){
-        utils::parser::getWithParser(pp_species, source_name, "q_tot", q_tot);
-    }
-    if(N_tot_is_specified){
-        utils::parser::getWithParser(pp_species, source_name, "npart_real", N_tot);
-    }
 
     utils::parser::getWithParser(pp_species, source_name, "npart", npart);
     utils::parser::queryWithParser(pp_species, source_name, "do_symmetrize", do_symmetrize);
     utils::parser::queryWithParser(pp_species, source_name, "symmetrization_order", symmetrization_order);
-    const bool focusing_is_specified = pp_species.contains("focal_distance");
+    const bool focusing_is_specified =
+        utils::parser::queryWithParser(pp_species, source_name, "focal_distance", focal_distance);
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation", do_rotation);
     utils::parser::queryWithParser(pp_species, source_name, "do_gaussian_beam_rotation_momenta", do_rotation_momenta);
 
@@ -264,16 +262,13 @@ void PlasmaInjector::setupGaussianBeam (amrex::ParmParse const& pp_species)
 
     if(focusing_is_specified){
         do_focusing = true;
-        utils::parser::queryWithParser(pp_species, source_name, "focal_distance", focal_distance);
     }
     const std::set<int> valid_symmetries = {4,8};
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( valid_symmetries.count(symmetrization_order),
         "Error: Symmetrization only supported to orders 4 or 8 ");
     gaussian_beam = true;
     SpeciesUtils::parseMomentum(species_name, source_name, "gaussian_beam", h_inj_mom,
-                                ux_parser, uy_parser, uz_parser,
-                                ux_th_parser, uy_th_parser, uz_th_parser,
-                                h_mom_temp, h_mom_vel);
+                                h_mom_temp, h_mom_vel, m_geom);
 
 #if defined(WARPX_DIM_XZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE( y_rms > 0._rt,
@@ -302,12 +297,14 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
 {
     utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell);
 #if WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles should be at least two times n_rz_azimuthal_modes "
-        "(Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Too few particles per cell for cylindrical geometry: got "
+            + std::to_string(num_particles_per_cell) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
     // Construct InjectorPosition with InjectorPositionRandom.
@@ -324,21 +321,21 @@ void PlasmaInjector::setupNRandomPerCell (amrex::ParmParse const& pp_species)
 
     SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nrandompercell", h_inj_mom,
-                                ux_parser, uy_parser, uz_parser,
-                                ux_th_parser, uy_th_parser, uz_th_parser,
-                                h_mom_temp, h_mom_vel);
+                                h_mom_temp, h_mom_vel, m_geom);
 }
 
 void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
 {
     utils::parser::getWithParser(pp_species, source_name, "num_particles_per_cell", num_particles_per_cell_real);
 #ifdef WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell_real>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles should be at least two times n_rz_azimuthal_modes "
-        "(Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell_real < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Too few particles per cell for cylindrical geometry: got "
+            + std::to_string(num_particles_per_cell_real) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
 
@@ -418,10 +415,8 @@ void PlasmaInjector::setupNFluxPerCell (amrex::ParmParse const& pp_species)
 
     parseFlux(pp_species);
     SpeciesUtils::parseMomentum(species_name, source_name, "nfluxpercell", h_inj_mom,
-                                ux_parser, uy_parser, uz_parser,
-                                ux_th_parser, uy_th_parser, uz_th_parser,
                                 h_mom_temp, h_mom_vel,
-                                flux_normal_axis, flux_direction);
+                                m_geom, flux_normal_axis, flux_direction);
 }
 
 void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
@@ -448,12 +443,15 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
     }
 
 #if WARPX_DIM_RZ
-    if (WarpX::n_rz_azimuthal_modes > 1) {
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        num_particles_per_cell_each_dim[1]>=2*WarpX::n_rz_azimuthal_modes,
-        "Error: For accurate use of WarpX cylindrical geometry the number "
-        "of particles in the theta direction should be at least two times "
-        "n_rz_azimuthal_modes (Please visit PR#765 for more information.)");
+    if ((WarpX::n_rz_azimuthal_modes > 1) && (num_particles_per_cell_each_dim[1] < 2*WarpX::n_rz_azimuthal_modes)) {
+        ablastr::warn_manager::WMRecordWarning("Species",
+            "Too few particles per cell in the theta direction for cylindrical "
+            "geometry: got "
+            + std::to_string(num_particles_per_cell_each_dim[1]) + ", but at least "
+            + std::to_string(2*WarpX::n_rz_azimuthal_modes)
+            + " (2 x n_rz_azimuthal_modes) are recommended for accuracy. "
+            "See https://github.com/ECP-WarpX/WarpX/pull/765 for details.",
+            ablastr::warn_manager::WarnPriority::high);
     }
 #endif
     // Construct InjectorPosition from InjectorPositionRegular.
@@ -475,9 +473,7 @@ void PlasmaInjector::setupNuniformPerCell (amrex::ParmParse const& pp_species)
                              num_particles_per_cell_each_dim[2];
     SpeciesUtils::parseDensity(species_name, source_name, h_inj_rho, density_parser, m_geom);
     SpeciesUtils::parseMomentum(species_name, source_name, "nuniformpercell", h_inj_mom,
-                                ux_parser, uy_parser, uz_parser,
-                                ux_th_parser, uy_th_parser, uz_th_parser,
-                                h_mom_temp, h_mom_vel);
+                                h_mom_temp, h_mom_vel, m_geom);
 }
 
 void PlasmaInjector::setupExternalFile (amrex::ParmParse const& pp_species)

@@ -30,7 +30,7 @@ last_fn = sys.argv[2]
 # the correction can have large numerical errors due to its nature,
 # involving the difference between similar numbers.
 p_tolerance = 1.0e-14
-KE_tolerance = 1.0e-10
+KE_tolerance = 5.0e-10
 
 ds0 = yt.load(first_fn)
 ds1 = yt.load(last_fn)

@@ -8,7 +8,7 @@
 #ifndef WARPX_DIAGNOSTICS_REDUCEDDIAGS_REDUCEDDIAGS_H_
 #define WARPX_DIAGNOSTICS_REDUCEDDIAGS_REDUCEDDIAGS_H_
 
-#include "Utils/Parser/IntervalsParser.H"
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <AMReX_REAL.H>
 
@@ -34,7 +34,7 @@ public:
     std::string m_rd_name;
 
     /// output intervals
-    utils::parser::IntervalsParser m_intervals;
+    ablastr::utils::text::IntervalsParser m_intervals;
 
     /// check if header should be written
     bool m_write_header = false;
@@ -52,7 +52,7 @@ public:
      * constructor
      * @param[in] rd_name reduced diags names
      */
-    ReducedDiags (const std::string& rd_name);
+    explicit ReducedDiags (const std::string& rd_name);
 
     /**
      * Virtual destructor for polymorphism
@@ -87,8 +87,9 @@ public:
      * function to compute diags at the mid step time level
      *
      * @param[in] step current time step
+     * @param[in] dt time step size
      */
-    virtual void ComputeDiagsMidStep (int step);
+    virtual void ComputeDiagsMidStep (int step, amrex::Real dt);
 
     /**
      * write to file function

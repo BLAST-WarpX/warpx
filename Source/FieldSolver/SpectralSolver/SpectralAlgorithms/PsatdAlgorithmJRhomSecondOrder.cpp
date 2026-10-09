@@ -190,7 +190,7 @@ PsatdAlgorithmJRhomSecondOrder::pushSpectralFields (SpectralFieldData& f) const
             const     amrex::Real kz = modified_kz_arr[j];
 #endif
             // Physical constants and imaginary unit
-            constexpr amrex::Real c2 = PhysConst::c * PhysConst::c;
+            constexpr amrex::Real c2 = PhysConst::c2;
             constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr Complex I = Complex{0._rt, 1._rt};
 

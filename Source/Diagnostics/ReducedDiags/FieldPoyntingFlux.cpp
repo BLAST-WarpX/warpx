@@ -103,18 +103,21 @@ void FieldPoyntingFlux::ComputeDiags (int /*step*/)
     // This will be called at the end of the time step. Only calculate the
     // flux if it had not already been calculated mid step.
     if (!use_mid_step_value) {
-        ComputePoyntingFlux();
+        auto & warpx = WarpX::GetInstance();
+        int const lev = 0;
+        amrex::Real const dt = warpx.getdt(lev);
+        ComputePoyntingFlux(dt);
     }
 }
 
-void FieldPoyntingFlux::ComputeDiagsMidStep (int /*step*/)
+void FieldPoyntingFlux::ComputeDiagsMidStep (int /*step*/, amrex::Real dt)
 {
     // If this is called, always use the value calculated here.
     use_mid_step_value = true;
-    ComputePoyntingFlux();
+    ComputePoyntingFlux(dt);
 }
 
-void FieldPoyntingFlux::ComputePoyntingFlux ()
+void FieldPoyntingFlux::ComputePoyntingFlux (amrex::Real dt)
 {
     using warpx::fields::FieldType;
     using ablastr::fields::Direction;
@@ -199,7 +202,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
         amrex::Real flux = 0._rt;
 
 #ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion()) reduction(+:flux)
 #endif
         // Loop over boxes, interpolate E,B data to cell face centers
         // and compute sum over cells of (E x B) components
@@ -214,7 +217,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
             // This produces a box that is node center in the face direction
             // and cell centered in the other directions
-            amrex::Box box = enclosedCells(mfi.nodaltilebox());
+            amrex::Box box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             box.surroundingNodes(face_dir);
 
             // Find the intersection with the boundary
@@ -253,8 +256,8 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
             // Compute E x B
             // On GPU, reduce_ops doesn't work with empty boxes.
             if (box.ok()) {
-                if (warpx.grid_type == ablastr::utils::enums::GridType::Staggered ||
-                    warpx.grid_type == ablastr::utils::enums::GridType::Hybrid) {
+                if (WarpX::grid_type == ablastr::utils::enums::GridType::Staggered ||
+                    WarpX::grid_type == ablastr::utils::enums::GridType::Hybrid) {
                     if (normal_dir == 0) {
                         flux += Poynting::Kernel<0, PoyntingStaggered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
@@ -265,7 +268,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
                         flux += Poynting::Kernel<2, PoyntingStaggered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
                 }
-                else if (warpx.grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_nodal()) {
+                else if (WarpX::grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_nodal()) {
                     if (normal_dir == 0) {
                         flux += Poynting::Kernel<0, PoyntingNodal>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
@@ -276,7 +279,7 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
                         flux += Poynting::Kernel<2, PoyntingNodal>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
                 }
-                else if (warpx.grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_cell_centered()) {
+                else if (WarpX::grid_type == ablastr::utils::enums::GridType::Collocated && Ex.is_cell_centered()) {
                     if (normal_dir == 0) {
                         flux += Poynting::Kernel<0, PoyntingCellCentered>(box, Ex_arr, Ey_arr, Ez_arr, Bx_arr, By_arr, Bz_arr, area_factor);
                     }
@@ -301,7 +304,6 @@ void FieldPoyntingFlux::ComputePoyntingFlux ()
 
     amrex::ParallelDescriptor::ReduceRealSum(m_data.data(), 2*AMREX_SPACEDIM);
 
-    amrex::Real const dt = warpx.getdt(lev);
     for (int ii=0 ; ii < 2*AMREX_SPACEDIM ; ii++) {
         m_data[ii + 2*AMREX_SPACEDIM] += m_data[ii]*dt;
     }

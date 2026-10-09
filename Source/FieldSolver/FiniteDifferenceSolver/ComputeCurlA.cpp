@@ -45,7 +45,7 @@ void FiniteDifferenceSolver::ComputeCurlA (
         );
 
 #else
-    if (WarpX::GetInstance().grid_type == GridType::Staggered)
+    if (WarpX::grid_type == GridType::Staggered)
     {
         ComputeCurlACartesian <CartesianYeeAlgorithm> (
             Bfield, Afield, eb_update_B, lev

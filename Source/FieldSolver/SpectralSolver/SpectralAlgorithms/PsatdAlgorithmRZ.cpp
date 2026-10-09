@@ -117,7 +117,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
         }
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);
@@ -182,7 +182,7 @@ PsatdAlgorithmRZ::pushSpectralFields(SpectralFieldDataRZ & f)
             amrex::Real const kr = kr_arr[ir];
             amrex::Real const kz = modified_kz_arr[j];
 
-            constexpr amrex::Real c2 = PhysConst::c*PhysConst::c;
+            constexpr amrex::Real c2 = PhysConst::c2;
             constexpr amrex::Real ep0 = PhysConst::epsilon_0;
             constexpr amrex::Real inv_ep0 = 1._rt/PhysConst::epsilon_0;
             Complex const I = Complex{0._rt,1._rt};
@@ -363,7 +363,7 @@ void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const
             X6 = X6_coef[mfi].array();
         }
 
-        auto const & kr_modes = f.getKrArray(mfi);
+        auto const & kr_modes = f.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         int const nr = bx.length(0);
         amrex::Real const dt = m_dt;
@@ -398,7 +398,7 @@ void PsatdAlgorithmRZ::InitializeSpectralCoefficients (SpectralFieldDataRZ const
 
             if (time_averaging && J_linear)
             {
-                constexpr amrex::Real c2 = PhysConst::c * PhysConst::c;
+                constexpr amrex::Real c2 = PhysConst::c2;
                 const amrex::Real dt3 = dt * dt * dt;
                 const amrex::Real om  = c * k_norm;
                 const amrex::Real om2 = om * om;
@@ -437,7 +437,7 @@ PsatdAlgorithmRZ::CurrentCorrection (SpectralFieldDataRZ& field_data)
         const amrex::Array4<Complex> fields = field_data.fields[mfi].array();
 
         // Extract pointers for the k vectors
-        auto const & kr_modes = field_data.getKrArray(mfi);
+        auto const & kr_modes = field_data.getKrArray();
         amrex::Real const* kr_arr = kr_modes.dataPtr();
         amrex::Real const* modified_kz_arr = modified_kz_vec[mfi].dataPtr();
         int const nr = bx.length(0);

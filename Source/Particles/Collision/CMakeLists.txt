@@ -10,4 +10,7 @@ endforeach()
 
 add_subdirectory(BinaryCollision)
 add_subdirectory(BackgroundMCC)
+add_subdirectory(PulsedDecay)
 add_subdirectory(BackgroundStopping)
+add_subdirectory(InverseBremsstrahlung)
+add_subdirectory(HybridResistiveDrag)

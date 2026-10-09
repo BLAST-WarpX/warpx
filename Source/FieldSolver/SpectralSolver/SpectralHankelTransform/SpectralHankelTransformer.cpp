@@ -52,7 +52,6 @@ SpectralHankelTransformer::ExtractKrArray ()
             kr_array[ii] = kr_m_array[ir];
         });
     }
-    amrex::Gpu::synchronize();
 }
 
 /* \brief Converts a scalar field from the physical to the spectral space for all modes */
@@ -117,8 +116,6 @@ SpectralHankelTransformer::PhysicalToSpectral_Vector (amrex::Box const & box,
             F_t_physical_array(i,j,k,mode_i) = 0.5_rt*(r_imag + t_real);
         });
 
-        amrex::Gpu::streamSynchronize();
-
         dhtp[mode]->HankelForwardTransform(F_r_physical, mode_r, G_p_spectral, mode_r);
         dhtp[mode]->HankelForwardTransform(F_r_physical, mode_i, G_p_spectral, mode_i);
         dhtm[mode]->HankelForwardTransform(F_t_physical, mode_r, G_m_spectral, mode_r);
@@ -137,8 +134,6 @@ SpectralHankelTransformer::SpectralToPhysical_Scalar (amrex::FArrayBox const & G
     // can be done.
     // Note that F_physical does not include the imaginary part of mode 0,
     // but G_spectral does.
-
-    amrex::Gpu::streamSynchronize();
 
     for (int mode=0 ; mode < m_n_rz_azimuthal_modes ; mode++) {
         int const mode_r = 2*mode;
@@ -172,14 +167,10 @@ SpectralHankelTransformer::SpectralToPhysical_Vector (amrex::Box const & box,
         int const mode_r = 2*mode;
         int const mode_i = 2*mode + 1;
 
-        amrex::Gpu::streamSynchronize();
-
         dhtp[mode]->HankelInverseTransform(G_p_spectral, mode_r, F_r_physical, mode_r);
         dhtp[mode]->HankelInverseTransform(G_p_spectral, mode_i, F_r_physical, mode_i);
         dhtm[mode]->HankelInverseTransform(G_m_spectral, mode_r, F_t_physical, mode_r);
         dhtm[mode]->HankelInverseTransform(G_m_spectral, mode_i, F_t_physical, mode_i);
-
-        amrex::Gpu::streamSynchronize();
 
         amrex::ParallelFor(box,
         [=] AMREX_GPU_DEVICE (int i, int j, int k)

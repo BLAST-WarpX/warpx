@@ -9,7 +9,8 @@
 
 #include "Diagnostics.H"
 #include "Particles/MultiParticleContainer.H"
-#include "Utils/Parser/IntervalsParser.H"
+
+#include <ablastr/utils/text/IntervalsParser.H>
 
 #include <string>
 
@@ -32,7 +33,7 @@ private:
     void ReadParameters ();
 
     /** Determines timesteps at which the particles are written out */
-    utils::parser::IntervalsParser m_intervals;
+    ablastr::utils::text::IntervalsParser m_intervals;
 
     /** \brief Flush data to file. */
     void Flush (int i_buffer, bool /* force_flush */) override;
