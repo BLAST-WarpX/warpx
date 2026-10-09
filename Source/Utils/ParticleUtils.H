@@ -8,14 +8,21 @@
 #define WARPX_PARTICLE_UTILS_H_
 
 #include "Particles/WarpXParticleContainer.H"
+#include "Utils/ScatteringUtils.H"
+#include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 
 #include <AMReX_DenseBins.H>
 #include <AMReX_Geometry.H>
+#include <AMReX_GpuBuffer.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_Particles.H>
 #include <AMReX_Math.H>
 
 #include <AMReX_BaseFwd.H>
+
+#include <array>
+#include <cmath>
 
 namespace ParticleUtils {
 
@@ -182,29 +189,98 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Generate a random unit vector with isotropic distribution,
-     * following the method described in equations (27)-(31) of
-     * Higginson et al., J. Comput. Phys. 388 (2019), doi.org/10.1016/j.jcp.2019.03.020.
+     * \brief Rotate a vector by polar angle theta and azimuthal angle phi, with theta measured from
+     *        the original vector. The magnitude of the vector is preserved.
+     *
+     * @tparam T floating-point type of the vector components and angles
+     * @param[in,out] ux x-component of the vector
+     * @param[in,out] uy y-component of the vector
+     * @param[in,out] uz z-component of the vector
+     * @param[in] phi azimuthal angle phi in [0, 2pi)
+     * @param[in] costh cosine of polar angle theta; must be in [-1, 1]
+     */
+    template <typename T>
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    void rotateVector (T& ux, T& uy, T& uz, T phi, T costh)
+    {
+        AMREX_ASSERT(costh >= -T(1) && costh <= T(1));
+        const T cosph = std::cos(phi);
+        const T sinph = std::sin(phi);
+        const T sinth = std::sqrt(std::max(T(0), T(1) - costh*costh));
+
+        const T ux0 = ux;
+        const T uy0 = uy;
+        const T uz0 = uz;
+        const T u = std::sqrt(ux0*ux0 + uy0*uy0 + uz0*uz0);
+        const T uperp = std::sqrt(ux0*ux0 + uy0*uy0);
+
+        if (uperp == T(0)) {
+            ux = u*sinth*cosph;
+            uy = u*sinth*sinph;
+            uz = uz0*costh;
+        }
+        else {
+            const T nx = ux0/uperp;
+            const T ny = uy0/uperp;
+            ux = uz0*nx*sinth*cosph - u*ny*sinth*sinph + ux0*costh;
+            uy = uz0*ny*sinth*cosph + u*nx*sinth*sinph + uy0*costh;
+            uz = -uperp*sinth*cosph + uz0*costh;
+        }
+    }
+
+    /**
+     * \brief Generate a random angle with isotropic or anisotropic distribution.
+     *
+     * @param[in] engine the random engine
+     * @param[in] scattering_angle_model the scattering angle distribution to use
+     * @param[in] anisotropic_coefficients table of coefficients for anisotropic scattering
+     * @param[in] collision_energy center-of-mass collision energy in eV
+     * @param[out] energy_range_status per-event status: -1 below, 0 within, 1 above
+     */
+    AMREX_GPU_HOST_DEVICE AMREX_INLINE
+    amrex::ParticleReal getRandomCosTheta (
+        amrex::RandomEngine const& engine,
+        ScatteringAngleModel scattering_angle_model,
+        ScatteringUtils::AnisotropicCoefficientTable const& anisotropic_coefficients,
+        amrex::ParticleReal const collision_energy,
+        int* const energy_range_status)
+    {
+        using namespace amrex::literals;
+        amrex::ParticleReal cos_theta = 1.0_prt;
+        if (scattering_angle_model == ScatteringAngleModel::Backward) {
+            cos_theta = -1.0_prt;
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Isotropic) {
+            // Isotropic scattering: the angle of emission of the products in the center of mass frame is random
+            cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        }
+        else if (scattering_angle_model == ScatteringAngleModel::Legendre) {
+            cos_theta = ScatteringUtils::sampleCosTheta(anisotropic_coefficients, collision_energy, amrex::Random(engine), energy_range_status);
+        }
+        return cos_theta;
+    }
+
+    /**
+     * \brief Generate a random unit vector with isotropic distribution.
      *
      * @param[out] x x-component of the random unit vector
      * @param[out] y y-component of the random unit vector
      * @param[out] z z-component of the random unit vector
-     * @param[in] engine the random-engine
+     * @param[in] engine the random engine
      */
     AMREX_GPU_HOST_DEVICE AMREX_INLINE
     void getRandomVector ( amrex::ParticleReal& x, amrex::ParticleReal& y,
-                           amrex::ParticleReal& z, amrex::RandomEngine const& engine )
+                           amrex::ParticleReal& z, amrex::RandomEngine const& engine)
     {
         using namespace amrex::literals;
 
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
-        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;  // opposite sign of that in Higginson's paper
+        auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
         x = sin_theta * std::cos(phi);
         y = sin_theta * std::sin(phi);
         z = cos_theta;
     }
-
 
     /** \brief Function to perform scattering of a particle that results in a
      * random velocity vector with given magnitude. This is used in isotropic
@@ -218,7 +294,7 @@ namespace ParticleUtils {
     void RandomizeVelocity ( amrex::ParticleReal& ux, amrex::ParticleReal& uy,
                              amrex::ParticleReal& uz,
                              const amrex::ParticleReal vp,
-                             amrex::RandomEngine const& engine )
+                             amrex::RandomEngine const& engine)
     {
         amrex::ParticleReal x, y, z;
         // generate random unit vector for the new velocity direction
@@ -669,25 +745,21 @@ namespace ParticleUtils {
     }
 
     /**
-     * \brief Check for grid crossing errors after Villasenor deposition and abort if any found
+     * \brief Check for grid crossing errors after Villasenor mass matrix deposition and abort if any found
      *
-     * \param d_error_x  Device vector containing x-direction error count
-     * \param d_error_y  Device vector containing y-direction error count
-     * \param d_error_z  Device vector containing z-direction error count
+     * \param grid_crossing_error_count  Buffer containing three error counts in x, y, z order
      * \param max_grid_crossings  Maximum allowed crossings per direction
      */
     AMREX_INLINE
-    void CheckGridCrossingErrors (const amrex::Gpu::DeviceVector<int>& d_error_x,
-                                  const amrex::Gpu::DeviceVector<int>& d_error_y,
-                                  const amrex::Gpu::DeviceVector<int>& d_error_z,
+    void CheckGridCrossingErrors (amrex::Gpu::Buffer<int>& grid_crossing_error_count,
                                   const int max_grid_crossings)
     {
-        const int h_error_x = d_error_x[0];
-        const int h_error_y = d_error_y[0];
-        const int h_error_z = d_error_z[0];
-
+        const int* h_errors = grid_crossing_error_count.copyToHost();
+        const int h_error_x = h_errors[0];
+        const int h_error_y = h_errors[1];
+        const int h_error_z = h_errors[2];
         if (h_error_x > 0 || h_error_y > 0 || h_error_z > 0) {
-            std::string error_msg = "Villasenor deposition error: particles exceeded max_grid_crossings.\n";
+            std::string error_msg = "Villasenor mass matrix deposition error: particles exceeded max_grid_crossings.\n";
             if (h_error_x > 0) {
                 error_msg += "  X-direction: " + std::to_string(h_error_x) + " particles\n";
             }

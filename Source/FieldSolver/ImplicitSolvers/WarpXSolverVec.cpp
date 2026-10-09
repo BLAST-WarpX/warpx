@@ -29,11 +29,11 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
         !IsDefined(),
         "WarpXSolverVec::Define() called on already defined WarpXSolverVec");
 
-    // Define static member pointer to WarpX
-    if (!m_warpx_ptr_defined) {
-        m_WarpX = a_WarpX;
-        m_warpx_ptr_defined = true;
-    }
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        a_WarpX != nullptr,
+        "WarpXSolverVec::Define() called with a nullptr WarpX instance");
+
+    m_WarpX = a_WarpX;
 
     m_num_amr_levels = 1;
 

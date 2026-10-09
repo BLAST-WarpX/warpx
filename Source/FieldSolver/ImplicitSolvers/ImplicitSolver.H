@@ -62,12 +62,21 @@ public:
 
     bool DoParticleSuborbits () const { return m_particle_suborbits; }
 
+    virtual void SetupStep(amrex::Real /* start_time */) {}
+
+    virtual int DoSolve(amrex::Real a_start_time, int a_step, bool verbose_step) = 0;
+
+    virtual void ResetStep(amrex::Real /* start_time */) {}
+
+    virtual void FinishStep(amrex::Real /* a_start_time */, int /* a_step */) {}
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
-    virtual int OneStep (amrex::Real  a_time,
+    virtual int OneStep (amrex::Real  start_time,
                          amrex::Real  a_dt,
-                         int          a_step) = 0;
+                         int          a_step,
+                         bool verbose_step);
 
     //
     // the following routines are called by the linear and nonlinear solvers
@@ -156,12 +165,24 @@ public:
         amrex::Real a_scale = 1.0,
         bool a_zero_out_first = false );
 
+    /**
+     * \brief Assert that ApplyMassMatrices(a_out, a_in, ...) reads a_in over the
+     * full stencil of the mass matrices, for every valid cell of a_out.
+     * ApplyMassMatrices silently clips the stencil at the edge of the guard
+     * cells of a_in. This is harmless when the mass matrices have not been
+     * summed over their guard cells, since the entries beyond the guard cells
+     * of a_in are then zero, but not when they have been (e.g. semi-implicit Darwin).
+     */
+    void AssertMassMatricesStencilNotClipped (
+        const ablastr::fields::MultiLevelVectorField& a_out,
+        const ablastr::fields::MultiLevelVectorField& a_in ) const;
+
     void ComputeJfromMassMatrices (bool a_J_from_MM_only);
 
     /**
      * \brief Finish filling the mass matrices after deposit
      */
-    void FinishMassMatrices ();
+    void FinishMassMatricesDeposition ();
 
     /**
      * \brief Finish the implicit particle update after the converged time-centered solve
@@ -186,6 +207,11 @@ protected:
      * \brief Time step
      */
     mutable amrex::Real m_dt = 0.0;
+
+    /**
+     * \brief Number of substeps
+     */
+    int m_nsubsteps = 1;
 
     /**
      * \brief Time-biasing parameter for fields used on RHS to advance system.
@@ -287,6 +313,8 @@ protected:
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
 
+    void CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src);
+
     void SaveEoldMultifab ();
 
     /**
@@ -301,7 +329,8 @@ protected:
      */
     void PreRHSOp ( amrex::Real  a_cur_time,
                     int          a_nl_iter,
-                    bool         a_from_jacobian );
+                    bool         a_from_jacobian,
+                    amrex::Real  a_dt_scale = amrex::Real(1.));
 
     /**
      * \brief Communicate Mass Matrices used for PC and apply boundary conditions

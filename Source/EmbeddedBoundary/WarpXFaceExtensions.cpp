@@ -190,9 +190,9 @@ namespace
             const amrex::Array4<int> &flag_ext_face_max_lev_idim = flag_ext_face[max_level][idim]->array(mfi);
             const amrex::Array4<int> &flag_info_face_max_lev_idim = flag_info_face[max_level][idim]->array(mfi);
             const amrex::Array4<amrex::Real> &S =  all_fields.get(FieldType::face_areas, Direction{idim}, max_level)->array(mfi);
-            const amrex::Array4<amrex::Real> &lx = all_fields.get(FieldType::face_areas, Direction{0}, max_level)->array(mfi);
-            const amrex::Array4<amrex::Real> &ly = all_fields.get(FieldType::face_areas, Direction{1}, max_level)->array(mfi);
-            const amrex::Array4<amrex::Real> &lz = all_fields.get(FieldType::face_areas, Direction{2}, max_level)->array(mfi);
+            const amrex::Array4<amrex::Real> &lx = all_fields.get(FieldType::edge_lengths, Direction{0},  max_level)->array(mfi);
+            const amrex::Array4<amrex::Real> &ly = all_fields.get(FieldType::edge_lengths, Direction{1},  max_level)->array(mfi);
+            const amrex::Array4<amrex::Real> &lz = all_fields.get(FieldType::edge_lengths, Direction{2},  max_level)->array(mfi);
 
             amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
                 if (flag_ext_face_max_lev_idim(i, j, k)) {

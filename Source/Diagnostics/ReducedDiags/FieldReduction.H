@@ -157,7 +157,7 @@ public:
         {
             // Make the box cell centered in preparation for the interpolation (and to avoid
             // including ghost cells in the calculation)
-            const amrex::Box& box = enclosedCells(mfi.nodaltilebox());
+            const amrex::Box& box = mfi.tilebox(amrex::IntVect::TheZeroVector());
             const auto& arrEx = Ex[mfi].array();
             const auto& arrEy = Ey[mfi].array();
             const auto& arrEz = Ez[mfi].array();
@@ -176,7 +176,7 @@ public:
 #if defined(WARPX_DIM_1D_Z)
                 const amrex::Real x = 0._rt;
                 const amrex::Real y = 0._rt;
-                const amrex::Real z = (k + 0.5_rt)*dx[0] + real_box.lo(0);
+                const amrex::Real z = (i + 0.5_rt)*dx[0] + real_box.lo(0);
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
                 const amrex::Real x = (i + 0.5_rt)*dx[0] + real_box.lo(0);
                 const amrex::Real y = 0._rt;

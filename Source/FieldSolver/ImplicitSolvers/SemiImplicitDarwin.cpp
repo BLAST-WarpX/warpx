@@ -70,11 +70,17 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     pp_l.query("absolute_tolerance",  m_linsol_atol);
     pp_l.query("relative_tolerance",  m_linsol_rtol);
     pp_l.query("max_iterations",      m_linsol_maxits);
+    pp_l.query("pc_type",             m_pc_type);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_pc_type == PreconditionerType::none ||
+        m_pc_type == PreconditionerType::pc_darwin_mlmg,
+        "The semi-implicit Darwin solver only supports pc_darwin_mlmg as "
+        "the GMRES preconditioner (amrex_gmres.pc_type).");
 
     // Define the linear operator (this also allocates the scratch space it
     // uses to evaluate the operator on each GMRES iteration)
     m_linear_function = std::make_unique<DarwinLinearFieldOperator>();
-    m_linear_function->define(m_Z, this, PreconditionerType::none);
+    m_linear_function->define(m_Z, this, m_pc_type);
 
     // Define the linear solver
     if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
@@ -121,12 +127,15 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
+    amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
+    if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
 
 int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
                                                    amrex::Real  a_dt,
-                                                   int          a_step )
+                                                   int          a_step,
+                                                   bool verbose_step)
 {
     BL_PROFILE("SemiImplicitDarwin::OneStep()");
 
@@ -183,11 +192,17 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // i.e. fill m_source with `2 * laplacian(B) + 2 * mu_0 curl(J)`
     CalculateSourceVector();
 
+    // Refresh the preconditioner from the freshly deposited mass matrices
+    // (no-op unless a preconditioner is enabled).
+    m_linear_function->updatePreCondMat();
+
     // Solve the magnetoinductive equation:
     // bilaplacian(Z) + curl(chi curl(Z)) = 2 * laplacian(B) + 2 * mu_0 curl(J)
     // where chi is the mass matrix scaled by 2 * mu_0 / dt (see
     // ApplyScaledMassMatrices), i.e. the linear response of the deposited
     // current to the inductive E-field that this solve produces.
+    int const verbosity = verbose_step ? m_linsol_verbose_int : 0;
+    m_linear_solver->setVerbose(verbosity);
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
     // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
@@ -331,18 +346,18 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices();
+    m_WarpX->DepositMassMatrices(m_dt);
+
+    // The deposit routine only fills half of each diagonal mass matrix's
+    // band (exploiting symmetry); mirror the other half to complete
+    // deposition before boundary summation.
+    FinishMassMatricesDeposition();
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();
-
-    // The deposit routine only fills half of each diagonal mass matrix's
-    // band (exploiting symmetry); mirror the other half back in now that
-    // deposition and boundary summation are complete.
-    FinishMassMatrices();
 }
 
 void SemiImplicitDarwin::CalculateSourceVector ()
@@ -564,6 +579,12 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
 
     const amrex::Real scale = 2._prt * PhysConst::mu0 / m_dt;
 
+    // The mass matrices were summed over their guard cells (SyncMassMatrices),
+    // so that the stencil of a valid cell reaches one cell beyond the guard
+    // cells of J (see guardCellManager::Init). Only the valid cells of rhs are
+    // checked, since its guard cells are overwritten by FillBoundaryAndSync below.
+    AssertMassMatricesStencilNotClipped(rhs, dA);
+
     ApplyMassMatrices(
         /* a_out           = */ rhs,
         /* a_in            = */ dA,
@@ -577,5 +598,55 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
         rhs[lev][0]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
         rhs[lev][1]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
         rhs[lev][2]->FillBoundaryAndSync(m_WarpX->Geom(lev).periodicity());
+    }
+}
+
+void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,
+                                                     amrex::MultiFab& a_chi_yy_cc,
+                                                     amrex::MultiFab& a_chi_zz_cc ) const
+{
+    BL_PROFILE("SemiImplicitDarwin::ComputeScaledMassMatrixCC()");
+
+    using ablastr::fields::Direction;
+
+    const int lev = 0;
+    const amrex::MultiFab* Sdiag[3] = {
+        m_WarpX->m_fields.get(FieldType::MassMatrices_X, Direction{0}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Y, Direction{1}, lev),
+        m_WarpX->m_fields.get(FieldType::MassMatrices_Z, Direction{2}, lev)};
+    amrex::MultiFab* chi_cc[3] = {&a_chi_xx_cc, &a_chi_yy_cc, &a_chi_zz_cc};
+
+    // Scale by the same 2 mu0/dt prefactor the operator applies to the
+    // mass-matrix product.
+    const amrex::Real fac = 2.0_rt * PhysConst::mu0 / m_dt;
+
+    for (int d = 0; d < 3; ++d) {
+        const int nc = Sdiag[d]->nComp();
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(*chi_cc[d], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi)
+        {
+            const amrex::Box& tbx = mfi.tilebox();
+            amrex::Array4<amrex::Real> const& chi = chi_cc[d]->array(mfi);
+            amrex::Array4<const amrex::Real> const& S = Sdiag[d]->const_array(mfi);
+            amrex::ParallelFor(tbx, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+            {
+                // Row-sum this block's stencil-band components at (i,j,k),
+                // then collocate onto the cell center by index identification
+                // (same convention DarwinMLMGPC uses for Z): a plain (i,j,k)
+                // fetch already reads the point at S's own native staggering
+                // that shares (i,j,k) with the target cell-centered array.
+                // This keeps chi_dd collocated with where curl(Z)_d itself
+                // would land under the same convention, and avoids zeroing the
+                // nodal-dimension Nyquist mode the way pair-averaging would.
+                amrex::Real s = 0.0;
+                for (int c = 0; c < nc; ++c) {
+                    s += S(i,j,k,c);
+                }
+                chi(i,j,k) = fac*s;
+            });
+        }
     }
 }

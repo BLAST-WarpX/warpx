@@ -171,7 +171,7 @@ class ProjectionDivCleanerTest(object):
         #######################################################################
         init_field = picmi.LoadInitialFieldFromPython(
             load_from_python=load_current_ring,
-            warpx_do_divb_cleaning_external=True,
+            warpx_do_initial_div_cleaning=True,
             load_E=False,
         )
         simulation.add_applied_field(init_field)

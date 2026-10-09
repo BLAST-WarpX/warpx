@@ -18,7 +18,9 @@ independent measurements of the resistivity from the force-free run:
 The figure additionally shows the cumulative energy budget: the electron
 thermal gain Delta E_e tracks the magnetic-field loss Delta E_B plus the
 (small, shot-noise driven) ion kinetic drain Delta E_ion, with the total
-conserved.
+conserved. All three are referenced to the first post-step dump: the
+iteration-0 field dump is written before the first field solve, when T_e
+still holds its zero allocation value (and J = 0), so it is skipped.
 
 PASS if the field-decay fit is within --tol-field and the Te fit within
 --tol-te of the input resistivity.
@@ -53,12 +55,14 @@ def read_te_series(diag_dir):
     Returns (t[s], density-weighted <Te>[eV], electron thermal energy E_e[J])
     with E_e = kB/(gamma-1) * sum(n_e Te dV) integrated over the domain
     (per meter in the ignored y direction, consistent with the reduced
-    diagnostics in 2D).
+    diagnostics in 2D), for the post-step dumps only (iteration 0 has
+    T_e = 0, see the module docstring).
     """
     ts = OpenPMDTimeSeries(str(diag_dir))
-    t = np.asarray(ts.t, dtype=float)
+    its = [it for it in ts.iterations if it > 0]
+    t = np.asarray(ts.t, dtype=float)[-len(its) :]
     Te_m, E_e = [], []
-    for it in ts.iterations:
+    for it in its:
         Te, info = ts.get_field("Te", iteration=it)
         rho, _ = ts.get_field("rho", iteration=it)
         Te = np.asarray(Te, dtype=float)  # K
@@ -128,18 +132,23 @@ def main(argv=None):
     eta_B = eta_from_field_decay(t_r, E_B)
     err_B = abs(eta_B - eta_input) / eta_input
 
+    # Post-step dumps only (iteration 0 is skipped in read_te_series); the
+    # ramp is measured from the first of them.
     t, Te, E_e = read_te_series(args.diag_dir)
-    # Skip the iteration-0 dump in the Te-ramp fit (fields are written
-    # before the first current deposition, so J = 0 there).
-    t_fit, dTe = t[1:] - t[1], Te[1:] - Te[1]
+    t_fit, dTe = t - t[0], Te - Te[0]
     eta_T = eta_from_te_ramp(t_fit, dTe, eta_input)
     err_T = abs(eta_T - eta_input) / eta_input
 
-    # Cumulative energy budget (each series relative to its first sample).
+    # Cumulative energy budget, every series relative to the first post-step
+    # field dump. The reduced diagnostics also carry a step-0 row (E_B and
+    # E_ion are genuine there, but E_e is not), so align them to t[0] by time
+    # rather than by index.
+    i0 = int(np.argmin(np.abs(t_r - t[0])))
+    t_b = t_r[i0:]
     dE_e = E_e - E_e[0]
-    dE_B = E_B - E_B[0]
-    dE_i = E_ion - E_ion[0]
-    n_b = min(t_r.size, t.size)
+    dE_B = E_B[i0:] - E_B[i0]
+    dE_i = E_ion[i0:] - E_ion[i0]
+    n_b = min(t_b.size, t.size)
     dE_tot = dE_e[:n_b] + dE_B[:n_b] + dE_i[:n_b]
     noncons = dE_tot[-1] / dE_e[n_b - 1] if dE_e[n_b - 1] != 0.0 else 0.0
 
@@ -163,11 +172,11 @@ def main(argv=None):
 
     fig, (axE, axT) = plt.subplots(1, 2, figsize=(12, 4.6))
 
-    tus_r = t_r * 1e6
+    tus_b = t_b * 1e6
     axE.plot(t * 1e6, dE_e, "o-", ms=4, label=r"$\Delta E_e$ (electron thermal)")
-    axE.plot(tus_r, dE_B, "s-", ms=4, label=r"$\Delta E_B$ (magnetic)")
-    axE.plot(tus_r, dE_i, "^-", ms=4, label=r"$\Delta E_{ion}$")
-    axE.plot(tus_r[:n_b], dE_tot, "k-", lw=2.5, label=r"$\Delta E_{tot}$ (should be 0)")
+    axE.plot(tus_b, dE_B, "s-", ms=4, label=r"$\Delta E_B$ (magnetic)")
+    axE.plot(tus_b, dE_i, "^-", ms=4, label=r"$\Delta E_{ion}$")
+    axE.plot(tus_b[:n_b], dE_tot, "k-", lw=2.5, label=r"$\Delta E_{tot}$ (should be 0)")
     axE.axhline(0.0, color="gray", lw=0.8, ls=":")
     axE.set_xlabel(r"time ($\mu$s)")
     axE.set_ylabel("cumulative energy change (J)")

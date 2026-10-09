@@ -111,26 +111,6 @@ namespace {
             photon_u_rest, photon_ux_rest, photon_uy_rest, photon_uz_rest,
             lepton_gamma, lepton_beta, lepton_nx, lepton_ny, lepton_nz);
 
-        // Find cos and sin of the spherical angle that represent
-        // the direction of the incoming photon in the rest frame
-        // TODO: Check if we could reuse code from the Coulomb scattering code.
-        amrex::ParticleReal const cos_theta = photon_uz_rest / photon_u_rest;
-        amrex::ParticleReal cos_phi = 0;
-        amrex::ParticleReal sin_phi = 0;
-        amrex::ParticleReal sin_theta = 0;
-        if (cos_theta*cos_theta < 1.0_prt) {
-            sin_theta = std::sqrt( 1.0_prt - cos_theta*cos_theta );
-            amrex::ParticleReal const inv_photon_rest_uxy = 1._prt / ( sin_theta * photon_u_rest );
-            cos_phi = photon_ux_rest * inv_photon_rest_uxy;
-            sin_phi = photon_uy_rest * inv_photon_rest_uxy;
-        } else {
-            sin_theta = 0._prt;
-            // Avoid division by 0; provide arbitrary direction
-            // for the phi angle (since theta is 0 or pi anyway)
-            cos_phi = 1.0_prt;
-            sin_phi = 0.0_prt;
-        }
-
         // Draw scattering angle in the rest frame, from the
         // Klein-Nishina cross-section (See Ozmutlu, E. N.
         // "Sampling of Angular Distribution in Compton Scattering"
@@ -140,45 +120,40 @@ namespace {
         amrex::ParticleReal const c0 = 2._prt * (2._prt*k*k + 2._prt*k + 1._prt) / amrex::Math::powi<3>(2._prt*k + 1._prt);
         amrex::ParticleReal const b = (2._prt + c0) / (2._prt - c0);
         amrex::ParticleReal const a = 2._prt*( b - 1._prt );
-        // Use rejection method to draw x
+        // Use rejection method to draw cos_theta_s, the cosine of the scattering angle
         bool reject = true;
-        amrex::ParticleReal x = 0;
+        amrex::ParticleReal cos_theta_s = 0;
         while (reject) {
-            // - Draw x with an approximate probability distribution
+            // - Draw cos_theta_s with an approximate probability distribution
             amrex::ParticleReal const r1 = amrex::Random(engine);
-            x = b - (b + 1._prt)*std::pow(0.5_prt*c0, r1);
+            cos_theta_s = b - (b + 1._prt)*std::pow(0.5_prt*c0, r1);
             // - Calculate approximate probability distribution h
-            amrex::ParticleReal const h = a/(b-x);
+            amrex::ParticleReal const h = a/(b-cos_theta_s);
             // - Calculate expected (exact) probability distribution f
-            amrex::ParticleReal const factor = 1._prt + k*(1._prt-x);
-            amrex::ParticleReal const f = ( (1._prt+x*x)*factor + k*k*(1._prt-x)*(1._prt-x) )/(factor*factor*factor);
-            // - Keep x according to rejection rule
+            amrex::ParticleReal const factor = 1._prt + k*(1._prt-cos_theta_s);
+            amrex::ParticleReal const f = ( (1._prt+cos_theta_s*cos_theta_s)*factor
+                                          + k*k*(1._prt-cos_theta_s)*(1._prt-cos_theta_s) )
+                                          /(factor*factor*factor);
+            // - Keep cos_theta_s according to rejection rule
             amrex::ParticleReal const r2 = amrex::Random(engine);
             if (r2 < f/h) {
                 reject = false;
             }
         }
 
-        // Get scattered momentum in the rest frame
-        amrex::ParticleReal const new_photon_u_rest = photon_u_rest/( 1._prt + k*(1._prt-x) );
-        // - First in a system of axes aligned with the incoming photon
-        amrex::ParticleReal const cos_theta_s = x;
-        amrex::ParticleReal const sin_theta_s = std::sqrt( 1._prt - x*x );
+        // Get the magnitude of the scattered momentum in the rest frame
+        amrex::ParticleReal const new_photon_u_rest =
+            photon_u_rest/( 1._prt + k*(1._prt-cos_theta_s) );
+        // - Scale the incoming photon momentum to the scattered momentum magnitude
+        //    and then rotate it by the randomly-sampled scattering angles theta_s and phi_s.
+        amrex::ParticleReal const u_ratio = new_photon_u_rest / photon_u_rest;
+        amrex::ParticleReal new_photon_ux_rest = photon_ux_rest * u_ratio;
+        amrex::ParticleReal new_photon_uy_rest = photon_uy_rest * u_ratio;
+        amrex::ParticleReal new_photon_uz_rest = photon_uz_rest * u_ratio;
+        // - Then rotate it by the scattering angle theta_s and phi_s
         amrex::ParticleReal const phi_s = 2._prt*MathConst::pi*amrex::Random(engine);
-        amrex::ParticleReal const cos_phi_s = std::cos( phi_s );
-        amrex::ParticleReal const sin_phi_s = std::sin( phi_s );
-        amrex::ParticleReal const new_photon_uX_rest = new_photon_u_rest * sin_theta_s*cos_phi_s;
-        amrex::ParticleReal const new_photon_uY_rest = new_photon_u_rest * sin_theta_s*sin_phi_s;
-        amrex::ParticleReal const new_photon_uZ_rest = new_photon_u_rest * cos_theta_s;
-        // - Then rotate it to the original system of axes
-        amrex::ParticleReal const new_photon_ux_rest = sin_theta * cos_phi * new_photon_uZ_rest
-                                                     + cos_theta * cos_phi * new_photon_uX_rest
-                                                                 - sin_phi * new_photon_uY_rest;
-        amrex::ParticleReal const new_photon_uy_rest = sin_theta * sin_phi * new_photon_uZ_rest
-                                                     + cos_theta * sin_phi * new_photon_uX_rest
-                                                                   + cos_phi * new_photon_uY_rest;
-        amrex::ParticleReal const new_photon_uz_rest = cos_theta * new_photon_uZ_rest
-                                                     - sin_theta * new_photon_uX_rest;
+        ParticleUtils::rotateVector(new_photon_ux_rest, new_photon_uy_rest, new_photon_uz_rest,
+                                    phi_s, cos_theta_s);
 
         // Transform the momentum of the scattered photon back to the lab frame
         amrex::ParticleReal new_photon_u, new_photon_ux, new_photon_uy, new_photon_uz;

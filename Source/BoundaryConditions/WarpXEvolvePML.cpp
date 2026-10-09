@@ -199,13 +199,11 @@ WarpX::DampPML_Cartesian (const int lev, PatchType patch_type)
                                   divb_cleaning);
             });
 
-            // For warpx_damp_pml_F(), mfi.nodaltilebox is used in the ParallelFor loop and here we
-            // use mfi.tilebox. However, it does not matter because in damp_pml, where nodaltilebox
-            // is used, only a simple multiplication is performed.
+            // Damp F when WarpX::do_dive_cleaning = true
             if (m_fields.has(FieldType::pml_F_fp, lev)) {
                 amrex::MultiFab* pml_F = (patch_type == PatchType::fine) ?
                     m_fields.get(FieldType::pml_F_fp, lev) : m_fields.get(FieldType::pml_F_cp, lev);
-                const Box& tnd = mfi.nodaltilebox();
+                const Box& tnd = mfi.tilebox(F_stag);
                 auto const& pml_F_fab = pml_F->array(mfi);
                 amrex::ParallelFor(tnd, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
