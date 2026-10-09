@@ -272,11 +272,18 @@ void ThetaImplicitEM::FinishFieldUpdate (amrex::Real end_time)
     m_WarpX->FinishMagneticFieldAndApplyBCs(m_theta, end_time);
 
     if (m_E.hasPML()) {
+        const amrex::Real c0 = 1._rt / m_theta;
+        const amrex::Real c1 = 1._rt - c0;
+        const auto pml_E = m_WarpX->m_fields.get_alldirs(FieldType::pml_E_fp, 0);
+        const auto pml_Eold = m_Eold.getPMLVec();
         const auto pml_B = m_WarpX->m_fields.get_alldirs(FieldType::pml_B_fp, 0);
         for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::LinComb(*pml_E[n], c0, *pml_E[n], 0,
+                c1, *pml_Eold[n], 0, 0, pml_E[n]->nComp(), 0);
             amrex::MultiFab::LinComb(*pml_B[n], c0, *pml_B[n], 0,
                 c1, *m_pml_Bold[n], 0, 0, pml_B[n]->nComp(), 0);
         }
+        m_WarpX->FillBoundaryE(m_WarpX->getngEB(), true);
         m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
     }
 
