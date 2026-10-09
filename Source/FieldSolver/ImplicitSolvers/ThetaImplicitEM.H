@@ -98,6 +98,13 @@ public:
      */
     void InitializeCurlCurlBCMasks ();
 
+protected:
+
+    /**
+     * \brief Allocate curl-curl BC mask fields needed by SparseJacobianMatrix assembly.
+     */
+    void InitializePCMatrixFields () override { InitializeCurlCurlBCMasks(); }
+
 private:
 
     /**

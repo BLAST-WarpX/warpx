@@ -101,10 +101,19 @@ There are several support classes use to specify components of the evolve scheme
 .. autopydantic_model:: pywarpx.picmi.PETScKSPLinearSolver
     :inherited-members: BaseModel
 
+.. autopydantic_model:: pywarpx.picmi.WeightedJacobiLinearSolver
+    :inherited-members: BaseModel
+
+.. autopydantic_model:: pywarpx.picmi.ChebyshevLinearSolver
+    :inherited-members: BaseModel
+
 .. autopydantic_model:: pywarpx.picmi.CurlCurlMLMGPreconditioner
     :inherited-members: BaseModel
 
 .. autopydantic_model:: pywarpx.picmi.JacobiPreconditioner
+    :inherited-members: BaseModel
+
+.. autopydantic_model:: pywarpx.picmi.ChebyshevPreconditioner
     :inherited-members: BaseModel
 
 .. autopydantic_model:: pywarpx.picmi.PETScPreconditioner
