@@ -69,19 +69,19 @@ namespace
     * \param[in] safe_guard_cells flag to enable "safe mode" data exchanges with more guard cells
     * \param[in] do_single_precision_comms flag to enable single precision communications
     * \param[in,out] cost the pointer to the data structure holding costs for timer-based load-balance
+    * \param[in] PMLRZ_flag flag to enable a special treatment for PML in RZ simulations
     * \param[in] external_field the external field (used to initialize EM fields)
     * \param[in] useparser flag to enable the use of a field parser to initialize EM fields
     * \param[in] field_parser the field parser
-    * \param[in] PMLRZ_flag flag to enable a special treatment for PML in RZ simulations
     */
     void shiftMF (
         amrex::MultiFab& mf, const amrex::Geometry& geom,
         int num_shift, int dir,
         bool safe_guard_cells, bool do_single_precision_comms,
         amrex::LayoutData<amrex::Real>* cost,
+        const bool PMLRZ_flag,
         amrex::Real external_field=0.0, bool useparser = false,
-        amrex::ParserExecutor<3> const& field_parser={},
-        const bool PMLRZ_flag = false)
+        amrex::ParserExecutor<3> const& field_parser={})
     {
         using namespace amrex::literals;
         ABLASTR_PROFILE("warpx::shiftMF()");
@@ -457,6 +457,13 @@ WarpX::MoveWindow (const int step, bool move_j)
 
         amrex::LayoutData<amrex::Real>* no_cost = nullptr ; //We can't update cost for PML
 
+        // With RZ PML, all fields need the corner guard cell exchange in shiftMF
+#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+        const bool pml_rz_flag = (pml_rz[0] != nullptr);
+#else
+        const bool pml_rz_flag = false;
+#endif
+
         // Shift each component of vector fields (E, B, j)
         for (int dim = 0; dim < 3; ++dim) {
             // Fine grid
@@ -478,60 +485,59 @@ WarpX::MoveWindow (const int step, bool move_j)
                 if (dim == 1) { Efield_parser = m_p_ext_field_params->Eyfield_parser->compile<3>(); }
                 if (dim == 2) { Efield_parser = m_p_ext_field_params->Ezfield_parser->compile<3>(); }
             }
-            ::shiftMF(*m_fields.get(FieldType::Bfield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+            ::shiftMF(*m_fields.get(FieldType::Bfield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                 m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-            ::shiftMF(*m_fields.get(FieldType::Efield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+            ::shiftMF(*m_fields.get(FieldType::Efield_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                 m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
             if (fft_do_time_averaging) {
                 ablastr::fields::MultiLevelVectorField Efield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_fp, finest_level);
                 ablastr::fields::MultiLevelVectorField Bfield_avg_fp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_fp, finest_level);
-                ::shiftMF(*Bfield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+                ::shiftMF(*Bfield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                     m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-                ::shiftMF(*Efield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+                ::shiftMF(*Efield_avg_fp[lev][dim], geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                    m_p_ext_field_params-> E_external_grid[dim], use_Eparser, Efield_parser);
             }
             if (move_j) {
-                ::shiftMF(*m_fields.get(FieldType::current_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                ::shiftMF(*m_fields.get(FieldType::current_fp, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
             }
             if (pml[lev] && pml[lev]->ok()) {
                 amrex::MultiFab* pml_B = m_fields.get(FieldType::pml_B_fp, Direction{dim}, lev);
                 amrex::MultiFab* pml_E = m_fields.get(FieldType::pml_E_fp, Direction{dim}, lev);
-                ::shiftMF(*pml_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
-                ::shiftMF(*pml_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                ::shiftMF(*pml_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
+                ::shiftMF(*pml_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
             }
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-            const bool PMLRZ_flag = pml_rz[0].get();
             if (pml_rz[lev] && dim < 2) {
                 amrex::MultiFab* pml_rz_B = m_fields.get(FieldType::pml_B_fp, Direction{dim}, lev);
                 amrex::MultiFab* pml_rz_E = m_fields.get(FieldType::pml_E_fp, Direction{dim}, lev);
-                ::shiftMF(*pml_rz_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, 0.0_rt, false, amrex::ParserExecutor<3>{}, PMLRZ_flag);
-                ::shiftMF(*pml_rz_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, 0.0_rt, false, amrex::ParserExecutor<3>{}, PMLRZ_flag);
+                ::shiftMF(*pml_rz_B, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
+                ::shiftMF(*pml_rz_E, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
             }
 #endif
             if (lev > 0) {
                 // coarse grid
-                ::shiftMF(*m_fields.get(FieldType::Bfield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+                ::shiftMF(*m_fields.get(FieldType::Bfield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                     m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-                ::shiftMF(*m_fields.get(FieldType::Efield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+                ::shiftMF(*m_fields.get(FieldType::Efield_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                     m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
-                ::shiftMF(*m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
-                ::shiftMF(*m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                ::shiftMF(*m_fields.get(FieldType::Bfield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
+                ::shiftMF(*m_fields.get(FieldType::Efield_aux, Direction{dim}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
                 if (fft_do_time_averaging) {
                     ablastr::fields::MultiLevelVectorField Efield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Efield_avg_cp, finest_level, skip_lev0_coarse_patch);
                     ablastr::fields::MultiLevelVectorField Bfield_avg_cp = m_fields.get_mr_levels_alldirs(FieldType::Bfield_avg_cp, finest_level, skip_lev0_coarse_patch);
-                    ::shiftMF(*Bfield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+                    ::shiftMF(*Bfield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                         m_p_ext_field_params->B_external_grid[dim], use_Bparser, Bfield_parser);
-                    ::shiftMF(*Efield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev,
+                    ::shiftMF(*Efield_avg_cp[lev][dim], geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag,
                         m_p_ext_field_params->E_external_grid[dim], use_Eparser, Efield_parser);
                 }
                 if (move_j) {
-                    ::shiftMF(*m_fields.get(FieldType::current_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                    ::shiftMF(*m_fields.get(FieldType::current_cp, Direction{dim}, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
                 }
                 if (do_pml && pml[lev]->ok()) {
                     amrex::MultiFab* pml_B_cp = m_fields.get(FieldType::pml_B_cp, Direction{dim}, lev);
                     amrex::MultiFab* pml_E_cp = m_fields.get(FieldType::pml_E_cp, Direction{dim}, lev);
-                    ::shiftMF(*pml_B_cp, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
-                    ::shiftMF(*pml_E_cp, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                    ::shiftMF(*pml_B_cp, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
+                    ::shiftMF(*pml_E_cp, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
                 }
             }
         }
@@ -541,11 +547,11 @@ WarpX::MoveWindow (const int step, bool move_j)
         if (m_fields.has(FieldType::F_fp, lev))
         {
             // Fine grid
-            ::shiftMF(*m_fields.get(FieldType::F_fp, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+            ::shiftMF(*m_fields.get(FieldType::F_fp, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
             if (lev > 0)
             {
                 // Coarse grid
-                ::shiftMF(*m_fields.get(FieldType::F_cp, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                ::shiftMF(*m_fields.get(FieldType::F_cp, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
             }
         }
 
@@ -556,7 +562,7 @@ WarpX::MoveWindow (const int step, bool move_j)
             if (do_pml && pml[lev]->ok())
             {
                 amrex::MultiFab* pml_F = m_fields.get(FieldType::pml_F_fp, lev);
-                ::shiftMF(*pml_F, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                ::shiftMF(*pml_F, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
             }
             if (lev > 0)
             {
@@ -564,7 +570,7 @@ WarpX::MoveWindow (const int step, bool move_j)
                 if (do_pml && pml[lev]->ok())
                 {
                     amrex::MultiFab* pml_F = m_fields.get(FieldType::pml_F_cp, lev);
-                    ::shiftMF(*pml_F, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                    ::shiftMF(*pml_F, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
                 }
             }
         }
@@ -574,11 +580,11 @@ WarpX::MoveWindow (const int step, bool move_j)
         if (m_fields.has(FieldType::G_fp, lev))
         {
             // Fine grid
-            ::shiftMF(*m_fields.get(FieldType::G_fp, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+            ::shiftMF(*m_fields.get(FieldType::G_fp, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
             if (lev > 0)
             {
                 // Coarse grid
-                ::shiftMF(*m_fields.get(FieldType::G_cp, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                ::shiftMF(*m_fields.get(FieldType::G_cp, lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
             }
         }
 
@@ -589,7 +595,7 @@ WarpX::MoveWindow (const int step, bool move_j)
             if (do_pml && pml[lev]->ok())
             {
                 amrex::MultiFab* pml_G = m_fields.get(FieldType::pml_G_fp, lev);
-                ::shiftMF(*pml_G, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                ::shiftMF(*pml_G, geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
             }
             if (lev > 0)
             {
@@ -597,7 +603,7 @@ WarpX::MoveWindow (const int step, bool move_j)
                 if (do_pml && pml[lev]->ok())
                 {
                     amrex::MultiFab* pml_G = m_fields.get(FieldType::pml_G_cp, lev);
-                    ::shiftMF(*pml_G, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost);
+                    ::shiftMF(*pml_G, geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, no_cost, pml_rz_flag);
                 }
             }
         }
@@ -606,10 +612,10 @@ WarpX::MoveWindow (const int step, bool move_j)
         if (move_j) {
             if (m_fields.has(FieldType::rho_fp, lev)) {
                 // Fine grid
-                ::shiftMF(*m_fields.get(FieldType::rho_fp,lev),   geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                ::shiftMF(*m_fields.get(FieldType::rho_fp,lev),   geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
                 if (lev > 0){
                     // Coarse grid
-                    ::shiftMF(*m_fields.get(FieldType::rho_cp,lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev);
+                    ::shiftMF(*m_fields.get(FieldType::rho_cp,lev), geom[lev-1], num_shift_crse, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag);
                 }
             }
         }
@@ -619,10 +625,10 @@ WarpX::MoveWindow (const int step, bool move_j)
             const int n_fluid_species = myfl->nSpecies();
             for (int i=0; i<n_fluid_species; i++) {
                 WarpXFluidContainer const& fl = myfl->GetFluidContainer(i);
-                ::shiftMF( *m_fields.get(fl.name_mf_N, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
-                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{0}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
-                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{1}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
-                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{2}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev );
+                ::shiftMF( *m_fields.get(fl.name_mf_N, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag );
+                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{0}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag );
+                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{1}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag );
+                ::shiftMF( *m_fields.get(fl.name_mf_NU, Direction{2}, lev), geom[lev], num_shift, dir, m_safe_guard_cells, do_single_precision_comms, cost_lev, pml_rz_flag );
             }
         }
     }
