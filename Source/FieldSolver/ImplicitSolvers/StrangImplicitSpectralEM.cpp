@@ -92,7 +92,7 @@ int StrangImplicitSpectralEM::OneStep (amrex::Real start_time,
 
     // Copy the converged implicit midpoint E into WarpX-owned Efield_fp
     UpdateWarpXFields(m_E, half_time);
-    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step);
+    m_WarpX->reduced_diags->ComputeDiagsMidStep(a_step, m_dt);
 
     amrex::Real const end_time = start_time + m_dt;
 

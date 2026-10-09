@@ -67,18 +67,15 @@ public:
 
     void PrintParameters () const override;
 
-    /**
-     * \brief Advances the simulation one time step
-     *
-     * \param[in] start_time The time at the start of the time step
-     * \param[in] a_dt The time step size
-     * \param[in] a_step The time step number
-     * \param[in] verbose_step whether there is verbose output on this step
-     */
-    int OneStep (amrex::Real  start_time,
-                 amrex::Real  a_dt,
+    void SetupStep (amrex::Real start_time) override;
+
+    int DoSolve (amrex::Real  start_time,
                  int          a_step,
                  bool verbose_step) override;
+
+    void ResetStep (amrex::Real /* start_time */) override;
+
+    void FinishStep (amrex::Real start_time, int a_step) override;
 
     void ComputeRHS ( WarpXSolverVec&  a_RHS,
                 const WarpXSolverVec&  a_E,
@@ -119,6 +116,14 @@ private:
      * diagnostics, and checkpointing alongside Efield_fp at E^{n+1}.
      */
     WarpXSolverVec m_E, m_Eold;
+
+    /**
+     * \brief m_E_save saves the value in m_E before the nonlinear solve (at n - 1/2).
+     * This is needed when substepping since the nonlinear solver updates m_E
+     * in place. If the solver fails, the data in m_E is corrupted. The saved value in m_E_save
+     * is used to reconstitute m_E for the initial value of the new substep.
+     */
+    WarpXSolverVec m_E_save;
 
     /**
      * \brief Update the E and B fields owned by WarpX

@@ -237,6 +237,9 @@ void CurlCurlMLMGPC<T,Ops>::Define ( const T& a_U,
     // Construct the MLMG solver
     m_solver = std::make_unique<MLMGT<MFArr>>(*m_curl_curl);
     m_solver->setFixedIter(m_max_iter);
+    // A Krylov bottom solver stops on a tolerance, making the preconditioner
+    // nonlinear; smoothing keeps it a fixed linear operator, as GMRES requires.
+    m_solver->setBottomSolver(BottomSolver::smoother);
     m_solver->setVerbose(static_cast<int>(m_verbose));
     m_solver->setBottomVerbose(static_cast<int>(m_bottom_verbose));
 

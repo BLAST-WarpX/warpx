@@ -25,7 +25,8 @@ enum TemperatureInitType {
     TempParserFunction,
     TempParserFunctionVector,
     TempConstantVector,
-    TempFromFileVector
+    TempFromFileVector,
+    TempFromFileValue
 };
 
 /**
@@ -51,7 +52,7 @@ struct TemperatureProperties
     /* Type of temperature initialization */
     TemperatureInitType m_type;
 
-    /* Constant temperature value, if m_type == TempConstantValue */
+    /* Constant temperature_in_eV, if m_type == TempConstantValue */
     amrex::Real m_temperature;
     /* Storage of the parser function, if m_type == TempParserFunction */
     std::unique_ptr<amrex::Parser> m_ptr_temperature_parser;
@@ -62,12 +63,16 @@ struct TemperatureProperties
     std::unique_ptr<amrex::Parser> m_ptr_ux_std_parser, m_ptr_uy_std_parser, m_ptr_uz_std_parser;
 
     std::string m_read_u_std_path;
+    std::string m_read_temperature_in_eV_path;
+    /* q_e / (m c^2) factor, used for temperature_in_eV conversion */
+    amrex::Real m_q_e_over_mc2{0.0};
 
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     std::unique_ptr<ExternalFieldReader> m_u_std_x_reader;
     std::unique_ptr<ExternalFieldReader> m_u_std_y_reader;
     std::unique_ptr<ExternalFieldReader> m_u_std_z_reader;
+    std::unique_ptr<ExternalFieldReader> m_temperature_in_eV_reader;
 #endif
 };
 

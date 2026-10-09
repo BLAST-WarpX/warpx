@@ -551,6 +551,99 @@ Overall simulation parameters
 
     Must be greater than zero when specified.
 
+.. pp:param:: warpx.self_fields_bottom_solver
+    :type: ``string``
+    :default: ``default``
+
+    The solver used by AMReX MLMG on the coarsest multigrid level ("bottom
+    solve") of the electrostatic self-field solve. Options are ``default``
+    (the linear operator's own default, usually BiCGStab), ``smoother``,
+    ``bicgstab``, ``cg``, ``bicgcg``, ``cgbicg``, ``hypre``, ``petsc``,
+    ``custom`` and ``algmg``. ``hypre`` and ``petsc`` require an AMReX built
+    with HYPRE / PETSc support. ``custom`` uses the linear operator's own bottom
+    solver, if it provides one (falling back to ``default`` otherwise).
+    ``algmg`` uses AMReX's built-in algebraic multigrid solver; it only
+    supports single-component operators.
+
+.. pp:param:: warpx.self_fields_bottom_verbosity
+    :type: ``integer``
+    :default: 0
+
+    The verbosity of the bottom solver used in the electrostatic self-field
+    MLMG solve. Setting this to 1 or higher prints the number of bottom solver
+    iterations, which is useful to assess whether the bottom solve is a
+    bottleneck.
+
+.. pp:param:: warpx.self_fields_bottom_max_iters
+    :type: ``integer``
+    :default: 200 (AMReX default)
+
+    Maximum number of iterations of the bottom solver in the electrostatic
+    self-field MLMG solve. MLMG tolerates an inexact bottom solve, so capping
+    this can be an effective way to reduce the cost of the bottom solve.
+
+.. pp:param:: warpx.self_fields_bottom_relative_tolerance
+    :type: ``float``
+    :default: 1e-4 (AMReX default)
+
+    Relative tolerance to which the bottom solve of the electrostatic
+    self-field MLMG solve is converged.
+
+.. pp:param:: warpx.self_fields_bottom_absolute_tolerance
+    :type: ``float``
+    :default: unused (AMReX default)
+
+    Absolute tolerance to which the bottom solve of the electrostatic
+    self-field MLMG solve is converged.
+
+.. pp:param:: warpx.self_fields_max_coarsening_level
+    :type: ``integer``
+    :default: 30 (AMReX default)
+
+    Maximum number of multigrid coarsening levels used in the electrostatic
+    self-field MLMG solve. Setting this to a low value leaves a larger problem
+    to the bottom solver; setting it to 0 turns MLMG into a single-level solve
+    performed entirely by the bottom solver.
+
+.. pp:param:: warpx.self_fields_agglomeration
+    :type: ``bool``
+    :default: 1 (AMReX default)
+
+    Whether AMReX MLMG may gather the coarse multigrid levels of the
+    electrostatic self-field solve onto a single box, which is then owned by a
+    single MPI rank.
+
+    Agglomeration avoids very small boxes at coarse levels, but it also
+    serializes those levels: one rank performs all the work from the
+    agglomerated level down to and including the bottom solve, while the
+    remaining ranks wait.
+
+.. pp:param:: warpx.self_fields_agglomeration_grid_size
+    :type: ``integer``
+    :default: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU (AMReX defaults)
+
+    Box size below which AMReX MLMG agglomerates the coarse multigrid levels of
+    the electrostatic self-field solve. Increasing this makes agglomeration
+    happen at a finer level, decreasing it delays agglomeration to coarser
+    levels. Only used if ``warpx.self_fields_agglomeration`` is enabled.
+
+.. pp:param:: warpx.self_fields_consolidation
+    :type: ``bool``
+    :default: 1 (AMReX default)
+
+    Whether AMReX MLMG may redistribute the coarse multigrid levels of the
+    electrostatic self-field solve onto a subset of the MPI ranks. Like
+    agglomeration, this reduces the number of ranks participating in the coarse
+    levels and can serialize them.
+
+.. pp:param:: warpx.self_fields_consolidation_grid_size
+    :type: ``integer``
+    :default: 8 in 3D, 16 in 2D, 32 in 1D for CPU and 32 for GPU (AMReX defaults)
+
+    Box size below which AMReX MLMG consolidates the coarse multigrid levels of
+    the electrostatic self-field solve onto fewer MPI ranks. Only used if
+    ``warpx.self_fields_consolidation`` is enabled.
+
 .. pp:param:: warpx.magnetostatic_solver_required_precision
     :type: ``float``
     :default: value of ``self_fields_required_precision``
@@ -1846,10 +1939,13 @@ Particle initialization
 
       * ``<species_name>.maxwellian_u_std_distribution_type`` (`string`, default ``constant``):
         Specifies the distribution type for the thermal spread (standard deviation) of the
-        particle momentum. Here, ``u_std`` is a 3D vector (with components ``ux_std``,
+        particle momentum.
+        Here, ``u_std`` is a 3D vector (with components ``ux_std``,
         ``uy_std``, ``uz_std``) representing the standard deviation of the normalized momentum
         :math:`u_\mathrm{std} = \sqrt{\theta}`, where
         :math:`\theta = \frac{k_\mathrm{B} \cdot T}{m \cdot c^2}`.
+        Mutually exclusive with
+        ``<species_name>.maxwellian_temperature_in_eV_distribution_type``.
 
         * If ``constant``, the following are required: ``<species_name>.ux_std``,
           ``<species_name>.uy_std``, ``<species_name>.uz_std`` (`float`, default ``0``).
@@ -1869,6 +1965,26 @@ Particle initialization
 
         Particles may be relativistic in the lab frame, but the sampling model treats them as
         non-relativistic in the drift frame. For a relativistic thermal spread, use ``maxwell_juttner`` instead.
+
+      * ``<species_name>.maxwellian_temperature_in_eV_distribution_type`` (`string`):
+        Specifies the temperature in eV for the thermal spread of the particle momentum. This is an alternative to and mutually
+        exclusive with ``<species_name>.maxwellian_u_std_distribution_type`` for specifying the thermal spread.
+        Under the hood, the standard deviation of each normalized momentum component in the drift frame is computed as:
+        :math:`u_\mathrm{std} = \sqrt{\mathrm{temperature\_in\_eV}\, q_e / (m c^2)}`, where
+        :math:`m` is the species mass (from ``species_type`` or ``mass``).
+
+        * If ``constant``, the following is required: ``<species_name>.temperature_in_eV`` (`float`).
+        * If ``parser``, the following is required:
+          ``<species_name>.temperature_in_eV_function(x,y,z)``.
+        * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
+          from an openPMD file and converted to an isotropic vector
+          :math:`u_\mathrm{std}` at the particle positions (requires a WarpX build with openPMD;
+          not supported yet in ``RZ`` / ``RCYLINDER`` / ``RSPHERE``). The following is required:
+          ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
+          contain a scalar openPMD mesh with the name given by
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
     * ``maxwell_juttner``: Maxwell-Juttner distribution for relativistic plasma.
       More specifically, the plasma is initialized with a Maxwell-Juttner distribution
@@ -1909,12 +2025,23 @@ Particle initialization
           `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
           for an example of how to prepare the openPMD data file.
 
-      * ``<species_name>.theta_distribution_type`` (`string`, default ``constant``):
-        Specifies the distribution type for the temperature :math:`\theta`.
-        Values less than zero are not allowed.
+      * ``<species_name>.maxwell_juttner_temperature_in_eV_distribution_type`` (`string`, default ``constant``):
+        Specifies the distribution type for the temperature in eV.
+        Internally converted to dimensionless :math:`\theta = \mathrm{temperature\_in\_eV}\, q_e / (m c^2)`,
+        where :math:`m` is the species mass (from ``species_type`` or ``mass``).
+        Values of ``temperature_in_eV`` less than zero are not allowed.
 
-        * If ``constant``, the following is required: ``<species_name>.theta`` (`float`).
-        * If ``parser``, the following is required: ``<species_name>.theta_function(x,y,z)``.
+        * If ``constant``, the following is required: ``<species_name>.temperature_in_eV`` (`float`).
+        * If ``parser``, the following is required:
+          ``<species_name>.temperature_in_eV_function(x,y,z)``.
+        * If ``read_from_file``, ``temperature_in_eV`` is read as a scalar function of position
+          from an openPMD file (requires a WarpX build with openPMD; not supported yet in ``RZ`` / ``RCYLINDER`` /
+          ``RSPHERE``). The following is required:
+          ``<species_name>.read_temperature_in_eV_from_path`` (openPMD file path). The file must
+          contain a scalar openPMD mesh with the name given by
+          ``<species_name>.temperature_in_eV_mesh_name`` (default ``temperature_in_eV``). See
+          `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/initial_distribution/inputs_test_3d_initial_distribution_prepare.py>`__
+          for an example of how to prepare the openPMD data file.
 
       Sampling uses the Sobol and flipping methods described in :cite:t:`param-ZenitaniPOP2015`.
       For :math:`\theta \lesssim 0.1`, the Sobol method becomes inefficient (its acceptance
@@ -5446,6 +5573,7 @@ This shifts analysis from post-processing to runtime calculation of reduction op
         * ``<reduced_diags_name>.value_function(t,x,y,z,ux,uy,uz,w)`` (``string``) optional
             Users can provide an expression for the weight used to calculate the number of particles
             per cell associated with the selected abscissa and ordinate functions and/or the filter function.
+            If not specified, the particle weight ``w`` is used.
             ``t`` represents the physical time in seconds during the simulation.
             ``x, y, z`` represent particle positions in the unit of meter.
             ``ux, uy, uz`` represent particle velocities in the unit of
