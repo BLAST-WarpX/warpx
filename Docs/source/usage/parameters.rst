@@ -282,6 +282,9 @@ Overall simulation parameters
             after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
+          - ``newton.divergence_tolerance`` (``float``, default: 1.0e4)
+            Must not be less than 1. The nonlinear solve fails as diverged when the
+            residual norm exceeds this factor times the initial residual norm.
           - ``newton.diagnostic_file`` (``string``, default: None)
           - ``newton.diagnostic_interval`` (``int``, default: 1)
 

@@ -256,13 +256,14 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         }
 
         // As PETSc SNES, a diverged solve returns a negative exit status
-        if (norm_abs > 100._rt*norm0) {
+        if (norm_abs > m_newton_params.divergence_tolerance*norm0) {
             this->m_exit_status = -9;
             std::stringstream convergenceMsg;
             convergenceMsg << "Newton solver diverged at iteration " << iter <<
                               " of step " << a_step <<
                               ". Absolute norm " << norm_abs <<
-                              " is more than 100 times the initial norm " << norm0;
+                              " is more than " << m_newton_params.divergence_tolerance <<
+                              " times the initial norm " << norm0;
             if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
             ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
             break;

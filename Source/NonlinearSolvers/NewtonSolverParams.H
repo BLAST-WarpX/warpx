@@ -25,6 +25,9 @@
  */
 struct NewtonSolverParams
 {
+    //! The solve has diverged when the residual norm exceeds this factor times the initial norm.
+    amrex::Real divergence_tolerance = 1.0e4;
+
     //! Zero updates the PC only at iteration zero; positive values give a Newton interval.
     int pc_update_newton_interval = 1;
     //! Update the PC on time steps whose zero-based index is divisible by this interval.
@@ -50,6 +53,10 @@ struct NewtonSolverParams
     {
         const amrex::ParmParse pp_newton("newton");
         pp_newton.query("linear_solver",       linear_solver_type);
+        pp_newton.query("divergence_tolerance", divergence_tolerance);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            divergence_tolerance >= 1.,
+            "newton.divergence_tolerance must not be less than 1");
         pp_newton.query("pc_update_newton_interval", pc_update_newton_interval);
         pp_newton.query("pc_update_time_step_interval", pc_update_time_step_interval);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -110,6 +117,7 @@ struct NewtonSolverParams
 
     void Print (const std::string& a_name) const
     {
+        amrex::Print() << a_name << " divergence tolerance: " << divergence_tolerance << "\n";
         amrex::Print() << a_name << " PC update Newton interval:    " << pc_update_newton_interval << "\n";
         amrex::Print() << a_name << " PC update time-step interval: " << pc_update_time_step_interval << "\n";
         auto linsol_name = amrex::getEnumNameString(linear_solver_type);

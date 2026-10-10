@@ -715,6 +715,7 @@ void SNES_impl::setTolerances()
                        m_stol,
                        m_params.maxits,
                        PETSC_CURRENT );
+    SNESSetDivergenceTolerance(m_snes->obj, m_newton_params.divergence_tolerance);
     KSP ksp;
     SNESGetKSP(m_snes->obj, &ksp);
     KSPSetTolerances( ksp,
