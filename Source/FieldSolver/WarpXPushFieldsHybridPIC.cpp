@@ -116,9 +116,21 @@ void WarpX::HybridPICEvolveFields ()
         }
     }
 
+    // With the electron energy equation grad(P_e) is kept in the Faraday
+    // E-solves, so P_e = n_e k_B T_e is evaluated on the density that each
+    // Ohm's-law solve divides by: the part of grad(P_e)/(e n_e) that depends
+    // on n_e alone then stays curl-free.
+    auto const fill_Pe_from_Te = [&] (ablastr::fields::MultiLevelScalarField const& rho) {
+        if (!m_hybrid_pic_model->m_solve_electron_energy_equation) { return; }
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev, *rho[lev]);
+        }
+    };
+
     // Push the B field from t=n to t=n+1/2 using the current and density
     // at t=n, while updating the E field along with B using the electron
     // momentum equation
+    fill_Pe_from_Te(rho_fp_temp);
     m_hybrid_pic_model->BfieldEvolve(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
@@ -161,6 +173,7 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
+    fill_Pe_from_Te(rho_fp_temp);
     m_hybrid_pic_model->BfieldEvolve(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
@@ -198,6 +211,7 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
+    fill_Pe_from_Te(m_fields.get_mr_levels(FieldType::rho_fp, finest_level));
     m_hybrid_pic_model->CalculatePlasmaCurrent(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_eb_update_E);
@@ -489,13 +503,8 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // needs) rather than re-running the adiabat seed, which would
         // overwrite it and discard the evolved thermal structure.
         for (int lev = 0; lev <= finest_level; ++lev) {
-            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev);
-            ApplyElectronPressureBoundary(lev, PatchType::fine);
-            ablastr::utils::communication::FillBoundary(
-                *m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
-                do_single_precision_comms,
-                Geom(lev).periodicity(),
-                true);
+            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(
+                lev, *m_fields.get(FieldType::rho_fp, lev));
         }
     } else {
         m_hybrid_pic_model->CalculateElectronPressure(energy_eq);

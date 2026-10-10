@@ -158,9 +158,9 @@ The homogeneous part of the equation (the left-hand side) is solved with the
 QDSMC kinetic-enslavement scheme of :cite:t:`kfhm-Belyaev2024`: the electron
 entropy function :math:`K_e = T_e\, n_e^{1-\gamma}`, which the transport terms
 conserve along electron-fluid characteristics, is advected by fictitious
-Lagrangian markers. Each PIC step one marker is initialized at every cell
-center carrying the local :math:`K_e N_e` and :math:`N_e` (with :math:`N_e`
-the electron count of the cell), is pushed by one timestep with
+Lagrangian markers. Each PIC step one marker is initialized at every grid
+node carrying the local :math:`K_e N_e` and :math:`N_e` (with :math:`N_e`
+the electron count of the node's control volume), is pushed by one timestep with
 :math:`\vec{V}_e` interpolated at its position, and both quantities are
 deposited back to the grid with the standard (linear) particle shape factors.
 The updated temperature is recovered from the deposited quantities and the
