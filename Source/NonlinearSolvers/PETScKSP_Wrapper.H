@@ -105,6 +105,9 @@ public:
     //! Gets the solver status.
     [[nodiscard]] int getStatus () const override { return m_solver->getStatus(); }
 
+    //! A negative KSPConvergedReason is a failure, including the maximum iterations.
+    [[nodiscard]] bool converged () const override { return (m_solver->getStatus() > 0); }
+
     //! Gets the 2-norm of the residual.
     [[nodiscard]] RT getResidualNorm () const override { return m_solver->getResidualNorm(); }
 

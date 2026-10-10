@@ -213,6 +213,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
     int iter;
     int linear_solver_iters = 0;
+    bool reached_maxits = false;
     for (iter = 0; iter <= this->m_params.maxits; iter++) {
 
         // Determine whether to update the PC on this iteration
@@ -254,23 +255,26 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             break;
         }
 
+        // As PETSc SNES, a diverged solve returns a negative exit status
+        if (norm_abs > 100._rt*norm0) {
+            this->m_exit_status = -9;
+            std::stringstream convergenceMsg;
+            convergenceMsg << "Newton solver diverged at iteration " << iter <<
+                              " of step " << a_step <<
+                              ". Absolute norm " << norm_abs <<
+                              " is more than 100 times the initial norm " << norm0;
+            if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
+            break;
+        }
+
         if (iter == this->m_params.maxits) {
+            reached_maxits = true;
             if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
                                << ". Maximum iteration reached: iter = " << this->m_params.maxits << "\n";
             }
             break;
-        }
-
-        if (norm_abs > 100._rt*norm0) {
-            this->m_exit_status = -9;
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". SOLVER DIVERGED! relative tolerance = " << this->m_params.rtol << "\n";
-            std::stringstream convergenceMsg;
-            convergenceMsg << "Newton: exiting at iteration " << std::setw(3) << iter <<
-                              ". SOLVER DIVERGED! absolute norm = " << norm_abs <<
-                              " has increased by 100X from that after first iteration.";
-            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
         }
 
         // Prepare for the linear solve
@@ -289,6 +293,19 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         m_linear_solver->solve( m_dU, m_F, m_newton_params.linsol_rtol, m_newton_params.linsol_atol );
         linear_solver_iters += m_linear_solver->getNumIters();
 
+        // As PETSc SNES, stop at a failed linear solve without updating the solution
+        if (!m_linear_solver->converged()) {
+            this->m_exit_status = -3;
+            std::stringstream convergenceMsg;
+            convergenceMsg << "Newton solver stopped at iteration " << iter <<
+                              " of step " << a_step <<
+                              ": the linear solver failed to converge in " <<
+                              m_linear_solver->getNumIters() << " iterations";
+            if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
+            break;
+        }
+
         // Update solution
         a_U -= m_dU;
     }
@@ -299,7 +316,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
     // Note that the failure warning is skipped in the case when
     // rtol == 0 to allow a fixed number of iterations without a flood of warning.
-    if (norm_rel > this->m_params.rtol and norm_abs > this->m_params.atol and this->m_params.rtol > 0.) {
+    if (reached_maxits and this->m_params.rtol == 0.) { this->m_exit_status = 0; }
+    if (reached_maxits and this->m_params.rtol > 0.) {
         std::stringstream convergenceMsg;
         convergenceMsg << "Newton solver failed to converge after " << iter <<
                           " iterations at step " << a_step <<

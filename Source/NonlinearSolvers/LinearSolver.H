@@ -76,6 +76,9 @@ public:
     //! Gets the solver status.
     [[nodiscard]] virtual int getStatus () const = 0;
 
+    //! Whether the last solve converged; the status codes differ between solvers.
+    [[nodiscard]] virtual bool converged () const = 0;
+
     //! Gets the 2-norm of the residual.
     [[nodiscard]] virtual RT getResidualNorm () const = 0;
 

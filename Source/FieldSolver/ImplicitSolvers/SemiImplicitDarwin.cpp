@@ -205,10 +205,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     m_linear_solver->setVerbose(verbosity);
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
-    // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
-    // value (e.g. 1 if the iteration count was exceeded) otherwise. Map
-    // that onto the negative-means-failure convention used by the caller.
-    const int exit_status = (m_linear_solver->getStatus() == 0) ? 0 : -1;
+    // Map a failed linear solve onto the negative-means-failure convention
+    // used by the caller.
+    const int exit_status = m_linear_solver->converged() ? 0 : -1;
     if (exit_status < 0) {
         return exit_status;
     }

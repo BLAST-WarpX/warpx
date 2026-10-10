@@ -98,6 +98,10 @@ public:
     AMREX_FORCE_INLINE
     int getStatus () const override { return m_solver->getStatus(); }
 
+    //! amrex::GMRES returns 0 on convergence and 1 at the maximum iterations.
+    AMREX_FORCE_INLINE
+    bool converged () const override { return (m_solver->getStatus() == 0); }
+
     //! Gets the 2-norm of the residual.
     AMREX_FORCE_INLINE
     RT getResidualNorm () const override { return m_solver->getResidualNorm(); }
