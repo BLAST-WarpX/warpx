@@ -4186,6 +4186,9 @@ Maxwell solver: kinetic-fluid hybrid
     5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where
     :pp:param:`hybrid_pic_model.use_rkf45` is not active.
 
+    Checkpoint restart restores the learned substep count instead of resetting it to this input value.
+    Older checkpoints without this count still use the configured input value.
+
 .. pp:param:: hybrid_pic_model.use_rkf45
     :type: ``string`` or ``bool``
     :default: ``false``
