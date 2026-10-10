@@ -25,6 +25,9 @@
  */
 struct NewtonSolverParams
 {
+    //! The solve has converged when the norm of the update is below this factor times
+    //! the norm of the solution (not an input parameter).
+    amrex::Real step_tolerance = 1.0e-16;
     //! The solve has diverged when the residual norm exceeds this factor times the initial norm.
     amrex::Real divergence_tolerance = 1.0e4;
 

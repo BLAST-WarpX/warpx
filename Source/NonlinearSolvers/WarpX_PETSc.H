@@ -308,8 +308,6 @@ class SNES_impl : public PETScSolver_impl
         //! PC update decision for the current nonlinear iteration.
         mutable bool m_update_pc = true;
 
-        //! step tolerance
-        amrex::Real m_stol = 1e-16;
         //! verbosity
         bool m_verbose = true;
 

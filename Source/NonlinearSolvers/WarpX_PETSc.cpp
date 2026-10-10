@@ -712,7 +712,7 @@ void SNES_impl::setTolerances()
     SNESSetTolerances( m_snes->obj,
                        m_params.atol,
                        m_params.rtol,
-                       m_stol,
+                       m_newton_params.step_tolerance,
                        m_params.maxits,
                        PETSC_CURRENT );
     SNESSetDivergenceTolerance(m_snes->obj, m_newton_params.divergence_tolerance);

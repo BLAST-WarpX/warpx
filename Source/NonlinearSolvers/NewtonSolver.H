@@ -210,6 +210,9 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     amrex::Real norm_abs = 0.;
     amrex::Real norm0 = 1._rt;
     amrex::Real norm_rel = 0.;
+    // Norms of the last update and of the updated solution
+    amrex::Real norm_step = 0.;
+    amrex::Real norm_sol = 0.;
 
     int iter;
     int linear_solver_iters = 0;
@@ -252,6 +255,17 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
                                << ". Satisfied relative tolerance " << this->m_params.rtol << "\n";
+            }
+            break;
+        }
+
+        // As PETSc SNES, stop when the update is negligible
+        if (iter > 0 and norm_step < m_newton_params.step_tolerance*norm_sol) {
+            this->m_exit_status = 4;
+            if (this->m_params.verbose and verbose_step) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied step tolerance "
+                               << m_newton_params.step_tolerance << "\n";
             }
             break;
         }
@@ -310,6 +324,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
 
         // Update solution
         a_U -= m_dU;
+        norm_step = m_dU.norm2();
+        norm_sol = a_U.norm2();
     }
 
     // Update total iteration count
