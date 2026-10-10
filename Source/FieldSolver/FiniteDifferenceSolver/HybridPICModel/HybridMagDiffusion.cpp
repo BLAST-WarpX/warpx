@@ -781,9 +781,10 @@ public:
                 const FieldBoundaryType fb = (iside == 0)
                     ? WarpX::field_boundary_lo[idim]
                     : WarpX::field_boundary_hi[idim];
-                bool on_axis = false;
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                on_axis = idim == 0 && iside == 0 && m_geom.ProbLo(0) == 0.0_rt;
+                bool const on_axis = idim == 0 && iside == 0 && m_geom.ProbLo(0) == 0.0_rt;
+#else
+                bool const on_axis = false;
 #endif
                 // None leaves exterior guards fixed. Their contribution is an
                 // affine offset, even without an explicit boundary parser.
