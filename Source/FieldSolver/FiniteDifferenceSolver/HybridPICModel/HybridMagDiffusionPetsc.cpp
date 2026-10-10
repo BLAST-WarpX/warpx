@@ -466,6 +466,7 @@ private:
         if (options.sub_pc_type == "ilu") {
             set_default("-magdiff_sub_pc_factor_levels",
                         std::to_string(options.ilu_factor_levels));
+            set_default("-magdiff_sub_pc_factor_shift_type", options.ilu_factor_shift_type);
         }
     }
 

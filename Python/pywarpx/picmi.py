@@ -2232,6 +2232,11 @@ class HybridPICSolver(
         description="Fill level used when the ASM subdomain preconditioner is ILU.",
     )
 
+    mag_diff_petsc_ilu_factor_shift_type: str | None = Field(
+        default=None,
+        description="PETSc ASM ILU factor shift policy; defaults to positive_definite in the native solver.",
+    )
+
     solve_electron_energy_equation: bool | None = Field(
         default=None,
         description="Solve the electron energy equation instead of the algebraic adiabatic pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is transported each step by QDSMC markers advected with the electron fluid velocity, the source terms below are applied per cell, and ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve. (default False)",
@@ -2355,6 +2360,7 @@ class HybridPICSolver(
             "mag_diff_petsc_sub_ksp_type": self.mag_diff_petsc_sub_ksp_type,
             "mag_diff_petsc_sub_pc_type": self.mag_diff_petsc_sub_pc_type,
             "mag_diff_petsc_ilu_factor_levels": self.mag_diff_petsc_ilu_factor_levels,
+            "mag_diff_petsc_ilu_factor_shift_type": self.mag_diff_petsc_ilu_factor_shift_type,
         }
         for name, value in mag_diffusion_inputs.items():
             if value is not None:

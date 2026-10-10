@@ -35,6 +35,8 @@ struct MagDiffPetscOptions
     std::string sub_ksp_type = "preonly";
     std::string sub_pc_type = "ilu";
     int ilu_factor_levels = 2;
+    // Shift only incomplete preconditioner factors, not the physical operator.
+    std::string ilu_factor_shift_type = "positive_definite";
 };
 
 /**

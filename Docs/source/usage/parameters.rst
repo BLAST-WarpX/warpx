@@ -4169,6 +4169,18 @@ Maxwell solver: kinetic-fluid hybrid
 
     Fill level used when ``mag_diff_petsc_sub_pc_type = ilu``.
 
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_ilu_factor_shift_type
+    :type: ``str``
+    :default: ``positive_definite``
+    :optional:
+
+    PETSc diagonal-shift policy for ASM incomplete-LU subdomain factors.
+    The default stabilizes factors for stiff, spatially varying resistivity.
+    This shifts only the preconditioner; it does not change the magnetic
+    diffusion operator or its residual tolerance. ``none`` restores unshifted
+    factorization. The PETSc option ``-magdiff_sub_pc_factor_shift_type`` takes
+    precedence.
+
 .. rubric:: PETSc magnetic-diffusion diagnostics
 
 For solver diagnostics, set ``PETSC_OPTIONS`` to include

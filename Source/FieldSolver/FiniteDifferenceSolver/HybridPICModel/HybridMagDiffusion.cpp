@@ -63,6 +63,7 @@ HybridMagDiffusion::ReadParameters ()
     pp.query("mag_diff_petsc_sub_ksp_type", m_petsc_options.sub_ksp_type);
     pp.query("mag_diff_petsc_sub_pc_type", m_petsc_options.sub_pc_type);
     pp.query("mag_diff_petsc_ilu_factor_levels", m_petsc_options.ilu_factor_levels);
+    pp.query("mag_diff_petsc_ilu_factor_shift_type", m_petsc_options.ilu_factor_shift_type);
 
     if (utils::parser::queryWithParser(pp, "mag_diff_constant_eta", m_constant_eta)) {
         m_has_constant_eta = true;
