@@ -48,6 +48,7 @@ HybridMagDiffusion::ReadParameters ()
 {
     const ParmParse pp("hybrid_pic_model");
 
+    // Read the diffusion discretization and native solver controls first.
     pp.query("implicit_mag_diffusion", m_enabled);
     utils::parser::queryWithParser(pp, "mag_diff_theta", m_theta);
     utils::parser::queryWithParser(pp, "mag_diff_rtol", m_rtol);
@@ -60,6 +61,7 @@ HybridMagDiffusion::ReadParameters ()
     pp.query("mag_diff_use_variable_eta", m_use_variable_eta);
     pp.query("mag_diff_native_ilu", m_native_ilu);
 
+    // PETSc options also describe the host setup for the optional native ILU.
     pp.query("mag_diff_linear_solver", m_linear_solver);
     pp.query("mag_diff_petsc_pc_type", m_petsc_options.pc_type);
     pp.query("mag_diff_petsc_asm_overlap", m_petsc_options.asm_overlap);
@@ -72,6 +74,7 @@ HybridMagDiffusion::ReadParameters ()
         m_has_constant_eta = true;
     }
 
+    // Disabled diffusion leaves the existing explicit hybrid advance unchanged.
     if (!m_enabled) { return; }
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_bicgstab_residual_replacement_interval >= 0,
@@ -1315,8 +1318,11 @@ HybridMagDiffusion::AdvanceVariable (
                 return std::isfinite(x) &&
                        std::abs(x) > std::numeric_limits<Real>::min();
             };
-            for (; residual > tolerance && iterations < bicgstab_max_iter;
-                 ++iterations) {
+            // Keep the loop index separate from the number of completed updates:
+            // a breakdown can exit before this attempt changes the solution.
+            for (int iteration = 0;
+                 residual > tolerance && iteration < bicgstab_max_iter;
+                 ++iteration) {
                 Real const rho_new = linop.dotProduct(shadow, r);
                 if (!valid_divisor(rho_new) || !valid_divisor(omega)) {
                     break;
@@ -1340,7 +1346,7 @@ HybridMagDiffusion::AdvanceVariable (
                 residual_stage.linComb(1.0_rt, r, -alpha, v);
                 if (linop.norm2(residual_stage) <= tolerance) {
                     solution.increment(phat, alpha);
-                    ++iterations;
+                    iterations = iteration + 1;
                     break;
                 }
                 linop.precond(shat, residual_stage);
@@ -1360,13 +1366,13 @@ HybridMagDiffusion::AdvanceVariable (
                 if (!std::isfinite(residual)) {
                     break;
                 }
+                iterations = iteration + 1;
                 rho_old = rho_new;
                 // Recompute the physical residual and restart the recurrence
                 // periodically. This bounds drift in ill-conditioned solves
                 // without weakening the final physical stopping criterion.
                 if (m_bicgstab_residual_replacement_interval > 0 &&
-                    (iterations + 1) %
-                            m_bicgstab_residual_replacement_interval ==
+                    iterations % m_bicgstab_residual_replacement_interval ==
                         0) {
                     linop.apply(image_stage, solution);
                     r.linComb(1.0_rt, rhs, -1.0_rt, image_stage);
