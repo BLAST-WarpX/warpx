@@ -15,6 +15,7 @@
 #include "Deposition/VarianceAccumulationBuffer.H"
 #include "Deposition/TemperatureDeposition.H"
 #include "Deposition/MassMatricesDeposition.H"
+#include "Deposition/MassMatricesDepositionBinned.H"
 #include "Deposition/SharedDepositionUtils.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
@@ -1219,6 +1220,44 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
         const ParticleReal* zp_n_data = zp_n.dataPtr() + offset;
 #else
         const ParticleReal* zp_n_data = nullptr;
+#endif
+
+#if defined(WARPX_DIM_XZ) && (defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP))
+        // Binned deposition of the full mass matrices: one thread block per cell,
+        // accumulating in registers without atomics (see MassMatricesDepositionBinned.H)
+        if (WarpX::do_binned_mass_matrices_deposition && full_mass_matrices &&
+            offset == 0 && np_to_deposit == pti.numParticles() && WarpX::nox <= 3)
+        {
+            auto const& ptd = ParticlesAt(lev, pti).getConstParticleTileData();
+            const int nbins_x = tilebox.length(0);
+            const int nbins_z = tilebox.length(1);
+            auto deposit_binned = [&](auto order_tag)
+            {
+                constexpr int depos_order = decltype(order_tag)::value;
+                constexpr int msgc = WarpX::villasenor_mass_matrices_max_grid_crossings;
+                doVillasenorSigmaDepositionBinned<depos_order,msgc>(
+                    ptd, nbins_x, nbins_z,
+                    xp_n_data, yp_n_data, zp_n_data,
+                    GetPosition, nsuborbits, wp.dataPtr() + offset,
+                    uxp_n.dataPtr() + offset, uyp_n.dataPtr() + offset, uzp_n.dataPtr() + offset,
+                    uxp.dataPtr() + offset, uyp.dataPtr() + offset, uzp.dataPtr() + offset,
+                    WarpX::particle_max_grid_crossings,
+                    Sxx_arr, Sxy_arr, Sxz_arr,
+                    Syx_arr, Syy_arr, Syz_arr,
+                    Szx_arr, Szy_arr, Szz_arr,
+                    getExternalEB, Bx_ext, By_ext, Bz_ext,
+                    Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
+                    np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
+            };
+            if (WarpX::nox == 1) {
+                deposit_binned(std::integral_constant<int,1>{});
+            } else if (WarpX::nox == 2) {
+                deposit_binned(std::integral_constant<int,2>{});
+            } else {
+                deposit_binned(std::integral_constant<int,3>{});
+            }
+            return;
+        }
 #endif
 
         if (WarpX::nox == 1 && full_mass_matrices) {

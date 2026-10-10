@@ -4528,6 +4528,22 @@ Additional parameters
     (e.g. for high particles per cell). This feature is only available for CUDA
     and HIP, and is only recommended for 3D or 2D.
 
+.. pp:param:: warpx.do_binned_mass_matrices_deposition
+    :type: ``bool``
+    :default: ``true``
+    :optional:
+
+    Whether to use the binned algorithm for the deposition of the full mass matrices
+    (``implicit_evolve.use_mass_matrices_jacobian = true``) on GPUs.
+    Particles are binned by cell and one thread block per cell accumulates the contributions
+    of its particles to each (node, component) entry of the mass matrices in registers,
+    instead of one atomic add per particle and entry.
+    This is much faster for large numbers of particles per cell.
+    Particles whose orbit crosses a cell boundary during the time step are deposited
+    with the standard algorithm.
+    This option is only available for CUDA and HIP, in 2D Cartesian geometry
+    and for ``algo.particle_shape <= 3``; it is otherwise ignored.
+
 .. pp:param:: warpx.shared_tilesize
     :type: list of ``int``
     :default: ``6 6 8`` in 3D; ``14 14`` in 2D; ``1s`` otherwise

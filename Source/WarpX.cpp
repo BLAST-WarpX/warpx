@@ -126,6 +126,7 @@ bool WarpX::do_single_precision_comms = false;
 
 bool WarpX::do_shared_mem_charge_deposition = false;
 bool WarpX::do_shared_mem_current_deposition = false;
+bool WarpX::do_binned_mass_matrices_deposition = true;
 #if defined(WARPX_DIM_3D)
 amrex::IntVect WarpX::shared_tilesize(AMREX_D_DECL(6,6,8));
 #elif (AMREX_SPACEDIM == 2)
@@ -941,6 +942,7 @@ WarpX::ReadParameters ()
 #endif
         pp_warpx.query("do_shared_mem_charge_deposition", do_shared_mem_charge_deposition);
         pp_warpx.query("do_shared_mem_current_deposition", do_shared_mem_current_deposition);
+        pp_warpx.query("do_binned_mass_matrices_deposition", do_binned_mass_matrices_deposition);
 #if !(defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) || \
     (defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_shared_mem_current_deposition,

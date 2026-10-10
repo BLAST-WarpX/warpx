@@ -2052,7 +2052,8 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
                                   const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
                                   const amrex::Dim3 lo,
                                   const amrex::Real qs,
-                                  const amrex::Real ms)
+                                  const amrex::Real ms,
+                                  const int* particle_indices = nullptr)
 {
     using namespace amrex::literals;
 
@@ -2074,7 +2075,10 @@ void doVillasenorSigmaDeposition ([[maybe_unused]] const amrex::ParticleReal* xp
         amrex::TypeList<amrex::CompileTimeOptions<no_exteb, has_exteb>>{},
         {exteb_runtime_flag},
         np_to_deposit,
-        [=] AMREX_GPU_DEVICE (long const ip, auto exteb_control) {
+        [=] AMREX_GPU_DEVICE (long const ii, auto exteb_control) {
+
+            // Optionally, loop over a subset of the particles given by a list of indices
+            const long ip = (particle_indices ? particle_indices[ii] : ii);
 
             // Skip mass matrix deposition for particles with suborbits.
             if (nsuborbits && nsuborbits[ip] > 1) { return; }

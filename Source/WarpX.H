@@ -255,6 +255,9 @@ public:
     //! use shared memory algorithm for current deposition
     static bool do_shared_mem_current_deposition;
 
+    //! use the binned (per-cell) algorithm for the deposition of the full mass matrices on GPU
+    static bool do_binned_mass_matrices_deposition;
+
     //! number of threads to use per block in shared deposition
     static int shared_mem_current_tpb;
 
