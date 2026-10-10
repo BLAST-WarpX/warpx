@@ -1,0 +1,66 @@
+# Explicit hybrid reference for the Ohm / mag-diff residual-eta parity test.
+#
+# Mild uniform eta chosen so pure-explicit Faraday is resistive-CFL stable:
+#   dx ~ 6.25e-4 m, eta = 5e-4 Ohm m
+#   mu0 dx^2 / eta ~ 1e-9 s  >>  dt_sub ~ 1.25e-10 s  (dt=1e-9, substeps=8)
+#
+# Companion split test uses the same eta with
+#   mag_diff_eta_explicit_max = eta
+# so residual eta_D = max(eta-eta_max,0) = 0 after the fix and must match this
+# pure-Ohm run. Without residual subtraction, mag-diff double-damps Bt.
+
+max_step = 80
+amr.n_cell = 32 64
+amr.max_level = 0
+amr.blocking_factor = 8
+amr.max_grid_size = 64
+
+geometry.dims = RZ
+geometry.prob_lo = 0.0 0.0
+geometry.prob_hi = 2.0e-2 1.0
+
+boundary.field_lo = none periodic
+boundary.field_hi = none periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+
+warpx.const_dt = 1.0e-9
+warpx.cfl = -1.
+warpx.do_initial_div_cleaning = false
+
+algo.maxwell_solver = hybridPIC
+algo.particle_shape = 1
+algo.current_deposition = direct
+
+particles.species_names = protons
+particles.do_tiling = true
+
+protons.species_type = hydrogen
+protons.injection_style = NUniformPerCell
+protons.num_particles_per_cell_each_dim = 2 1 2
+protons.profile = constant
+protons.density = 1.0e26
+protons.momentum_distribution_type = constant
+protons.ux = 0.0
+protons.uy = 0.0
+protons.uz = 0.0
+
+warpx.B_ext_grid_init_style = constant
+warpx.B_external_grid = 0.0 1.0e-4 0.0
+
+hybrid_pic_model.elec_temp = 0.1
+hybrid_pic_model.gamma = 1.0
+hybrid_pic_model.n0_ref = 1.0e26
+hybrid_pic_model.n_floor = 1.0e20
+hybrid_pic_model.substeps = 8
+hybrid_pic_model.plasma_resistivity(rho,J,t) = "5.0e-4"
+hybrid_pic_model.plasma_hyper_resistivity(rho,B) = "0.0"
+
+# Pure explicit hybrid Faraday: full eta in Ohm, no mag-diff.
+hybrid_pic_model.implicit_mag_diffusion = 0
+
+diagnostics.diags_names = diag1
+diag1.intervals = 80
+diag1.diag_type = Full
+diag1.fields_to_plot = Br Bt Bz
+diag1.format = plotfile

@@ -2193,6 +2193,105 @@ class HybridPICSolver(
         default=None,
         description="Per-species resistivity overlays added on top of ``plasma_resistivity``, as a dictionary mapping a charged species name to a value or expression in Ohm*m. The expression may depend on ``rho_s`` (the species charge density), ``rho`` (total charge density which, by quasineutrality, equals the electron charge density), ``Te`` (electron temperature in Kelvin), ``J`` (plasma current density magnitude), ``J_s`` (the species current density magnitude), ``B`` (magnetic field magnitude) and ``t`` (time). The effective resistivity applied to species ``s`` in Ohm's law, the Joule heating source and the resistive drag is ``plasma_resistivity + plasma_resistivity_species[s]``.",
     )
+    implicit_mag_diffusion: bool | None = Field(
+        default=None,
+        description="Advance the resistive magnetic-diffusion term with an operator-split implicit theta-method solve after each hybrid magnetic-field half-step.",
+    )
+
+    mag_diff_theta: float | None = Field(
+        default=None,
+        description="Theta-method parameter in ``(0, 1]`` for implicit magnetic diffusion. The default 1.0 is backward Euler; 0.5 is Crank-Nicolson.",
+    )
+
+    mag_diff_eta_explicit_max: float | None = Field(
+        default=None,
+        description="Maximum resistivity in Ohm*m retained in the explicit Ohm/Faraday update when implicit magnetic diffusion is enabled. The implicit solve advances the residual ``max(eta - mag_diff_eta_explicit_max, 0)``. Zero keeps all resistive diffusion implicit. In coupled production problems, a small positive, explicitly CFL-safe value can improve robustness by retaining controlled damping in the explicit substeps; the appropriate value depends on the problem, mesh, and timestep.",
+    )
+
+    mag_diff_use_variable_eta: bool | None = Field(
+        default=None,
+        description="Use the spatially varying resistivity assembled from the hybrid resistivity parsers. If False, ``mag_diff_constant_eta`` is used when provided; otherwise the plasma resistivity is sampled at ``n_floor``.",
+    )
+
+    mag_diff_constant_eta: float | None = Field(
+        default=None,
+        description="Constant resistivity in Ohm*m for the implicit magnetic-diffusion solve.",
+    )
+
+    mag_diff_linear_solver: Literal["amrex_gmres", "amrex_bicgstab", "petsc"] | None = (
+        Field(
+            default=None,
+            description='Linear solver for implicit magnetic diffusion: ``"amrex_gmres"``, ``"amrex_bicgstab"`` with GMRES fallback, or ``"petsc"``. The PETSc option requires a PETSc-enabled WarpX build.',
+        )
+    )
+
+    mag_diff_rtol: float | None = Field(
+        default=None,
+        description="Relative tolerance for the magnetic-diffusion linear solve.",
+    )
+
+    mag_diff_bicgstab_max_iter: int | None = Field(
+        default=None,
+        ge=1,
+        description="Native BiCGStab iteration cap before GMRES fallback; defaults to mag_diff_max_iter and must not exceed it.",
+    )
+
+    mag_diff_bicgstab_residual_replacement_interval: int | None = Field(
+        default=None,
+        ge=0,
+        description="Recompute the true residual and restart native BiCGStab every N iterations; zero disables periodic replacement.",
+    )
+
+    mag_diff_native_ilu: bool | None = Field(
+        default=None,
+        description="Native color-ordered block ILU(0) of the exact curl-curl matrix. Requires PETSc for setup.",
+    )
+
+    mag_diff_atol: float | None = Field(
+        default=None,
+        description="Absolute tolerance for the magnetic-diffusion linear solve.",
+    )
+
+    mag_diff_max_iter: int | None = Field(
+        default=None,
+        description="Maximum number of magnetic-diffusion linear iterations.",
+    )
+
+    mag_diff_verbose: int | None = Field(
+        default=None,
+        description="Verbosity level for the magnetic-diffusion solve.",
+    )
+
+    mag_diff_petsc_pc_type: str | None = Field(
+        default=None,
+        description="PETSc preconditioner type. If omitted, PETSc selects its default.",
+    )
+
+    mag_diff_petsc_asm_overlap: int | None = Field(
+        default=None,
+        description="Number of graph-overlap layers when the PETSc preconditioner is ASM.",
+    )
+
+    mag_diff_petsc_sub_ksp_type: str | None = Field(
+        default=None,
+        description="PETSc KSP type used for each ASM subdomain solve.",
+    )
+
+    mag_diff_petsc_sub_pc_type: str | None = Field(
+        default=None,
+        description="PETSc preconditioner used inside each ASM subdomain.",
+    )
+
+    mag_diff_petsc_ilu_factor_levels: int | None = Field(
+        default=None,
+        description="Fill level used when the ASM subdomain preconditioner is ILU.",
+    )
+
+    mag_diff_petsc_ilu_factor_shift_type: str | None = Field(
+        default=None,
+        description="PETSc ASM ILU factor shift policy; defaults to positive_definite in the native solver.",
+    )
+
     solve_electron_energy_equation: bool | None = Field(
         default=None,
         description="Solve the electron energy equation instead of the algebraic adiabatic pressure closure: the electron entropy ``K = Te * ne**(1-gamma)`` is transported each step by QDSMC markers advected with the electron fluid velocity, the source terms below are applied per cell, and ``Pe = ne * kB * Te`` is fed back into the Ohm's-law E-solve. (default False)",
@@ -2298,6 +2397,33 @@ class HybridPICSolver(
                 self.plasma_hyper_resistivity, self._mangle_dict
             ),
         )
+        # Leave unspecified controls to the C++ defaults so PICMI and native
+        # input decks share one source of truth for solver behavior.
+        mag_diffusion_inputs = {
+            "implicit_mag_diffusion": self.implicit_mag_diffusion,
+            "mag_diff_theta": self.mag_diff_theta,
+            "mag_diff_eta_explicit_max": self.mag_diff_eta_explicit_max,
+            "mag_diff_use_variable_eta": self.mag_diff_use_variable_eta,
+            "mag_diff_constant_eta": self.mag_diff_constant_eta,
+            "mag_diff_linear_solver": self.mag_diff_linear_solver,
+            "mag_diff_native_ilu": self.mag_diff_native_ilu,
+            "mag_diff_bicgstab_max_iter": self.mag_diff_bicgstab_max_iter,
+            "mag_diff_bicgstab_residual_replacement_interval": self.mag_diff_bicgstab_residual_replacement_interval,
+            "mag_diff_rtol": self.mag_diff_rtol,
+            "mag_diff_atol": self.mag_diff_atol,
+            "mag_diff_max_iter": self.mag_diff_max_iter,
+            "mag_diff_verbose": self.mag_diff_verbose,
+            "mag_diff_petsc_pc_type": self.mag_diff_petsc_pc_type,
+            "mag_diff_petsc_asm_overlap": self.mag_diff_petsc_asm_overlap,
+            "mag_diff_petsc_sub_ksp_type": self.mag_diff_petsc_sub_ksp_type,
+            "mag_diff_petsc_sub_pc_type": self.mag_diff_petsc_sub_pc_type,
+            "mag_diff_petsc_ilu_factor_levels": self.mag_diff_petsc_ilu_factor_levels,
+            "mag_diff_petsc_ilu_factor_shift_type": self.mag_diff_petsc_ilu_factor_shift_type,
+        }
+        for name, value in mag_diffusion_inputs.items():
+            if value is not None:
+                setattr(pywarpx.hybridpicmodel, name, value)
+
         if self.plasma_resistivity_species is not None:
             for name, expr in self.plasma_resistivity_species.items():
                 pywarpx.hybridpicmodel.__setattr__(

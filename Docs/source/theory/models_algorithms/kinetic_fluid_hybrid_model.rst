@@ -116,6 +116,43 @@ number of times during each half-step outlined above. The number of sub-steps
 used can be specified by the user through a runtime simulation parameter
 (see :ref:`input parameters section <running-cpp-parameters-hybrid-model>`).
 
+Implicit magnetic diffusion
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For large resistivity, the explicit Faraday update can be limited by a
+parabolic timestep constraint. WarpX can operator-split the resistive part of
+Ohm's law into an explicitly advanced cap and an implicitly advanced residual,
+
+    .. math::
+
+        \eta_E = \min(\eta, \eta_{E,\max}), \qquad
+        \eta_D = \max(\eta-\eta_{E,\max}, 0).
+
+The split avoids counting resistivity twice. After each hybrid magnetic-field
+half-step, the implicit stage solves the theta-method system
+
+    .. math::
+
+        \left(I+\theta\Delta t_h K\right)\boldsymbol{B}^{n+1}
+        = \left(I-(1-\theta)\Delta t_h K\right)\boldsymbol{B}^{*},
+        \qquad
+        K\boldsymbol{B} =
+        \boldsymbol{\nabla}\times\left(
+        \frac{\eta_D}{\mu_0}\boldsymbol{\nabla}\times\boldsymbol{B}
+        \right),
+
+where :math:`\boldsymbol{B}^{*}` is the field produced by the explicit hybrid
+stage. Backward Euler (:math:`\theta=1`) is the default; Crank--Nicolson uses
+:math:`\theta=1/2`.
+
+The linear operator is applied matrix-free with the same staggered curl
+kernels and physical boundary handling as the hybrid field update. PETSc builds
+can instead drive this operator through a ``MATSHELL`` and use an assembled
+frozen-resistivity curl--curl matrix as the preconditioner. Embedded-boundary
+covered magnetic degrees of freedom use identity rows. An inhomogeneous
+``pec_insulator`` magnetic feed is separated into an affine offset so the
+Krylov operator remains linear.
+
 .. _theory-hybrid-model-elec-temp:
 
 Electron pressure

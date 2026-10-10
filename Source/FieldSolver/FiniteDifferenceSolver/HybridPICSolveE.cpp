@@ -29,6 +29,17 @@
 using namespace amrex;
 using warpx::fields::FieldType;
 
+namespace {
+
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real ohmResistivity (
+    amrex::Real eta, bool cap_enabled, amrex::Real eta_max) noexcept
+{
+    return cap_enabled ? amrex::min(eta, eta_max) : eta;
+}
+
+}
+
 #if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 namespace
 {
@@ -617,6 +628,12 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
+    // Cap Ohm resistivity when implicit magnetic diffusion is enabled.
+    // Partition: Ohm uses eta_Ohm = min(eta, eta_explicit_max); mag-diff uses
+    // the residual max(eta - eta_explicit_max, 0). Default eta_explicit_max = 0
+    // puts all resistive diffusion in the implicit step.
+    const bool cap_eta_for_ohm = hybrid_model->ImplicitMagDiffusionEnabled();
+    const amrex::Real eta_ohm_max = hybrid_model->MagDiffEtaExplicitMax();
 
     // With the resistive-drag collision active, the resistive terms belong
     // in every E-solve, including the one that builds the particle-push
@@ -874,7 +891,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Er(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jr(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Er(i, j, 0) += eta_val * Jr(i, j, 0);
                     // Per-species resistive friction (Phys. Plasmas 31, 012902 (2024)):
                     // frozen ion-drift remainder plus the lagged coefficient
                     // times the live plasma current.
@@ -952,7 +971,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Etheta(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jtheta(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Etheta(i, j, 0) += eta_val * Jtheta(i, j, 0);
                     if (has_eta_overlay) {
                         Etheta(i, j, 0) += eta_overlay_t(i, j, 0)
                                            + eta_coef_t(i, j, 0) * Jtheta(i, j, 0);
@@ -1024,7 +1045,9 @@ void FiniteDifferenceSolver::HybridPICSolveECylindrical (
                         jtot_val = std::sqrt(jr_val*jr_val + jtheta_val*jtheta_val + jz_val*jz_val);
                     }
 
-                    Ez(i, j, 0) += eta(rho_val, jtot_val, t_new) * Jz(i, j, 0);
+                    const Real eta_val = ohmResistivity(
+                        eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                    Ez(i, j, 0) += eta_val * Jz(i, j, 0);
                     if (has_eta_overlay) {
                         Ez(i, j, 0) += eta_overlay_z(i, j, 0)
                                        + eta_coef_z(i, j, 0) * Jz(i, j, 0);
@@ -1113,6 +1136,12 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
     const auto resistivity_has_J_dependence = hybrid_model->m_resistivity_has_J_dependence;
     const auto hyper_resistivity_has_B_dependence = hybrid_model->m_hyper_resistivity_has_B_dependence;
     const bool include_hyper_resistivity_term = hybrid_model->m_include_hyper_resistivity_term;
+    // Cap Ohm resistivity when implicit magnetic diffusion is enabled.
+    // Partition: Ohm uses eta_Ohm = min(eta, eta_explicit_max); mag-diff uses
+    // the residual max(eta - eta_explicit_max, 0). Default eta_explicit_max = 0
+    // puts all resistive diffusion in the implicit step.
+    const bool cap_eta_for_ohm = hybrid_model->ImplicitMagDiffusionEnabled();
+    const amrex::Real eta_ohm_max = hybrid_model->MagDiffEtaExplicitMax();
 
     // Resistive terms in the push field when the drag is active; see the
     // design notes in HybridPICSolveECylindrical.
@@ -1375,7 +1404,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ex(i, j, k) += eta(rho_val, jtot_val, t_new) * Jx(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ex(i, j, k) += eta_val * Jx(i, j, k);
                 // Per-species resistive friction: frozen ion-drift remainder
                 // plus the lagged coefficient times the live plasma current.
                 if (has_eta_overlay) {
@@ -1456,7 +1487,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ey(i, j, k) += eta(rho_val, jtot_val, t_new) * Jy(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ey(i, j, k) += eta_val * Jy(i, j, k);
                 if (has_eta_overlay) {
                     Ey(i, j, k) += eta_overlay_y(i, j, k)
                                    + eta_coef_y(i, j, k) * Jy(i, j, k);
@@ -1535,7 +1568,9 @@ void FiniteDifferenceSolver::HybridPICSolveECartesian (
                     jtot_val = std::sqrt(jx_val*jx_val + jy_val*jy_val + jz_val*jz_val);
                 }
 
-                Ez(i, j, k) += eta(rho_val, jtot_val, t_new) * Jz(i, j, k);
+                const Real eta_val = ohmResistivity(
+                    eta(rho_val, jtot_val, t_new), cap_eta_for_ohm, eta_ohm_max);
+                Ez(i, j, k) += eta_val * Jz(i, j, k);
                 if (has_eta_overlay) {
                     Ez(i, j, k) += eta_overlay_z(i, j, k)
                                    + eta_coef_z(i, j, k) * Jz(i, j, k);

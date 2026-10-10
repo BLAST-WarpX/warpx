@@ -4086,6 +4086,227 @@ Maxwell solver: kinetic-fluid hybrid
 
     If :pp:param:`algo.maxwell_solver` is set to ``hybrid``, this sets the plasma hyper-resistivity in :math:`\Omega m^3`.
 
+.. pp:param:: hybrid_pic_model.implicit_mag_diffusion
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Advance resistive magnetic diffusion with an operator-split implicit solve
+    after each hybrid magnetic-field half-step.
+
+.. pp:param:: hybrid_pic_model.mag_diff_theta
+    :type: ``float``
+    :default: ``1.0``
+    :optional:
+
+    Theta-method parameter in ``(0, 1]``. The default ``1.0`` is backward Euler
+    and is L-stable for stiff resistive modes; ``0.5`` is Crank--Nicolson.
+
+.. pp:param:: hybrid_pic_model.mag_diff_eta_explicit_max
+    :type: ``float``
+    :default: ``0.0``
+    :optional:
+
+    Maximum resistivity, in :math:`\Omega m`, retained in the explicit Ohm/Faraday
+    update. The implicit solve advances the residual
+    ``max(eta - mag_diff_eta_explicit_max, 0)``, so resistivity is not counted twice.
+    Zero places all resistive diffusion in the implicit solve and avoids an explicit
+    resistive timestep restriction. In coupled production problems, a small positive,
+    explicitly CFL-safe cap can improve robustness by retaining controlled resistive
+    damping in the explicit substeps. The appropriate cap depends on the problem,
+    mesh, and timestep and should remain well below a stiff vacuum resistivity.
+
+.. pp:param:: hybrid_pic_model.mag_diff_use_variable_eta
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Use the spatially varying resistivity assembled from
+    :pp:param:`hybrid_pic_model.plasma_resistivity(rho,J,t)`. If false,
+    :pp:param:`hybrid_pic_model.mag_diff_constant_eta` is used when provided;
+    otherwise the plasma resistivity is sampled at :pp:param:`hybrid_pic_model.n_floor`.
+
+.. pp:param:: hybrid_pic_model.mag_diff_constant_eta
+    :type: ``float``
+    :optional:
+
+    Constant resistivity, in :math:`\Omega m`, for the implicit magnetic-diffusion
+    solve. This is used when :pp:param:`hybrid_pic_model.mag_diff_use_variable_eta`
+    is false.
+
+.. pp:param:: hybrid_pic_model.mag_diff_linear_solver
+    :type: ``str``
+    :default: ``amrex_gmres``
+    :optional:
+
+    Linear solver for implicit magnetic diffusion: ``amrex_gmres``,
+    ``amrex_bicgstab`` or ``petsc``. The native BiCGStab path checks the full
+    physical residual and falls back to native GMRES on breakdown or failure
+    to meet that tolerance. Each attempt has the ``mag_diff_max_iter`` limit.
+    The PETSc option requires a PETSc-enabled WarpX build.
+
+    The PETSc path uses the matrix-free physical operator with an assembled
+    discrete curl-curl preconditioning matrix. The selected algebraic
+    preconditioner, such as ILU, approximates the inverse of that matrix; an
+    exact assembled stencil does not imply an exact inverse.
+
+    PETSc defaults to GMRES with restart length ``min(mag_diff_max_iter, 50)``.
+    Prefixed PETSc options can change the outer Krylov method independently of
+    the preconditioner, for example
+    ``PETSC_OPTIONS="-magdiff_ksp_type bcgs"`` for BiCGStab or
+    ``PETSC_OPTIONS="-magdiff_ksp_gmres_restart 100"`` for a larger GMRES basis.
+    Compare preconditioners with the same outer method and stopping criteria.
+    The current CUDA implementation stages PETSc vectors through host memory;
+    fewer iterations therefore do not necessarily give a shorter runtime.
+
+.. pp:param:: hybrid_pic_model.mag_diff_bicgstab_max_iter
+    :type: ``int``
+    :default: value of ``mag_diff_max_iter``
+    :optional:
+
+    Maximum native BiCGStab iterations before GMRES fallback. Must be positive
+    and no larger than ``mag_diff_max_iter``. The fallback solves for a correction
+    about the retained BiCGStab iterate, using the original physical residual
+    goal. Set a smaller limit to leave the BiCGStab attempt earlier.
+
+.. pp:param:: hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    For ``mag_diff_linear_solver=amrex_bicgstab``, recompute the physical
+    residual and restart the BiCGStab recurrence every this many iterations.
+    Zero disables periodic replacement. Must be nonnegative.
+
+    This can reduce accumulated recurrence error in ill-conditioned solves.
+    Restarting too frequently can also slow convergence. The final physical
+    residual is always checked, independently of this setting. This option
+    does not affect the GMRES or PETSc outer solvers.
+
+.. pp:param:: hybrid_pic_model.mag_diff_native_ilu
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Use color-ordered block ILU(0) with a native AMReX outer solver. Each MPI
+    rank factors its exact local curl-curl matrix block. All local spatial and
+    component couplings are retained; off-rank couplings remain in the physical
+    operator and are treated iteratively. This is an approximate inverse,
+    not a global direct solve.
+
+    Requires a PETSc-enabled build for matrix assembly and CPU factor setup.
+    Repeated triangular solves and vector operations run in the native AMReX
+    compute arena, including GPU memory in CUDA/HIP/SYCL builds. Complete
+    field vectors are not staged through host memory during each iteration.
+    Dependency coloring permits parallel solves within each color.
+
+    Rows are equilibrated before factorization. If needed, a diagonal shift
+    stabilizes only the preconditioner; the physical equation and its tolerance
+    remain unchanged. An independent factor-solve comparison is checked during
+    setup, and the final native physical residual is checked before acceptance.
+    Changed resistivity, diffusion time or boundary response invalidates the
+    cached factors. This option is independent of the ``mag_diff_petsc_*``
+    algebraic-PC settings and cannot be combined with ``mag_diff_linear_solver=petsc``.
+
+.. pp:param:: hybrid_pic_model.mag_diff_rtol
+    :type: ``float``
+    :default: ``1.e-8``
+    :optional:
+
+    Relative tolerance for the magnetic-diffusion linear solve. Must be positive.
+
+.. pp:param:: hybrid_pic_model.mag_diff_atol
+    :type: ``float``
+    :default: ``0.0``
+    :optional:
+
+    Absolute tolerance for the magnetic-diffusion linear solve. Must be non-negative.
+
+.. pp:param:: hybrid_pic_model.mag_diff_max_iter
+    :type: ``int``
+    :default: ``200``
+    :optional:
+
+    Maximum number of magnetic-diffusion linear iterations. Must be positive.
+
+.. pp:param:: hybrid_pic_model.mag_diff_verbose
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    Verbosity level for the magnetic-diffusion linear solve.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_pc_type
+    :type: ``str``
+    :optional:
+
+    PETSc preconditioner type for implicit hybrid magnetic diffusion when
+    ``mag_diff_linear_solver = petsc``. If omitted, PETSc selects its default.
+    Common values include ``asm``, ``bjacobi`` and, on a single CPU rank, ``lu``.
+    Global ``lu`` is not supported in GPU builds; use ``asm`` with
+    :pp:param:`hybrid_pic_model.mag_diff_petsc_sub_pc_type` = ``lu`` instead.
+    The prefixed PETSc option ``-magdiff_pc_type`` takes precedence over this
+    input group without changing other PETSc solvers in the process.
+    An exact assembled curl-curl matrix does not guarantee stable incomplete
+    factors for stiff, strongly heterogeneous coefficients. If ILU breaks
+    down, inspect the vector diagnostics below and test a local ``lu``
+    factorization or PETSc's factor-shift and ordering options. Local LU
+    generally requires more memory.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_asm_overlap
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    Number of graph-overlap layers for ``mag_diff_petsc_pc_type = asm``.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_sub_ksp_type
+    :type: ``str``
+    :default: ``preonly``
+    :optional:
+
+    PETSc KSP type used for each ASM subdomain solve.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_sub_pc_type
+    :type: ``str``
+    :default: ``ilu``
+    :optional:
+
+    PETSc preconditioner used inside each ASM subdomain. ``lu`` selects an exact
+    local factorization and does not require a distributed sparse-direct package.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_ilu_factor_levels
+    :type: ``int``
+    :default: ``2``
+    :optional:
+
+    Fill level used when ``mag_diff_petsc_sub_pc_type = ilu``.
+
+.. pp:param:: hybrid_pic_model.mag_diff_petsc_ilu_factor_shift_type
+    :type: ``str``
+    :default: ``positive_definite``
+    :optional:
+
+    PETSc diagonal-shift policy for ASM incomplete-LU subdomain factors.
+    The default stabilizes factors for stiff, spatially varying resistivity.
+    This shifts only the preconditioner; it does not change the magnetic
+    diffusion operator or its residual tolerance. ``none`` restores unshifted
+    factorization. The PETSc option ``-magdiff_sub_pc_factor_shift_type`` takes
+    precedence.
+
+.. rubric:: PETSc magnetic-diffusion diagnostics
+
+For solver diagnostics, set ``PETSC_OPTIONS`` to include
+``-magdiff_check_finite`` (vector entries and norms),
+``-magdiff_audit_matrix`` (assembled preconditioner versus the matrix-free
+operator on a deterministic mixed-field probe), or
+``-magdiff_dump_matrix <path>`` (PETSc binary matrix output).
+``-magdiff_audit_file <path>`` writes the matrix audit as JSON when
+``-magdiff_audit_matrix`` is enabled. These checks are opt-in and add
+synchronization and operator applications; disable them for timing runs.
+The reported relative matrix difference is for the probe vector, not an
+operator-norm estimate.
+
 .. pp:param:: hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)
     :type: ``float`` or ``str``
     :default: ``0``
