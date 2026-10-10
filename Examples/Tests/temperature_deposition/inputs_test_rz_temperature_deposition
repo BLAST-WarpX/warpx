@@ -1,0 +1,12 @@
+# RZ axis, near-axis, and off-axis shapes, with multiple boxes in r and z.
+geometry.dims = RZ
+amr.n_cell = 16 16
+geometry.prob_lo = 0. 0.
+geometry.prob_hi = 16. 16.
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = reflecting periodic
+my_constants.y0 = 0.
+FILE = inputs_base
+diag1.fields_to_plot = Tr_equal Tt_equal Tz_equal Tr_macro Tt_macro Tz_macro Tr_shape Tt_shape Tz_shape Tr_small Tt_small Tz_small Tr_large Tt_large Tz_large Tr_axis Tt_axis Tz_axis Tr_nearaxis Tt_nearaxis Tz_nearaxis Tr_single Tt_single Tz_single Tr_zero Tt_zero Tz_zero Tr_dominant Tt_dominant Tz_dominant Tr_biased_equal Tt_biased_equal Tz_biased_equal Tr_biased_macro Tt_biased_macro Tz_biased_macro Tr_biased_single Tt_biased_single Tz_biased_single Tr_biased_zero Tt_biased_zero Tz_biased_zero Tr_biased_dominant Tt_biased_dominant Tz_biased_dominant

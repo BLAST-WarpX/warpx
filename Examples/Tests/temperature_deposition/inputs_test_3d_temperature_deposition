@@ -1,0 +1,12 @@
+# Cartesian control with particle pairs straddling a box boundary.
+geometry.dims = 3
+amr.n_cell = 16 16 16
+geometry.prob_lo = 0. 0. 0.
+geometry.prob_hi = 16. 16. 16.
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+boundary.particle_lo = periodic periodic periodic
+boundary.particle_hi = periodic periodic periodic
+my_constants.y0 = 8.25
+FILE = inputs_base
+diag1.fields_to_plot = Tx_equal Ty_equal Tz_equal Tx_macro Ty_macro Tz_macro Tx_shape Ty_shape Tz_shape Tx_small Ty_small Tz_small Tx_large Ty_large Tz_large Tx_axis Ty_axis Tz_axis Tx_nearaxis Ty_nearaxis Tz_nearaxis Tx_single Ty_single Tz_single Tx_zero Ty_zero Tz_zero Tx_dominant Ty_dominant Tz_dominant Tx_biased_equal Ty_biased_equal Tz_biased_equal Tx_biased_macro Ty_biased_macro Tz_biased_macro Tx_biased_single Ty_biased_single Tz_biased_single Tx_biased_zero Ty_biased_zero Tz_biased_zero Tx_biased_dominant Ty_biased_dominant Tz_biased_dominant
