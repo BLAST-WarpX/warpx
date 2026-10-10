@@ -272,6 +272,7 @@ void DarwinMLMGPC<T,Ops>::Define ( const T& a_U,
         mg->setBottomSolver(BottomSolver::smoother);
         mg->setVerbose(static_cast<int>(m_verbose));
         mg->setBottomVerbose(static_cast<int>(m_bottom_verbose));
+        mg->setNoGpuSync(true);
     }
 
     for (auto& chi_cc : m_chi_cc) {
