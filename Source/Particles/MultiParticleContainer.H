@@ -124,7 +124,8 @@ public:
      * \brief Deposit mass matrices.
     */
     void DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                              int lev, amrex::Real dt);
+                              int lev, amrex::Real dt,
+                              ImplicitOptions const& implicit_options);
 
     /**
     * \brief This pushes the particle positions by one time step for all the species in the

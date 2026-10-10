@@ -527,7 +527,8 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
 void
 MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& fields,
-                                             int lev, amrex::Real dt)
+                                             int lev, amrex::Real dt,
+                                             ImplicitOptions const& implicit_options)
 {
     using ablastr::fields::Direction;
 
@@ -538,7 +539,7 @@ MultiParticleContainer::DepositMassMatrices (ablastr::fields::MultiFabRegister& 
     }
 
     for (auto& pc : allcontainers) {
-        pc->DepositMassMatrices(fields, lev, dt);
+        pc->DepositMassMatrices(fields, lev, dt, implicit_options);
     }
 }
 

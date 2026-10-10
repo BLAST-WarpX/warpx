@@ -96,6 +96,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // Initialize the mass matrices for plasma response
     InitializeMassMatrices();
+    InitializeImplicitOptions();
 
     // The predictor velocity push in OneStep() temporarily overrides the
     // global galerkin_interpolation flag to true, to gather with the same
@@ -346,7 +347,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices(m_dt);
+    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete

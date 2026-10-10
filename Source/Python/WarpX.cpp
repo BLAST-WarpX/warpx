@@ -201,7 +201,11 @@ void init_WarpX (py::module& m)
             R"pbdoc(Save the particle positions and velocities at the start of the step)pbdoc"
         )
         .def("deposit_mass_matrices",
-            [](WarpX& wx, amrex::Real a_dt){ wx.DepositMassMatrices(a_dt); },
+            [](WarpX& wx, amrex::Real a_dt){
+                auto const* solver = wx.get_pointer_ImplicitSolver();
+                if (!solver) { throw py::value_error("deposit_mass_matrices requires an implicit solver"); }
+                wx.DepositMassMatrices(a_dt, solver->GetImplicitOptions());
+            },
             R"pbdoc(Zero and deposit the mass matrices from all species)pbdoc"
         )
         .def("sync_mass_matrices",

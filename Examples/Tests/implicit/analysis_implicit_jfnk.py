@@ -12,8 +12,9 @@
 # `inputs_test_3d_theta_implicit_jfnk_direct`.
 # These simulate a periodic uniform plasma using the theta-implicit solver
 # with shape factor 2. The dimensionality and the relevant algorithm options
-# (deposition type, use of the mass matrices for the Jacobian) are read from
-# the `warpx_used_inputs` file.
+# (deposition type, use of the mass matrices for the Jacobian or
+# preconditioner) are read from the `warpx_used_inputs` file.
+import argparse
 import sys
 
 import numpy as np
@@ -23,19 +24,29 @@ from scipy.constants import e, epsilon_0
 sys.path.append("../../../Tools/Parser/")
 from input_file_parser import parse_input_file
 
+parser = argparse.ArgumentParser()
+parser.add_argument("plotfile")
+parser.add_argument("--gmres-iters-tol", type=float)
+parser.add_argument("--newton-iters-tol", type=float)
+args = parser.parse_args()
+
 input_dict = parse_input_file("./warpx_used_inputs")
 dims = input_dict["geometry.dims"][0]
 current_deposition = input_dict["algo.current_deposition"][0].strip('"')
 use_mass_matrices_jacobian = input_dict.get(
     "implicit_evolve.use_mass_matrices_jacobian", ["false"]
 )[0] in ("true", "1")
+use_mass_matrices_pc = input_dict.get(
+    "implicit_evolve.use_mass_matrices_pc", ["false"]
+)[0] in ("true", "1")
 
 print(f"dimensionality: {dims}")
 print(f"current deposition: {current_deposition}")
 print(f"mass matrices used for the Jacobian: {use_mass_matrices_jacobian}")
+print(f"mass matrices used for the preconditioner: {use_mass_matrices_pc}")
 
-field_energy = np.loadtxt("diags/reducedfiles/field_energy.txt", skiprows=1)
-particle_energy = np.loadtxt("diags/reducedfiles/particle_energy.txt", skiprows=1)
+field_energy = np.loadtxt("diags/reduced_files/field_energy.txt", skiprows=1)
+particle_energy = np.loadtxt("diags/reduced_files/particle_energy.txt", skiprows=1)
 
 total_energy = field_energy[:, 2] + particle_energy[:, 2]
 
@@ -55,8 +66,7 @@ if current_deposition == "villasenor":
     tolerance_rel_charge = 2.0e-15
     n0 = 1.0e30
 
-    pltdir = sys.argv[1]
-    ds = yt.load(pltdir)
+    ds = yt.load(args.plotfile)
     data = ds.covering_grid(
         level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
     )
@@ -76,8 +86,8 @@ if current_deposition == "villasenor":
 
     assert drho_rms < tolerance_rel_charge
 
-if use_mass_matrices_jacobian:
-    newton_solver = np.loadtxt("diags/newton_solver.txt", skiprows=1)
+if use_mass_matrices_jacobian or use_mass_matrices_pc:
+    newton_solver = np.loadtxt("diags/reduced_files/newton_solver.txt", skiprows=1)
     num_steps = newton_solver[-1, 0]
     total_newton_iters = newton_solver[-1, 3]
     total_gmres_iters = newton_solver[-1, 7]
@@ -85,14 +95,20 @@ if use_mass_matrices_jacobian:
     # check that the number of gmres iterations per newton iteration is below
     # tolerance; this is sensitive to the quality of the mass-matrices-based
     # preconditioner
-    gmres_iters_tol = 5.0
+    if args.gmres_iters_tol is not None:
+        gmres_iters_tol = args.gmres_iters_tol
+    else:
+        gmres_iters_tol = 5.0
     print(f"gmres iters per newton: {total_gmres_iters / total_newton_iters}")
     print(f"gmres iters tolerance: {gmres_iters_tol}")
     assert total_gmres_iters / total_newton_iters <= gmres_iters_tol
 
     # check that the number of newton iterations per step is below tolerance;
     # this is sensitive to the quality of the mass-matrices-based Jacobian
-    newton_iters_tol = 10.0
+    if args.newton_iters_tol is not None:
+        newton_iters_tol = args.newton_iters_tol
+    else:
+        newton_iters_tol = 10.0
     print(f"newton iters per time step: {total_newton_iters / num_steps}")
     print(f"newton iters tolerance: {newton_iters_tol}")
     assert total_newton_iters / num_steps <= newton_iters_tol

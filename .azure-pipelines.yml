@@ -54,7 +54,7 @@ jobs:
       # Cartesian 3D
       cartesian_3d:
         CDASH_BUILD_NAME: CPU-3D
-        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON
+        WARPX_CMAKE_FLAGS: -DWarpX_DIMS=3 -DWarpX_FFT=ON -DWarpX_PYTHON=ON -DWarpX_PETSC=ON
       # Cylindrical RZ
       cylindrical_rz:
         CDASH_BUILD_NAME: CPU-RZ

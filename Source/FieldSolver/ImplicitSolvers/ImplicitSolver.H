@@ -70,6 +70,8 @@ public:
 
     virtual void FinishStep(amrex::Real /* a_start_time */, int /* a_step */) {}
 
+    [[nodiscard]] ImplicitOptions const& GetImplicitOptions () const { return m_implicit_options; }
+
     /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
@@ -257,6 +259,9 @@ protected:
      */
     bool m_print_unconverged_particle_details = false;
 
+    // Stable particle options. PreRHSOp copies this before setting per-call values.
+    ImplicitOptions m_implicit_options;
+
     /**
      * \brief whether to skip the full Picard update of particles on the initial newton step
      */
@@ -321,6 +326,8 @@ protected:
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
      */
     void InitializeMassMatrices ();
+
+    void InitializeImplicitOptions ();
 
     void PrintBaseImplicitSolverParameters () const;
 

@@ -67,6 +67,7 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
+    InitializeImplicitOptions();
 
     const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
     if (pc_type == PreconditionerType::pc_petsc ||
