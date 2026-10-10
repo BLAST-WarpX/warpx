@@ -283,6 +283,9 @@ Overall simulation parameters
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
             Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
+          - ``newton.step_tolerance`` (``float``, default: 1.0e-16)
+            Must be nonnegative. The nonlinear solve has converged when the norm of the
+            update is below this factor times the norm of the solution.
           - ``newton.divergence_tolerance`` (``float``, default: 1.0e4)
             Must not be less than 1. The nonlinear solve fails as diverged when the
             residual norm exceeds this factor times the initial residual norm.

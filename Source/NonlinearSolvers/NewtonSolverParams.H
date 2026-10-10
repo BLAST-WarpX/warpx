@@ -26,7 +26,7 @@
 struct NewtonSolverParams
 {
     //! The solve has converged when the norm of the update is below this factor times
-    //! the norm of the solution (not an input parameter).
+    //! the norm of the solution.
     amrex::Real step_tolerance = 1.0e-16;
     //! The solve has diverged when the residual norm exceeds this factor times the initial norm.
     amrex::Real divergence_tolerance = 1.0e4;
@@ -56,6 +56,10 @@ struct NewtonSolverParams
     {
         const amrex::ParmParse pp_newton("newton");
         pp_newton.query("linear_solver",       linear_solver_type);
+        pp_newton.query("step_tolerance", step_tolerance);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            step_tolerance >= 0.,
+            "newton.step_tolerance must be nonnegative");
         pp_newton.query("divergence_tolerance", divergence_tolerance);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             divergence_tolerance >= 1.,
@@ -120,6 +124,7 @@ struct NewtonSolverParams
 
     void Print (const std::string& a_name) const
     {
+        amrex::Print() << a_name << " step tolerance:       " << step_tolerance << "\n";
         amrex::Print() << a_name << " divergence tolerance: " << divergence_tolerance << "\n";
         amrex::Print() << a_name << " PC update Newton interval:    " << pc_update_newton_interval << "\n";
         amrex::Print() << a_name << " PC update time-step interval: " << pc_update_time_step_interval << "\n";
