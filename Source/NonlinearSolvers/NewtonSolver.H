@@ -246,7 +246,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             break;
         }
 
-        if (norm_rel < this->m_params.rtol) {
+        // As PETSc SNES, the relative test is skipped at iteration 0
+        if (iter > 0 and norm_abs <= this->m_params.rtol*norm0) {
             this->m_exit_status = 3;
             if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
