@@ -4095,6 +4095,20 @@ Maxwell solver: kinetic-fluid hybrid
     Linear solver for implicit magnetic diffusion: ``amrex_gmres`` or ``petsc``.
     The PETSc option requires a PETSc-enabled WarpX build.
 
+    The PETSc path uses the matrix-free physical operator with an assembled
+    discrete curl-curl preconditioning matrix. The selected algebraic
+    preconditioner, such as ILU, approximates the inverse of that matrix; an
+    exact assembled stencil does not imply an exact inverse.
+
+    PETSc defaults to GMRES with restart length ``min(mag_diff_max_iter, 50)``.
+    Prefixed PETSc options can change the outer Krylov method independently of
+    the preconditioner, for example
+    ``PETSC_OPTIONS="-magdiff_ksp_type bcgs"`` for BiCGStab or
+    ``PETSC_OPTIONS="-magdiff_ksp_gmres_restart 100"`` for a larger GMRES basis.
+    Compare preconditioners with the same outer method and stopping criteria.
+    The current CUDA implementation stages PETSc vectors through host memory;
+    fewer iterations therefore do not necessarily give a shorter runtime.
+
 .. pp:param:: hybrid_pic_model.mag_diff_rtol
     :type: ``float``
     :default: ``1.e-8``
