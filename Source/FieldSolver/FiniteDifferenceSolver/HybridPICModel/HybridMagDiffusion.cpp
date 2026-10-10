@@ -678,10 +678,15 @@ public:
 
         // Reference scale from max eta so stiff vacuum modes are O(1) and
         // uniform eta reduces to the identity map after PC.
-        Real max_eta = 0.0_rt;
-        for (int idim = 0; idim < 3; ++idim) {
-            max_eta = std::max(max_eta, m_eta_pc[idim].max(0));
+        // Eta is frozen for this operator's lifetime. Cache its global maximum
+        // to avoid three device reductions and MPI collectives per application.
+        if (m_max_eta_pc < 0.0_rt) {
+            m_max_eta_pc = 0.0_rt;
+            for (int idim = 0; idim < 3; ++idim) {
+                m_max_eta_pc = std::max(m_max_eta_pc, m_eta_pc[idim].max(0));
+            }
         }
+        Real max_eta = m_max_eta_pc;
         // 1e-99 underflows to 0 in single precision; keep a representable floor.
         max_eta = std::max(max_eta, Real(1.e-3) * std::numeric_limits<Real>::min());
         Real const chi_max = max_eta / PhysConst::mu0;
@@ -867,6 +872,7 @@ private:
     // B-centered eta for Jacobi PC (same BA as each B component). Built once
     // from E/J-centered frozen eta via Interp — never use E indices on B.
     Array<MultiFab,3> m_eta_pc;
+    Real m_max_eta_pc = -1.0_rt;
     // Nonzero when a pec_insulator Dirichlet tangential-B feed is active.
     // m_feed_offset holds c = A_full(0); apply() subtracts c so GMRES sees a
     // linear operator; AdvanceVariable subtracts c from the RHS.

@@ -60,7 +60,10 @@ hybrid_pic_model.mag_diff_linear_solver = petsc
 hybrid_pic_model.mag_diff_rtol = 1.0e-10
 hybrid_pic_model.mag_diff_atol = 0.0
 hybrid_pic_model.mag_diff_max_iter = 300
-hybrid_pic_model.mag_diff_petsc_pc_type = lu
+hybrid_pic_model.mag_diff_petsc_pc_type = asm
+hybrid_pic_model.mag_diff_petsc_asm_overlap = 0
+hybrid_pic_model.mag_diff_petsc_sub_ksp_type = preonly
+hybrid_pic_model.mag_diff_petsc_sub_pc_type = lu
 # Exact Pmat == MatShell must converge in one iteration; the CMake test rejects
 # larger iteration counts.
 hybrid_pic_model.mag_diff_verbose = 1
