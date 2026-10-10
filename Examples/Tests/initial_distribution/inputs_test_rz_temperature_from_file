@@ -1,0 +1,18 @@
+# base input parameters
+FILE = inputs_base_temperature_from_file
+
+# test input parameters
+amr.n_cell = 16 16
+geometry.dims = RZ
+geometry.prob_lo = 0. -1.
+geometry.prob_hi = 1.  1.
+warpx.n_rz_azimuthal_modes = 1
+boundary.field_lo = none periodic
+boundary.field_hi = pec periodic
+boundary.particle_lo = none periodic
+boundary.particle_hi = absorbing periodic
+
+maxwellian.num_particles_per_cell = 1000
+maxwellian.read_temperature_in_eV_from_path = "../test_rz_temperature_from_file_prepare/example-temperature-in-eV.h5"
+maxwell_juttner.num_particles_per_cell = 1000
+maxwell_juttner.read_temperature_in_eV_from_path = "../test_rz_temperature_from_file_prepare/example-temperature-in-eV.h5"

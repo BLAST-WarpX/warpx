@@ -23,6 +23,7 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_TableData.H>
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -160,6 +161,43 @@ struct ExternalFieldView
 #endif
     }
 
+    //! Return the value of the field, linearly interpolated at the position
+    //! given in Cartesian coordinates (x,y,z), as used by the particle injectors.
+    //! The position is converted to the coordinates of the data, i.e. (z) in 1D,
+    //! (x,z) in 2D Cartesian, (r,z) in RZ and (r) in RCYLINDER and RSPHERE.
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real
+    getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
+    {
+#if defined(WARPX_DIM_1D_Z)
+        amrex::ignore_unused(x,y);
+        amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_RCYLINDER)
+        amrex::ignore_unused(z);
+        amrex::RealVect const pos{std::sqrt(x*x + y*y)};
+#elif defined(WARPX_DIM_RSPHERE)
+        amrex::RealVect const pos{std::sqrt(x*x + y*y + z*z)};
+#elif defined(WARPX_DIM_XZ)
+        amrex::ignore_unused(y);
+        amrex::RealVect const pos{x,z};
+#elif defined(WARPX_DIM_RZ)
+        amrex::RealVect const pos{std::sqrt(x*x + y*y), z};
+#else
+        amrex::RealVect const pos{x,y,z};
+#endif
+#if defined(AMREX_USE_GPU)
+        // The view can only be evaluated on device: operator() calls
+        // the interpolation routines of ablastr::math, which are device-only.
+        AMREX_IF_ON_HOST((amrex::Abort(
+            "For GPU builds, ExternalFieldView only works on device.");))
+        AMREX_IF_ON_DEVICE((return (*this)(pos);))
+        return 0.0;
+#else
+        return (*this)(pos);
+#endif
+    }
+
     amrex::RealVect dx;     //! mesh spacing of the data
     amrex::RealVect offset; //! data's physical location at (0,0,0)
 #if (AMREX_SPACEDIM == 1)
@@ -288,26 +326,9 @@ struct ExternalFieldVectorView
     amrex::XDim3
     getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
     {
-#if (AMREX_SPACEDIM < 3)
-        amrex::ignore_unused(x,y,z);
-#endif
-#if (AMREX_SPACEDIM == 1)
-        amrex::RealVect const pos{z};
-#elif defined(WARPX_DIM_XZ)
-        amrex::RealVect const pos{x,z};
-#else
-        amrex::RealVect const pos{x,y,z};
-#endif
-#if defined(AMREX_USE_GPU)
-        // The views can only be evaluated on device: ExternalFieldView calls
-        // the interpolation routines of ablastr::math, which are device-only.
-        AMREX_IF_ON_HOST((amrex::Abort(
-            "For GPU builds, ExternalFieldVectorView only works on device.");))
-        AMREX_IF_ON_DEVICE((return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};))
-        return amrex::XDim3{0.0, 0.0, 0.0};
-#else
-        return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};
-#endif
+        return amrex::XDim3{m_x_view.getValue(x,y,z),
+                            m_y_view.getValue(x,y,z),
+                            m_z_view.getValue(x,y,z)};
     }
 
 private:

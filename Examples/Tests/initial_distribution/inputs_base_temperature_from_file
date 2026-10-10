@@ -1,0 +1,46 @@
+# Base input parameters for the tests that load the temperature from an
+# openPMD file in RZ, RCYLINDER and RSPHERE geometry. The geometry-dependent
+# parameters are set in inputs_test_<geometry>_temperature_from_file.
+
+#################################
+####### GENERAL PARAMETERS ######
+#################################
+max_step = 0
+amr.max_level = 0
+warpx.verbose = 1
+
+# Order of particle shape factors
+algo.particle_shape = 1
+
+#################################
+############ PLASMA #############
+#################################
+# The same temperature is loaded through the maxwellian distribution
+# and through the maxwell_juttner distribution
+# (at these low temperatures, the latter samples a Maxwellian).
+particles.species_names = maxwellian maxwell_juttner
+
+maxwellian.charge = -q_e
+maxwellian.mass = m_e
+maxwellian.injection_style = "NRandomPerCell"
+maxwellian.profile = constant
+maxwellian.density = 1.0e21
+maxwellian.momentum_distribution_type = "maxwellian"
+maxwellian.maxwellian_temperature_in_eV_distribution_type = "read_from_file"
+
+maxwell_juttner.charge = -q_e
+maxwell_juttner.mass = m_e
+maxwell_juttner.injection_style = "NRandomPerCell"
+maxwell_juttner.profile = constant
+maxwell_juttner.density = 1.0e21
+maxwell_juttner.momentum_distribution_type = "maxwell_juttner"
+maxwell_juttner.maxwell_juttner_temperature_in_eV_distribution_type = "read_from_file"
+
+#################################
+########## DIAGNOSTIC ###########
+#################################
+diagnostics.diags_names = diag1
+diag1.intervals = 1
+diag1.diag_type = Full
+diag1.fields_to_plot = none
+diag1.format = openpmd

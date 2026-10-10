@@ -15,7 +15,7 @@
 
 #include <AMReX_BaseFabUtility.H>
 
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD)
 #   include <openPMD/openPMD.hpp>
 #endif
 
@@ -206,7 +206,7 @@ ExternalFieldReader::ExternalFieldReader (
 
 void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 {
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+#if defined(WARPX_USE_OPENPMD)
     using namespace amrex;
 
     auto series = openPMD::Series(m_file, openPMD::Access::READ_ONLY);
@@ -251,6 +251,12 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 #elif defined(WARPX_DIM_1D_Z)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cartesian", "1D3V can only read from files with cartesian geometry");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.at(0) == "z", "1D3V expects axisLabel {z}");
+#elif defined(WARPX_DIM_RCYLINDER)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "cylindrical", "RCYLINDER can only read from files with 'cylindrical' geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.size() == 1 && axisLabels.at(0) == "r", "RCYLINDER expects axisLabel {r}");
+#elif defined(WARPX_DIM_RSPHERE)
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(fileGeom == "spherical", "RSPHERE can only read from files with 'spherical' geometry");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(axisLabels.size() == 1 && axisLabels.at(0) == "r", "RSPHERE expects axisLabel {r}");
 #endif
 
     const auto d = F.gridSpacing<long double>();
@@ -433,7 +439,7 @@ void ExternalFieldReader::load_data (amrex::RealBox const& pbox)
 
 #else
     amrex::ignore_unused(pbox);
-    WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires openPMD and it is not supported for 1D RCYLINDER and RSPHERE");
+    WARPX_ABORT_WITH_MESSAGE("ExternalFieldReader requires WarpX built with openPMD support");
 #endif
 }
 
