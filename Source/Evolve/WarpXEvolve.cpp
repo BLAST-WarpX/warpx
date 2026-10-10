@@ -588,12 +588,16 @@ WarpX::OneStep_nosub (
 
     // Synchronize J and rho:
     // filter (if used), exchange guard cells, interpolate across MR levels
-    // and apply boundary conditions
     SyncCurrentAndRho();
+    FinalizeRho();
+    // Vay constructs J from D in PushPSATD, which finalizes the resulting J.
+    if (current_deposition_algo != CurrentDepositionAlgo::Vay) {
+        FinalizeJ();
+    }
 
-    // At this point, J is up-to-date inside the domain, and E and B are
-    // up-to-date including enough guard cells for first step of the field
-    // solve.
+    // At this point, J is up-to-date inside the domain except with Vay deposition,
+    // and E and B are up-to-date including enough guard cells for the first
+    // step of the field solve.
 
     // For extended PML: copy J from regular grid to PML, and damp J in PML
     if (do_pml && pml_has_particles) { CopyJPML(); }
@@ -839,7 +843,6 @@ void WarpX::HandleParticlesAtBoundaries (int step, amrex::Real cur_time, int num
 
 void WarpX::SyncCurrentAndRho ()
 {
-    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD)
@@ -870,6 +873,10 @@ void WarpX::SyncCurrentAndRho ()
 
             if (current_deposition_algo == CurrentDepositionAlgo::Vay)
             {
+                // Nonperiodic physical-boundary support for Vay deposition is unestablished.
+                // With periodic domain boundaries, D needs filtering and periodic communication,
+                // but no physical-boundary finalization. Periodic domain boundaries do not
+                // require periodic_single_box_fft: local FFTs can also use a periodic domain.
                 // TODO This works only without mesh refinement
                 const int lev = 0;
                 if (use_filter) {
@@ -884,28 +891,61 @@ void WarpX::SyncCurrentAndRho ()
         SyncRho();
     }
 
-    // Reflect charge and current density over PEC boundaries, if needed.
+}
+
+void WarpX::FinalizeJ ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        if (m_fields.has(FieldType::rho_fp, lev)) {
-            ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_fp,lev), PatchType::fine);
+        if (m_fields.has_vector(FieldType::current_fp, lev)) {
+            FinalizeJOnLevel(lev,
+                m_fields.get(FieldType::current_fp, Direction{0}, lev),
+                m_fields.get(FieldType::current_fp, Direction{1}, lev),
+                m_fields.get(FieldType::current_fp, Direction{2}, lev),
+                PatchType::fine);
         }
-        ApplyJfieldBoundary(lev,
-            m_fields.get(FieldType::current_fp, Direction{0}, lev),
-            m_fields.get(FieldType::current_fp, Direction{1}, lev),
-            m_fields.get(FieldType::current_fp, Direction{2}, lev),
-            PatchType::fine);
-        if (lev > 0) {
-            if (m_fields.has(FieldType::rho_cp, lev)) {
-                ApplyRhofieldBoundary(lev, m_fields.get(FieldType::rho_cp,lev), PatchType::coarse);
-            }
-            ApplyJfieldBoundary(lev,
+        if (lev > 0 && m_fields.has_vector(FieldType::current_cp, lev)) {
+            FinalizeJOnLevel(lev,
                 m_fields.get(FieldType::current_cp, Direction{0}, lev),
                 m_fields.get(FieldType::current_cp, Direction{1}, lev),
                 m_fields.get(FieldType::current_cp, Direction{2}, lev),
                 PatchType::coarse);
         }
     }
+}
+
+void WarpX::FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
+                              amrex::MultiFab* Jz, PatchType patch_type)
+{
+    ApplyJfieldBoundary(lev, Jx, Jy, Jz, patch_type);
+}
+
+void WarpX::FinalizeRho ()
+{
+    using warpx::fields::FieldType;
+
+    for (int lev = 0; lev <= finest_level; ++lev)
+    {
+        if (m_fields.has(FieldType::rho_fp, lev)) {
+            FinalizeRho(lev, m_fields.get(FieldType::rho_fp, lev), PatchType::fine);
+        }
+        if (lev > 0 && m_fields.has(FieldType::rho_cp, lev)) {
+            FinalizeRho(lev, m_fields.get(FieldType::rho_cp, lev), PatchType::coarse);
+        }
+    }
+}
+
+void WarpX::FinalizeRho (int lev, amrex::MultiFab* rho, PatchType patch_type,
+                         int scomp, int ncomp)
+{
+    ApplyRhofieldBoundary(lev, rho, patch_type, scomp, ncomp);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const int glev = (patch_type == PatchType::fine) ? lev : lev - 1;
+    ApplyInverseVolumeScalingToChargeDensity(rho, glev, scomp, ncomp);
+#endif
 }
 
 void
@@ -952,8 +992,8 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // Deposit rho at relative time -dt
         // (dt[0] denotes the time step on mesh refinement level 0)
         mypc->DepositCharge(rho_fp, -dt[0]);
-        // Filter, exchange boundary, and interpolate across levels
-        SyncRho();
+        SyncRho();     // Filter, exchange boundary, and interpolate across levels
+        FinalizeRho(); // Apply boundary conditions to rho, and then apply volume scaling
         // Forward FFT of rho
         PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
     }
@@ -970,6 +1010,7 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
         SyncCurrent("current_fp");
+        FinalizeJ();
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
     }
@@ -1004,14 +1045,17 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
         // into 'current_fp' and then performs both filtering, if used, and exchange
         // of guard cells.
         SyncCurrent("current_fp");
+        FinalizeJ();
         // Forward FFT of J
         PSATDForwardTransformJ("current_fp", "current_cp");
 
         if (time_dependency_J == TimeDependencyJ::Quadratic)
         {
             PSATDMoveJNewToJMid();
-            mypc->DepositCurrent( m_fields.get_mr_levels_alldirs(current_string, finest_level),  dt[0], t_deposit_current + 0.5_rt*sub_dt);
+            mypc->DepositCurrent(m_fields.get_mr_levels_alldirs(current_string, finest_level),
+                                 dt[0], t_deposit_current + 0.5_rt*sub_dt);
             SyncCurrent("current_fp");
+            FinalizeJ();
             PSATDForwardTransformJ("current_fp", "current_cp");
         }
 
@@ -1029,8 +1073,8 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
 
             // Deposit rho at relative time t_deposit_charge
             mypc->DepositCharge(rho_fp, t_deposit_charge);
-            // Filter, exchange boundary, and interpolate across levels
-            SyncRho();
+            SyncRho();     // Filter, exchange boundary, and interpolate across levels
+            FinalizeRho(); // Apply boundary conditions to rho, and then apply volume scaling
             // Forward FFT of rho
             const int rho_idx = (time_dependency_rho != TimeDependencyRho::Constant) ? rho_new : rho_mid;
             PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_idx);
@@ -1039,7 +1083,8 @@ WarpX::OneStep_JRhom (const amrex::Real cur_time)
             {
                 PSATDMoveRhoNewToRhoMid();
                 mypc->DepositCharge(rho_fp, t_deposit_charge + 0.5_rt*sub_dt);
-                SyncRho();
+                SyncRho();     // Filter, exchange boundary, and interpolate across levels
+                FinalizeRho(); // Apply boundary conditions to rho, and then apply volume scaling
                 PSATDForwardTransformRho(rho_fp_string, rho_cp_string, 0, rho_new);
             }
         }
@@ -1152,9 +1197,13 @@ WarpX::OneStep_sub1 (Real cur_time)
         WARPX_ABORT_WITH_MESSAGE(msg.str());
     }
 
+    using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
     bool const skip_lev0_coarse_patch = true;
+    const ablastr::fields::MultiLevelScalarField rho_buf = m_fields.has(FieldType::rho_buf, fine_lev)
+        ? m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch)
+        : ablastr::fields::MultiLevelScalarField{static_cast<size_t>(finest_level + 1)};
 
     // i) Push particles and fields on the fine patch (first fine step)
     PushParticlesandDeposit(fine_lev, cur_time, SubcyclingHalf::FirstHalf);
@@ -1168,6 +1217,11 @@ WarpX::OneStep_sub1 (Real cur_time)
     SumBoundaryJ(
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         fine_lev, Geom(fine_lev).periodicity());
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, fine_lev),
+        PatchType::fine);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
         m_fields.has(FieldType::rho_cp, finest_level)) {
@@ -1175,6 +1229,7 @@ WarpX::OneStep_sub1 (Real cur_time)
             m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
             m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
             fine_lev, PatchType::fine, 0, 2*ncomps);
+        FinalizeRho(fine_lev, m_fields.get(FieldType::rho_fp, fine_lev), PatchType::fine);
     }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time);
@@ -1207,15 +1262,28 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
         m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch), coarse_lev);
+    FinalizeJOnLevel(coarse_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, coarse_lev),
+        PatchType::fine);
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_cp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{2}, fine_lev),
+        PatchType::coarse);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
-        m_fields.has(FieldType::rho_cp, finest_level) &&
-        m_fields.has(FieldType::rho_buf, finest_level)) {
+        m_fields.has(FieldType::rho_cp, finest_level)) {
         AddRhoFromFineLevelandSumBoundary(
             m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
             m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
-            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch),
+            rho_buf,
             coarse_lev, 0, ncomps);
+        FinalizeRho(coarse_lev, m_fields.get(FieldType::rho_fp, coarse_lev),
+                    PatchType::fine, 0, ncomps);
+        FinalizeRho(fine_lev, m_fields.get(FieldType::rho_cp, fine_lev),
+                    PatchType::coarse, 0, ncomps);
     }
 
     EvolveB(fine_lev, PatchType::coarse, dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time);
@@ -1252,13 +1320,19 @@ WarpX::OneStep_sub1 (Real cur_time)
         ApplyFilterJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev);
     }
     SumBoundaryJ( m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level), fine_lev, Geom(fine_lev).periodicity());
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, fine_lev),
+        PatchType::fine);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
         m_fields.has(FieldType::rho_cp, finest_level)) {
         ApplyFilterandSumBoundaryRho(
             m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
             m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
-            fine_lev, PatchType::fine, 0, ncomps);
+            fine_lev, PatchType::fine, 0, 2*ncomps);
+        FinalizeRho(fine_lev, m_fields.get(FieldType::rho_fp, fine_lev), PatchType::fine);
     }
 
     EvolveB(fine_lev, PatchType::fine, 0.5_rt*dt[fine_lev], SubcyclingHalf::FirstHalf, cur_time + dt[fine_lev]);
@@ -1291,15 +1365,28 @@ WarpX::OneStep_sub1 (Real cur_time)
         m_fields.get_mr_levels_alldirs(FieldType::current_cp, finest_level, skip_lev0_coarse_patch),
         m_fields.get_mr_levels_alldirs(FieldType::current_buf, finest_level, skip_lev0_coarse_patch),
         coarse_lev);
+    FinalizeJOnLevel(coarse_lev,
+        m_fields.get(FieldType::current_fp, Direction{0}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{1}, coarse_lev),
+        m_fields.get(FieldType::current_fp, Direction{2}, coarse_lev),
+        PatchType::fine);
+    FinalizeJOnLevel(fine_lev,
+        m_fields.get(FieldType::current_cp, Direction{0}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{1}, fine_lev),
+        m_fields.get(FieldType::current_cp, Direction{2}, fine_lev),
+        PatchType::coarse);
 
     if (m_fields.has(FieldType::rho_fp, finest_level) &&
-        m_fields.has(FieldType::rho_cp, finest_level) &&
-        m_fields.has(FieldType::rho_buf, finest_level)) {
+        m_fields.has(FieldType::rho_cp, finest_level)) {
         AddRhoFromFineLevelandSumBoundary(
             m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
             m_fields.get_mr_levels(FieldType::rho_cp, finest_level, skip_lev0_coarse_patch),
-            m_fields.get_mr_levels(FieldType::rho_buf, finest_level, skip_lev0_coarse_patch),
+            rho_buf,
             coarse_lev, ncomps, ncomps);
+        FinalizeRho(coarse_lev, m_fields.get(FieldType::rho_fp, coarse_lev),
+                    PatchType::fine, ncomps, ncomps);
+        FinalizeRho(fine_lev, m_fields.get(FieldType::rho_cp, fine_lev),
+                    PatchType::coarse, ncomps, ncomps);
     }
 
     EvolveE(fine_lev, PatchType::coarse, dt[fine_lev], cur_time + 0.5_rt * dt[fine_lev]);
@@ -1477,15 +1564,6 @@ WarpX::PushParticlesandDeposit (
                     m_fields.get(FieldType::current_buf, Direction{1}, lev),
                     m_fields.get(FieldType::current_buf, Direction{2}, lev),
                     lev-1);
-            }
-        }
-        // Unlike J, the charge density has no post-deposition accumulation step:
-        // rho is reset and fully deposited within this call on both the explicit
-        // and implicit paths, so it is scaled here in all cases.
-        if (m_fields.has(FieldType::rho_fp, lev)) {
-            ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_fp, lev), lev);
-            if (m_fields.has(FieldType::rho_buf, lev)) {
-                ApplyInverseVolumeScalingToChargeDensity(m_fields.get(FieldType::rho_buf, lev), lev-1);
             }
         }
 // #else

@@ -355,6 +355,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
+    m_WarpX->FinalizeJ();
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();

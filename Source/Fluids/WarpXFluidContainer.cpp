@@ -21,6 +21,26 @@
 using namespace ablastr::utils::communication;
 using namespace amrex;
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+namespace
+{
+    // Radial factor removed by ApplyInverseVolumeScalingToChargeDensity.
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real RadialVolumeFactor (amrex::Real r, amrex::Real dr, bool use_axis_correction)
+    {
+        using namespace amrex::literals;
+        r = amrex::Math::abs(r);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+        const amrex::Real axis_factor = use_axis_correction ? 1.0_rt/3.0_rt : 1.0_rt/4.0_rt;
+        return (r == 0.0_rt) ? MathConst::pi*dr*axis_factor : 2.0_rt*MathConst::pi*r;
+#else
+        const amrex::Real axis_factor = use_axis_correction ? 1.0_rt/4.0_rt : 1.0_rt/8.0_rt;
+        return (r == 0.0_rt) ? 4.0_rt/3.0_rt*MathConst::pi*dr*dr*axis_factor : 4.0_rt*MathConst::pi*r*r;
+#endif
+    }
+}
+#endif
+
 
 WarpXFluidContainer::WarpXFluidContainer(int ispecies, const std::string &name):
     species_id{ispecies},
@@ -1407,12 +1427,16 @@ void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fiel
     const amrex::Geometry &geom = warpx.Geom(lev);
     const amrex::Periodicity &period = geom.periodicity();
     const amrex::Real q = getCharge();
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const amrex::Real dr = WarpX::CellSize(lev)[0];
+    const bool use_axis_correction = warpx.UseVerboncoeurAxisCorrection();
+#endif
     auto const &owner_mask_rho = amrex::OwnerMask(rho, period);
 
     // Assertion, make sure rho is at the same location as N
     AMREX_ALWAYS_ASSERT(rho.ixType().nodeCentered());
 
-    // Loop over and deposit charge density
+    // Deposit fluid charge in the unscaled PIC representation
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -1424,11 +1448,25 @@ void WarpXFluidContainer::DepositCharge (ablastr::fields::MultiFabRegister& fiel
         const amrex::Array4<amrex::Real> rho_arr = rho.array(mfi);
         const amrex::Array4<int> owner_mask_rho_arr = owner_mask_rho->array(mfi);
 
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        const amrex::Real rmin = WarpX::LowerCorner(tile_box, lev, 0.0_rt).x;
+        const int irmin = amrex::lbound(tile_box).x;
+#endif
+
         // Deposit Rho
         amrex::ParallelFor(tile_box,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept
             {
-                if ( owner_mask_rho_arr(i,j,k) ) { rho_arr(i,j,k,icomp) += q*N_arr(i,j,k); }
+                if (owner_mask_rho_arr(i,j,k)) {
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+                    const amrex::Real volume_factor = RadialVolumeFactor(
+                        rmin + (i - irmin)*dr, dr, use_axis_correction);
+#else
+                    const amrex::Real volume_factor = 1.0_rt;
+#endif
+                    // Match PIC deposits before radial inverse-volume scaling.
+                    rho_arr(i,j,k,icomp) += volume_factor*q*N_arr(i,j,k);
+                }
             }
         );
     }

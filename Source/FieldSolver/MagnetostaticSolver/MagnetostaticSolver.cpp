@@ -118,6 +118,7 @@ WarpX::AddMagnetostaticFieldLabFrame()
 #endif
 
     SyncCurrent("current_fp");
+    FinalizeJ();
 
     // set the boundary and current density potentials
     setVectorPotentialBC(m_fields.get_mr_levels_alldirs(FieldType::vector_potential_fp_nodal, finest_level));
