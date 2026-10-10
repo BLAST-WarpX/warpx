@@ -405,12 +405,12 @@ void SemiImplicitDarwin::CalculateSourceVector ()
 
     // Calculate the vector Laplacian of B and write result into first temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeVectorLaplacian(
-        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate the curl of J and write result into second temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate 2 * laplacian(B) + 2 * mu_0 curl(J) and write result in m_source
@@ -471,7 +471,7 @@ void SemiImplicitDarwin::ComputeInductiveEfromdA ( int astep )
 
     // Calculate dA = curl(Z)
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
-        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
+        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag_fp()[lev], lev
     );
     for (int ii = 0; ii < 3; ii++)
     {

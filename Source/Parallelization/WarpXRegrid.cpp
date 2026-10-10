@@ -200,8 +200,12 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
             if (eb_enabled) {
                 RemakeMultiFab( m_eb_reduce_particle_shape[lev] );
                 if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
-                    RemakeMultiFab( m_eb_update_E[lev][idim] );
-                    RemakeMultiFab( m_eb_update_B[lev][idim] );
+                    RemakeMultiFab( m_eb_update_E_fp[lev][idim] );
+                    RemakeMultiFab( m_eb_update_B_fp[lev][idim] );
+                    if (lev > 0) {
+                        RemakeMultiFab( m_eb_update_E_cp[lev][idim] );
+                        RemakeMultiFab( m_eb_update_B_cp[lev][idim] );
+                    }
                     if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
                         m_borrowing[lev][idim] = std::make_unique<amrex::LayoutData<FaceInfoBox>>(amrex::convert(ba, Bfield_fp[lev][idim]->ixType().toIntVect()), dm);
                     }

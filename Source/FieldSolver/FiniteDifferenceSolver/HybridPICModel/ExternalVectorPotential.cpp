@@ -199,7 +199,7 @@ ExternalVectorPotential::InitData ()
                     m_A_external[i][1],
                     m_A_external[i][2],
                     lev, PatchType::fine,
-                    warpx.GetEBUpdateEFlag(),
+                    warpx.GetEBUpdateEFlag_fp(),
                     false);
             }
             // NOTE: Fill Boundary is not done here since non-periodic A fields can lead to periodic E/B fields
@@ -255,7 +255,7 @@ ExternalVectorPotential::CalculateExternalCurlA (std::string& coil_name)
         warpx.get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
             curlA_ext[lev],
             A_ext[lev],
-            warpx.GetEBUpdateBFlag()[lev],
+            warpx.GetEBUpdateBFlag_fp()[lev],
             lev);
 
         for (int idir = 0; idir < 3; ++idir) {
@@ -366,8 +366,8 @@ ExternalVectorPotential::UpdateHybridExternalFields (const amrex::Real t, const 
             warpx.m_fields.get_mr_levels_alldirs(curlAext_field, warpx.finestLevel());
 
         for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
-            AddExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag()[lev]);
-            AddExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag()[lev]);
+            AddExternalFieldFromVectorPotential(E_ext[lev], scale_factor_E, A_ext[lev], warpx.GetEBUpdateEFlag_fp()[lev]);
+            AddExternalFieldFromVectorPotential(B_ext[lev], scale_factor_B, curlA_ext[lev], warpx.GetEBUpdateBFlag_fp()[lev]);
 
             for (int idir = 0; idir < 3; ++idir) {
                 E_ext[lev][Direction{idir}]->FillBoundary(warpx.Geom(lev).periodicity());

@@ -401,8 +401,10 @@ WarpX::WarpX ()
     Afield_dotMask.resize(nlevs_max);
     phi_dotMask.resize(nlevs_max);
 
-    m_eb_update_E.resize(nlevs_max);
-    m_eb_update_B.resize(nlevs_max);
+    m_eb_update_E_fp.resize(nlevs_max);
+    m_eb_update_B_fp.resize(nlevs_max);
+    m_eb_update_E_cp.resize(nlevs_max);
+    m_eb_update_B_cp.resize(nlevs_max);
     m_eb_reduce_particle_shape.resize(nlevs_max);
 
     m_flag_info_face.resize(nlevs_max);
@@ -2651,10 +2653,7 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         AllocInitMultiFab(m_eb_reduce_particle_shape[lev], amrex::convert(ba, IntVect::TheCellVector()), dm, ncomps,
             ngRho, lev, "m_eb_reduce_particle_shape");
 
-        // EB info are needed only at the finest level
-        if (lev == maxLevel()) {
-
-            if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+        if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
 
                 // Initialize the flags to 1 (i.e. "update this point") so that
                 // every allocated entry is well-defined, including the guard
@@ -2664,19 +2663,19 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 // tileboxes (e.g. `CalculateCurrentAmpere` or
                 // `ComputeExternalFieldOnGridUsingParser`). This matches the
                 // initialization of the corresponding PML flags in PML.cpp.
-                AllocInitMultiFab(m_eb_update_E[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[x]", 1);
-                AllocInitMultiFab(m_eb_update_E[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[y]", 1);
-                AllocInitMultiFab(m_eb_update_E[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E[z]", 1);
+                AllocInitMultiFab(m_eb_update_E_fp[lev][0], amrex::convert(ba, Ex_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E_fp[x]", 1);
+                AllocInitMultiFab(m_eb_update_E_fp[lev][1], amrex::convert(ba, Ey_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E_fp[y]", 1);
+                AllocInitMultiFab(m_eb_update_E_fp[lev][2], amrex::convert(ba, Ez_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_E_fp[z]", 1);
 
-                AllocInitMultiFab(m_eb_update_B[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[x]", 1);
-                AllocInitMultiFab(m_eb_update_B[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[y]", 1);
-                AllocInitMultiFab(m_eb_update_B[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B[z]", 1);
+                AllocInitMultiFab(m_eb_update_B_fp[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B_fp[x]", 1);
+                AllocInitMultiFab(m_eb_update_B_fp[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B_fp[y]", 1);
+                AllocInitMultiFab(m_eb_update_B_fp[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
+                                  guard_cells.ng_FieldSolver, lev, "m_eb_update_B_fp[z]", 1);
             }
             if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
@@ -2697,17 +2696,17 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
 
                 AllocInitMultiFab(m_flag_info_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_info_face[x]");
                 AllocInitMultiFab(m_flag_info_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[y]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_info_face[y]");
                 AllocInitMultiFab(m_flag_info_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_info_face[z]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_info_face[z]");
                 AllocInitMultiFab(m_flag_ext_face[lev][0], amrex::convert(ba, Bx_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[x]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[x]");
                 AllocInitMultiFab(m_flag_ext_face[lev][1], amrex::convert(ba, By_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[y]");
                 AllocInitMultiFab(m_flag_ext_face[lev][2], amrex::convert(ba, Bz_nodal_flag), dm, ncomps,
-                                  guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
+                                    guard_cells.ng_FieldSolver, lev, "m_flag_ext_face[z]");
 
                 /** EB: area_mod contains the modified areas of the mesh faces, i.e. if a face is enlarged it
                 * contains the area of the enlarged face
@@ -2749,7 +2748,6 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
                 m_fields.alloc_init(FieldType::ECTRhofield, Direction{2}, lev, amrex::convert(ba, Bz_nodal_flag),
                     dm, ncomps, guard_cells.ng_FieldSolver, 0.0_rt);
-            }
         }
     }
 
@@ -2995,6 +2993,25 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
         m_fields.alloc_init(FieldType::Efield_cp, Direction{0}, lev, amrex::convert(cba, Ex_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::Efield_cp, Direction{1}, lev, amrex::convert(cba, Ey_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
         m_fields.alloc_init(FieldType::Efield_cp, Direction{2}, lev, amrex::convert(cba, Ez_nodal_flag), dm, ncomps, ngEB, 0.0_rt);
+
+        // EB info are needed on the coarse patch to update the coarse-patch fields
+        if (EB::enabled() &&
+            WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
+
+            AllocInitMultiFab(m_eb_update_E_cp[lev][0], amrex::convert(cba, Ex_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_E_cp[x]");
+            AllocInitMultiFab(m_eb_update_E_cp[lev][1], amrex::convert(cba, Ey_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_E_cp[y]");
+            AllocInitMultiFab(m_eb_update_E_cp[lev][2], amrex::convert(cba, Ez_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_E_cp[z]");
+
+            AllocInitMultiFab(m_eb_update_B_cp[lev][0], amrex::convert(cba, Bx_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_B_cp[x]");
+            AllocInitMultiFab(m_eb_update_B_cp[lev][1], amrex::convert(cba, By_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_B_cp[y]");
+            AllocInitMultiFab(m_eb_update_B_cp[lev][2], amrex::convert(cba, Bz_nodal_flag), dm, ncomps,
+                              guard_cells.ng_FieldSolver, lev, "m_eb_update_B_cp[z]");
+        }
 
         if (fft_do_time_averaging)
         {

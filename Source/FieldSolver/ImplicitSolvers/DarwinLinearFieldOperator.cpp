@@ -129,13 +129,13 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
     // Evaluation of the (single) 4th-order field equation:
     // bilaplacian(Z), discretized directly in a single pass.
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeVectorBiLaplacian(
-        rhs_vec[lev], Zscratch, warpx_ptr->GetEBUpdateBFlag()[lev], lev
+        rhs_vec[lev], Zscratch, warpx_ptr->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate dA = curl(Z)
     // Use Zscratch (guard cells already filled above) rather than Zvec directly.
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
-        dA_fp[lev], Zscratch, warpx_ptr->GetEBUpdateEFlag()[lev], lev
+        dA_fp[lev], Zscratch, warpx_ptr->GetEBUpdateEFlag_fp()[lev], lev
     );
 
     // include guard cells. dA_fp is E-staggered: use FillBoundaryAndSync so
@@ -159,7 +159,7 @@ void DarwinLinearFieldOperator::apply ( WarpXSolverVec& a_Ax, const WarpXSolverV
 
     // Reuse lapZ as a temporary storage location for the curl(E)_temp = curl(chi curl(Z)_vec)
     warpx_ptr->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-        lapZ, E_temp[lev], warpx_ptr->GetEBUpdateBFlag()[lev], lev
+        lapZ, E_temp[lev], warpx_ptr->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     for (int ii = 0; ii < 3; ii++)
