@@ -25,6 +25,7 @@
 #include <AMReX_Config.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_Gpu.H>
+#include <AMReX_GpuLaunch.H>
 #include <AMReX_Loop.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_Print.H>
@@ -68,6 +69,7 @@
 #include <memory>
 #include <sstream>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #ifdef AMREX_USE_PETSC
@@ -243,14 +245,386 @@ public:
         }
     }
 
+    void
+    solveColoredFactors () {
+        auto const* offsets = m_ilu_offsets.data();
+        auto const* columns = m_ilu_columns.data();
+        auto const* diagonals = m_ilu_diagonals.data();
+        auto const* factors = m_ilu_factors.data();
+        auto const* rhs = m_ilu_rhs.data();
+        auto* solution = m_ilu_sol.data();
+        for (std::size_t color = 0; color + 1 < m_ilu_colors.size(); ++color) {
+            int const start = m_ilu_colors[color];
+            int const count = m_ilu_colors[color + 1] - start;
+            amrex::ParallelFor(count, [=] AMREX_GPU_DEVICE(int entry) {
+                int const row = start + entry;
+                amrex::Real value = rhs[row];
+                for (int j = offsets[row]; j < diagonals[row]; ++j) {
+                    value -= factors[j] * solution[columns[j]];
+                }
+                solution[row] = value;
+            });
+        }
+        for (std::size_t color = m_ilu_colors.size() - 1; color > 0; --color) {
+            int const start = m_ilu_colors[color - 1];
+            int const count = m_ilu_colors[color] - start;
+            amrex::ParallelFor(count, [=] AMREX_GPU_DEVICE(int entry) {
+                int const row = start + entry;
+                amrex::Real value = solution[row];
+                for (int j = diagonals[row] + 1; j < offsets[row + 1]; ++j) {
+                    value -= factors[j] * solution[columns[j]];
+                }
+                // PETSc's in-place ILU stores reciprocal U diagonals.
+                solution[row] = value * factors[diagonals[row]];
+            });
+        }
+        amrex::Gpu::streamSynchronize();
+    }
+
+    void
+    prepareColoredILU () {
+        BL_PROFILE("HybridMagDiffusion::NativeColoredILUSetup");
+        double const started = amrex::second();
+        // The row ownership map is immutable until this solver is recreated.
+        for (int idim = 0; idim < 3; ++idim) {
+            if (!m_ilu_gindex[idim]) {
+                auto const& host = *m_gindex[idim];
+                m_ilu_gindex[idim] = std::make_unique<amrex::iMultiFab>(
+                    host.boxArray(), host.DistributionMap(), 1, 0);
+                amrex::iMultiFab::Copy(*m_ilu_gindex[idim], host, 0, 0, 1, 0);
+            }
+        }
+        // Empty MPI ranks still participate in the field synchronization.
+        if (m_n_local == 0) {
+            m_ilu_colors.assign(1, 0);
+            m_ilu_ready = true;
+            return;
+        }
+        Mat local_matrix = m_P;
+        PetscBool sequential = PETSC_FALSE;
+        MAGDIFF_PETSC_CHK(PetscObjectTypeCompare(
+            reinterpret_cast<PetscObject>(m_P), MATSEQAIJ, &sequential));
+        if (!sequential) {
+            MAGDIFF_PETSC_CHK(MatGetDiagonalBlock(m_P, &local_matrix));
+        }
+        PetscInt n = 0;
+        PetscInt const *offsets = nullptr, *columns = nullptr;
+        PetscScalar const* values = nullptr;
+        PetscBool done = PETSC_FALSE;
+        MAGDIFF_PETSC_CHK(MatGetRowIJ(local_matrix, 0, PETSC_FALSE, PETSC_FALSE,
+                                      &n, &offsets, &columns, &done));
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            done && n == m_n_local,
+            "Native ILU requires the local exact AIJ curl-curl block");
+        MAGDIFF_PETSC_CHK(MatSeqAIJGetArrayRead(local_matrix, &values));
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            offsets[n] <= std::numeric_limits<int>::max() / 2,
+            "Native ILU undirected graph exceeds the GPU index range");
+
+        // Color the undirected structural graph, including initially zero
+        // entries: ILU(0) can turn those entries into nonzero factors.
+        std::vector<int> graph_offsets(static_cast<std::size_t>(n) + 1, 0);
+        for (PetscInt row = 0; row < n; ++row) {
+            for (PetscInt j = offsets[row]; j < offsets[row + 1]; ++j) {
+                PetscInt const col = columns[j];
+                if (row != col) {
+                    ++graph_offsets[row + 1];
+                    ++graph_offsets[col + 1];
+                }
+            }
+        }
+        for (PetscInt row = 0; row < n; ++row) {
+            graph_offsets[row + 1] += graph_offsets[row];
+        }
+        std::vector<int> graph_columns(
+            static_cast<std::size_t>(graph_offsets.back()));
+        auto cursor = graph_offsets;
+        for (PetscInt row = 0; row < n; ++row) {
+            for (PetscInt j = offsets[row]; j < offsets[row + 1]; ++j) {
+                PetscInt const col = columns[j];
+                if (row != col) {
+                    graph_columns[cursor[row]++] = static_cast<int>(col);
+                    graph_columns[cursor[col]++] = static_cast<int>(row);
+                }
+            }
+        }
+        std::vector<int> color(static_cast<std::size_t>(n), -1), stamps;
+        int ncolors = 0;
+        for (PetscInt row = 0; row < n; ++row) {
+            for (int j = graph_offsets[row]; j < graph_offsets[row + 1]; ++j) {
+                int const c = color[graph_columns[j]];
+                if (c >= 0) {
+                    stamps[c] = static_cast<int>(row);
+                }
+            }
+            int c = 0;
+            while (c < ncolors && stamps[c] == row) {
+                ++c;
+            }
+            if (c == ncolors) {
+                ++ncolors;
+                stamps.push_back(-1);
+            }
+            color[row] = c;
+        }
+        m_ilu_colors.assign(static_cast<std::size_t>(ncolors) + 1, 0);
+        for (int c : color) {
+            ++m_ilu_colors[c + 1];
+        }
+        for (int c = 0; c < ncolors; ++c) {
+            m_ilu_colors[c + 1] += m_ilu_colors[c];
+        }
+        auto color_cursor = m_ilu_colors;
+        std::vector<int> old_to_new(static_cast<std::size_t>(n));
+        std::vector<int> new_to_old(static_cast<std::size_t>(n));
+        for (PetscInt row = 0; row < n; ++row) {
+            int const mapped = color_cursor[color[row]]++;
+            old_to_new[row] = mapped;
+            new_to_old[mapped] = static_cast<int>(row);
+        }
+        std::vector<PetscInt> rows(static_cast<std::size_t>(n) + 1, 0), cols;
+        std::vector<PetscScalar> base;
+        std::vector<int> diagonals(static_cast<std::size_t>(n));
+        std::vector<amrex::Real> scaling(static_cast<std::size_t>(n));
+        amrex::Real dominance_bound = 0;
+        for (PetscInt mapped = 0; mapped < n; ++mapped) {
+            int const row = new_to_old[mapped];
+            amrex::Real diagonal = 0;
+            for (PetscInt j = offsets[row]; j < offsets[row + 1]; ++j) {
+                if (columns[j] == row) {
+                    diagonal = values[j];
+                }
+            }
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                std::isfinite(diagonal) && diagonal > 0,
+                "Native curl-curl ILU requires finite positive physical "
+                "diagonals");
+            scaling[mapped] = amrex::Real(1) / diagonal;
+            std::vector<std::pair<PetscInt, PetscScalar>> entries;
+            amrex::Real off_sum = 0;
+            for (PetscInt j = offsets[row]; j < offsets[row + 1]; ++j) {
+                int const original_col = static_cast<int>(columns[j]);
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    original_col == row || color[original_col] != color[row],
+                    "Invalid native ILU dependency coloring");
+                PetscScalar const value = values[j] * scaling[mapped];
+                entries.emplace_back(old_to_new[original_col], value);
+                if (original_col != row) {
+                    off_sum += std::abs(value);
+                }
+            }
+            dominance_bound =
+                std::max(dominance_bound, off_sum + amrex::Real(1));
+            std::sort(entries.begin(), entries.end());
+            for (auto const& entry : entries) {
+                if (entry.first == mapped) {
+                    diagonals[mapped] = static_cast<int>(base.size());
+                }
+                cols.push_back(entry.first);
+                base.push_back(entry.second);
+            }
+            rows[mapped + 1] = static_cast<PetscInt>(base.size());
+        }
+        MAGDIFF_PETSC_CHK(MatSeqAIJRestoreArrayRead(local_matrix, &values));
+        MAGDIFF_PETSC_CHK(MatRestoreRowIJ(local_matrix, 0, PETSC_FALSE,
+                                          PETSC_FALSE, &n, &offsets, &columns,
+                                          &done));
+        n = m_n_local;
+
+        // Factor fresh values on every retry. Shift only the equilibrated
+        // preconditioner; the physical matrix m_P is never modified.
+        std::vector<PetscScalar> factor_values;
+        Mat factor = nullptr;
+        amrex::Real used_shift = 0;
+        bool accepted = false;
+        for (amrex::Real shift :
+             {amrex::Real(0), amrex::Real(1.e-8), amrex::Real(1.e-6),
+              amrex::Real(1.e-4), amrex::Real(1.e-2), amrex::Real(.1),
+              amrex::Real(1),
+              std::max(amrex::Real(10), dominance_bound * amrex::Real(1.1))}) {
+            factor_values = base;
+            for (int diagonal : diagonals) {
+                factor_values[diagonal] += shift;
+            }
+            MAGDIFF_PETSC_CHK(MatCreateSeqAIJWithArrays(
+                PETSC_COMM_SELF, n, n, rows.data(), cols.data(),
+                factor_values.data(), &factor));
+            MAGDIFF_PETSC_CHK(MatSetErrorIfFailure(factor, PETSC_FALSE));
+            IS identity = nullptr;
+            MAGDIFF_PETSC_CHK(
+                ISCreateStride(PETSC_COMM_SELF, n, 0, 1, &identity));
+            MatFactorInfo info;
+            MAGDIFF_PETSC_CHK(MatFactorInfoInitialize(&info));
+            info.levels = 0;
+            info.shifttype = MAT_SHIFT_NONE;
+            info.zeropivot = 64 * std::numeric_limits<amrex::Real>::epsilon();
+            MAGDIFF_PETSC_CHK(
+                PetscPushErrorHandler(PetscReturnErrorHandler, nullptr));
+            PetscErrorCode const error =
+                MatILUFactor(factor, identity, identity, &info);
+            MAGDIFF_PETSC_CHK(PetscPopErrorHandler());
+            MAGDIFF_PETSC_CHK(ISDestroy(&identity));
+            MatFactorError factor_error = MAT_FACTOR_NOERROR;
+            if (!error) {
+                MAGDIFF_PETSC_CHK(MatFactorGetError(factor, &factor_error));
+            }
+            accepted = !error && factor_error == MAT_FACTOR_NOERROR;
+            for (auto const value : factor_values) {
+                accepted = accepted && std::isfinite(value);
+            }
+            for (int diagonal : diagonals) {
+                accepted = accepted && factor_values[diagonal] > 0;
+            }
+            if (accepted) {
+                used_shift = shift;
+                break;
+            }
+            MAGDIFF_PETSC_CHK(MatDestroy(&factor));
+        }
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            accepted, "Native colored ILU factorization failed");
+
+        auto upload = [] (auto& device, auto const& host) {
+            device.resize(host.size());
+            amrex::Gpu::copy(amrex::Gpu::hostToDevice, host.begin(), host.end(),
+                             device.begin());
+        };
+        std::vector<int> int_rows(rows.begin(), rows.end()),
+            int_cols(cols.begin(), cols.end());
+        upload(m_ilu_offsets, int_rows);
+        upload(m_ilu_columns, int_cols);
+        upload(m_ilu_diagonals, diagonals);
+        upload(m_ilu_factors, factor_values);
+        upload(m_ilu_permutation, old_to_new);
+        upload(m_ilu_scaling, scaling);
+        m_ilu_rhs.resize(static_cast<std::size_t>(n));
+        m_ilu_sol.resize(static_cast<std::size_t>(n));
+
+        // Check the exported factor convention and parallel scheduling
+        // against PETSc MatSolve before using it in a physical timestep.
+        Vec sample = nullptr, reference = nullptr;
+        MAGDIFF_PETSC_CHK(VecCreateSeq(PETSC_COMM_SELF, n, &sample));
+        MAGDIFF_PETSC_CHK(VecDuplicate(sample, &reference));
+        PetscScalar* sample_values = nullptr;
+        MAGDIFF_PETSC_CHK(VecGetArray(sample, &sample_values));
+        std::vector<amrex::Real> sample_host(static_cast<std::size_t>(n));
+        for (PetscInt row = 0; row < n; ++row) {
+            amrex::Real const index =
+                static_cast<amrex::Real>(m_rstart + new_to_old[row]);
+            sample_host[row] =
+                std::sin(amrex::Real(.017) * index) +
+                amrex::Real(.25) * std::cos(amrex::Real(.11) * index);
+            sample_values[row] = sample_host[row];
+        }
+        MAGDIFF_PETSC_CHK(VecRestoreArray(sample, &sample_values));
+        MAGDIFF_PETSC_CHK(MatSolve(factor, sample, reference));
+        upload(m_ilu_rhs, sample_host);
+        solveColoredFactors();
+        std::vector<amrex::Real> answer(static_cast<std::size_t>(n));
+        amrex::Gpu::copy(amrex::Gpu::deviceToHost, m_ilu_sol.begin(),
+                         m_ilu_sol.end(), answer.begin());
+        PetscScalar const* reference_values = nullptr;
+        MAGDIFF_PETSC_CHK(VecGetArrayRead(reference, &reference_values));
+        amrex::Real error = 0, magnitude = 1;
+        bool finite = true;
+        for (PetscInt row = 0; row < n; ++row) {
+            finite = finite && std::isfinite(answer[row]) &&
+                     std::isfinite(reference_values[row]);
+            error =
+                std::max(error, std::abs(answer[row] - reference_values[row]));
+            magnitude = std::max(magnitude, std::abs(reference_values[row]));
+        }
+        MAGDIFF_PETSC_CHK(VecRestoreArrayRead(reference, &reference_values));
+        MAGDIFF_PETSC_CHK(VecDestroy(&reference));
+        MAGDIFF_PETSC_CHK(VecDestroy(&sample));
+        MAGDIFF_PETSC_CHK(MatDestroy(&factor));
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            finite && error <= 256 *
+                                   std::numeric_limits<amrex::Real>::epsilon() *
+                                   magnitude,
+            "Native GPU colored ILU disagrees with the PETSc factor solve");
+        m_ilu_ready = true;
+        amrex::AllPrint() << "NATIVE_COLORED_ILU_SETUP colors=" << ncolors
+                          << " normalized_diagonal_shift=" << used_shift
+                          << " factor_solve_relative_error="
+                          << error / magnitude
+                          << " setup_seconds=" << amrex::second() - started
+                          << "\n";
+    }
+
+    void
+    applyColoredILU (amrex::Array<amrex::MultiFab*, 3> const& destination,
+                     amrex::Array<amrex::MultiFab const*, 3> const& source) {
+        BL_PROFILE("HybridMagDiffusion::NativeColoredILUApply");
+        if (!m_ilu_ready) {
+            prepareColoredILU();
+        }
+        auto* rhs = m_ilu_rhs.data();
+        auto const* permutation = m_ilu_permutation.data();
+        auto const* scaling = m_ilu_scaling.data();
+        amrex::Long const row_start = static_cast<amrex::Long>(m_rstart);
+        amrex::Long const local_size = static_cast<amrex::Long>(m_n_local);
+        for (int idim = 0; idim < 3; ++idim) {
+            for (amrex::MFIter mfi(*source[idim]); mfi.isValid(); ++mfi) {
+                auto const index = m_ilu_gindex[idim]->const_array(mfi);
+                auto const input = source[idim]->const_array(mfi);
+                amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE(
+                                                       int i, int j, int k) {
+                    amrex::Long const local =
+                        static_cast<amrex::Long>(index(i, j, k)) - row_start;
+                    if (index(i, j, k) >= 0 && local >= 0 &&
+                        local < local_size) {
+                        int const row = permutation[local];
+                        rhs[row] = input(i, j, k) * scaling[row];
+                    }
+                });
+            }
+        }
+        amrex::Gpu::streamSynchronize();
+        solveColoredFactors();
+        auto const* solution = m_ilu_sol.data();
+        for (int idim = 0; idim < 3; ++idim) {
+            destination[idim]->setVal(amrex::Real(0));
+            for (amrex::MFIter mfi(*destination[idim]); mfi.isValid(); ++mfi) {
+                auto const index = m_ilu_gindex[idim]->const_array(mfi);
+                auto const output = destination[idim]->array(mfi);
+                amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE(
+                                                       int i, int j, int k) {
+                    amrex::Long const local =
+                        static_cast<amrex::Long>(index(i, j, k)) - row_start;
+                    if (index(i, j, k) >= 0 && local >= 0 &&
+                        local < local_size) {
+                        output(i, j, k) = solution[permutation[local]];
+                    }
+                });
+            }
+            destination[idim]->OverrideSync(m_geom.periodicity());
+        }
+    }
+
     ~MagDiffPetscSolverImpl () {
         // Destroy KSP before Mats/Vecs it references (PETSc refcounts make
         // reverse order usually safe, but KSP-first is the documented pattern).
-        if (m_ksp) { KSPDestroy(&m_ksp); m_ksp = nullptr; }
-        if (m_A)   { MatDestroy(&m_A);   m_A = nullptr; }
-        if (m_P)   { MatDestroy(&m_P);   m_P = nullptr; }
-        if (m_x)   { VecDestroy(&m_x);   m_x = nullptr; }
-        if (m_b)   { VecDestroy(&m_b);   m_b = nullptr; }
+        if (m_ksp) {
+            KSPDestroy(&m_ksp);
+            m_ksp = nullptr;
+        }
+        if (m_A) {
+            MatDestroy(&m_A);
+            m_A = nullptr;
+        }
+        if (m_P) {
+            MatDestroy(&m_P);
+            m_P = nullptr;
+        }
+        if (m_x) {
+            VecDestroy(&m_x);
+            m_x = nullptr;
+        }
+        if (m_b) {
+            VecDestroy(&m_b);
+            m_b = nullptr;
+        }
     }
 
     MagDiffPetscSolverImpl (MagDiffPetscSolverImpl const&) = delete;
@@ -1004,6 +1378,7 @@ public:
         amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B)
     {
         copyBoundaryMapToHost(boundary_response_B);
+        m_ilu_ready = false;
         m_theta_dt = theta_dt;
         m_opctx = opctx;
 
@@ -1017,6 +1392,13 @@ public:
         MAGDIFF_PETSC_CHK(assemblePreconditioner());
         MAGDIFF_PETSC_CHK(KSPSetOperators(m_ksp, m_A, m_P));
     }
+
+    bool m_ilu_ready = false;
+    std::vector<int> m_ilu_colors;
+    amrex::Gpu::DeviceVector<int> m_ilu_offsets, m_ilu_columns, m_ilu_diagonals;
+    amrex::Gpu::DeviceVector<int> m_ilu_permutation;
+    amrex::Gpu::DeviceVector<amrex::Real> m_ilu_factors, m_ilu_scaling, m_ilu_rhs, m_ilu_sol;
+    std::array<std::unique_ptr<amrex::iMultiFab>,3> m_ilu_gindex;
 
     amrex::Geometry m_geom;
     amrex::Real m_theta_dt = amrex::Real(0.0);
@@ -1100,6 +1482,15 @@ void magdiff_petsc_destroy (MagDiffPetscSolver* s) {
     delete s;
 }
 
+void magdiff_petsc_apply_native_ilu (
+    MagDiffPetscSolver* s,
+    amrex::Array<amrex::MultiFab*,3> const& destination,
+    amrex::Array<amrex::MultiFab const*,3> const& source)
+{
+    s->impl->applyColoredILU(destination, source);
+}
+
+
 #else // !AMREX_USE_PETSC
 
 // Stubs so the translation unit links without PETSc. These are never called:
@@ -1134,5 +1525,13 @@ void magdiff_petsc_update (
     void*, amrex::Array<amrex::MultiFab const*,3> const*) {}
 
 void magdiff_petsc_destroy (MagDiffPetscSolver*) {}
+
+void magdiff_petsc_apply_native_ilu (
+    MagDiffPetscSolver*, amrex::Array<amrex::MultiFab*,3> const&,
+    amrex::Array<amrex::MultiFab const*,3> const&)
+{
+    amrex::Abort("Native curl-curl ILU requires a PETSc matrix-assembly build");
+}
+
 
 #endif // AMREX_USE_PETSC

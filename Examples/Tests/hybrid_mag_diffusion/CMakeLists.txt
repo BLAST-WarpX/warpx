@@ -1,4 +1,5 @@
 # Add tests (alphabetical order) ##############################################
+
 #
 # Coverage is intentionally factorized rather than taking the Cartesian product
 # of eta source, theta value, linear solver, and geometry. The theta RHS is
@@ -511,3 +512,180 @@ if(AMReX_PETSC)
         OFF  # dependency (absolute oracle; no reference dir needed)
     )
 endif()
+
+# Keep literal names and base-deck names visible to the static CI input checker.
+# All native controls compare complete fields with existing physical references.
+add_warpx_test(
+    test_1d_hybrid_mag_diffusion_native_bicgstab
+    1
+    2
+    "inputs_base_1d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+    "analysis_native_solver_parity.py ../test_1d_hybrid_mag_diffusion_coupled cartesian"
+    OFF
+    test_1d_hybrid_mag_diffusion_coupled
+)
+
+add_warpx_test(
+    test_2d_hybrid_mag_diffusion_native_bicgstab
+    2
+    2
+    "inputs_base_2d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+    "analysis_native_solver_parity.py ../test_2d_hybrid_mag_diffusion_coupled cartesian"
+    OFF
+    test_2d_hybrid_mag_diffusion_coupled
+)
+
+add_warpx_test(
+    test_3d_hybrid_mag_diffusion_native_bicgstab
+    3
+    2
+    "inputs_base_3d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+    "analysis_native_solver_parity.py ../test_3d_hybrid_mag_diffusion_coupled cartesian"
+    OFF
+    test_3d_hybrid_mag_diffusion_coupled
+)
+
+add_warpx_test(
+    test_rz_hybrid_mag_diffusion_native_bicgstab
+    RZ
+    2
+    "inputs_base_rz_hybrid_mag_diffusion_smoke hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+    "analysis_native_solver_parity.py ../test_rz_hybrid_mag_diffusion_smoke cylindrical"
+    OFF
+    test_rz_hybrid_mag_diffusion_smoke
+)
+
+add_warpx_test(
+    test_rcylinder_hybrid_mag_diffusion_native_bicgstab
+    RCYLINDER
+    2
+    "inputs_base_rcylinder_hybrid_mag_diffusion_mild hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+    "analysis_native_solver_parity.py ../test_rcylinder_hybrid_mag_diffusion_mild cylindrical"
+    OFF
+    test_rcylinder_hybrid_mag_diffusion_mild
+)
+
+if(AMReX_PETSC)
+    add_warpx_test(
+        test_1d_hybrid_mag_diffusion_native_ilu_amrex_gmres
+        1
+        2
+        "inputs_base_1d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_gmres hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_1d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_1d_hybrid_mag_diffusion_coupled
+    )
+
+    add_warpx_test(
+        test_1d_hybrid_mag_diffusion_native_ilu_amrex_bicgstab
+        1
+        2
+        "inputs_base_1d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_1d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_1d_hybrid_mag_diffusion_coupled
+    )
+
+    add_warpx_test(
+        test_2d_hybrid_mag_diffusion_native_ilu_amrex_gmres
+        2
+        2
+        "inputs_base_2d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_gmres hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_2d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_2d_hybrid_mag_diffusion_coupled
+    )
+
+    add_warpx_test(
+        test_2d_hybrid_mag_diffusion_native_ilu_amrex_bicgstab
+        2
+        2
+        "inputs_base_2d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_2d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_2d_hybrid_mag_diffusion_coupled
+    )
+
+    add_warpx_test(
+        test_3d_hybrid_mag_diffusion_native_ilu_amrex_gmres
+        3
+        2
+        "inputs_base_3d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_gmres hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_3d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_3d_hybrid_mag_diffusion_coupled
+    )
+
+    add_warpx_test(
+        test_3d_hybrid_mag_diffusion_native_ilu_amrex_bicgstab
+        3
+        2
+        "inputs_base_3d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_3d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_3d_hybrid_mag_diffusion_coupled
+    )
+
+    add_warpx_test(
+        test_rz_hybrid_mag_diffusion_native_ilu_amrex_gmres
+        RZ
+        2
+        "inputs_base_rz_hybrid_mag_diffusion_smoke hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_gmres hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_rz_hybrid_mag_diffusion_smoke cylindrical"
+        OFF
+        test_rz_hybrid_mag_diffusion_smoke
+    )
+
+    add_warpx_test(
+        test_rz_hybrid_mag_diffusion_native_ilu_amrex_bicgstab
+        RZ
+        2
+        "inputs_base_rz_hybrid_mag_diffusion_smoke hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_rz_hybrid_mag_diffusion_smoke cylindrical"
+        OFF
+        test_rz_hybrid_mag_diffusion_smoke
+    )
+
+    add_warpx_test(
+        test_rcylinder_hybrid_mag_diffusion_native_ilu_amrex_gmres
+        RCYLINDER
+        2
+        "inputs_base_rcylinder_hybrid_mag_diffusion_mild hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_gmres hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_rcylinder_hybrid_mag_diffusion_mild cylindrical"
+        OFF
+        test_rcylinder_hybrid_mag_diffusion_mild
+    )
+
+    add_warpx_test(
+        test_rcylinder_hybrid_mag_diffusion_native_ilu_amrex_bicgstab
+        RCYLINDER
+        2
+        "inputs_base_rcylinder_hybrid_mag_diffusion_mild hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval=2 hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_rcylinder_hybrid_mag_diffusion_mild cylindrical"
+        OFF
+        test_rcylinder_hybrid_mag_diffusion_mild
+    )
+
+    # One grid on two ranks exercises the native ILU empty-rank path.
+    add_warpx_test(
+        test_1d_hybrid_mag_diffusion_native_ilu_empty_rank
+        1
+        2
+        "inputs_base_1d_hybrid_mag_diffusion_coupled amr.max_grid_size=32 hybrid_pic_model.mag_diff_native_ilu=1 hybrid_pic_model.mag_diff_verbose=1"
+        "analysis_native_solver_parity.py ../test_1d_hybrid_mag_diffusion_coupled cartesian"
+        OFF
+        test_1d_hybrid_mag_diffusion_coupled
+    )
+
+endif()
+
+# Force early fallback and independently compare the completed fields.
+add_warpx_test(
+    test_2d_hybrid_mag_diffusion_native_bicgstab_fallback
+    2
+    2
+    "inputs_base_2d_hybrid_mag_diffusion_coupled hybrid_pic_model.mag_diff_linear_solver=amrex_bicgstab hybrid_pic_model.mag_diff_bicgstab_max_iter=1 hybrid_pic_model.mag_diff_verbose=1"
+    "analysis_native_solver_parity.py ../test_2d_hybrid_mag_diffusion_coupled cartesian"
+    OFF
+    test_2d_hybrid_mag_diffusion_coupled
+)

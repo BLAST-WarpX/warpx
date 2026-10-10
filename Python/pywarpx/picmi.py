@@ -2182,14 +2182,33 @@ class HybridPICSolver(
         description="Constant resistivity in Ohm*m for the implicit magnetic-diffusion solve.",
     )
 
-    mag_diff_linear_solver: Literal["amrex_gmres", "petsc"] | None = Field(
-        default=None,
-        description='Linear solver for implicit magnetic diffusion: ``"amrex_gmres"`` or ``"petsc"``. The PETSc option requires a PETSc-enabled WarpX build.',
+    mag_diff_linear_solver: Literal["amrex_gmres", "amrex_bicgstab", "petsc"] | None = (
+        Field(
+            default=None,
+            description='Linear solver for implicit magnetic diffusion: ``"amrex_gmres"``, ``"amrex_bicgstab"`` with GMRES fallback, or ``"petsc"``. The PETSc option requires a PETSc-enabled WarpX build.',
+        )
     )
 
     mag_diff_rtol: float | None = Field(
         default=None,
         description="Relative tolerance for the magnetic-diffusion linear solve.",
+    )
+
+    mag_diff_bicgstab_max_iter: int | None = Field(
+        default=None,
+        ge=1,
+        description="Native BiCGStab iteration cap before GMRES fallback; defaults to mag_diff_max_iter and must not exceed it.",
+    )
+
+    mag_diff_bicgstab_residual_replacement_interval: int | None = Field(
+        default=None,
+        ge=0,
+        description="Recompute the true residual and restart native BiCGStab every N iterations; zero disables periodic replacement.",
+    )
+
+    mag_diff_native_ilu: bool | None = Field(
+        default=None,
+        description="Native color-ordered block ILU(0) of the exact curl-curl matrix. Requires PETSc for setup.",
     )
 
     mag_diff_atol: float | None = Field(
@@ -2351,6 +2370,9 @@ class HybridPICSolver(
             "mag_diff_use_variable_eta": self.mag_diff_use_variable_eta,
             "mag_diff_constant_eta": self.mag_diff_constant_eta,
             "mag_diff_linear_solver": self.mag_diff_linear_solver,
+            "mag_diff_native_ilu": self.mag_diff_native_ilu,
+            "mag_diff_bicgstab_max_iter": self.mag_diff_bicgstab_max_iter,
+            "mag_diff_bicgstab_residual_replacement_interval": self.mag_diff_bicgstab_residual_replacement_interval,
             "mag_diff_rtol": self.mag_diff_rtol,
             "mag_diff_atol": self.mag_diff_atol,
             "mag_diff_max_iter": self.mag_diff_max_iter,

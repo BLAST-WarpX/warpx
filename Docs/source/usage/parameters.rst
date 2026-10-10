@@ -4092,7 +4092,10 @@ Maxwell solver: kinetic-fluid hybrid
     :default: ``amrex_gmres``
     :optional:
 
-    Linear solver for implicit magnetic diffusion: ``amrex_gmres`` or ``petsc``.
+    Linear solver for implicit magnetic diffusion: ``amrex_gmres``,
+    ``amrex_bicgstab`` or ``petsc``. The native BiCGStab path checks the full
+    physical residual and falls back to native GMRES on breakdown or failure
+    to meet that tolerance. Each attempt has the ``mag_diff_max_iter`` limit.
     The PETSc option requires a PETSc-enabled WarpX build.
 
     The PETSc path uses the matrix-free physical operator with an assembled
@@ -4108,6 +4111,55 @@ Maxwell solver: kinetic-fluid hybrid
     Compare preconditioners with the same outer method and stopping criteria.
     The current CUDA implementation stages PETSc vectors through host memory;
     fewer iterations therefore do not necessarily give a shorter runtime.
+
+.. pp:param:: hybrid_pic_model.mag_diff_bicgstab_max_iter
+    :type: ``int``
+    :default: value of ``mag_diff_max_iter``
+    :optional:
+
+    Maximum native BiCGStab iterations before GMRES fallback. Must be positive
+    and no larger than ``mag_diff_max_iter``. The fallback solves for a correction
+    about the retained BiCGStab iterate, using the original physical residual
+    goal. Set a smaller limit to leave the BiCGStab attempt earlier.
+
+.. pp:param:: hybrid_pic_model.mag_diff_bicgstab_residual_replacement_interval
+    :type: ``int``
+    :default: ``0``
+    :optional:
+
+    For ``mag_diff_linear_solver=amrex_bicgstab``, recompute the physical
+    residual and restart the BiCGStab recurrence every this many iterations.
+    Zero disables periodic replacement. Must be nonnegative.
+
+    This can reduce accumulated recurrence error in ill-conditioned solves.
+    Restarting too frequently can also slow convergence. The final physical
+    residual is always checked, independently of this setting. This option
+    does not affect the GMRES or PETSc outer solvers.
+
+.. pp:param:: hybrid_pic_model.mag_diff_native_ilu
+    :type: ``bool``
+    :default: ``false``
+    :optional:
+
+    Use color-ordered block ILU(0) with a native AMReX outer solver. Each MPI
+    rank factors its exact local curl-curl matrix block. All local spatial and
+    component couplings are retained; off-rank couplings remain in the physical
+    operator and are treated iteratively. This is an approximate inverse,
+    not a global direct solve.
+
+    Requires a PETSc-enabled build for matrix assembly and CPU factor setup.
+    Repeated triangular solves and vector operations run in the native AMReX
+    compute arena, including GPU memory in CUDA/HIP/SYCL builds. Complete
+    field vectors are not staged through host memory during each iteration.
+    Dependency coloring permits parallel solves within each color.
+
+    Rows are equilibrated before factorization. If needed, a diagonal shift
+    stabilizes only the preconditioner; the physical equation and its tolerance
+    remain unchanged. An independent factor-solve comparison is checked during
+    setup, and the final native physical residual is checked before acceptance.
+    Changed resistivity, diffusion time or boundary response invalidates the
+    cached factors. This option is independent of the ``mag_diff_petsc_*``
+    algebraic-PC settings and cannot be combined with ``mag_diff_linear_solver=petsc``.
 
 .. pp:param:: hybrid_pic_model.mag_diff_rtol
     :type: ``float``

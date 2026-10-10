@@ -30,6 +30,7 @@ struct HybridMagDiffusionWorkspace;
 // it (see PreconditionerLibrary.H for the same pattern).
 AMREX_ENUM(MagDiffLinearSolver,
     amrex_gmres,
+    amrex_bicgstab,
     petsc
 );
 
@@ -104,11 +105,13 @@ private:
     amrex::Real m_rtol = 1.e-8;
     amrex::Real m_atol = 0.0;
     int m_max_iter = 200;
+    int m_bicgstab_residual_replacement_interval = 0;
     int m_verbose = 0;
     amrex::Real m_eta_explicit_max = 0.0;
     bool m_has_constant_eta = false;
     amrex::Real m_constant_eta = 0.0;
     bool m_use_variable_eta = false;
+    bool m_native_ilu = false;
     MagDiffLinearSolver m_linear_solver = MagDiffLinearSolver::amrex_gmres;
     MagDiffPetscOptions m_petsc_options;
     mutable std::unique_ptr<HybridMagDiffusionWorkspace> m_workspace;

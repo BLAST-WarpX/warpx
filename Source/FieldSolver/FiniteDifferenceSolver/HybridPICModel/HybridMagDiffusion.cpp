@@ -54,8 +54,11 @@ HybridMagDiffusion::ReadParameters ()
     utils::parser::queryWithParser(pp, "mag_diff_atol", m_atol);
     pp.query("mag_diff_max_iter", m_max_iter);
     pp.query("mag_diff_verbose", m_verbose);
+    pp.query("mag_diff_bicgstab_residual_replacement_interval",
+             m_bicgstab_residual_replacement_interval);
     utils::parser::queryWithParser(pp, "mag_diff_eta_explicit_max", m_eta_explicit_max);
     pp.query("mag_diff_use_variable_eta", m_use_variable_eta);
+    pp.query("mag_diff_native_ilu", m_native_ilu);
 
     pp.query("mag_diff_linear_solver", m_linear_solver);
     pp.query("mag_diff_petsc_pc_type", m_petsc_options.pc_type);
@@ -71,10 +74,16 @@ HybridMagDiffusion::ReadParameters ()
 
     if (!m_enabled) { return; }
 
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_bicgstab_residual_replacement_interval >= 0,
+        "mag_diff_bicgstab_residual_replacement_interval must be nonnegative");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!m_native_ilu || m_linear_solver != MagDiffLinearSolver::petsc,
+        "mag_diff_native_ilu requires an AMReX native outer solver");
+
 #ifndef AMREX_USE_PETSC
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_linear_solver == MagDiffLinearSolver::amrex_gmres,
-        "hybrid_pic_model.mag_diff_linear_solver = petsc requires building WarpX "
+        m_linear_solver != MagDiffLinearSolver::petsc && !m_native_ilu,
+        "The PETSc solver or native ILU setup requires building WarpX "
         "with PETSc (-DWarpX_PETSC=ON, AMREX_USE_PETSC). The default amrex_gmres "
         "path needs no PETSc.");
 #endif
@@ -604,6 +613,15 @@ public:
      */
     void precond (MagDiffVector& destination, MagDiffVector const& source)
     {
+#ifdef AMREX_USE_PETSC
+        if (m_native_ilu_solver != nullptr) {
+            auto& df = destination.fields();
+            auto const& sf = source.fields();
+            magdiff_petsc_apply_native_ilu(m_native_ilu_solver,
+                {&df[0], &df[1], &df[2]}, {&sf[0], &sf[1], &sf[2]});
+            return;
+        }
+#endif
         Geometry const& geom = WarpX::GetInstance().Geom(m_lev);
         auto const * const dx = geom.CellSize();
 
@@ -697,6 +715,10 @@ public:
             }
         }
     }
+
+#ifdef AMREX_USE_PETSC
+    void setNativeILU (MagDiffPetscSolver* solver) { m_native_ilu_solver = solver; }
+#endif
 
     void apply (MagDiffVector& output, MagDiffVector const& input)
     {
@@ -824,6 +846,9 @@ public:
     [[nodiscard]] Array<MultiFab const*,3> const& etaEdge () const { return m_eta; }
 
 private:
+#ifdef AMREX_USE_PETSC
+    MagDiffPetscSolver* m_native_ilu_solver = nullptr;
+#endif
     Real m_theta_dt;
     int m_lev;
     Array<MultiFab*,3> m_source;
@@ -1161,7 +1186,7 @@ HybridMagDiffusion::AdvanceVariable (
         rhs.increment(linop.feedOffset(), -1.0_rt);
     }
 
-    if (m_linear_solver == MagDiffLinearSolver::petsc) {
+    if (m_linear_solver == MagDiffLinearSolver::petsc || m_native_ilu) {
 #ifdef AMREX_USE_PETSC
         auto const& eta_edge = linop.etaEdge();
         amrex::Array<MultiFab const*,3> const B_proto{
@@ -1227,56 +1252,204 @@ HybridMagDiffusion::AdvanceVariable (
                                 &boundary_response_ptrs);
         }
 
-        const amrex::Long n_local = magdiff_petsc_nlocal(m_petsc_solver.get());
-        const amrex::Long rstart = magdiff_petsc_rstart(m_petsc_solver.get());
-        auto const gindex = magdiff_petsc_gindex(m_petsc_solver.get());
+        if (m_native_ilu) { linop.setNativeILU(m_petsc_solver.get()); }
+        if (m_linear_solver == MagDiffLinearSolver::petsc) {
+            const amrex::Long n_local = magdiff_petsc_nlocal(m_petsc_solver.get());
+            const amrex::Long rstart = magdiff_petsc_rstart(m_petsc_solver.get());
+            auto const gindex = magdiff_petsc_gindex(m_petsc_solver.get());
 
-        // PETSc uses a zero initial guess; gather only the DOF-mapped RHS.
-        std::vector<Real> sol_flat(static_cast<std::size_t>(n_local), Real(0.0));
-        std::vector<Real> rhs_flat(static_cast<std::size_t>(n_local), Real(0.0));
+            // PETSc uses a zero initial guess; gather only the DOF-mapped RHS.
+            std::vector<Real> sol_flat(static_cast<std::size_t>(n_local), Real(0.0));
+            std::vector<Real> rhs_flat(static_cast<std::size_t>(n_local), Real(0.0));
 #ifdef AMREX_USE_GPU
-        petscGather(rhs_flat.data(), rhs, gindex, rstart, opctx.host_F);
+            petscGather(rhs_flat.data(), rhs, gindex, rstart, opctx.host_F);
 #else
-        petscGather(rhs_flat.data(), rhs, gindex, rstart);
+            petscGather(rhs_flat.data(), rhs, gindex, rstart);
 #endif
 
-        Real rnorm = 0.0_rt;
-        const int reason = magdiff_petsc_solve(
-            m_petsc_solver.get(), rhs_flat.data(), sol_flat.data(), rnorm);
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-            reason > 0 && std::isfinite(rnorm),
-            "Hybrid magnetic-diffusion PETSc solve did not converge");
+            Real rnorm = 0.0_rt;
+            const int reason = magdiff_petsc_solve(
+                m_petsc_solver.get(), rhs_flat.data(), sol_flat.data(), rnorm);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                reason > 0 && std::isfinite(rnorm),
+                "Hybrid magnetic-diffusion PETSc solve did not converge");
 
 #ifdef AMREX_USE_GPU
-        petscScatter(solution, sol_flat.data(), gindex, rstart, opctx.host_U);
+            petscScatter(solution, sol_flat.data(), gindex, rstart, opctx.host_U);
 #else
-        petscScatter(solution, sol_flat.data(), gindex, rstart);
+            petscScatter(solution, sol_flat.data(), gindex, rstart);
 #endif
+        }
 #else
         WARPX_ABORT_WITH_MESSAGE(
             "hybrid_pic_model.mag_diff_linear_solver = petsc requires building "
             "WarpX with PETSc (-DWarpX_PETSC=ON, AMREX_USE_PETSC).");
 #endif
-    } else {
-        amrex::GMRES<MagDiffVector, VariableCoeffMagDiffusionOp> solver;
-        solver.define(linop);
-        solver.setMaxIters(m_max_iter);
-        solver.setRestartLength(std::min(m_max_iter, 50));
-        solver.setVerbose(m_verbose);
-        solver.solve(solution, rhs, m_rtol, m_atol);
-
-        const Real rnorm = solver.getResidualNorm();
-        if (solver.getStatus() != 0 || !std::isfinite(rnorm)) {
-            std::ostringstream msg;
-            msg << "Hybrid magnetic-diffusion GMRES solve failed: status="
-                << solver.getStatus() << ", iterations=" << solver.getNumIters()
-                << ", residual=" << rnorm;
-            WARPX_ABORT_WITH_MESSAGE(msg.str());
+    }
+    if (m_linear_solver != MagDiffLinearSolver::petsc) {
+        bool bicgstab_converged = false;
+        if (m_linear_solver == MagDiffLinearSolver::amrex_bicgstab) {
+            int bicgstab_max_iter = m_max_iter;
+            ParmParse("hybrid_pic_model")
+                .query("mag_diff_bicgstab_max_iter", bicgstab_max_iter);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                bicgstab_max_iter > 0 && bicgstab_max_iter <= m_max_iter,
+                "mag_diff_bicgstab_max_iter must be in [1, mag_diff_max_iter]");
+            MagDiffVector r, shadow, p, v, residual_stage, image_stage, phat,
+                shat;
+            for (auto* work : {&r, &shadow, &p, &v, &residual_stage,
+                               &image_stage, &phat, &shat}) {
+                work->Define(Bfield);
+                work->setVal(0.0_rt);
+            }
+            Ae.Copy(solution);
+            linop.apply(image_stage, solution);
+            r.linComb(1.0_rt, rhs, -1.0_rt, image_stage);
+            shadow.Copy(r);
+            Real const tolerance = std::max(m_atol, m_rtol * linop.norm2(rhs));
+            Real residual = linop.norm2(r);
+            Real const initial_residual = residual;
+            Real rho_old = 1.0_rt, alpha = 1.0_rt, omega = 1.0_rt;
+            int iterations = 0;
+            auto const valid_divisor = [] (Real x) {
+                return std::isfinite(x) &&
+                       std::abs(x) > std::numeric_limits<Real>::min();
+            };
+            for (; residual > tolerance && iterations < bicgstab_max_iter;
+                 ++iterations) {
+                Real const rho_new = linop.dotProduct(shadow, r);
+                if (!valid_divisor(rho_new) || !valid_divisor(omega)) {
+                    break;
+                }
+                Real const beta = (rho_new / rho_old) * (alpha / omega);
+                if (!std::isfinite(beta)) {
+                    break;
+                }
+                p.increment(v, -omega);
+                p.linComb(beta, p, 1.0_rt, r);
+                linop.precond(phat, p);
+                linop.apply(v, phat);
+                Real const denominator = linop.dotProduct(shadow, v);
+                if (!valid_divisor(denominator)) {
+                    break;
+                }
+                alpha = rho_new / denominator;
+                if (!std::isfinite(alpha)) {
+                    break;
+                }
+                residual_stage.linComb(1.0_rt, r, -alpha, v);
+                if (linop.norm2(residual_stage) <= tolerance) {
+                    solution.increment(phat, alpha);
+                    ++iterations;
+                    break;
+                }
+                linop.precond(shat, residual_stage);
+                linop.apply(image_stage, shat);
+                Real const tt = linop.dotProduct(image_stage, image_stage);
+                if (!valid_divisor(tt)) {
+                    break;
+                }
+                omega = linop.dotProduct(image_stage, residual_stage) / tt;
+                if (!std::isfinite(omega)) {
+                    break;
+                }
+                solution.increment(phat, alpha);
+                solution.increment(shat, omega);
+                r.linComb(1.0_rt, residual_stage, -omega, image_stage);
+                residual = linop.norm2(r);
+                if (!std::isfinite(residual)) {
+                    break;
+                }
+                rho_old = rho_new;
+                // Recompute the physical residual and restart the recurrence
+                // periodically. This bounds drift in ill-conditioned solves
+                // without weakening the final physical stopping criterion.
+                if (m_bicgstab_residual_replacement_interval > 0 &&
+                    (iterations + 1) %
+                            m_bicgstab_residual_replacement_interval ==
+                        0) {
+                    linop.apply(image_stage, solution);
+                    r.linComb(1.0_rt, rhs, -1.0_rt, image_stage);
+                    residual = linop.norm2(r);
+                    shadow.Copy(r);
+                    p.setVal(0.0_rt);
+                    v.setVal(0.0_rt);
+                    rho_old = alpha = omega = 1.0_rt;
+                }
+            }
+            linop.apply(image_stage, solution);
+            r.linComb(1.0_rt, rhs, -1.0_rt, image_stage);
+            residual = linop.norm2(r);
+            bicgstab_converged =
+                std::isfinite(residual) && residual <= tolerance;
+            if (!bicgstab_converged && !(residual < initial_residual)) {
+                solution.Copy(Ae);
+            }
+            if (m_verbose > 0 || !bicgstab_converged) {
+                amrex::Print()
+                    << "HybridMagDiffusion native BiCGStab iterations="
+                    << iterations << " true_residual=" << residual
+                    << " tolerance=" << tolerance
+                    << " fallback_gmres=" << !bicgstab_converged << "\n";
+            }
         }
+        if (!bicgstab_converged) {
+            amrex::GMRES<MagDiffVector, VariableCoeffMagDiffusionOp> solver;
+            solver.define(linop);
+            solver.setMaxIters(m_max_iter);
+            solver.setRestartLength(std::min(m_max_iter, 50));
+            solver.setVerbose(m_verbose);
+            Real rnorm = 0.0_rt;
+            if (m_linear_solver == MagDiffLinearSolver::amrex_bicgstab) {
+                // AMReX GMRES resets its solution to zero. Solve for a
+                // correction to retain the BiCGStab progress, with the original
+                // physical goal.
+                MagDiffVector correction, residual_rhs;
+                correction.Define(Bfield);
+                residual_rhs.Define(Bfield);
+                linop.apply(residual_rhs, solution);
+                residual_rhs.linComb(1.0_rt, rhs, -1.0_rt, residual_rhs);
+                Real const tolerance =
+                    std::max(m_atol, m_rtol * linop.norm2(rhs));
+                solver.solve(correction, residual_rhs, 0.0_rt,
+                             0.25_rt * tolerance);
+                solution.increment(correction, 1.0_rt);
+                linop.apply(residual_rhs, solution);
+                residual_rhs.linComb(1.0_rt, rhs, -1.0_rt, residual_rhs);
+                rnorm = linop.norm2(residual_rhs);
+            } else {
+                solver.solve(solution, rhs, m_rtol, m_atol);
+                rnorm = solver.getResidualNorm();
+            }
+            if (solver.getStatus() != 0 || !std::isfinite(rnorm)) {
+                std::ostringstream msg;
+                msg << "Hybrid magnetic-diffusion GMRES solve failed: status="
+                    << solver.getStatus()
+                    << ", iterations=" << solver.getNumIters()
+                    << ", residual=" << rnorm;
+                WARPX_ABORT_WITH_MESSAGE(msg.str());
+            }
+            if (m_verbose > 0) {
+                amrex::Print()
+                    << "HybridMagDiffusion matrix-free GMRES iterations="
+                    << solver.getNumIters() << " residual=" << rnorm << "\n";
+            }
+        }
+    }
+
+    if (m_native_ilu ||
+        m_linear_solver == MagDiffLinearSolver::amrex_bicgstab) {
+        linop.apply(Ae, solution);
+        Ae.linComb(1.0_rt, rhs, -1.0_rt, Ae);
+        Real const residual = linop.norm2(Ae);
+        Real const tolerance = std::max(m_atol, m_rtol * linop.norm2(rhs));
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::isfinite(residual) &&
+                                             residual <= tolerance,
+                                         "Native magnetic diffusion failed the "
+                                         "full physical residual check");
         if (m_verbose > 0) {
-            amrex::Print() << "HybridMagDiffusion matrix-free GMRES iterations="
-                           << solver.getNumIters()
-                           << " residual=" << rnorm << "\n";
+            amrex::Print() << "HybridMagDiffusion native full_residual="
+                           << residual << " tolerance=" << tolerance << "\n";
         }
     }
 

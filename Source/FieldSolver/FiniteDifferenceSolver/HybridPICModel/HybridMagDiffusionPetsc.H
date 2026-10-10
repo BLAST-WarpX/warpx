@@ -98,4 +98,13 @@ void magdiff_petsc_update (
 
 void magdiff_petsc_destroy (MagDiffPetscSolver* s);
 
+/** Apply native color-ordered block ILU(0) using the exact local curl-curl matrix.
+ * Matrix assembly and factor setup use PETSc; repeated solves use the native
+ * AMReX compute arena and exchange no complete vectors with host memory.
+ */
+void magdiff_petsc_apply_native_ilu (
+    MagDiffPetscSolver* s,
+    amrex::Array<amrex::MultiFab*,3> const& destination,
+    amrex::Array<amrex::MultiFab const*,3> const& source);
+
 #endif // WARPX_HYBRID_MAG_DIFFUSION_PETSC_H_
