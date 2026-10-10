@@ -88,24 +88,7 @@ struct GetTemperature
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             case (TempFromFileValue):
             {
-#if (AMREX_SPACEDIM < 3)
-                amrex::ignore_unused(x,y,z);
-#endif
-#if (AMREX_SPACEDIM == 1)
-                amrex::RealVect const pos{z};
-#elif defined(WARPX_DIM_XZ)
-                amrex::RealVect const pos{x,z};
-#else
-                amrex::RealVect const pos{x,y,z};
-#endif
-#if defined(AMREX_USE_GPU)
-                AMREX_IF_ON_HOST((amrex::Abort(
-                    "For GPU builds, TempFromFileValue only works on device.");))
-                AMREX_IF_ON_DEVICE((return m_temperature_in_eV_from_file(pos);))
-                return 0.0;
-#else
-                return m_temperature_in_eV_from_file(pos);
-#endif
+                return m_temperature_in_eV_from_file.getValue(x,y,z);
             }
 #endif
             default:

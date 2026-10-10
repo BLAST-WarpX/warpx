@@ -93,18 +93,7 @@ struct InjectorDensityFromFile
     amrex::Real
     getDensity (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
     {
-#if (AMREX_SPACEDIM < 3)
-        amrex::ignore_unused(x,y,z);
-#endif
-#if (AMREX_SPACEDIM == 1)
-        return m_external_field_view(amrex::RealVect{z});
-#elif defined(WARPX_DIM_RZ)
-        return m_external_field_view(amrex::RealVect{std::sqrt(x*x+y*y),z});
-#elif defined(WARPX_DIM_XZ)
-        return m_external_field_view(amrex::RealVect{x,z});
-#else
-        return m_external_field_view(amrex::RealVect{x,y,z});
-#endif
+        return m_external_field_view.getValue(x,y,z);
     }
 
 private:
