@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_base_2d_theta_implicit_planar_pinch
+
+# test input parameters
+newton.linear_solver = amrex_gmres
+jacobian.pc_type = pc_algmg
+pc_algmg.verbose = true

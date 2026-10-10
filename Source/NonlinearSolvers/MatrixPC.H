@@ -8,6 +8,7 @@
 #define MATRIX_PC_H_
 
 #include "Fields.H"
+#include "MatrixPCAlgMG.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
 #include "Preconditioner.H"
@@ -20,6 +21,9 @@
 #include <AMReX_Array.H>
 #include <AMReX_Vector.H>
 #include <AMReX_MultiFab.H>
+
+#include <memory>
+#include <string>
 
 namespace MatrixPCUtils
 {
@@ -60,8 +64,8 @@ namespace MatrixPCUtils
  *
  *  This class is templated on a solution-type class T and an operator class Ops. It implements
  *  a preconditioner based on constructing and solving the sparse matrix representation of the
- *  Jacobian. Currently, it implements constructing/assembling the sparse matrix. An external
- *  library with sparse matrix solvers (for example, PETSc) is needed to apply the preconditioner.
+ *  Jacobian. With pc_petsc, PETSc applies the preconditioner to the assembled matrix. With
+ *  pc_algmg, AMReX's algebraic multigrid (AlgMG) applies it.
  *
  *  The Ops class must have the following function:
  *      + Return number of AMR levels
@@ -71,6 +75,7 @@ namespace MatrixPCUtils
  *
  *  The T class must have the following functions:
  *      + Return underlying vector of amrex::MultiFab arrays
+ *      + Return the first global DOF of each process (pc_algmg)
  */
 
 template <class T, class Ops>
@@ -123,6 +128,7 @@ class MatrixPC : public Preconditioner<T,Ops>
          *      A x = b
          *  where A is the linear operator, in this case, the curl-curl operator:
          *      A x = curl (alpha * curl (x) ) + beta * x
+         *  Only available with pc_algmg; pc_petsc is applied by PETSc.
          */
         void Apply (T&, const T&) override;
 
@@ -201,6 +207,12 @@ class MatrixPC : public Preconditioner<T,Ops>
 
         int m_num_realloc = 0;
 
+        // pc_algmg: AlgMG V-cycles on the assembled matrix
+        bool m_use_algmg = false;
+        std::unique_ptr<MatrixPCAlgMG> m_algmg;
+        bool m_algmg_is_set_up = false;
+        RT m_algmg_theta_dt = RT(0); // theta*dt of the last AlgMG setup
+
         /**
          * \brief Read parameters
          */
@@ -217,6 +229,7 @@ void MatrixPC<T,Ops>::printParameters() const
     Print() << m_name << " verbose:                " << (m_verbose?"true":"false") << "\n";
     Print() << m_name << " pc_diagonal_only:       " << (m_pc_diag_only?"true":"false") << "\n";
     Print() << m_name << " include_mass_matrices:  " << (m_include_mass_matrices?"true":"false") << "\n";
+    if (m_algmg) { m_algmg->printParameters(); }
 }
 
 template <class T, class Ops>
@@ -225,6 +238,8 @@ void MatrixPC<T,Ops>::readParameters()
     const amrex::ParmParse pp(m_name);
     pp.query("verbose", m_verbose);
     pp.query("pc_diagonal_only", m_pc_diag_only);
+
+    m_use_algmg = (m_name == amrex::getEnumNameString(PreconditionerType::pc_algmg));
 }
 
 template <class T, class Ops>
@@ -276,6 +291,10 @@ void MatrixPC<T,Ops>::Define ( const T& a_U,
         m_include_mass_matrices = true;
     }
 
+    if (m_use_algmg) {
+        m_algmg = std::make_unique<MatrixPCAlgMG>(m_name, a_U.dofRowOffsets());
+    }
+
     m_is_defined = true;
 }
 
@@ -310,6 +329,20 @@ void MatrixPC<T,Ops>::Update ()
         ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
     }
 
+    if (m_use_algmg) {
+        // Without mass matrices, the matrix only depends on theta*dt.
+        // Load balancing is not supported by the implicit solvers. If it is
+        // supported in the future, this and the DOF-based data in MatrixPC
+        // (sizes, AlgMG partition) need to be updated when the
+        // DistributionMapping changes.
+        const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
+        if (m_include_mass_matrices || !m_algmg_is_set_up || thetaDt != m_algmg_theta_dt) {
+            m_algmg->Setup(m_ndofs_l, m_pc_mat_nnz, m_num_nz.data(),
+                           m_c_indices_g.data(), m_a_ij.data());
+            m_algmg_is_set_up = true;
+            m_algmg_theta_dt = thetaDt;
+        }
+    }
 }
 
 template <class T, class Ops>
@@ -835,8 +868,13 @@ void MatrixPC<T,Ops>::Apply (T& a_x, const T& a_b)
         a_b.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
         "MatrixPC::Apply() - a_b must be Efield_fp type");
 
-    WARPX_ABORT_WITH_MESSAGE("MatrixPC<T,Ops>::Apply() - native matrix solvers not implemented. Use with external library, eg, PETSc.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_use_algmg,
+        "MatrixPC::Apply() - only pc_algmg is applied natively; pc_petsc requires PETSc's KSP or SNES.");
 
+    a_b.copyTo(m_algmg->rhs());
+    m_algmg->Apply();
+    a_x.copyFrom(m_algmg->sol());
 }
 
 #endif

@@ -173,24 +173,24 @@ void WarpXSolverDOF::fill_global_dof ()
 {
 #ifndef AMREX_USE_MPI
     m_nDoFs_g = m_nDoFs_l;
+    m_row_offsets = {0, m_nDoFs_g};
 #else
     const int nprocs = ParallelDescriptor::NProcs();
     if (nprocs == 1) {
         m_nDoFs_g = m_nDoFs_l;
+        m_row_offsets = {0, m_nDoFs_g};
     } else {
         Vector<Long> ndofs_allprocs(nprocs);
         MPI_Allgather(&m_nDoFs_l, 1, ParallelDescriptor::Mpi_typemap<Long>::type(),
                       ndofs_allprocs.data(), 1, ParallelDescriptor::Mpi_typemap<Long>::type(),
                       ParallelDescriptor::Communicator());
-        Long proc_begin = 0;
-        const int myproc = ParallelDescriptor::MyProc();
-        m_nDoFs_g = 0;
+        m_row_offsets.resize(nprocs+1);
+        m_row_offsets[0] = 0;
         for (int iproc = 0; iproc < nprocs; ++iproc) {
-            if (iproc < myproc) {
-                proc_begin += ndofs_allprocs[iproc];
-            }
-            m_nDoFs_g += ndofs_allprocs[iproc];
+            m_row_offsets[iproc+1] = m_row_offsets[iproc] + ndofs_allprocs[iproc];
         }
+        const Long proc_begin = m_row_offsets[ParallelDescriptor::MyProc()];
+        m_nDoFs_g = m_row_offsets[nprocs];
         for (auto& x : m_array) {
             for (auto& y : x) {
                 if (y) {

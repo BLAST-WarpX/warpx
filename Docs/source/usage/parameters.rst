@@ -328,13 +328,13 @@ Overall simulation parameters
 
         - ``implicit_evolve.use_mass_matrices_pc`` (``bool``, default: false).
           When ``true``, the plasma response is captured in the preconditioner.
-          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, or ``pc_jacobi``).
+          Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, ``pc_algmg``, or ``pc_jacobi``).
 
         - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 0).
-          If using ``jacobian.pc_type = pc_petsc``, this parameter specifies the width of the mass matrices included in the preconditioner.
+          If using ``jacobian.pc_type = pc_petsc`` or ``pc_algmg``, this parameter specifies the width of the mass matrices included in the preconditioner.
           In most cases, a width of 1 is sufficient for good GMRES performance.
 
-        - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. There are three options:
+        - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. The options are:
 
           - ``jacobian.pc_type = pc_curl_curl_mlmg``: Use the AMReX MLMG solver for the curl curl formulation of Maxwell's equations. This preconditioner solves the following equation:
 
@@ -371,6 +371,18 @@ Overall simulation parameters
             - ``pc_petsc.ilu_factor_levels`` (``int``, default: 2)
             - ``pc_petsc.hypre_type`` (``string``, default: "euclid")
             - ``pc_petsc.euclid_factor_levels`` (``int``, default: 2)
+
+          - ``jacobian.pc_type = pc_algmg``: Use AMReX's algebraic multigrid solver (AlgMG) on the sparse matrix that ``pc_petsc`` uses.
+            It runs on CPUs and GPUs, does not require PETSc, and works with both ``newton.linear_solver`` values.
+
+            - ``pc_algmg.verbose`` (``bool``, default: true)
+            - ``pc_algmg.algmg_verbose`` (``int``, default: 0) Verbosity of the multigrid solver.
+            - ``pc_algmg.max_iter`` (``int``, default: 1) Number of V-cycles per application.
+            - ``pc_algmg.smoother`` (``string``, default: "chebyshev") One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only).
+            - ``pc_algmg.chebyshev_degree`` (``int``, default: 4)
+            - ``pc_algmg.strong_threshold`` (``float``, default: 0.25)
+            - ``pc_algmg.aggressive_levels`` (``int``, default: 0) Number of levels with aggressive coarsening.
+            - ``pc_algmg.max_levels`` (``int``, default: 25)
 
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
@@ -1608,58 +1620,59 @@ Particle initialization
     * ``SingleParticle``: Inject a single macroparticle.
       This requires the additional parameters:
 
-      * ``<species_name>.single_particle_pos`` (``3 doubles``, particle 3D position [meter])
+      * ``<species_name>.single_particle_pos`` (``3 floats``) particle 3D position [meter]
 
-      * ``<species_name>.single_particle_u`` (``3 doubles``, particle 3D normalized momentum, i.e. :math:`\gamma \beta`)
+      * ``<species_name>.single_particle_u`` (``3 floats``) particle 3D normalized momentum, i.e. :math:`\gamma \beta`
 
-      * ``<species_name>.single_particle_weight`` ( ``double``, macroparticle weight, i.e. number of physical particles it represents)
+      * ``<species_name>.single_particle_weight`` (``float``) macroparticle weight, i.e. number of physical particles it represents
 
     * ``MultipleParticles``: Inject multiple macroparticles.
       This requires the additional parameters:
 
-      * ``<species_name>.multiple_particles_pos_x`` (list of ``doubles``, X positions of the particles [meter])
+      * ``<species_name>.multiple_particles_pos_x`` (list of ``floats``) X positions of the particles [meter]
 
-      * ``<species_name>.multiple_particles_pos_y`` (list of ``doubles``, Y positions of the particles [meter])
+      * ``<species_name>.multiple_particles_pos_y`` (list of ``floats``) Y positions of the particles [meter]
 
-      * ``<species_name>.multiple_particles_pos_z`` (list of ``doubles``, Z positions of the particles [meter])
+      * ``<species_name>.multiple_particles_pos_z`` (list of ``floats``) Z positions of the particles [meter]
 
-      * ``<species_name>.multiple_particles_ux`` (list of ``doubles``, X normalized momenta of the particles, i.e. :math:`\gamma \beta_x`)
+      * ``<species_name>.multiple_particles_ux`` (list of ``floats``) X normalized momenta of the particles, i.e. :math:`\gamma \beta_x`
 
-      * ``<species_name>.multiple_particles_uy`` (list of ``doubles``, Y normalized momenta of the particles, i.e. :math:`\gamma \beta_y`)
+      * ``<species_name>.multiple_particles_uy`` (list of ``floats``) Y normalized momenta of the particles, i.e. :math:`\gamma \beta_y`
 
-      * ``<species_name>.multiple_particles_uz`` (list of ``doubles``, Z normalized momenta of the particles, i.e. :math:`\gamma \beta_z`)
+      * ``<species_name>.multiple_particles_uz`` (list of ``floats``) Z normalized momenta of the particles, i.e. :math:`\gamma \beta_z`
 
-      * ``<species_name>.multiple_particles_weight`` (list of ``doubles``, macroparticle weights, i.e. number of physical particles each represents)
+      * ``<species_name>.multiple_particles_weight`` (list of ``floats``) macroparticle weights, i.e. number of physical particles each represents
 
     * ``gaussian_beam``: Inject particle beam with gaussian distribution in
       space in all directions. This requires additional parameters:
 
-      * ``<species_name>.q_tot`` (beam charge),
+      * ``<species_name>.q_tot`` (``float``) beam charge
 
-      * ``<species_name>.npart_real`` (total number of real particles in the beam)
+      * ``<species_name>.npart_real`` (``float``) total number of real particles in the beam
 
       The user must define one and only only between ``q_tot`` and ``npart_real``.
       The latter must be used for neutral species.
 
-      * ``<species_name>.npart`` (number of macroparticles in the beam),
+      * ``<species_name>.npart`` (``int``) number of macroparticles in the beam
 
-      * ``<species_name>.x/y/z_m`` (average position in ``x/y/z``),
+      * ``<species_name>.x/y/z_m`` (``float``) average position in ``x/y/z``
 
-      * ``<species_name>.x/y/z_rms`` (standard deviation in ``x/y/z``),
+      * ``<species_name>.x/y/z_rms`` (``float``) standard deviation in ``x/y/z``
 
       There are additional optional parameters:
 
-      * ``<species_name>.x/y/z_cut`` (optional, particles with ``abs(x-x_m) > x_cut*x_rms`` are not injected, same for y and z. ``<species_name>.q_tot`` is the charge of the un-cut beam, so that cutting the distribution is likely to result in a lower total charge),
-      * ``<species_name>.do_symmetrize`` (optional, whether to symmetrize the beam)
+      * ``<species_name>.x/y/z_cut`` (``float``, optional) particles with ``abs(x-x_m) > x_cut*x_rms`` are not injected, same for y and z. ``<species_name>.q_tot`` is the charge of the un-cut beam, so that cutting the distribution is likely to result in a lower total charge.
 
-      * ``<species_name>.symmetrization_order`` (order of symmetrization, default is 4, can be 4 or 8).
+      * ``<species_name>.do_symmetrize`` (``bool``, optional) whether to symmetrize the beam
+
+      * ``<species_name>.symmetrization_order`` (``int``) order of symmetrization, default is 4, can be 4 or 8.
 
       If ``<species_name>.do_symmetrize`` is 0, no symmetrization occurs.  If ``<species_name>.do_symmetrize`` is 1,
       then the beam is symmetrized according to the value of ``<species_name>.symmetrization_order``.
       If set to 4, symmetrization is in the x and y direction, (x,y) (-x,y) (x,-y) (-x,-y).
       If set to 8, symmetrization is also done with x and y exchanged, (y,x), (-y,x), (y,-x), (-y,-x)).
 
-      * ``<species_name>.focal_distance`` (optional, distance between the beam centroid and the position of the focal plane of the beam, along the direction of the beam mean velocity; space charge is ignored in the initialization of the particles)
+      * ``<species_name>.focal_distance`` (``float``, optional) distance between the beam centroid and the position of the focal plane of the beam, along the direction of the beam mean velocity; space charge is ignored in the initialization of the particles
 
       If ``<species_name>.focal_distance`` is specified, ``x_rms``, ``y_rms`` and ``z_rms`` are the sizes of the beam in the focal plane. Since the beam is not necessarily initialized close to its focal plane, the initial size of the beam will differ from ``x_rms``, ``y_rms``, ``z_rms``.
 
@@ -1679,9 +1692,9 @@ Particle initialization
 
       If ``do_gaussian_beam_rotation = 1`` then the user needs to specify:
 
-          * ``<species_name>.gaussian_beam_rotation_axis``: (list of 3 ``doubles``) axis around which the rotation takes place
+          * ``<species_name>.gaussian_beam_rotation_axis`` (list of 3 ``floats``) axis around which the rotation takes place
 
-          * ``<species_name>.gaussian_beam_rotation_angle``: (``double``) angle of rotation around the specified axis, in radians.
+          * ``<species_name>.gaussian_beam_rotation_angle`` (``float``) angle of rotation around the specified axis, in radians.
 
       * ``<species_name>.do_gaussian_beam_rotation_momenta`` (``bool``, optional) the momenta of the beam particles are also rotated using the same transformation applied to their positions. The rotation is the same as that for the positions. Momenta cannot be rotated independently; position rotation must be enabled first.
 
@@ -1691,15 +1704,15 @@ Particle initialization
     * ``external_file``: Inject macroparticles with properties (mass, charge, position, and momentum - :math:`\gamma \beta m c`) read from an external openPMD file.
       With it users can specify the additional arguments:
 
-      * ``<species_name>.injection_file`` (``string``) openPMD file name and
+      * ``<species_name>.injection_file`` (``string``) openPMD file name
 
-      * :pp:param:`<species_name>.charge` (``double``) optional (default is read from openPMD file) when set this will be the charge of the physical particle represented by the injected macroparticles.
+      * :pp:param:`<species_name>.charge` (``float``, optional) (default is read from openPMD file) when set this will be the charge of the physical particle represented by the injected macroparticles.
 
-      * :pp:param:`<species_name>.mass` (``double``) optional (default is read from openPMD file) when set this will be the charge of the physical particle represented by the injected macroparticles.
+      * :pp:param:`<species_name>.mass` (``float``, optional) (default is read from openPMD file) when set this will be the charge of the physical particle represented by the injected macroparticles.
 
-      * ``<species_name>.z_shift`` (``double``) optional (default is no shift) when set this value will be added to the longitudinal, ``z``, position of the particles.
+      * ``<species_name>.z_shift`` (``float``, optional) when set this value will be added to the longitudinal, ``z``, position of the particles. The default is no shift.
 
-      * ``<species_name>.impose_t_lab_from_file`` (``bool``) optional (default is false) only read if warpx.gamma_boost > 1., it allows to set t_lab for the Lorentz Transform as being the time stored in the openPMD file.
+      * ``<species_name>.impose_t_lab_from_file`` (``bool``, optional) only read if warpx.gamma_boost > 1., it allows to set t_lab for the Lorentz Transform as being the time stored in the openPMD file.
 
       Warning: ``q_tot!=0`` is not supported with the ``external_file`` injection style. If a value is provided, it is ignored and no re-scaling is done.
       The external file must include the species ``openPMD::Record`` labeled ``position`` and ``momentum`` (``double`` arrays), with dimensionality and units set via ``openPMD::setUnitDimension`` and ``setUnitSI``.
@@ -1713,23 +1726,23 @@ Particle initialization
       defined by the user (using some of the parameters listed below), or the embedded boundary (see :ref:`Embedded Boundary Conditions <running-cpp-parameters-eb>`).
       This requires the additional parameters:
 
-      * :pp:param:`<species_name>.flux_profile` (see the description of this parameter further below)
+      * :pp:param:`<species_name>.flux_profile` (``string``) see the description of this parameter further below
 
-      * ``<species_name>.inject_from_embedded_boundary`` (``0`` or ``1``, default ``0`` ; whether to inject from the embedded boundary or from a user-specified plane.
+      * ``<species_name>.inject_from_embedded_boundary`` (``0`` or ``1``) whether to inject from the embedded boundary or from a user-specified plane. The default is ``0``.
         When injecting from the embedded boundary, the momentum distribution specified by the user along ``z`` (see e.g. ``uz_m``, ``uz_th`` below) is interpreted
         as the momentum distribution along the local normal to the embedded boundary.)
 
-      * ``<species_name>.surface_flux_pos`` (only used when injecting from a plane, ``double``, location of the injection plane [meter])
+      * ``<species_name>.surface_flux_pos`` (``float``) only used when injecting from a plane, location of the injection plane [meter]
 
-      * ``<species_name>.flux_normal_axis`` (only used when injecting from a plane, ``x``, ``y``, or ``z`` for 3D, ``x`` or ``z`` for 2D, or ``r``, ``t``, or ``z`` for RZ, or ``r`` for RCYLINDER and RSPHERE. When ``flux_normal_axis`` is ``r`` or ``t``, the ``x`` and ``y`` components of the user-specified momentum distribution are interpreted as the ``r`` and ``t`` components respectively)
+      * ``<species_name>.flux_normal_axis`` (``string``) only used when injecting from a plane, ``x``, ``y``, or ``z`` for 3D, ``x`` or ``z`` for 2D, or ``r``, ``t``, or ``z`` for RZ, or ``r`` for RCYLINDER and RSPHERE. When ``flux_normal_axis`` is ``r`` or ``t``, the ``x`` and ``y`` components of the user-specified momentum distribution are interpreted as the ``r`` and ``t`` components respectively
 
-      * ``<species_name>.flux_direction`` (only used when injecting from a plane, ``-1`` or ``+1``, direction of flux relative to the plane)
+      * ``<species_name>.flux_direction`` (``int``) only used when injecting from a plane, ``-1`` or ``+1``, direction of flux relative to the plane
 
-      * ``<species_name>.num_particles_per_cell`` (``double``)
+      * ``<species_name>.num_particles_per_cell`` (``float``)
 
-      * ``<species_name>.flux_tmin`` (``double``, Optional time at which the flux will be turned on. Ignored when negative.)
+      * ``<species_name>.flux_tmin`` (``float``) optional time at which the flux will be turned on. Ignored when negative.
 
-      * ``<species_name>.flux_tmax`` (``double``, Optional time at which the flux will be turned off. Ignored when negative.)
+      * ``<species_name>.flux_tmax`` (``float``) optional time at which the flux will be turned off. Ignored when negative.
 
     * ``none``: Do not inject macro-particles (for example, in a simulation that starts with neutral, ionizable atoms, one may want to create the electrons species -- where ionized electrons can be stored later on -- without injecting electron macro-particles).
 
