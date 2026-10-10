@@ -147,6 +147,9 @@ class KSP_impl : public PETScSolver_impl
         //! Set max iters
         void setMaxIters(int);
 
+        //! Rebuild the PETSc matrix and preconditioner on the next linear solve.
+        void invalidatePreconditioner () { m_pc_needs_update = true; }
+
         //! Solve
         void solve(VecType&, const VecType&);
 
@@ -172,6 +175,9 @@ class KSP_impl : public PETScSolver_impl
         LinOpType* m_linop = nullptr;
 
     private:
+
+        //! Whether the PETSc preconditioner matrix needs reassembly.
+        bool m_pc_needs_update = true;
 
         //! absolute tolerance
         amrex::Real m_atol = 1e-12;
@@ -236,6 +242,9 @@ class SNES_impl : public PETScSolver_impl
         //! Returns if a preconditioner is being used
         [[nodiscard]] bool usePC() const;
 
+        //! Whether PC updates are enabled for the current nonlinear solve.
+        [[nodiscard]] bool updatePC() const { return m_update_pc; }
+
         //! Set verbosity
         void setVerbose(bool);
 
@@ -282,15 +291,22 @@ class SNES_impl : public PETScSolver_impl
 
         /** Whether computeRHS() still has to run its first-call path.
          *
-         * Scoped to a single solver, so each solver built in a process takes that
-         * path exactly once.
+         * Reset for each nonlinear solve so its initial residual prepares the
+         * particle state before finite-difference Jacobian evaluations.
          */
-        bool m_rhs_first_call = true;
+        mutable bool m_rhs_first_call = true;
 
         //! Linear operator object
         std::unique_ptr<LinOpType> m_linop;
 
     private:
+
+        //! Time-step interval for PC updates; SNES does not use the Newton interval.
+        int m_pc_update_time_step_interval = 1;
+        //! Ensure the first linear solve initializes the PC, including after restart.
+        mutable bool m_pc_initialized = false;
+        //! Fixed PC update decision for all nonlinear evaluations in one solve.
+        mutable bool m_update_pc = true;
 
         //! absolute tolerance
         amrex::Real m_atol = 0.;

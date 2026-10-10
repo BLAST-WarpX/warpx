@@ -108,20 +108,21 @@ int StrangImplicitSpectralEM::OneStep (amrex::Real start_time,
     return exit_status;
 }
 
-void StrangImplicitSpectralEM::ComputeRHS ( WarpXSolverVec& a_RHS,
-                                            WarpXSolverVec const & a_E,
-                                            amrex::Real start_time,
-                                            int a_nl_iter,
-                                            bool a_from_jacobian )
+void StrangImplicitSpectralEM::ComputeRHS (WarpXSolverVec& a_RHS,
+                                           WarpXSolverVec const & a_E,
+                                           amrex::Real start_time,
+                                           int a_nl_iter,
+                                           bool a_from_jacobian,
+                                           const bool update_pc)
 {
     // Update WarpX-owned Efield_fp and Bfield_fp using current state of
     // E from the nonlinear solver at time n+1/2
     const amrex::Real half_time = start_time + 0.5_rt*m_dt;
-    UpdateWarpXFields( a_E, half_time );
+    UpdateWarpXFields(a_E, half_time);
 
     // Self consistently update particle positions and velocities using the
     // current state of the fields E and B. Deposit current density at time n+1/2.
-    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
+    PreRHSOp(half_time, a_nl_iter, a_from_jacobian, /*a_dt_scale=*/1.0_rt, update_pc);
 
     // For Strang split implicit PSATD, the RHS = -dt*mu*c**2*J
     bool const allow_type_mismatch = true;

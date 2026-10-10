@@ -269,6 +269,18 @@ Overall simulation parameters
           - ``newton.linear_solver`` (``string``, default: "gmres") Other excepted value, "petsc_ksp".
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
+          - ``newton.pc_update_newton_interval`` (``int``, default: 1)
+            Controls preconditioner updates within a native Newton solve. Zero updates
+            only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
+          - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
+            Must be positive. Updates are allowed only when the zero-based simulation
+            step index is divisible by this interval. For native Newton, both interval
+            conditions must hold. PETSc SNES uses only this time-step interval: on
+            update steps it retains PC updates within the nonlinear solve, while on
+            skipped steps it reuses the PC, including the PETSc factorization.
+            ``newton.pc_update_newton_interval`` does not apply to PETSc SNES.
+            The first required linear solve always initializes the PC, including
+            after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
           - ``newton.diagnostic_file`` (``string``, default: None)

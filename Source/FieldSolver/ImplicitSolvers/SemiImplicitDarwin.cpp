@@ -254,7 +254,8 @@ void SemiImplicitDarwin::ComputeRHS ( [[maybe_unused]] WarpXSolverVec& a_RHS,
                                       [[maybe_unused]] const WarpXSolverVec& a_Z,
                                       [[maybe_unused]] amrex::Real start_time,
                                       [[maybe_unused]] int a_nl_iter,
-                                      [[maybe_unused]] bool a_from_jacobian )
+                                      [[maybe_unused]] bool a_from_jacobian,
+                                      [[maybe_unused]] const bool update_pc )
 {
     // The Darwin scheme is linear in its unknown and never installs a
     // nonlinear solver, so it has no nonlinear residual to compute. This
