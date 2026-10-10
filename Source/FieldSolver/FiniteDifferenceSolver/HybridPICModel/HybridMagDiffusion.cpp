@@ -770,7 +770,7 @@ public:
         }
     }
 
-    // Precompute c=A_full(0) for an inhomogeneous pec_insulator feed.
+    // Precompute c=A_full(0) for parser feeds and retained physical guards.
     void prepareFeed ()
     {
         m_has_feed = false;
@@ -780,6 +780,15 @@ public:
                 const FieldBoundaryType fb = (iside == 0)
                     ? WarpX::field_boundary_lo[idim]
                     : WarpX::field_boundary_hi[idim];
+                bool on_axis = false;
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
+                on_axis = idim == 0 && iside == 0 && m_geom.ProbLo(0) == 0.0_rt;
+#endif
+                // None leaves exterior guards fixed. Their contribution is an
+                // affine offset, even without an explicit boundary parser.
+                if (fb == FieldBoundaryType::None && !on_axis) {
+                    m_has_feed = true;
+                }
                 if (fb != FieldBoundaryType::PEC_Insulator) { continue; }
                 for (int ifield = 0; ifield < 3; ++ifield) {
                     if (warpx.GetPECInsulator_IsBSet(idim, iside, ifield)) {
@@ -891,6 +900,10 @@ petscScatter (MagDiffVector& dst, Real const* flat,
     // the homogeneous extension required by the matrix-free stencil instead
     // of leaving allocation-dependent values in the MultiFabs.
     dst.setVal(0.0_rt);
+#ifdef AMREX_USE_GPU
+    // PETSc writes staging memory on the CPU; finish previous device accesses.
+    amrex::Gpu::synchronize();
+#endif
     for (int idim = 0; idim < 3; ++idim) {
 #ifdef AMREX_USE_GPU
         MultiFab& host = host_bufs[idim];
@@ -916,6 +929,9 @@ petscScatter (MagDiffVector& dst, Real const* flat,
 #ifdef AMREX_USE_GPU
         MultiFab::Copy(f[idim], host, 0, 0, 1, 0);
 #endif
+        // The PETSc vector contains owners only. Populate valid nodal aliases
+        // before physical-boundary application or current-port projection.
+        f[idim].OverrideSync(WarpX::GetInstance().Geom(0).periodicity());
     }
 }
 
@@ -933,6 +949,8 @@ petscGather (Real* flat, MagDiffVector const& src,
 #ifdef AMREX_USE_GPU
         MultiFab& host = host_bufs[idim];
         MultiFab::Copy(host, f[idim], 0, 0, 1, 0);
+        // Device-to-pinned-host copies must complete before CPU reads.
+        amrex::Gpu::synchronize();
         for (MFIter mfi(host); mfi.isValid(); ++mfi) {
             auto const& arrf = host.const_array(mfi);
 #else
@@ -1154,15 +1172,57 @@ HybridMagDiffusion::AdvanceVariable (
             eb_update_B[0].get(), eb_update_B[1].get(), eb_update_B[2].get()};
         bool const petsc_eb_on = EB::enabled();
 
+        // Probe the actual native boundary map rather than assuming that every
+        // PEC_Insulator face is an evolved insulator. Its default area is PEC,
+        // which clamps normal B DOFs. The affine feed cancels between the zero
+        // and one probes; only the homogeneous map determines the Pmat rows.
+        Array<MultiFab,3> boundary_response;
+        Array<MultiFab,3> boundary_saved;
+        for (int idim = 0; idim < 3; ++idim) {
+            boundary_saved[idim].define(Bfield[idim]->boxArray(),
+                Bfield[idim]->DistributionMap(), 1, Bfield[idim]->nGrowVect());
+            MultiFab::Copy(boundary_saved[idim], *Bfield[idim], 0, 0, 1,
+                           Bfield[idim]->nGrowVect());
+            Bfield[idim]->setVal(0.0_rt);
+        }
+        auto& warpx = WarpX::GetInstance();
+        warpx.ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::None,
+                                  warpx.gett_new(lev));
+        Array<MultiFab,3> boundary_zero;
+        for (int idim = 0; idim < 3; ++idim) {
+            boundary_zero[idim].define(Bfield[idim]->boxArray(),
+                Bfield[idim]->DistributionMap(), 1, 1);
+            MultiFab::Copy(boundary_zero[idim], *Bfield[idim], 0, 0, 1, 1);
+            Bfield[idim]->setVal(1.0_rt, 0, 1, 0);
+            boundary_response[idim].define(Bfield[idim]->boxArray(),
+                Bfield[idim]->DistributionMap(), 1, 1);
+            boundary_response[idim].setVal(1);
+        }
+        warpx.ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::None,
+                                  warpx.gett_new(lev));
+        for (int idim = 0; idim < 3; ++idim) {
+            MultiFab::LinComb(boundary_response[idim], 1.0_rt, *Bfield[idim], 0,
+                              -1.0_rt, boundary_zero[idim], 0, 0, 1, 1);
+            boundary_response[idim].FillBoundary(linop.geom().periodicity());
+            // None faces retain their existing guard values. Preserve those
+            // too: a boundary probe must not introduce an artificial feed.
+            MultiFab::Copy(*Bfield[idim], boundary_saved[idim], 0, 0, 1,
+                           Bfield[idim]->nGrowVect());
+        }
+        amrex::Array<MultiFab const*,3> const boundary_response_ptrs{
+            &boundary_response[0], &boundary_response[1], &boundary_response[2]};
+
+
         if (!m_petsc_solver) {
             m_petsc_solver.reset(magdiff_petsc_make(
                 B_proto, eta_edge, linop.geom(), linop.thetaDt(),
                 PhysConst::mu0, m_rtol, m_atol, m_max_iter, m_verbose,
                 m_petsc_options,
                 &petscMatvec, &opctx,
-                petsc_eb_on ? &eb_update_B_ptrs : nullptr));
+                petsc_eb_on ? &eb_update_B_ptrs : nullptr, &boundary_response_ptrs));
         } else {
-            magdiff_petsc_update(m_petsc_solver.get(), eta_edge, linop.thetaDt(), &opctx);
+            magdiff_petsc_update(m_petsc_solver.get(), eta_edge, linop.thetaDt(), &opctx,
+                                &boundary_response_ptrs);
         }
 
         const amrex::Long n_local = magdiff_petsc_nlocal(m_petsc_solver.get());

@@ -70,7 +70,8 @@ MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
     MagDiffPetscOptions const& options,
     MagDiffMatvecFn matvec, void* opctx,
-    amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B = nullptr);
+    amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B = nullptr,
+    amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B = nullptr);
 
 [[nodiscard]] amrex::Long magdiff_petsc_nlocal (MagDiffPetscSolver const* s);
 [[nodiscard]] amrex::Long magdiff_petsc_rstart (MagDiffPetscSolver const* s);
@@ -90,7 +91,8 @@ void magdiff_petsc_update (
     MagDiffPetscSolver* s,
     amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
     amrex::Real theta_dt,
-    void* opctx);
+    void* opctx,
+    amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B = nullptr);
 
 void magdiff_petsc_destroy (MagDiffPetscSolver* s);
 

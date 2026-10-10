@@ -37,11 +37,33 @@
 #include <petscpc.h>
 #include <petscsys.h>
 #include <petscvec.h>
+#include <petscviewer.h>
+
+// PETSc added these convenience macros after the 3.15 release shipped by
+// Ubuntu 22.04. Keep the optional solver buildable against that distribution
+// package while preserving the newer API when it is available.
+#ifndef PETSC_SUCCESS
+#define PETSC_SUCCESS 0
+#endif
+#ifndef PetscCall
+#define PetscCall(...) do { \
+    PetscErrorCode const ierr_petsc_call = (__VA_ARGS__); \
+    CHKERRQ(ierr_petsc_call); \
+} while (false)
+#endif
+#ifndef PetscCallAbort
+#define PetscCallAbort(comm, ...) do { \
+    PetscErrorCode const ierr_petsc_call_abort = (__VA_ARGS__); \
+    CHKERRABORT(comm, ierr_petsc_call_abort); \
+} while (false)
+#endif
 #endif
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -63,9 +85,10 @@ static_assert(std::is_same_v<PetscScalar, amrex::Real>,
 /**
  * \brief PETSc KSP driver for the matrix-free mag-diff operator.
  *
- * DOF layout: component-major (B0, B1, B2), per-rank MFIter order, interior
- * (nghost=0) cells only. A per-component global-index iMultiFab (nghost=1,
- * -1 = exterior) maps each interior cell to its PETSc row/column; the matvec
+ * DOF layout: component-major (B0, B1, B2), per-rank MFIter order, owned
+ * valid (nghost=0) values only. Shared nodal and periodic aliases are one DOF.
+ * A per-component global-index iMultiFab (-1 = non-owner/covered) maps owned
+ * values to PETSc rows; a synchronized column map resolves aliases; the matvec
  * callback (in HybridMagDiffusion.cpp) reads this same index to scatter/gather
  * its field MultiFabs, so the Vec and the assembled Pmat stay
  * self-consistent regardless of tiling. Norms use the nghost=0 interior only
@@ -81,7 +104,8 @@ public:
         amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
         MagDiffPetscOptions const& options,
         MagDiffMatvecFn matvec, void* opctx,
-        amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B)
+        amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B,
+        amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B)
         : m_geom(geom), m_theta_dt(theta_dt), m_mu0(mu0),
           m_rtol(rtol), m_atol(atol), m_max_iter(max_iter),
           m_verbose(verbose), m_matvec(matvec), m_opctx(opctx)
@@ -92,21 +116,32 @@ public:
         if (eb_update_B) {
             copyEbMasksToHost(*eb_update_B);
         }
+        copyBoundaryMapToHost(boundary_response_B);
 
-        // Local DOF count over interior (nghost=0) cells, component-major,
-        // skipping covered B DOFs when the EB mask is provided.
+        // A nodal value shared by boxes or periodic images is one unknown.
+        // Count only AMReX owners; aliases are resolved separately for columns.
+        auto const host_info = amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
+        for (int idim = 0; idim < 3; ++idim) {
+            auto owner = B_proto[idim]->OwnerMask(m_geom.periodicity());
+            m_owner_host[idim] = std::make_unique<amrex::iMultiFab>(
+                B_proto[idim]->boxArray(), B_proto[idim]->DistributionMap(),
+                1, 0, host_info);
+            amrex::iMultiFab::Copy(*m_owner_host[idim], *owner, 0, 0, 1, 0);
+        }
+        amrex::Gpu::synchronize();
         for (int idim = 0; idim < 3; ++idim) {
             for (amrex::MFIter mfi(*B_proto[idim]); mfi.isValid(); ++mfi) {
-                if (m_eb_mask_host[0]) {
-                    auto const& mask_arr = m_eb_mask_host[idim]->const_array(mfi);
-                    amrex::Box const& tb = mfi.tilebox();
-                    amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
-                        [&] (int i, int j, int k) {
-                            if (mask_arr(i, j, k) != 0) { ++m_n_local; }
-                        });
-                } else {
-                    m_n_local += mfi.tilebox().numPts();
-                }
+                auto const owner = m_owner_host[idim]->const_array(mfi);
+                auto const mask = m_eb_mask_host[idim]
+                    ? m_eb_mask_host[idim]->const_array(mfi)
+                    : amrex::Array4<int const>{};
+                auto const& box = mfi.validbox();
+                amrex::LoopOnCpu(amrex::lbound(box), amrex::ubound(box),
+                    [&] (int i, int j, int k) {
+                        if (owner(i,j,k) != 0 && (!mask || mask(i,j,k) != 0)) {
+                            ++m_n_local;
+                        }
+                    });
             }
         }
 
@@ -185,6 +220,27 @@ public:
         setOptions(options);
         // Let -magdiff_ksp_type, -magdiff_pc_type, and related options win.
         MAGDIFF_PETSC_CHK(KSPSetFromOptions(m_ksp));
+        MAGDIFF_PETSC_CHK(PetscOptionsGetBool(
+            nullptr, nullptr, "-magdiff_check_finite", &m_check_finite, nullptr));
+        if (m_check_finite) {
+            amrex::Print() << "PETSC_AUDIT vector checks enabled\n";
+        }
+        PetscBool inspect_matrix = PETSC_FALSE;
+        MAGDIFF_PETSC_CHK(PetscOptionsGetBool(
+            nullptr, nullptr, "-magdiff_audit_matrix", &inspect_matrix, nullptr));
+        if (inspect_matrix) { MAGDIFF_PETSC_CHK(auditMatrix()); }
+        char dump_path[4096] = {};
+        PetscBool dump_matrix = PETSC_FALSE;
+        MAGDIFF_PETSC_CHK(PetscOptionsGetString(
+            nullptr, nullptr, "-magdiff_dump_matrix", dump_path, sizeof(dump_path),
+            &dump_matrix));
+        if (dump_matrix) {
+            PetscViewer viewer = nullptr;
+            MAGDIFF_PETSC_CHK(PetscViewerBinaryOpen(
+                PETSC_COMM_WORLD, dump_path, FILE_MODE_WRITE, &viewer));
+            MAGDIFF_PETSC_CHK(MatView(m_P, viewer));
+            MAGDIFF_PETSC_CHK(PetscViewerDestroy(&viewer));
+        }
     }
 
     ~MagDiffPetscSolverImpl () {
@@ -212,6 +268,7 @@ public:
         MAGDIFF_PETSC_CHK(VecGetArray(m_b, &barr));
         for (amrex::Long i = 0; i < m_n_local; ++i) { barr[i] = rhs[i]; }
         MAGDIFF_PETSC_CHK(VecRestoreArray(m_b, &barr));
+        MAGDIFF_PETSC_CHK(auditVector(m_b, "right-hand side"));
 
         MAGDIFF_PETSC_CHK(KSPSolve(m_ksp, m_b, m_x));
 
@@ -252,6 +309,146 @@ public:
     }
 
 private:
+    PetscErrorCode auditMatrix () {
+        PetscFunctionBeginUser;
+        Vec input = nullptr, assembled = nullptr, applied = nullptr;
+        PetscCall(VecDuplicate(m_x, &input));
+        PetscCall(VecDuplicate(m_x, &assembled));
+        PetscCall(VecDuplicate(m_x, &applied));
+        PetscScalar* values = nullptr;
+        PetscCall(VecGetArray(input, &values));
+        for (amrex::Long i = 0; i < m_n_local; ++i) {
+            auto const index = static_cast<amrex::Real>(m_rstart + i);
+            values[i] = std::sin(index * 0.031) + std::cos(index * 0.017);
+        }
+        PetscCall(VecRestoreArray(input, &values));
+        PetscCall(MatMult(m_P, input, assembled));
+        PetscCall(MatMult(m_A, input, applied));
+        PetscScalar const *x_values = nullptr, *p_values = nullptr, *a_values = nullptr;
+        PetscCall(VecGetArrayRead(input, &x_values));
+        PetscCall(VecGetArrayRead(assembled, &p_values));
+        PetscCall(VecGetArrayRead(applied, &a_values));
+        amrex::Real boundary_p_error = 0.0, boundary_a_error = 0.0;
+        amrex::Long clamped_rows = 0;
+        for (int idim = 0; idim < 3; ++idim) {
+            if (!m_boundary_map_host[idim]) { continue; }
+            for (amrex::MFIter mfi(*m_gindex[idim]); mfi.isValid(); ++mfi) {
+                auto const indices = m_gindex[idim]->const_array(mfi);
+                auto const active = m_boundary_map_host[idim]->const_array(mfi);
+                auto const& box = mfi.validbox();
+                amrex::LoopOnCpu(amrex::lbound(box), amrex::ubound(box),
+                    [&] (int i, int j, int k) {
+                        if (indices(i,j,k) < 0 || std::abs(active(i,j,k)) > 0.5) { return; }
+                        auto const index = static_cast<amrex::Long>(indices(i,j,k))-m_rstart;
+                        boundary_p_error = std::max(boundary_p_error,
+                            std::abs(p_values[index]-x_values[index]));
+                        boundary_a_error = std::max(boundary_a_error,
+                            std::abs(a_values[index]-x_values[index]));
+                        ++clamped_rows;
+                    });
+            }
+        }
+        PetscCall(VecRestoreArrayRead(input, &x_values));
+        PetscCall(VecRestoreArrayRead(assembled, &p_values));
+        PetscCall(VecRestoreArrayRead(applied, &a_values));
+        amrex::ParallelDescriptor::ReduceRealMax(boundary_p_error);
+        amrex::ParallelDescriptor::ReduceRealMax(boundary_a_error);
+        amrex::ParallelDescriptor::ReduceLongSum(clamped_rows);
+        amrex::Print() << "PETSC_AUDIT clamped_rows=" << clamped_rows
+            << " P_error=" << boundary_p_error << " A_error=" << boundary_a_error << "\n";
+        if (boundary_p_error > 1.e-12 || boundary_a_error > 1.e-12) {
+            amrex::Abort("PETSc boundary identity rows disagree with the native operator");
+        }
+        PetscReal applied_norm = 0.0, mismatch = 0.0, max_row_sum = 0.0;
+        PetscCall(VecNorm(applied, NORM_2, &applied_norm));
+        PetscCall(VecAXPY(assembled, -1.0, applied));
+        PetscCall(VecNorm(assembled, NORM_2, &mismatch));
+        PetscCall(VecAbs(assembled));
+        PetscInt worst_index = 0;
+        PetscReal worst_difference = 0.0;
+        PetscCall(VecMax(assembled, &worst_index, &worst_difference));
+        for (int idim = 0; idim < 3; ++idim) {
+            for (amrex::MFIter mfi(*m_gindex[idim]); mfi.isValid(); ++mfi) {
+                auto const& indices = m_gindex[idim]->const_array(mfi);
+                auto const& box = mfi.validbox();
+                amrex::LoopOnCpu(amrex::lbound(box), amrex::ubound(box),
+                    [&] (int i, int j, int k) {
+                        if (indices(i, j, k) == worst_index) {
+                            amrex::AllPrint() << "PETSC_AUDIT largest_difference="
+                                << worst_difference << " row=" << worst_index
+                                << " component=" << idim << " index="
+                                << i << "," << j << "," << k << " box=" << box << "\n";
+                        }
+                    });
+            }
+        }
+        PetscCall(MatNorm(m_P, NORM_INFINITY, &max_row_sum));
+        PetscCall(MatGetDiagonal(m_P, assembled));
+        PetscReal minimum = 0.0, maximum = 0.0;
+        PetscCall(VecMin(assembled, nullptr, &minimum));
+        PetscCall(VecMax(assembled, nullptr, &maximum));
+        amrex::Print() << "PETSC_AUDIT matrix diagonal_min=" << minimum
+            << " diagonal_max=" << maximum << " max_row_sum=" << max_row_sum
+            << " relative_Pmat_vs_shell=" << mismatch / applied_norm << "\n";
+        char report_path[4096] = {};
+        PetscBool report_requested = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(nullptr, nullptr, "-magdiff_audit_file",
+            report_path, sizeof(report_path), &report_requested));
+        if (report_requested && amrex::ParallelDescriptor::IOProcessor()) {
+            std::ofstream report(report_path);
+            report.precision(17);
+            report << "{\"clamped_rows\":" << clamped_rows
+                << ",\"boundary_P_error\":" << boundary_p_error
+                << ",\"boundary_A_error\":" << boundary_a_error
+                << ",\"relative_Pmat_vs_shell\":" << mismatch/applied_norm
+                << ",\"diagonal_min\":" << minimum
+                << ",\"diagonal_max\":" << maximum << "}\n";
+            if (!report) { amrex::Abort("Cannot write PETSc operator audit report"); }
+        }
+        PetscCall(VecDestroy(&input));
+        PetscCall(VecDestroy(&assembled));
+        PetscCall(VecDestroy(&applied));
+        PetscFunctionReturn(PETSC_SUCCESS);
+    }
+
+    PetscErrorCode auditVector (Vec vector, char const* stage) const {
+        PetscFunctionBeginUser;
+        if (!m_check_finite) { PetscFunctionReturn(PETSC_SUCCESS); }
+        PetscScalar const* values = nullptr;
+        PetscCall(VecGetArrayRead(vector, &values));
+        amrex::Long first_bad = -1;
+        amrex::Real bad_value = 0.0;
+        for (amrex::Long i = 0; i < m_n_local; ++i) {
+            if (!std::isfinite(values[i])) {
+                first_bad = i;
+                bad_value = values[i];
+                break;
+            }
+        }
+        PetscCall(VecRestoreArrayRead(vector, &values));
+        bool invalid = first_bad >= 0;
+        amrex::ParallelDescriptor::ReduceBoolOr(invalid);
+        if (invalid) {
+            if (first_bad >= 0) {
+                amrex::AllPrint() << "MAGDIFF_FINITE stage=" << stage
+                    << " global_index=" << m_rstart + first_bad
+                    << " value=" << bad_value << "\n";
+            }
+            amrex::Abort(std::string("Non-finite PETSc vector at ") + stage);
+        }
+        PetscReal norm = 0.0, maximum = 0.0;
+        PetscCall(VecNorm(vector, NORM_2, &norm));
+        PetscCall(VecNorm(vector, NORM_INFINITY, &maximum));
+        if (m_audit_calls++ < 16 || !std::isfinite(norm)) {
+            amrex::Print() << "PETSC_AUDIT stage=" << stage
+                << " norm=" << norm << " max_abs=" << maximum << "\n";
+        }
+        if (!std::isfinite(norm)) {
+            amrex::Abort(std::string("Non-finite PETSc vector norm at ") + stage);
+        }
+        PetscFunctionReturn(PETSC_SUCCESS);
+    }
+
     void setOptions (MagDiffPetscOptions const& options)
     {
         auto set_default = [] (char const* name, std::string const& value) {
@@ -276,6 +473,7 @@ private:
         PetscFunctionBeginUser;
         MagDiffPetscSolverImpl* self = nullptr;
         PetscCall(MatShellGetContext(A, reinterpret_cast<void**>(&self)));
+        PetscCall(self->auditVector(in, "matrix-free operator input"));
         const PetscScalar* x = nullptr; PetscScalar* y = nullptr;
         PetscCall(VecGetArrayRead(in, &x));
         PetscCall(VecGetArray(out, &y));
@@ -285,6 +483,7 @@ private:
                        self->gindexView(), self->m_rstart);
         PetscCall(VecRestoreArrayRead(in, &x));
         PetscCall(VecRestoreArray(out, &y));
+        PetscCall(self->auditVector(out, "matrix-free operator output"));
         PetscFunctionReturn(PETSC_SUCCESS);
     }
 
@@ -297,8 +496,89 @@ private:
         PetscFunctionReturn(PETSC_SUCCESS);
     }
 
-    // Copy device (or host) EB B-masks onto pinned host iMultiFabs for safe
-    // LoopOnCpu access. Called once from the ctor when eb_update_B is non-null.
+    // Retain the native homogeneous boundary response on pinned host memory
+    // for safe CPU matrix assembly, including GPU builds.
+    int copyBoundaryMapToHost (
+        amrex::Array<amrex::MultiFab const*,3> const* masks)
+    {
+        int changed = 0;
+        if (masks == nullptr) {
+            for (auto& mask : m_boundary_map_host) {
+                if (mask) { changed = 1; }
+                mask.reset();
+            }
+            return changed;
+        }
+        amrex::Array<std::unique_ptr<amrex::MultiFab>,3> incoming;
+        auto const info = amrex::MFInfo().SetArena(amrex::The_Pinned_Arena());
+        for (int idim = 0; idim < 3; ++idim) {
+            incoming[idim] = std::make_unique<amrex::MultiFab>(
+                (*masks)[idim]->boxArray(), (*masks)[idim]->DistributionMap(),
+                1, 1, info);
+            amrex::MultiFab::Copy(*incoming[idim], *(*masks)[idim], 0, 0, 1, 1);
+        }
+        amrex::Gpu::synchronize();
+        for (int idim = 0; idim < 3; ++idim) {
+            if (!m_boundary_map_host[idim]) {
+                changed = 1;
+            } else {
+                for (amrex::MFIter mfi(*incoming[idim]); mfi.isValid(); ++mfi) {
+                    auto const& previous = (*m_boundary_map_host[idim])[mfi];
+                    auto const& current = (*incoming[idim])[mfi];
+                    if (std::memcmp(previous.dataPtr(), current.dataPtr(),
+                                    static_cast<std::size_t>(current.size())*sizeof(amrex::Real)) != 0) {
+                        changed = 1;
+                        break;
+                    }
+                }
+            }
+            m_boundary_map_host[idim] = std::move(incoming[idim]);
+        }
+        return changed;
+    }
+
+    struct BoundaryColumn
+    {
+        PetscInt index = -1;
+        amrex::Real weight = 0.0;
+        operator PetscInt () const { return index; }
+    };
+
+    struct BoundaryColumnIndex
+    {
+        amrex::Array4<int const> indices;
+        amrex::Array4<amrex::Real const> response;
+        amrex::Box domain;
+        BoundaryColumn operator() (int i, int j, int k) const {
+            int const column = indices(i,j,k);
+            if (column >= 0) {
+                if (response && std::abs(response(i,j,k)) < 0.5) { return {}; }
+                return {column, 1.0};
+            }
+            amrex::IntVect point(AMREX_D_DECL(i,j,k));
+            if (domain.contains(point) || !response) { return {}; }
+            amrex::Real const weight = response(i,j,k);
+            if (std::abs(weight) < 1.e-12) { return {}; }
+            // Yee curl-curl references exterior B only in a direction where
+            // that component is cell centered (tangential to the boundary).
+            // The native first guard is either fixed or a signed mirror.
+            for (int direction = 0; direction < AMREX_SPACEDIM; ++direction) {
+                if (point[direction] < domain.smallEnd(direction)) {
+                    AMREX_ALWAYS_ASSERT(!domain.ixType().nodeCentered(direction));
+                    point[direction] = 2*domain.smallEnd(direction)-1-point[direction];
+                } else if (point[direction] > domain.bigEnd(direction)) {
+                    AMREX_ALWAYS_ASSERT(!domain.ixType().nodeCentered(direction));
+                    point[direction] = 2*domain.bigEnd(direction)+1-point[direction];
+                }
+            }
+            int const reflected = indices(point[0], AMREX_D_PICK(0,point[1],point[1]), AMREX_D_PICK(0,0,point[2]));
+            if (reflected < 0 || std::abs(response(point[0], AMREX_D_PICK(0,point[1],point[1]), AMREX_D_PICK(0,0,point[2]))) < 0.5) {
+                return {};
+            }
+            return {reflected, weight};
+        }
+    };
+
     void copyEbMasksToHost (
         amrex::Array<amrex::iMultiFab const*,3> const& eb_update_B)
     {
@@ -317,9 +597,9 @@ private:
 #endif
     }
 
-    // Per-component global DOF index for interior cells (component-major).
-    // nghost=1 so neighbor columns resolve; -1 marks exterior/unknown or covered
-    // B DOFs (when an EB mask is provided). Pinned host arena: PETSc scatter/gather
+    // Owner-only global DOF indices (component-major); -1 marks non-owners,
+    // exterior values and covered B DOFs. A separate synchronized column map
+    // resolves neighboring values and periodic aliases. Pinned host arena: PETSc scatter/gather
     // and Mat assembly use LoopOnCpu host access; device-arena iMultiFab would SEGV
     // under CUDA WarpX.
     void buildGlobalIndex (amrex::Array<amrex::MultiFab const*,3> const& B_proto) {
@@ -336,30 +616,31 @@ private:
         // LoopOnCpu(lbound,ubound,(i,j,k)) (k pads to 0 in 2D/1D), not explicit
         // smallEnd(2)/bigEnd(2) which is out of range for BoxND<2>.
         PetscInt run = static_cast<PetscInt>(m_rstart);
-        bool const skip_covered = (m_eb_mask_host[0] != nullptr);
         for (int idim = 0; idim < 3; ++idim) {
             for (amrex::MFIter mfi(*B_proto[idim]); mfi.isValid(); ++mfi) {
-                auto gix = m_gindex[idim]->array(mfi);
-                amrex::Box const& tb = mfi.tilebox();
-                if (skip_covered) {
-                    auto const& mask_arr = m_eb_mask_host[idim]->const_array(mfi);
-                    amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
-                        [&] (int i, int j, int k) {
-                            if (mask_arr(i, j, k) == 0) { return; }
-                            gix(i, j, k) = static_cast<int>(run);
-                            ++run;
-                        });
-                } else {
-                    amrex::LoopOnCpu(amrex::lbound(tb), amrex::ubound(tb),
-                        [&] (int i, int j, int k) {
-                            gix(i, j, k) = static_cast<int>(run);
-                            ++run;
-                        });
-                }
+                auto const owner = m_owner_host[idim]->const_array(mfi);
+                auto const mask = m_eb_mask_host[idim]
+                    ? m_eb_mask_host[idim]->const_array(mfi)
+                    : amrex::Array4<int const>{};
+                auto const gix = m_gindex[idim]->array(mfi);
+                auto const& box = mfi.validbox();
+                amrex::LoopOnCpu(amrex::lbound(box), amrex::ubound(box),
+                    [&] (int i, int j, int k) {
+                        if (owner(i,j,k) == 0 || (mask && mask(i,j,k) == 0)) { return; }
+                        gix(i,j,k) = static_cast<int>(run++);
+                    });
             }
         }
+        AMREX_ALWAYS_ASSERT(run == m_rstart + m_n_local);
         for (int idim = 0; idim < 3; ++idim) {
-            m_gindex[idim]->FillBoundary(m_geom.periodicity());
+            m_column_index[idim] = std::make_unique<amrex::iMultiFab>(
+                B_proto[idim]->boxArray(), B_proto[idim]->DistributionMap(),
+                1, amrex::IntVect::Unit, host_info);
+            amrex::iMultiFab::Copy(*m_column_index[idim], *m_gindex[idim], 0, 0, 1, 1);
+            // Preserve the owner-only row map for scatter/gather, while the
+            // column map resolves all nodal aliases and neighboring ghosts.
+            m_column_index[idim]->OverrideSync(m_geom.periodicity());
+            m_column_index[idim]->FillBoundary(m_geom.periodicity());
         }
     }
 
@@ -381,9 +662,9 @@ private:
         }
     }
 
-    // Assemble frozen-η curl-curl Pmat (P != A; matvec stays
-    // matrix-free computeAFull). Exterior neighbors (global index -1) are
-    // dropped, matching the homogeneous-operator BC the matvec imposes.
+    // Assemble frozen-η curl-curl Pmat; the operator stays matrix-free.
+    // Native boundary responses clamp valid DOFs, eliminate prescribed guards,
+    // or fold reflected guards into their interior columns.
     //
     // RZ / RCYLINDER: discrete curl-curl stencil from the staggered Yee/RZ
     // operator — uncoupled Bt 5-point block; Br and Bz coupled via J_θ mixed
@@ -432,17 +713,31 @@ private:
             for (amrex::MFIter mfi(*m_gindex[idim]); mfi.isValid(); ++mfi) {
                 auto const& gix = m_gindex[idim]->const_array(mfi);
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                auto const& gix_r = m_gindex[0]->const_array(mfi);
-                auto const& gix_t = m_gindex[1]->const_array(mfi);
-                auto const& gix_z = m_gindex[2]->const_array(mfi);
+                auto boundary_index = [&] (int component) {
+                    auto domain = m_geom.Domain();
+                    domain.convert(m_gindex[component]->ixType());
+                    return BoundaryColumnIndex{m_column_index[component]->const_array(mfi),
+                        m_boundary_map_host[component]
+                            ? m_boundary_map_host[component]->const_array(mfi)
+                            : amrex::Array4<amrex::Real const>{}, domain};
+                };
+                auto const gix_r = boundary_index(0);
+                auto const gix_t = boundary_index(1);
+                auto const gix_z = boundary_index(2);
                 auto const& et_r = m_eta_g[0].const_array(mfi);
                 auto const& et_t = m_eta_g[1].const_array(mfi);
                 auto const& et_z = m_eta_g[2].const_array(mfi);
 #else
-                amrex::Array<amrex::Array4<int const>,3> const gix_b{
-                    m_gindex[0]->const_array(mfi),
-                    m_gindex[1]->const_array(mfi),
-                    m_gindex[2]->const_array(mfi)};
+                auto boundary_index = [&] (int component) {
+                    auto domain = m_geom.Domain();
+                    domain.convert(m_gindex[component]->ixType());
+                    return BoundaryColumnIndex{m_column_index[component]->const_array(mfi),
+                        m_boundary_map_host[component]
+                            ? m_boundary_map_host[component]->const_array(mfi)
+                            : amrex::Array4<amrex::Real const>{}, domain};
+                };
+                amrex::Array<BoundaryColumnIndex,3> const gix_b{
+                    boundary_index(0), boundary_index(1), boundary_index(2)};
                 amrex::Array<amrex::Array4<amrex::Real const>,3> const eta_j{
                     m_eta_g[0].const_array(mfi),
                     m_eta_g[1].const_array(mfi),
@@ -453,9 +748,34 @@ private:
                 [&] (int i, int j, int k) {
                     PetscInt const row = gix(i, j, k);
                     if (row < 0) { return; }  // covered B DOF (EB), skip
+                    if (m_boundary_map_host[idim] &&
+                        std::abs(m_boundary_map_host[idim]->const_array(mfi)(i,j,k)) < 0.5) {
+                        // The native PEC map clamps this normal B DOF before
+                        // either curl. Its homogeneous diffusion row is zero:
+                        // the full theta-method equation is an identity row.
+                        MAGDIFF_PETSC_CHK(MatSetValue(m_P, row, row, 1.0, INSERT_VALUES));
+                        return;
+                    }
                     PetscScalar diag = 1.0;
                     cols.clear();
                     vals.clear();
+                    auto add_value = [&] (BoundaryColumn term, PetscScalar value) {
+                        PetscInt const column = term.index;
+                        value *= term.weight;
+                        if (column < 0) { return; }
+                        if (column == row) {
+                            diag += value;
+                            return;
+                        }
+                        auto const iter = std::find(cols.begin(), cols.end(), column);
+                        if (iter == cols.end()) {
+                            cols.push_back(column);
+                            vals.push_back(value);
+                        } else {
+                            auto const index = static_cast<std::size_t>(iter-cols.begin());
+                            vals[index] += value;
+                        }
+                    };
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     // RZ / RCYLINDER Exact Curl-Curl Assembly
@@ -471,45 +791,41 @@ private:
                         // r-derivatives use et_z, z-derivatives use et_r.
 
                         // Radial neighbor i+1
-                        PetscInt cp_r = gix_t(i+1, j, k);
-                        if (cp_r >= 0) {
+                        auto const cp_r = gix_t(i+1, j, k);
+                        {
                             amrex::Real const chi_n = std::max(et_z(i+1, j, k), amrex::Real(0.0)) / m_mu0;
                             PetscScalar v = -m_theta_dt * chi_n / dr2 * (r_cell_ip1 / r_node_ip1);
-                            cols.push_back(cp_r);
-                            vals.push_back(v);
+                            add_value(cp_r, v);
                             diag += m_theta_dt * chi_n / dr2 * (r_cell_i / r_node_ip1);
                         }
 
                         // Radial neighbor i-1
-                        PetscInt cm_r = gix_t(i-1, j, k);
+                        auto const cm_r = gix_t(i-1, j, k);
                         if (i == 0) {
                             // On-axis correction for J_z at i=0
                             amrex::Real const chi_0 = std::max(et_z(0, j, k), amrex::Real(0.0)) / m_mu0;
                             diag += m_theta_dt * chi_0 * 4.0 / dr2;
-                        } else if (cm_r >= 0) {
+                        } else {
                             amrex::Real const chi_n = std::max(et_z(i, j, k), amrex::Real(0.0)) / m_mu0;
                             PetscScalar v = -m_theta_dt * chi_n / dr2 * (r_cell_im1 / r_node_i);
-                            cols.push_back(cm_r);
-                            vals.push_back(v);
+                            add_value(cm_r, v);
                             diag += m_theta_dt * chi_n / dr2 * (r_cell_i / r_node_i);
                         }
 
                         // Axial neighbors (z direction, only for RZ)
                         if (AMREX_SPACEDIM > 1) {
-                            PetscInt cp_z = gix_t(i, j+1, k);
-                            if (cp_z >= 0) {
+                            auto const cp_z = gix_t(i, j+1, k);
+                            {
                                 amrex::Real const chi_n = std::max(et_r(i, j+1, k), amrex::Real(0.0)) / m_mu0;
                                 PetscScalar v = -m_theta_dt * chi_n / dz2;
-                                cols.push_back(cp_z);
-                                vals.push_back(v);
+                                add_value(cp_z, v);
                                 diag -= v;
                             }
-                            PetscInt cm_z = gix_t(i, j-1, k);
-                            if (cm_z >= 0) {
+                            auto const cm_z = gix_t(i, j-1, k);
+                            {
                                 amrex::Real const chi_n = std::max(et_r(i, j, k), amrex::Real(0.0)) / m_mu0;
                                 PetscScalar v = -m_theta_dt * chi_n / dz2;
-                                cols.push_back(cm_z);
-                                vals.push_back(v);
+                                add_value(cm_z, v);
                                 diag -= v;
                             }
                         }
@@ -521,103 +837,91 @@ private:
                         } else {
                             // Axial neighbors (B_r to B_r)
                             if (AMREX_SPACEDIM > 1) {
-                                PetscInt cp_z = gix_r(i, j+1, k);
-                                if (cp_z >= 0) {
+                                auto const cp_z = gix_r(i, j+1, k);
+                                {
                                     amrex::Real const chi_n = std::max(et_t(i, j+1, k), amrex::Real(0.0)) / m_mu0;
                                     PetscScalar v = -m_theta_dt * chi_n / dz2;
-                                    cols.push_back(cp_z);
-                                    vals.push_back(v);
+                                    add_value(cp_z, v);
                                     diag -= v;
                                 }
-                                PetscInt cm_z = gix_r(i, j-1, k);
-                                if (cm_z >= 0) {
+                                auto const cm_z = gix_r(i, j-1, k);
+                                {
                                     amrex::Real const chi_n = std::max(et_t(i, j, k), amrex::Real(0.0)) / m_mu0;
                                     PetscScalar v = -m_theta_dt * chi_n / dz2;
-                                    cols.push_back(cm_z);
-                                    vals.push_back(v);
+                                    add_value(cm_z, v);
                                     diag -= v;
                                 }
 
                                 // Cross terms to B_z
-                                PetscInt cp_z_cp_r = gix_z(i, j+1, k);
+                                auto const cp_z_cp_r = gix_z(i, j+1, k);
                                 if (cp_z_cp_r >= 0) {
                                     amrex::Real const chi_n = std::max(et_t(i, j+1, k), amrex::Real(0.0)) / m_mu0;
                                     PetscScalar v = m_theta_dt * chi_n / drdz;
-                                    cols.push_back(cp_z_cp_r);
-                                    vals.push_back(v);
+                                    add_value(cp_z_cp_r, v);
                                 }
-                                PetscInt cm_z_cp_r = gix_z(i-1, j+1, k);
+                                auto const cm_z_cp_r = gix_z(i-1, j+1, k);
                                 if (cm_z_cp_r >= 0) {
                                     amrex::Real const chi_n = std::max(et_t(i, j+1, k), amrex::Real(0.0)) / m_mu0;
                                     PetscScalar v = -m_theta_dt * chi_n / drdz;
-                                    cols.push_back(cm_z_cp_r);
-                                    vals.push_back(v);
+                                    add_value(cm_z_cp_r, v);
                                 }
-                                PetscInt cp_z_cm_r = gix_z(i, j, k);
+                                auto const cp_z_cm_r = gix_z(i, j, k);
                                 if (cp_z_cm_r >= 0) {
                                     amrex::Real const chi_n = std::max(et_t(i, j, k), amrex::Real(0.0)) / m_mu0;
                                     PetscScalar v = -m_theta_dt * chi_n / drdz;
-                                    cols.push_back(cp_z_cm_r);
-                                    vals.push_back(v);
+                                    add_value(cp_z_cm_r, v);
                                 }
-                                PetscInt cm_z_cm_r = gix_z(i-1, j, k);
+                                auto const cm_z_cm_r = gix_z(i-1, j, k);
                                 if (cm_z_cm_r >= 0) {
                                     amrex::Real const chi_n = std::max(et_t(i, j, k), amrex::Real(0.0)) / m_mu0;
                                     PetscScalar v = m_theta_dt * chi_n / drdz;
-                                    cols.push_back(cm_z_cm_r);
-                                    vals.push_back(v);
+                                    add_value(cm_z_cm_r, v);
                                 }
                             }
                         }
                     } else if (idim == 2) {
                         // B_z (idim = 2)
                         // Radial neighbors (B_z to B_z)
-                        PetscInt cp_r = gix_z(i+1, j, k);
-                        if (cp_r >= 0) {
+                        auto const cp_r = gix_z(i+1, j, k);
+                        {
                             amrex::Real const chi_n = std::max(et_t(i+1, j, k), amrex::Real(0.0)) / m_mu0;
                             PetscScalar v = -m_theta_dt * chi_n / dr2 * (r_node_ip1 / r_cell_i);
-                            cols.push_back(cp_r);
-                            vals.push_back(v);
+                            add_value(cp_r, v);
                             diag -= v;
                         }
-                        PetscInt cm_r = gix_z(i-1, j, k);
-                        if (cm_r >= 0 && i > 0) { // If i=0, r_node_0 = 0, so v=0
+                        auto const cm_r = gix_z(i-1, j, k);
+                        if (i > 0) { // r_node_0 = 0
                             amrex::Real const chi_n = std::max(et_t(i, j, k), amrex::Real(0.0)) / m_mu0;
                             PetscScalar v = -m_theta_dt * chi_n / dr2 * (r_node_i / r_cell_i);
-                            cols.push_back(cm_r);
-                            vals.push_back(v);
+                            add_value(cm_r, v);
                             diag -= v;
                         }
 
                         // Cross terms to B_r
                         if (AMREX_SPACEDIM > 1) {
-                            PetscInt cp_r_cp_z = gix_r(i+1, j, k);
+                            auto const cp_r_cp_z = gix_r(i+1, j, k);
                             if (cp_r_cp_z >= 0) {
                                 amrex::Real const chi_n = std::max(et_t(i+1, j, k), amrex::Real(0.0)) / m_mu0;
                                 PetscScalar v = m_theta_dt * chi_n / drdz * (r_node_ip1 / r_cell_i);
-                                cols.push_back(cp_r_cp_z);
-                                vals.push_back(v);
+                                add_value(cp_r_cp_z, v);
                             }
-                            PetscInt cp_r_cm_z = gix_r(i+1, j-1, k);
+                            auto const cp_r_cm_z = gix_r(i+1, j-1, k);
                             if (cp_r_cm_z >= 0) {
                                 amrex::Real const chi_n = std::max(et_t(i+1, j, k), amrex::Real(0.0)) / m_mu0;
                                 PetscScalar v = -m_theta_dt * chi_n / drdz * (r_node_ip1 / r_cell_i);
-                                cols.push_back(cp_r_cm_z);
-                                vals.push_back(v);
+                                add_value(cp_r_cm_z, v);
                             }
-                            PetscInt cm_r_cp_z = gix_r(i, j, k);
+                            auto const cm_r_cp_z = gix_r(i, j, k);
                             if (cm_r_cp_z >= 0 && i > 0) {
                                 amrex::Real const chi_n = std::max(et_t(i, j, k), amrex::Real(0.0)) / m_mu0;
                                 PetscScalar v = -m_theta_dt * chi_n / drdz * (r_node_i / r_cell_i);
-                                cols.push_back(cm_r_cp_z);
-                                vals.push_back(v);
+                                add_value(cm_r_cp_z, v);
                             }
-                            PetscInt cm_r_cm_z = gix_r(i, j-1, k);
+                            auto const cm_r_cm_z = gix_r(i, j-1, k);
                             if (cm_r_cm_z >= 0 && i > 0) {
                                 amrex::Real const chi_n = std::max(et_t(i, j, k), amrex::Real(0.0)) / m_mu0;
                                 PetscScalar v = m_theta_dt * chi_n / drdz * (r_node_i / r_cell_i);
-                                cols.push_back(cm_r_cm_z);
-                                vals.push_back(v);
+                                add_value(cm_r_cm_z, v);
                             }
                         }
                     }
@@ -639,21 +943,6 @@ private:
                         if (direction == 0) { ii += amount; }
                         else if (direction == 1) { jj += amount; }
                         else { kk += amount; }
-                    };
-                    auto add_value = [&] (PetscInt column, PetscScalar value) {
-                        if (column < 0) { return; }
-                        if (column == row) {
-                            diag += value;
-                            return;
-                        }
-                        auto const iter = std::find(cols.begin(), cols.end(), column);
-                        if (iter == cols.end()) {
-                            cols.push_back(column);
-                            vals.push_back(value);
-                        } else {
-                            auto const index = static_cast<std::size_t>(iter - cols.begin());
-                            vals[index] += value;
-                        }
                     };
 
                     for (int outer_term = 0; outer_term < 2; ++outer_term) {
@@ -710,8 +999,10 @@ public:
     void update (
         amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
         amrex::Real theta_dt,
-        void* opctx)
+        void* opctx,
+        amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B)
     {
+        copyBoundaryMapToHost(boundary_response_B);
         m_theta_dt = theta_dt;
         m_opctx = opctx;
 
@@ -733,6 +1024,8 @@ public:
     amrex::Real m_atol = amrex::Real(0.0);
     int m_max_iter = 0;
     int m_verbose = 0;
+    PetscBool m_check_finite = PETSC_FALSE;
+    mutable int m_audit_calls = 0;
     MagDiffMatvecFn m_matvec = nullptr;
     void* m_opctx = nullptr;
 
@@ -745,10 +1038,13 @@ public:
     Mat m_P = nullptr;
     KSP m_ksp = nullptr;
     std::array<std::unique_ptr<amrex::iMultiFab>,3> m_gindex;
+    std::array<std::unique_ptr<amrex::iMultiFab>,3> m_column_index;
+    std::array<std::unique_ptr<amrex::iMultiFab>,3> m_owner_host;
     amrex::Array<amrex::MultiFab,3> m_eta_g;
     // Host (pinned) copy of eb_update_B when EB is on. Empty when EB off.
     // Never LoopOnCpu into the live device eb_update_B MultiFabs.
     std::array<std::unique_ptr<amrex::iMultiFab>,3> m_eb_mask_host;
+    std::array<std::unique_ptr<amrex::MultiFab>,3> m_boundary_map_host;
 };
 
 } // namespace
@@ -762,12 +1058,13 @@ MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Real rtol, amrex::Real atol, int max_iter, int verbose,
     MagDiffPetscOptions const& options,
     MagDiffMatvecFn matvec, void* opctx,
-    amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B)
+    amrex::Array<amrex::iMultiFab const*,3> const* eb_update_B,
+    amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B)
 {
     auto* s = new MagDiffPetscSolver;
     s->impl = std::make_unique<MagDiffPetscSolverImpl>(
         B_proto, eta_edge, geom, theta_dt, mu0,
-        rtol, atol, max_iter, verbose, options, matvec, opctx, eb_update_B);
+        rtol, atol, max_iter, verbose, options, matvec, opctx, eb_update_B, boundary_response_B);
     return s;
 }
 
@@ -792,9 +1089,10 @@ void magdiff_petsc_update (
     MagDiffPetscSolver* s,
     amrex::Array<amrex::MultiFab const*,3> const& eta_edge,
     amrex::Real theta_dt,
-    void* opctx)
+    void* opctx,
+    amrex::Array<amrex::MultiFab const*,3> const* boundary_response_B)
 {
-    s->impl->update(eta_edge, theta_dt, opctx);
+    s->impl->update(eta_edge, theta_dt, opctx, boundary_response_B);
 }
 
 void magdiff_petsc_destroy (MagDiffPetscSolver* s) {
@@ -812,7 +1110,8 @@ MagDiffPetscSolver* magdiff_petsc_make (
     amrex::Geometry const& /*geom*/, amrex::Real /*theta_dt*/, amrex::Real /*mu0*/,
     amrex::Real, amrex::Real, int, int, MagDiffPetscOptions const&,
     MagDiffMatvecFn, void*,
-    amrex::Array<amrex::iMultiFab const*,3> const*)
+    amrex::Array<amrex::iMultiFab const*,3> const*,
+    amrex::Array<amrex::MultiFab const*,3> const*)
 {
     amrex::Abort("magdiff_petsc_make: WarpX was not built with PETSc "
                  "(AMREX_USE_PETSC undefined).");
@@ -831,7 +1130,7 @@ void magdiff_petsc_update (
     MagDiffPetscSolver*,
     amrex::Array<amrex::MultiFab const*,3> const&,
     amrex::Real,
-    void*) {}
+    void*, amrex::Array<amrex::MultiFab const*,3> const*) {}
 
 void magdiff_petsc_destroy (MagDiffPetscSolver*) {}
 

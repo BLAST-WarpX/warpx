@@ -236,6 +236,41 @@ if(AMReX_PETSC)
         OFF  # dependency
     )
 
+    # A periodic smoke does not exercise clamped normal-B boundary rows.
+    # Check the native and assembled operators with an independent mixed-field
+    # vector, then require a finite, damped physical trajectory on two ranks.
+    foreach(boundary_case IN ITEMS default_pec_insulator pec evolved_insulator forced_feed held_guards)
+        set(boundary_overrides "")
+        set(boundary_analysis "analysis_petsc_boundary.py")
+        if(boundary_case STREQUAL "pec")
+            set(boundary_overrides "boundary.field_lo=none pec boundary.field_hi=pec pec")
+        elseif(boundary_case STREQUAL "evolved_insulator")
+            set(boundary_overrides "insulator.area_x_hi(y,z)=1 insulator.area_z_lo(x,y)=1 insulator.area_z_hi(x,y)=1")
+            set(boundary_analysis "analysis_petsc_boundary.py evolved")
+        elseif(boundary_case STREQUAL "forced_feed")
+            set(boundary_overrides "insulator.area_x_hi(y,z)=1 insulator.By_x_hi(y,z,t)=1.e-4 warpx.B_external_grid=0 0 0")
+            set(boundary_analysis "analysis_petsc_boundary.py feed")
+        elseif(boundary_case STREQUAL "held_guards")
+            set(boundary_overrides "boundary.field_hi=none pec_insulator")
+        endif()
+        set(boundary_test "test_rz_hybrid_mag_diffusion_petsc_boundary_${boundary_case}")
+        add_warpx_test(
+            ${boundary_test}
+            RZ
+            2
+            "inputs_test_rz_hybrid_mag_diffusion_petsc_boundary ${boundary_overrides}"
+            "${boundary_analysis}"
+            OFF
+            OFF
+        )
+        if(TEST ${boundary_test}.run)
+            set_property(
+                TEST ${boundary_test}.run APPEND PROPERTY ENVIRONMENT
+                "PETSC_OPTIONS=-magdiff_check_finite -magdiff_audit_matrix -magdiff_audit_file pmat_audit.json"
+            )
+        endif()
+    endforeach()
+
     # Cartesian XZ exact-Pmat regression. The reference and PETSc runs use a
     # divergence-free coupled Bx/Bz mode and spatially varying eta. With a
     # direct LU factorization of P, an exact Pmat must converge the MatShell

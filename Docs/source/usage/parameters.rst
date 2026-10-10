@@ -4134,6 +4134,11 @@ Maxwell solver: kinetic-fluid hybrid
     :pp:param:`hybrid_pic_model.mag_diff_petsc_sub_pc_type` = ``lu`` instead.
     The prefixed PETSc option ``-magdiff_pc_type`` takes precedence over this
     input group without changing other PETSc solvers in the process.
+    An exact assembled curl-curl matrix does not guarantee stable incomplete
+    factors for stiff, strongly heterogeneous coefficients. If ILU breaks
+    down, inspect the vector diagnostics below and test a local ``lu``
+    factorization or PETSc's factor-shift and ordering options. Local LU
+    generally requires more memory.
 
 .. pp:param:: hybrid_pic_model.mag_diff_petsc_asm_overlap
     :type: ``int``
@@ -4163,6 +4168,19 @@ Maxwell solver: kinetic-fluid hybrid
     :optional:
 
     Fill level used when ``mag_diff_petsc_sub_pc_type = ilu``.
+
+.. rubric:: PETSc magnetic-diffusion diagnostics
+
+For solver diagnostics, set ``PETSC_OPTIONS`` to include
+``-magdiff_check_finite`` (vector entries and norms),
+``-magdiff_audit_matrix`` (assembled preconditioner versus the matrix-free
+operator on a deterministic mixed-field probe), or
+``-magdiff_dump_matrix <path>`` (PETSc binary matrix output).
+``-magdiff_audit_file <path>`` writes the matrix audit as JSON when
+``-magdiff_audit_matrix`` is enabled. These checks are opt-in and add
+synchronization and operator applications; disable them for timing runs.
+The reported relative matrix difference is for the probe vector, not an
+operator-norm estimate.
 
 .. pp:param:: hybrid_pic_model.plasma_resistivity_<species>(rho_s,rho,Te,J,J_s,B,t)
     :type: ``float`` or ``str``
