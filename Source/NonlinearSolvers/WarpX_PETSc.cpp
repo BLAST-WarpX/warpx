@@ -762,8 +762,10 @@ void SNES_impl::solve (VecType& a_U,
     SNESConvergedReason reason;
     SNESGetConvergedReason( m_snes->obj, &reason );
     m_status = (int)reason;
-    // Reaching the maximum number of iterations is a failure only if convergence is required
-    if (reason == SNES_DIVERGED_MAX_IT && !m_params.require_convergence) { m_status = 0; }
+    // Reaching the maximum number of iterations is a failure only if convergence is required.
+    // As in the native Newton solver, rtol == 0 allows a fixed number of iterations.
+    if (reason == SNES_DIVERGED_MAX_IT &&
+        (!m_params.require_convergence || m_params.rtol == 0.)) { m_status = 0; }
     SNESGetFunctionNorm(m_snes->obj, &m_norm);
 
     // Norm relative to the initial residual norm, as in the native Newton solver
