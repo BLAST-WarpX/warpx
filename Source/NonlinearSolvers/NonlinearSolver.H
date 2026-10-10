@@ -204,7 +204,7 @@ protected:
     void WriteDiagnostics (int a_step, amrex::Real a_time, const Args&... a_values) const
     {
         if (m_params.diagnostic_file.empty() || !amrex::ParallelDescriptor::IOProcessor() ||
-            !((a_step+1)%m_params.diagnostic_interval==0 || a_step==0)) { return; }
+            ((a_step+1)%m_params.diagnostic_interval!=0 && a_step!=0)) { return; }
 
         std::ofstream diagnostic_file{m_params.diagnostic_file, std::ofstream::out | std::ofstream::app};
         diagnostic_file << std::setprecision(14);
