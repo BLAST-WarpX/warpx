@@ -281,6 +281,7 @@ Overall simulation parameters
             The first required linear solve always initializes the PC, including
             after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
+            Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
           - ``newton.divergence_tolerance`` (``float``, default: 1.0e4)
             Must not be less than 1. The nonlinear solve fails as diverged when the

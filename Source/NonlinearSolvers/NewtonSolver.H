@@ -182,6 +182,7 @@ template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::ParseParameters ()
 {
     this->m_params.Parse("newton");
+    this->m_params.ResetInvalidRelativeTolerance("newton");
     m_newton_params.Parse();
 }
 

@@ -52,6 +52,7 @@ class PETScSNES : public NonlinearSolver<Vec,Ops>
         void Define ( const Vec& a_U, Ops* a_op ) override
         {
             this->m_params.Parse("newton");
+            this->m_params.ResetInvalidRelativeTolerance("newton");
 
             // The linear solver is always PETSc's KSP
             m_newton_params.linear_solver_type = LinearSolverType::petsc_ksp;

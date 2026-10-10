@@ -3,6 +3,8 @@
 
 #include "PreconditionerLibrary.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 #include <AMReX_GpuContainers.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_ParmParse.H>
@@ -17,6 +19,7 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -50,6 +53,21 @@ struct NonlinearSolverParams
         pp.query("require_convergence", require_convergence);
         pp.query("diagnostic_file",     diagnostic_file);
         pp.query("diagnostic_interval", diagnostic_interval);
+    }
+
+    /**
+     * \brief PETSc SNES accepts a relative tolerance in [0,1). The Newton-type solvers
+     * reject other values with a warning and keep the default.
+     */
+    void ResetInvalidRelativeTolerance (const std::string& a_prefix)
+    {
+        if (rtol >= 0. && rtol < 1.) { return; }
+        const amrex::Real rtol_default = NonlinearSolverParams().rtol;
+        std::stringstream msg;
+        msg << a_prefix << ".relative_tolerance = " << rtol
+            << " is not in [0,1); using the default " << rtol_default << ".";
+        ablastr::warn_manager::WMRecordWarning("Nonlinear solver", msg.str());
+        rtol = rtol_default;
     }
 
     void Print (const std::string& a_name) const
