@@ -119,6 +119,15 @@ class FiniteDifferenceSolver
                       amrex::Real dt,
                       std::unique_ptr<MacroscopicProperties> const& macroscopic_properties);
 
+#ifdef WARPX_DIM_RZ
+        // Vacuum curl increments on the exterior radial PML grids.
+        void EvolveEPMLRZ (ablastr::fields::VectorField const& increment,
+                           ablastr::fields::VectorField const& B,
+                           ablastr::fields::VectorField const& zero_current, amrex::Real dt);
+        void EvolveBPMLRZ (ablastr::fields::VectorField const& increment,
+                           ablastr::fields::VectorField const& E, amrex::Real dt);
+#endif
+
         void EvolveBPML (
             ablastr::fields::MultiFabRegister& fields,
             PatchType patch_type,

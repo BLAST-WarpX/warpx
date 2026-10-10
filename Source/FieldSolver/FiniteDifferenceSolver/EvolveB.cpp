@@ -581,3 +581,12 @@ void FiniteDifferenceSolver::EvolveBSpherical (
 }
 
 #endif
+
+#ifdef WARPX_DIM_RZ
+void FiniteDifferenceSolver::EvolveBPMLRZ (
+    ablastr::fields::VectorField const& increment,
+    ablastr::fields::VectorField const& E, amrex::Real dt)
+{
+    EvolveBCylindrical<CylindricalYeeAlgorithm>(increment, E, 0, dt);
+}
+#endif

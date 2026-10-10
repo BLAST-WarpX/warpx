@@ -9,6 +9,9 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
+#ifdef WARPX_DIM_RZ
+#   include "BoundaryConditions/PML_RZ_FDTD.H"
+#endif
 #include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
 #if defined(WARPX_USE_FFT)
@@ -981,8 +984,13 @@ WarpX::EvolveB (int lev, PatchType patch_type, amrex::Real a_dt, SubcyclingHalf 
                                         m_flag_info_face[lev], m_borrowing[lev], a_dt );
     }
 
+#ifdef WARPX_DIM_RZ
+    if (m_pml_rz_fdtd) {
+        m_pml_rz_fdtd->EvolveB(*m_fdtd_solver_fp[lev], a_dt);
+    }
+#endif
     // Evolve B field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveBPML(
                 m_fields, patch_type, lev, a_dt, WarpX::do_dive_cleaning);
@@ -1040,8 +1048,13 @@ WarpX::EvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amrex::Real sta
                                         a_dt );
     }
 
+#ifdef WARPX_DIM_RZ
+    if (m_pml_rz_fdtd) {
+        m_pml_rz_fdtd->EvolveE(*m_fdtd_solver_fp[lev], a_dt);
+    }
+#endif
     // Evolve E field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
                 m_fields,
@@ -1125,7 +1138,7 @@ WarpX::EvolveF (int lev, PatchType patch_type, amrex::Real a_dt, int const rho_c
     }
 
     // Evolve F field in PML cells
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveFPML(
                 m_fields.get(FieldType::pml_F_fp, lev),
@@ -1229,7 +1242,7 @@ WarpX::MacroscopicEvolveE (int lev, PatchType patch_type, amrex::Real a_dt, amre
         m_eb_update_E[lev],
         a_dt, m_macroscopic_properties);
 
-    if (do_pml && pml[lev]->ok()) {
+    if (do_pml && pml[lev] && pml[lev]->ok()) {
         if (patch_type == PatchType::fine) {
             m_fdtd_solver_fp[lev]->EvolveEPML(
                 m_fields,

@@ -1,0 +1,5 @@
+FILE = inputs_test_rz_pml_yee
+# Same mesh spacing and source; the distant boundary cannot return the pulse
+# to the small domain during the comparison interval.
+amr.n_cell = 128 64
+geometry.prob_hi = 64.e-6 16.e-6
