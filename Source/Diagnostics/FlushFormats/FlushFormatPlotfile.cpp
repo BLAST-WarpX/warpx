@@ -247,7 +247,8 @@ FlushFormatPlotfile::WriteJobInfo(const std::string& dir) const
 void
 FlushFormatPlotfile::WriteWarpXHeader(
     const std::string& name,
-    amrex::Vector<amrex::Geometry>& geom) const
+    amrex::Vector<amrex::Geometry>& geom,
+    bool const is_checkpoint) const
 {
     auto & warpx = WarpX::GetInstance();
     if (ParallelDescriptor::IOProcessor())
@@ -349,7 +350,9 @@ FlushFormatPlotfile::WriteWarpXHeader(
             }
         }
 
-        if (auto const* hybrid = warpx.get_pointer_HybridPICModel()) {
+        // Keep the plotfile header compatible with readers such as yt, which
+        // interpret trailing multi-value lines as numeric species metadata.
+        if (auto const* hybrid = warpx.get_pointer_HybridPICModel(); is_checkpoint && hybrid) {
             // This learned count is distinct from the AMR nsubsteps above.
             HeaderFile << "hybrid_pic_substeps " << hybrid->m_substeps << '\n';
         }

@@ -44,8 +44,17 @@ ions.ux = 0
 ions.uy = 0
 ions.uz = 0
 
-diagnostics.diags_names = chk
+diagnostics.diags_names = chk diag1
 chk.diag_type = Full
 chk.format = checkpoint
 chk.file_prefix = diags/chk
 chk.intervals = 3
+
+# Keep particle plotfiles in this test: yt parses their WarpXHeader differently
+# from field-only output, and checkpoint metadata must not change that format.
+diag1.diag_type = Full
+diag1.format = plotfile
+diag1.file_prefix = diags/fields
+diag1.intervals = 6
+diag1.fields_to_plot = Ex Ey Ez Bx By Bz rho
+diag1.write_species = 1
