@@ -1766,8 +1766,11 @@ WarpX::ApplyInverseVolumeScalingToMassMatricesPC (amrex::MultiFab* Sxx, amrex::M
 }
 
 void
-WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) const
+WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev,
+                                                int scomp, int ncomp) const
 {
+    if (ncomp < 0) { ncomp = Rho->nComp() - scomp; }
+    AMREX_ALWAYS_ASSERT(scomp >= 0 && ncomp > 0 && scomp + ncomp <= Rho->nComp());
     const amrex::IntVect ngRho = Rho->nGrowVect();
     const std::array<amrex::Real,3>& dx = WarpX::CellSize(lev);
     const amrex::Real dr = dx[0];
@@ -1819,33 +1822,30 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) 
         // uses the same component layout as J: component 0 is the mode 0,
         // and components 2*m-1 and 2*m are the real and imaginary parts of
         // the mode m.
-        int const ncomp = Rho->nComp();
+        int const rho_ncomp = Rho->nComp();
         int const ncomps_per_copy = WarpX::ncomps;
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(ncomp % ncomps_per_copy == 0,
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(rho_ncomp % ncomps_per_copy == 0,
             "ApplyInverseVolumeScalingToChargeDensity: the number of components of rho ("
-            + std::to_string(ncomp) + ") must be a multiple of the number of mode components ("
+            + std::to_string(rho_ncomp) + ") must be a multiple of the number of mode components ("
             + std::to_string(ncomps_per_copy) + ")");
-        int const ncopies = ncomp / ncomps_per_copy;
-#if defined(WARPX_DIM_RZ)
-        const int nmodes = n_rz_azimuthal_modes;
-#endif
-
         amrex::ParallelFor(tb,
         [=] AMREX_GPU_DEVICE (int i, int j, int /*k*/)
         {
-            // Wrap the charge density deposited in the guard cells around
-            // to the cells above the axis.
-            // Rho is located on the boundary
+            // Fold only the requested components. Components are grouped by
+            // copy, with the azimuthal-mode layout repeated in each copy.
             if (rmin == 0. && 1-ishift <= i && i <= ngRho[0]-ishift) {
-                for (int icopy = 0; icopy < ncopies; icopy++) {
-                    int const ic0 = icopy*ncomps_per_copy;
-                    // The mode 0 is symmetric across the axis
-                    Rho_arr(i,j,0,ic0) += Rho_arr(-ishift-i,j,0,ic0);
+                for (int icomp = scomp; icomp < scomp + ncomp; icomp++) {
+                    int const comp_in_copy = icomp % ncomps_per_copy;
+                    if (comp_in_copy == 0) {
+                        // Mode 0 is symmetric across the axis.
+                        Rho_arr(i,j,0,icomp) += Rho_arr(-ishift-i,j,0,icomp);
+                    }
 #if defined(WARPX_DIM_RZ)
-                    for (int imode=1 ; imode < nmodes ; imode++) {
-                        // The mode m has parity (-1)^m across the axis
-                        Rho_arr(i,j,0,ic0+2*imode-1) += static_cast<amrex::Real>(std::pow(-1, imode)*Rho_arr(-ishift-i,j,0,ic0+2*imode-1));
-                        Rho_arr(i,j,0,ic0+2*imode) += static_cast<amrex::Real>(std::pow(-1, imode)*Rho_arr(-ishift-i,j,0,ic0+2*imode));
+                    else {
+                        int const imode = (comp_in_copy + 1) / 2;
+                        // Mode m has parity (-1)^m across the axis.
+                        Rho_arr(i,j,0,icomp) += static_cast<amrex::Real>(
+                            std::pow(-1, imode)*Rho_arr(-ishift-i,j,0,icomp));
                     }
 #endif
                 }
@@ -1854,7 +1854,7 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) 
             // Apply the inverse volume scaling
             const amrex::Real r = amrex::Math::abs(rminr + (i - irmin)*dr);
             if (r == 0.) {
-                for (int icomp = 0; icomp < ncomp; icomp++) {
+                for (int icomp = scomp; icomp < scomp + ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     Rho_arr(i,j,0,icomp) /= (MathConst::pi*dr*axis_volume_factor);
 #elif defined(WARPX_DIM_RSPHERE)
@@ -1862,7 +1862,7 @@ WarpX::ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho, int lev) 
 #endif
                 }
             } else {
-                for (int icomp = 0; icomp < ncomp; icomp++) {
+                for (int icomp = scomp; icomp < scomp + ncomp; icomp++) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
                     // Scale factor is pi*((r + dr/2)**2 - (r - dr/2)**2)/dr
                     Rho_arr(i,j,0,icomp) /= (2.0_rt*MathConst::pi*r);

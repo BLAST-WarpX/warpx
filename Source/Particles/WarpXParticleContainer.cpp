@@ -1832,7 +1832,6 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 void
 WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                                        const bool local, const bool reset,
-                                       const bool apply_boundary_and_scale_volume,
                                        const bool interpolate_across_levels,
                                        const int icomp)
 {
@@ -1842,8 +1841,8 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
     auto const finest_level = static_cast<int>(rho.size() - 1);
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        DepositCharge (
-            rho[lev], lev, local, reset, apply_boundary_and_scale_volume, icomp
+        DepositChargeOnLevel (
+            rho[lev], lev, local, reset, icomp
         );
     }
 
@@ -1871,9 +1870,8 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
 }
 
 void
-WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
+WarpXParticleContainer::DepositChargeOnLevel (amrex::MultiFab* rho,
                                        const int lev, const bool local, const bool reset,
-                                       const bool apply_boundary_and_scale_volume,
                                        const int icomp)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -1911,13 +1909,6 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
     }
 #endif
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho, lev);
-    }
-#endif
-
     // Exchange guard cells
     if ( !local ) {
         // Possible performance optimization:
@@ -1928,18 +1919,10 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
             m_gdb->Geom(lev).periodicity()
         );
     }
-
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        // Reflect density over PEC boundaries, if needed.
-        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
-    }
-#endif
 }
 
 std::unique_ptr<MultiFab>
-WarpXParticleContainer::GetChargeDensity (int lev, bool local)
+WarpXParticleContainer::GetChargeDensity (int lev, bool local, bool finalize)
 {
     const auto& ba = m_gdb->ParticleBoxArray(lev);
     const auto& dm = m_gdb->DistributionMap(lev);
@@ -1960,7 +1943,10 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     const int ng_rho = warpx.get_ng_depos_rho().max();
 
     auto rho = std::make_unique<MultiFab>(nba, dm, WarpX::ncomps,ng_rho);
-    DepositCharge(rho.get(), lev, local, true, true, 0);
+    DepositChargeOnLevel(rho.get(), lev, local, /*reset=*/true, /*icomp=*/0);
+    if (finalize) { // Apply boundary conditions to rho, and then apply volume scaling
+        WarpX::GetInstance().FinalizeRho(lev, rho.get(), PatchType::fine);
+    }
     return rho;
 }
 

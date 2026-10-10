@@ -1075,9 +1075,8 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     // Apply the inverse volume scaling for radial geometries after the total
-    // current has been accumulated from all containers above. The charge
-    // density needs no such treatment here: rho is deposited directly and is
-    // scaled inside WarpX::PushParticlesandDeposit(), on the implicit path too.
+    // current has been accumulated from all containers above.
+    // Rho (if used) is scaled inside WarpX::FinalizeRho().
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
         ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
         m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
@@ -1086,6 +1085,7 @@ void ImplicitSolver::PreRHSOp ( const amrex::Real  a_cur_time,
 
     // Apply BCs to J and communicate
     m_WarpX->SyncCurrentAndRho();
+    m_WarpX->FinalizeRho();
 
     if (m_nlsolver_type == NonlinearSolverType::petsc_snes && !a_from_jacobian) {
         // The native Newton solver calls this routine immediately before the linear solve,

@@ -334,27 +334,26 @@ public:
                          amrex::Real dt, amrex::Real relative_time);
 
     /**
-     * \brief Deposit charge density.
+     * \brief Deposit charge without physical boundary folding or radial volume scaling.
      *
      * \param[in,out] rho vector of charge densities (one pointer to MultiFab per mesh refinement level)
      * \param[in] local if false, exchange the data in the guard cells after the deposition
      * \param[in] reset if true, reset all values of rho to zero
-     * \param[in] apply_boundary_and_scale_volume whether to apply boundary conditions and scale the
-     *            final density by some volume norm in cylindrical and spherical geometry
      * \param[in] interpolate_across_levels whether to average down from the fine patch to the coarse patch
      * \param[in] icomp component of the MultiFab where rho is deposited (old, new)
      */
     void DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                         bool local = false, bool reset = false,
-                        bool apply_boundary_and_scale_volume = false,
                         bool interpolate_across_levels = true,
                         int icomp = 0);
-    void DepositCharge (amrex::MultiFab* rho, int lev,
+
+    void DepositChargeOnLevel (amrex::MultiFab* rho, int lev,
                         bool local = false, bool reset = false,
-                        bool apply_boundary_and_scale_volume = false,
                         int icomp = 0);
 
-    std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
+    /** Return physical charge density by default. Set finalize=false to obtain
+     * unscaled deposits for filtering/synchronization followed by FinalizeRho. */
+    std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false, bool finalize = true);
 
     virtual void DepositCharge (WarpXParIter& pti,
                                RealVector const & wp,

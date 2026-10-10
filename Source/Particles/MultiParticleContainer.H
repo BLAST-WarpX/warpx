@@ -199,7 +199,9 @@ public:
     /// This deposits the particle charge onto a node-centered MultiFab and returns a unique ptr
     /// to it. The charge density is accumulated over all the particles in the MultiParticleContainer
 
-    std::unique_ptr<amrex::MultiFab> GetChargeDensity(int lev, bool local = false);
+    /** Set finalize=false for unscaled deposits; finalize after synchronization. */
+    std::unique_ptr<amrex::MultiFab> GetChargeDensity(
+        int lev, bool local = false, bool finalize = true);
 
     std::unique_ptr<amrex::MultiFab> GetGlobalPlasmaFrequency (int lev);
     void GenerateGlobalDebyeLength ();

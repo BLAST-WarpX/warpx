@@ -591,7 +591,8 @@ public:
                                                     int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
-                                                   int lev) const;
+                                                   int lev, int scomp = 0,
+                                                   int ncomp = -1) const;
 #endif
 
     /**
@@ -600,7 +601,7 @@ public:
      * the simulation domain. This function performs that logic.
      */
     void ApplyRhofieldBoundary (int lev, amrex::MultiFab* Rho,
-                                PatchType patch_type);
+                                PatchType patch_type, int scomp = 0, int ncomp = -1);
 
     /**
      * \brief If a PEC boundary conditions is used the current
@@ -709,6 +710,18 @@ public:
      * Contains separate calls to WarpX::SyncCurrent and WarpX::SyncRho.
      */
     void SyncCurrentAndRho ();
+
+    void FinalizeRho ();
+
+    /** Fold physical boundaries and convert unscaled deposits to charge density.
+     *  Call after filtering, guard summation, and transfers between levels.
+     *  scomp/ncomp select array components; ncomp=-1 selects all remaining components. */
+    void FinalizeRho (int lev, amrex::MultiFab* rho, PatchType patch_type, int scomp = 0, int ncomp = -1);
+
+    [[nodiscard]] bool UseVerboncoeurAxisCorrection () const
+    {
+        return m_verboncoeur_axis_correction;
+    }
 
     /**
      * \brief Apply filter and sum guard cells across MR levels.
@@ -946,10 +959,21 @@ public:
      * volume factors (conventions of the inverse-volume-scaling routines),
      * which conserves the volume integral exactly, leaves constants
      * untouched, has zero flux through the axis, and reduces to the
-     * standard bilinear filter where the volumes are uniform. */
-    /** \returns the guard-cell width over which dst holds filtered data. */
+     * standard bilinear filter where the volumes are uniform.
+     *
+     * \param[out] dst The destination MultiFab to store filtered data
+     * \param[in] src_mf The source MultiFab containing data to be filtered
+     * \param[in] lev The mesh refinement level
+     * \param[in] scomp The starting component index in the source MultiFab
+     * \param[in] dcomp The starting component index in the destination MultiFab
+     * \param[in] ncomp The number of components to filter
+     * \param[in] is_volume_scaled Whether input contains physical density.
+     *            If false, input and output contain density times the radial volume factor.
+     * \returns the guard-cell width over which dst holds filtered data.
+     */
     amrex::IntVect ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
-                                    int lev, int scomp, int dcomp, int ncomp);
+                                    int lev, int scomp, int dcomp, int ncomp,
+                                    bool is_volume_scaled = true);
 #endif
 
     /** Filter a current density. In radial geometries this dispatches to

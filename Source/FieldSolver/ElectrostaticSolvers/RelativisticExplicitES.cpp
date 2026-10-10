@@ -106,11 +106,10 @@ void RelativisticExplicitES::AddSpaceChargeField (
     // The options below are identical to those in MultiParticleContainer::DepositCharge
     bool const local = true;
     bool const reset = false;
-    bool const apply_boundary_and_scale_volume = true;
     bool const interpolate_across_levels = false;
     if ( !pc.do_not_deposit) {
         pc.DepositCharge(amrex::GetVecOfPtrs(rho),
-            local, reset, apply_boundary_and_scale_volume,
+            local, reset,
             interpolate_across_levels);
     }
 
@@ -120,6 +119,10 @@ void RelativisticExplicitES::AddSpaceChargeField (
         amrex::GetVecOfPtrs(rho),
         amrex::GetVecOfPtrs(rho_coarse),
         amrex::GetVecOfPtrs(rho_buf));
+
+    for (int lev = 0; lev < num_levels; ++lev) {
+        warpx.FinalizeRho(lev, rho[lev].get(), PatchType::fine);
+    }
 
     // Get the particle beta vector
     bool const local_average = false; // Average across all MPI ranks
