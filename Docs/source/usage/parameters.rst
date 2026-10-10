@@ -249,7 +249,7 @@ Overall simulation parameters
         - Practical limits on :math:`\Delta t` set by solver efficiency, number of particle cell crossings, and physics resolution.
 
       - **Nonlinear solvers:**
-        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are ``picard`` and ``newton``.
+        Advancing the implicit system in time requires solving a nonlinear system. The nonlinear solver options are ``picard``, ``newton``, and ``petsc_snes``.
 
         - ``implicit_evolve.nonlinear_solver`` (``string``, default: None)
 
@@ -269,8 +269,26 @@ Overall simulation parameters
           - ``newton.linear_solver`` (``string``, default: "gmres") Other excepted value, "petsc_ksp".
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
+          - ``newton.pc_update_newton_interval`` (``int``, default: 1)
+            Controls preconditioner updates within a nonlinear solve. Zero updates
+            only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
+          - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
+            Must be positive. Updates are allowed only when the zero-based simulation
+            step index is divisible by this interval. Both interval conditions must
+            hold for the preconditioner to be updated; otherwise it is reused, including
+            the PETSc factorization. The same schedule applies to the native Newton
+            solver and to PETSc SNES.
+            The first required linear solve always initializes the PC, including
+            after restart.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
+            Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
+          - ``newton.step_tolerance`` (``float``, default: 1.0e-16)
+            Must be nonnegative. The nonlinear solve has converged when the norm of the
+            update is below this factor times the norm of the solution.
+          - ``newton.divergence_tolerance`` (``float``, default: 1.0e4)
+            Must not be less than 1. The nonlinear solve fails as diverged when the
+            residual norm exceeds this factor times the initial residual norm.
           - ``newton.diagnostic_file`` (``string``, default: None)
           - ``newton.diagnostic_interval`` (``int``, default: 1)
 
@@ -282,8 +300,13 @@ Overall simulation parameters
           - ``gmres.relative_tolerance`` (``float``, default: 1.0e-4)
           - ``gmres.absolute_tolerance`` (``float``, default: 0.0)
 
+        - ``implicit_evolve.nonlinear_solver = petsc_snes``: Use a PS-JFNK method with the PETSc SNES solver. Requires WarpX to be compiled with PETSc (``WarpX_PETSC=ON``).
+          The ``newton`` and ``gmres`` parameters listed above apply, except that ``newton.linear_solver`` is not used: the linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES).
+
+          PETSc options given on the command line (for example, ``-snes_view``) are passed to the PETSc solver.
+
       - **PS-JFNK solver specific options:**
-        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton``) has a variety of additional parameters and options.
+        The PS-JFNK solver (``implicit_evolve.nonlinear_solver = newton`` or ``petsc_snes``) has a variety of additional parameters and options.
 
         - At each iteration in the PS-JFNK process, each particle is self-consistently updated for fixed :math:`\textbf{E}` and :math:`\textbf{B}` on the grid using a Picard method. The options for this Picard solve are set by:
 

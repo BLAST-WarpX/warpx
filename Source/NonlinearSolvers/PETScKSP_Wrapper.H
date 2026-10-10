@@ -87,11 +87,14 @@ public:
         m_solver->solve(a_sol, a_rhs);
     }
 
+    //! Rebuild the PETSc matrix and preconditioner on the next linear solve.
+    void invalidatePreconditioner () override { m_solver->invalidatePreconditioner(); }
+
     //! Sets verbosity.
     void setVerbose (int v) override { m_solver->setVerbose(v); }
 
     //! Sets restart length. The default is 30.
-    void setRestartLength (int rl) override { amrex::ignore_unused(rl); }
+    void setRestartLength (int rl) override { m_solver->setRestartLength(rl); }
 
     //! Sets the max number of iterations
     void setMaxIters (int niters) override { m_solver->setMaxIters(niters); }
@@ -101,6 +104,9 @@ public:
 
     //! Gets the solver status.
     [[nodiscard]] int getStatus () const override { return m_solver->getStatus(); }
+
+    //! A negative KSPConvergedReason is a failure, including the maximum iterations.
+    [[nodiscard]] bool converged () const override { return (m_solver->getStatus() > 0); }
 
     //! Gets the 2-norm of the residual.
     [[nodiscard]] RT getResidualNorm () const override { return m_solver->getResidualNorm(); }

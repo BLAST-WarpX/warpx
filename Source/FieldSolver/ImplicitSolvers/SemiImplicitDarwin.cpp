@@ -205,10 +205,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     m_linear_solver->setVerbose(verbosity);
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
-    // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
-    // value (e.g. 1 if the iteration count was exceeded) otherwise. Map
-    // that onto the negative-means-failure convention used by the caller.
-    const int exit_status = (m_linear_solver->getStatus() == 0) ? 0 : -1;
+    // Map a failed linear solve onto the negative-means-failure convention
+    // used by the caller.
+    const int exit_status = m_linear_solver->converged() ? 0 : -1;
     if (exit_status < 0) {
         return exit_status;
     }
@@ -254,7 +253,8 @@ void SemiImplicitDarwin::ComputeRHS ( [[maybe_unused]] WarpXSolverVec& a_RHS,
                                       [[maybe_unused]] const WarpXSolverVec& a_Z,
                                       [[maybe_unused]] amrex::Real start_time,
                                       [[maybe_unused]] int a_nl_iter,
-                                      [[maybe_unused]] bool a_from_jacobian )
+                                      [[maybe_unused]] bool a_from_jacobian,
+                                      [[maybe_unused]] const bool update_pc )
 {
     // The Darwin scheme is linear in its unknown and never installs a
     // nonlinear solver, so it has no nonlinear residual to compute. This

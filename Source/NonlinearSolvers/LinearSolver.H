@@ -56,6 +56,10 @@ public:
                         RT a_tol_abs,
                         int a_its=-1) = 0;
 
+    //! Mark the preconditioner for rebuilding before the next linear solve.
+    //! Solvers without a cached preconditioner need no notification.
+    virtual void invalidatePreconditioner () {}
+
     //! Sets verbosity.
     virtual void setVerbose (int v) = 0;
 
@@ -71,6 +75,9 @@ public:
 
     //! Gets the solver status.
     [[nodiscard]] virtual int getStatus () const = 0;
+
+    //! Whether the last solve converged; the status codes differ between solvers.
+    [[nodiscard]] virtual bool converged () const = 0;
 
     //! Gets the 2-norm of the residual.
     [[nodiscard]] virtual RT getResidualNorm () const = 0;

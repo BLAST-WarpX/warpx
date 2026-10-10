@@ -1,0 +1,31 @@
+{
+  "deuterium": {
+    "particle_momentum_x": 3.21916374169345e-18,
+    "particle_momentum_y": 3.2168969102398206e-18,
+    "particle_momentum_z": 3.2228049420374136e-18,
+    "particle_position_x": 1309.3091029245043,
+    "particle_position_y": 96.00799686448339,
+    "particle_weight": 1.6501375e+18
+  },
+  "electrons": {
+    "particle_momentum_x": 5.2885830539479e-20,
+    "particle_momentum_y": 5.2983604575890016e-20,
+    "particle_momentum_z": 5.28492427583091e-20,
+    "particle_position_x": 1309.3090979904614,
+    "particle_position_y": 96.007998546566,
+    "particle_weight": 1.6501375e+18
+  },
+  "lev=0": {
+    "Bx": 8.101905724533815,
+    "By": 17.753996668651,
+    "Bz": 11.134577805091535,
+    "Ex": 4161828493.6503134,
+    "Ey": 3082738132.035376,
+    "Ez": 4251732746.877161,
+    "divE": 48960118411450.56,
+    "jx": 382820509220.21155,
+    "jy": 277059924811.5774,
+    "jz": 382062556330.8368,
+    "rho": 433.3318896973335
+  }
+}

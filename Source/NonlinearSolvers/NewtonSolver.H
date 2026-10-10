@@ -8,6 +8,7 @@
 #define NEWTON_SOLVER_H_
 
 #include "LinearSolverLibrary.H"
+#include "NewtonSolverParams.H"
 #include "NonlinearSolver.H"
 #include "JacobianFunctionMF.H"
 #include "Preconditioner.H"
@@ -54,15 +55,6 @@ public:
           int          a_step,
           bool verbose_step) const override;
 
-    void GetSolverParams (amrex::Real&  a_rtol,
-                          amrex::Real&  a_atol,
-                          int&          a_maxits) override
-    {
-        a_rtol = m_rtol;
-        a_atol = m_atol;
-        a_maxits = m_maxits;
-    }
-
     inline void CurTime ( amrex::Real  a_time ) const
     {
         m_cur_time = a_time;
@@ -82,20 +74,8 @@ public:
 
     void PrintParams () const override
     {
-        amrex::Print()     << "Newton verbose:             " << (this->m_verbose?"true":"false") << "\n";
-        amrex::Print()     << "Newton max iterations:      " << m_maxits << "\n";
-        amrex::Print()     << "Newton relative tolerance:  " << m_rtol << "\n";
-        amrex::Print()     << "Newton absolute tolerance:  " << m_atol << "\n";
-        amrex::Print()     << "Newton require convergence: " << (m_require_convergence?"true":"false") << "\n";
-        auto linsol_name = amrex::getEnumNameString(m_linear_solver_type);
-        amrex::Print()     << "Newton linear solver:       " << linsol_name << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") verbose:            " << m_linsol_verbose_int << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") restart length:     " << m_linsol_restart_length << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") max iterations:     " << m_linsol_maxits << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
-        amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
-        amrex::Print()     << "Preconditioner type:      " << amrex::getEnumNameString(m_pc_type) << "\n";
-
+        this->m_params.Print("Newton");
+        m_newton_params.Print("Newton");
         m_linear_function->printParams();
     }
 
@@ -112,24 +92,12 @@ private:
     Ops* m_ops = nullptr;
 
     /**
-     * \brief Flag to determine whether convergence is required.
+     * \brief Parameters specific to Newton-type solvers.
      */
-    bool m_require_convergence = true;
+    NewtonSolverParams m_newton_params;
 
-    /**
-     * \brief Relative tolerance for the Newton solver.
-     */
-    amrex::Real m_rtol = 1.0e-6;
-
-    /**
-     * \brief Absolute tolerance for the Newton solver.
-     */
-    amrex::Real m_atol = 0.;
-
-    /**
-     * \brief Maximum iterations for the Newton solver.
-     */
-    int m_maxits = 100;
+    //! Ensure the first required linear solve initializes the PC, including after restart.
+    mutable bool m_pc_initialized = false;
 
     /**
      * \brief Total nonlinear iterations for the diagnostic file
@@ -137,39 +105,9 @@ private:
     mutable int m_total_iters = 0;
 
     /**
-     * \brief Relative tolerance for linear solver.
-     */
-    amrex::Real m_linsol_rtol = 1.0e-4;
-
-    /**
-     * \brief Absolute tolerance for linear solver.
-     */
-    amrex::Real m_linsol_atol = 0.;
-
-    /**
-     * \brief Maximum iterations for linear solver.
-     */
-    int m_linsol_maxits = 1000;
-
-    /**
      * \brief Total linear iterations for the diagnostic file
      */
     mutable int m_total_linsol_iters = 0;
-
-    /**
-     * \brief Verbosity flag for linear solver.
-     */
-    int m_linsol_verbose_int = 2;
-
-    /**
-     * \brief Restart iteration for linear solver.
-     */
-    int m_linsol_restart_length = 30;
-
-    /**
-     * \brief Preconditioner type
-     */
-    PreconditionerType m_pc_type = PreconditionerType::none;
 
     mutable amrex::Real m_cur_time, m_dt;
 
@@ -178,11 +116,6 @@ private:
      * In the contect of JFNK, A = dF/dU (i.e., system Jacobian)
      */
     std::unique_ptr<JacobianFunctionMF<Vec,Ops>> m_linear_function;
-
-    /**
-     * \brief Choice of linear solver
-     */
-    LinearSolverType m_linear_solver_type = LinearSolverType::amrex_gmres;
 
     /**
      * \brief The linear solver object.
@@ -194,11 +127,12 @@ private:
     /**
      * \brief Compute the nonlinear residual: F(U) = U - b - R(U).
      */
-    void EvalResidual ( Vec&         a_F,
-                  const Vec&         a_U,
-                  const Vec&         a_b,
-                        amrex::Real  a_time,
-                        int          a_iter ) const;
+    void EvalResidual (Vec&        a_F,
+                 const Vec&        a_U,
+                 const Vec&        a_b,
+                       amrex::Real a_time,
+                       int         a_iter,
+                       bool        update_pc) const;
 
 };
 
@@ -220,12 +154,12 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
     m_ops = a_ops;
 
     m_linear_function = std::make_unique<JacobianFunctionMF<Vec,Ops>>();
-    m_linear_function->define(m_F, m_ops, m_pc_type);
+    m_linear_function->define(m_F, m_ops, m_newton_params.pc_type);
     this->m_usePC = m_linear_function->usePreconditioner();
 
-    if (m_linear_solver_type == LinearSolverType::amrex_gmres) {
+    if (m_newton_params.linear_solver_type == LinearSolverType::amrex_gmres) {
         m_linear_solver = std::make_unique<AMReXGMRES<Vec,JacobianFunctionMF<Vec,Ops>>>();
-    } else if (m_linear_solver_type == LinearSolverType::petsc_ksp) {
+    } else if (m_newton_params.linear_solver_type == LinearSolverType::petsc_ksp) {
 #ifdef AMREX_USE_PETSC
         m_linear_solver = std::make_unique<PETScKSP<Vec,JacobianFunctionMF<Vec,Ops>>>();
 #else
@@ -235,78 +169,21 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): invalid linear solver type");
     }
     m_linear_solver->define(*m_linear_function);
-    m_linear_solver->setVerbose( m_linsol_verbose_int );
-    m_linear_solver->setRestartLength( m_linsol_restart_length );
-    m_linear_solver->setMaxIters( m_linsol_maxits );
+    m_linear_solver->setVerbose( m_newton_params.linsol_verbose_int );
+    m_linear_solver->setRestartLength( m_newton_params.linsol_restart_length );
+    m_linear_solver->setMaxIters( m_newton_params.linsol_maxits );
 
     this->m_is_defined = true;
 
-    // Create diagnostic file and write header
-    if (amrex::ParallelDescriptor::IOProcessor()
-        && !this->m_diagnostic_file.empty()
-        && !amrex::FileExists(this->m_diagnostic_file)) {
-
-        std::filesystem::path const diagnostic_path(this->m_diagnostic_file);
-        std::filesystem::path const diagnostic_dir = diagnostic_path.parent_path();
-        if (!diagnostic_dir.empty()) {
-            std::filesystem::create_directories(diagnostic_dir);
-        }
-
-        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::trunc};
-        int c = 0;
-        diagnostic_file << "#";
-        diagnostic_file << "[" << c++ << "]step()";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]time(s)";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]iters";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]total_iters";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]norm_abs";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]norm_rel";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]gmres_iters";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]gmres_total_iters";
-        diagnostic_file << " ";
-        diagnostic_file << "[" << c++ << "]gmres_last_res";
-        diagnostic_file << "\n";
-        diagnostic_file.close();
-    }
+    this->InitDiagnosticFile({"gmres_iters", "gmres_total_iters", "gmres_last_res"});
 }
 
 template <class Vec, class Ops>
 void NewtonSolver<Vec,Ops>::ParseParameters ()
 {
-    const amrex::ParmParse pp_newton("newton");
-    pp_newton.query("verbose",             this->m_verbose);
-    pp_newton.query("linear_solver",       m_linear_solver_type);
-    pp_newton.query("absolute_tolerance",  m_atol);
-    pp_newton.query("relative_tolerance",  m_rtol);
-    pp_newton.query("max_iterations",      m_maxits);
-    pp_newton.query("require_convergence", m_require_convergence);
-    pp_newton.query("diagnostic_file",     this->m_diagnostic_file);
-    pp_newton.query("diagnostic_interval", this->m_diagnostic_interval);
-
-    const amrex::ParmParse pp_l(amrex::getEnumNameString(m_linear_solver_type));
-    pp_l.query("verbose_int",         m_linsol_verbose_int);
-    pp_l.query("restart_length",      m_linsol_restart_length);
-    pp_l.query("absolute_tolerance",  m_linsol_atol);
-    pp_l.query("relative_tolerance",  m_linsol_rtol);
-    pp_l.query("max_iterations",      m_linsol_maxits);
-
-    /* backward compatibility */
-    const amrex::ParmParse pp_gmres("gmres");
-    pp_gmres.query("verbose_int",         m_linsol_verbose_int);
-    pp_gmres.query("restart_length",      m_linsol_restart_length);
-    pp_gmres.query("absolute_tolerance",  m_linsol_atol);
-    pp_gmres.query("relative_tolerance",  m_linsol_rtol);
-    pp_gmres.query("max_iterations",      m_linsol_maxits);
-
-    const amrex::ParmParse pp_jac("jacobian");
-    pp_jac.query("pc_type", m_pc_type);
+    this->m_params.Parse("newton");
+    this->m_params.ResetInvalidRelativeTolerance("newton");
+    m_newton_params.Parse();
 }
 
 template <class Vec, class Ops>
@@ -334,13 +211,20 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     amrex::Real norm_abs = 0.;
     amrex::Real norm0 = 1._rt;
     amrex::Real norm_rel = 0.;
+    // Norms of the last update and of the updated solution
+    amrex::Real norm_step = 0.;
+    amrex::Real norm_sol = 0.;
 
     int iter;
     int linear_solver_iters = 0;
-    for (iter = 0; iter <= m_maxits; iter++) {
+    bool reached_maxits = false;
+    for (iter = 0; iter <= this->m_params.maxits; iter++) {
+
+        // Determine whether to update the PC on this iteration
+        const bool update_pc = m_newton_params.UpdatePC(a_step, iter, m_pc_initialized);
 
         // Compute residual: F(U) = U - b - R(U)
-        EvalResidual(m_F, a_U, a_b, a_time, iter);
+        EvalResidual(m_F, a_U, a_b, a_time, iter, update_pc);
 
         // Compute norm of the residual
         norm_abs = m_F.norm2();
@@ -351,62 +235,98 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
         norm_rel = norm_abs/norm0;
 
         // Check for convergence criteria
-        if (this->m_verbose and verbose_step) {
+        if (this->m_params.verbose and verbose_step) {
             amrex::Print() << "Newton: iteration = " << std::setw(3) << iter <<  ", norm = "
                            << std::scientific << std::setprecision(5) << norm_abs << " (abs.), "
                            << std::scientific << std::setprecision(5) << norm_rel << " (rel.)" << "\n";
         }
 
-        if (norm_abs < m_atol) {
+        if (norm_abs < this->m_params.atol) {
             this->m_exit_status = 2;
-            if (this->m_verbose and verbose_step) {
+            if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                               << ". Satisfied absolute tolerance " << m_atol << "\n";
+                               << ". Satisfied absolute tolerance " << this->m_params.atol << "\n";
             }
             break;
         }
 
-        if (norm_rel < m_rtol) {
+        // As PETSc SNES, the relative test is skipped at iteration 0
+        if (iter > 0 and norm_abs <= this->m_params.rtol*norm0) {
             this->m_exit_status = 3;
-            if (this->m_verbose and verbose_step) {
+            if (this->m_params.verbose and verbose_step) {
                 amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                               << ". Satisfied relative tolerance " << m_rtol << "\n";
+                               << ". Satisfied relative tolerance " << this->m_params.rtol << "\n";
             }
             break;
         }
 
-        if (iter == m_maxits) {
-            if (this->m_verbose and verbose_step) {
-                amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
-                               << ". Maximum iteration reached: iter = " << m_maxits << "\n";
+        // As PETSc SNES, stop when the update is negligible
+        if (iter > 0 and norm_step < m_newton_params.step_tolerance*norm_sol) {
+            this->m_exit_status = 4;
+            if (this->m_params.verbose and verbose_step) {
+                amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
+                               << ". Satisfied step tolerance "
+                               << m_newton_params.step_tolerance << "\n";
             }
             break;
         }
 
-        if (norm_abs > 100._rt*norm0) {
+        // As PETSc SNES, a diverged solve returns a negative exit status
+        if (norm_abs > m_newton_params.divergence_tolerance*norm0) {
             this->m_exit_status = -9;
-            amrex::Print() << "Newton: exiting at iteration = " << std::setw(3) << iter
-                           << ". SOLVER DIVERGED! relative tolerance = " << m_rtol << "\n";
             std::stringstream convergenceMsg;
-            convergenceMsg << "Newton: exiting at iteration " << std::setw(3) << iter <<
-                              ". SOLVER DIVERGED! absolute norm = " << norm_abs <<
-                              " has increased by 100X from that after first iteration.";
-            WARPX_ABORT_WITH_MESSAGE(convergenceMsg.str());
+            convergenceMsg << "Newton solver diverged at iteration " << iter <<
+                              " of step " << a_step <<
+                              ". Absolute norm " << norm_abs <<
+                              " is more than " << m_newton_params.divergence_tolerance <<
+                              " times the initial norm " << norm0;
+            if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
+            break;
+        }
+
+        if (iter == this->m_params.maxits) {
+            reached_maxits = true;
+            if (this->m_params.verbose and verbose_step) {
+                amrex::Print() << "Newton: exiting at iter = " << std::setw(3) << iter
+                               << ". Maximum iteration reached: iter = " << this->m_params.maxits << "\n";
+            }
+            break;
         }
 
         // Prepare for the linear solve
-        m_ops->PreLinearSolve();
         m_linear_function->setBaseSolution(a_U);
         m_linear_function->setBaseRHS(m_R);
-        m_linear_function->updatePreCondMat();
+        m_ops->PreLinearSolve(update_pc);
+        if (update_pc) {
+            m_linear_function->updatePreCondMat();
+            // Keep WarpX sparse assembly and cached PETSc factors on the same schedule.
+            m_linear_solver->invalidatePreconditioner();
+            m_pc_initialized = true;
+        }
 
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();
-        m_linear_solver->solve( m_dU, m_F, m_linsol_rtol, m_linsol_atol );
+        m_linear_solver->solve( m_dU, m_F, m_newton_params.linsol_rtol, m_newton_params.linsol_atol );
         linear_solver_iters += m_linear_solver->getNumIters();
+
+        // As PETSc SNES, stop at a failed linear solve without updating the solution
+        if (!m_linear_solver->converged()) {
+            this->m_exit_status = -3;
+            std::stringstream convergenceMsg;
+            convergenceMsg << "Newton solver stopped at iteration " << iter <<
+                              " of step " << a_step <<
+                              ": the linear solver failed to converge in " <<
+                              m_linear_solver->getNumIters() << " iterations";
+            if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
+            break;
+        }
 
         // Update solution
         a_U -= m_dU;
+        norm_step = m_dU.norm2();
+        norm_sol = a_U.norm2();
     }
 
     // Update total iteration count
@@ -414,58 +334,39 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     m_total_linsol_iters += linear_solver_iters;
 
     // Note that the failure warning is skipped in the case when
-    // m_rtol == 0 to allow a fixed number of iterations without a flood of warning.
-    if (norm_rel > m_rtol and norm_abs > m_atol and m_rtol > 0.) {
+    // rtol == 0 to allow a fixed number of iterations without a flood of warning.
+    if (reached_maxits and this->m_params.rtol == 0.) { this->m_exit_status = 0; }
+    if (reached_maxits and this->m_params.rtol > 0.) {
         std::stringstream convergenceMsg;
         convergenceMsg << "Newton solver failed to converge after " << iter <<
                           " iterations at step " << a_step <<
                           ". Relative norm is " << norm_rel <<
-                          " and the relative tolerance is " << m_rtol <<
+                          " and the relative tolerance is " << this->m_params.rtol <<
                           ". Absolute norm is " << norm_abs <<
-                          " and the absolute tolerance is " << m_atol;
-        if (this->m_verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
+                          " and the absolute tolerance is " << this->m_params.atol;
+        if (this->m_params.verbose) { amrex::Print() << convergenceMsg.str() << "\n"; }
         ablastr::warn_manager::WMRecordWarning("NewtonSolver", convergenceMsg.str());
 
-        if (m_require_convergence) { this->m_exit_status = -5; }
+        if (this->m_params.require_convergence) { this->m_exit_status = -5; }
         else { this->m_exit_status = 0; }
     }
 
-    if (!this->m_diagnostic_file.empty() && amrex::ParallelDescriptor::IOProcessor() &&
-        ((a_step+1)%this->m_diagnostic_interval==0 || a_step==0)) {
-        std::ofstream diagnostic_file{this->m_diagnostic_file, std::ofstream::out | std::ofstream::app};
-        diagnostic_file << std::setprecision(14);
-        diagnostic_file << a_step+1;
-        diagnostic_file << " ";
-        diagnostic_file << a_time + a_dt;
-        diagnostic_file << " ";
-        diagnostic_file << iter;
-        diagnostic_file << " ";
-        diagnostic_file << m_total_iters;
-        diagnostic_file << " ";
-        diagnostic_file << norm_abs;
-        diagnostic_file << " ";
-        diagnostic_file << norm_rel;
-        diagnostic_file << " ";
-        diagnostic_file << linear_solver_iters;
-        diagnostic_file << " ";
-        diagnostic_file << m_total_linsol_iters;
-        diagnostic_file << " ";
-        diagnostic_file << m_linear_solver->getResidualNorm();
-        diagnostic_file << "\n";
-        diagnostic_file.close();
-    }
+    this->WriteDiagnostics(a_step, a_time + a_dt, iter, m_total_iters, norm_abs, norm_rel,
+                           linear_solver_iters, m_total_linsol_iters,
+                           m_linear_solver->getResidualNorm());
 
 }
 
 template <class Vec, class Ops>
-void NewtonSolver<Vec,Ops>::EvalResidual ( Vec&         a_F,
-                                     const Vec&         a_U,
-                                     const Vec&         a_b,
-                                           amrex::Real  a_time,
-                                           int          a_iter ) const
+void NewtonSolver<Vec,Ops>::EvalResidual (Vec&        a_F,
+                                    const Vec&        a_U,
+                                    const Vec&        a_b,
+                                          amrex::Real a_time,
+                                          int         a_iter,
+                                          bool        update_pc) const
 {
     BL_PROFILE("NewtonSolver::EvalResidual()");
-    m_ops->ComputeRHS( m_R, a_U, a_time, a_iter, false );
+    m_ops->ComputeRHS(m_R, a_U, a_time, a_iter, false, update_pc);
 
     // Compute residual: F(U) = U - b - R(U)
     a_F.Copy(a_U);
