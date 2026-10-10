@@ -3,6 +3,7 @@
 #include "Fields.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ParticleDiag/ParticleDiag.H"
+#include "FieldSolver/FiniteDifferenceSolver/HybridPICModel/HybridPICModel.H"
 #include "Particles/Filter/FilterFunctors.H"
 #include "Particles/ParticleIO.H"
 #include "Particles/WarpXParticleContainer.H"
@@ -346,6 +347,11 @@ FlushFormatPlotfile::WriteWarpXHeader(
                     HeaderFile << diag.get_snapshot_full_flag(i_buffer) << "\n";
                 }
             }
+        }
+
+        if (auto const* hybrid = warpx.get_pointer_HybridPICModel()) {
+            // This learned count is distinct from the AMR nsubsteps above.
+            HeaderFile << "hybrid_pic_substeps " << hybrid->m_substeps << '\n';
         }
     }
 }
