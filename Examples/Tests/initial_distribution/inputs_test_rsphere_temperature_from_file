@@ -1,0 +1,17 @@
+# base input parameters
+FILE = inputs_base_temperature_from_file
+
+# test input parameters
+amr.n_cell = 64
+geometry.dims = RSPHERE
+geometry.prob_lo = 0.
+geometry.prob_hi = 1.
+boundary.field_lo = none
+boundary.field_hi = pec
+boundary.particle_lo = none
+boundary.particle_hi = absorbing
+
+maxwellian.num_particles_per_cell = 4000
+maxwellian.read_temperature_in_eV_from_path = "../test_rsphere_temperature_from_file_prepare/example-temperature-in-eV.h5"
+maxwell_juttner.num_particles_per_cell = 4000
+maxwell_juttner.read_temperature_in_eV_from_path = "../test_rsphere_temperature_from_file_prepare/example-temperature-in-eV.h5"

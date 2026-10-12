@@ -54,10 +54,8 @@ struct GetTemperature
     amrex::ParserExecutor<3> m_temperature_parser;
     /* q_e / (m c^2) factor, used for temperature_in_eV conversion */
     amrex::Real m_q_e_over_mc2{0.0};
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
+    /* Temperature in eV read from an openPMD file, if m_type == TempFromFileValue */
     ExternalFieldView m_temperature_in_eV_from_file;
-#endif
 
     /**
      * \brief Construct the functor with information provided by temp
@@ -84,30 +82,10 @@ struct GetTemperature
             {
                 return m_temperature_parser(x,y,z);
             }
-#if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
-    !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
             case (TempFromFileValue):
             {
-#if (AMREX_SPACEDIM < 3)
-                amrex::ignore_unused(x,y,z);
-#endif
-#if (AMREX_SPACEDIM == 1)
-                amrex::RealVect const pos{z};
-#elif defined(WARPX_DIM_XZ)
-                amrex::RealVect const pos{x,z};
-#else
-                amrex::RealVect const pos{x,y,z};
-#endif
-#if defined(AMREX_USE_GPU)
-                AMREX_IF_ON_HOST((amrex::Abort(
-                    "For GPU builds, TempFromFileValue only works on device.");))
-                AMREX_IF_ON_DEVICE((return m_temperature_in_eV_from_file(pos);))
-                return 0.0;
-#else
-                return m_temperature_in_eV_from_file(pos);
-#endif
+                return m_temperature_in_eV_from_file.getValue(x,y,z);
             }
-#endif
             default:
             {
                 amrex::Abort("Get initial temperature: unknown type");
