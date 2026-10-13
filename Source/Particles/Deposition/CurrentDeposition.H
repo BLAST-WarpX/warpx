@@ -25,7 +25,24 @@
 #include <AMReX_Array4.H>
 #include <AMReX_Dim3.H>
 #include <AMReX_GpuAtomic.H>
+#include <AMReX_GpuQualifiers.H>
 #include <AMReX_REAL.H>
+
+/**
+ * \brief Bitmask of the components of J that a deposition kernel deposits.
+ *
+ * Kernels with a \c components template parameter deposit only the components whose bits
+ * are set, e.g. \c JComponents::x deposits only Jx. The shared memory depositions use this
+ * to deposit one component at a time into a single buffer when the buffers for all three
+ * components do not fit in shared memory.
+ */
+namespace JComponents {
+    enum : int { x = 1, y = 2, z = 4, all = x | y | z };
+
+    /** \brief Whether the bitmask \c components includes the component \c c */
+    AMREX_GPU_HOST_DEVICE
+    constexpr bool has (int components, int c) noexcept { return (components & c) != 0; }
+}
 
 /**
  * \brief Kernel for the direct current deposition for thread thread_num
@@ -542,9 +559,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     constexpr int CELL = amrex::IndexType::CELL;
 
     // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
-    const auto dxiarr = geom.InvCellSizeArray();
-    const auto plo = geom.ProbLoArray();
-    const auto domain = geom.Domain();
+    amrex::ignore_unused(geom);
 
     amrex::Box sample_tbox(IntVect(AMREX_D_DECL(0,0,0)), a_tbox_max_size - 1);
     sample_tbox.grow(depos_order);
@@ -574,26 +589,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
         if (bin_start == bin_stop) { return; /*this bin has no particles*/ }
 
-        // These boxes define the index space for the shared memory buffers
-        amrex::Box buffer_box;
-        {
-            ParticleReal xp, yp, zp;
-            GetPosition(permutation[bin_start], xp, yp, zp);
-#if defined(WARPX_DIM_3D)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ),
-                                 int( amrex::Math::floor((yp-plo[1]) * dxiarr[1]) ),
-                                 int( amrex::Math::floor((zp-plo[2]) * dxiarr[2]) ));
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ),
-                                 int( amrex::Math::floor((zp-plo[1]) * dxiarr[1]) ));
-#elif defined(WARPX_DIM_1D_Z)
-            IntVect iv = IntVect(int( amrex::Math::floor((zp-plo[0]) * dxiarr[0]) ));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ));
-#endif
-            iv += domain.smallEnd();
-            getTileIndex(iv, box, true, bin_size, buffer_box);
-        }
+        // These boxes define the index space for the shared memory buffers.
+        // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
+        amrex::Box buffer_box = getTileBoxFromIndex(bin_id, box, bin_size);
 
         buffer_box.grow(depos_order);
         Box tbox_x = convert(buffer_box, jx_type);
@@ -671,23 +669,24 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 }
 
 /**
- * \brief Esirkepov Current Deposition for thread thread_num
+ * \brief Esirkepov current deposition of a single particle.
+ *
+ * Kernel of doEsirkepovDepositionShapeN and doEsirkepovDepositionSharedShapeN.
  *
  * \tparam depos_order  deposition order
+ * \tparam reduce_shape whether to use an order-1 shape in the cells flagged by
+ *                      reduced_particle_shape_mask
+ * \tparam components   bitmask of the components of J to deposit (see JComponents). The
+ *                      arrays of the other components are not accessed.
+ * \param ip           Index of the particle.
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
- * \param ion_lev      Pointer to array of particle ionization level. This is
-                       required to have the charge of each macroparticle
-                       since q is a scalar. For non-ionizable species,
-                       ion_lev is a null pointer.
- * \param Jx_arr,Jy_arr,Jz_arr Array4 of current density, either full array or tile.
- * \param np_to_deposit Number of particles for which current is deposited.
+ * \param ion_lev      Pointer to array of particle ionization level, or null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr Array4 of current density.
  * \param dt           Time step for particle level
- * \param[in] relative_time Time at which to deposit J, relative to the time of the
- *                          current positions of the particles. When different than 0,
- *                          the particle position will be temporarily modified to match
- *                          the time of the deposition.
+ * \param relative_time Time at which to deposit J, relative to the time of the
+ *                      current positions of the particles.
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
  * \param lo           Index lower bounds of domain.
@@ -695,10 +694,11 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
  * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
- * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
  */
-template <int depos_order>
-void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+template <int depos_order, bool reduce_shape, int components = JComponents::all>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doEsirkepovDepositionShapeNKernel (const long ip,
+                                  const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::ParticleReal * const wp,
                                   const amrex::ParticleReal * const uxp,
                                   const amrex::ParticleReal * const uyp,
@@ -707,20 +707,19 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::Array4<amrex::Real>& Jx_arr,
                                   const amrex::Array4<amrex::Real>& Jy_arr,
                                   const amrex::Array4<amrex::Real>& Jz_arr,
-                                  long np_to_deposit,
-                                  amrex::Real dt,
-                                  amrex::Real relative_time,
+                                  const amrex::Real dt,
+                                  const amrex::Real relative_time,
                                   const amrex::XDim3 & dinv,
                                   const amrex::XDim3 & xyzmin,
-                                  amrex::Dim3 lo,
-                                  amrex::Real q,
-                                  [[maybe_unused]] int n_rz_azimuthal_modes,
-                                  const amrex::Array4<const int>& reduced_particle_shape_mask,
-                                  bool enable_reduced_shape
-                                  )
+                                  const amrex::Dim3 lo,
+                                  const amrex::Real q,
+                                  [[maybe_unused]] const int n_rz_azimuthal_modes,
+                                  const amrex::Array4<const int>& reduced_particle_shape_mask)
 {
     using namespace amrex;
     using namespace amrex::literals;
+
+    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr);
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
     // (do_ionization=1)
@@ -740,16 +739,6 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
 
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-
-    // (Compile 2 versions of the kernel: with and without reduced shape)
-    enum eb_flags : int { has_reduced_shape, no_reduced_shape };
-    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
-
-    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
-    amrex::For( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
-        {reduce_shape_runtime_flag},
-        np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
             // --- Get particle quantities
             Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
                                                  + uyp[ip]*uyp[ip]*inv_c2
@@ -834,7 +823,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #ifdef AMREX_USE_CUDA
             amrex::ignore_unused(reduced_particle_shape_mask, lo); // Needed to avoid compilation error with nvcc
 #endif
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
 #if defined(WARPX_DIM_3D)
                 reduce_shape_old = reduced_particle_shape_mask(
                     lo.x + int(amrex::Math::floor(x_old)),
@@ -896,7 +885,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const Compute_shifted_shape_factor< depos_order > compute_shifted_shape_factor;
             // In cells marked by reduced_particle_shape_mask, we need order 1 deposition
             const Compute_shifted_shape_factor< 1 > compute_shifted_shape_factor_order1;
-            amrex::ignore_unused(compute_shifted_shape_factor_order1); // unused for `no_reduced_shape`
+            amrex::ignore_unused(compute_shifted_shape_factor_order1); // unused without reduced shape
 
             // Shape factor arrays
             // Note that there are extra values above and below
@@ -909,7 +898,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int i_new = compute_shape_factor(sx_new+1, x_new );
             const int i_old = compute_shifted_shape_factor(sx_old, x_old, i_new);
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
                 if (reduce_shape_new) {
                     for (int i=0; i<depos_order+3; i++) {sx_new[i] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sx_new+depos_order/2, x_new, i_new+depos_order/2 ); // Redeposit with order 1
@@ -928,7 +917,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int j_new = compute_shape_factor(sy_new+1, y_new);
             const int j_old = compute_shifted_shape_factor(sy_old, y_old, j_new);
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
                 if (reduce_shape_new) {
                     for (int j=0; j<depos_order+3; j++) {sy_new[j] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sy_new+depos_order/2, y_new, j_new+depos_order/2 ); // Redeposit with order 1
@@ -947,7 +936,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int k_new = compute_shape_factor(sz_new+1, z_new );
             const int k_old = compute_shifted_shape_factor(sz_old, z_old, k_new );
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
                 if (reduce_shape_new) {
                     for (int k=0; k<depos_order+3; k++) {sz_new[k] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sz_new+depos_order/2, z_new, k_new+depos_order/2 ); // Redeposit with order 1
@@ -980,6 +969,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
 #if defined(WARPX_DIM_3D)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 for (int j=djl; j<=depos_order+2-dju; j++) {
                     amrex::Real sdxi = 0._rt;
@@ -991,6 +981,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     }
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 for (int i=dil; i<=depos_order+2-diu; i++) {
                     amrex::Real sdyj = 0._rt;
@@ -1002,6 +994,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     }
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             for (int j=djl; j<=depos_order+2-dju; j++) {
                 for (int i=dil; i<=depos_order+2-diu; i++) {
                     amrex::Real sdzk = 0._rt;
@@ -1013,9 +1007,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     }
                 }
             }
+            }
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real sdxi = 0._rt;
                 for (int i=dil; i<=depos_order+1-diu; i++) {
@@ -1033,6 +1029,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 for (int i=dil; i<=depos_order+2-diu; i++) {
                     Real const sdyj = wq*vy*invvol*(
@@ -1060,6 +1058,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 Real sdzk = 0._rt;
                 for (int k=dkl; k<=depos_order+1-dku; k++) {
@@ -1077,40 +1077,264 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
                 }
             }
+            }
 #elif defined(WARPX_DIM_1D_Z)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real const sdxi = wq*vx*invvol*0.5_rt*(sz_old[k] + sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k_new-1+k, 0, 0, 0), sdxi);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sz_old[k] + sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k_new-1+k, 0, 0, 0), sdyj);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             amrex::Real sdzk = 0._rt;
             for (int k=dkl; k<=depos_order+1-dku; k++) {
                 sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k_new-1+k, 0, 0, 0), sdzk);
             }
+            }
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             amrex::Real sdri = 0._rt;
             for (int i=dil; i<=depos_order+1-diu; i++) {
                 sdri += wq*invdtd.x*(sx_old[i] - sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, 0, 0, 0), sdri);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i_new-1+i, 0, 0, 0), sdyj);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 amrex::Real const sdzi = wq*vz*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, 0, 0, 0), sdzi);
             }
+            }
 #endif
+}
+
+/**
+ * \brief Esirkepov Current Deposition for thread thread_num
+ *
+ * \tparam depos_order  deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr Array4 of current density, either full array or tile.
+ * \param np_to_deposit Number of particles for which current is deposited.
+ * \param dt           Time step for particle level
+ * \param[in] relative_time Time at which to deposit J, relative to the time of the
+ *                          current positions of the particles. When different than 0,
+ *                          the particle position will be temporarily modified to match
+ *                          the time of the deposition.
+ * \param dinv         3D cell size inverse
+ * \param xyzmin       Physical lower bounds of domain.
+ * \param lo           Index lower bounds of domain.
+ * \param q            species charge.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
+ * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
+ * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ */
+template <int depos_order>
+void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+                                  const amrex::ParticleReal * const wp,
+                                  const amrex::ParticleReal * const uxp,
+                                  const amrex::ParticleReal * const uyp,
+                                  const amrex::ParticleReal * const uzp,
+                                  const int* ion_lev,
+                                  const amrex::Array4<amrex::Real>& Jx_arr,
+                                  const amrex::Array4<amrex::Real>& Jy_arr,
+                                  const amrex::Array4<amrex::Real>& Jz_arr,
+                                  long np_to_deposit,
+                                  amrex::Real dt,
+                                  amrex::Real relative_time,
+                                  const amrex::XDim3 & dinv,
+                                  const amrex::XDim3 & xyzmin,
+                                  amrex::Dim3 lo,
+                                  amrex::Real q,
+                                  [[maybe_unused]] int n_rz_azimuthal_modes,
+                                  const amrex::Array4<const int>& reduced_particle_shape_mask,
+                                  bool enable_reduced_shape
+                                  )
+{
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+
+    // (Compile 2 versions of the kernel: with and without reduced shape)
+    enum eb_flags : int { has_reduced_shape, no_reduced_shape };
+    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
+
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For( amrex::TypeList<amrex::CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
+        {reduce_shape_runtime_flag},
+        np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
+            doEsirkepovDepositionShapeNKernel<
+                depos_order, (decltype(reduce_shape_control)::value == has_reduced_shape)>(
+                ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, Jx_arr, Jy_arr, Jz_arr,
+                dt, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
+                reduced_particle_shape_mask);
         }
     );
+}
+
+/**
+ * \brief Functor that deposits the current of one particle with the Esirkepov deposition, for
+ *        doSharedDeposition. See doEsirkepovDepositionShapeNKernel for the members.
+ *
+ * \tparam depos_order  deposition order
+ * \tparam reduce_shape whether to use an order-1 shape in the cells flagged by
+ *                      reduced_particle_shape_mask
+ */
+template <int depos_order, bool reduce_shape>
+struct EsirkepovParticleDeposit
+{
+    GetParticlePosition<PIdx> GetPosition;
+    const amrex::ParticleReal* wp;
+    const amrex::ParticleReal* uxp;
+    const amrex::ParticleReal* uyp;
+    const amrex::ParticleReal* uzp;
+    const int* ion_lev;
+    amrex::Real dt;
+    amrex::Real relative_time;
+    amrex::XDim3 dinv;
+    amrex::XDim3 xyzmin;
+    amrex::Dim3 lo;
+    amrex::Real q;
+    int n_rz_azimuthal_modes;
+    amrex::Array4<const int> reduced_particle_shape_mask;
+
+    /** \brief Deposit the components of J in the bitmask \c components (see JComponents)
+     *         of particle \c ip into \c J */
+    template <int components>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void deposit (const long ip, amrex::GpuArray<amrex::Array4<amrex::Real>, 3> const& J) const
+    {
+        doEsirkepovDepositionShapeNKernel<depos_order, reduce_shape, components>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, J[0], J[1], J[2],
+            dt, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
+            reduced_particle_shape_mask);
+    }
+};
+
+/**
+ * \brief Esirkepov current deposition using shared memory buffers. Particles are
+ *        binned into tiles of bin_size cells, and each tile is processed by one GPU
+ *        thread block, which accumulates the current in shared memory before adding
+ *        it to the global arrays. Only available for CUDA and HIP.
+ *
+ * \tparam depos_order  deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param jx_fab,jy_fab,jz_fab FArrayBox of current density.
+ * \param dt           Time step for particle level
+ * \param relative_time Time at which to deposit J, relative to the time of the
+ *                      current positions of the particles.
+ * \param dinv         3D cell size inverse
+ * \param xyzmin       Physical lower bounds of domain.
+ * \param lo           Index lower bounds of domain.
+ * \param q            species charge.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry; must be 1.
+ * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
+ * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
+ * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ * \param a_bins             bins used for particle sorting
+ * \param box                the current box
+ * \param geom               the geometry of the current level
+ * \param a_tbox_max_size    the maximum size of a tilebox
+ * \param threads_per_block  number of threads to use per block in shared deposition
+ * \param bin_size           tileSize to use for shared current deposition operations
+ */
+template <int depos_order>
+void doEsirkepovDepositionSharedShapeN (
+    const GetParticlePosition<PIdx>& GetPosition,
+    const amrex::ParticleReal * const wp,
+    const amrex::ParticleReal * const uxp,
+    const amrex::ParticleReal * const uyp,
+    const amrex::ParticleReal * const uzp,
+    const int* ion_lev,
+    amrex::FArrayBox& jx_fab,
+    amrex::FArrayBox& jy_fab,
+    amrex::FArrayBox& jz_fab,
+    const amrex::Real dt,
+    const amrex::Real relative_time,
+    const amrex::XDim3 & dinv,
+    const amrex::XDim3 & xyzmin,
+    const amrex::Dim3 lo,
+    const amrex::Real q,
+    const int n_rz_azimuthal_modes,
+    const amrex::Array4<const int>& reduced_particle_shape_mask,
+    const bool enable_reduced_shape,
+    const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
+    const amrex::Box& box,
+    const amrex::Geometry& geom,
+    const amrex::IntVect& a_tbox_max_size,
+    const int threads_per_block,
+    const amrex::IntVect bin_size)
+{
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+    using namespace amrex::literals;
+
+    // Esirkepov deposits all components of J on the same nodes, which span the old and
+    // new positions of the particle. With the CFL condition, a particle in a given cell
+    // touches nodes from depos_order cells below to depos_order+1 cells above that cell,
+    // so the buffers cover the tile grown by depos_order and made nodal.
+    // The new position is the current position (used for binning) pushed by
+    // relative_time + dt/2, which is 0 for the usual explicit deposition. Otherwise,
+    // grow the buffers by the number of cells that the particle can move in that time.
+    const auto dxiarr = geom.InvCellSizeArray();
+    const amrex::Real shift_time = std::abs(relative_time + 0.5_rt*dt);
+    int ngrow = depos_order;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        ngrow = amrex::max(ngrow, depos_order + static_cast<int>(
+            std::ceil(PhysConst::c*shift_time*dxiarr[idim])));
+    }
+
+    const amrex::GpuArray<amrex::Array4<amrex::Real>, 3> J{
+        jx_fab.array(), jy_fab.array(), jz_fab.array()};
+    const amrex::IntVect nodal = amrex::IntVect::TheNodeVector();
+    const amrex::GpuArray<amrex::IntVect, 3> types{nodal, nodal, nodal};
+
+    // Compile versions of the kernel with and without reduced shape
+    auto launch = [&] (auto reduce_shape) {
+        const EsirkepovParticleDeposit<depos_order, decltype(reduce_shape)::value> deposit_particle{
+            GetPosition, wp, uxp, uyp, uzp, ion_lev, dt, relative_time, dinv, xyzmin, lo, q,
+            n_rz_azimuthal_modes, reduced_particle_shape_mask};
+        doSharedDeposition<3>(deposit_particle, J, types, ngrow, a_bins, box, a_tbox_max_size,
+                              threads_per_block, bin_size);
+    };
+    if (enable_reduced_shape && (depos_order > 1)) {
+        launch(std::true_type{});
+    } else {
+        launch(std::false_type{});
+    }
+#else
+    amrex::ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
+        dt, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
+        reduced_particle_shape_mask, enable_reduced_shape, a_bins, box, geom,
+        a_tbox_max_size, threads_per_block, bin_size);
+    WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
+#endif
 }
 
 /**
@@ -1521,6 +1745,8 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  *        in a tighter stencil. The implementation is valid for an arbitrary number of cell crossings.
  *
  * \tparam depos_order  deposition order
+ * \tparam components   bitmask of the components of J to deposit (see JComponents). The
+ *                      arrays of the other components are not accessed.
  * \param xp_old,yp_old,zp_old  Old particle positions (nominally at start of step)
  * \param xp_new,yp_new,zp_new  New particle positions (nominally at end of step)
  * \param wq           Pointer to array of particle weights.
@@ -1536,7 +1762,7 @@ void doChargeConservingDepositionShapeNImplicit ([[maybe_unused]]const amrex::Pa
  * \param invvol                One over cell volume
  * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry
  */
-template <int depos_order>
+template <int depos_order, int components = JComponents::all>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal const xp_old,
                                        [[maybe_unused]] amrex::ParticleReal const yp_old,
@@ -1563,6 +1789,8 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 {
 
     using namespace amrex::literals;
+
+    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr);
 
 #if (AMREX_SPACEDIM > 1)
     amrex::Real constexpr one_third = 1.0_rt / 3.0_rt;
@@ -1814,6 +2042,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         const int j0_node = compute_shape_factors_node( sy_old_node, sy_new_node, y0_old, y0_new );
         const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
+        if constexpr (JComponents::has(components, JComponents::x)) {
         // deposit Jx for this segment
         amrex::Real this_Jx;
         for (int i=0; i<=depos_order-1; i++) {
@@ -1827,7 +2056,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                 }
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::y)) {
         // deposit Jy for this segment
         amrex::Real this_Jy;
         for (int i=0; i<=depos_order; i++) {
@@ -1841,7 +2072,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                 }
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::z)) {
         // deposit Jz for this segment
         amrex::Real this_Jz;
         for (int i=0; i<=depos_order; i++) {
@@ -1852,6 +2085,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                                              + sx_new_node[i]*sy_old_node[j]*one_sixth
                                              + sx_new_node[i]*sy_new_node[j]*one_third )*seg_factor_z;
                     amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, lo.y+j0_node+j, lo.z+k0_cell+k), this_Jz);
+                }
                 }
             }
         }
@@ -1961,6 +2195,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         const int i0_node = compute_shape_factors_node( sx_old_node, sx_new_node, x0_old, x0_new );
         const int k0_node = compute_shape_factors_node( sz_old_node, sz_new_node, z0_old, z0_new );
 
+        if constexpr (JComponents::has(components, JComponents::x)) {
         // deposit Jx for this segment
         amrex::Real this_Jx;
         for (int i=0; i<=depos_order-1; i++) {
@@ -1979,7 +2214,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 #endif
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::y)) {
         // deposit out-of-plane Jy for this segment
         const auto seg_factor_y = std::min(seg_factor_x,seg_factor_z);
         amrex::Real this_Jy;
@@ -2003,7 +2240,9 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
 #endif
             }
         }
+        }
 
+        if constexpr (JComponents::has(components, JComponents::z)) {
         // deposit Jz for this segment
         amrex::Real this_Jz;
         for (int i=0; i<=depos_order; i++) {
@@ -2020,6 +2259,7 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
                     xy_mid = xy_mid*xy_mid0;
                 }
 #endif
+            }
             }
         }
 
@@ -2089,14 +2329,20 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         // deposit out-of-plane Jx and Jy for this segment
         for (int k=0; k<=depos_order; k++) {
             const amrex::Real weight = 0.5_rt*(sz_old_node[k] + sz_new_node[k])*seg_factor;
+            if constexpr (JComponents::has(components, JComponents::x)) {
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k0_node+k, 0, 0), wqx*weight);
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k0_node+k, 0, 0), wqy*weight);
+            }
         }
 
+        if constexpr (JComponents::has(components, JComponents::z)) {
         // deposit Jz for this segment
         for (int k=0; k<=depos_order-1; k++) {
             const amrex::Real this_Jz = wqz*sz_cell[k]*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k0_cell+k, 0, 0), this_Jz);
+        }
         }
 
         // update old segment values
@@ -2164,14 +2410,20 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
         // deposit out-of-plane Jy and Jz for this segment
         for (int i=0; i<=depos_order; i++) {
             const amrex::Real weight = 0.5_rt*(sx_old_node[i] + sx_new_node[i])*seg_factor;
+            if constexpr (JComponents::has(components, JComponents::y)) {
             amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i0_node+i, 0, 0), wqy*weight);
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i0_node+i, 0, 0), wqz*weight);
+            }
         }
 
+        if constexpr (JComponents::has(components, JComponents::x)) {
         // deposit Jx for this segment
         for (int i=0; i<=depos_order-1; i++) {
             const amrex::Real this_Jx = wqx*sx_cell[i]*seg_factor;
             amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i0_cell+i, 0, 0), this_Jx);
+        }
         }
 
         // update old segment values
@@ -2182,6 +2434,91 @@ void VillasenorDepositionShapeNKernel ([[maybe_unused]] amrex::ParticleReal cons
     }
 
 #endif
+}
+
+/**
+ * \brief Villasenor and Buneman current deposition of a single particle, for the explicit scheme.
+ *
+ * Kernel of doVillasenorDepositionShapeNExplicit and doVillasenorDepositionSharedShapeN.
+ * Computes the old and new positions and gamma of the particle, then calls
+ * VillasenorDepositionShapeNKernel.
+ *
+ * \tparam depos_order  deposition order
+ * \tparam components   bitmask of the components of J to deposit (see JComponents). The
+ *                      arrays of the other components are not accessed.
+ * \param ip           Index of the particle.
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level, or null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr  Array4 of current density.
+ * \param dt                    Time step for particle level
+ * \param relative_time         Time at which to deposit, relative to the time of the current positions of the particles.
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain.
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
+ * \param lo                    Index lower bounds of domain.
+ * \param q                     species charge.
+ * \param invvol                One over cell volume
+ * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry.
+ */
+template <int depos_order, int components = JComponents::all>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doVillasenorDepositionShapeNExplicitKernel (const long ip,
+                                                 const GetParticlePosition<PIdx>& GetPosition,
+                                                 const amrex::ParticleReal * const wp,
+                                                 const amrex::ParticleReal * const uxp,
+                                                 const amrex::ParticleReal * const uyp,
+                                                 const amrex::ParticleReal * const uzp,
+                                                 const int * const ion_lev,
+                                                 const amrex::Array4<amrex::Real>& Jx_arr,
+                                                 const amrex::Array4<amrex::Real>& Jy_arr,
+                                                 const amrex::Array4<amrex::Real>& Jz_arr,
+                                                 const amrex::Real dt,
+                                                 const amrex::Real relative_time,
+                                                 const amrex::XDim3 & dinv,
+                                                 const amrex::XDim3 & xyzmin,
+                                                 const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+                                                 const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
+                                                 const amrex::Dim3 lo,
+                                                 const amrex::Real q,
+                                                 const amrex::Real invvol,
+                                                 [[maybe_unused]] const int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+            constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
+            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
+                                                               + uyp[ip]*uyp[ip]*inv_c2
+                                                               + uzp[ip]*uzp[ip]*inv_c2);
+
+            // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
+            // (do_ionization=1)
+            bool const do_ionization = ion_lev;
+
+            amrex::Real wq = q*wp[ip];
+            if (do_ionization){
+                wq *= ion_lev[ip];
+            }
+
+            amrex::ParticleReal xp, yp, zp;
+            GetPosition(ip, xp, yp, zp);
+
+            // computes current and old position
+            amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
+            amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
+            amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
+            amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
+            amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
+            amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
+
+            VillasenorDepositionShapeNKernel<depos_order, components>(
+                xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
+                                                          uxp[ip], uyp[ip], uzp[ip], gaminv,
+                                                          Jx_arr, Jy_arr, Jz_arr,
+                                                          dt, dinv, xyzmin, domain_double, do_cropping,
+                                                          lo, invvol, n_rz_azimuthal_modes);
 }
 
 /**
@@ -2232,12 +2569,6 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
                                            const amrex::Real q,
                                            [[maybe_unused]] const int n_rz_azimuthal_modes)
 {
-    using namespace amrex::literals;
-
-    // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
-    // (do_ionization=1)
-    bool const do_ionization = ion_lev;
-
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
     // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr.
@@ -2245,36 +2576,148 @@ void doVillasenorDepositionShapeNExplicit (const GetParticlePosition<PIdx>& GetP
     amrex::For(
         np_to_deposit,
         [=] AMREX_GPU_DEVICE (long const ip) {
-
-            constexpr auto inv_c2 = PhysConst::inv_c2_v<amrex::ParticleReal>;
-            const amrex::Real gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
-                                                               + uyp[ip]*uyp[ip]*inv_c2
-                                                               + uzp[ip]*uzp[ip]*inv_c2);
-
-            amrex::Real wq = q*wp[ip];
-            if (do_ionization){
-                wq *= ion_lev[ip];
-            }
-
-            amrex::ParticleReal xp, yp, zp;
-            GetPosition(ip, xp, yp, zp);
-
-            // computes current and old position
-            amrex::Real const xp_new = xp + (relative_time + 0.5_rt*dt)*uxp[ip]*gaminv;
-            amrex::Real const xp_old = xp_new - dt*uxp[ip]*gaminv;
-            amrex::Real const yp_new = yp + (relative_time + 0.5_rt*dt)*uyp[ip]*gaminv;
-            amrex::Real const yp_old = yp_new - dt*uyp[ip]*gaminv;
-            amrex::Real const zp_new = zp + (relative_time + 0.5_rt*dt)*uzp[ip]*gaminv;
-            amrex::Real const zp_old = zp_new - dt*uzp[ip]*gaminv;
-
-            VillasenorDepositionShapeNKernel<depos_order>(xp_old, yp_old, zp_old, xp_new, yp_new, zp_new, wq,
-                                                          uxp[ip], uyp[ip], uzp[ip], gaminv,
-                                                          Jx_arr, Jy_arr, Jz_arr,
-                                                          dt, dinv, xyzmin, domain_double, do_cropping,
-                                                          lo, invvol, n_rz_azimuthal_modes);
-
+            doVillasenorDepositionShapeNExplicitKernel<depos_order>(
+                ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, Jx_arr, Jy_arr, Jz_arr,
+                dt, relative_time, dinv, xyzmin, domain_double, do_cropping, lo, q, invvol,
+                n_rz_azimuthal_modes);
     });
 
+}
+
+/**
+ * \brief Functor that deposits the current of one particle with the Villasenor and Buneman
+ *        deposition, for doSharedDeposition. See doVillasenorDepositionShapeNExplicitKernel
+ *        for the members.
+ *
+ * \tparam depos_order  deposition order
+ */
+template <int depos_order>
+struct VillasenorParticleDeposit
+{
+    GetParticlePosition<PIdx> GetPosition;
+    const amrex::ParticleReal* wp;
+    const amrex::ParticleReal* uxp;
+    const amrex::ParticleReal* uyp;
+    const amrex::ParticleReal* uzp;
+    const int* ion_lev;
+    amrex::Real dt;
+    amrex::Real relative_time;
+    amrex::XDim3 dinv;
+    amrex::XDim3 xyzmin;
+    amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> domain_double;
+    amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> do_cropping;
+    amrex::Dim3 lo;
+    amrex::Real q;
+    amrex::Real invvol;
+    int n_rz_azimuthal_modes;
+
+    /** \brief Deposit the components of J in the bitmask \c components (see JComponents)
+     *         of particle \c ip into \c J */
+    template <int components>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void deposit (const long ip, amrex::GpuArray<amrex::Array4<amrex::Real>, 3> const& J) const
+    {
+        doVillasenorDepositionShapeNExplicitKernel<depos_order, components>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, J[0], J[1], J[2],
+            dt, relative_time, dinv, xyzmin, domain_double, do_cropping, lo, q, invvol,
+            n_rz_azimuthal_modes);
+    }
+};
+
+/**
+ * \brief Villasenor and Buneman current deposition, for the explicit scheme, using shared
+ *        memory buffers. Particles are binned into tiles of bin_size cells, and each tile
+ *        is processed by one GPU thread block, which accumulates the current in shared
+ *        memory before adding it to the global arrays. Only available for CUDA and HIP.
+ *
+ * \tparam depos_order  deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param jx_fab,jy_fab,jz_fab FArrayBox of current density.
+ * \param dt                    Time step for particle level
+ * \param relative_time         Time at which to deposit J, relative to the time of the
+ *                              current positions of the particles.
+ * \param dinv                  3D cell size inverse
+ * \param xyzmin                Physical lower bounds of domain.
+ * \param domain_double         The domain boundary indicies cast to double values
+ * \param do_cropping           Whether to crop particle orbits at domain boundaries
+ * \param lo                    Index lower bounds of domain.
+ * \param q                     species charge.
+ * \param n_rz_azimuthal_modes  Number of azimuthal modes when using RZ geometry; must be 1.
+ * \param a_bins             bins used for particle sorting
+ * \param box                the current box
+ * \param geom               the geometry of the current level
+ * \param a_tbox_max_size    the maximum size of a tilebox
+ * \param threads_per_block  number of threads to use per block in shared deposition
+ * \param bin_size           tileSize to use for shared current deposition operations
+ */
+template <int depos_order>
+void doVillasenorDepositionSharedShapeN (
+    const GetParticlePosition<PIdx>& GetPosition,
+    const amrex::ParticleReal * const wp,
+    const amrex::ParticleReal * const uxp,
+    const amrex::ParticleReal * const uyp,
+    const amrex::ParticleReal * const uzp,
+    const int* ion_lev,
+    amrex::FArrayBox& jx_fab,
+    amrex::FArrayBox& jy_fab,
+    amrex::FArrayBox& jz_fab,
+    const amrex::Real dt,
+    const amrex::Real relative_time,
+    const amrex::XDim3 & dinv,
+    const amrex::XDim3 & xyzmin,
+    const amrex::GpuArray<amrex::GpuArray<double,2>, AMREX_SPACEDIM> & domain_double,
+    const amrex::GpuArray<amrex::GpuArray<bool,2>, AMREX_SPACEDIM> & do_cropping,
+    const amrex::Dim3 lo,
+    const amrex::Real q,
+    const int n_rz_azimuthal_modes,
+    const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
+    const amrex::Box& box,
+    const amrex::Geometry& geom,
+    const amrex::IntVect& a_tbox_max_size,
+    const int threads_per_block,
+    const amrex::IntVect bin_size)
+{
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+    using namespace amrex::literals;
+
+    // Like Esirkepov, Villasenor deposits each component of J on nodes or cell centers that
+    // span the old and new positions of the particle. With the CFL condition, a particle in
+    // a given cell touches points from depos_order cells below to depos_order+1 cells above
+    // that cell, so the buffers cover the tile grown by depos_order and made nodal (cell
+    // centers along a direction are within the range of the nodes).
+    // The new position is the current position (used for binning) pushed by
+    // relative_time + dt/2, which is 0 for the usual explicit deposition. Otherwise,
+    // grow the buffers by the number of cells that the particle can move in that time.
+    const auto dxiarr = geom.InvCellSizeArray();
+    const amrex::Real shift_time = std::abs(relative_time + 0.5_rt*dt);
+    int ngrow = depos_order;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        ngrow = amrex::max(ngrow, depos_order + static_cast<int>(
+            std::ceil(PhysConst::c*shift_time*dxiarr[idim])));
+    }
+
+    const VillasenorParticleDeposit<depos_order> deposit_particle{
+        GetPosition, wp, uxp, uyp, uzp, ion_lev, dt, relative_time, dinv, xyzmin,
+        domain_double, do_cropping, lo, q, dinv.x*dinv.y*dinv.z, n_rz_azimuthal_modes};
+    const amrex::GpuArray<amrex::Array4<amrex::Real>, 3> J{
+        jx_fab.array(), jy_fab.array(), jz_fab.array()};
+    const amrex::IntVect nodal = amrex::IntVect::TheNodeVector();
+    const amrex::GpuArray<amrex::IntVect, 3> types{nodal, nodal, nodal};
+    doSharedDeposition<3>(deposit_particle, J, types, ngrow, a_bins, box, a_tbox_max_size,
+                          threads_per_block, bin_size);
+#else
+    amrex::ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
+        dt, relative_time, dinv, xyzmin, domain_double, do_cropping, lo, q, n_rz_azimuthal_modes,
+        a_bins, box, geom, a_tbox_max_size, threads_per_block, bin_size);
+    WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
+#endif
 }
 
 /**
@@ -2401,67 +2844,84 @@ void doVillasenorDepositionShapeNImplicit ([[maybe_unused]]const amrex::Particle
 }
 
 /**
- * \brief Vay current deposition
- * (<a href="https://doi.org/10.1016/j.jcp.2013.03.010"> Vay et al, 2013</a>)
- * for thread \c thread_num: deposit \c D in real space and store the result in
- * \c Dx_fab, \c Dy_fab, \c Dz_fab
+ * \brief Bitmask of the arrays that the Vay deposition kernel deposits into: the temporary
+ *        arrays t0 to t3 (in 3D, all four; in 2D, t0 and t1) and, in 2D, Dy.
+ *
+ * As for JComponents, the shared memory deposition uses this to deposit into one array at
+ * a time when the buffers for all the arrays do not fit in shared memory.
+ */
+namespace VayArrays {
+    enum : int { t0 = 1, t1 = 2, t2 = 4, t3 = 8, Dy = 16, all = t0 | t1 | t2 | t3 | Dy };
+
+    /** \brief Whether the bitmask \c components includes the array \c a */
+    AMREX_GPU_HOST_DEVICE
+    constexpr bool has (int components, int a) noexcept { return (components & a) != 0; }
+}
+
+/**
+ * \brief Atomically add a value to an array element, if the bit \c bit is set in the bitmask
+ *        \c components of the arrays to deposit into (see VayArrays). Helper of
+ *        doVayDepositionShapeNKernel.
+ */
+template <int bit, int components>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void vayAddNoRet (amrex::Array4<amrex::Real> const& arr, int i, int j, int k, amrex::Real value)
+{
+    if constexpr (VayArrays::has(components, bit)) {
+        amrex::Gpu::Atomic::AddNoRet(&arr(i, j, k), value);
+    } else {
+        amrex::ignore_unused(arr, i, j, k, value);
+    }
+}
+
+/**
+ * \brief Vay current deposition of a single particle.
+ *
+ * Kernel of doVayDepositionShapeN and doVayDepositionSharedShapeN. Deposits into the
+ * temporary arrays that are then combined into D (and, in 2D, directly into Dy).
  *
  * \tparam depos_order  deposition order
+ * \tparam components   bitmask of the arrays to deposit into (see VayArrays). In 3D, only
+ *                      t0_arr to t3_arr are used; in 2D (XZ), only t0_arr, t1_arr and Dy_arr
+ *                      are used. The arrays not deposited into are not accessed.
+ * \param[in] ip           Index of the particle
  * \param[in] GetPosition  Functor that returns the particle position
  * \param[in] wp           Pointer to array of particle weights
- * \param[in] uxp,uyp,uzp  Pointer to arrays of particle momentum along \c x
- * \param[in] ion_lev      Pointer to array of particle ionization level. This is
-                           required to have the charge of each macroparticle since \c q
-                           is a scalar. For non-ionizable species, \c ion_lev is \c null
- * \param[in,out] Dx_fab,Dy_fab,Dz_fab FArrayBox of Vay current density, either full array or tile
- * \param[in] np_to_deposit Number of particles for which current is deposited
+ * \param[in] uxp,uyp,uzp  Pointer to arrays of particle momentum
+ * \param[in] ion_lev      Pointer to array of particle ionization level, or null pointer
+ * \param[in,out] t0_arr,t1_arr,t2_arr,t3_arr Array4 of the temporary arrays
+ * \param[in,out] Dy_arr   Array4 of Dy (2D only)
  * \param[in] dt           Time step for particle level
  * \param[in] relative_time Time at which to deposit D, relative to the time of the
- *                          current positions of the particles. When different than 0,
- *                          the particle position will be temporarily modified to match
- *                          the time of the deposition.
+ *                          current positions of the particles.
  * \param[in] dinv         3D cell size inverse
  * \param[in] xyzmin       3D lower bounds of physical domain
  * \param[in] lo           Dimension-agnostic lower bounds of index domain
  * \param[in] q            Species charge
- * \param[in] n_rz_azimuthal_modes Number of azimuthal modes in RZ geometry
  */
-template <int depos_order>
-void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
-                            const amrex::ParticleReal* const wp,
-                            const amrex::ParticleReal* const uxp,
-                            const amrex::ParticleReal* const uyp,
-                            const amrex::ParticleReal* const uzp,
-                            const int* const ion_lev,
-                            amrex::FArrayBox& Dx_fab,
-                            amrex::FArrayBox& Dy_fab,
-                            amrex::FArrayBox& Dz_fab,
-                            long np_to_deposit,
-                            amrex::Real dt,
-                            amrex::Real relative_time,
-                            const amrex::XDim3 & dinv,
-                            const amrex::XDim3 & xyzmin,
-                            amrex::Dim3 lo,
-                            amrex::Real q,
-                            [[maybe_unused]]int n_rz_azimuthal_modes)
+template <int depos_order, int components = VayArrays::all>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doVayDepositionShapeNKernel ([[maybe_unused]] const long ip,
+                                  [[maybe_unused]] const GetParticlePosition<PIdx>& GetPosition,
+                                  [[maybe_unused]] const amrex::ParticleReal* const wp,
+                                  [[maybe_unused]] const amrex::ParticleReal* const uxp,
+                                  [[maybe_unused]] const amrex::ParticleReal* const uyp,
+                                  [[maybe_unused]] const amrex::ParticleReal* const uzp,
+                                  [[maybe_unused]] const int* const ion_lev,
+                                  [[maybe_unused]] amrex::Array4<amrex::Real> const& t0_arr,
+                                  [[maybe_unused]] amrex::Array4<amrex::Real> const& t1_arr,
+                                  [[maybe_unused]] amrex::Array4<amrex::Real> const& t2_arr,
+                                  [[maybe_unused]] amrex::Array4<amrex::Real> const& t3_arr,
+                                  [[maybe_unused]] amrex::Array4<amrex::Real> const& Dy_arr,
+                                  [[maybe_unused]] const amrex::Real dt,
+                                  [[maybe_unused]] const amrex::Real relative_time,
+                                  [[maybe_unused]] const amrex::XDim3 & dinv,
+                                  [[maybe_unused]] const amrex::XDim3 & xyzmin,
+                                  [[maybe_unused]] const amrex::Dim3 lo,
+                                  [[maybe_unused]] const amrex::Real q)
 {
-    using namespace amrex::literals;
-
-#if defined(WARPX_DIM_RZ)
-    amrex::ignore_unused(GetPosition,
-        wp, uxp, uyp, uzp, ion_lev, Dx_fab, Dy_fab, Dz_fab,
-        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q);
-    WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented in RZ geometry");
-#endif
-
-#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    amrex::ignore_unused(GetPosition,
-        wp, uxp, uyp, uzp, ion_lev, Dx_fab, Dy_fab, Dz_fab,
-        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q);
-    WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented in 1D geometry");
-#endif
-
 #if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z || defined WARPX_DIM_RCYLINDER || defined WARPX_DIM_RSPHERE)
+    using namespace amrex::literals;
 
     // If ion_lev is a null pointer, then do_ionization=0, else do_ionization=1
     const bool do_ionization = ion_lev;
@@ -2471,26 +2931,6 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
     const amrex::Real invvol = dinv.x*dinv.y*dinv.z;
 
-    // Allocate temporary arrays
-#if defined(WARPX_DIM_3D)
-    AMREX_ALWAYS_ASSERT(Dx_fab.box() == Dy_fab.box() && Dx_fab.box() == Dz_fab.box());
-    amrex::FArrayBox temp_fab{Dx_fab.box(), 4};
-#elif defined(WARPX_DIM_XZ)
-    AMREX_ALWAYS_ASSERT(Dx_fab.box() == Dz_fab.box());
-    amrex::FArrayBox temp_fab{Dx_fab.box(), 2};
-#endif
-    temp_fab.setVal<amrex::RunOn::Device>(0._rt);
-    amrex::Array4<amrex::Real> const& temp_arr = temp_fab.array();
-
-    // Arrays where D will be stored
-    amrex::Array4<amrex::Real> const& Dx_arr = Dx_fab.array();
-    amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
-    amrex::Array4<amrex::Real> const& Dz_arr = Dz_fab.array();
-
-    // Loop over particles and deposit (Dx,Dy,Dz) into Dx_fab, Dy_fab and Dz_fab.
-    // amrex::For: iterations scatter-add into shared nodes (no SIMD pragma, see issue #7097)
-    amrex::For(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
-    {
         // Inverse of Lorentz factor gamma
         const amrex::Real invgam = 1._rt / std::sqrt(1._rt + uxp[ip] * uxp[ip] * PhysConst::inv_c2
                                                            + uyp[ip] * uyp[ip] * PhysConst::inv_c2
@@ -2584,40 +3024,40 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
                 if (i_new == i_old && k_new == k_old) {
                     // temp arrays for Dx and Dz
-                    amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + k_new + k, 0, 0),
+                    vayAddNoRet<VayArrays::t0, components>(t0_arr, lo.x + i_new + i, lo.y + k_new + k, 0,
                         wq * invvol * invdt * (sxn_szn - sxo_szo));
 
-                    amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + k_new + k, 0, 1),
+                    vayAddNoRet<VayArrays::t1, components>(t1_arr, lo.x + i_new + i, lo.y + k_new + k, 0,
                         wq * invvol * invdt * (sxn_szo - sxo_szn));
 
                     // Dy
-                    amrex::Gpu::Atomic::AddNoRet(&Dy_arr(lo.x + i_new + i, lo.y + k_new + k, 0, 0),
+                    vayAddNoRet<VayArrays::Dy, components>(Dy_arr, lo.x + i_new + i, lo.y + k_new + k, 0,
                         wqy * 0.25_rt * (sxn_szn + sxn_szo + sxo_szn + sxo_szo));
                 } else {
                     // temp arrays for Dx and Dz
-                    amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + k_new + k, 0, 0),
+                    vayAddNoRet<VayArrays::t0, components>(t0_arr, lo.x + i_new + i, lo.y + k_new + k, 0,
                         wq * invvol * invdt * sxn_szn);
 
-                    amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_old + i, lo.y + k_old + k, 0, 0),
+                    vayAddNoRet<VayArrays::t0, components>(t0_arr, lo.x + i_old + i, lo.y + k_old + k, 0,
                         - wq * invvol * invdt * sxo_szo);
 
-                    amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + k_old + k, 0, 1),
+                    vayAddNoRet<VayArrays::t1, components>(t1_arr, lo.x + i_new + i, lo.y + k_old + k, 0,
                         wq * invvol * invdt * sxn_szo);
 
-                    amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_old + i, lo.y + k_new + k, 0, 1),
+                    vayAddNoRet<VayArrays::t1, components>(t1_arr, lo.x + i_old + i, lo.y + k_new + k, 0,
                         - wq * invvol * invdt * sxo_szn);
 
                     // Dy
-                    amrex::Gpu::Atomic::AddNoRet(&Dy_arr(lo.x + i_new + i, lo.y + k_new + k, 0, 0),
+                    vayAddNoRet<VayArrays::Dy, components>(Dy_arr, lo.x + i_new + i, lo.y + k_new + k, 0,
                         wqy * 0.25_rt * sxn_szn);
 
-                    amrex::Gpu::Atomic::AddNoRet(&Dy_arr(lo.x + i_new + i, lo.y + k_old + k, 0, 0),
+                    vayAddNoRet<VayArrays::Dy, components>(Dy_arr, lo.x + i_new + i, lo.y + k_old + k, 0,
                         wqy * 0.25_rt * sxn_szo);
 
-                    amrex::Gpu::Atomic::AddNoRet(&Dy_arr(lo.x + i_old + i, lo.y + k_new + k, 0, 0),
+                    vayAddNoRet<VayArrays::Dy, components>(Dy_arr, lo.x + i_old + i, lo.y + k_new + k, 0,
                         wqy * 0.25_rt * sxo_szn);
 
-                    amrex::Gpu::Atomic::AddNoRet(&Dy_arr(lo.x + i_old + i, lo.y + k_old + k, 0, 0),
+                    vayAddNoRet<VayArrays::Dy, components>(Dy_arr, lo.x + i_old + i, lo.y + k_old + k, 0,
                         wqy * 0.25_rt * sxo_szo);
                 }
 
@@ -2647,48 +3087,72 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
                     if (i_new == i_old && j_new == j_old && k_new == k_old) {
                         // temp arrays for Dx, Dy and Dz
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k, 0),
+                        vayAddNoRet<VayArrays::t0, components>(t0_arr, lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k,
                             wq * invvol * invdt * (sxn_syn_szn - sxo_syo_szo));
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k, 1),
+                        vayAddNoRet<VayArrays::t1, components>(t1_arr, lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k,
                             wq * invvol * invdt * (sxn_syn_szo - sxo_syo_szn));
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k, 2),
+                        vayAddNoRet<VayArrays::t2, components>(t2_arr, lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k,
                             wq * invvol * invdt * (sxn_syo_szn - sxo_syn_szo));
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k, 3),
+                        vayAddNoRet<VayArrays::t3, components>(t3_arr, lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k,
                             wq * invvol * invdt * (sxo_syn_szn - sxn_syo_szo));
                     } else {
                         // temp arrays for Dx, Dy and Dz
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k, 0),
+                        vayAddNoRet<VayArrays::t0, components>(t0_arr, lo.x + i_new + i, lo.y + j_new + j, lo.z + k_new + k,
                             wq * invvol * invdt * sxn_syn_szn);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_old + i, lo.y + j_old + j, lo.z + k_old + k, 0),
+                        vayAddNoRet<VayArrays::t0, components>(t0_arr, lo.x + i_old + i, lo.y + j_old + j, lo.z + k_old + k,
                             - wq * invvol * invdt * sxo_syo_szo);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_new + j, lo.z + k_old + k, 1),
+                        vayAddNoRet<VayArrays::t1, components>(t1_arr, lo.x + i_new + i, lo.y + j_new + j, lo.z + k_old + k,
                             wq * invvol * invdt * sxn_syn_szo);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_old + i, lo.y + j_old + j, lo.z + k_new + k, 1),
+                        vayAddNoRet<VayArrays::t1, components>(t1_arr, lo.x + i_old + i, lo.y + j_old + j, lo.z + k_new + k,
                             - wq * invvol * invdt * sxo_syo_szn);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_old + j, lo.z + k_new + k, 2),
+                        vayAddNoRet<VayArrays::t2, components>(t2_arr, lo.x + i_new + i, lo.y + j_old + j, lo.z + k_new + k,
                             wq * invvol * invdt * sxn_syo_szn);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_old + i, lo.y + j_new + j, lo.z + k_old + k, 2),
+                        vayAddNoRet<VayArrays::t2, components>(t2_arr, lo.x + i_old + i, lo.y + j_new + j, lo.z + k_old + k,
                             - wq * invvol * invdt * sxo_syn_szo);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_old + i, lo.y + j_new + j, lo.z + k_new + k, 3),
+                        vayAddNoRet<VayArrays::t3, components>(t3_arr, lo.x + i_old + i, lo.y + j_new + j, lo.z + k_new + k,
                             wq * invvol * invdt * sxo_syn_szn);
 
-                        amrex::Gpu::Atomic::AddNoRet(&temp_arr(lo.x + i_new + i, lo.y + j_old + j, lo.z + k_old + k, 3),
+                        vayAddNoRet<VayArrays::t3, components>(t3_arr, lo.x + i_new + i, lo.y + j_old + j, lo.z + k_old + k,
                             - wq * invvol * invdt * sxn_syo_szo);
                     }
                 }
             }
         }
 #endif
-    } );
+#endif // #if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z ...)
+}
+
+/**
+ * \brief Combine the temporary arrays of the Vay deposition into \c Dx_fab, \c Dy_fab, \c Dz_fab.
+ *        This is kept separate from (and not templated like) doVayDepositionWithTempArrays,
+ *        since nvcc does not allow an extended device lambda in a function template
+ *        instantiated with a function-local type.
+ *
+ * \param[in] temp_arr  Array4 of the temporary arrays
+ * \param[in,out] Dx_fab,Dy_fab,Dz_fab FArrayBox of Vay current density
+ */
+inline
+void doVayDepositionCombineTempArrays (
+    [[maybe_unused]] amrex::Array4<amrex::Real const> const& temp_arr,
+    [[maybe_unused]] amrex::FArrayBox& Dx_fab,
+    [[maybe_unused]] amrex::FArrayBox& Dy_fab,
+    [[maybe_unused]] amrex::FArrayBox& Dz_fab)
+{
+#if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z || defined WARPX_DIM_RCYLINDER || defined WARPX_DIM_RSPHERE)
+    using namespace amrex::literals;
+
+    amrex::Array4<amrex::Real> const& Dx_arr = Dx_fab.array();
+    [[maybe_unused]] amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
+    amrex::Array4<amrex::Real> const& Dz_arr = Dz_fab.array();
 
 #if defined(WARPX_DIM_3D)
     amrex::ParallelFor(Dx_fab.box(), [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
@@ -2710,9 +3174,288 @@ void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
         Dz_arr(i,j,0) += (0.5_rt)*(t_a - t_b);
     });
 #endif
+#endif
+}
+
+/**
+ * \brief Common part of the Vay current deposition with and without shared memory:
+ *        allocate the temporary arrays, call \c deposit to deposit the particles into them
+ *        (and into Dy in 2D), then combine them into \c Dx_fab, \c Dy_fab, \c Dz_fab.
+ *
+ * \param[in,out] Dx_fab,Dy_fab,Dz_fab FArrayBox of Vay current density
+ * \param[in] deposit  callable with arguments (t0_arr, t1_arr, t2_arr, t3_arr, Dy_arr), the
+ *                     Array4s to deposit into (see doVayDepositionShapeNKernel)
+ */
+template <typename F>
+void doVayDepositionWithTempArrays ([[maybe_unused]] amrex::FArrayBox& Dx_fab,
+                                    [[maybe_unused]] amrex::FArrayBox& Dy_fab,
+                                    [[maybe_unused]] amrex::FArrayBox& Dz_fab,
+                                    [[maybe_unused]] F&& deposit)
+{
+#if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z || defined WARPX_DIM_RCYLINDER || defined WARPX_DIM_RSPHERE)
+    using namespace amrex::literals;
+
+    // Allocate temporary arrays
+#if defined(WARPX_DIM_3D)
+    AMREX_ALWAYS_ASSERT(Dx_fab.box() == Dy_fab.box() && Dx_fab.box() == Dz_fab.box());
+    amrex::FArrayBox temp_fab{Dx_fab.box(), 4};
+#elif defined(WARPX_DIM_XZ)
+    AMREX_ALWAYS_ASSERT(Dx_fab.box() == Dz_fab.box());
+    amrex::FArrayBox temp_fab{Dx_fab.box(), 2};
+#endif
+    temp_fab.setVal<amrex::RunOn::Device>(0._rt);
+    amrex::Array4<amrex::Real> const& temp_arr = temp_fab.array();
+
+    // Array where Dy is deposited directly (2D only)
+    amrex::Array4<amrex::Real> const& Dy_arr = Dy_fab.array();
+
+    // Components of the temporary arrays
+    amrex::Array4<amrex::Real> const t0_arr(temp_arr, 0, 1);
+    amrex::Array4<amrex::Real> const t1_arr(temp_arr, 1, 1);
+#if defined(WARPX_DIM_3D)
+    amrex::Array4<amrex::Real> const t2_arr(temp_arr, 2, 1);
+    amrex::Array4<amrex::Real> const t3_arr(temp_arr, 3, 1);
+#else
+    amrex::Array4<amrex::Real> const t2_arr, t3_arr; // not used
+#endif
+
+    deposit(t0_arr, t1_arr, t2_arr, t3_arr, Dy_arr);
+
+    doVayDepositionCombineTempArrays(temp_arr, Dx_fab, Dy_fab, Dz_fab);
+
     // Synchronize so that temp_fab can be safely deallocated in its destructor
     amrex::Gpu::streamSynchronize();
 
+#endif
+}
+
+/**
+ * \brief Vay current deposition
+ * (<a href="https://doi.org/10.1016/j.jcp.2013.03.010"> Vay et al, 2013</a>)
+ * for thread \c thread_num: deposit \c D in real space and store the result in
+ * \c Dx_fab, \c Dy_fab, \c Dz_fab
+ *
+ * \tparam depos_order  deposition order
+ * \param[in] GetPosition  Functor that returns the particle position
+ * \param[in] wp           Pointer to array of particle weights
+ * \param[in] uxp,uyp,uzp  Pointer to arrays of particle momentum along \c x
+ * \param[in] ion_lev      Pointer to array of particle ionization level. This is
+                           required to have the charge of each macroparticle since \c q
+                           is a scalar. For non-ionizable species, \c ion_lev is \c null
+ * \param[in,out] Dx_fab,Dy_fab,Dz_fab FArrayBox of Vay current density, either full array or tile
+ * \param[in] np_to_deposit Number of particles for which current is deposited
+ * \param[in] dt           Time step for particle level
+ * \param[in] relative_time Time at which to deposit D, relative to the time of the
+ *                          current positions of the particles. When different than 0,
+ *                          the particle position will be temporarily modified to match
+ *                          the time of the deposition.
+ * \param[in] dinv         3D cell size inverse
+ * \param[in] xyzmin       3D lower bounds of physical domain
+ * \param[in] lo           Dimension-agnostic lower bounds of index domain
+ * \param[in] q            Species charge
+ * \param[in] n_rz_azimuthal_modes Number of azimuthal modes in RZ geometry
+ */
+template <int depos_order>
+void doVayDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+                            const amrex::ParticleReal* const wp,
+                            const amrex::ParticleReal* const uxp,
+                            const amrex::ParticleReal* const uyp,
+                            const amrex::ParticleReal* const uzp,
+                            const int* const ion_lev,
+                            amrex::FArrayBox& Dx_fab,
+                            amrex::FArrayBox& Dy_fab,
+                            amrex::FArrayBox& Dz_fab,
+                            long np_to_deposit,
+                            amrex::Real dt,
+                            amrex::Real relative_time,
+                            const amrex::XDim3 & dinv,
+                            const amrex::XDim3 & xyzmin,
+                            amrex::Dim3 lo,
+                            amrex::Real q,
+                            [[maybe_unused]]int n_rz_azimuthal_modes)
+{
+    using namespace amrex::literals;
+
+#if defined(WARPX_DIM_RZ)
+    amrex::ignore_unused(GetPosition,
+        wp, uxp, uyp, uzp, ion_lev, Dx_fab, Dy_fab, Dz_fab,
+        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q);
+    WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented in RZ geometry");
+#endif
+
+#if defined(WARPX_DIM_1D_Z) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(GetPosition,
+        wp, uxp, uyp, uzp, ion_lev, Dx_fab, Dy_fab, Dz_fab,
+        np_to_deposit, dt, relative_time, dinv, xyzmin, lo, q);
+    WARPX_ABORT_WITH_MESSAGE("Vay deposition not implemented in 1D geometry");
+#endif
+
+#if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z || defined WARPX_DIM_RCYLINDER || defined WARPX_DIM_RSPHERE)
+
+    // Loop over particles and deposit (Dx,Dy,Dz) into Dx_fab, Dy_fab and Dz_fab.
+    doVayDepositionWithTempArrays(Dx_fab, Dy_fab, Dz_fab,
+        [&] (amrex::Array4<amrex::Real> const& t0_arr, amrex::Array4<amrex::Real> const& t1_arr,
+             amrex::Array4<amrex::Real> const& t2_arr, amrex::Array4<amrex::Real> const& t3_arr,
+             amrex::Array4<amrex::Real> const& Dy_arr)
+    {
+    // amrex::For: iterations scatter-add into shared nodes (no SIMD pragma, see issue #7097)
+    amrex::For(np_to_deposit, [=] AMREX_GPU_DEVICE (long ip)
+    {
+        doVayDepositionShapeNKernel<depos_order>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, t0_arr, t1_arr, t2_arr, t3_arr,
+            Dy_arr, dt, relative_time, dinv, xyzmin, lo, q);
+    } );
+    });
+
 #endif // #if !(defined WARPX_DIM_RZ || defined WARPX_DIM_1D_Z)
+}
+
+/**
+ * \brief Functor that deposits the temporary arrays of the Vay deposition of one particle,
+ *        for doSharedDeposition. See doVayDepositionShapeNKernel for the members.
+ *
+ * The arrays are, in this order, t0, t1, t2 and t3 in 3D, and t0, t1 and Dy in 2D (XZ).
+ *
+ * \tparam depos_order  deposition order
+ */
+template <int depos_order>
+struct VayParticleDeposit
+{
+    //! Number of arrays deposited into
+    static constexpr int narrays = (AMREX_SPACEDIM == 3) ? 4 : 3;
+
+    GetParticlePosition<PIdx> GetPosition;
+    const amrex::ParticleReal* wp;
+    const amrex::ParticleReal* uxp;
+    const amrex::ParticleReal* uyp;
+    const amrex::ParticleReal* uzp;
+    const int* ion_lev;
+    amrex::Real dt;
+    amrex::Real relative_time;
+    amrex::XDim3 dinv;
+    amrex::XDim3 xyzmin;
+    amrex::Dim3 lo;
+    amrex::Real q;
+
+    /** \brief Deposit particle \c ip into the arrays in the bitmask \c arrays (bit n for
+     *         array n of \c A) */
+    template <int arrays>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void deposit (const long ip,
+                  amrex::GpuArray<amrex::Array4<amrex::Real>, narrays> const& A) const
+    {
+        // The arrays not in the bitmask are not accessed: pass A[0] for them
+#if defined(WARPX_DIM_3D)
+        doVayDepositionShapeNKernel<depos_order, arrays>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, A[0], A[1], A[2], A[3], A[0],
+            dt, relative_time, dinv, xyzmin, lo, q);
+#else
+        constexpr int components = (arrays & (VayArrays::t0 | VayArrays::t1)) |
+                                   ((arrays & 4) ? VayArrays::Dy : 0);
+        doVayDepositionShapeNKernel<depos_order, components>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, A[0], A[1], A[0], A[0], A[2],
+            dt, relative_time, dinv, xyzmin, lo, q);
+#endif
+    }
+};
+
+/**
+ * \brief Vay current deposition using shared memory buffers: deposit \c D in real space and
+ *        store the result in \c Dx_fab, \c Dy_fab, \c Dz_fab. Particles are binned into
+ *        tiles of bin_size cells, and each tile is processed by one GPU thread block, which
+ *        accumulates the temporary arrays of the Vay deposition in shared memory before
+ *        adding them to the global arrays. Only available for CUDA and HIP, in 2D and 3D.
+ *
+ * \tparam depos_order  deposition order
+ * \param[in] GetPosition  Functor that returns the particle position
+ * \param[in] wp           Pointer to array of particle weights
+ * \param[in] uxp,uyp,uzp  Pointer to arrays of particle momentum
+ * \param[in] ion_lev      Pointer to array of particle ionization level. This is
+                           required to have the charge of each macroparticle since \c q
+                           is a scalar. For non-ionizable species, \c ion_lev is \c null
+ * \param[in,out] Dx_fab,Dy_fab,Dz_fab FArrayBox of Vay current density
+ * \param[in] dt           Time step for particle level
+ * \param[in] relative_time Time at which to deposit D, relative to the time of the
+ *                          current positions of the particles.
+ * \param[in] dinv         3D cell size inverse
+ * \param[in] xyzmin       3D lower bounds of physical domain
+ * \param[in] lo           Dimension-agnostic lower bounds of index domain
+ * \param[in] q            Species charge
+ * \param[in] a_bins             bins used for particle sorting
+ * \param[in] box                the current box
+ * \param[in] geom               the geometry of the current level
+ * \param[in] a_tbox_max_size    the maximum size of a tilebox
+ * \param[in] threads_per_block  number of threads to use per block in shared deposition
+ * \param[in] bin_size           tileSize to use for shared current deposition operations
+ */
+template <int depos_order>
+void doVayDepositionSharedShapeN (
+    const GetParticlePosition<PIdx>& GetPosition,
+    const amrex::ParticleReal* const wp,
+    const amrex::ParticleReal* const uxp,
+    const amrex::ParticleReal* const uyp,
+    const amrex::ParticleReal* const uzp,
+    const int* const ion_lev,
+    amrex::FArrayBox& Dx_fab,
+    amrex::FArrayBox& Dy_fab,
+    amrex::FArrayBox& Dz_fab,
+    const amrex::Real dt,
+    const amrex::Real relative_time,
+    const amrex::XDim3 & dinv,
+    const amrex::XDim3 & xyzmin,
+    const amrex::Dim3 lo,
+    const amrex::Real q,
+    const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
+    const amrex::Box& box,
+    const amrex::Geometry& geom,
+    const amrex::IntVect& a_tbox_max_size,
+    const int threads_per_block,
+    const amrex::IntVect bin_size)
+{
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    (defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ))
+    using namespace amrex::literals;
+
+    // Vay deposits on the nodes touched by the particle at its old and new positions, which
+    // are the current position (used for binning) pushed by relative_time -/+ dt/2. A
+    // particle in a given cell touches nodes from depos_order cells below to depos_order+1
+    // cells above that cell, plus the number of cells that it can move in that time, so the
+    // buffers cover the tile grown by that many cells and made nodal.
+    const auto dxiarr = geom.InvCellSizeArray();
+    const amrex::Real shift_time = std::abs(relative_time) + 0.5_rt*dt;
+    int ngrow = depos_order;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        ngrow = amrex::max(ngrow, depos_order + static_cast<int>(
+            std::ceil(PhysConst::c*shift_time*dxiarr[idim])));
+    }
+
+    const VayParticleDeposit<depos_order> deposit_particle{
+        GetPosition, wp, uxp, uyp, uzp, ion_lev, dt, relative_time, dinv, xyzmin, lo, q};
+    constexpr int narrays = VayParticleDeposit<depos_order>::narrays;
+    const amrex::IntVect nodal = amrex::IntVect::TheNodeVector();
+    amrex::GpuArray<amrex::IntVect, narrays> types;
+    for (int n = 0; n < narrays; ++n) { types[n] = nodal; }
+
+    doVayDepositionWithTempArrays(Dx_fab, Dy_fab, Dz_fab,
+        [&] (amrex::Array4<amrex::Real> const& t0_arr, amrex::Array4<amrex::Real> const& t1_arr,
+             [[maybe_unused]] amrex::Array4<amrex::Real> const& t2_arr,
+             [[maybe_unused]] amrex::Array4<amrex::Real> const& t3_arr,
+             [[maybe_unused]] amrex::Array4<amrex::Real> const& Dy_arr)
+    {
+#if defined(WARPX_DIM_3D)
+        const amrex::GpuArray<amrex::Array4<amrex::Real>, narrays> arrays{
+            t0_arr, t1_arr, t2_arr, t3_arr};
+#else
+        const amrex::GpuArray<amrex::Array4<amrex::Real>, narrays> arrays{t0_arr, t1_arr, Dy_arr};
+#endif
+        doSharedDeposition<narrays>(deposit_particle, arrays, types, ngrow, a_bins, box,
+                                    a_tbox_max_size, threads_per_block, bin_size);
+    });
+#else
+    amrex::ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, Dx_fab, Dy_fab, Dz_fab,
+        dt, relative_time, dinv, xyzmin, lo, q, a_bins, box, geom, a_tbox_max_size,
+        threads_per_block, bin_size);
+    WARPX_ABORT_WITH_MESSAGE("Shared memory Vay deposition only implemented for HIP/CUDA in 2D and 3D");
+#endif
 }
 #endif // WARPX_CURRENTDEPOSITION_H_
