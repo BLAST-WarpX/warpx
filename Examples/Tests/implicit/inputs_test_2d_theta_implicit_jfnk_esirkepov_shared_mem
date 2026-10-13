@@ -1,0 +1,11 @@
+# base input parameters
+FILE = inputs_test_2d_theta_implicit_jfnk_vandb
+
+# test input parameters
+algo.current_deposition = "esirkepov"
+warpx.do_shared_mem_current_deposition = 1
+warpx.shared_tilesize = 4 4
+# GPU only: 16 boxes of 10x10 cells instead of 25 boxes of 8x8 cells, which would raise the
+# high-priority warning about too many boxes per GPU (more than 12) with 2 MPI ranks
+amr.max_grid_size = 10
+amr.blocking_factor = 2

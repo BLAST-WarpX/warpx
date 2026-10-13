@@ -504,6 +504,10 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             direct_current_dep_kernel);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::EsirkepovCurrentDepKernel",
             esirkepov_current_dep_kernel);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::VillasenorCurrentDepKernel",
+            villasenor_current_dep_kernel);
+    ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::VayCurrentDepKernel",
+            vay_current_dep_kernel);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::CurrentDeposition", blp_deposit);
     ABLASTR_PROFILE_VAR_NS("WarpXParticleContainer::DepositCurrent::Accumulate", blp_accumulate);
 
@@ -658,12 +662,19 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
             auto ptd = ptile.getParticleTileData();
 
             const int ntiles = numTilesInBox(box, true, bin_size);
+            const bool implicit_push = (push_type == PushType::Implicit);
 
             bins.build(ptile.numParticles(), ptd, ntiles,
                     [=] AMREX_GPU_HOST_DEVICE (const ParticleType& p) -> unsigned int
                     {
                         Box tbox;
                         auto iv = getParticleCell(p, plo, dxi, domain);
+                        if (implicit_push) {
+                            // Trial positions out of bounds are detected (and not deposited)
+                            // by the deposition; keep their bin index valid until then
+                            iv.max(box.smallEnd());
+                            iv.min(box.bigEnd());
+                        }
                         AMREX_ASSERT(box.contains(iv));
                         auto tid = getTileIndex(iv, box, true, bin_size, tbox);
                         return static_cast<unsigned int>(tid);
@@ -688,16 +699,115 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
         // Now pick current deposition algorithm
         if (push_type == PushType::Implicit) {
-            amrex::Abort("Cannot do shared memory deposition with implicit algorithm");
-        }
-        if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
-            WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Esirkepov algorithm");
-        }
-        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
-            WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Villasenor algorithm");
+            const int threads_per_block = WarpX::shared_mem_current_tpb;
+
+            if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
+                WARPX_ABORT_WITH_MESSAGE(
+                    "The Vay algorithm cannot be used with implicit algorithm.");
+            }
+            else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+                ABLASTR_PROFILE_VAR_START(villasenor_current_dep_kernel);
+                amrex::AnyCTO(
+                    amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                    [&](auto depos_order) {
+                        doVillasenorDepositionSharedShapeNImplicit<depos_order.value>(
+                            xp_n_data, yp_n_data, zp_n_data, GetPosition, wp.dataPtr() + offset,
+                            uxp_n_data, uyp_n_data, uzp_n_data, uxp.dataPtr() + offset,
+                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                            jx_fab, jy_fab, jz_fab, dt, dinv, xyzmin, domain_double, do_cropping,
+                            lo, q, WarpX::n_rz_azimuthal_modes,
+                            implicit_nodal_lo, implicit_nodal_hi, position_error_count_ptr,
+                            bins, box, max_tbox_size, threads_per_block, bin_size);
+                    });
+                ABLASTR_PROFILE_VAR_STOP(villasenor_current_dep_kernel);
+            }
+            else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
+                ABLASTR_PROFILE_VAR_START(esirkepov_current_dep_kernel);
+                amrex::AnyCTO(
+                    amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                    [&](auto depos_order) {
+                        doChargeConservingDepositionSharedShapeNImplicit<depos_order.value>(
+                            xp_n_data, yp_n_data, zp_n_data, GetPosition, wp.dataPtr() + offset,
+                            uxp_n_data, uyp_n_data, uzp_n_data, uxp.dataPtr() + offset,
+                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                            jx_fab, jy_fab, jz_fab, dt, dinv, xyzmin, domain_double, do_cropping,
+                            lo, q, WarpX::n_rz_azimuthal_modes,
+                            implicit_nodal_lo, implicit_nodal_hi, position_error_count_ptr,
+                            bins, box, max_tbox_size, threads_per_block, bin_size);
+                    });
+                ABLASTR_PROFILE_VAR_STOP(esirkepov_current_dep_kernel);
+            }
+            else {
+                ABLASTR_PROFILE_VAR_START(direct_current_dep_kernel);
+                amrex::AnyCTO(
+                    amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                    [&](auto depos_order) {
+                        doDepositionSharedShapeNImplicit<depos_order.value>(
+                            xp_n_data, yp_n_data, zp_n_data, GetPosition, wp.dataPtr() + offset,
+                            uxp_n_data, uyp_n_data, uzp_n_data, uxp.dataPtr() + offset,
+                            uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                            jx_fab, jy_fab, jz_fab, dinv, xyzmin, lo, q,
+                            WarpX::n_rz_azimuthal_modes,
+                            implicit_nodal_lo, implicit_nodal_hi, position_error_count_ptr,
+                            bins, box, max_tbox_size, threads_per_block, bin_size);
+                    });
+                ABLASTR_PROFILE_VAR_STOP(direct_current_dep_kernel);
+            }
         }
         else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Vay) {
-            WARPX_ABORT_WITH_MESSAGE("Cannot do shared memory deposition with Vay algorithm");
+            ABLASTR_PROFILE_VAR_START(vay_current_dep_kernel);
+
+            const int threads_per_block = WarpX::shared_mem_current_tpb;
+
+            amrex::AnyCTO(
+                amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                [&](auto depos_order) {
+                    doVayDepositionSharedShapeN<depos_order.value>(
+                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                        jx_fab, jy_fab, jz_fab, dt, relative_time, dinv, xyzmin, lo, q,
+                        bins, box, geom, max_tbox_size, threads_per_block, bin_size);
+                });
+            ABLASTR_PROFILE_VAR_STOP(vay_current_dep_kernel);
+        }
+        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Villasenor) {
+            ABLASTR_PROFILE_VAR_START(villasenor_current_dep_kernel);
+
+            const int threads_per_block = WarpX::shared_mem_current_tpb;
+
+            amrex::AnyCTO(
+                amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                [&](auto depos_order) {
+                    doVillasenorDepositionSharedShapeN<depos_order.value>(
+                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                        jx_fab, jy_fab, jz_fab, dt, relative_time, dinv, xyzmin,
+                        domain_double, do_cropping, lo, q, WarpX::n_rz_azimuthal_modes,
+                        bins, box, geom, max_tbox_size, threads_per_block, bin_size);
+                });
+            ABLASTR_PROFILE_VAR_STOP(villasenor_current_dep_kernel);
+        }
+        else if (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov) {
+            ABLASTR_PROFILE_VAR_START(esirkepov_current_dep_kernel);
+
+            const int threads_per_block = WarpX::shared_mem_current_tpb;
+
+            amrex::Array4<const int> eb_reduce_particle_shape;
+            if (EB::enabled()) {
+                eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+            }
+
+            amrex::AnyCTO(
+                amrex::TypeList<amrex::CompileTimeOptions<1,2,3,4>>{}, {WarpX::nox},
+                [&](auto depos_order) {
+                    doEsirkepovDepositionSharedShapeN<depos_order.value>(
+                        GetPosition, wp.dataPtr() + offset, uxp.dataPtr() + offset,
+                        uyp.dataPtr() + offset, uzp.dataPtr() + offset, ion_lev_offset,
+                        jx_fab, jy_fab, jz_fab, dt, relative_time, dinv, xyzmin, lo, q,
+                        WarpX::n_rz_azimuthal_modes, eb_reduce_particle_shape, EB::enabled(),
+                        bins, box, geom, max_tbox_size, threads_per_block, bin_size);
+                });
+            ABLASTR_PROFILE_VAR_STOP(esirkepov_current_dep_kernel);
         }
         else {
             ABLASTR_PROFILE_VAR_START(direct_current_dep_kernel);
