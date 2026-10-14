@@ -484,6 +484,9 @@ protected:
     // Flag controlling whether or not variance and then temperatures are computed per species
     bool m_do_temperature_deposition = false;
 
+    // Apply the finite-sample bias correction to deposited velocity variances
+    bool m_temperature_deposition_bias_correction = true;
+
     std::unique_ptr<warpx::particles::deposition::VarianceAccumulationBuffer> local_temperature_arrays;
 
 #ifdef WARPX_QED

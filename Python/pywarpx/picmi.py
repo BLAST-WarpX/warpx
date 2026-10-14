@@ -305,6 +305,10 @@ class Species(picmistandard.PICMI_Species):
         default=None,
         description="This flag is set per species to do another pass to deposit temperature on each timestep if required. Currently only works with Ohm's Law Hybrid Solver.",
     )
+    temperature_deposition_bias_correction: bool | None = Field(
+        default=None,
+        description="Apply the finite-sample bias correction to the deposited temperature of this species. If False, use the weighted population variance without the correction.",
+    )
 
     # --- Runtime state (not user inputs; populated during/after initialization).
     _species_type: str | None = PrivateAttr(default=None)
@@ -424,6 +428,7 @@ class Species(picmistandard.PICMI_Species):
             resampling_algorithm_n_phi=self.resampling_algorithm_n_phi,
             resampling_algorithm_delta_u=self.resampling_algorithm_delta_u,
             do_temperature_deposition=self.do_temperature_deposition,
+            temperature_deposition_bias_correction=self.temperature_deposition_bias_correction,
         )
 
         # add reflection models
