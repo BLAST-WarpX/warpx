@@ -31,9 +31,10 @@ ds = yt.load(filename)
 data = ds.covering_grid(
     level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
 )
-my_grid = ds.index.grids[0]
 
-By_sim = my_grid["By"].squeeze().v
+# Read By from the covering grid (not ds.index.grids[0], which is a single
+# box and does not span the domain in multi-box layouts)
+By_sim = data["By"].squeeze().v
 
 t = ds.current_time.to_value()
 
