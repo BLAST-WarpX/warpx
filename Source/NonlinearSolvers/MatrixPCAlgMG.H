@@ -15,9 +15,9 @@
 #include <string>
 
 /**
- * \brief AMReX algebraic multigrid (AlgMG) on the matrix assembled by MatrixPC
+ * \brief AMReX algebraic multigrid (AlgMG) on the matrix assembled by SparseJacobianMatrix
  *
- *  Kept out of MatrixPC.H so that the AlgMG headers are only compiled here.
+ *  Kept out of AlgMGPC.H so that the AlgMG headers are only compiled here.
  */
 class MatrixPCAlgMG
 {

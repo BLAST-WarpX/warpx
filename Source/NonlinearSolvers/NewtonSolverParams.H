@@ -12,6 +12,8 @@
 #include "PreconditionerLibrary.H"
 #include "Utils/TextMsg.H"
 
+#include <ablastr/warn_manager/WarnManager.H>
+
 #include <AMReX_Enum.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
@@ -45,8 +47,10 @@ struct NewtonSolverParams
     int linsol_maxits = 1000;
     //! Verbosity flag for the linear solver.
     int linsol_verbose_int = 2;
-    //! Restart iteration for the linear solver.
+    //! Restart iteration for the linear solver (amrex_gmres and petsc_ksp).
     int linsol_restart_length = 30;
+    //! Weighted Jacobi and Chebyshev linear solvers: iterate on the assembled PC matrix.
+    bool use_pcmat = true;
 
     //! Preconditioner type.
     PreconditionerType pc_type = PreconditionerType::none;
@@ -77,32 +81,55 @@ struct NewtonSolverParams
 
         const amrex::ParmParse pp_l(amrex::getEnumNameString(linear_solver_type));
         pp_l.query("verbose_int",         linsol_verbose_int);
-        pp_l.query("restart_length",      linsol_restart_length);
         pp_l.query("absolute_tolerance",  linsol_atol);
         pp_l.query("relative_tolerance",  linsol_rtol);
         pp_l.query("max_iterations",      linsol_maxits);
+        if (IsKrylov()) { pp_l.query("restart_length", linsol_restart_length); }
+        else { pp_l.query("use_pcmat", use_pcmat); }
 
         /* backward compatibility */
-        const amrex::ParmParse pp_gmres("gmres");
-        pp_gmres.query("verbose_int",         linsol_verbose_int);
-        pp_gmres.query("restart_length",      linsol_restart_length);
-        pp_gmres.query("absolute_tolerance",  linsol_atol);
-        pp_gmres.query("relative_tolerance",  linsol_rtol);
-        pp_gmres.query("max_iterations",      linsol_maxits);
+        if (IsKrylov()) {
+            const amrex::ParmParse pp_gmres("gmres");
+            pp_gmres.query("verbose_int",         linsol_verbose_int);
+            pp_gmres.query("restart_length",      linsol_restart_length);
+            pp_gmres.query("absolute_tolerance",  linsol_atol);
+            pp_gmres.query("relative_tolerance",  linsol_rtol);
+            pp_gmres.query("max_iterations",      linsol_maxits);
+        }
 
         const amrex::ParmParse pp_jac("jacobian");
         pp_jac.query("pc_type", pc_type);
+        // The weighted Jacobi and Chebyshev linear solvers do not apply a preconditioner
+        if (!IsKrylov() && pc_type != PreconditionerType::none) {
+            ablastr::warn_manager::WMRecordWarning("NewtonSolver",
+                amrex::getEnumNameString(linear_solver_type) +
+                " linear solver does not use a preconditioner; ignoring jacobian.pc_type = " +
+                amrex::getEnumNameString(pc_type));
+            pc_type = PreconditionerType::none;
+        }
 
-        // Jacobi reads MassMatrices_PC directly. A scheduled PC update can clear these
-        // coefficients during residual evaluation and leave them unfinished if Newton
-        // converges before PreLinearSolve(). Restrict the Newton interval when lagging
+        // Jacobi and Chebyshev may read MassMatrices_PC directly. A scheduled PC update can
+        // clear these coefficients during residual evaluation and leave them unfinished if
+        // Newton converges before PreLinearSolve(). Restrict the Newton interval when lagging
         // across time steps, until the PC deposition is moved to PreLinearSolve().
-        if (pc_type == PreconditionerType::pc_jacobi && pc_update_time_step_interval > 1) {
+        const bool reads_mass_matrices_pc =
+            pc_type == PreconditionerType::pc_jacobi ||
+            pc_type == PreconditionerType::pc_chebyshev ||
+            (!IsKrylov() && use_pcmat);
+        if (reads_mass_matrices_pc && pc_update_time_step_interval > 1) {
             WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
                 pc_update_newton_interval == 0,
-                "newton.pc_update_newton_interval must be 0 when using "
-                "pc_type = pc_jacobi and pc_update_time_step_interval > 1.");
+                "newton.pc_update_newton_interval must be 0 when using pc_type = pc_jacobi "
+                "or pc_chebyshev, or the weighted_jacobi or chebyshev linear solver with "
+                "use_pcmat = true, and pc_update_time_step_interval > 1.");
         }
+    }
+
+    //! Whether the linear solver is a Krylov method (amrex_gmres or petsc_ksp)
+    [[nodiscard]] bool IsKrylov () const
+    {
+        return linear_solver_type == LinearSolverType::amrex_gmres ||
+               linear_solver_type == LinearSolverType::petsc_ksp;
     }
 
     /**
@@ -125,10 +152,15 @@ struct NewtonSolverParams
         auto linsol_name = amrex::getEnumNameString(linear_solver_type);
         amrex::Print() << a_name << " linear solver:       " << linsol_name << "\n";
         amrex::Print() << "Linear solver (" << linsol_name << ") verbose:            " << linsol_verbose_int << "\n";
-        amrex::Print() << "Linear solver (" << linsol_name << ") restart length:     " << linsol_restart_length << "\n";
+        if (IsKrylov()) {
+            amrex::Print() << "Linear solver (" << linsol_name << ") restart length:     " << linsol_restart_length << "\n";
+        }
         amrex::Print() << "Linear solver (" << linsol_name << ") max iterations:     " << linsol_maxits << "\n";
         amrex::Print() << "Linear solver (" << linsol_name << ") relative tolerance: " << linsol_rtol << "\n";
         amrex::Print() << "Linear solver (" << linsol_name << ") absolute tolerance: " << linsol_atol << "\n";
+        if (!IsKrylov()) {
+            amrex::Print() << "Linear solver (" << linsol_name << ") use_pcmat:           " << (use_pcmat?"true":"false") << "\n";
+        }
         amrex::Print() << "Preconditioner type:      " << amrex::getEnumNameString(pc_type) << "\n";
     }
 };

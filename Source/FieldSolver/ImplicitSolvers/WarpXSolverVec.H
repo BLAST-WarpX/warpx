@@ -254,6 +254,12 @@ public:
         }
     }
 
+    /**
+     * \brief Fill with pseudo-random values in [-1,1) that depend only on the
+     *        global index, so they do not depend on the domain decomposition.
+     */
+    void setValPseudoRandom ();
+
     inline
     void assertIsDefined( const WarpXSolverVec&  a_solver_vec ) const
     {
