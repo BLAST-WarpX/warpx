@@ -83,9 +83,9 @@ namespace {
         amrex::ParticleReal const & Ex_external_particle,
         amrex::ParticleReal const & Ey_external_particle,
         amrex::ParticleReal const & Ez_external_particle,
-        amrex::ParticleReal const & Bx_external_particle,
-        amrex::ParticleReal const & By_external_particle,
-        amrex::ParticleReal const & Bz_external_particle,
+        [[maybe_unused]] amrex::ParticleReal const & Bx_external_particle,
+        [[maybe_unused]] amrex::ParticleReal const & By_external_particle,
+        [[maybe_unused]] amrex::ParticleReal const & Bz_external_particle,
         amrex::ParticleReal & Bxp,
         amrex::ParticleReal & Byp,
         amrex::ParticleReal & Bzp,
@@ -174,9 +174,15 @@ namespace {
             amrex::ParticleReal Exp = Ex_external_particle;
             amrex::ParticleReal Eyp = Ey_external_particle;
             amrex::ParticleReal Ezp = Ez_external_particle;
+#if defined(WARPX_DIM_RSPHERE)
+            Bxp = 0._prt;
+            Byp = 0._prt;
+            Bzp = 0._prt;
+#else
             Bxp = Bx_external_particle;
             Byp = By_external_particle;
             Bzp = Bz_external_particle;
+#endif
 
             if (do_gather) {
                 // first gather E and B to the particle positions

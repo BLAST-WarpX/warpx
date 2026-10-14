@@ -82,8 +82,8 @@ void FiniteDifferenceSolver::EvolveE (
         EvolveECylindrical <CylindricalYeeAlgorithm> ( Efield, Bfield, Jfield, eb_update_E, Ffield, lev, dt );
 #elif defined(WARPX_DIM_RSPHERE)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee){
-        amrex::ignore_unused(eb_update_E);
-        EvolveESpherical <SphericalYeeAlgorithm> ( Efield, Bfield, Jfield, Ffield, lev, dt );
+        amrex::ignore_unused(eb_update_E, Bfield);
+        EvolveESpherical <SphericalYeeAlgorithm> ( Efield, Jfield, Ffield, lev, dt );
 #else
     if (m_grid_type == GridType::Collocated) {
 
@@ -462,7 +462,6 @@ void FiniteDifferenceSolver::EvolveECylindrical (
 template<typename T_Algo>
 void FiniteDifferenceSolver::EvolveESpherical (
     ablastr::fields::VectorField const& Efield,
-    ablastr::fields::VectorField const& Bfield,
     ablastr::fields::VectorField const& Jfield,
     amrex::MultiFab const* Ffield,
     int lev, amrex::Real const dt ) {
@@ -484,19 +483,11 @@ void FiniteDifferenceSolver::EvolveESpherical (
         Array4<Real> const& Er = Efield[0]->array(mfi);
         Array4<Real> const& Etheta = Efield[1]->array(mfi);
         Array4<Real> const& Ephi = Efield[2]->array(mfi);
-        Array4<Real> const& Btheta = Bfield[1]->array(mfi);
-        Array4<Real> const& Bphi = Bfield[2]->array(mfi);
         Array4<Real> const& jr = Jfield[0]->array(mfi);
-        Array4<Real> const& jtheta = Jfield[1]->array(mfi);
-        Array4<Real> const& jphi = Jfield[2]->array(mfi);
 
         // Extract stencil coefficients
         Real const * const AMREX_RESTRICT coefs_r = m_stencil_coefs_r.dataPtr();
         auto const n_coefs_r = static_cast<int>(m_stencil_coefs_r.size());
-
-        // Extract spherical specific parameters
-        Real const dr = m_dr;
-        Real const rmin = m_rmin;
 
         // Extract tileboxes for which to loop
         Box const& ter  = mfi.tilebox(Efield[0]->ixType().toIntVect());
@@ -514,27 +505,11 @@ void FiniteDifferenceSolver::EvolveESpherical (
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + i*dr; // r on a nodal grid (Etheta is nodal in r)
-                if (r != 0) { // Off-axis, regular Maxwell equations
-                    Etheta(i, 0, 0, 0) += c2 * dt*(
-                        - T_Algo::DownwardDrr_over_r(Bphi, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
-                        - PhysConst::mu0 * jtheta(i, 0, 0, 0 ) );
-                } else { // r==0: on-axis corrections
-                    // Ensure that Etheta remains 0 on axis
-                    Etheta(i, 0, 0, 0) = 0.;
-                }
+                Etheta(i, 0, 0, 0) = 0.;
             },
 
             [=] AMREX_GPU_DEVICE (int i, int /*j*/, int /*k*/){
-                Real const r = rmin + i*dr; // r on a nodal grid (Ephi is nodal in r)
-                if (r != 0) { // Off-axis, regular Maxwell equations
-                    Ephi(i, 0, 0, 0) += c2 * dt*(
-                        + T_Algo::DownwardDrr_over_r(Btheta, r, dr, coefs_r, n_coefs_r, i, 0, 0, 0)
-                        - PhysConst::mu0 * jphi(i, 0, 0, 0  ) );
-                } else { // r==0: on-axis corrections
-                    // Ensure that Ephi remains 0 on axis
-                    Ephi(i, 0, 0, 0) = 0.;
-                }
+                Ephi(i, 0, 0, 0) = 0.;
             }
 
         ); // end of loop over cells

@@ -10,9 +10,7 @@
 #include "EmbeddedBoundary/Enabled.H"
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 #   include "FiniteDifferenceAlgorithms/CylindricalYeeAlgorithm.H"
-#elif defined(WARPX_DIM_RSPHERE)
-#   include "FiniteDifferenceAlgorithms/SphericalYeeAlgorithm.H"
-#else
+#elif !defined(WARPX_DIM_RSPHERE)
 #   include "FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
 #   include "FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
@@ -28,6 +26,9 @@ void FiniteDifferenceSolver::ComputeCurlB (
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
     int lev )
 {
+#if defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(Efield, Bfield, eb_update_E, lev);
+#else
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
     if (m_fdtd_algo == ElectromagneticSolverAlgo::Yee ||
@@ -36,12 +37,6 @@ void FiniteDifferenceSolver::ComputeCurlB (
         ComputeCurlBCylindrical <CylindricalYeeAlgorithm> (
             Efield, Bfield, eb_update_E, lev
         );
-
-#elif defined(WARPX_DIM_RSPHERE)
-        ComputeCurlBSpherical <SphericalYeeAlgorithm> (
-            Efield, Bfield, eb_update_E, lev
-        );
-
 #else
     if (WarpX::grid_type == GridType::Staggered)
     {
@@ -53,12 +48,12 @@ void FiniteDifferenceSolver::ComputeCurlB (
             Efield, Bfield, eb_update_E, lev
         );
     }
-
 #endif
     } else {
         amrex::Abort(Utils::TextMsg::Err(
             "ComputeCurlB: Unknown algorithm choice."));
     }
+#endif
 }
 
 // /**
@@ -82,20 +77,7 @@ void FiniteDifferenceSolver::ComputeCurlBCylindrical (
     WARPX_ABORT_WITH_MESSAGE("ComputeCurlBCylindrical not fully implemented");
 }
 
-#elif defined(WARPX_DIM_RSPHERE)
-template<typename T_Algo>
-void FiniteDifferenceSolver::ComputeCurlBSpherical (
-    ablastr::fields::VectorField& Efield,
-    ablastr::fields::VectorField const& Bfield,
-    std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-    int lev
-)
-{
-    amrex::ignore_unused(Efield, Bfield, eb_update_E, lev);
-    WARPX_ABORT_WITH_MESSAGE("ComputeCurlBSpherical not fully implemented");
-}
-
-#else
+#elif !defined(WARPX_DIM_RSPHERE)
 
 template<typename T_Algo>
 void FiniteDifferenceSolver::ComputeCurlBCartesian (
