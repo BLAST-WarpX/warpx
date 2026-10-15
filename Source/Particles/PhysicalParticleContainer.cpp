@@ -645,7 +645,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 amrex::MultiFab* rho = fields.get(FieldType::rho_fp, lev);
                 DepositCharge(pti, wp, ion_lev, rho, 0, 0,
                               np_to_deposit, thread_num, lev, lev);
-                if (has_buffer){
+                if (has_J_buf){
                     amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
                     DepositCharge(pti, wp, ion_lev, crho, 0, np_to_deposit,
                                   np-np_to_deposit, thread_num, lev, lev-1);
@@ -780,7 +780,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                                        0, np_to_deposit, thread_num,
                                        lev, lev, dt, relative_time, push_type);
                     }
-                    if (has_buffer)
+                    if (has_J_buf)
                     {
                         // Deposit in buffers
                         amrex::MultiFab * cjx = fields.get(FieldType::current_buf, Direction{0}, lev);
@@ -855,7 +855,7 @@ PhysicalParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
 
                     DepositCharge(pti, wp, ion_lev, rho, 1, 0,
                                   np_to_deposit, thread_num, lev, lev);
-                    if (has_buffer){
+                    if (has_J_buf){
                         amrex::MultiFab* crho = fields.get(FieldType::rho_buf, lev);
                         DepositCharge(pti, wp, ion_lev, crho, 1, np_to_deposit,
                                       np-np_to_deposit, thread_num, lev, lev-1);
