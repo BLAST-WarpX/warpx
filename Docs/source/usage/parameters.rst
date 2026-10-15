@@ -434,6 +434,16 @@ Overall simulation parameters
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
 
+      - **Particle shapes:**
+        The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
+
+        - :pp:param:`algo.particle_shape` sets the shape used for the electrostatic part: the charge
+          density deposition, and the electric-field gather in the electrostatic (predictor) velocity push.
+        - ``implicit_evolve.ms_particle_shape`` (``int``, default: :pp:param:`algo.particle_shape`) sets the shape used for the
+          magnetostatic part: the current and mass matrices deposition, the field gather in the
+          inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
+          It must not be larger than :pp:param:`algo.particle_shape`.
+
       - **Linear (GMRES) solver options:**
         The magnetoinductive solve uses the AMReX GMRES linear solver, whose parameters are set with the
         ``amrex_gmres`` prefix:

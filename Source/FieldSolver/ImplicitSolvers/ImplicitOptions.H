@@ -19,6 +19,7 @@ struct ImplicitOptions
     amrex::IntVect ncomp_pc_xx = amrex::IntVect{0};
     amrex::IntVect ncomp_pc_yy = amrex::IntVect{0};
     amrex::IntVect ncomp_pc_zz = amrex::IntVect{0};
+    int particle_shape = 1;
 };
 
 #endif
