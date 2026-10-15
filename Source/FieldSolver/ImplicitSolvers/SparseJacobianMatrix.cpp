@@ -1,322 +1,108 @@
-/* Copyright 2024 Debojyoti Ghosh
+/* Copyright 2025-2026 Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
  * License: BSD-3-Clause-LBNL
  */
-#ifndef MATRIX_PC_H_
-#define MATRIX_PC_H_
 
-#include "Fields.H"
-#include "MatrixPCAlgMG.H"
+#include "SparseJacobianMatrix.H"
+#include "WarpXSolverDOF.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
-#include "Preconditioner.H"
 
-#include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/warn_manager/WarnManager.H>
 
-#include <AMReX.H>
+#include <AMReX_GpuBuffer.H>
+#include <AMReX_GpuLaunch.H>
+#include <AMReX_iMultiFab.H>
 #include <AMReX_ParmParse.H>
-#include <AMReX_Array.H>
-#include <AMReX_Vector.H>
-#include <AMReX_MultiFab.H>
+#include <AMReX_ParallelDescriptor.H>
+#include <AMReX_Print.H>
 
-#include <memory>
-#include <string>
+#include <algorithm>
+#include <sstream>
 
-namespace MatrixPCUtils
+void SparseJacobianMatrix::readParameters ()
 {
-    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    bool insertOrAdd( const int a_cidx, /*!< Column index (global) */
-                      const amrex::Real a_val, /*!< Value to insert/add */
-                      int* const a_cidxs, /*!< Column index array */
-                      amrex::Real* const a_aij, /*!< array of values */
-                      const int a_nnz, /*!< max number of non-zero columns */
-                      int& a_ncol /*!< number of non-zero columns */)
-    {
-        if (a_cidx < 0) { return true; /* outside domain */ }
-        int loc = -1;
-        for (int icol = 0; icol < std::min(a_ncol,a_nnz); icol++) {
-            if (a_cidxs[icol] == a_cidx) {
-                loc = icol;
-                break;
-            }
-        }
-        if (loc < 0) {
-            a_ncol++;
-            if (a_ncol > a_nnz) { return false; }
-            else {
-                // column index not found; add new entry
-                a_cidxs[a_ncol-1] = a_cidx;
-                a_aij[a_ncol-1] = a_val;
-            }
-        } else {
-            // column index already exists; add to value
-            a_aij[loc] += a_val;
-        }
-        return true;
-    }
-}
-
-/**
- * \brief Matrix Preconditione
- *
- *  This class is templated on a solution-type class T and an operator class Ops. It implements
- *  a preconditioner based on constructing and solving the sparse matrix representation of the
- *  Jacobian. With pc_petsc, PETSc applies the preconditioner to the assembled matrix. With
- *  pc_algmg, AMReX's algebraic multigrid (AlgMG) applies it.
- *
- *  The Ops class must have the following function:
- *      + Return number of AMR levels
- *      + Return the amrex::Geometry object given an AMR level
- *      + Return hi and lo linear operator boundaries
- *      + Return the time step factor (theta) for the time integration scheme
- *
- *  The T class must have the following functions:
- *      + Return underlying vector of amrex::MultiFab arrays
- *      + Return the first global DOF of each process (pc_algmg)
- */
-
-template <class T, class Ops>
-class MatrixPC : public Preconditioner<T,Ops>
-{
-    public:
-
-        using RT = typename T::value_type;
-
-        /**
-         * \brief Default constructor
-         */
-        MatrixPC () = default;
-
-        /**
-         * \brief Default destructor
-         */
-        ~MatrixPC () override = default;
-
-        // Prohibit move and copy operations
-        MatrixPC(const MatrixPC&) = delete;
-        MatrixPC& operator=(const MatrixPC&) = delete;
-        MatrixPC(MatrixPC&&) noexcept = delete;
-        MatrixPC& operator=(MatrixPC&&) noexcept = delete;
-
-        /**
-         * \brief Define the preconditioner
-         */
-        void Define (const T&, Ops*) override;
-
-        /**
-         * \brief Update the preconditioner
-         */
-        void Update () override;
-
-        /**
-         * \brief Assemble the matrix
-         *
-         * Returns 0 if matrix assembly is successful; returns
-         * positive integer if allocated arrays are insufficient to hold all
-         * non-zero elements (return value is difference in current number
-         * of nonzero elements and the desired number).
-         */
-        int Assemble ();
-
-        /**
-         * \brief Apply (solve) the preconditioner given a RHS
-         *
-         *  Given a right-hand-side b, solve:
-         *      A x = b
-         *  where A is the linear operator, in this case, the curl-curl operator:
-         *      A x = curl (alpha * curl (x) ) + beta * x
-         *  Only available with pc_algmg; pc_petsc is applied by PETSc.
-         */
-        void Apply (T&, const T&) override;
-
-        inline void getPCMatrix (amrex::Gpu::DeviceVector<int>& a_r_indices_g,
-                                 amrex::Gpu::DeviceVector<int>& a_num_nz,
-                                 amrex::Gpu::DeviceVector<int>& a_c_indices_g,
-                                 amrex::Gpu::DeviceVector<RT>& a_a_ij,
-                                 int& a_n, int& a_ncols_max ) override
-        {
-            a_n = m_ndofs_l;
-            a_ncols_max = m_pc_mat_nnz;
-
-            a_r_indices_g.resize(m_r_indices_g.size());
-            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
-                                   m_r_indices_g.begin(),
-                                   m_r_indices_g.end(),
-                                   a_r_indices_g.begin() );
-
-            a_num_nz.resize(m_num_nz.size());
-            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
-                                   m_num_nz.begin(),
-                                   m_num_nz.end(),
-                                   a_num_nz.begin() );
-
-            a_c_indices_g.resize(m_c_indices_g.size());
-            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
-                                   m_c_indices_g.begin(),
-                                   m_c_indices_g.end(),
-                                   a_c_indices_g.begin() );
-
-            a_a_ij.resize(m_a_ij.size());
-            amrex::Gpu::copyAsync( amrex::Gpu::deviceToDevice,
-                                   m_a_ij.begin(),
-                                   m_a_ij.end(),
-                                   a_a_ij.begin() );
-            amrex::Gpu::streamSynchronize();
-        }
-
-        /**
-         * \brief Print parameters
-         */
-        void printParameters() const override;
-
-        /**
-         * \brief Check if the nonlinear solver has been defined.
-         */
-        [[nodiscard]] inline bool IsDefined () const override { return m_is_defined; }
-
-        inline void setName (const std::string& a_name) override { m_name = a_name; }
-
-    protected:
-
-        bool m_is_defined = false;
-        bool m_verbose = true;
-
-        Ops* m_ops = nullptr;
-
-        int m_num_amr_levels = 0;
-        amrex::Vector<amrex::Geometry> m_geom;
-
-        int m_ndofs_l = 0;
-        int m_ndofs_g = 0;
-
-        bool m_pc_diag_only = false;
-        int m_pc_mat_nnz = 1;
-        bool m_include_mass_matrices = false;
-
-        std::string m_name = "noname";
-
-        amrex::Gpu::DeviceVector<int> m_r_indices_g;
-        amrex::Gpu::DeviceVector<int> m_num_nz;
-        amrex::Gpu::DeviceVector<int> m_c_indices_g;
-        amrex::Gpu::DeviceVector<amrex::Real> m_a_ij;
-
-        const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* m_bcoefs = nullptr;
-
-        int m_num_realloc = 0;
-
-        // pc_algmg: AlgMG V-cycles on the assembled matrix
-        bool m_use_algmg = false;
-        std::unique_ptr<MatrixPCAlgMG> m_algmg;
-        bool m_algmg_is_set_up = false;
-        RT m_algmg_theta_dt = RT(0); // theta*dt of the last AlgMG setup
-
-        /**
-         * \brief Read parameters
-         */
-        void readParameters();
-
-    private:
-
-};
-
-template <class T, class Ops>
-void MatrixPC<T,Ops>::printParameters() const
-{
-    using namespace amrex;
-    Print() << m_name << " verbose:                " << (m_verbose?"true":"false") << "\n";
-    Print() << m_name << " pc_diagonal_only:       " << (m_pc_diag_only?"true":"false") << "\n";
-    Print() << m_name << " include_mass_matrices:  " << (m_include_mass_matrices?"true":"false") << "\n";
-    if (m_algmg) { m_algmg->printParameters(); }
-}
-
-template <class T, class Ops>
-void MatrixPC<T,Ops>::readParameters()
-{
-    const amrex::ParmParse pp(m_name);
+    const amrex::ParmParse pp("precon_mat");
     pp.query("verbose", m_verbose);
-    pp.query("pc_diagonal_only", m_pc_diag_only);
 
-    m_use_algmg = (m_name == amrex::getEnumNameString(PreconditionerType::pc_algmg));
+    // Backward compatibility: pc_petsc.verbose was read by the old MatrixPC
+    // class (renamed to ExternLibPC).
+    const amrex::ParmParse pp_old("pc_petsc");
+    bool backward_bool;
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pp_old.query("verbose", backward_bool),
+        "pc_petsc.verbose is no longer supported. "
+        "Use precon_mat.verbose instead.");
 }
 
-template <class T, class Ops>
-void MatrixPC<T,Ops>::Define ( const T& a_U,
-                              Ops* const a_ops )
+void SparseJacobianMatrix::printParameters () const
 {
-    BL_PROFILE("MatrixPC::Define()");
     using namespace amrex;
+    Print() << "precon_mat verbose:              "
+            << (m_verbose ? "true" : "false") << "\n";
+    Print() << "precon_mat include_mass_matrices: "
+            << (m_include_mass_matrices ? "true" : "false") << "\n";
+}
+
+void SparseJacobianMatrix::Define (int a_ndofs_l, int a_ndofs_g)
+{
+    BL_PROFILE("SparseJacobianMatrix::Define()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         !IsDefined(),
-        "MatrixPC::Define() called on defined object" );
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        (a_ops != nullptr),
-        "MatrixPC::Define(): a_ops is nullptr" );
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        a_U.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
-        "MatrixPC::Define() must be called with Efield_fp type");
+        "SparseJacobianMatrix::Define() called on defined object");
 
-    m_ops = a_ops;
-    // read preconditioner parameters
     readParameters();
 
-    // Set number of AMR levels and create geometry, grids, and
-    // distribution mapping vectors.
-    m_num_amr_levels = m_ops->numAMRLevels();
-    if (m_num_amr_levels > 1) {
-        WARPX_ABORT_WITH_MESSAGE("MatrixPC::Define(): m_num_amr_levels > 1");
-    }
-    m_geom.resize(m_num_amr_levels);
-    for (int n = 0; n < m_num_amr_levels; n++) {
-        m_geom[n] = m_ops->GetGeometry(n);
-    }
+    m_ndofs_l = a_ndofs_l;
+    m_ndofs_g = a_ndofs_g;
 
-    m_ndofs_l = a_U.nDOF_local();
-    m_ndofs_g = a_U.nDOF_global();
-
-    auto n_rows = size_t(m_ndofs_l);
-    auto n_cols = size_t(m_pc_mat_nnz) * size_t(m_ndofs_l);
+    auto n_rows = static_cast<size_t>(m_ndofs_l);
+    auto n_cols = static_cast<size_t>(m_pc_mat_nnz) * n_rows;
 
     m_r_indices_g.resize(n_rows);
     m_num_nz.resize(n_rows);
     m_c_indices_g.resize(n_cols);
     m_a_ij.resize(n_cols);
 
-
-    m_bcoefs = m_ops->GetMassMatricesCoeff();
-    if (m_bcoefs != nullptr) {
-        m_include_mass_matrices = true;
-    }
-
-    if (m_use_algmg) {
-        m_algmg = std::make_unique<MatrixPCAlgMG>(m_name, a_U.dofRowOffsets());
-    }
-
     m_is_defined = true;
 }
 
-template <class T, class Ops>
-void MatrixPC<T,Ops>::Update ()
+void SparseJacobianMatrix::Update (
+    const WarpXSolverDOF* a_dofs,
+    const amrex::Vector<amrex::Geometry>& a_geom,
+    amrex::Real a_theta_dt,
+    const amrex::Vector<amrex::Array<const amrex::MultiFab*,3>>& a_bc_masks,
+    const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* a_mass_matrices,
+    const amrex::Array<amrex::IntVect,3>& a_mm_ncomp)
 {
-    BL_PROFILE("MatrixPC::Update()");
-    using namespace amrex;
+    BL_PROFILE("SparseJacobianMatrix::Update()");
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
-        "MatrixPC::Update() called on undefined object" );
+        "SparseJacobianMatrix::Update() called on undefined object");
 
-    while(true) {
+    m_include_mass_matrices = (a_mass_matrices != nullptr);
 
-        auto nnz_diff = Assemble();
+    const amrex::Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
+    if (m_verbose) {
+        amrex::Print() << "Updating precon_mat: theta*dt = " << a_theta_dt
+                        << ", alpha = " << alpha << "\n";
+    }
+
+    while (true) {
+
+        auto nnz_diff = Assemble(a_dofs, a_geom, a_theta_dt,
+                                 a_bc_masks, a_mass_matrices, a_mm_ncomp);
         AMREX_ALWAYS_ASSERT(nnz_diff >= 0);
-        if (nnz_diff) {
-
-            m_pc_mat_nnz += nnz_diff;
+        if (nnz_diff > 0) {
             m_num_realloc++;
-
+            amrex::Print() << "precon_mat: reallocating CSR arrays"
+                           << " (nnz_max " << m_pc_mat_nnz
+                           << " -> " << m_pc_mat_nnz + nnz_diff << ")\n";
+            m_pc_mat_nnz += nnz_diff;
         } else {
             break;
         }
@@ -325,28 +111,52 @@ void MatrixPC<T,Ops>::Update ()
     if (m_num_realloc > 1) {
         std::stringstream warning_message;
         warning_message << "Number of times arrays were reallocated due to new nonzero elements "
-                        << "is greater than 1 (" << m_num_realloc <<"). This is unexpected.\n";
-        ablastr::warn_manager::WMRecordWarning("MatrixPC", warning_message.str());
-    }
-
-    if (m_use_algmg) {
-        // Without mass matrices, the matrix only depends on theta*dt.
-        // Load balancing is not supported by the implicit solvers. If it is
-        // supported in the future, this and the DOF-based data in MatrixPC
-        // (sizes, AlgMG partition) need to be updated when the
-        // DistributionMapping changes.
-        const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
-        if (m_include_mass_matrices || !m_algmg_is_set_up || thetaDt != m_algmg_theta_dt) {
-            m_algmg->Setup(m_ndofs_l, m_pc_mat_nnz, m_num_nz.data(),
-                           m_c_indices_g.data(), m_a_ij.data());
-            m_algmg_is_set_up = true;
-            m_algmg_theta_dt = thetaDt;
-        }
+                        << "is greater than 1 (" << m_num_realloc << "). This is unexpected.\n";
+        ablastr::warn_manager::WMRecordWarning("SparseJacobianMatrix", warning_message.str());
     }
 }
 
-template <class T, class Ops>
-int MatrixPC<T,Ops>::Assemble ()
+void SparseJacobianMatrix::GetMatrix (
+    amrex::Gpu::DeviceVector<int>& a_r_indices_g,
+    amrex::Gpu::DeviceVector<int>& a_num_nz,
+    amrex::Gpu::DeviceVector<int>& a_c_indices_g,
+    amrex::Gpu::DeviceVector<amrex::Real>& a_a_ij,
+    int& a_n,
+    int& a_ncols_max) const
+{
+    a_n = m_ndofs_l;
+    a_ncols_max = m_pc_mat_nnz;
+
+    a_r_indices_g.resize(m_r_indices_g.size());
+    amrex::Gpu::copyAsync(amrex::Gpu::deviceToDevice,
+                          m_r_indices_g.begin(), m_r_indices_g.end(),
+                          a_r_indices_g.begin());
+
+    a_num_nz.resize(m_num_nz.size());
+    amrex::Gpu::copyAsync(amrex::Gpu::deviceToDevice,
+                          m_num_nz.begin(), m_num_nz.end(),
+                          a_num_nz.begin());
+
+    a_c_indices_g.resize(m_c_indices_g.size());
+    amrex::Gpu::copyAsync(amrex::Gpu::deviceToDevice,
+                          m_c_indices_g.begin(), m_c_indices_g.end(),
+                          a_c_indices_g.begin());
+
+    a_a_ij.resize(m_a_ij.size());
+    amrex::Gpu::copyAsync(amrex::Gpu::deviceToDevice,
+                          m_a_ij.begin(), m_a_ij.end(),
+                          a_a_ij.begin());
+
+    amrex::Gpu::streamSynchronize();
+}
+
+int SparseJacobianMatrix::Assemble (
+    const WarpXSolverDOF* a_dofs,
+    const amrex::Vector<amrex::Geometry>& a_geom,
+    amrex::Real a_theta_dt,
+    const amrex::Vector<amrex::Array<const amrex::MultiFab*,3>>& a_bc_masks,
+    const amrex::Vector<amrex::Array<amrex::MultiFab*,3>>* a_mass_matrices,
+    const amrex::Array<amrex::IntVect,3>& a_mm_ncomp)
 {
     // Assemble the sparse matrix representation of the preconditioner
     //      A = curl (alpha * curl []) + M
@@ -354,32 +164,25 @@ int MatrixPC<T,Ops>::Assemble ()
     // - m_r_indices_g: integer array of size n with the global row indices
     // - m_num_nz:      integer array of size n with the number of non-zero elements
     //                  in each row
-    // - m_c_indices:   integer array of size n*ncmax with the global column indices
+    // - m_c_indices_g: integer array of size n*ncmax with the global column indices
     //                  of non-zero elements in each row (row-major)
     // - m_a_ij:        real-type array of size n*ncmax with the matrix element values
     //                  (row-major format)
     // where n is the local number of rows, and ncmax is the maximum number of non-zero
     // elements per row.
 
-    BL_PROFILE("MatrixPC::Assemble()");
+    BL_PROFILE("SparseJacobianMatrix::Assemble()");
     using namespace amrex;
 
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
-        "MatrixPC::Assemble() called on undefined object" );
+        "SparseJacobianMatrix::Assemble() called on undefined object" );
 
     // set the alpha coefficient for the curl-curl op
-    const RT thetaDt = m_ops->GetThetaForPC()*this->m_dt;
-    const RT alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
-    if (m_verbose) {
-        amrex::Print() << "Updating " << m_name
-                       << ": theta*dt = " << thetaDt << ", "
-                       << " coefficients: "
-                       << "alpha = " << alpha << "\n";
-    }
+    const Real thetaDt = a_theta_dt;
+    const Real alpha = (thetaDt*PhysConst::c) * (thetaDt*PhysConst::c);
 
-    // The DOF object is shared by every solver vector.
-    const auto& dofs_mfarrvec = T::getDOFsObject()->m_array;
+    const auto& dofs_mfarrvec = a_dofs->m_array;
 
     m_r_indices_g.clear();
     m_num_nz.clear();
@@ -402,12 +205,13 @@ int MatrixPC<T,Ops>::Assemble ()
     const auto nnz_max = m_pc_mat_nnz;
     auto nnz_actual = nnz_max;
 
-    for (int lev = 0; lev < m_num_amr_levels; lev++) {
+    const int num_amr_levels = static_cast<int>(a_geom.size());
+    for (int lev = 0; lev < num_amr_levels; lev++) {
 
         auto ncomp = dofs_mfarrvec[lev][0]->nComp();
         AMREX_ALWAYS_ASSERT(ncomp == 2); // local, global
 
-        const auto& geom = m_geom[lev];
+        const auto& geom = a_geom[lev];
         const auto dxi = geom.InvCellSizeArray();
 
         Gpu::Buffer<int> nnz_actual_d({nnz_max});
@@ -438,7 +242,7 @@ int MatrixPC<T,Ops>::Assemble ()
                     {
                         const int cidx_g_lhs = dof_arr(i,j,k,1);
                         const amrex::Real val = 1.0_rt;
-                        auto flag = MatrixPCUtils::insertOrAdd( cidx_g_lhs, val,
+                        auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_lhs, val,
                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
                                                                 &a_ij_ptr[ridx_l*nnz_max],
                                                                 nnz_max, icol );
@@ -455,7 +259,7 @@ int MatrixPC<T,Ops>::Assemble ()
                     // 1D spherical geometry is electrostatic
                     amrex::ignore_unused(dxi);
 #else
-                    const amrex::MultiFab* BC_mask_Edir = m_ops->GetCurl2BCmask(lev,dir);
+                    const amrex::MultiFab* BC_mask_Edir = a_bc_masks[lev][dir];
                     AMREX_ALWAYS_ASSERT(BC_mask_Edir != nullptr);
                     const auto BC_mask_Edir_arr = BC_mask_Edir->const_array(mfi);
 #endif
@@ -493,7 +297,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                 // diagonal component (i) of 2nd derivative operator
                                 const int cidx_g_rhs = dof_arr(i,j,k,1);
                                 const amrex::Real val = 2.0_rt*alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -503,7 +307,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                 // left component (i-1) of 2nd derivative operator
                                 const int cidx_g_rhs = dof_arr(i-1,j,k,1);
                                 const amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -513,7 +317,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                 // right component (i+1) of 2nd derivative operator
                                 const int cidx_g_rhs = dof_arr(i+1,j,k,1);
                                 const amrex::Real val = -alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -538,7 +342,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                     geom_factor = 2.0_rt; // (r_{i+1/2} + r_{i-1/2}) / r_{i}
                                 }
                                 amrex::Real val = geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0);
-                                auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -555,7 +359,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                     geom_factor = 1.0_rt - 0.5_rt / i_real; // r_{i-1/2} / r_{i}
                                 }
                                 amrex::Real val = -geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
-                                auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -572,7 +376,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                     geom_factor = 1.0_rt + 0.5_rt / i_real; // r_{i+1/2} / r_{i}
                                 }
                                 amrex::Real val = -geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,1);
-                                auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -608,7 +412,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                 val = geom_factor * alpha * dxi[0]*dxi[0] * BC_mask_Edir_arr(i,j,k,0)
                                     +      2.0_rt * alpha * dxi[1]*dxi[1] * BC_mask_Edir_arr(i,j,k,2);
                             }
-                            auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
                                                                     &a_ij_ptr[ridx_l*nnz_max],
                                                                     nnz_max, icol );
@@ -624,7 +428,7 @@ int MatrixPC<T,Ops>::Assemble ()
 #endif
                                 const int cidx_g_rhs = (dir == 0 ? dof_arr(i,j-1,k,1) : dof_arr(i-1,j,k,1));
                                 const amrex::Real val = -geom_factor * alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
                                                                               nnz_max, icol );
@@ -639,7 +443,7 @@ int MatrixPC<T,Ops>::Assemble ()
 #endif
                                 const int cidx_g_rhs = (dir == 0 ? dof_arr(i,j+1,k,1) : dof_arr(i+1,j,k,1));
                                 const amrex::Real val = -geom_factor * alpha * dxi[dir==0?1:0] * dxi[dir==0?1:0] * BC_mask_Edir_arr(i,j,k,1);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
                                                                               nnz_max, icol );
@@ -662,7 +466,7 @@ int MatrixPC<T,Ops>::Assemble ()
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i,j-1,k,1) : dof_tdir_arr(i-1,j,k,1));
                                 const amrex::Real val = geom_m * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
                                                                               nnz_max, icol );
@@ -671,7 +475,7 @@ int MatrixPC<T,Ops>::Assemble ()
                             {
                                 const int cidx_g_rhs = dof_tdir_arr(i,j,k,1);
                                 const amrex::Real val = -geom_p * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
                                                                               nnz_max, icol );
@@ -680,7 +484,7 @@ int MatrixPC<T,Ops>::Assemble ()
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j-1,k,1) : dof_tdir_arr(i-1,j+1,k,1));
                                 const amrex::Real val = -geom_m * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
                                                                               nnz_max, icol );
@@ -689,7 +493,7 @@ int MatrixPC<T,Ops>::Assemble ()
                             {
                                 const int cidx_g_rhs = (dir == 0 ? dof_tdir_arr(i+1,j,k,1) : dof_tdir_arr(i,j+1,k,1));
                                 const amrex::Real val = geom_p * alpha * dxi[0] * dxi[1] * BC_mask_Edir_arr(i,j,k,2);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                               &c_indices_g_ptr[ridx_l*nnz_max],
                                                                               &a_ij_ptr[ridx_l*nnz_max],
                                                                               nnz_max, icol );
@@ -705,7 +509,7 @@ int MatrixPC<T,Ops>::Assemble ()
 #endif
                                     const int cidx_g_rhs = (jdir == 0 ? dof_arr(i-1,j,k,1) : dof_arr(i,j-1,k,1));
                                     const amrex::Real val = -geom_factor * alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
-                                    const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                    const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                                   &c_indices_g_ptr[ridx_l*nnz_max],
                                                                                   &a_ij_ptr[ridx_l*nnz_max],
                                                                                   nnz_max, icol );
@@ -719,7 +523,7 @@ int MatrixPC<T,Ops>::Assemble ()
 #endif
                                     const int cidx_g_rhs = (jdir == 0 ? dof_arr(i+1,j,k,1) : dof_arr(i,j+1,k,1));
                                     const amrex::Real val = -geom_factor * alpha * dxi[jdir==0?0:1] * dxi[jdir==0?0:1] * BC_mask_Edir_arr(i,j,k,jdir+1);
-                                    const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                    const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                                   &c_indices_g_ptr[ridx_l*nnz_max],
                                                                                   &a_ij_ptr[ridx_l*nnz_max],
                                                                                   nnz_max, icol );
@@ -738,7 +542,7 @@ int MatrixPC<T,Ops>::Assemble ()
                             const int cidx_g_rhs = dof_arrays[0](ic,1);
                             const amrex::Real val = 2.0_rt * alpha * ( dxi[dvec[1]]*dxi[dvec[1]] * BC_mask_Edir_arr(i,j,k,0)
                                                                + dxi[dvec[2]]*dxi[dvec[2]] * BC_mask_Edir_arr(i,j,k,3) );
-                            const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                            const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                     &c_indices_g_ptr[ridx_l*nnz_max],
                                                                     &a_ij_ptr[ridx_l*nnz_max],
                                                                     nnz_max, icol );
@@ -751,7 +555,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                 const int cidx_g_rhs = dof_arrays[0](iv,1);
                                 const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
                                 const amrex::Real val = -alpha * dxi[dvec[tdir]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+1);
-                                const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                         &c_indices_g_ptr[ridx_l*nnz_max],
                                                                         &a_ij_ptr[ridx_l*nnz_max],
                                                                         nnz_max, icol );
@@ -767,7 +571,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                     const int cidx_g_rhs = dof_arrays[tdir](iv,1);
                                     const int comp_shift = (dvec[tdir] == tdir1) ? 0:3;
                                     const amrex::Real val = amrex::Real(sign) * alpha * dxi[dvec[0]]*dxi[dvec[tdir]] * BC_mask_Edir_arr(i,j,k,comp_shift+2);
-                                    const auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                    const auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                             &c_indices_g_ptr[ridx_l*nnz_max],
                                                                             &a_ij_ptr[ridx_l*nnz_max],
                                                                             nnz_max, icol );
@@ -786,17 +590,17 @@ int MatrixPC<T,Ops>::Assemble ()
                 //
                 // The coupling of Jx(i,j,k) to Ex(i+i0,j+j0,k+k0), where i0 ranges from
                 // -MM_width[0] to +MM_width[0], j0 ranges from -MM_width[1] to +MM_width[1], and k0 ranges
-                // from -MM_width[2] to +MM_width[2], is stored as components of m_bcoefs[dir=0] (mass matrices).
-                // Similarly for Jy/Ey (m_bcoefs[dir=1]) and Jz/Ez (m_bcoefs[dir=2]).
+                // from -MM_width[2] to +MM_width[2], is stored as components of a_mass_matrices[dir=0].
+                // Similarly for Jy/Ey (a_mass_matrices[dir=1]) and Jz/Ez (a_mass_matrices[dir=2]).
                 // The mapping to the components is given by:
                 // mm_comp = i0 + MM_width[0] + MM_comp[0]*(j0 + MM_width[1]) + MM_comp[0]*MM_comp[1]*(k0 + MM_width[2])
-                if (m_include_mass_matrices) {
+                if (a_mass_matrices != nullptr) {
 
-                    auto sigma_ii_arr = (*m_bcoefs)[lev][dir]->const_array(mfi);
+                    auto sigma_ii_arr = (*a_mass_matrices)[lev][dir]->const_array(mfi);
                     amrex::GpuArray<int,3> MM_ncomp = {1,1,1};
                     amrex::GpuArray<int,3> MM_width = {0,0,0};
                     for (int space_dir=0; space_dir<AMREX_SPACEDIM; space_dir++) {
-                        MM_ncomp[space_dir] = m_ops->GetMassMatricesPCnComp(dir,space_dir);
+                        MM_ncomp[space_dir] = a_mm_ncomp[dir][space_dir];
                         MM_width[space_dir] = (MM_ncomp[space_dir] - 1)/2;
                     }
 
@@ -821,7 +625,7 @@ int MatrixPC<T,Ops>::Assemble ()
                                     if (full_bx.contains(iv_base + iv_shift)) {
                                         const int cidx_g_rhs = dof_arr(iv_base + iv_shift,1);
                                         const amrex::Real val = sigma_ii_arr(iv_base,mm_comp);
-                                        auto flag = MatrixPCUtils::insertOrAdd( cidx_g_rhs, val,
+                                        auto flag = SparseJacobianMatrixUtil::insertOrAdd( cidx_g_rhs, val,
                                                                                 &c_indices_g_ptr[ridx_l*nnz_max],
                                                                                 &a_ij_ptr[ridx_l*nnz_max],
                                                                                 nnz_max, icol );
@@ -845,36 +649,3 @@ int MatrixPC<T,Ops>::Assemble ()
     amrex::ParallelDescriptor::ReduceIntMax(&nnz_actual, 1);
     return (nnz_actual - nnz_max);
 }
-
-template <class T, class Ops>
-void MatrixPC<T,Ops>::Apply (T& a_x, const T& a_b)
-{
-    //  Given a right-hand-side b, solve:
-    //      A x = b
-    //  where A is the linear operator, in this case, the curl-curl
-    //  operator:
-    //      A x = curl (alpha * curl (x) ) + beta * x
-
-    BL_PROFILE("MatrixPC::Apply()");
-    using namespace amrex;
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        IsDefined(),
-        "MatrixPC::Apply() called on undefined object" );
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        a_x.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
-        "MatrixPC::Apply() - a_x must be Efield_fp type");
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        a_b.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
-        "MatrixPC::Apply() - a_b must be Efield_fp type");
-
-    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_use_algmg,
-        "MatrixPC::Apply() - only pc_algmg is applied natively; pc_petsc requires PETSc's KSP or SNES.");
-
-    a_b.copyTo(m_algmg->rhs());
-    m_algmg->Apply();
-    a_x.copyFrom(m_algmg->sol());
-}
-
-#endif

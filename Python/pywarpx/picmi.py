@@ -1694,12 +1694,32 @@ class PreconditionerBase(picmistandard.PICMI_Extension):
     # solver (rather than only via a nonlinear solver's Jacobian).
     supports_direct_gmres: ClassVar[bool] = False
 
+    # Attributes that are not written with the preconditioner name as prefix.
+    other_inputs: ClassVar[tuple[str, ...]] = ()
+
     def preconditioner_type_initialize_inputs(self, jacobian=None):
         if jacobian is not None:
             jacobian.pc_type = self.name
         bucket = pywarpx.warpx.get_bucket(self.name)
         for attr in type(self).model_fields:
-            setattr(bucket, attr, getattr(self, attr))
+            if attr not in self.other_inputs:
+                setattr(bucket, attr, getattr(self, attr))
+
+
+class AssembledMatrixPreconditionerBase(PreconditionerBase):
+    """Base class of the preconditioners that can use the assembled sparse matrix"""
+
+    other_inputs: ClassVar[tuple[str, ...]] = ("precon_mat_verbose",)
+
+    precon_mat_verbose: bool | None = Field(
+        default=None,
+        description="Whether to print information on the assembly of the sparse matrix (default True)",
+    )
+
+    def preconditioner_type_initialize_inputs(self, jacobian=None):
+        super().preconditioner_type_initialize_inputs(jacobian)
+        if self.precon_mat_verbose is not None:
+            pywarpx.warpx.get_bucket("precon_mat").verbose = self.precon_mat_verbose
 
 
 class GMRESLinearSolver(LinearSolverBase):
@@ -1861,7 +1881,7 @@ class JacobiPreconditioner(PreconditionerBase):
     )
 
 
-class PETScPreconditioner(PreconditionerBase):
+class PETScPreconditioner(AssembledMatrixPreconditionerBase):
     """
     Sets up the PETSc preconditioner used during the nonlinear solver
     """
@@ -1889,7 +1909,7 @@ class PETScPreconditioner(PreconditionerBase):
     )
 
 
-class AlgMGPreconditioner(PreconditionerBase):
+class AlgMGPreconditioner(AssembledMatrixPreconditionerBase):
     """
     Sets up the AMReX algebraic multigrid (AlgMG) preconditioner used during the nonlinear solver
     """

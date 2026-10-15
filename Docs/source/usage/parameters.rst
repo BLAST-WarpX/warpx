@@ -398,6 +398,10 @@ Overall simulation parameters
             - ``pc_algmg.aggressive_levels`` (``int``, default: 0) Number of levels with aggressive coarsening.
             - ``pc_algmg.max_levels`` (``int``, default: 25)
 
+        - ``precon_mat.verbose`` (``bool``, default: true)
+          Print information on the assembly of the sparse matrix used by ``pc_petsc`` and ``pc_algmg``.
+          This replaces ``pc_petsc.verbose``.
+
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
         - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.
