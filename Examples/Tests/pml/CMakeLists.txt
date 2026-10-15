@@ -90,3 +90,33 @@ if(WarpX_FFT)
         OFF  # dependency
     )
 endif()
+
+add_warpx_test(
+    test_rz_pml_yee_reference
+    RZ
+    2
+    inputs_test_rz_pml_yee_reference
+    OFF
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_pml_yee
+    RZ
+    2
+    inputs_test_rz_pml_yee
+    "analysis_pml_yee_rz.py"
+    OFF
+    test_rz_pml_yee_reference
+)
+
+add_warpx_test(
+    test_rz_pml_yee_restart
+    RZ
+    2
+    inputs_test_rz_pml_yee_restart
+    "analysis_default_restart.py --path diags/diag1000300"
+    OFF
+    test_rz_pml_yee
+)

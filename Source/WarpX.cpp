@@ -14,6 +14,9 @@
 #include "BoundaryConditions/FieldBoundaries.H"
 #include "BoundaryConditions/PEC_Insulator.H"
 #include "BoundaryConditions/PML.H"
+#ifdef WARPX_DIM_RZ
+#   include "BoundaryConditions/PML_RZ_FDTD.H"
+#endif
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
@@ -1070,8 +1073,16 @@ WarpX::ReadParameters ()
         }
 
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        WARPX_ALWAYS_ASSERT_WITH_MESSAGE( ::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi) == false || electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD,
-            "PML are are only implemented with Cartesian geometry with FDTD; please set a different boundary condition using boundary.field_lo and boundary.field_hi.");
+        const bool pml_solver_supported =
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD
+#ifdef WARPX_DIM_RZ
+            || electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee
+#endif
+            ;
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !::isAnyBoundaryPML(field_boundary_lo, field_boundary_hi) || pml_solver_supported,
+            "PML is not implemented for this solver and geometry. "
+            "In RZ, select PSATD or explicit Yee.");
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( (do_pml_dive_cleaning == false && do_pml_divb_cleaning == false),
             "do_pml_dive_cleaning and do_pml_divb_cleaning are only implemented in Cartesian geometry." );
 #endif

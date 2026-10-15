@@ -267,6 +267,58 @@ When the generalized conductivities are zero, the update equations are
 
 as expected.
 
+.. _theory-bc-rz-yee-pml:
+
+Radial PML for the RZ Yee solver
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The explicit cylindrical Yee solver uses a uniaxial PML outside the outer
+radial boundary, with periodic z boundaries. Let :math:`p` denote the time
+differentiation operator, :math:`R` the interface radius, and
+:math:`\sigma(r)` the quadratic conductivity profile used by WarpX's Cartesian
+PML. Define
+
+.. math::
+
+    s_r = 1 + \sigma/p, \qquad
+    s_\theta = 1 + \bar\sigma/p, \qquad
+    \bar\sigma = \frac{1}{r}\int_R^r \sigma(\rho)\,d\rho.
+
+For radial stretching only, the relative electric and magnetic constitutive
+tensors in the :math:`(r,\theta,z)` basis are
+
+.. math::
+
+    \mathrm{diag}\left(s_\theta/s_r,\;s_r/s_\theta,\;s_r s_\theta\right).
+
+The integrated profile accounts for the stretched cylindrical radius; using
+only Cartesian damping would omit this term. This follows the cylindrical
+coordinate-stretching formulation described by
+`Bouchard et al. (2024) <https://arxiv.org/abs/2409.06287>`_.
+
+Writing :math:`C=c^2\nabla\times B` for the vacuum electric curl, the
+auxiliary equations used in the implementation are
+
+.. math::
+
+    \partial_t D_r &= C_r, &
+    (\partial_t+\bar\sigma)E_r &= (\partial_t+\sigma)D_r, \\
+    \partial_t D_\theta &= C_\theta, &
+    (\partial_t+\sigma)E_\theta &= (\partial_t+\bar\sigma)D_\theta, \\
+    (\partial_t+\sigma)U_z &= C_z, &
+    (\partial_t+\bar\sigma)E_z &= \partial_t U_z.
+
+The magnetic update has the same form with :math:`C=-\nabla\times E`.
+Inside the layer, the magnetic field is stored as :math:`\mu_0 H`, matching
+the regular vacuum B field at the interface.
+
+The implementation reuses the cylindrical Yee curls, including azimuthal-mode
+coupling. Auxiliary constitutive equations are advanced locally with
+trapezoidal time centering during each electric or magnetic field push. For
+:math:`\sigma=0` they reduce to the ordinary vacuum updates. Electric and
+magnetic auxiliary states are included in checkpoints; the separate exponential
+PML damping step used by the Cartesian solver is not applied here.
+
 .. _theory-bc-pec:
 
 Perfect Electrical Conductor

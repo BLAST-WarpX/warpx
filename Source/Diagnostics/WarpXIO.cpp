@@ -12,6 +12,9 @@
 
 
 #include "BoundaryConditions/PML.H"
+#ifdef WARPX_DIM_RZ
+#   include "BoundaryConditions/PML_RZ_FDTD.H"
+#endif
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #    include "BoundaryConditions/PML_RZ.H"
 #endif
@@ -411,6 +414,12 @@ WarpX::InitFromCheckpoint ()
     }
 
     InitPML();
+#ifdef WARPX_DIM_RZ
+    if (m_pml_rz_fdtd) {
+        m_pml_rz_fdtd->Restart(amrex::MultiFabFileFullPrefix(
+            0, restart_chkfile, level_prefix, "pml_rz_fdtd"));
+    }
+#endif
     if (do_pml)
     {
         for (int lev = 0; lev < nlevs; ++lev) {
