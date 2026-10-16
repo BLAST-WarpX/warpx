@@ -1,0 +1,10 @@
+# base input parameters
+FILE = inputs_base_2d_implicit_planar_pinch
+
+# test input parameters
+max_step = 2
+diag1.intervals = 2
+newton.diagnostic_interval = 1
+algo.evolve_scheme = "semi_implicit_em"
+newton.linear_solver = weighted_jacobi
+weighted_jacobi.verbose_int = 2

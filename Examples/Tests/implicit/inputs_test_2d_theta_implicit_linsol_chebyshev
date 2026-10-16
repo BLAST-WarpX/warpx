@@ -1,0 +1,12 @@
+# base input parameters
+FILE = inputs_base_2d_implicit_planar_pinch
+
+# test input parameters
+max_step = 2
+diag1.intervals = 2
+newton.diagnostic_interval = 1
+algo.evolve_scheme = "theta_implicit_em"
+implicit_evolve.theta = 0.5
+particles.max_grid_crossings = 2
+newton.linear_solver = chebyshev
+chebyshev.verbose_int = 2
