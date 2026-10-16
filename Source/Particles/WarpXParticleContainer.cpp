@@ -1842,13 +1842,24 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
         AMREX_ALWAYS_ASSERT(WarpX::nox == WarpX::noy);
         AMREX_ALWAYS_ASSERT(WarpX::nox == WarpX::noz);
 
+        // Near embedded boundaries, explicit Esirkepov current deposition reduces the
+        // particle shape to order 1 (MarkReducedShapeCells). Deposit rho with the same
+        // shape so that rho and J satisfy the discrete continuity equation there.
+        amrex::iMultiFab const* reduced_shape_mask = nullptr;
+        if (EB::enabled() && (lev == depos_lev) && (WarpX::nox > 1)
+            && (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::None)
+            && (WarpX::current_deposition_algo == CurrentDepositionAlgo::Esirkepov)
+            && (warpx.evolve_scheme == EvolveScheme::Explicit)) {
+            reduced_shape_mask = warpx.GetEBReduceParticleShapeFlag()[lev].get();
+        }
+
         ablastr::particles::deposit_charge<WarpXParticleContainer>(
                 pti, wp, this->m_charge, ion_lev,
                 rho, local_rho[thread_num],
                 WarpX::noz, dinv, xyzmin, WarpX::n_rz_azimuthal_modes,
                 ng_rho, depos_lev, ref_ratio,
                 offset, np_to_deposit,
-                icomp, nc);
+                icomp, nc, reduced_shape_mask);
     }
 }
 
