@@ -1,0 +1,5 @@
+# Writes the metadata of the matrix-free weighted Jacobi operator at its first update
+FILE = inputs_test_2d_theta_implicit_linsol_jacobi_mf
+
+max_step = 1
+weighted_jacobi.print_matrix = 1

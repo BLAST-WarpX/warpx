@@ -69,10 +69,6 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
     InitializeImplicitOptions();
 
-    const PreconditionerType pc_type = m_nlsolver->GetPreconditionerType();
-    if (pc_type == PreconditionerType::pc_petsc ||
-        pc_type == PreconditionerType::pc_algmg) { InitializeCurlCurlBCMasks(); }
-
     m_is_defined = true;
 
 }
