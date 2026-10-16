@@ -301,6 +301,42 @@ void WarpX::ApplyJfieldBoundary (const int lev, amrex::MultiFab* Jx,
     }
 }
 
+void WarpX::ApplyDiagonalMassMatricesBoundary (
+    const int lev, amrex::MultiFab* Sxx, amrex::MultiFab* Syy, amrex::MultiFab* Szz,
+    const amrex::IntVect& ncomp_xx, const amrex::IntVect& ncomp_yy,
+    const amrex::IntVect& ncomp_zz, PatchType patch_type)
+{
+    BL_PROFILE("WarpX::ApplyDiagonalMassMatricesBoundary()");
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const bool has_axis = Geom(lev).ProbLo(0) == 0._rt;
+#else
+    const bool has_axis = false;
+#endif
+
+    if (has_axis ||
+        ::isAnyBoundary<FieldBoundaryType::PMC>(field_boundary_lo, field_boundary_hi) ||
+        ::isAnyBoundary<FieldBoundaryType::PEC>(field_boundary_lo, field_boundary_hi) ||
+        ::isAnyBoundary<FieldBoundaryType::PEC_Insulator>(field_boundary_lo, field_boundary_hi))
+    {
+        amrex::GpuArray<amrex::GpuArray<int,2>,AMREX_SPACEDIM> voltage_driven{};
+        PEC::InsulatorAreaParsers insulator_area{};
+        for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+            if (field_boundary_lo[idim] == FieldBoundaryType::PEC_Insulator) {
+                voltage_driven[idim][0] = GetPECInsulator_IsESet(idim, 0);
+                insulator_area[idim][0] = pec_insulator_boundary->GetInsulatorAreaParser(idim, 0);
+            }
+            if (field_boundary_hi[idim] == FieldBoundaryType::PEC_Insulator) {
+                voltage_driven[idim][1] = GetPECInsulator_IsESet(idim, 1);
+                insulator_area[idim][1] = pec_insulator_boundary->GetInsulatorAreaParser(idim, 1);
+            }
+        }
+        PEC::ApplyDiagonalMassMatricesBoundary(Sxx, Syy, Szz,
+            ncomp_xx, ncomp_yy, ncomp_zz, field_boundary_lo, field_boundary_hi,
+            voltage_driven, insulator_area, has_axis, Geom(lev), lev, patch_type, ref_ratio);
+    }
+}
+
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 // Applies the boundary conditions that are specific to the axis when in cylindrical or spherical
 void

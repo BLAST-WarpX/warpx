@@ -611,6 +611,18 @@ public:
                               amrex::MultiFab* Jy, amrex::MultiFab* Jz,
                               PatchType patch_type);
 
+    /**
+     * \brief Fold diagonal preconditioner mass matrices at physical boundaries and the axis.
+     * Map both current rows and electric-field columns, then zero constrained entries.
+     * Apply to raw coefficients before inverse-volume scaling.
+     */
+    void ApplyDiagonalMassMatricesBoundary (int lev, amrex::MultiFab* Sxx,
+                                            amrex::MultiFab* Syy, amrex::MultiFab* Szz,
+                                            const amrex::IntVect& ncomp_xx,
+                                            const amrex::IntVect& ncomp_yy,
+                                            const amrex::IntVect& ncomp_zz,
+                                            PatchType patch_type);
+
     void ApplyEfieldBoundary (int lev, PatchType patch_type, amrex::Real cur_time);
     void ApplyBfieldBoundary (int lev, PatchType patch_type, SubcyclingHalf subcycling_half, amrex::Real cur_time);
 
