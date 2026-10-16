@@ -1,7 +1,7 @@
 #ifndef WARPX_NONLINEAR_SOLVER_H_
 #define WARPX_NONLINEAR_SOLVER_H_
 
-#include "PreconditionerLibrary.H"
+#include "PreconditionerTypes.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
