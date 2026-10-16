@@ -4,8 +4,10 @@ foreach(D IN LISTS WarpX_DIMS)
       PRIVATE
         DarwinLinearFieldOperator.cpp
         ImplicitSolver.cpp
+        MatrixMarketWriter.cpp
         SemiImplicitEM.cpp
         SemiImplicitDarwin.cpp
+        SparseJacobianMatrix.cpp
         ThetaImplicitEM.cpp
         StrangImplicitSpectralEM.cpp
         WarpXImplicitOps.cpp

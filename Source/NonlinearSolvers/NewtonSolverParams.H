@@ -9,7 +9,7 @@
 
 #include "LinearSolverLibrary.H"
 #include "NonlinearSolver.H"
-#include "PreconditionerLibrary.H"
+#include "PreconditionerTypes.H"
 #include "Utils/TextMsg.H"
 
 #include <AMReX_Enum.H>

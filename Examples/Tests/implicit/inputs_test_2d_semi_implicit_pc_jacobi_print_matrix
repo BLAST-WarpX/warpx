@@ -1,0 +1,5 @@
+# Writes the pc_jacobi matrix in MatrixMarket format at its first update
+FILE = inputs_test_2d_semi_implicit_pc_jacobi
+
+max_step = 1
+pc_jacobi.print_matrix = 1
