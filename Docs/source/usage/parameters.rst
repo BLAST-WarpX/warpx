@@ -183,6 +183,7 @@ Overall simulation parameters
 
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
+    If this parameter is set to the string ``/dev/null``, used inputs are not written to any file.
 
 .. pp:param:: warpx.gamma_boost
     :type: ``float``
