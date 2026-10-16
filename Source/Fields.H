@@ -152,7 +152,7 @@ namespace warpx::fields
     };
 
     /** Returns true if a FieldType represents a vector field */
-    inline bool
+    [[nodiscard]] constexpr bool
     isFieldArray (const FieldType field_type)
     {
         return std::any_of( std::begin(ArrayFieldTypes), std::end(ArrayFieldTypes),
