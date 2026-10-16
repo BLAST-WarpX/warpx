@@ -187,10 +187,22 @@ public:
      */
     void FinishMassMatricesDeposition ();
 
+#if defined(WARPX_EM_TEY)
+    /**
+     * \brief Construct Szx from the negative transpose of unscaled deposited Sxz.
+     * Entries whose source row lies outside the local Sxz box are left unchanged.
+     */
+    void CopyMassMatrixXZToZX ();
+#endif
+
     /**
      * \brief Finish the implicit particle update after the converged time-centered solve
      */
     void FinishImplicitParticleUpdate (amrex::Real time, int step);
+
+    const amrex::Array<bool,3>& GetBlankElectricField () const {
+        return m_blank_electric_field;
+    }
 
 protected:
 
@@ -220,6 +232,15 @@ protected:
      * \brief Time-biasing parameter for fields used on RHS to advance system.
      */
     amrex::Real m_theta = 0.5;
+
+    /**
+     * \brief Flags to turn off evolving select components of the electric field
+     */
+#if defined(WARPX_EM_TEY)
+    amrex::Array<bool,3> m_blank_electric_field{false,true,false};
+#else
+    amrex::Array<bool,3> m_blank_electric_field{false,false,false};
+#endif
 
     /**
      * \brief Nonlinear solver type and object
@@ -314,10 +335,9 @@ protected:
      */
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
 
-    /**
-     * \brief parse nonlinear solver parameters (if one is used)
-     */
-    void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
+    void parseBaseImplicitSolverParams ();
+
+    void parseNonlinearSolverParams (const amrex::ParmParse& pp);
 
     void CopyVectorField (warpx::fields::FieldType dst, warpx::fields::FieldType src);
 
