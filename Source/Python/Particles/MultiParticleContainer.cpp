@@ -46,10 +46,10 @@ strength_E, strength_B: floats
         )
 
         .def("get_charge_density",
-            [](MultiParticleContainer& mpc, int lev, bool local) {
-                return mpc.GetChargeDensity(lev, local);
+            [](MultiParticleContainer& mpc, int lev, bool local, bool finalize) {
+                return mpc.GetChargeDensityOnLevel(lev, local, finalize);
             },
-            py::arg("lev"), py::arg("local")
+            py::arg("lev"), py::arg("local"), py::arg("finalize")
         )
 
         .def("push_p",

@@ -309,7 +309,6 @@ void WarpX::HybridPICDepositRhoAndJ ()
             }
             pc.DepositCurrent(J_spec, dt[0], -0.5_rt * dt[0]);
             pc.DepositCharge(rho_spec, /*local*/true, /*reset*/true,
-                             /*apply_boundary_and_scale_volume*/false,
                              /*interpolate_across_levels*/false);
             // Accumulate the RAW (locally deposited, unsummed) per-species
             // fields into the totals: shape-spread contributions near box
@@ -324,18 +323,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
                                   0, 0, 1, current_fp[lev][idim]->nGrowVect());
                 }
             }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            // Radial geometries: apply the inverse-volume scaling to the
-            // per-species deposits so they carry physical charge/current
-            // densities, like the totals below. The per-species fields are
-            // compared with the physical rho_floor (species fractions,
-            // Vs = Js/rhos) and exposed to SI-unit parsers.
-            for (int lev = 0; lev <= finest_level; ++lev) {
-                ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
-                ApplyInverseVolumeScalingToCurrentDensity(
-                    J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
-            }
-#endif
+
             // The per-species fields themselves are consumed directly
             // (Vs = Js/rhos, species fractions, per-species resistivity,
             // resistive drag) and need their own guard-cell sum here;
@@ -352,6 +340,11 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         J_spec[lev][idim]->nGrowVect(), J_spec[lev][idim]->nGrowVect(),
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
+                // Apply boundary conditions to rho_spec, and then apply volume scaling
+                FinalizeRhoOnLevel(lev, rho_spec[lev], PatchType::fine);
+                // Apply boundary conditions to J_spec
+                FinalizeJOnLevel(lev, J_spec[lev][0], J_spec[lev][1],
+                                 J_spec[lev][2], PatchType::fine);
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after
@@ -373,18 +366,11 @@ void WarpX::HybridPICDepositRhoAndJ ()
                               0, 0, 1, rho_species_sum[lev]->nGrowVect());
             }
         }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        for (int lev = 0; lev <= finest_level; ++lev) {
-            ApplyInverseVolumeScalingToChargeDensity(rho_fp[lev], lev);
-            ApplyInverseVolumeScalingToCurrentDensity(
-                current_fp[lev][0], current_fp[lev][1], current_fp[lev][2], lev);
-        }
-#endif
     } else {
         // Single-pass deposition (rho at t_{n+1}, J at t_{n-1/2}): no active
         // feature consumes the per-species fields, so skip the per-species
         // deposits and guard-cell sums entirely. Zeroing and the RZ inverse
-        // volume scaling are handled inside.
+        // volume scaling (for J, not rho) are handled inside.
         mypc->DepositCharge(rho_fp, 0._rt);
         mypc->DepositCurrent(current_fp, dt[0], -0.5_rt * dt[0]);
     }
@@ -406,8 +392,11 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Synchronize J and rho:
     // filter (if used), exchange guard cells, interpolate across MR levels
-    // and apply boundary conditions
     SyncCurrentAndRho();
+
+    // Apply boundary conditions and finalize rho volume scaling.
+    FinalizeRho();
+    FinalizeJ();
 
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to

@@ -591,7 +591,8 @@ public:
                                                     int lev) const;
 
     void ApplyInverseVolumeScalingToChargeDensity (amrex::MultiFab* Rho,
-                                                   int lev) const;
+                                                   int lev, int scomp = 0,
+                                                   int ncomp = -1) const;
 #endif
 
     /**
@@ -600,7 +601,7 @@ public:
      * the simulation domain. This function performs that logic.
      */
     void ApplyRhofieldBoundary (int lev, amrex::MultiFab* Rho,
-                                PatchType patch_type);
+                                PatchType patch_type, int scomp = 0, int ncomp = -1);
 
     /**
      * \brief If a PEC boundary conditions is used the current
@@ -704,11 +705,81 @@ public:
 
     /**
      * \brief Synchronize J and rho:
-     * filter (if used), exchange guard cells, interpolate across MR levels
-     * and apply boundary conditions.
+     * filter (if used), exchange guard cells, and interpolate across MR levels.
      * Contains separate calls to WarpX::SyncCurrent and WarpX::SyncRho.
      */
     void SyncCurrentAndRho ();
+
+    /**
+     * \brief Finalize deposited current on all fine and coarse patches.
+     *
+     * - Apply physical boundary conditions: current deposited in guard cells beyond
+     *   supported physical boundaries is folded back into the valid cells next to
+     *   the boundary, and the guard cells are updated accordingly.
+     * - In cylindrical and spherical geometries, fold current deposited at negative
+     *   radius onto cells at positive radius with the appropriate component parity,
+     *   and divide by the radial volume factors to obtain physical current density.
+     *
+     * Call once per deposition, before using J in a field solver or diagnostic.
+     * Normally, call after filtering, guard-cell summation and transfers between
+     * mesh-refinement levels (i.e. after SyncCurrent()). PSATD paths that defer
+     * synchronization until after current correction retain their solver-specific ordering.
+     */
+    void FinalizeJ ();
+
+    /**
+     * \brief Finalize deposited current on one fine or coarse patch.
+     *
+     * Apply the physical-boundary and radial-axis folding and radial volume scaling
+     * described in FinalizeJ() to the supplied current components. Call once per
+     * deposition for this patch, following the ordering requirements in FinalizeJ().
+     *
+     * \param[in] lev Mesh refinement level of the patch.
+     * \param[in,out] Jx First deposited current component to finalize.
+     * \param[in,out] Jy Second deposited current component to finalize.
+     * \param[in,out] Jz Third deposited current component to finalize.
+     * \param[in] patch_type Fine or coarse patch; a coarse patch uses level lev-1 geometry.
+     */
+    void FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
+                           amrex::MultiFab* Jz, PatchType patch_type);
+
+    /**
+     * \brief Finalize deposited rho on all fine and coarse patches.
+     *
+     * - Apply physical boundary conditions: charge deposited in guard cells beyond
+     *   supported physical boundaries is folded back into the valid cells next to
+     *   the boundary, and the guard cells are updated accordingly.
+     * - In cylindrical and spherical geometries, fold charge deposited at negative
+     *   radius onto cells at positive radius and divide by the radial volume factor
+     *   so that rho becomes a physical charge density.
+     *
+     * Deposition routines accumulate raw charge on the grid. Finalize rho before
+     * using it in a field solver or writing it to a diagnostic. Call once per
+     * deposition, after filtering, guard-cell summation and transfers between
+     * mesh-refinement levels (i.e. after SyncRho()).
+     */
+    void FinalizeRho ();
+
+    /**
+     * \brief Finalize selected rho components on one fine or coarse patch.
+     *
+     * Apply the physical-boundary and radial-axis folding and radial volume scaling
+     * described in FinalizeRho(). Call once per deposited component, after filtering,
+     * guard-cell summation and transfers between mesh-refinement levels for those
+     * components are complete, and before using rho in a field solver or diagnostic.
+     *
+     * \param[in] lev Mesh refinement level of the patch.
+     * \param[in,out] rho Deposited charge to finalize into physical charge density.
+     * \param[in] patch_type Fine or coarse patch; a coarse patch uses level lev-1 geometry.
+     * \param[in] scomp Starting array component to finalize.
+     * \param[in] ncomp Number of array components; -1 selects all remaining components.
+     */
+    void FinalizeRhoOnLevel (int lev, amrex::MultiFab* rho, PatchType patch_type, int scomp = 0, int ncomp = -1);
+
+    [[nodiscard]] bool UseVerboncoeurAxisCorrection () const
+    {
+        return m_verboncoeur_axis_correction;
+    }
 
     /**
      * \brief Apply filter and sum guard cells across MR levels.
@@ -946,8 +1017,16 @@ public:
      * volume factors (conventions of the inverse-volume-scaling routines),
      * which conserves the volume integral exactly, leaves constants
      * untouched, has zero flux through the axis, and reduces to the
-     * standard bilinear filter where the volumes are uniform. */
-    /** \returns the guard-cell width over which dst holds filtered data. */
+     * standard bilinear filter where the volumes are uniform.
+     *
+     * \param[out] dst The destination MultiFab to store filtered data
+     * \param[in] src_mf The source MultiFab containing data to be filtered
+     * \param[in] lev The mesh refinement level
+     * \param[in] scomp The starting component index in the source MultiFab
+     * \param[in] dcomp The starting component index in the destination MultiFab
+     * \param[in] ncomp The number of components to filter
+     * \returns the guard-cell width over which dst holds filtered data.
+     */
     amrex::IntVect ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
                                     int lev, int scomp, int dcomp, int ncomp);
 #endif

@@ -393,19 +393,6 @@ namespace
             // Update the cell if the mirror guard cell exists
             if (fabbox.contains(ijk_mirror)) {
                 // Note that this includes the cells on the boundary
-                amrex::Real rscale = 1._rt; // NOLINT(misc-const-correctness)
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
-                const amrex::Real rvalid = ijk_vec[idim] + rshift;
-                if (idim == 0 && iside == 1) {
-                    // Account for different dV at different radii
-                    const amrex::Real rmirror = ijk_mirror[idim] + rshift;
-                    rscale = rmirror/rvalid;
-#if defined(WARPX_DIM_RSPHERE)
-                    rscale *= rmirror/rvalid;
-#endif
-                }
-#endif
                 if (ijk_vec == ijk_mirror && sum_on_boundary[iside] && psign[iside] < 0._rt) {
                     // For J-parallel in PECInsulator boundaries, sum the values in the guard
                     // cells and add it to the J on the boundary.
@@ -414,19 +401,11 @@ namespace
                     amrex::IntVect ijk_guard = ijk_vec;
                     for (int ig = 0 ; ig < nguards ; ig++) {
                         ijk_guard[idim] += isign;
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                        if (idim == 0 && iside == 1) {
-                            rscale = (rvalid + ig + 1)/rvalid;
-#if defined(WARPX_DIM_RSPHERE)
-                            rscale *= (rvalid + ig + 1)/rvalid;
-#endif
-                        }
-#endif
-                        field(ijk_vec,n) += 2._rt*rscale*field(ijk_guard,n);
+                        field(ijk_vec,n) += 2._rt * field(ijk_guard,n);
                     }
                 } else {
                     // J/rho deposited to guard cell is added to the valid mirror cell
-                    field(ijk_vec,n) += rscale * psign[iside] * field(ijk_mirror,n);
+                    field(ijk_vec,n) += psign[iside] * field(ijk_mirror,n);
                 }
             }
         }
@@ -484,20 +463,7 @@ namespace
             // Update the cell if the mirror guard cell exists
             // This assumes that the nodal boundary cells are not included in the box.
             if (fabbox.contains(ijk_mirror)) {
-                auto inv_rscale = 1._rt; // NOLINT(misc-const-correctness)
-#if (defined WARPX_DIM_RZ) || (defined WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                if (idim == 0 && iside == 1) {
-                    // Account for different dV at different radii
-                    amrex::Real const rshift = (is_nodal_r ? 0.0_rt : 0.5_rt);
-                    const amrex::Real rvalid = ijk_vec[idim] + rshift;
-                    const amrex::Real rmirror = ijk_mirror[idim] + rshift;
-                    inv_rscale = rvalid/rmirror;
-#if defined(WARPX_DIM_RSPHERE)
-                    inv_rscale *= rvalid/rmirror;
-#endif
-                }
-#endif
-                field(ijk_mirror,n) = inv_rscale * psign[iside] * field(ijk_vec,n);
+                field(ijk_mirror,n) = psign[iside] * field(ijk_vec,n);
             }
         }
     }

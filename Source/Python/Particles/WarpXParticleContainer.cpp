@@ -7,6 +7,7 @@
 #include "Python/pyWarpX.H"
 
 #include <Particles/WarpXParticleContainer.H>
+#include <WarpX.H>
 
 
 void init_WarpXParIter (py::module& m)
@@ -127,16 +128,20 @@ void init_WarpXParticleContainer (py::module& m)
             py::arg("rho"), py::arg("lev")
         )
         .def("get_charge_density",
-            [](WarpXParticleContainer& pc, int lev, bool local)
+            [](WarpXParticleContainer& pc, int lev, bool local, bool finalize)
             {
-                return pc.GetChargeDensity(lev, local);
+                return pc.GetChargeDensityOnLevel(lev, local, finalize);
             },
-            py::arg("lev"), py::arg("local")
+            py::arg("lev"), py::arg("local"), py::arg("finalize")
         )
         .def("deposit_current",
             [](WarpXParticleContainer& pc, std::string mf_name, int lev, double dt, double relative_time)
             {
-                pc.DepositCurrent(mf_name, lev, dt, relative_time);
+                pc.DepositCurrentOnLevel(mf_name, lev, dt, relative_time);
+                auto& warpx = WarpX::GetInstance();
+                auto const current = warpx.m_fields.get_alldirs(mf_name, lev);
+                // Apply boundary conditions to current, then apply volume scaling
+                warpx.FinalizeJOnLevel(lev, current[0], current[1], current[2], PatchType::fine);
             },
             py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time"),
             R"pbdoc(Deposit current density, sum guard values, and apply boundary conditions
