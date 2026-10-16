@@ -70,6 +70,10 @@ private:
      * \param[in] ncomp number of components (modes, real and imag)
      */
     void AddRZModesToOutputNames (const std::string& field, int ncomp);
+
+    /** Append diagnostic names for all requested cylindrical modes. */
+    void AddRZModeNamesToDiags ();
+
     /** Define the cell-centered multifab m_mf_output depending on user-defined
       * lo and hi and coarsening ratio. This MultiFab may have a different BoxArray and
       * DistributionMap than field MultiFabs in the simulation.
