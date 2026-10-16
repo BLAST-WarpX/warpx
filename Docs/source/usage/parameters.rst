@@ -393,10 +393,14 @@ Overall simulation parameters
             - ``pc_algmg.algmg_verbose`` (``int``, default: 0) Verbosity of the multigrid solver.
             - ``pc_algmg.max_iter`` (``int``, default: 1) Number of V-cycles per application.
             - ``pc_algmg.smoother`` (``string``, default: "chebyshev") One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only).
-            - ``pc_algmg.chebyshev_degree`` (``int``, default: 4)
+            - ``pc_algmg.chebyshev_degree`` (``int``, default: 8)
+            - ``pc_algmg.chebyshev_ratio`` (``float``, default: 50) The Chebyshev smoother damps eigenvalues from the largest down to the largest divided by this ratio. With mass matrices in the preconditioner the smallest eigenvalues are far below the diagonal, so this is much larger than the usual multigrid value of about 6.
             - ``pc_algmg.strong_threshold`` (``float``, default: 0.25)
             - ``pc_algmg.aggressive_levels`` (``int``, default: 0) Number of levels with aggressive coarsening.
             - ``pc_algmg.max_levels`` (``int``, default: 25)
+            - ``pc_algmg.nu1`` (``int``, default: 1 for "chebyshev", 2 otherwise) Smoother sweeps before the coarse correction.
+            - ``pc_algmg.nu2`` (``int``, default: 1 for "chebyshev", 2 otherwise) Smoother sweeps after the coarse correction.
+            - ``pc_algmg.nu_bottom`` (``int``, default: 4 for "chebyshev", 8 otherwise) Smoother sweeps on the coarsest level when it has more than 1024 rows and is therefore not solved directly.
 
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
