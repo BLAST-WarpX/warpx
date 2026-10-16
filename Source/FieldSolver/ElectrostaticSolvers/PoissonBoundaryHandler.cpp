@@ -187,5 +187,6 @@ void PoissonBoundaryHandler::BuildParsersEB ()
     else {
         potential_eb_parser = utils::parser::makeParser(potential_eb_str, {"t"});
         potential_eb_t = potential_eb_parser.compile<1>();
+        phi_EB_only_t = true;
     }
 }

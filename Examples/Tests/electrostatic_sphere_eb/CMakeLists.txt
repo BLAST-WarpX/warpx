@@ -31,7 +31,7 @@ if(WarpX_EB)
         3  # dims
         2  # nprocs
         inputs_test_3d_electrostatic_sphere_eb_picmi.py  # inputs
-        "analysis.py"  # analysis
+        "analysis.py --last-potential 2"  # analysis
         "analysis_default_regression.py --path diags/diag1/"  # checksum
         OFF  # dependency
     )
