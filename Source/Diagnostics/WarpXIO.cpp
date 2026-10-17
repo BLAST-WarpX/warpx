@@ -425,7 +425,11 @@ WarpX::InitFromCheckpoint ()
         }
     }
 
-    if (EB::enabled()) { InitializeEBGridData(maxLevel()); }
+    if (EB::enabled()) {
+        for (int lev = 0; lev < nlevs; ++lev) {
+            InitializeEBGridData(lev);
+        }
+    }
 
     reduced_diags->ReadCheckpointData(restart_chkfile);
 

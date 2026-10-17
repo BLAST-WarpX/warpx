@@ -170,6 +170,7 @@ public:
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateEFlag_fp() { return m_eb_update_E_fp; }
     amrex::Vector<std::array< std::unique_ptr<amrex::iMultiFab>,3 > >& GetEBUpdateBFlag_fp() { return m_eb_update_B_fp; }
     amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag() const { return m_eb_reduce_particle_shape; }
+    amrex::Vector< std::unique_ptr<amrex::iMultiFab> > const & GetEBReduceParticleShapeFlag_cp() const { return m_eb_reduce_particle_shape_cp; }
 
     /**
      * \brief
@@ -1045,8 +1046,10 @@ public:
 
     /**
     * \brief Compute the level set function used for particle-boundary interaction.
+    *
+    * \param[in] lev level on which the level set function is computed
     */
-    void ComputeDistanceToEB ();
+    void ComputeDistanceToEB (int lev);
     /**
     * \brief Main function computing the cell extension. Where possible it computes one-way
     *       extensions and, when this is not possible, it does eight-ways extensions.
@@ -1365,6 +1368,10 @@ private:
      *  errors in charge conservation when a particle is too close to the embedded boundary.
      */
     amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape;
+    /** EB: Same as m_eb_reduce_particle_shape, but on the coarse patch of each level (lev > 0).
+     *  Used by the particles that deposit their current in the deposition buffers.
+     */
+    amrex::Vector<  std::unique_ptr<amrex::iMultiFab> > m_eb_reduce_particle_shape_cp;
 
     /** EB: for every mesh face flag_info_face contains one of the FaceInfo::Flag values:
      *          * FaceInfo::extended if the face needs to be extended

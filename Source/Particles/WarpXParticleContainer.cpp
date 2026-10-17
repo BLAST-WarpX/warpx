@@ -743,7 +743,12 @@ WarpXParticleContainer::DepositCurrent (WarpXParIter& pti,
 
                 amrex::Array4<const int> eb_reduce_particle_shape;
                 if (EB::enabled()) {
-                    eb_reduce_particle_shape = (*warpx.GetEBReduceParticleShapeFlag()[lev])[pti].array();
+                    // When depositing in the buffers (depos_lev<lev), the current is deposited
+                    // on the coarse patch of level lev: use the flags on that same grid.
+                    auto const & eb_reduce_particle_shape_mf = (lev == depos_lev) ?
+                        warpx.GetEBReduceParticleShapeFlag()[lev] :
+                        warpx.GetEBReduceParticleShapeFlag_cp()[lev];
+                    eb_reduce_particle_shape = (*eb_reduce_particle_shape_mf)[pti].array();
                 }
 
                 if      (WarpX::nox == 1){

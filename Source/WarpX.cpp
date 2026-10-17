@@ -406,6 +406,7 @@ WarpX::WarpX ()
     m_eb_update_E_cp.resize(nlevs_max);
     m_eb_update_B_cp.resize(nlevs_max);
     m_eb_reduce_particle_shape.resize(nlevs_max);
+    m_eb_reduce_particle_shape_cp.resize(nlevs_max);
 
     m_flag_info_face.resize(nlevs_max);
     m_flag_ext_face.resize(nlevs_max);
@@ -3146,6 +3147,12 @@ WarpX::AllocLevelMFs (int lev, const BoxArray& ba, const DistributionMapping& dm
                 m_fields.alloc_init(FieldType::rho_buf, lev, amrex::convert(cba,rho_nodal_flag), dm, 2*ncomps, ngRho, 0.0_rt);
             }
             AllocInitMultiFab(current_buffer_masks[lev], ba, dm, ncomps, amrex::IntVect(1), lev, "current_buffer_masks");
+            if (EB::enabled()) {
+                // Whether to reduce the particle shape to order 1 when close to the EB,
+                // for the particles that deposit in the buffers (i.e. on the coarse patch)
+                AllocInitMultiFab(m_eb_reduce_particle_shape_cp[lev], amrex::convert(cba, IntVect::TheCellVector()), dm, ncomps,
+                    ngRho, lev, "m_eb_reduce_particle_shape_cp");
+            }
             // Current buffer masks have 1 ghost cell, because of the fact
             // that particles may move by more than one cell when using subcycling.
         }

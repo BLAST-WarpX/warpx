@@ -1,0 +1,32 @@
+# base input parameters
+FILE = inputs_base
+
+geometry.dims = 2
+amr.n_cell = 32 32
+geometry.prob_lo     = -10 -10
+geometry.prob_hi     =  10  10
+boundary.field_lo = pec absorbing_silver_mueller
+boundary.field_hi = pec absorbing_silver_mueller
+
+algo.particle_shape = 2
+
+# Mesh refinement: the refined patch covers the embedded boundary on the +x side,
+# so that the electron is absorbed on the refined level (and deposits in the
+# current deposition buffers on its way there), while the positron is absorbed on level 0
+amr.max_level = 1
+amr.ref_ratio = 2
+warpx.fine_tag_lo = 2.5 -10
+warpx.fine_tag_hi = 10 10
+
+# Reduce the timestep to satisfy the CFL condition on the refined level,
+# while keeping the same physical times in the output (as in the other tests)
+warpx.const_dt = 5.8978641799e-10
+max_step = 200
+diag1.intervals = 2
+
+# Additional plotfile diagnostic for the checksum
+# (openPMD output of the refined level is not supported by the checksum script)
+diagnostics.diags_names = diag1 diag2
+diag2.intervals = 200
+diag2.diag_type = Full
+diag2.fields_to_plot = Ex Ey Ez divE rho

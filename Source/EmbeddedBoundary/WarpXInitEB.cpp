@@ -130,7 +130,7 @@ WarpX::InitEB ()
 }
 
 void
-WarpX::ComputeDistanceToEB ()
+WarpX::ComputeDistanceToEB (int lev)
 {
     if (!EB::enabled()) {
         throw std::runtime_error("ComputeDistanceToEB only works when EBs are enabled at runtime");
@@ -138,11 +138,11 @@ WarpX::ComputeDistanceToEB ()
 #ifdef AMREX_USE_EB
     BL_PROFILE("ComputeDistanceToEB");
     using warpx::fields::FieldType;
-    for (int lev=0; lev<=maxLevel(); lev++) {
-        auto const* eb_index_space = GetEBIndexSpace(lev);
-        const amrex::EB2::Level& eb_level = eb_index_space->getLevel(Geom(lev));
-        auto const eb_fact = fieldEBFactory(lev);
-        amrex::FillSignedDistance(*m_fields.get(FieldType::distance_to_eb, lev), eb_level, eb_fact, 1);
-    }
+    auto const* eb_index_space = GetEBIndexSpace(lev);
+    const amrex::EB2::Level& eb_level = eb_index_space->getLevel(Geom(lev));
+    auto const& eb_fact = fieldEBFactory(lev);
+    amrex::FillSignedDistance(*m_fields.get(FieldType::distance_to_eb, lev), eb_level, eb_fact, 1);
+#else
+    amrex::ignore_unused(lev);
 #endif
 }

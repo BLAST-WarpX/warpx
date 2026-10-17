@@ -63,6 +63,18 @@ endif()
 
 if(WarpX_EB)
     add_warpx_test(
+        test_2d_embedded_boundary_em_particle_absorption_sh_factor_2_mr  # name
+        2  # dims
+        1  # nprocs
+        inputs_test_2d_embedded_boundary_em_particle_absorption_sh_factor_2_mr  # inputs
+        "analysis.py"  # analysis
+        "analysis_default_regression.py --path diags/diag2000200"  # checksum
+        OFF  # dependency
+    )
+endif()
+
+if(WarpX_EB)
+    add_warpx_test(
         test_2d_embedded_boundary_em_particle_absorption_sh_factor_3  # name
         2  # dims
         1  # nprocs

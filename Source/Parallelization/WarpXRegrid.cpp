@@ -199,6 +199,7 @@ WarpX::RemakeLevel (int lev, Real /*time*/, const BoxArray& ba, const Distributi
         {
             if (eb_enabled) {
                 RemakeMultiFab( m_eb_reduce_particle_shape[lev] );
+                RemakeMultiFab( m_eb_reduce_particle_shape_cp[lev] );
                 if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD) {
                     RemakeMultiFab( m_eb_update_E_fp[lev][idim] );
                     RemakeMultiFab( m_eb_update_B_fp[lev][idim] );

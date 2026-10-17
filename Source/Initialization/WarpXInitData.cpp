@@ -1598,11 +1598,29 @@ void WarpX::CheckGuardCells()
 void WarpX::InitializeEBGridData (int lev)
 {
 #ifdef AMREX_USE_EB
+    using warpx::fields::FieldType;
+
     auto const& eb_fact = fieldEBFactory(lev);
+
+    // The coarse patch of this level lives on a coarsened grid, so its EB flags
+    // need to be computed from an EB factory at the coarse-patch resolution.
+    amrex::Geometry cgeom;
+    std::unique_ptr<amrex::EBFArrayBoxFactory> cp_eb_fact;
+    if (lev > 0) {
+        cgeom = amrex::coarsen(Geom(lev), refRatio(lev-1));
+        // Use the exact (cell-centered) BoxArray and DistributionMapping of the
+        // coarse-patch fields, so that the EB flags share their grid layout.
+        const amrex::MultiFab& Efield_cp0 = *m_fields.get(FieldType::Efield_cp, ablastr::fields::Direction{0}, lev);
+        const amrex::BoxArray cba = amrex::convert(Efield_cp0.boxArray(), amrex::IntVect::TheCellVector());
+        const amrex::DistributionMapping& cdm = Efield_cp0.DistributionMap();
+        int const max_guard = guard_cells.ng_FieldSolver.max();
+        cp_eb_fact = amrex::makeEBFabFactory(
+            cgeom, cba, cdm,
+            {max_guard, max_guard, max_guard}, amrex::EBSupport::full);
+    }
 
     if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
     {
-        using warpx::fields::FieldType;
 
         if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
@@ -1645,21 +1663,8 @@ void WarpX::InitializeEBGridData (int lev)
                 m_fields.get_alldirs(FieldType::Bfield_fp, lev),
                 eb_fact, Geom(lev).periodicity() );
 
-            // The coarse-patch fields (Efield_cp/Bfield_cp) live on a coarsened grid, so they
-            // need their own EB flags, computed from an EB factory at the coarse-patch resolution.
+            // Same on the coarse patch of this level (for Efield_cp/Bfield_cp)
             if (lev > 0) {
-                const amrex::IntVect rr = refRatio(lev-1);
-                const amrex::Geometry cgeom = amrex::coarsen(Geom(lev), rr);
-                // Use the exact (cell-centered) BoxArray and DistributionMapping of the
-                // coarse-patch fields, so that the EB flags share their grid layout.
-                const amrex::MultiFab& Efield_cp0 = *m_fields.get(FieldType::Efield_cp, ablastr::fields::Direction{0}, lev);
-                const amrex::BoxArray cba = amrex::convert(Efield_cp0.boxArray(), amrex::IntVect::TheCellVector());
-                const amrex::DistributionMapping& cdm = Efield_cp0.DistributionMap();
-                int const max_guard = guard_cells.ng_FieldSolver.max();
-                auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    cgeom, cba, cdm,
-                    {max_guard, max_guard, max_guard}, amrex::EBSupport::full);
-
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
                     m_eb_update_E_cp[lev],
                     m_fields.get_alldirs(FieldType::Efield_cp, lev),
@@ -1673,9 +1678,17 @@ void WarpX::InitializeEBGridData (int lev)
 
     }
 
-    if (lev == maxLevel()) {
-        ComputeDistanceToEB();
-        warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
+    ComputeDistanceToEB(lev);
+
+    // Mark the cells in which particles should use a reduced shape factor when depositing,
+    // on the fine patch of this level...
+    warpx::embedded_boundary::MarkReducedShapeCells(
+        m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(lev).periodicity());
+    // ... and on its coarse patch, which is used by the particles of this level
+    // that deposit their current in the deposition buffers (i.e. at level lev-1)
+    if (lev > 0 && m_eb_reduce_particle_shape_cp[lev]) {
+        warpx::embedded_boundary::MarkReducedShapeCells(
+            m_eb_reduce_particle_shape_cp[lev], *cp_eb_fact, nox, cgeom.periodicity());
     }
 #else
     amrex::ignore_unused(lev);
