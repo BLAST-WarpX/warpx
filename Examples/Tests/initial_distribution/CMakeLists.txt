@@ -20,3 +20,23 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1/"  # checksum
     test_3d_initial_distribution_prepare  # dependency
 )
+
+add_warpx_test(
+    test_rsphere_initial_distribution_prepare  # name
+    RSPHERE  # dims
+    1  # nprocs
+    inputs_test_rsphere_initial_distribution_prepare.py  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rsphere_initial_distribution  # name
+    RSPHERE  # dims
+    1  # nprocs
+    inputs_test_rsphere_initial_distribution  # inputs
+    "analysis_rsphere.py"  # analysis
+    "analysis_default_regression.py --path diags/diag1/"  # checksum
+    test_rsphere_initial_distribution_prepare  # dependency
+)
