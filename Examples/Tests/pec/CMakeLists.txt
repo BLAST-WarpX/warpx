@@ -70,3 +70,43 @@ add_warpx_test(
     "analysis_default_regression.py --path diags/diag1000020"  # checksum
     test_2d_pec_field_insulator_implicit  # dependency
 )
+
+add_warpx_test(
+    test_2d_pec_absorbing_crop_picmi  # name
+    2  # dims
+    1  # nprocs
+    "inputs_test_pec_absorbing_crop_picmi.py --dim xz --shape 1"  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_pec_absorbing_crop_picmi  # name
+    RZ  # dims
+    1  # nprocs
+    "inputs_test_pec_absorbing_crop_picmi.py --dim rz --shape 1"  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_pec_absorbing_crop_shape2_picmi  # name
+    RZ  # dims
+    1  # nprocs
+    "inputs_test_pec_absorbing_crop_picmi.py --dim rz --shape 2"  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
+    test_rz_pec_absorbing_crop_shape3_picmi  # name
+    RZ  # dims
+    1  # nprocs
+    "inputs_test_pec_absorbing_crop_picmi.py --dim rz --shape 3"  # inputs
+    OFF  # analysis
+    OFF  # checksum
+    OFF  # dependency
+)
