@@ -1126,6 +1126,7 @@ void ImplicitSolver::PreRHSOp (const amrex::Real a_cur_time,
     // Apply BCs to J and communicate
     m_WarpX->SyncCurrentAndRho();
     m_WarpX->FinalizeRho();
+    m_WarpX->FinalizeJ();
 
 }
 

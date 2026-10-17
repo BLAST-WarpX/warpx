@@ -705,11 +705,17 @@ public:
 
     /**
      * \brief Synchronize J and rho:
-     * filter (if used), exchange guard cells, interpolate across MR levels
-     * and apply boundary conditions.
+     * filter (if used), exchange guard cells, and interpolate across MR levels.
      * Contains separate calls to WarpX::SyncCurrent and WarpX::SyncRho.
      */
     void SyncCurrentAndRho ();
+
+    /** Apply physical boundary conditions to fine- and coarse-patch currents. */
+    void FinalizeJ ();
+
+    /** Apply physical boundary conditions to the supplied current components. */
+    void FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
+                           amrex::MultiFab* Jz, PatchType patch_type);
 
     /**
      * \brief Finalize deposited rho on all fine and coarse patches.

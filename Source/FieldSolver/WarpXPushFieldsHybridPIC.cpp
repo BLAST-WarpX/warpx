@@ -352,8 +352,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
                 }
                 // Apply boundary conditions to rho_spec, and then apply volume scaling
                 FinalizeRhoOnLevel(lev, rho_spec[lev], PatchType::fine);
-                ApplyJfieldBoundary(lev, J_spec[lev][0], J_spec[lev][1],
-                                    J_spec[lev][2], PatchType::fine);
+                // Apply boundary conditions to J_spec
+                FinalizeJOnLevel(lev, J_spec[lev][0], J_spec[lev][1],
+                                 J_spec[lev][2], PatchType::fine);
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after
@@ -409,8 +410,9 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // filter (if used), exchange guard cells, interpolate across MR levels
     SyncCurrentAndRho();
 
-    // Apply BCs to rho and then apply volume scaling
+    // Apply boundary conditions to J and rho, then apply volume scaling.
     FinalizeRho();
+    FinalizeJ();
 
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to

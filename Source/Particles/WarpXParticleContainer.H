@@ -350,8 +350,8 @@ public:
      *                          the particle position will be temporarily modified to match
      *                          the time of the deposition.
      */
-    void DepositCurrent (const std::string& mf_name, int lev,
-                         amrex::Real dt, amrex::Real relative_time);
+    void DepositCurrentOnLevel (const std::string& mf_name, int lev,
+                                amrex::Real dt, amrex::Real relative_time);
 
     /**
      * \brief Deposit charge without physical boundary folding or radial volume scaling.

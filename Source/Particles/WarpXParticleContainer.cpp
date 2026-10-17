@@ -1513,12 +1513,12 @@ WarpXParticleContainer::DepositCurrent (
     }
 }
 
-void WarpXParticleContainer::DepositCurrent (
+void WarpXParticleContainer::DepositCurrentOnLevel (
     const std::string& mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
 ) {
     auto& warpx = WarpX::GetInstance();
     // allocate temporary multifab to deposit current density into
-    ablastr::fields::MultiLevelVectorField current {
+    const ablastr::fields::MultiLevelVectorField current {
         warpx.m_fields.get_alldirs(mf_name, lev)
     };
 
@@ -1532,11 +1532,6 @@ void WarpXParticleContainer::DepositCurrent (
 
     // Sum guard cells
     warpx.SyncCurrent(mf_name);
-
-    // Apply boundary conditions
-    warpx.ApplyJfieldBoundary(
-        lev, current[lev][0], current[lev][1], current[lev][2], PatchType::fine
-    );
 }
 
 /* \brief Charge Deposition for thread thread_num

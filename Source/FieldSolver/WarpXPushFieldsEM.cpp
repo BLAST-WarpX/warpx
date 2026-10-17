@@ -825,6 +825,7 @@ WarpX::PushPSATD (amrex::Real start_time)
                 cell_size_at_all_levels.push_back(CellSize(lev));
             }
             ::PSATDSubtractCurrentPartialSumsAvg(cell_size_at_all_levels, m_fields);
+            FinalizeJ();
 
             // FFT of J after subtraction of cumulative sums
             PSATDForwardTransformJ(current_fp_string, current_cp_string);
@@ -890,6 +891,7 @@ WarpX::PushPSATD (amrex::Real start_time)
             // TODO This works only without mesh refinement
             const int lev = 0;
             SumBoundaryJ(current_fp, lev, Geom(lev).periodicity());
+            FinalizeJ();
             SyncRho();
         }
 
