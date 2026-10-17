@@ -23,6 +23,7 @@
 #include <AMReX_RealVect.H>
 #include <AMReX_TableData.H>
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
@@ -89,7 +90,7 @@ struct ExternalFieldView
     amrex::Real operator() (amrex::RealVect const& pos) const
     {
 #if defined(AMREX_USE_GPU)
-        AMREX_IF_ON_HOST((amrex::Abort("For GPU builds, ExternalFieldView only works on device. We could make it work on host if necessary.");))
+        AMREX_IF_ON_HOST((amrex::Abort("For GPU builds, ExternalFieldView only works on device, since the data is stored in device memory.");))
 #endif
 
         // Get index of the external field array
@@ -158,6 +159,25 @@ struct ExternalFieldView
                     pos[0], pos[1], pos[2]));
         }
 #endif
+    }
+
+    [[nodiscard]]
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real
+    getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
+    {
+#if (AMREX_SPACEDIM == 1)
+        amrex::ignore_unused(x,y);
+        amrex::RealVect const pos{z};
+#elif defined(WARPX_DIM_XZ)
+        amrex::ignore_unused(y);
+        amrex::RealVect const pos{x,z};
+#elif defined(WARPX_DIM_RZ)
+        amrex::RealVect const pos{std::sqrt(x*x + y*y), z};
+#else
+        amrex::RealVect const pos{x,y,z};
+#endif
+        return (*this)(pos);
     }
 
     amrex::RealVect dx;     //! mesh spacing of the data
@@ -288,26 +308,9 @@ struct ExternalFieldVectorView
     amrex::XDim3
     getValue (amrex::Real x, amrex::Real y, amrex::Real z) const noexcept
     {
-#if (AMREX_SPACEDIM < 3)
-        amrex::ignore_unused(x,y,z);
-#endif
-#if (AMREX_SPACEDIM == 1)
-        amrex::RealVect const pos{z};
-#elif defined(WARPX_DIM_XZ)
-        amrex::RealVect const pos{x,z};
-#else
-        amrex::RealVect const pos{x,y,z};
-#endif
-#if defined(AMREX_USE_GPU)
-        // The views can only be evaluated on device: ExternalFieldView calls
-        // the interpolation routines of ablastr::math, which are device-only.
-        AMREX_IF_ON_HOST((amrex::Abort(
-            "For GPU builds, ExternalFieldVectorView only works on device.");))
-        AMREX_IF_ON_DEVICE((return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};))
-        return amrex::XDim3{0.0, 0.0, 0.0};
-#else
-        return amrex::XDim3{m_x_view(pos), m_y_view(pos), m_z_view(pos)};
-#endif
+        return amrex::XDim3{m_x_view.getValue(x,y,z),
+                            m_y_view.getValue(x,y,z),
+                            m_z_view.getValue(x,y,z)};
     }
 
 private:
