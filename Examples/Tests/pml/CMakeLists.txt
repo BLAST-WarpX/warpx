@@ -90,3 +90,63 @@ if(WarpX_FFT)
         OFF  # dependency
     )
 endif()
+
+add_warpx_test(
+    test_2d_pml_theta_implicit
+    2
+    1
+    inputs_test_2d_pml_theta_implicit
+    analysis_pml_theta_implicit.py
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_pml_yee_smr_picmi
+    RZ
+    1
+    inputs_test_rz_pml_yee_smr_picmi.py
+    analysis_pml_yee_rz_smr.py
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_pml_yee_smr_picmi_restart
+    RZ
+    1
+    "inputs_test_rz_pml_yee_smr_picmi.py --restart ../test_rz_pml_yee_smr_picmi/diags/chk000175"
+    "analysis_pml_yee_rz_smr.py --reference ../test_rz_pml_yee_smr_picmi"
+    OFF
+    test_rz_pml_yee_smr_picmi
+)
+
+add_warpx_test(
+    test_rz_pml_yee_smr_mode1_picmi
+    RZ
+    1
+    "inputs_test_rz_pml_yee_smr_picmi.py --mode 1"
+    analysis_pml_yee_rz_smr.py
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_pml_yee_smr_annular_picmi
+    RZ
+    1
+    "inputs_test_rz_pml_yee_smr_picmi.py --annular"
+    analysis_pml_yee_rz_smr.py
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_rz_pml_yee_smr_mode1_material_picmi
+    RZ
+    1
+    "inputs_test_rz_pml_yee_smr_picmi.py --mode 1 --material"
+    analysis_pml_yee_rz_smr.py
+    OFF
+    OFF
+)

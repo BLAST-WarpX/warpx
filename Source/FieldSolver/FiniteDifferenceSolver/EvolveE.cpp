@@ -17,11 +17,13 @@
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianNodalAlgorithm.H"
 #endif
 #include "EmbeddedBoundary/Enabled.H"
+#include "MacroscopicProperties/MacroscopicProperties.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
 #include "WarpX.H"
 
+#include <ablastr/coarsen/sample.H>
 #include <ablastr/fields/MultiFabRegister.H>
 
 #include <AMReX.H>
@@ -568,3 +570,104 @@ void FiniteDifferenceSolver::EvolveESpherical (
 }
 
 #endif // corresponds to ifndef WARPX_DIM_RZ
+
+#ifdef WARPX_DIM_RZ
+void
+FiniteDifferenceSolver::MacroscopicEvolveECylindrical (
+    MacroscopicSolverAlgo algorithm, ablastr::fields::VectorField const& electric,
+    ablastr::fields::VectorField const& magnetic, ablastr::fields::VectorField const& current,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& flags, amrex::Real dt,
+    std::unique_ptr<MacroscopicProperties> const& material, int level)
+{
+    std::array<std::unique_ptr<amrex::MultiFab>, 3> normalized_storage, increment_storage;
+    ablastr::fields::VectorField normalized, increment;
+    for (int direction = 0; direction < 3; ++direction) {
+        normalized_storage[direction] = std::make_unique<amrex::MultiFab>(
+            magnetic[direction]->boxArray(), magnetic[direction]->DistributionMap(),
+            magnetic[direction]->nComp(), magnetic[direction]->nGrowVect());
+        increment_storage[direction] = std::make_unique<amrex::MultiFab>(
+            electric[direction]->boxArray(), electric[direction]->DistributionMap(),
+            electric[direction]->nComp(), 0);
+        normalized[direction] = normalized_storage[direction].get();
+        increment[direction] = increment_storage[direction].get();
+        normalized[direction]->setVal(0);
+        increment[direction]->setVal(0);
+        for (amrex::MFIter mfi(*normalized[direction]); mfi.isValid(); ++mfi) {
+            auto const b = magnetic[direction]->const_array(mfi);
+            auto const mu = material->getmu_mf().const_array(mfi);
+            auto const h = normalized[direction]->array(mfi);
+            auto const& material_box = material->getmu_mf()[mfi].box();
+            // Compare index ranges without extending the cell-centered material storage.
+            amrex::Box const covered(material_box.smallEnd(), material_box.bigEnd(),
+                                      magnetic[direction]->ixType());
+            auto const box = mfi.fabbox() & covered;
+            amrex::ParallelFor(box, magnetic[direction]->nComp(),
+                               [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                                   h(i, j, k, n) = PhysConst::mu0 * b(i, j, k, n) / mu(i, j, k);
+                               });
+        }
+    }
+    // Reuse the native cylindrical curl, azimuthal modes, and axis regularization.
+    EvolveECylindrical<CylindricalYeeAlgorithm>(increment, normalized, current, flags, nullptr,
+                                                level, dt);
+    amrex::Real const bias = algorithm == MacroscopicSolverAlgo::BackwardEuler ? 1.0_rt : 0.5_rt;
+    for (int direction = 0; direction < 3; ++direction) {
+        auto const staggering = direction == 0   ? material->Ex_IndexType
+                                : direction == 1 ? material->Ey_IndexType
+                                                 : material->Ez_IndexType;
+        auto const sigma_staggering = material->sigma_IndexType;
+        auto const epsilon_staggering = material->epsilon_IndexType;
+        auto const ratio = material->macro_cr_ratio;
+        for (amrex::MFIter mfi(*electric[direction]); mfi.isValid(); ++mfi) {
+            auto const sigma = material->getsigma_mf().const_array(mfi);
+            auto const epsilon = material->getepsilon_mf().const_array(mfi);
+            auto const output = electric[direction]->array(mfi);
+            auto const delta = increment[direction]->const_array(mfi);
+            auto const active =
+                flags[direction] ? flags[direction]->const_array(mfi) : amrex::Array4<int const>{};
+            amrex::ParallelFor(
+                mfi.validbox(), electric[direction]->nComp(),
+                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                    if (active && active(i, j, k) == 0) {
+                        return;
+                    }
+                    amrex::Real const conductivity = ablastr::coarsen::sample::Interp(
+                        sigma, sigma_staggering, staggering, ratio, i, j, k, 0);
+                    amrex::Real const permittivity = ablastr::coarsen::sample::Interp(
+                        epsilon, epsilon_staggering, staggering, ratio, i, j, k, 0);
+                    amrex::Real const denominator = permittivity + bias * conductivity * dt;
+                    amrex::Real const alpha =
+                        (permittivity - (1 - bias) * conductivity * dt) / denominator;
+                    output(i, j, k, n) = alpha * output(i, j, k, n) +
+                                         PhysConst::epsilon_0 / denominator * delta(i, j, k, n);
+                });
+        }
+    }
+    if (m_rmin == 0) {
+        for (int direction = 1; direction < 3; ++direction) {
+            for (amrex::MFIter mfi(*electric[direction]); mfi.isValid(); ++mfi) {
+                auto box = mfi.validbox();
+                if (!box.contains(amrex::IntVect(AMREX_D_DECL(0, box.smallEnd(1), 0)))) {
+                    continue;
+                }
+                box.setBig(0, 0);
+                auto const output = electric[direction]->array(mfi);
+                auto const er = electric[0]->const_array(mfi);
+                amrex::ParallelFor(box, electric[direction]->nComp(),
+                                   [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                                       int const mode = (n + 1) / 2;
+                                       if (direction == 1) {
+                                           output(i, j, k, n) =
+                                               mode == 1 ? (n % 2 == 1 ? er(i, j, k, n + 1)
+                                                                       : -er(i, j, k, n - 1))
+                                                         : 0;
+                                       } else if (mode > 0) {
+                                           output(i, j, k, n) = 0;
+                                       }
+                                   });
+            }
+        }
+    }
+    amrex::Gpu::streamSynchronize();
+}
+#endif

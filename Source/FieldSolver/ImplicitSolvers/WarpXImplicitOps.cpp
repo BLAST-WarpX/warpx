@@ -9,18 +9,20 @@
 #include "BoundaryConditions/PML.H"
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
-#include "Fields.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
+#include "FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/MacroscopicProperties.H"
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+#include "Fields.H"
 #include "Parallelization/GuardCellManager.H"
 #include "Particles/MultiParticleContainer.H"
 #include "Particles/ParticleBoundaryBuffer.H"
 #include "Python/callbacks.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpXUtil.H"
 #include "Utils/WarpXConst.H"
+#include "Utils/WarpXUtil.H"
 
+#include <ablastr/coarsen/sample.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <ablastr/utils/SignalHandling.H>
 
@@ -54,11 +56,26 @@ WarpX::SetElectricFieldAndApplyBCs ( const WarpXSolverVec& a_E, amrex::Real a_ti
 
     ablastr::fields::MultiLevelVectorField Efield_fp = m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level);
     const ablastr::fields::MultiLevelVectorField& Evec = a_E.getArrayVec();
-    amrex::MultiFab::Copy(*Efield_fp[0][0], *Evec[0][0], 0, 0, ncomps, Evec[0][0]->nGrowVect());
-    amrex::MultiFab::Copy(*Efield_fp[0][1], *Evec[0][1], 0, 0, ncomps, Evec[0][1]->nGrowVect());
-    amrex::MultiFab::Copy(*Efield_fp[0][2], *Evec[0][2], 0, 0, ncomps, Evec[0][2]->nGrowVect());
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*Efield_fp[lev][n], *Evec[lev][n], 0, 0, ncomps, 0);
+        }
+    }
+    for (auto const& block : a_E.getExtraFields()) {
+        auto const field = m_fields.get_alldirs(block.type, block.level);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*field[n], *block.values[n], 0, 0, field[n]->nComp(), 0);
+        }
+    }
     FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
-    ApplyEfieldBoundary(0, PatchType::fine, a_time);
+    // Physical-boundary reflections can read neighboring grids' guard cells.
+    // Refresh those cells from the trial field before applying the reflections.
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyEfieldBoundary(lev, PatchType::fine, a_time);
+        if (lev > 0) {
+            ApplyEfieldBoundary(lev, PatchType::coarse, a_time);
+        }
+    }
 }
 
 void
@@ -83,9 +100,16 @@ WarpX::FinishElectricFieldAndApplyBCs(amrex::Real a_theta, amrex::Real a_time)
 {
     using warpx::fields::FieldType;
 
-    ablastr::fields::MultiLevelVectorField const & En = m_fields.get_mr_levels_alldirs(FieldType::E_old, 0);
-    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, 0), En, a_theta);
-    ApplyEfieldBoundary(0, PatchType::fine, a_time);
+    ablastr::fields::MultiLevelVectorField const& En =
+        m_fields.get_mr_levels_alldirs(FieldType::E_old, finest_level);
+    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level), En,
+                        a_theta);
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyEfieldBoundary(lev, PatchType::fine, a_time);
+        if (lev > 0) {
+            ApplyEfieldBoundary(lev, PatchType::coarse, a_time);
+        }
+    }
     FillBoundaryE(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
 }
 
@@ -94,10 +118,20 @@ WarpX::FinishMagneticFieldAndApplyBCs(amrex::Real a_theta, amrex::Real a_time)
 {
     using warpx::fields::FieldType;
 
-    ablastr::fields::MultiLevelVectorField const & Bn = m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
-    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, 0), Bn, a_theta);
-    ApplyBfieldBoundary(0, PatchType::fine, SubcyclingHalf::None, a_time);
+    ablastr::fields::MultiLevelVectorField const& Bn =
+        m_fields.get_mr_levels_alldirs(FieldType::B_old, finest_level);
+    FinishImplicitField(m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level), Bn,
+                        a_theta);
+    for (int lev = 0; lev <= finest_level; ++lev) {
+        ApplyBfieldBoundary(lev, PatchType::fine, SubcyclingHalf::None, a_time);
+        ApplyCurrentControlledPort(lev, PatchType::fine, a_time);
+        if (lev > 0) {
+            ApplyBfieldBoundary(lev, PatchType::coarse, SubcyclingHalf::None, a_time);
+            ApplyCurrentControlledPort(lev, PatchType::coarse, a_time);
+        }
+    }
     FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+    ApplyCompositeCurrentControlledPorts(a_time);
 }
 
 void
@@ -357,34 +391,64 @@ WarpX::ImplicitComputeRHSE (int lev, PatchType patch_type, amrex::Real a_dt, War
         a_Erhs_vec.getArrayVecType()==warpx::fields::FieldType::Efield_fp,
         "WarpX::ImplicitComputeRHSE() must be called with Efield_fp type");
 
-    // set RHS to zero value
-    a_Erhs_vec.getArrayVec()[lev][0]->setVal(0.0);
-    a_Erhs_vec.getArrayVec()[lev][1]->setVal(0.0);
-    a_Erhs_vec.getArrayVec()[lev][2]->setVal(0.0);
-
-    // Compute Efield_rhs in regular cells by calling EvolveE. Because
-    // a_Erhs_vec is set to zero above, calling EvolveE below results in
-    // a_Erhs_vec storing only the RHS of the update equation. I.e.,
-    // c^2*dt*(curl(B^{n+theta} - mu0*J^{n+1/2})
-    if (patch_type == PatchType::fine) {
-        m_fdtd_solver_fp[lev]->EvolveE( m_fields,
-                                        lev,
-                                        patch_type,
-                                        a_Erhs_vec.getArrayVec()[lev],
-                                        m_eb_update_E_fp[lev],
-                                        a_dt );
+    using warpx::fields::FieldType;
+    bool const fine = patch_type == PatchType::fine;
+    auto const rhs =
+        fine ? a_Erhs_vec.getArrayVec()[lev] : a_Erhs_vec.getExtraField(FieldType::Efield_cp, lev);
+    for (auto* field : rhs) {
+        field->setVal(0.0);
+    }
+    auto* const solver = fine ? m_fdtd_solver_fp[lev].get() : m_fdtd_solver_cp[lev].get();
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
+        auto const field =
+            m_fields.get_alldirs(fine ? FieldType::Efield_fp : FieldType::Efield_cp, lev);
+        auto const magnetic =
+            m_fields.get_alldirs(fine ? FieldType::Bfield_fp : FieldType::Bfield_cp, lev);
+        auto const current =
+            m_fields.get_alldirs(fine ? FieldType::current_fp : FieldType::current_cp, lev);
+        auto const& material = m_macroscopic_properties[lev][fine ? 0 : 1];
+        // With zero E, the existing material curl gives dt*(curl(H)-J)/(epsilon+dt*sigma).
+        // Undo that denominator and include the conductivity of the trial E^{n+theta}.
+        solver->MacroscopicEvolveE(MacroscopicSolverAlgo::BackwardEuler, rhs, magnetic, current,
+                                   GetEBUpdateEFlag(patch_type)[lev], a_dt, material, lev);
+        for (int n = 0; n < 3; ++n) {
+            auto const staggering = n == 0   ? material->Ex_IndexType
+                                    : n == 1 ? material->Ey_IndexType
+                                             : material->Ez_IndexType;
+            auto const sigma_staggering = material->sigma_IndexType;
+            auto const epsilon_staggering = material->epsilon_IndexType;
+            auto const ratio = material->macro_cr_ratio;
+            for (amrex::MFIter mfi(*rhs[n], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                auto const sigma = material->getsigma_mf().const_array(mfi);
+                auto const epsilon = material->getepsilon_mf().const_array(mfi);
+                auto const values = rhs[n]->array(mfi);
+                auto const trial = field[n]->const_array(mfi);
+                amrex::ParallelFor(
+                    mfi.tilebox(), ncomps, [=] AMREX_GPU_DEVICE(int i, int j, int k, int mode) {
+                        amrex::Real const conductivity = ablastr::coarsen::sample::Interp(
+                            sigma, sigma_staggering, staggering, ratio, i, j, k, 0);
+                        amrex::Real const permittivity = ablastr::coarsen::sample::Interp(
+                            epsilon, epsilon_staggering, staggering, ratio, i, j, k, 0);
+                        amrex::Real const damping = a_dt * conductivity / permittivity;
+                        values(i, j, k, mode) =
+                            (1 + damping) * values(i, j, k, mode) - damping * trial(i, j, k, mode);
+                    });
+            }
+        }
     } else {
-        m_fdtd_solver_cp[lev]->EvolveE( m_fields,
-                                        lev,
-                                        patch_type,
-                                        a_Erhs_vec.getArrayVec()[lev],
-                                        m_eb_update_E_cp[lev],
-                                        a_dt );
+        solver->EvolveE(m_fields, lev, patch_type, rhs, GetEBUpdateEFlag(patch_type)[lev], a_dt);
     }
 
-    // Compute Efield_rhs in PML cells by calling EvolveEPML
-    if (do_pml && pml[lev]->ok()) {
-        amrex::Abort("PML not yet implemented with implicit solvers.");
+    if (do_pml && pml[lev] && pml[lev]->ok()) {
+        auto const type = fine ? FieldType::pml_E_fp : FieldType::pml_E_cp;
+        auto const pml_rhs = a_Erhs_vec.getExtraField(type, lev);
+        for (auto* field : pml_rhs) {
+            field->setVal(0.0);
+        }
+        solver->EvolveEPML(m_fields, patch_type, lev, pml[lev]->GetEBUpdateEFlag(patch_type),
+                           fine ? pml[lev]->GetMultiSigmaBox_fp() : pml[lev]->GetMultiSigmaBox_cp(),
+                           a_dt, false, pml_rhs);
+        pml[lev]->ApplyImplicitSigma(pml_rhs, m_fields.get_alldirs(type, lev), a_dt, false,
+                                     patch_type);
     }
-
 }

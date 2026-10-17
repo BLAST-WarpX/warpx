@@ -668,6 +668,7 @@ WarpX::OneStep_nosub (
         }
     } // !PSATD
 
+    ApplyCompositeCurrentControlledPorts(a_cur_time + a_dt);
     ExecutePythonCallback("afterEsolve");
 }
 

@@ -20,3 +20,5 @@ include $(WARPX_HOME)/Source/FieldSolver/FiniteDifferenceSolver/HybridPICModel/M
 include $(WARPX_HOME)/Source/FieldSolver/FiniteDifferenceSolver/MacroscopicProperties/Make.package
 
 VPATH_LOCATIONS   += $(WARPX_HOME)/Source/FieldSolver/FiniteDifferenceSolver
+
+CEXE_sources += CylindricalPML.cpp

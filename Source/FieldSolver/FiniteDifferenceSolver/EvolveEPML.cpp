@@ -45,26 +45,34 @@ using namespace amrex;
 /**
  * \brief Update the E field, over one timestep
  */
-void FiniteDifferenceSolver::EvolveEPML (
-    ablastr::fields::MultiFabRegister& fields,
-    PatchType patch_type,
-    int level,
-    std::array< std::unique_ptr<amrex::iMultiFab>, 3 > const& eb_update_E,
-    MultiSigmaBox const& sigba,
-    amrex::Real const dt, bool pml_has_particles ) {
+void
+FiniteDifferenceSolver::EvolveEPML (
+    ablastr::fields::MultiFabRegister& fields, PatchType patch_type, int level,
+    std::array<std::unique_ptr<amrex::iMultiFab>, 3> const& eb_update_E, MultiSigmaBox const& sigba,
+    amrex::Real const dt, bool pml_has_particles, ablastr::fields::VectorField const& output)
+{
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    amrex::ignore_unused(fields, patch_type, level, eb_update_E, sigba, dt, pml_has_particles);
+#ifdef WARPX_DIM_RZ
+    amrex::ignore_unused(eb_update_E);
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !pml_has_particles && output[0] == nullptr,
+        "Cylindrical QCPML currently supports explicit exterior vacuum layers.");
+    EvolvePMLCylindrical(fields, patch_type, level, sigba, dt, false);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    amrex::ignore_unused(fields, patch_type, level, eb_update_E, sigba, dt, pml_has_particles,
+                         output);
     WARPX_ABORT_WITH_MESSAGE(
         "PML are only implemented in Cartesian geometry.");
 #elif !defined(WARPX_DIM_RSPHERE)
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const ablastr::fields::VectorField Efield = (patch_type == PatchType::fine) ?
-        fields.get_alldirs(FieldType::pml_E_fp, level) : fields.get_alldirs(FieldType::pml_E_cp, level);
+    const ablastr::fields::VectorField Efield =
+        output[0]                         ? output
+        : (patch_type == PatchType::fine) ? fields.get_alldirs(FieldType::pml_E_fp, level)
+                                          : fields.get_alldirs(FieldType::pml_E_cp, level);
     const ablastr::fields::VectorField Bfield = (patch_type == PatchType::fine) ?
         fields.get_alldirs(FieldType::pml_B_fp, level) : fields.get_alldirs(FieldType::pml_B_cp, level);
     const ablastr::fields::VectorField Jfield = (patch_type == PatchType::fine) ?
@@ -95,7 +103,6 @@ void FiniteDifferenceSolver::EvolveEPML (
     }
 #endif
 }
-
 
 #if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 

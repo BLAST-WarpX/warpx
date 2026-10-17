@@ -8,6 +8,10 @@
 
 #include "BoundaryConditions/PMLComponent.H"
 #include "Fields.H"
+#ifdef WARPX_DIM_RZ
+#include "BoundaryConditions/PML.H"
+#include "WarpX.H"
+#endif
 
 #if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
 #   include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceAlgorithms/CartesianYeeAlgorithm.H"
@@ -51,7 +55,14 @@ void FiniteDifferenceSolver::EvolveBPML (
 
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+#ifdef WARPX_DIM_RZ
+    amrex::ignore_unused(dive_cleaning);
+    auto const* pml = WarpX::GetInstance().GetPML(level);
+    EvolvePMLCylindrical(fields, patch_type, level,
+                         patch_type == PatchType::fine ? pml->GetMultiSigmaBox_fp()
+                                                       : pml->GetMultiSigmaBox_cp(),
+                         dt, true);
+#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
     amrex::ignore_unused(fields, patch_type, level, dt, dive_cleaning);
     WARPX_ABORT_WITH_MESSAGE(
         "PML only implemented in Cartesian geometry.");

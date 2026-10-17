@@ -4,9 +4,12 @@
  *
  * License: BSD-3-Clause-LBNL
  */
-#include "Fields.H"
 #include "ThetaImplicitEM.H"
+
+#include "BoundaryConditions/PML.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
+#include "Fields.H"
+#include "NonlinearSolvers/LinearSolverLibrary.H"
 #include "WarpX.H"
 
 using warpx::fields::FieldType;
@@ -22,7 +25,28 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
 
     // Retain a pointer back to main WarpX class
     m_WarpX = a_WarpX;
-    m_num_amr_levels = 1;
+    m_num_amr_levels = m_WarpX->finestLevel() + 1;
+
+    if (m_WarpX->DoPML() || m_num_amr_levels > 1) {
+        NonlinearSolverType solver_type;
+        amrex::ParmParse("implicit_evolve").get("nonlinear_solver", solver_type);
+        PreconditionerType pc_type = PreconditionerType::none;
+        amrex::ParmParse("jacobian").query("pc_type", pc_type);
+        LinearSolverType linear_solver = LinearSolverType::amrex_gmres;
+        amrex::ParmParse("newton").query("linear_solver", linear_solver);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            linear_solver == LinearSolverType::amrex_gmres,
+            "Theta-implicit SMR/PML requires native AMReX GMRES; PETSc packing does not "
+            "include coarse-patch or PML unknowns.");
+        bool use_mm_jacobian = false, use_mm_pc = false;
+        amrex::ParmParse("implicit_evolve").query("use_mass_matrices_jacobian", use_mm_jacobian);
+        amrex::ParmParse("implicit_evolve").query("use_mass_matrices_pc", use_mm_pc);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            solver_type == NonlinearSolverType::newton && pc_type == PreconditionerType::none &&
+                !use_mm_jacobian && !use_mm_pc,
+            "Theta-implicit SMR/PML requires nonlinear_solver=newton, jacobian.pc_type=none, "
+            "and no mass matrices.");
+    }
 
     // Define E and Eold vectors
     m_E.Define(m_WarpX, "Efield_fp");
@@ -32,6 +56,21 @@ void ThetaImplicitEM::Define (WarpX* const a_WarpX, bool a_from_restart)
     // Set initial values for E and Eold vectors
     m_E.Copy(FieldType::Efield_fp);
     m_Eold.Copy(a_from_restart ? FieldType::E_old : FieldType::Efield_fp, FieldType::None, true);
+
+    for (auto const& block : m_E.getExtraFields()) {
+        MagneticSnapshot saved;
+        saved.type = block.type == FieldType::Efield_cp  ? FieldType::Bfield_cp
+                     : block.type == FieldType::pml_E_fp ? FieldType::pml_B_fp
+                                                         : FieldType::pml_B_cp;
+        saved.level = block.level;
+        auto const field = m_WarpX->m_fields.get_alldirs(saved.type, saved.level);
+        for (int n = 0; n < 3; ++n) {
+            saved.values[n] =
+                std::make_unique<amrex::MultiFab>(field[n]->boxArray(), field[n]->DistributionMap(),
+                                                  field[n]->nComp(), field[n]->nGrowVect());
+        }
+        m_extra_Bold.push_back(std::move(saved));
+    }
 
     // Define B_old MultiFab
     using ablastr::fields::Direction;
@@ -106,7 +145,8 @@ void ThetaImplicitEM::SetupStep (amrex::Real /* start_time */)
     // Save E at start of time step
     SaveEoldMultifab(); // Copy Efield_fp into E_old
     m_Eold.Copy(FieldType::Efield_fp); // Copy Efield_fp into m_Eold
-    m_E_save.Copy(m_E); // Copy m_E to m_E_save to save the field at t_{n-1/2}
+    m_E.CopyExtra(m_Eold);
+    m_E_save.Copy(m_E); // Save the initial guess, including CP/PML unknowns.
 
     // E_old is at t_{n}
     // m_Eold is at t_{n}
@@ -115,6 +155,13 @@ void ThetaImplicitEM::SetupStep (amrex::Real /* start_time */)
     // Save Bg at start of time step
     CopyVectorField(FieldType::B_old, FieldType::Bfield_fp);
 
+    for (auto& saved : m_extra_Bold) {
+        auto const field = m_WarpX->m_fields.get_alldirs(saved.type, saved.level);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*saved.values[n], *field[n], 0, 0, field[n]->nComp(),
+                                  field[n]->nGrowVect());
+        }
+    }
     // B_old is at t_{n}
 }
 
@@ -204,10 +251,35 @@ void ThetaImplicitEM::UpdateWarpXFields ( const WarpXSolverVec&  a_E,
     const amrex::Real theta_time = start_time + m_theta*m_dt;
     m_WarpX->SetElectricFieldAndApplyBCs( a_E, theta_time );
 
+    for (auto const& saved : m_extra_Bold) {
+        auto const field = m_WarpX->m_fields.get_alldirs(saved.type, saved.level);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*field[n], *saved.values[n], 0, 0, field[n]->nComp(),
+                                  field[n]->nGrowVect());
+        }
+    }
     // Update Bfield_fp owned by WarpX
-    ablastr::fields::MultiLevelVectorField const& B_old = m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, 0);
+    ablastr::fields::MultiLevelVectorField const& B_old =
+        m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::B_old, m_num_amr_levels - 1);
     m_WarpX->UpdateMagneticFieldAndApplyBCs( B_old, m_theta*m_dt, start_time );
-
+    for (auto const& saved : m_extra_Bold) {
+        if (saved.type == FieldType::Bfield_cp) {
+            continue;
+        }
+        auto const patch = saved.type == FieldType::pml_B_fp ? PatchType::fine : PatchType::coarse;
+        auto const field = m_WarpX->m_fields.get_alldirs(saved.type, saved.level);
+        m_WarpX->GetPML(saved.level)->ApplyImplicitSigma(field, field, m_theta * m_dt, true, patch);
+    }
+    if (!m_extra_Bold.empty()) {
+        m_WarpX->FillBoundaryB(m_WarpX->getngEB(), true);
+        m_WarpX->ApplyCompositeCurrentControlledPorts(theta_time);
+    }
+    if (m_num_amr_levels > 1) {
+        // Refined particle gathers use separate auxiliary fields, which must
+        // follow every trial iterate of the coupled field/particle solve.
+        m_WarpX->UpdateAuxiliaryData();
+        m_WarpX->FillBoundaryAux(m_WarpX->getngUpdateAux());
+    }
 }
 
 void ThetaImplicitEM::FinishFieldUpdate (amrex::Real end_time)
@@ -219,6 +291,23 @@ void ThetaImplicitEM::FinishFieldUpdate (amrex::Real end_time)
     // for checkpointing alongside Efield_fp at E^{n+1}.
     // E^{n+1} = (1/theta)*E^{n+theta} + (1-1/theta)*E^n
     // B^{n+1} = (1/theta)*B^{n+theta} + (1-1/theta)*B^n
+
+    for (auto const& block : m_Eold.getExtraFields()) {
+        auto const field = m_WarpX->m_fields.get_alldirs(block.type, block.level);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::LinComb(*field[n], 1.0_rt / m_theta, *field[n], 0,
+                                     1.0_rt - 1.0_rt / m_theta, *block.values[n], 0, 0,
+                                     field[n]->nComp(), 0);
+        }
+    }
+    for (auto const& saved : m_extra_Bold) {
+        auto const field = m_WarpX->m_fields.get_alldirs(saved.type, saved.level);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::LinComb(*field[n], 1.0_rt / m_theta, *field[n], 0,
+                                     1.0_rt - 1.0_rt / m_theta, *saved.values[n], 0, 0,
+                                     field[n]->nComp(), 0);
+        }
+    }
 
     m_WarpX->FinishElectricFieldAndApplyBCs(m_theta, end_time);
     m_WarpX->FinishMagneticFieldAndApplyBCs(m_theta, end_time);

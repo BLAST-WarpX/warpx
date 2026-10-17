@@ -48,6 +48,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_RealVect.H>
 #include <AMReX_SPACE.H>
+#include <AMReX_Utility.H>
 #include <AMReX_VisMF.H>
 
 #include <algorithm>
@@ -268,17 +269,42 @@ namespace
     }
 
 
+    amrex::BoxArray
+    clip_cylindrical_pml (amrex::BoxArray boxes, amrex::Geometry const& geometry)
+    {
+#ifdef WARPX_DIM_RZ
+        if (boxes.empty()) {
+            return boxes;
+        }
+        auto region = boxes.minimalBox();
+        if (geometry.ProbLo(0) == 0) {
+            region.setSmall(0, geometry.Domain().smallEnd(0));
+            return amrex::intersect(boxes, region);
+        }
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            geometry.ProbLo(0) + region.smallEnd(0) * geometry.CellSize(0) >= 0,
+            "An annular-domain PML must not extend through the cylindrical axis.");
+
+#else
+        amrex::ignore_unused(geometry);
+
+#endif
+        return boxes;
+    }
+
+
     BoxArray
     MakeBoxArray (bool is_single_box_domain, const amrex::Box& regular_domain,
                     const amrex::Geometry& geom, const amrex::BoxArray& grid_ba,
                     const amrex::IntVect& ncell, int do_pml_in_domain,
                     const amrex::IntVect& do_pml_Lo, const amrex::IntVect& do_pml_Hi)
     {
-        if (is_single_box_domain) {
-            return MakeBoxArray_single(regular_domain, grid_ba, ncell, do_pml_Lo, do_pml_Hi);
-        } else { // the union of the regular grids is *not* a single rectangular domain
-            return MakeBoxArray_multiple(geom, grid_ba, ncell, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
-        }
+        return clip_cylindrical_pml(
+            is_single_box_domain
+                ? MakeBoxArray_single(regular_domain, grid_ba, ncell, do_pml_Lo, do_pml_Hi)
+                : MakeBoxArray_multiple(geom, grid_ba, ncell, do_pml_in_domain,
+                                        do_pml_Lo, do_pml_Hi),
+            geom);
     }
 
 
@@ -686,28 +712,21 @@ MultiSigmaBox::ComputePMLFactorsE (const Real* dx, Real dt)
     }
 }
 
-PML::PML (const int lev, const BoxArray& grid_ba,
-          const DistributionMapping& grid_dm, const bool do_similar_dm_pml,
-          const Geometry* geom, const Geometry* cgeom,
-          int ncell, int delta, amrex::IntVect ref_ratio,
-          Real dt, int nox_fft, int noy_fft, int noz_fft,
-          ablastr::utils::enums::GridType grid_type,
-          int do_moving_window, int /*pml_has_particles*/, int do_pml_in_domain,
-          const PSATDSolutionType psatd_solution_type,
-          const TimeDependencyJ time_dependency_J, const TimeDependencyRho time_dependency_rho,
-          const bool do_pml_dive_cleaning, const bool do_pml_divb_cleaning,
-          const amrex::IntVect& fill_guards_fields,
-          const amrex::IntVect& fill_guards_current,
-          bool eb_enabled,
-          int max_guard_EB, const amrex::Real v_sigma_sb,
-          ablastr::fields::MultiFabRegister& fields,
+
+PML::PML (const int lev, const BoxArray& grid_ba, const DistributionMapping& grid_dm,
+          const bool do_similar_dm_pml, const Geometry* geom, const Geometry* cgeom, int ncell,
+          int delta, amrex::IntVect ref_ratio, Real dt, int nox_fft, int noy_fft, int noz_fft,
+          ablastr::utils::enums::GridType grid_type, int do_moving_window,
+          int /*pml_has_particles*/, int do_pml_in_domain,
+          const PSATDSolutionType psatd_solution_type, const TimeDependencyJ time_dependency_J,
+          const TimeDependencyRho time_dependency_rho, const bool do_pml_dive_cleaning,
+          const bool do_pml_divb_cleaning, const amrex::IntVect& fill_guards_fields,
+          const amrex::IntVect& fill_guards_current, bool eb_enabled, int max_guard_EB,
+          const amrex::Real v_sigma_sb, ablastr::fields::MultiFabRegister& fields,
           const amrex::IntVect do_pml_Lo, const amrex::IntVect do_pml_Hi)
-    : m_dive_cleaning(do_pml_dive_cleaning),
-      m_divb_cleaning(do_pml_divb_cleaning),
-      m_fill_guards_fields(fill_guards_fields),
-      m_fill_guards_current(fill_guards_current),
-      m_geom(geom),
-      m_cgeom(cgeom)
+    : m_level(lev), m_dive_cleaning(do_pml_dive_cleaning), m_divb_cleaning(do_pml_divb_cleaning),
+      m_fill_guards_fields(fill_guards_fields), m_fill_guards_current(fill_guards_current),
+      m_geom(geom), m_cgeom(cgeom)
 {
 #ifndef AMREX_USE_EB
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!eb_enabled, "PML: eb_enabled is true but was not compiled in.");
@@ -754,9 +773,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     }
     Box const domain0 = grid_ba_reduced.minimalBox();
     const bool is_single_box_domain = domain0.numPts() == grid_ba_reduced.numPts();
-    const BoxArray& ba = ::MakeBoxArray(is_single_box_domain, domain0, *geom, grid_ba_reduced,
-                                      IntVect(ncell), do_pml_in_domain, do_pml_Lo, do_pml_Hi);
-
+    BoxArray const ba = ::MakeBoxArray(is_single_box_domain, domain0, *geom, grid_ba_reduced,
+                                 IntVect(ncell), do_pml_in_domain, do_pml_Lo, do_pml_Hi);
 
     if (ba.empty()) {
         m_ok = false;
@@ -844,8 +862,14 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     }
 
     // Allocate diagonal components (xx,yy,zz) only with divergence cleaning
+#ifdef WARPX_DIM_RZ
+    // Each mode has its physical field plus two convolution-memory components.
+    int const ncompe = 3 * WarpX::ncomps;
+    int const ncompb = 3 * WarpX::ncomps;
+#else
     const int ncompe = (m_dive_cleaning) ? 3 : 2;
     const int ncompb = (m_divb_cleaning) ? 3 : 2;
+#endif
 
     using ablastr::fields::Direction;
 
@@ -866,9 +890,12 @@ PML::PML (const int lev, const BoxArray& grid_ba,
     const amrex::BoxArray ba_jx = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{0}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_jy = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{1}, 0)->ixType().toIntVect());
     const amrex::BoxArray ba_jz = amrex::convert(ba, fields.get(FieldType::current_fp, Direction{2}, 0)->ixType().toIntVect());
-    fields.alloc_init(FieldType::pml_j_fp, Direction{0}, lev, ba_jx, dm, 1, ngb, 0.0_rt, false, false);
-    fields.alloc_init(FieldType::pml_j_fp, Direction{1}, lev, ba_jy, dm, 1, ngb, 0.0_rt, false, false);
-    fields.alloc_init(FieldType::pml_j_fp, Direction{2}, lev, ba_jz, dm, 1, ngb, 0.0_rt, false, false);
+    fields.alloc_init(FieldType::pml_j_fp, Direction{0}, lev, ba_jx, dm, WarpX::ncomps, ngb, 0.0_rt,
+                      false, false);
+    fields.alloc_init(FieldType::pml_j_fp, Direction{1}, lev, ba_jy, dm, WarpX::ncomps, ngb, 0.0_rt,
+                      false, false);
+    fields.alloc_init(FieldType::pml_j_fp, Direction{2}, lev, ba_jz, dm, WarpX::ncomps, ngb, 0.0_rt,
+                      false, false);
 
 #ifdef AMREX_USE_EB
     if (eb_enabled) {
@@ -983,8 +1010,8 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         const IntVect cdelta = IntVect(delta)/ref_ratio;
 
         // Assuming that refinement ratio is equal in all dimensions
-        const BoxArray& cba = ::MakeBoxArray(is_single_box_domain, cdomain, *cgeom, grid_cba_reduced,
-                                           cncells, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
+        BoxArray const cba = ::MakeBoxArray(is_single_box_domain, cdomain, *cgeom, grid_cba_reduced,
+                                      cncells, do_pml_in_domain, do_pml_Lo, do_pml_Hi);
         DistributionMapping cdm;
         if (do_similar_dm_pml) {
             auto ng_sim = amrex::elemwiseMax(amrex::elemwiseMax(nge, ngb), ngf);
@@ -1000,45 +1027,37 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         fields.alloc_init(FieldType::pml_E_cp, Direction{1}, lev, cba_Ey, cdm, ncompe, nge, 0.0_rt, false, false);
         fields.alloc_init(FieldType::pml_E_cp, Direction{2}, lev, cba_Ez, cdm, ncompe, nge, 0.0_rt, false, false);
 
+#ifdef AMREX_USE_EB
+        if (eb_enabled) {
+            auto const coarse_factory = amrex::makeEBFabFactory(
+                WarpX::GetInstance().GetEBIndexSpace(lev - 1), *cgeom, cba, cdm,
+                {max_guard_EB, max_guard_EB, max_guard_EB},
+                amrex::EBSupport::full);
+            auto const coarse_fields =
+                fields.get_alldirs(FieldType::pml_E_cp, lev);
+            for (int component = 0; component < 3; ++component) {
+                m_eb_update_E_cp[component] =
+                    std::make_unique<amrex::iMultiFab>(
+                        coarse_fields[component]->boxArray(), cdm,
+                        WarpX::ncomps, amrex::IntVect(max_guard_EB));
+                m_eb_update_E_cp[component]->setVal(1);
+            }
+            if (WarpX::electromagnetic_solver_id !=
+                ElectromagneticSolverAlgo::PSATD) {
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                    m_eb_update_E_cp, coarse_fields, *coarse_factory,
+                    cgeom->periodicity());
+            }
+            amrex::Gpu::streamSynchronize();
+        }
+#endif
+
         const amrex::BoxArray cba_Bx = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{0}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_By = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{1}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_Bz = amrex::convert(cba, fields.get(FieldType::Bfield_cp, Direction{2}, 1)->ixType().toIntVect());
         fields.alloc_init(FieldType::pml_B_cp, Direction{0}, lev, cba_Bx, cdm, ncompb, ngb, 0.0_rt, false, false);
         fields.alloc_init(FieldType::pml_B_cp, Direction{1}, lev, cba_By, cdm, ncompb, ngb, 0.0_rt, false, false);
         fields.alloc_init(FieldType::pml_B_cp, Direction{2}, lev, cba_Bz, cdm, ncompb, ngb, 0.0_rt, false, false);
-
-#ifdef AMREX_USE_EB
-        if (eb_enabled) {
-            const amrex::IntVect max_guard_EB_vect = amrex::IntVect(max_guard_EB);
-
-            // Allocate the flags that indicate on which grid points the E field
-            // (and the PML current) should be updated. By default, all grid points
-            // are updated; this is refined below for the finite-difference solvers.
-            m_eb_update_E_cp[0] = std::make_unique<amrex::iMultiFab>(cba_Ex, cdm, WarpX::ncomps, max_guard_EB_vect);
-            m_eb_update_E_cp[1] = std::make_unique<amrex::iMultiFab>(cba_Ey, cdm, WarpX::ncomps, max_guard_EB_vect);
-            m_eb_update_E_cp[2] = std::make_unique<amrex::iMultiFab>(cba_Ez, cdm, WarpX::ncomps, max_guard_EB_vect);
-            for (int idim = 0; idim < 3; ++idim) { m_eb_update_E_cp[idim]->setVal(1); }
-
-            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee ||
-                WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::CKC ||
-                WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-
-                // The coarse-patch fields live on a coarsened grid, so they need their own
-                // EB factory, at the resolution of the coarse patch.
-                auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    *cgeom, cba, cdm,
-                    {max_guard_EB, max_guard_EB, max_guard_EB},
-                    amrex::EBSupport::full
-                );
-
-                // Mark on which grid points E should be updated (stair-case approximation)
-                warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                    m_eb_update_E_cp,
-                    fields.get_alldirs(FieldType::pml_E_cp, lev),
-                    *cp_eb_fact, m_cgeom->periodicity());
-            }
-        }
-#endif
 
         if (m_dive_cleaning)
         {
@@ -1059,9 +1078,12 @@ PML::PML (const int lev, const BoxArray& grid_ba,
         const amrex::BoxArray cba_jx = amrex::convert(cba, fields.get(FieldType::current_cp, Direction{0}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_jy = amrex::convert(cba, fields.get(FieldType::current_cp, Direction{1}, 1)->ixType().toIntVect());
         const amrex::BoxArray cba_jz = amrex::convert(cba, fields.get(FieldType::current_cp, Direction{2}, 1)->ixType().toIntVect());
-        fields.alloc_init(FieldType::pml_j_cp, Direction{0}, lev, cba_jx, cdm, 1, ngb, 0.0_rt, false, false);
-        fields.alloc_init(FieldType::pml_j_cp, Direction{1}, lev, cba_jy, cdm, 1, ngb, 0.0_rt, false, false);
-        fields.alloc_init(FieldType::pml_j_cp, Direction{2}, lev, cba_jz, cdm, 1, ngb, 0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_j_cp, Direction{0}, lev, cba_jx, cdm, WarpX::ncomps, ngb,
+                          0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_j_cp, Direction{1}, lev, cba_jy, cdm, WarpX::ncomps, ngb,
+                          0.0_rt, false, false);
+        fields.alloc_init(FieldType::pml_j_cp, Direction{2}, lev, cba_jz, cdm, WarpX::ncomps, ngb,
+                          0.0_rt, false, false);
 
         single_domain_box = is_single_box_domain ? cdomain : Box();
         sigba_cp = std::make_unique<MultiSigmaBox>(cba, cdm, &grid_cba_reduced, cgeom->CellSize(),
@@ -1169,9 +1191,85 @@ void PML::Exchange (amrex::MultiFab* mf_pml,
 }
 
 void
+PML::ApplyImplicitSigma (ablastr::fields::VectorField dst, ablastr::fields::VectorField src,
+                         amrex::Real dt, bool inverse, PatchType patch_type) const
+{
+#if !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_3D)
+    amrex::ignore_unused(dst, src, dt, inverse, patch_type);
+    WARPX_ABORT_WITH_MESSAGE("Implicit PML requires 2D or 3D Cartesian geometry.");
+#else
+    auto const& sigma_boxes = patch_type == PatchType::fine ? *sigba_fp : *sigba_cp;
+    // Component 0 is xy/yz/zx, component 1 is xz/yx/zy.
+    for (int n = 0; n < 3; ++n) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            src[n]->nComp() == 2, "Implicit PML requires two transverse split field components.");
+        for (int comp = 0; comp < 2; ++comp) {
+            int const physical_direction = (n + comp + 1) % 3;
+#if defined(WARPX_DIM_XZ)
+            if (physical_direction == 1) {
+                continue;
+            }
+            int const dir = physical_direction == 2 ? 1 : physical_direction;
+#else
+            int const dir = physical_direction;
+#endif
+            const bool nodal = src[n]->ixType().nodeCentered(dir);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(*dst[n], amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+                const auto& sig =
+                    nodal ? sigma_boxes[mfi].sigma[dir] : sigma_boxes[mfi].sigma_star[dir];
+                const auto* sigma = sig.data();
+                const int lo = sig.lo();
+                const auto out = dst[n]->array(mfi);
+                const auto in = src[n]->const_array(mfi);
+                amrex::ParallelFor(mfi.tilebox(), [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                    const int idx[3] = {i, j, k};
+                    const amrex::Real damping = dt * sigma[idx[dir] - lo];
+                    if (inverse) {
+                        out(i, j, k, comp) = in(i, j, k, comp) / (1.0_rt + damping);
+                    } else {
+                        out(i, j, k, comp) -= damping * in(i, j, k, comp);
+                    }
+                });
+            }
+        }
+    }
+#endif
+}
+
+void
 PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
                 int do_pml_in_domain)
 {
+#ifdef WARPX_DIM_RZ
+    ABLASTR_PROFILE("PML::Exchange");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!do_pml_in_domain, "Cylindrical QCPML must be exterior.");
+    int const components = reg.nComp();
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pml.nComp() == 3 * components,
+                                     "Unexpected cylindrical PML mode layout.");
+    auto const guards = reg.nGrowVect();
+    MultiFab temporary(reg.boxArray(), reg.DistributionMap(), components, guards);
+    MultiFab::Copy(temporary, reg, 0, 0, components, guards);
+    // Only the physical field participates in exchange; memories stay local.
+    ablastr::utils::communication::ParallelCopy(temporary, pml, 0, 0, components, IntVect(0),
+                                                guards, WarpX::do_single_precision_comms,
+                                                geom.periodicity());
+    for (MFIter mfi(reg); mfi.isValid(); ++mfi) {
+        auto const source = temporary.const_array(mfi);
+        auto const destination = reg.array(mfi);
+        for (auto const& box : amrex::boxDiff(mfi.fabbox(), mfi.validbox())) {
+            amrex::ParallelFor(box, components, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                destination(i, j, k, n) = source(i, j, k, n);
+            });
+        }
+    }
+    ablastr::utils::communication::ParallelCopy(pml, reg, 0, 0, components, IntVect(0),
+                                                pml.nGrowVect(), WarpX::do_single_precision_comms,
+                                                geom.periodicity());
+#else
+
     ABLASTR_PROFILE("PML::Exchange");
 
     const IntVect& ngr = reg.nGrowVect();
@@ -1245,6 +1343,7 @@ PML::Exchange (MultiFab& pml, MultiFab& reg, const Geometry& geom,
     }
     ablastr::utils::communication::ParallelCopy(pml, tmpregmf, 0, 0, ncp, IntVect(0), ngp,
                                                 WarpX::do_single_precision_comms, period);
+#endif
 }
 
 
@@ -1254,8 +1353,8 @@ PML::CopyToPML (MultiFab& pml, MultiFab& reg, const Geometry& geom)
   const IntVect& ngp = pml.nGrowVect();
   const auto& period = geom.periodicity();
 
-    ablastr::utils::communication::ParallelCopy(pml, reg, 0, 0, 1, IntVect(0), ngp,
-                                                WarpX::do_single_precision_comms, period);
+  ablastr::utils::communication::ParallelCopy(pml, reg, 0, 0, reg.nComp(), IntVect(0), ngp,
+                                              WarpX::do_single_precision_comms, period);
 }
 
 void
@@ -1268,6 +1367,31 @@ PML::FillBoundary (ablastr::fields::VectorField mf_pml, PatchType patch_type, st
 
     const Vector<MultiFab*> mf{mf_pml[0], mf_pml[1], mf_pml[2]};
     ablastr::utils::communication::FillBoundary(mf, WarpX::do_single_precision_comms, period, nodal_sync);
+#ifdef WARPX_DIM_RZ
+    auto const& geometry = patch_type == PatchType::fine ? *m_geom : *m_cgeom;
+    if (geometry.ProbLo(0) == 0) {
+        int const components = WarpX::ncomps;
+        for (int direction = 0; direction < 3; ++direction) {
+            auto& field = *mf_pml[direction];
+            bool const nodal = field.ixType().nodeCentered(0);
+            for (MFIter mfi(field); mfi.isValid(); ++mfi) {
+                auto box = mfi.fabbox();
+                box.setBig(0, std::min(box.bigEnd(0), -1));
+                if (!box.ok()) {
+                    continue;
+                }
+                auto const values = field.array(mfi);
+                amrex::ParallelFor(
+                    box, field.nComp(), [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                        int const mode = (n % components + 1) / 2;
+                        amrex::Real const sign =
+                            (mode + (direction < 2)) % 2 == 0 ? 1.0_rt : -1.0_rt;
+                        values(i, j, k, n) = sign * values(-i - (nodal ? 0 : 1), j, k, n);
+                    });
+            }
+        }
+    }
+#endif
 }
 
 void
@@ -1289,10 +1413,9 @@ PML::CheckPoint (
 {
     using ablastr::fields::Direction;
 
-    if (fields.has_vector(FieldType::pml_E_fp, 0))
-    {
-        ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, 0);
-        ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, 0);
+    if (fields.has_vector(FieldType::pml_E_fp, m_level)) {
+        ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, m_level);
+        ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, m_level);
         VisMF::AsyncWrite(*pml_E_fp[0], dir+"_Ex_fp");
         VisMF::AsyncWrite(*pml_E_fp[1], dir+"_Ey_fp");
         VisMF::AsyncWrite(*pml_E_fp[2], dir+"_Ez_fp");
@@ -1301,10 +1424,9 @@ PML::CheckPoint (
         VisMF::AsyncWrite(*pml_B_fp[2], dir+"_Bz_fp");
     }
 
-    if (fields.has_vector(FieldType::pml_E_cp, 0))
-    {
-        ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, 0);
-        ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, 0);
+    if (fields.has_vector(FieldType::pml_E_cp, m_level)) {
+        ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, m_level);
+        ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, m_level);
         VisMF::AsyncWrite(*pml_E_cp[0], dir+"_Ex_cp");
         VisMF::AsyncWrite(*pml_E_cp[1], dir+"_Ey_cp");
         VisMF::AsyncWrite(*pml_E_cp[2], dir+"_Ez_cp");
@@ -1312,20 +1434,29 @@ PML::CheckPoint (
         VisMF::AsyncWrite(*pml_B_cp[1], dir+"_By_cp");
         VisMF::AsyncWrite(*pml_B_cp[2], dir+"_Bz_cp");
     }
+    std::array<std::pair<FieldType, std::string>, 4> const scalar_fields{
+        {{FieldType::pml_F_fp, "_F_fp"},
+         {FieldType::pml_F_cp, "_F_cp"},
+         {FieldType::pml_G_fp, "_G_fp"},
+         {FieldType::pml_G_cp, "_G_cp"}}};
+    for (auto const& [field_type, suffix] : scalar_fields) {
+        if (fields.has(field_type, m_level)) {
+            VisMF::AsyncWrite(*fields.get(field_type, m_level), dir + suffix);
+        }
+    }
 }
 
 void
 PML::Restart (
     ablastr::fields::MultiFabRegister& fields,
     const std::string& dir
-)
+) const
 {
     using ablastr::fields::Direction;
 
-    if (fields.has_vector(FieldType::pml_E_fp, 0))
-    {
-        ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, 0);
-        ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, 0);
+    if (fields.has_vector(FieldType::pml_E_fp, m_level)) {
+        ablastr::fields::VectorField pml_E_fp = fields.get_alldirs(FieldType::pml_E_fp, m_level);
+        ablastr::fields::VectorField pml_B_fp = fields.get_alldirs(FieldType::pml_B_fp, m_level);
         VisMF::Read(*pml_E_fp[0], dir+"_Ex_fp");
         VisMF::Read(*pml_E_fp[1], dir+"_Ey_fp");
         VisMF::Read(*pml_E_fp[2], dir+"_Ez_fp");
@@ -1334,16 +1465,26 @@ PML::Restart (
         VisMF::Read(*pml_B_fp[2], dir+"_Bz_fp");
     }
 
-    if (fields.has_vector(FieldType::pml_E_cp, 0))
-    {
-        ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, 0);
-        ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, 0);
+    if (fields.has_vector(FieldType::pml_E_cp, m_level)) {
+        ablastr::fields::VectorField pml_E_cp = fields.get_alldirs(FieldType::pml_E_cp, m_level);
+        ablastr::fields::VectorField pml_B_cp = fields.get_alldirs(FieldType::pml_B_cp, m_level);
         VisMF::Read(*pml_E_cp[0], dir+"_Ex_cp");
         VisMF::Read(*pml_E_cp[1], dir+"_Ey_cp");
         VisMF::Read(*pml_E_cp[2], dir+"_Ez_cp");
         VisMF::Read(*pml_B_cp[0], dir+"_Bx_cp");
         VisMF::Read(*pml_B_cp[1], dir+"_By_cp");
         VisMF::Read(*pml_B_cp[2], dir+"_Bz_cp");
+    }
+    std::array<std::pair<FieldType, std::string>, 4> const scalar_fields{
+        {{FieldType::pml_F_fp, "_F_fp"},
+         {FieldType::pml_F_cp, "_F_cp"},
+         {FieldType::pml_G_fp, "_G_fp"},
+         {FieldType::pml_G_cp, "_G_cp"}}};
+    for (auto const& [field_type, suffix] : scalar_fields) {
+        // Older checkpoints did not store the PML cleaning fields.
+        if (fields.has(field_type, m_level) && amrex::FileExists(dir + suffix + "_H")) {
+            VisMF::Read(*fields.get(field_type, m_level), dir + suffix);
+        }
     }
 }
 
