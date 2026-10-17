@@ -143,8 +143,7 @@ private:
                  const Vec&        a_U,
                  const Vec&        a_b,
                        amrex::Real a_time,
-                       int         a_iter,
-                       bool        update_pc) const;
+                       int         a_iter) const;
 
 };
 
@@ -229,12 +228,8 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
     bool reached_maxits = false;
     for (iter = 0; iter <= this->m_params.maxits; iter++) {
 
-        // Determine whether to update the PC on this iteration
-        const bool update_pc = m_force_pc_update ||
-            m_newton_params.UpdatePC(a_step, iter, m_pc_initialized);
-
         // Compute residual: F(U) = U - b - R(U)
-        EvalResidual(m_F, a_U, a_b, a_time, iter, update_pc);
+        EvalResidual(m_F, a_U, a_b, a_time, iter);
 
         // Compute norm of the residual
         norm_abs = m_F.norm2();
@@ -288,6 +283,10 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             }
             break;
         }
+
+        // Determine whether to update the PC on this iteration
+        const bool update_pc = m_force_pc_update ||
+            m_newton_params.UpdatePC(a_step, iter, m_pc_initialized);
 
         // Prepare for the linear solve
         m_linear_function->setBaseSolution(a_U);
@@ -347,11 +346,10 @@ void NewtonSolver<Vec,Ops>::EvalResidual (Vec&        a_F,
                                     const Vec&        a_U,
                                     const Vec&        a_b,
                                           amrex::Real a_time,
-                                          int         a_iter,
-                                          bool        update_pc) const
+                                          int         a_iter) const
 {
     BL_PROFILE("NewtonSolver::EvalResidual()");
-    m_ops->ComputeRHS(m_R, a_U, a_time, a_iter, false, update_pc);
+    m_ops->ComputeRHS(m_R, a_U, a_time, a_iter, false);
 
     // Compute residual: F(U) = U - b - R(U)
     a_F.Copy(a_U);

@@ -1036,9 +1036,6 @@ void ImplicitSolver::InitializeImplicitOptions ()
     m_implicit_options.ncomp_xx = m_ncomp_xx;
     m_implicit_options.ncomp_yy = m_ncomp_yy;
     m_implicit_options.ncomp_zz = m_ncomp_zz;
-    m_implicit_options.ncomp_pc_xx = m_ncomp_pc_xx;
-    m_implicit_options.ncomp_pc_yy = m_ncomp_pc_yy;
-    m_implicit_options.ncomp_pc_zz = m_ncomp_pc_zz;
 }
 
 void ImplicitSolver::PreLinearSolve (const bool update_pc)
@@ -1047,7 +1044,10 @@ void ImplicitSolver::PreLinearSolve (const bool update_pc)
 
     // The deposit is skipped when the mass matrices are used only for a PC that is not updated
     if (m_use_mass_matrices_jacobian || (m_use_mass_matrices_pc && update_pc)) {
-        m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
+        // Preserve the PC coefficients when only the Jacobian matrices are being rebuilt.
+        ImplicitOptions options = m_implicit_options;
+        options.use_mass_matrices_pc = m_use_mass_matrices_pc && update_pc;
+        m_WarpX->DepositMassMatrices(m_dt, options);
         FinishMassMatricesDeposition();
     }
 
@@ -1066,8 +1066,7 @@ void ImplicitSolver::PreLinearSolve (const bool update_pc)
 void ImplicitSolver::PreRHSOp (const amrex::Real a_cur_time,
                                const int         a_nl_iter,
                                const bool        a_from_jacobian,
-                               const amrex::Real a_dt_scale,
-                               const bool        update_pc)
+                               const amrex::Real a_dt_scale)
 {
     BL_PROFILE("ImplicitSolver::PreRHSOp()");
 
@@ -1088,8 +1087,6 @@ void ImplicitSolver::PreRHSOp (const amrex::Real a_cur_time,
     ImplicitOptions options = m_implicit_options;
     options.linear_stage_of_jfnk = a_from_jacobian;
 
-    // PC deposition and zeroing follow the same schedule as sparse assembly.
-    options.use_mass_matrices_pc = m_use_mass_matrices_pc && update_pc && !a_from_jacobian;
     options.use_mass_matrices_jacobian = m_use_mass_matrices_jacobian;
     options.evolve_suborbit_particles_only = false;
 

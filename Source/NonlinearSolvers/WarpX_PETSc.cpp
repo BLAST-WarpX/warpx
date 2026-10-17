@@ -832,14 +832,7 @@ void SNES_impl::computeRHS(VecType& a_F, const VecType& a_U)
     // until its KSP solve has returned build the finite-difference Jacobian
     const bool from_jacobian = m_fd_jac_in_progress;
 
-    if (!from_jacobian) {
-        // Decide whether to update the PC at this iteration
-        m_update_pc = m_force_pc_update ||
-            m_newton_params.UpdatePC(m_step, m_iter, m_pc_initialized);
-    }
-
-    m_op->ComputeRHS(a_F, a_U, m_time, m_iter, from_jacobian,
-                     m_update_pc && !from_jacobian);
+    m_op->ComputeRHS(a_F, a_U, m_time, m_iter, from_jacobian);
     if (!from_jacobian) { m_iter++; }
 }
 
@@ -847,6 +840,10 @@ void SNES_impl::preLinearSolve()
 {
     BL_PROFILE("SNES_impl::preLinearSolve()");
     AMREX_ALWAYS_ASSERT(isDefined());
+
+    // computeRHS has already incremented m_iter after evaluating the current residual.
+    m_update_pc = m_force_pc_update ||
+        m_newton_params.UpdatePC(m_step, m_iter - 1, m_pc_initialized);
 
     // m_U and m_F hold the current iterate and its RHS from the last residual evaluation
     dynamic_cast<JacobianFunctionMF<VecType,TIType>*>(m_linop.get())->setBaseSolution(this->m_U);
