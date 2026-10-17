@@ -25,7 +25,24 @@
 #include <AMReX_Array4.H>
 #include <AMReX_Dim3.H>
 #include <AMReX_GpuAtomic.H>
+#include <AMReX_GpuQualifiers.H>
 #include <AMReX_REAL.H>
+
+/**
+ * \brief Bitmask of the components of J that a deposition kernel deposits.
+ *
+ * Kernels with a \c components template parameter deposit only the components whose bits
+ * are set, e.g. \c JComponents::x deposits only Jx. The shared memory depositions use this
+ * to deposit one component at a time into a single buffer when the buffers for all three
+ * components do not fit in shared memory.
+ */
+namespace JComponents {
+    enum : int { x = 1, y = 2, z = 4, all = x | y | z };
+
+    /** \brief Whether the bitmask \c components includes the component \c c */
+    AMREX_GPU_HOST_DEVICE
+    constexpr bool has (int components, int c) noexcept { return (components & c) != 0; }
+}
 
 /**
  * \brief Kernel for the direct current deposition for thread thread_num
@@ -542,9 +559,7 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
     constexpr int CELL = amrex::IndexType::CELL;
 
     // Loop over particles and deposit into jx_fab, jy_fab and jz_fab
-    const auto dxiarr = geom.InvCellSizeArray();
-    const auto plo = geom.ProbLoArray();
-    const auto domain = geom.Domain();
+    amrex::ignore_unused(geom);
 
     amrex::Box sample_tbox(IntVect(AMREX_D_DECL(0,0,0)), a_tbox_max_size - 1);
     sample_tbox.grow(depos_order);
@@ -574,26 +589,9 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
         if (bin_start == bin_stop) { return; /*this bin has no particles*/ }
 
-        // These boxes define the index space for the shared memory buffers
-        amrex::Box buffer_box;
-        {
-            ParticleReal xp, yp, zp;
-            GetPosition(permutation[bin_start], xp, yp, zp);
-#if defined(WARPX_DIM_3D)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ),
-                                 int( amrex::Math::floor((yp-plo[1]) * dxiarr[1]) ),
-                                 int( amrex::Math::floor((zp-plo[2]) * dxiarr[2]) ));
-#elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ),
-                                 int( amrex::Math::floor((zp-plo[1]) * dxiarr[1]) ));
-#elif defined(WARPX_DIM_1D_Z)
-            IntVect iv = IntVect(int( amrex::Math::floor((zp-plo[0]) * dxiarr[0]) ));
-#elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            IntVect iv = IntVect(int( amrex::Math::floor((xp-plo[0]) * dxiarr[0]) ));
-#endif
-            iv += domain.smallEnd();
-            getTileIndex(iv, box, true, bin_size, buffer_box);
-        }
+        // These boxes define the index space for the shared memory buffers.
+        // Tile of this bin (the bins are numbered as by amrex::getTileIndex)
+        amrex::Box buffer_box = getTileBoxFromIndex(bin_id, box, bin_size);
 
         buffer_box.grow(depos_order);
         Box tbox_x = convert(buffer_box, jx_type);
@@ -671,23 +669,24 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
 }
 
 /**
- * \brief Esirkepov Current Deposition for thread thread_num
+ * \brief Esirkepov current deposition of a single particle.
+ *
+ * Kernel of doEsirkepovDepositionShapeN and doEsirkepovDepositionSharedShapeN.
  *
  * \tparam depos_order  deposition order
+ * \tparam reduce_shape whether to use an order-1 shape in the cells flagged by
+ *                      reduced_particle_shape_mask
+ * \tparam components   bitmask of the components of J to deposit (see JComponents). The
+ *                      arrays of the other components are not accessed.
+ * \param ip           Index of the particle.
  * \param GetPosition  A functor for returning the particle position.
  * \param wp           Pointer to array of particle weights.
  * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
- * \param ion_lev      Pointer to array of particle ionization level. This is
-                       required to have the charge of each macroparticle
-                       since q is a scalar. For non-ionizable species,
-                       ion_lev is a null pointer.
- * \param Jx_arr,Jy_arr,Jz_arr Array4 of current density, either full array or tile.
- * \param np_to_deposit Number of particles for which current is deposited.
+ * \param ion_lev      Pointer to array of particle ionization level, or null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr Array4 of current density.
  * \param dt           Time step for particle level
- * \param[in] relative_time Time at which to deposit J, relative to the time of the
- *                          current positions of the particles. When different than 0,
- *                          the particle position will be temporarily modified to match
- *                          the time of the deposition.
+ * \param relative_time Time at which to deposit J, relative to the time of the
+ *                      current positions of the particles.
  * \param dinv         3D cell size inverse
  * \param xyzmin       Physical lower bounds of domain.
  * \param lo           Index lower bounds of domain.
@@ -695,10 +694,11 @@ void doDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPosition,
  * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
  * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
  * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
- * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
  */
-template <int depos_order>
-void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+template <int depos_order, bool reduce_shape, int components = JComponents::all>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void doEsirkepovDepositionShapeNKernel (const long ip,
+                                  const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::ParticleReal * const wp,
                                   const amrex::ParticleReal * const uxp,
                                   const amrex::ParticleReal * const uyp,
@@ -707,20 +707,19 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                   const amrex::Array4<amrex::Real>& Jx_arr,
                                   const amrex::Array4<amrex::Real>& Jy_arr,
                                   const amrex::Array4<amrex::Real>& Jz_arr,
-                                  long np_to_deposit,
-                                  amrex::Real dt,
-                                  amrex::Real relative_time,
+                                  const amrex::Real dt,
+                                  const amrex::Real relative_time,
                                   const amrex::XDim3 & dinv,
                                   const amrex::XDim3 & xyzmin,
-                                  amrex::Dim3 lo,
-                                  amrex::Real q,
-                                  [[maybe_unused]] int n_rz_azimuthal_modes,
-                                  const amrex::Array4<const int>& reduced_particle_shape_mask,
-                                  bool enable_reduced_shape
-                                  )
+                                  const amrex::Dim3 lo,
+                                  const amrex::Real q,
+                                  [[maybe_unused]] const int n_rz_azimuthal_modes,
+                                  const amrex::Array4<const int>& reduced_particle_shape_mask)
 {
     using namespace amrex;
     using namespace amrex::literals;
+
+    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr);
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
     // (do_ionization=1)
@@ -740,16 +739,6 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
     Real constexpr one_sixth = 1.0_rt / 6.0_rt;
 #endif
 
-    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
-
-    // (Compile 2 versions of the kernel: with and without reduced shape)
-    enum eb_flags : int { has_reduced_shape, no_reduced_shape };
-    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
-
-    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
-    amrex::For( TypeList<CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
-        {reduce_shape_runtime_flag},
-        np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
             // --- Get particle quantities
             Real const gaminv = 1.0_rt/std::sqrt(1.0_rt + uxp[ip]*uxp[ip]*inv_c2
                                                  + uyp[ip]*uyp[ip]*inv_c2
@@ -834,7 +823,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #ifdef AMREX_USE_CUDA
             amrex::ignore_unused(reduced_particle_shape_mask, lo); // Needed to avoid compilation error with nvcc
 #endif
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
 #if defined(WARPX_DIM_3D)
                 reduce_shape_old = reduced_particle_shape_mask(
                     lo.x + int(amrex::Math::floor(x_old)),
@@ -896,7 +885,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const Compute_shifted_shape_factor< depos_order > compute_shifted_shape_factor;
             // In cells marked by reduced_particle_shape_mask, we need order 1 deposition
             const Compute_shifted_shape_factor< 1 > compute_shifted_shape_factor_order1;
-            amrex::ignore_unused(compute_shifted_shape_factor_order1); // unused for `no_reduced_shape`
+            amrex::ignore_unused(compute_shifted_shape_factor_order1); // unused without reduced shape
 
             // Shape factor arrays
             // Note that there are extra values above and below
@@ -909,7 +898,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int i_new = compute_shape_factor(sx_new+1, x_new );
             const int i_old = compute_shifted_shape_factor(sx_old, x_old, i_new);
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
                 if (reduce_shape_new) {
                     for (int i=0; i<depos_order+3; i++) {sx_new[i] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sx_new+depos_order/2, x_new, i_new+depos_order/2 ); // Redeposit with order 1
@@ -928,7 +917,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int j_new = compute_shape_factor(sy_new+1, y_new);
             const int j_old = compute_shifted_shape_factor(sy_old, y_old, j_new);
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
                 if (reduce_shape_new) {
                     for (int j=0; j<depos_order+3; j++) {sy_new[j] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sy_new+depos_order/2, y_new, j_new+depos_order/2 ); // Redeposit with order 1
@@ -947,7 +936,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
             const int k_new = compute_shape_factor(sz_new+1, z_new );
             const int k_old = compute_shifted_shape_factor(sz_old, z_old, k_new );
             // If particle is close to the embedded boundary, recompute deposition with order 1 shape
-            if constexpr (reduce_shape_control == has_reduced_shape) {
+            if constexpr (reduce_shape) {
                 if (reduce_shape_new) {
                     for (int k=0; k<depos_order+3; k++) {sz_new[k] = 0.;} // Erase previous deposition
                     compute_shifted_shape_factor_order1( sz_new+depos_order/2, z_new, k_new+depos_order/2 ); // Redeposit with order 1
@@ -980,6 +969,7 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 
 #if defined(WARPX_DIM_3D)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 for (int j=djl; j<=depos_order+2-dju; j++) {
                     amrex::Real sdxi = 0._rt;
@@ -991,6 +981,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     }
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 for (int i=dil; i<=depos_order+2-diu; i++) {
                     amrex::Real sdyj = 0._rt;
@@ -1002,6 +994,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     }
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             for (int j=djl; j<=depos_order+2-dju; j++) {
                 for (int i=dil; i<=depos_order+2-diu; i++) {
                     amrex::Real sdzk = 0._rt;
@@ -1013,9 +1007,11 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                     }
                 }
             }
+            }
 
 #elif defined(WARPX_DIM_XZ) || defined(WARPX_DIM_RZ)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real sdxi = 0._rt;
                 for (int i=dil; i<=depos_order+1-diu; i++) {
@@ -1033,6 +1029,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 for (int i=dil; i<=depos_order+2-diu; i++) {
                     Real const sdyj = wq*vy*invvol*(
@@ -1060,6 +1058,8 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
                 }
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 Real sdzk = 0._rt;
                 for (int k=dkl; k<=depos_order+1-dku; k++) {
@@ -1077,40 +1077,264 @@ void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
 #endif
                 }
             }
+            }
 #elif defined(WARPX_DIM_1D_Z)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real const sdxi = wq*vx*invvol*0.5_rt*(sz_old[k] + sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+k_new-1+k, 0, 0, 0), sdxi);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int k=dkl; k<=depos_order+2-dku; k++) {
                 amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sz_old[k] + sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+k_new-1+k, 0, 0, 0), sdyj);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             amrex::Real sdzk = 0._rt;
             for (int k=dkl; k<=depos_order+1-dku; k++) {
                 sdzk += wq*invdtd.z*(sz_old[k] - sz_new[k]);
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+k_new-1+k, 0, 0, 0), sdzk);
             }
+            }
 
 #elif defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
 
+            if constexpr (JComponents::has(components, JComponents::x)) {
             amrex::Real sdri = 0._rt;
             for (int i=dil; i<=depos_order+1-diu; i++) {
                 sdri += wq*invdtd.x*(sx_old[i] - sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jx_arr(lo.x+i_new-1+i, 0, 0, 0), sdri);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::y)) {
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 amrex::Real const sdyj = wq*vy*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jy_arr(lo.x+i_new-1+i, 0, 0, 0), sdyj);
             }
+            }
+            if constexpr (JComponents::has(components, JComponents::z)) {
             for (int i=dil; i<=depos_order+2-diu; i++) {
                 amrex::Real const sdzi = wq*vz*invvol*0.5_rt*(sx_old[i] + sx_new[i]);
                 amrex::Gpu::Atomic::AddNoRet( &Jz_arr(lo.x+i_new-1+i, 0, 0, 0), sdzi);
             }
+            }
 #endif
+}
+
+/**
+ * \brief Esirkepov Current Deposition for thread thread_num
+ *
+ * \tparam depos_order  deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param Jx_arr,Jy_arr,Jz_arr Array4 of current density, either full array or tile.
+ * \param np_to_deposit Number of particles for which current is deposited.
+ * \param dt           Time step for particle level
+ * \param[in] relative_time Time at which to deposit J, relative to the time of the
+ *                          current positions of the particles. When different than 0,
+ *                          the particle position will be temporarily modified to match
+ *                          the time of the deposition.
+ * \param dinv         3D cell size inverse
+ * \param xyzmin       Physical lower bounds of domain.
+ * \param lo           Index lower bounds of domain.
+ * \param q            species charge.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry.
+ * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
+ * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
+ * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ */
+template <int depos_order>
+void doEsirkepovDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
+                                  const amrex::ParticleReal * const wp,
+                                  const amrex::ParticleReal * const uxp,
+                                  const amrex::ParticleReal * const uyp,
+                                  const amrex::ParticleReal * const uzp,
+                                  const int* ion_lev,
+                                  const amrex::Array4<amrex::Real>& Jx_arr,
+                                  const amrex::Array4<amrex::Real>& Jy_arr,
+                                  const amrex::Array4<amrex::Real>& Jz_arr,
+                                  long np_to_deposit,
+                                  amrex::Real dt,
+                                  amrex::Real relative_time,
+                                  const amrex::XDim3 & dinv,
+                                  const amrex::XDim3 & xyzmin,
+                                  amrex::Dim3 lo,
+                                  amrex::Real q,
+                                  [[maybe_unused]] int n_rz_azimuthal_modes,
+                                  const amrex::Array4<const int>& reduced_particle_shape_mask,
+                                  bool enable_reduced_shape
+                                  )
+{
+    // Loop over particles and deposit into Jx_arr, Jy_arr and Jz_arr
+
+    // (Compile 2 versions of the kernel: with and without reduced shape)
+    enum eb_flags : int { has_reduced_shape, no_reduced_shape };
+    const int reduce_shape_runtime_flag = (enable_reduced_shape && (depos_order>1))? has_reduced_shape : no_reduced_shape;
+
+    // amrex::For: iterations scatter-add into shared J nodes (no SIMD pragma, see issue #7097)
+    amrex::For( amrex::TypeList<amrex::CompileTimeOptions<has_reduced_shape,no_reduced_shape>>{},
+        {reduce_shape_runtime_flag},
+        np_to_deposit, [=] AMREX_GPU_DEVICE (long ip, auto reduce_shape_control) {
+            doEsirkepovDepositionShapeNKernel<
+                depos_order, (decltype(reduce_shape_control)::value == has_reduced_shape)>(
+                ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, Jx_arr, Jy_arr, Jz_arr,
+                dt, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
+                reduced_particle_shape_mask);
         }
     );
+}
+
+/**
+ * \brief Functor that deposits the current of one particle with the Esirkepov deposition, for
+ *        doSharedDeposition. See doEsirkepovDepositionShapeNKernel for the members.
+ *
+ * \tparam depos_order  deposition order
+ * \tparam reduce_shape whether to use an order-1 shape in the cells flagged by
+ *                      reduced_particle_shape_mask
+ */
+template <int depos_order, bool reduce_shape>
+struct EsirkepovParticleDeposit
+{
+    GetParticlePosition<PIdx> GetPosition;
+    const amrex::ParticleReal* wp;
+    const amrex::ParticleReal* uxp;
+    const amrex::ParticleReal* uyp;
+    const amrex::ParticleReal* uzp;
+    const int* ion_lev;
+    amrex::Real dt;
+    amrex::Real relative_time;
+    amrex::XDim3 dinv;
+    amrex::XDim3 xyzmin;
+    amrex::Dim3 lo;
+    amrex::Real q;
+    int n_rz_azimuthal_modes;
+    amrex::Array4<const int> reduced_particle_shape_mask;
+
+    /** \brief Deposit the components of J in the bitmask \c components (see JComponents)
+     *         of particle \c ip into \c J */
+    template <int components>
+    AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+    void deposit (const long ip, amrex::GpuArray<amrex::Array4<amrex::Real>, 3> const& J) const
+    {
+        doEsirkepovDepositionShapeNKernel<depos_order, reduce_shape, components>(
+            ip, GetPosition, wp, uxp, uyp, uzp, ion_lev, J[0], J[1], J[2],
+            dt, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
+            reduced_particle_shape_mask);
+    }
+};
+
+/**
+ * \brief Esirkepov current deposition using shared memory buffers. Particles are
+ *        binned into tiles of bin_size cells, and each tile is processed by one GPU
+ *        thread block, which accumulates the current in shared memory before adding
+ *        it to the global arrays. Only available for CUDA and HIP.
+ *
+ * \tparam depos_order  deposition order
+ * \param GetPosition  A functor for returning the particle position.
+ * \param wp           Pointer to array of particle weights.
+ * \param uxp,uyp,uzp  Pointer to arrays of particle momentum.
+ * \param ion_lev      Pointer to array of particle ionization level. This is
+                       required to have the charge of each macroparticle
+                       since q is a scalar. For non-ionizable species,
+                       ion_lev is a null pointer.
+ * \param jx_fab,jy_fab,jz_fab FArrayBox of current density.
+ * \param dt           Time step for particle level
+ * \param relative_time Time at which to deposit J, relative to the time of the
+ *                      current positions of the particles.
+ * \param dinv         3D cell size inverse
+ * \param xyzmin       Physical lower bounds of domain.
+ * \param lo           Index lower bounds of domain.
+ * \param q            species charge.
+ * \param n_rz_azimuthal_modes Number of azimuthal modes when using RZ geometry; must be 1.
+ * \param reduced_particle_shape_mask  Array4 of int, Mask that indicates whether a particle
+ * should use its regular shape factor or a reduced, order-1 shape factor instead in a given cell.
+ * \param enable_reduced_shape Flag to indicate whether to use the reduced shape factor
+ * \param a_bins             bins used for particle sorting
+ * \param box                the current box
+ * \param geom               the geometry of the current level
+ * \param a_tbox_max_size    the maximum size of a tilebox
+ * \param threads_per_block  number of threads to use per block in shared deposition
+ * \param bin_size           tileSize to use for shared current deposition operations
+ */
+template <int depos_order>
+void doEsirkepovDepositionSharedShapeN (
+    const GetParticlePosition<PIdx>& GetPosition,
+    const amrex::ParticleReal * const wp,
+    const amrex::ParticleReal * const uxp,
+    const amrex::ParticleReal * const uyp,
+    const amrex::ParticleReal * const uzp,
+    const int* ion_lev,
+    amrex::FArrayBox& jx_fab,
+    amrex::FArrayBox& jy_fab,
+    amrex::FArrayBox& jz_fab,
+    const amrex::Real dt,
+    const amrex::Real relative_time,
+    const amrex::XDim3 & dinv,
+    const amrex::XDim3 & xyzmin,
+    const amrex::Dim3 lo,
+    const amrex::Real q,
+    const int n_rz_azimuthal_modes,
+    const amrex::Array4<const int>& reduced_particle_shape_mask,
+    const bool enable_reduced_shape,
+    const amrex::DenseBins<WarpXParticleContainer::ParticleTileType::ParticleTileDataType>& a_bins,
+    const amrex::Box& box,
+    const amrex::Geometry& geom,
+    const amrex::IntVect& a_tbox_max_size,
+    const int threads_per_block,
+    const amrex::IntVect bin_size)
+{
+#if (defined(AMREX_USE_HIP) || defined(AMREX_USE_CUDA)) && \
+    !(defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE))
+    using namespace amrex::literals;
+
+    // Esirkepov deposits all components of J on the same nodes, which span the old and
+    // new positions of the particle. With the CFL condition, a particle in a given cell
+    // touches nodes from depos_order cells below to depos_order+1 cells above that cell,
+    // so the buffers cover the tile grown by depos_order and made nodal.
+    // The new position is the current position (used for binning) pushed by
+    // relative_time + dt/2, which is 0 for the usual explicit deposition. Otherwise,
+    // grow the buffers by the number of cells that the particle can move in that time.
+    const auto dxiarr = geom.InvCellSizeArray();
+    const amrex::Real shift_time = std::abs(relative_time + 0.5_rt*dt);
+    int ngrow = depos_order;
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        ngrow = amrex::max(ngrow, depos_order + static_cast<int>(
+            std::ceil(PhysConst::c*shift_time*dxiarr[idim])));
+    }
+
+    const amrex::GpuArray<amrex::Array4<amrex::Real>, 3> J{
+        jx_fab.array(), jy_fab.array(), jz_fab.array()};
+    const amrex::IntVect nodal = amrex::IntVect::TheNodeVector();
+    const amrex::GpuArray<amrex::IntVect, 3> types{nodal, nodal, nodal};
+
+    // Compile versions of the kernel with and without reduced shape
+    auto launch = [&] (auto reduce_shape) {
+        const EsirkepovParticleDeposit<depos_order, decltype(reduce_shape)::value> deposit_particle{
+            GetPosition, wp, uxp, uyp, uzp, ion_lev, dt, relative_time, dinv, xyzmin, lo, q,
+            n_rz_azimuthal_modes, reduced_particle_shape_mask};
+        doSharedDeposition<3>(deposit_particle, J, types, ngrow, a_bins, box, a_tbox_max_size,
+                              threads_per_block, bin_size);
+    };
+    if (enable_reduced_shape && (depos_order > 1)) {
+        launch(std::true_type{});
+    } else {
+        launch(std::false_type{});
+    }
+#else
+    amrex::ignore_unused(GetPosition, wp, uxp, uyp, uzp, ion_lev, jx_fab, jy_fab, jz_fab,
+        dt, relative_time, dinv, xyzmin, lo, q, n_rz_azimuthal_modes,
+        reduced_particle_shape_mask, enable_reduced_shape, a_bins, box, geom,
+        a_tbox_max_size, threads_per_block, bin_size);
+    WARPX_ABORT_WITH_MESSAGE("Shared memory only implemented for HIP/CUDA");
+#endif
 }
 
 /**
