@@ -1,7 +1,8 @@
 #include "FlushFormatAscent.H"
 
-#include "WarpX.H"
+#include "Python/GIL.H"
 #include "Utils/TextMsg.H"
+#include "WarpX.H"
 
 #include <ablastr/profiler/ProfilerWrapper.H>
 #include <AMReX.H>
@@ -52,6 +53,10 @@ FlushFormatAscent::WriteToFile (
     // extract, you can call the following AMReX helper:
     // const auto step = istep[0];
     // WriteBlueprintFiles(bp_mesh,"bp_export",step,"hdf5");
+
+    // If WarpX is driven from Python, then Ascent runs its Python extracts and filters in the same
+    // interpreter and relies on its caller to hold the GIL.
+    const warpx::python::ScopedGIL gil;
 
     ABLASTR_PROFILE_VAR("FlushFormatAscent::WriteToFile::publish", prof_ascent_publish);
     ascent::Ascent ascent;

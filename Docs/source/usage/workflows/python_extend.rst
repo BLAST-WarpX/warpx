@@ -110,3 +110,21 @@ The specific Python syntax to access this data is described in the following sec
    python_particle_boundary_data
    python_warpx
    python_portable
+
+.. _usage-python-extend-threads:
+
+Python threads
+--------------
+
+WarpX releases the Python `global interpreter lock (GIL) <https://docs.python.org/3/glossary.html#term-global-interpreter-lock>`__ while it initializes and advances a simulation.
+This keeps other Python threads running, for instance the threads that Jupyter uses to show the output of a simulation while it advances.
+WarpX re-acquires the GIL for each installed :ref:`callback function <usage-python-extend-callbacks>`.
+
+.. note::
+
+   The simulation is not thread-safe.
+   While a simulation initializes or advances, access its data only from callback functions and not from other Python threads.
+   Install and uninstall callback functions before calling ``sim.step``, not from within callback functions.
+
+   If another Python thread is busy, then WarpX waits each time it re-acquires the GIL: up to the `switch interval <https://docs.python.org/3/library/sys.html#sys.setswitchinterval>`__ of Python or until a C function that holds the GIL in the other thread returns.
+   This wait is reported as ``warpx_py_acquire_gil`` by the :ref:`TinyProfiler <developers-profiling-tiny-profiler>`, separately from the ``warpx_py_<name>`` entries of the callback functions.
