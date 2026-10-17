@@ -188,6 +188,11 @@ public:
     void FinishMassMatricesDeposition ();
 
     /**
+     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
+     */
+    void SyncMassMatricesPCAndApplyBCs ();
+
+    /**
      * \brief Finish the implicit particle update after the converged time-centered solve
      */
     void FinishImplicitParticleUpdate (amrex::Real time, int step);
@@ -340,11 +345,6 @@ protected:
                    bool        a_from_jacobian,
                    amrex::Real a_dt_scale,
                    bool        update_pc = true);
-
-    /**
-     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
-     */
-    void SyncMassMatricesPCAndApplyBCs ();
 
     /**
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
