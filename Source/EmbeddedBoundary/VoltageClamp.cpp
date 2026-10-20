@@ -182,6 +182,27 @@ namespace
     }
 
     // sum_nodes a b measure (each node once)
+    amrex::Real Integrate (amrex::MultiFab const& a, amrex::MultiFab const& b,
+                           amrex::MultiFab const& measure)
+    {
+        amrex::ReduceOps<amrex::ReduceOpSum> op;
+        amrex::ReduceData<amrex::Real> data(op);
+        for (amrex::MFIter mfi(measure); mfi.isValid(); ++mfi) {
+            auto const aa = a.const_array(mfi);
+            auto const ba = b.const_array(mfi);
+            auto const ma = measure.const_array(mfi);
+            op.eval(mfi.validbox(), data, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                -> amrex::GpuTuple<amrex::Real>
+            {
+                return {aa(i,j,k) * ba(i,j,k) * ma(i,j,k)};
+            });
+        }
+        amrex::Real sum = amrex::get<0>(data.value());
+        amrex::ParallelDescriptor::ReduceRealSum(sum);
+        return sum;
+    }
+
+    // Register a nodal field once; later calls (e.g. a second solve) reuse it
     void AllocNodal (WarpX& warpx, std::string const& name)
     {
         if (!warpx.m_fields.has(name, lev)) {
@@ -439,6 +460,36 @@ namespace
         amrex::Gpu::streamSynchronize();
     }
 
+    std::unique_ptr<amrex::MultiFab> NodalDivE (WarpX& warpx, std::string const& name)
+    {
+        // The divergence stencil reads guard cells; syncing them from valid data
+        // keeps the result independent of the domain decomposition.
+        ablastr::fields::VectorField efield = warpx.m_fields.get_alldirs(name, lev);
+        for (auto* e : efield) { e->FillBoundary(warpx.Geom(lev).periodicity()); }
+        // The FDTD solver's own nodal divergence, so the observer sees exactly the
+        // discrete Gauss law of the field update
+        auto div_e = std::make_unique<amrex::MultiFab>(
+            NodalBoxArray(warpx), warpx.DistributionMap(lev), 1, 0);
+        warpx.get_pointer_fdtd_solver_fp(lev)->ComputeDivE(efield, *div_e);
+        return div_e;
+    }
+
+    // Fresh nodal physical charge density of all species (deposit, guard sum, boundary
+    // folding and RZ volume scaling, i.e. finalized), without touching rho_fp. Within
+    // the supported envelope (one level, no filter, no fluids, m=0) this equals the rho
+    // the electrostatic solver would use.
+    std::unique_ptr<amrex::MultiFab> DepositedRho (WarpX& warpx)
+    {
+        bool const local = false;
+        bool const finalize = true;
+        auto rho = warpx.GetPartContainer().GetChargeDensityOnLevel(lev, local, finalize);
+        // The integrals below pair rho with fields on the field grids by MFIter
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            rho->boxArray() == NodalBoxArray(warpx) &&
+            rho->DistributionMap() == warpx.DistributionMap(lev),
+            "The voltage clamp requires particle and field grids to coincide");
+        return rho;
+    }
 }
 
 amrex::Real SolveUnitPotential (int k, std::string const& selector,
@@ -455,6 +506,13 @@ amrex::Real SolveUnitPotential (int k, std::string const& selector,
                     warpx.RZAxisVolumeFactor());
     }
     return SolveStaircase(k, selector, nullptr, rtol, max_iter);
+}
+
+amrex::Real SolveGrounded (amrex::Real rtol, int max_iter)
+{
+    // All conductors at 0 V (selector "0") and the live charge as source
+    auto const rho = DepositedRho(WarpX::GetInstance());
+    return SolveStaircase(-1, "0", rho.get(), rtol, max_iter);
 }
 
 void CheckSelection (int n)
@@ -490,6 +548,97 @@ void CheckSelection (int n)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(invalid.max(0) == 0,
         "Every fixed node must belong to exactly one conductor, or to a conductor joined "
         "to a PEC wall (the ground); list grounded conductors that do not touch a wall");
+}
+
+std::vector<amrex::Real> GaussCharge (int n, std::string const& efield_name)
+{
+    auto& warpx = WarpX::GetInstance();
+    auto const div_e = NodalDivE(warpx, efield_name);
+    auto const& measure = *warpx.m_fields.get(gauss_measure, lev);
+    std::vector<amrex::Real> charge(n);
+    for (int k = 0; k < n; ++k) {
+        charge[k] = PhysConst::epsilon_0 *
+            Integrate(*div_e, *warpx.m_fields.get(WeightName(k), lev), measure);
+    }
+    return charge;
+}
+
+// C is measured with the observer itself (column k = charges read for E_k) rather
+// than computed from psi: then V = C^-1 Q is exact for any combination of unit
+// fields, so the readback after a correction is the target to roundoff.
+std::vector<std::vector<amrex::Real>> CapacitanceMatrix (int n)
+{
+    std::vector<std::vector<amrex::Real>> cap(n, std::vector<amrex::Real>(n));
+    for (int k = 0; k < n; ++k) {
+        auto const column = GaussCharge(n, EFieldName(k));
+        for (int j = 0; j < n; ++j) { cap[j][k] = column[j]; }
+    }
+    return cap;
+}
+
+std::pair<std::vector<amrex::Real>, std::vector<amrex::Real>>
+ChargeState (int n)
+{
+    auto& warpx = WarpX::GetInstance();
+    // Gauss charge of the live field on each conductor's fixed nodes
+    auto charge = GaussCharge(n, "Efield_fp");
+    auto const rho = DepositedRho(warpx);
+    auto const& measure = *warpx.m_fields.get(rho_measure, lev);
+
+    // With the Verboncoeur correction (the default), the axis node volume of rho
+    // (1/3) differs from that of div E (1/4). On fixed axis nodes this cancels
+    // between Q and C; for charge on free axis nodes it is not verified, so such
+    // charge aborts the run (workaround: boundary.verboncoeur_axis_correction = 0).
+    if (warpx.RZAxisVolumeFactor() != 0.25_rt) {
+        auto const& fixed = *warpx.m_fields.get(fixed_nodes, lev);
+        amrex::ReduceOps<amrex::ReduceOpMax> op;
+        amrex::ReduceData<amrex::Real> data(op);
+        for (amrex::MFIter mfi(fixed); mfi.isValid(); ++mfi) {
+            auto const q = rho->const_array(mfi);
+            auto const f = fixed.const_array(mfi);
+            op.eval(mfi.validbox(), data, [=] AMREX_GPU_DEVICE (int i, int j, int k)
+                -> amrex::GpuTuple<amrex::Real>
+            {
+                return {(i == 0 && f(i,j,k) == 0._rt) ? amrex::Math::abs(q(i,j,k)) : 0._rt};
+            });
+        }
+        amrex::Real free_axis_rho = amrex::get<0>(data.value());
+        amrex::ParallelDescriptor::ReduceRealMax(free_axis_rho);
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(free_axis_rho == 0._rt,
+            "The voltage clamp does not support charge on free axis nodes with the "
+            "Verboncoeur axis correction");
+    }
+
+    // Field charge: subtract the particle charge on the fixed nodes (it is in div E
+    // but not on the conductor surface). Grounded charge: the charge the plasma
+    // induces on the conductors when all are at 0 V (Shockley-Ramo), -psi_k^T V rho.
+    std::vector<amrex::Real> grounded(n);
+    for (int k = 0; k < n; ++k) {
+        charge[k] -= Integrate(*rho, *warpx.m_fields.get(WeightName(k), lev), measure);
+        grounded[k] = -Integrate(*rho, *warpx.m_fields.get(PhiName(k), lev), measure);
+    }
+    return {charge, grounded};
+}
+
+void AddUnitFields (std::vector<amrex::Real> const& dv)
+{
+    auto& warpx = WarpX::GetInstance();
+    // E_fp += sum_k dv[k] E_k on the valid region; the unit fields are curl-free and
+    // zero on frozen edges, so B and the EB-frozen E edges are unchanged.
+    ablastr::fields::VectorField efield =
+        warpx.m_fields.get_alldirs(warpx::fields::FieldType::Efield_fp, lev);
+    for (int k = 0; k < static_cast<int>(dv.size()); ++k) {
+        ablastr::fields::VectorField unit = warpx.m_fields.get_alldirs(EFieldName(k), lev);
+        for (int d = 0; d < 3; ++d) {
+            amrex::MultiFab::Saxpy(*efield[d], dv[k], *unit[d], 0, 0, 1, 0);
+        }
+    }
+    // Same boundary conditions and guard-cell refresh as after a field push, so the
+    // next particle gather (from Efield_aux, an alias of Efield_fp here; see
+    // CheckSupported) sees the corrected field everywhere
+    warpx.ApplyEfieldBoundary(lev, PatchType::fine, warpx.gett_new(lev));
+    bool const nodal_sync = true; // make shared nodes of neighbouring boxes agree
+    warpx.FillBoundaryE(lev, warpx.getngEB(), nodal_sync);
 }
 
 }

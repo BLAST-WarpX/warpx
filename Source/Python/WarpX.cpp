@@ -310,11 +310,44 @@ density multiplied by the radial volume factor, not a physical charge density.)p
             py::arg("k"), py::arg("selector"), py::arg("rtol"), py::arg("max_iter"),
             "Unit potential and field of conductor k; returns the solve residual."
         )
+        .def("voltage_clamp_solve_grounded",
+            [] (WarpX&, amrex::Real rtol, int max_iter) {
+                return voltage_clamp::SolveGrounded(rtol, max_iter);
+            },
+            py::arg("rtol"), py::arg("max_iter"),
+            "Diagnostic: solve with every conductor at 0 V and the live charge as source. "
+            "voltage_clamp_gauss_charge(n, \"voltage_clamp_E_grounded\") then gives the "
+            "induced charge independently of the reciprocity value in voltage_clamp_charge_state."
+        )
         .def("voltage_clamp_check_selection",
             [] (WarpX&, int n) { voltage_clamp::CheckSelection(n); },
             py::arg("n"),
             "Abort unless every fixed node belongs to exactly one of n conductors or to "
             "a conductor joined to a PEC wall (the ground)."
+        )
+        .def("voltage_clamp_gauss_charge",
+            [] (WarpX&, int n, std::string const& efield) {
+                return voltage_clamp::GaussCharge(n, efield);
+            },
+            py::arg("n"), py::arg("efield") = "Efield_fp",
+            "Gauss charge of each conductor for the named E field, in coulombs."
+        )
+        .def("voltage_clamp_capacitance",
+            [] (WarpX&, int n) { return voltage_clamp::CapacitanceMatrix(n); },
+            py::arg("n"),
+            "Capacitance matrix C[j][k] read by the observer, in farads."
+        )
+        .def("voltage_clamp_charge_state",
+            [] (WarpX&, int n) { return voltage_clamp::ChargeState(n); },
+            py::arg("n"),
+            "(field charge, grounded charge -psi^T q) of each conductor, in coulombs."
+        )
+        .def("voltage_clamp_add_unit_fields",
+            [] (WarpX&, std::vector<amrex::Real> const& dv) {
+                voltage_clamp::AddUnitFields(dv);
+            },
+            py::arg("dv"),
+            "Add sum_k dv[k] E_k to Efield_fp and refresh its guard cells."
         )
 #endif
         .def("run_div_cleaner",

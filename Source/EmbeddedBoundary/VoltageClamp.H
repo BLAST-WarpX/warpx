@@ -48,6 +48,17 @@ namespace warpx::embedded_boundary::voltage_clamp
     amrex::Real SolveUnitPotential (int k, std::string const& selector,
                                     amrex::Real rtol, int max_iter);
 
+    /** Solve with every conductor grounded and the live charge as source.
+     *
+     * Reading the result with GaussCharge gives the charge the plasma induces on
+     * the conductors, an independent check of the reciprocity value -psi_k^T q.
+     *
+     * \param[in] rtol     relative tolerance of the MLMG solve
+     * \param[in] max_iter maximum number of MLMG iterations
+     * \return final MLMG residual
+     */
+    amrex::Real SolveGrounded (amrex::Real rtol, int max_iter);
+
     /** Abort unless every fixed node belongs to exactly one of the n conductors, or
      *  to a conductor that frozen edges join to a PEC wall (part of the ground, not
      *  listed). Call once after the unit solves.
@@ -55,6 +66,39 @@ namespace warpx::embedded_boundary::voltage_clamp
      * \param[in] n number of conductors
      */
     void CheckSelection (int n);
+
+    /** Gauss charge eps0 sum_{fixed nodes of k} V div E of each conductor k.
+     *
+     * \param[in] n           number of conductors
+     * \param[in] efield_name registered name of the E field to read
+     * \return charge of each conductor, in coulombs
+     */
+    std::vector<amrex::Real> GaussCharge (int n, std::string const& efield_name);
+
+    /** Capacitance matrix C[j][k]: charge that the observer reads on conductor j
+     *  for the unit field E_k. Call after CheckSelection.
+     *
+     * \param[in] n number of conductors
+     * \return C[j][k], in farads
+     */
+    std::vector<std::vector<amrex::Real>> CapacitanceMatrix (int n);
+
+    /** Charge state of the live fields, from one deposition and one divergence:
+     *  the field charge eps0 s_k^T V div E - s_k^T V q of each conductor, and the
+     *  grounded (plasma-induced) charge -psi_k^T V q. The voltages are
+     *  C^-1 (field charge - grounded charge).
+     *
+     * \param[in] n number of conductors
+     * \return field charge and grounded charge of each conductor, in coulombs
+     */
+    std::pair<std::vector<amrex::Real>, std::vector<amrex::Real>>
+    ChargeState (int n);
+
+    /** E_fp += sum_k dv[k] E_k, then refresh the guard cells of E_fp.
+     *
+     * \param[in] dv voltage change of each conductor, in volts
+     */
+    void AddUnitFields (std::vector<amrex::Real> const& dv);
 }
 
 #endif // WARPX_EB_VOLTAGE_CLAMP_H_
