@@ -1254,21 +1254,21 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
                 });
         }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
-#endif
     }
 
-    // Do addOp Exchange on MassMatrices_PC
+    // Sum raw coefficients, fold boundaries, then apply inverse-volume scaling
+    // using each destination current row's volume factor.
     m_WarpX->SyncMassMatricesPC();
 
     // Apply BCs to MassMatrices_PC
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        m_WarpX->ApplyJfieldBoundary(lev,
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
-            PatchType::fine);
+        ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        m_WarpX->ApplyDiagonalMassMatricesBoundary(lev, MM_PC[0], MM_PC[1], MM_PC[2],
+            m_ncomp_pc_xx, m_ncomp_pc_yy, m_ncomp_pc_zz, PatchType::fine);
+
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
     }
 }
 
