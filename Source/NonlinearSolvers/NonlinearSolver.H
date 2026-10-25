@@ -1,7 +1,7 @@
 #ifndef WARPX_NONLINEAR_SOLVER_H_
 #define WARPX_NONLINEAR_SOLVER_H_
 
-#include "PreconditionerLibrary.H"
+#include "PreconditionerTypes.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
 
@@ -182,6 +182,10 @@ public:
      * Solvers that always update the PC need no notification.
      */
     virtual void InvalidatePreconditioner () {}
+
+    //! Destroy and recreate the PETSc objects around a PETSc re-initialization.
+    //! Returns false if the solver does not use PETSc.
+    virtual bool ReinitializePETSc () { return false; }
 
     /**
      * \brief Allow caller to dynamically change the verbosity flag. For

@@ -127,7 +127,7 @@ void FiniteDifferenceSolver::EvolveEPMLCartesian (
 
         // Extract structures indicating whether the E field should be updated
         amrex::Array4<int> update_Ex_arr, update_Ey_arr, update_Ez_arr;
-        if (EB::enabled()) {
+        if (EB::enabled() && eb_update_E[0] != nullptr) {
             update_Ex_arr = eb_update_E[0]->array(mfi);
             update_Ey_arr = eb_update_E[1]->array(mfi);
             update_Ez_arr = eb_update_E[2]->array(mfi);

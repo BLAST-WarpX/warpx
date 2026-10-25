@@ -320,27 +320,29 @@ Mat setupPC( KSP a_ksp, PETScSolver_impl& a_solver, const std::string& a_name )
 #endif
 #else
     MatSetType( a_solver.m_P->obj, MATAIJ );
-    MatMPIAIJSetPreallocation( a_solver.m_P->obj, 1 /*a_ops->numPCMatBands()*/, NULL,
-                                                  1 /*a_ops->numPCMatBands()-1*/, NULL);
 #endif
-    MatSetOption(a_solver.m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE);
-    MatSetOption(a_solver.m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE);
-    MatSetUp(a_solver.m_P->obj);
     MatSetFromOptions(a_solver.m_P->obj);
+    // preallocated with the exact row lengths at the first assembly, in assemblePCMatrix()
     return a_solver.m_P->obj;
 }
 
 //! Constructor
 PETScSolver_impl::PETScSolver_impl()
 {
-    m_A = std::make_unique<MatObj>();
-    m_P = std::make_unique<MatObj>();
-    m_x = std::make_unique<VecObj>();
-    m_b = std::make_unique<VecObj>();
+    PETScSolver_impl::destroyObjects(); // creates the empty handles
 }
 
 //! Destructor
 PETScSolver_impl::~PETScSolver_impl() { }
+
+void PETScSolver_impl::destroyObjects ()
+{
+    m_A = std::make_unique<MatObj>();
+    m_P = std::make_unique<MatObj>();
+    m_x = std::make_unique<VecObj>();
+    m_b = std::make_unique<VecObj>();
+    m_is_defined = false;
+}
 
 // Set PETSc options from WarpX input file
 void PETScSolver_impl::setOptions()
@@ -488,6 +490,37 @@ int PETScSolver_impl::assemblePCMatrix(LinOpType* const a_linop)
         amrex::Gpu::copy( amrex::Gpu::deviceToHost,
                           a_ij.begin(), a_ij.end(),
                           h_a_ij.begin() );
+
+        // Preallocate the diagonal and off-diagonal blocks exactly at the first assembly; without
+        // preallocation, PETSc assembles through a hash table, which fails intermittently (#7438)
+        PetscBool assembled = PETSC_FALSE;
+        PetscCall(MatAssembled(m_P->obj, &assembled));
+        if (!assembled) {
+            MPI_Comm comm = PetscObjectComm(reinterpret_cast<PetscObject>(m_P->obj));
+            const PetscInt nloc = static_cast<PetscInt>(m_ndofs_l);
+            PetscInt start = 0;
+            PetscCallMPI(MPI_Exscan(&nloc, &start, 1, MPIU_INT, MPI_SUM, comm));
+            PetscMPIInt rank = 0;
+            PetscCallMPI(MPI_Comm_rank(comm, &rank));
+            if (rank == 0) { start = 0; }
+            std::vector<PetscInt> d_nnz(nloc, 0);
+            std::vector<PetscInt> o_nnz(nloc, 0);
+            for (int i = 0; i < n; i++) {
+                const PetscInt row = h_r_indices_g[i] - start;
+                AMREX_ALWAYS_ASSERT(row >= 0 && row < nloc);
+                for (int k = 0; k < h_n_nz_cols[i]; k++) {
+                    const PetscInt col = h_c_indices_g[i*ncols_max + k];
+                    if (col < 0) { continue; }
+                    if (col >= start && col < start + nloc) { ++d_nnz[row]; }
+                    else { ++o_nnz[row]; }
+                }
+            }
+            PetscCall(MatXAIJSetPreallocation(m_P->obj, 1, d_nnz.data(), o_nnz.data(),
+                                              nullptr, nullptr));
+            PetscCall(MatSetOption(m_P->obj, MAT_NEW_NONZERO_LOCATION_ERR, PETSC_FALSE));
+            PetscCall(MatSetOption(m_P->obj, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
+        }
+
         for (int i = 0; i < n; i++) {
             PetscCall(MatSetValues( m_P->obj,
                                     1,
@@ -516,14 +549,27 @@ KSP_impl::KSP_impl(LinOpType& a_op)
 
 KSP_impl::~KSP_impl() { }
 
+void KSP_impl::destroyObjects ()
+{
+    PETScSolver_impl::destroyObjects();
+    m_ksp = std::make_unique<KSPObj>();
+    m_pc_needs_update = true;
+}
+
+void KSP_impl::setRestartLength (int a_restart_length)
+{
+    m_restart_length = a_restart_length;
+    PETScSolver_impl::setRestartLength(a_restart_length);
+}
+
 void KSP_impl::createObjects(const VecType& a_vec)
 {
     BL_PROFILE("KSP_impl::createObjects()");
     AMREX_ALWAYS_ASSERT(!isDefined());
 
-    // define work vector
-    this->m_U.Define(a_vec);
-    m_F.Define(a_vec);
+    // define the work vectors (kept across a re-initialization of PETSc)
+    if (!this->m_U.IsDefined()) { this->m_U.Define(a_vec); }
+    if (!m_F.IsDefined()) { m_F.Define(a_vec); }
     // find local and global vector sizes
     this->m_ndofs_l = this->m_U.nDOF_local();
     this->m_ndofs_g = this->m_U.nDOF_global();
@@ -548,6 +594,7 @@ void KSP_impl::createObjects(const VecType& a_vec)
     this->m_pc_type = m_linop->pcType();
     // set PETSc options from WarpX inputs
     setOptions();
+    if (m_restart_length > 0) { PETScSolver_impl::setRestartLength(m_restart_length); }
     KSPSetOperators( m_ksp->obj, this->m_A->obj, setupPC(m_ksp->obj, *this, "KSP_impl") );
     KSPSetTolerances( m_ksp->obj, m_rtol, m_atol, PETSC_CURRENT, m_maxits );
     KSPSetNormType( m_ksp->obj, KSP_NORM_UNPRECONDITIONED );
@@ -651,7 +698,6 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op,
     amrex::Print() << "SNES_impl: Initialized PETSc's SNES solver.\n";
 
     m_verbose = m_params.verbose;
-    setRestartLength(m_newton_params.linsol_restart_length);
     this->m_pc_type = m_newton_params.pc_type;
 
     this->m_U.Define(a_vec);
@@ -664,6 +710,16 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op,
 
     m_linop = std::make_unique<JacobianFunctionMF<VecType,TIType>>();
     m_linop->define(m_F, m_op, this->m_pc_type);
+
+    createObjects();
+}
+
+void SNES_impl::createObjects ()
+{
+    BL_PROFILE("SNES_impl::createObjects()");
+    AMREX_ALWAYS_ASSERT(!this->m_is_defined);
+
+    setRestartLength(m_newton_params.linsol_restart_length);
 
     m_snes = std::make_unique<SNESObj>();
 
@@ -716,6 +772,14 @@ SNES_impl::SNES_impl(const VecType& a_vec, TIType* a_op,
 }
 
 SNES_impl::~SNES_impl() { }
+
+void SNES_impl::destroyObjects ()
+{
+    PETScSolver_impl::destroyObjects();
+    m_snes = std::make_unique<SNESObj>();
+    // Only the PETSc preconditioner lost its state (the matrix); the native ones keep it
+    if (this->m_pc_type == PreconditionerType::pc_petsc) { m_pc_initialized = false; }
+}
 
 void SNES_impl::printParams () const
 {

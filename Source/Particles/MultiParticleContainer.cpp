@@ -634,25 +634,17 @@ MultiParticleContainer::DepositCharge (
 
     bool const local = true;
     bool const reset = false;
-    bool const apply_boundary_and_scale_volume = false;
     bool const interpolate_across_levels = false;
     // Call the deposition kernel for each species
     for (auto& pc : allcontainers)
     {
         if (pc->do_not_deposit) { continue; }
-        pc->DepositCharge(rho, local, reset, apply_boundary_and_scale_volume,
-                              interpolate_across_levels);
+        pc->DepositCharge(rho, local, reset, interpolate_across_levels);
     }
 
     // Push the particles back in time
     if (relative_time != 0.) { PushX(-relative_time); }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    for (int lev = 0; lev < rho.size(); ++lev)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho[lev], lev);
-    }
-#endif
 }
 
 void
@@ -686,13 +678,14 @@ MultiParticleContainer::DepositTemperatures (
 }
 
 std::unique_ptr<MultiFab>
-MultiParticleContainer::GetChargeDensity (int lev, bool local)
+MultiParticleContainer::GetChargeDensityOnLevel (int lev, bool local, bool finalize)
 {
+
     std::unique_ptr<MultiFab> rho = GetZeroChargeDensity(lev);
 
     for (auto& container : allcontainers) {
         if (container->do_not_deposit) { continue; }
-        const std::unique_ptr<MultiFab> rhoi = container->GetChargeDensity(lev, true);
+        const auto rhoi = container->GetChargeDensityOnLevel(lev, /*local=*/true, /*finalize=*/false);
         MultiFab::Add(*rho, *rhoi, 0, 0, rho->nComp(), rho->nGrowVect());
     }
     if (!local) {
@@ -704,6 +697,12 @@ MultiParticleContainer::GetChargeDensity (int lev, bool local)
             WarpX::do_single_precision_comms, gm.periodicity());
     }
 
+    if (finalize) {
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !local,
+            "GetChargeDensityOnLevel requires local=false when finalize=true.");
+        WarpX::GetInstance().FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
+    }
     return rho;
 }
 

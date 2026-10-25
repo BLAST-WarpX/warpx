@@ -223,14 +223,6 @@ void init_WarpX (py::module& m)
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        .def("apply_inverse_volume_scaling_to_charge_density",
-            [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
-                wx.ApplyInverseVolumeScalingToChargeDensity(rho, lev);
-            },
-            py::arg("rho"), py::arg("lev")
-        )
-#endif
 
         // Expose functions to get the current simulation step and time
         .def("getistep",

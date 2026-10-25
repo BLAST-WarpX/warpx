@@ -24,7 +24,7 @@ implicit_evolve.mass_matrices_pc_width = 1
 
 newton.linear_solver = petsc_ksp
 jacobian.pc_type = pc_petsc
-pc_petsc.verbose = true
+precon_mat.verbose = true
 pc_petsc.type = asm
 pc_petsc.asm_overlap = 2
 pc_petsc.sub_type = lu

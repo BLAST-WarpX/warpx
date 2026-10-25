@@ -82,6 +82,8 @@ public:
         m_pc_initialized = false;
     }
 
+    bool ReinitializePETSc () override { return m_linear_solver->reinitializePETSc(); }
+
     void PrintParams () const override
     {
         this->m_params.Print("Newton");

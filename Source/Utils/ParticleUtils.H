@@ -204,8 +204,7 @@ namespace ParticleUtils {
     void rotateVector (T& ux, T& uy, T& uz, T phi, T costh)
     {
         AMREX_ASSERT(costh >= -T(1) && costh <= T(1));
-        const T cosph = std::cos(phi);
-        const T sinph = std::sin(phi);
+        const auto [sinph, cosph] = amrex::Math::sincos(phi);
         const T sinth = std::sqrt(std::max(T(0), T(1) - costh*costh));
 
         const T ux0 = ux;
@@ -277,8 +276,9 @@ namespace ParticleUtils {
         auto const phi = 2.0_prt * MathConst::pi * amrex::Random(engine);
         auto const cos_theta = 2.0_prt * amrex::Random(engine) - 1.0_prt;
         auto const sin_theta = std::sqrt(1.0_prt - cos_theta*cos_theta);
-        x = sin_theta * std::cos(phi);
-        y = sin_theta * std::sin(phi);
+        auto const [sin_phi, cos_phi] = amrex::Math::sincos(phi);
+        x = sin_theta * cos_phi;
+        y = sin_theta * sin_phi;
         z = cos_theta;
     }
 

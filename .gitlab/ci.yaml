@@ -13,6 +13,9 @@
 #
 # Available runners: https://gitlab.spack.io/groups/hpsf/-/wikis/supported-tags
 #
+variables:
+  CMAKE_BUILD_PARALLEL_LEVEL: "16"
+
 .install-dependencies:
   timeout: 90 minutes
   before_script:
@@ -68,7 +71,8 @@ NVIDIA-H100:
           -DWarpX_FFT=ON                                   \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
-    - cmake --build build -j 16
+    - ctest --test-dir build -D ExperimentalBuild -V
+    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
@@ -127,7 +131,8 @@ AMD-MI300:
           -DWarpX_PRECISION=DOUBLE                     \
           -DWarpX_PARTICLE_PRECISION=DOUBLE            \
           -DWarpX_FFT=ON
-    - cmake --build build -j 16
+    - ctest --test-dir build -D ExperimentalBuild -V
+    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
@@ -184,7 +189,8 @@ Intel-PVC:
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
-    - cmake --build build -j 16
+    - ctest --test-dir build -D ExperimentalBuild -V
+    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then

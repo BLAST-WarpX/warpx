@@ -183,6 +183,7 @@ Overall simulation parameters
 
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
+    If this parameter is set to the string ``/dev/null``, used inputs are not written to any file. Note that this works on any OS if the provided string matches exactly ``/dev/null``, regardless of the existence of a null device file.
 
 .. pp:param:: warpx.gamma_boost
     :type: ``float``
@@ -322,6 +323,15 @@ Overall simulation parameters
           - ``implicit_evolve.suborbit_statistics_interval`` (``int``, default: 100)
           - ``implicit_evolve.print_unconverged_particle_details`` (``bool``, default: false)
 
+        - ``implicit_evolve.petsc_reinit_interval`` (``integer``, default: 1000 on GPU builds, 0 otherwise)
+          With ``newton.linear_solver = petsc_ksp`` or ``implicit_evolve.nonlinear_solver = petsc_snes``, finalize and re-initialize PETSc every this many steps, recreating the PETSc solver objects.
+          This works around host memory that the GPU builds of PETSc (3.24 to 3.26, CUDA and HIP) accumulate in every GMRES iteration and release only in ``PetscFinalize``, which otherwise grows without bound in long runs.
+          The leak is a few kB per GMRES iteration, so the default interval bounds it to tens of MB per rank; 0 never re-initializes PETSc.
+          Output that PETSc produces at finalization (for example with ``-log_view``) is produced at every re-initialization.
+          Set the interval to 0 if the run holds PETSc objects outside WarpX's implicit solvers (for example petsc4py objects in a PICMI script), which a re-initialization would invalidate.
+          PETSc option values that contain spaces are not preserved across a re-initialization.
+          The parameter is ignored if PETSc is built with Kokkos, which cannot be initialized twice.
+
         - ``implicit_evolve.use_mass_matrices_jacobian`` (``bool``, default: false).
           When ``true``, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
           In 3D, this option is currently only implemented for ``algo.current_deposition = direct``.
@@ -337,7 +347,7 @@ Overall simulation parameters
           In 3D, ``algo.current_deposition = villasenor`` is supported only for PC-only use
           (``implicit_evolve.use_mass_matrices_jacobian = false``) with ``implicit_evolve.mass_matrices_pc_width = 0``.
 
-        - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 0).
+        - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 1).
           Specifies the non-negative spatial half-width of the mass-matrix stencil retained in the preconditioner.
           This applies whenever ``implicit_evolve.use_mass_matrices_pc = true``, independently of whether mass matrices are also used for the Jacobian.
           A width of 0 retains only the local diagonal entries; larger widths retain neighboring couplings, up to the full stencil extent.
@@ -367,14 +377,21 @@ Overall simulation parameters
             - ``pc_curl_curl_mlmg.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_curl_curl_mlmg.absolute_tolerance`` (``float``, default: 1.0e-16)
 
-          - ``jacobian.pc_type = pc_jacobi``: Use the damped Point-Jacobi method for the plasma response captured by the mass matrices.
-            At ``implicit_evolve.mass_matrices_pc_width = 0``, the diagonal system is solved directly.
-            For wider stencils, damped Jacobi iterations include the neighboring couplings.
+          - ``jacobian.pc_type = pc_jacobi``: Use weighted (damped) Jacobi iterations on :math:`A = \mathbb{I} + M`, where :math:`M` is the plasma response from the mass matrices (``implicit_evolve.use_mass_matrices_pc = true``).
+            The curl curl operator is not included.
+            At ``implicit_evolve.mass_matrices_pc_width = 0``, the diagonal system is solved exactly in one step.
+            For wider stencils, the iterations include the neighboring couplings.
 
-            - ``pc_jacobi.verbose`` (``bool``, default: true)
-            - ``pc_jacobi.max_iter`` (``int``, default: 10)
+            - ``pc_jacobi.verbose`` (``bool``, default: false)
+            - ``pc_jacobi.verbose_int`` (``int``) If given, overrides ``pc_jacobi.verbose``: a positive value turns on the output.
+            - ``pc_jacobi.max_iter`` (``int``, default: 200)
             - ``pc_jacobi.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_jacobi.absolute_tolerance`` (``float``, default: 1.0e-16)
+            - ``pc_jacobi.omega`` (``float``, default: Gershgorin estimate from the matrix) Relaxation factor.
+              Setting it turns off ``pc_jacobi.adaptive_omega``.
+              A warning is issued if it exceeds the Gershgorin estimate, since convergence is then not guaranteed.
+            - ``pc_jacobi.adaptive_omega`` (``bool``, default: true)
+              When ``true``, the relaxation factor is reduced by a factor of 0.9 whenever the residual increases.
 
           - ``jacobian.pc_type = pc_petsc``: Use the PETSc solver.
 
@@ -393,10 +410,18 @@ Overall simulation parameters
             - ``pc_algmg.algmg_verbose`` (``int``, default: 0) Verbosity of the multigrid solver.
             - ``pc_algmg.max_iter`` (``int``, default: 1) Number of V-cycles per application.
             - ``pc_algmg.smoother`` (``string``, default: "chebyshev") One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only).
-            - ``pc_algmg.chebyshev_degree`` (``int``, default: 4)
+            - ``pc_algmg.chebyshev_degree`` (``int``, default: 8)
+            - ``pc_algmg.chebyshev_ratio`` (``float``, default: 50) The Chebyshev smoother damps eigenvalues from the largest down to the largest divided by this ratio. With mass matrices in the preconditioner the smallest eigenvalues are far below the diagonal, so this is much larger than the usual multigrid value of about 6.
             - ``pc_algmg.strong_threshold`` (``float``, default: 0.25)
             - ``pc_algmg.aggressive_levels`` (``int``, default: 0) Number of levels with aggressive coarsening.
             - ``pc_algmg.max_levels`` (``int``, default: 25)
+            - ``pc_algmg.nu1`` (``int``, default: 1 for "chebyshev", 2 otherwise) Smoother sweeps before the coarse correction.
+            - ``pc_algmg.nu2`` (``int``, default: 1 for "chebyshev", 2 otherwise) Smoother sweeps after the coarse correction.
+            - ``pc_algmg.nu_bottom`` (``int``, default: 4 for "chebyshev", 8 otherwise) Smoother sweeps on the coarsest level when it has more than 1024 rows and is therefore not solved directly.
+
+        - ``precon_mat.verbose`` (``bool``, default: true)
+          Print information on the assembly of the sparse matrix used by ``pc_petsc`` and ``pc_algmg``.
+          This replaces ``pc_petsc.verbose``.
 
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
