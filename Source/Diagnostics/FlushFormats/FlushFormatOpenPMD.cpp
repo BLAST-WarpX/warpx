@@ -66,6 +66,12 @@ FlushFormatOpenPMD::FlushFormatOpenPMD (const std::string& diag_name)
         }
 
         pp_diag_name.query("buffer_flush_limit_btd", m_NumAggBTDBufferToFlush);
+
+#ifdef _WIN32
+        _putenv_s("OPENPMD_ADIOS2_ASYNC_WRITE", "1");
+#else
+        setenv("OPENPMD_ADIOS2_ASYNC_WRITE", "1", 1);
+#endif
     }
 
     //
