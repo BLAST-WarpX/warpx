@@ -439,7 +439,7 @@ Overall simulation parameters
 
         - :pp:param:`algo.particle_shape` sets the shape used for the electrostatic part: the charge
           density deposition, and the electric-field gather in the electrostatic (predictor) velocity push.
-        - ``implicit_evolve.ms_particle_shape`` (``int``, default: :pp:param:`algo.particle_shape`) sets the shape used for the
+        - ``implicit_evolve.magnetostatic_particle_shape`` (``int``, default: :pp:param:`algo.particle_shape`) sets the shape used for the
           magnetostatic part: the current and mass matrices deposition, the field gather in the
           inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
           It must not be larger than :pp:param:`algo.particle_shape`.

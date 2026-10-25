@@ -9,6 +9,7 @@
 #include "Fields.H"
 #include "SemiImplicitDarwin.H"
 #include "Python/callbacks.H"
+#include "Utils/Parser/ParserUtils.H"
 #include "WarpX.H"
 
 #include <ablastr/warn_manager/WarnManager.H>
@@ -63,10 +64,11 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Defaults to the electrostatic particle shape, algo.particle_shape.
     m_ms_particle_shape = WarpX::nox;
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
-    pp_implicit_evolve.query("ms_particle_shape", m_ms_particle_shape);
+    utils::parser::queryWithParser(
+        pp_implicit_evolve, "magnetostatic_particle_shape", m_ms_particle_shape);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         m_ms_particle_shape >= 1 && m_ms_particle_shape <= WarpX::nox,
-        "implicit_evolve.ms_particle_shape must be between 1 and algo.particle_shape");
+        "implicit_evolve.magnetostatic_particle_shape must be between 1 and algo.particle_shape");
 
     // Set parameters used by `InitializeMassMatrices`
     m_use_mass_matrices = true;
