@@ -80,6 +80,7 @@
 #include <cctype>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -179,11 +180,19 @@ namespace
     void CheckGuardCells (
         ablastr::fields::MultiFabRegister& fields,
         const std::string& mf_name,
-        int lev
+        int lev,
+        std::optional<ablastr::fields::Direction> dir = std::nullopt
     )
     {
-        if (!fields.has(mf_name, lev)) { return; }
-        auto & mf = *fields.get(mf_name, lev);
+        // Do not impose a field-solver grid-size restriction when no field
+        // solver is active (for example, on collision-only grids).
+        if (dir && WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::None &&
+            WarpX::electrostatic_solver_id == ElectrostaticSolverAlgo::None &&
+            WarpX::GetInstance().evolve_scheme == EvolveScheme::Explicit) {
+            return;
+        }
+        if (!(dir ? fields.has(mf_name, *dir, lev) : fields.has(mf_name, lev))) { return; }
+        auto & mf = *(dir ? fields.get(mf_name, *dir, lev) : fields.get(mf_name, lev));
 
         for (amrex::MFIter mfi(mf); mfi.isValid(); ++mfi)
         {
@@ -1553,18 +1562,20 @@ void WarpX::ComputeExternalFieldOnGridUsingParser (
 
 void WarpX::CheckGuardCells()
 {
+    using ablastr::fields::Direction;
+
     for (int lev = 0; lev <= max_level; ++lev)
     {
         for (int dim = 0; dim < 3; ++dim)
         {
-            ::CheckGuardCells(m_fields, "Efield_fp[" + std::to_string(dim) + "]", lev);
-            ::CheckGuardCells(m_fields, "Bfield_fp[" + std::to_string(dim) + "]", lev);
-            ::CheckGuardCells(m_fields, "current_fp[" + std::to_string(dim) + "]", lev);
+            ::CheckGuardCells(m_fields, "Efield_fp", lev, Direction{dim});
+            ::CheckGuardCells(m_fields, "Bfield_fp", lev, Direction{dim});
+            ::CheckGuardCells(m_fields, "current_fp", lev, Direction{dim});
 
             if (WarpX::fft_do_time_averaging)
             {
-                ::CheckGuardCells(m_fields, "Efield_avg_fp[" + std::to_string(dim) + "]", lev);
-                ::CheckGuardCells(m_fields, "Bfield_avg_fp[" + std::to_string(dim) + "]", lev);
+                ::CheckGuardCells(m_fields, "Efield_avg_fp", lev, Direction{dim});
+                ::CheckGuardCells(m_fields, "Bfield_avg_fp", lev, Direction{dim});
             }
         }
 
@@ -1577,14 +1588,14 @@ void WarpX::CheckGuardCells()
         {
             for (int dim = 0; dim < 3; ++dim)
             {
-                ::CheckGuardCells(m_fields, "Efield_cp[" + std::to_string(dim) + "]", lev);
-                ::CheckGuardCells(m_fields, "Bfield_cp[" + std::to_string(dim) + "]", lev);
-                ::CheckGuardCells(m_fields, "current_cp[" + std::to_string(dim) + "]", lev);
+                ::CheckGuardCells(m_fields, "Efield_cp", lev, Direction{dim});
+                ::CheckGuardCells(m_fields, "Bfield_cp", lev, Direction{dim});
+                ::CheckGuardCells(m_fields, "current_cp", lev, Direction{dim});
 
                 if (WarpX::fft_do_time_averaging)
                 {
-                    ::CheckGuardCells(m_fields, "Efield_avg_cp[" + std::to_string(dim) + "]", lev);
-                    ::CheckGuardCells(m_fields, "Bfield_avg_cp[" + std::to_string(dim) + "]", lev);
+                    ::CheckGuardCells(m_fields, "Efield_avg_cp", lev, Direction{dim});
+                    ::CheckGuardCells(m_fields, "Bfield_avg_cp", lev, Direction{dim});
                 }
             }
 

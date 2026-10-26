@@ -1,0 +1,25 @@
+# No scalar fields: this must exercise vector-field guard validation.
+max_step = 0
+geometry.dims = 3
+geometry.prob_lo = -1 -1 -1
+geometry.prob_hi = 1 1 1
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+amr.n_cell = 16 16 16
+amr.max_level = 0
+amr.blocking_factor = 2
+amr.max_grid_size = 64
+amr.n_error_buf = 0
+amr.grid_eff = 1.0
+warpx.pml_ncell = 4
+warpx.pml_delta = 4
+warpx.cfl = 0.5
+warpx.do_dive_cleaning = 0
+warpx.do_divb_cleaning = 0
+algo.maxwell_solver = yee
+algo.particle_shape = 3
+warpx.use_filter = 0
+particles.species_names = guard_probe
+guard_probe.species_type = electron
+guard_probe.injection_style = none
+diagnostics.enable = 0
