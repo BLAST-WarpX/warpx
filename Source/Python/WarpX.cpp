@@ -201,7 +201,11 @@ void init_WarpX (py::module& m)
             R"pbdoc(Save the particle positions and velocities at the start of the step)pbdoc"
         )
         .def("deposit_mass_matrices",
-            [](WarpX& wx, amrex::Real a_dt){ wx.DepositMassMatrices(a_dt); },
+            [](WarpX& wx, amrex::Real a_dt){
+                auto const* solver = wx.get_pointer_ImplicitSolver();
+                if (!solver) { throw py::value_error("deposit_mass_matrices requires an implicit solver"); }
+                wx.DepositMassMatrices(a_dt, solver->GetImplicitOptions());
+            },
             R"pbdoc(Zero and deposit the mass matrices from all species)pbdoc"
         )
         .def("sync_mass_matrices",
@@ -219,14 +223,6 @@ void init_WarpX (py::module& m)
         .def("sync_rho",
             [](WarpX& wx){ wx.SyncRho(); }
         )
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        .def("apply_inverse_volume_scaling_to_charge_density",
-            [](WarpX& wx, amrex::MultiFab* rho, int const lev) {
-                wx.ApplyInverseVolumeScalingToChargeDensity(rho, lev);
-            },
-            py::arg("rho"), py::arg("lev")
-        )
-#endif
 
         // Expose functions to get the current simulation step and time
         .def("getistep",

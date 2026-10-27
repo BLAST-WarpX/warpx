@@ -46,6 +46,14 @@ How to run a simulation with Python extensions
          # advance simulation until the last time step
          sim.step()
 
+      As for the WarpX executable, parameters of the file can be :ref:`overwritten from the command line <usage_run>` of the Python script:
+
+      .. code-block:: bash
+
+         python3 <python_script> max_step=10 amr.n_cell=64 64 128
+
+      Arguments that your script parses itself go before the first ``name=value`` override or after a ``--`` separator.
+
       .. dropdown:: Full Example
 
          .. literalinclude:: inputs_test_3d_laser_acceleration_python.py

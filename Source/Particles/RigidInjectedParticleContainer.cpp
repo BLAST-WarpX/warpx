@@ -313,9 +313,13 @@ void
 RigidInjectedParticleContainer::PushP (int lev, Real dt,
                                        const MultiFab& Ex, const MultiFab& Ey, const MultiFab& Ez,
                                        const MultiFab& Bx, const MultiFab& By, const MultiFab& Bz,
-                                       MomentumPushType momentum_push_type)
+                                       MomentumPushType momentum_push_type,
+                                       std::optional<FieldGatherOrders> gather_orders)
 {
     ABLASTR_PROFILE("RigidInjectedParticleContainer::PushP");
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!gather_orders.has_value(),
+        "Explicit field gather orders are not supported for rigid-injected species");
 
     if (do_not_push) { return; }
 

@@ -70,7 +70,8 @@ public:
                       const WarpXSolverVec&  a_Z,
                       amrex::Real      start_time,
                       int              a_nl_iter,
-                      bool             a_from_jacobian ) override;
+                      bool             a_from_jacobian,
+                      bool update_pc = true ) override;
 
     /** \brief Pointer back to the main WarpX class, used by DarwinLinearFieldOperator */
     [[nodiscard]] WarpX* GetWarpX () const { return m_WarpX; }
@@ -143,8 +144,8 @@ private:
     std::unique_ptr<DarwinLinearFieldOperator> m_linear_function;
 
     /**
-     * \brief Whether the predictor velocity push in OneStep() should
-     *  temporarily override the global galerkin_interpolation flag to true.
+     * \brief Whether the predictor velocity push in OneStep() should gather
+     *  the electrostatic E-field with the Galerkin scheme.
      *  Set once in Define(); false if the user explicitly selected
      *  momentum-conserving gathering, to avoid silently overriding that choice.
      */

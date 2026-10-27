@@ -306,6 +306,14 @@ public:
             "WarpXSolverVec::nDOF_global() DOF object is a nullptr");
         return m_dofs->m_nDoFs_g;
     }
+    // first global DOF of each process, plus the total (size nprocs+1)
+    [[nodiscard]] const amrex::Vector<amrex::Long>& dofRowOffsets () const
+    {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            (m_dofs != nullptr),
+            "WarpXSolverVec::dofRowOffsets() DOF object is a nullptr");
+        return m_dofs->m_row_offsets;
+    }
 
     // copy to/from Real-type arrays
     void copyFrom (const amrex::Real*);

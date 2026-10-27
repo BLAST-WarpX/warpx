@@ -9,6 +9,7 @@
 
 #include <AMReX_ParmParse.H>
 
+#include <algorithm>
 #include <map>
 #include <vector>
 
@@ -32,7 +33,7 @@ ParticleDiag::ParticleDiag (
     if (variables_specified) {
         // If only specific variables have been specified, fill m_plot_flags with zero and only set
         // requested variables to one
-        std::fill(m_plot_flags.begin(), m_plot_flags.end(), 0);
+        std::ranges::fill(m_plot_flags, 0);
         bool contains_positions = false;
         if (variables[0] != "none"){
             for (auto& var : variables){

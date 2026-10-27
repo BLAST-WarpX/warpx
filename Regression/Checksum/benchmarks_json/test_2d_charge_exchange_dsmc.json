@@ -1,41 +1,41 @@
 {
   "He": {
-    "particle_momentum_x": 4.2848885782041145e-18,
-    "particle_momentum_y": 4.272496794101889e-18,
-    "particle_momentum_z": 4.292232101781472e-18,
-    "particle_position_x": 0.0004353167765630204,
+    "particle_momentum_x": 4.284888578114845e-18,
+    "particle_momentum_y": 4.272496794103378e-18,
+    "particle_momentum_z": 4.2922321018624386e-18,
+    "particle_position_x": 0.00043531677656302264,
     "particle_position_y": 0.0,
-    "particle_position_z": 0.00043533138606804235,
+    "particle_position_z": 0.00043533138606804316,
     "particle_weight": 2823958725036869.5
   },
   "Heplus": {
-    "particle_momentum_x": 4.320179313499432e-18,
-    "particle_momentum_y": 4.282061196788185e-18,
-    "particle_momentum_z": 4.24901287179338e-18,
-    "particle_position_x": 0.00043532018977624366,
+    "particle_momentum_x": 4.320179313467392e-18,
+    "particle_momentum_y": 4.2820611966532325e-18,
+    "particle_momentum_z": 4.249012871840438e-18,
+    "particle_position_x": 0.00043532018977624143,
     "particle_position_y": 0.0,
-    "particle_position_z": 0.00043532659858939906,
+    "particle_position_z": 0.0004353265985893982,
     "particle_weight": 2823958725036869.5
   },
   "electrons": {
-    "particle_momentum_x": 4.9309808542993256e-20,
+    "particle_momentum_x": 4.930980854298779e-20,
     "particle_momentum_y": 5.076441659627338e-20,
-    "particle_momentum_z": 4.9836048795288286e-20,
-    "particle_position_x": 0.00043465124283866317,
+    "particle_momentum_z": 4.983604879529019e-20,
+    "particle_position_x": 0.000434651242838662,
     "particle_position_y": 0.0,
-    "particle_position_z": 0.0004366013032818781,
+    "particle_position_z": 0.0004366013032818772,
     "particle_weight": 2823958725036869.5
   },
   "lev=0": {
     "Bx": 0.0,
     "By": 0.0,
     "Bz": 0.0,
-    "Ex": 14496166501772.488,
+    "Ex": 14496166501504.137,
     "Ey": 0.0,
-    "Ez": 16709212106886.684,
-    "jx": 7.789602978867528e+18,
-    "jy": 7.125751315876321e+18,
-    "jz": 6.517838787244204e+18,
-    "rho": 52386879871.95241
+    "Ez": 16709212106964.484,
+    "jx": 7.957437210021169e+18,
+    "jy": 7.577892677375115e+18,
+    "jz": 6.679219750096105e+18,
+    "rho": 52386879871.525406
   }
 }
