@@ -108,4 +108,4 @@ laser_ionization.product_species = electrons ions
 laser_ionization.decay_rate(x,y,z,t) = Amp*exp(-(t-shift)^2/(2*width^2))
 laser_ionization.productA_temperature_eV = 0.05 0.05 0.05
 laser_ionization.productB_temperature_eV = 0.0 0.0 0.0
-laser_ionization.fixed_product_weight = 1.6328e13 # target_density*dV/target_Nppc
+laser_ionization.weight_ratio = 2

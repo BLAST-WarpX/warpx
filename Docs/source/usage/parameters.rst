@@ -183,6 +183,7 @@ Overall simulation parameters
 
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
+    If this parameter is set to the string ``/dev/null``, used inputs are not written to any file. Note that this works on any OS if the provided string matches exactly ``/dev/null``, regardless of the existence of a null device file.
 
 .. pp:param:: warpx.gamma_boost
     :type: ``float``
@@ -266,20 +267,30 @@ Overall simulation parameters
         - ``implicit_evolve.nonlinear_solver = newton``: Use a PS-JFNK method. Required for large time steps, but efficiency often relies on preconditioning and/or using ``implicit_evolve.use_mass_matrices_jacobian = true``.
 
           - ``newton.verbose`` (``bool``, default: true)
-          - ``newton.linear_solver`` (``string``, default: "gmres") Other excepted value, "petsc_ksp".
+          - ``newton.linear_solver`` (``string``, default: "amrex_gmres") Other accepted value, "petsc_ksp".
           - ``newton.require_convergence`` (``bool``, default: true)
           - ``newton.max_iterations`` (``int``, default: 100)
           - ``newton.pc_update_newton_interval`` (``int``, default: 1)
-            Controls preconditioner updates within a native Newton solve. Zero updates
+            Controls preconditioner updates within a nonlinear solve. Zero updates
             only at iteration 0; a positive N updates at iterations 0, N, 2N, etc.
+            A negative value is replaced by the default, with a warning.
           - ``newton.pc_update_time_step_interval`` (``int``, default: 1)
-            Must be positive. Updates are allowed only when the zero-based simulation
+            Must be positive; other values are replaced by the default, with a warning.
+            Updates are allowed only when the zero-based simulation
             step index is divisible by this interval. Both interval conditions must
-            hold. The first required linear solve always initializes the PC, including
+            hold for the preconditioner to be updated; otherwise it is reused, including
+            the PETSc factorization. The same schedule applies to the native Newton
+            solver and to PETSc SNES.
+            The first required linear solve always initializes the PC, including
             after restart. During adaptive implicit substepping, PC updates are forced
             on every Newton iteration, overriding both intervals.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
+            Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
+          - ``newton.divergence_tolerance`` (``float``, default: 1.0e4)
+            The nonlinear solve fails as diverged when the residual norm exceeds this
+            factor times the initial residual norm. A value less than 1 is replaced by
+            the default, with a warning.
           - ``newton.diagnostic_file`` (``string``, default: None)
           - ``newton.diagnostic_interval`` (``int``, default: 1)
 
@@ -291,11 +302,12 @@ Overall simulation parameters
           - ``gmres.relative_tolerance`` (``float``, default: 1.0e-4)
           - ``gmres.absolute_tolerance`` (``float``, default: 0.0)
 
-        - ``implicit_evolve.nonlinear_solver = petsc_snes``: Use a PS-JFNK method with the PETSc SNES solver. Requires WarpX to be compiled with PETSc (``WarpX_PETSC=ON``).
-          The ``newton`` and ``gmres`` parameters listed above apply, with the following differences:
+          - These parameters can also be given with the name of the linear solver as prefix (``amrex_gmres`` or ``petsc_ksp``); the ``gmres`` prefix takes precedence.
 
-          - ``newton.linear_solver`` is not used. The linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES).
-          - ``gmres.restart_length`` is not used.
+          - If the linear solver fails to converge (for example, on reaching ``gmres.max_iterations``), the nonlinear solve stops and the time step is repeated with substeps, as for any failed nonlinear solve. This does not depend on ``newton.require_convergence``.
+
+        - ``implicit_evolve.nonlinear_solver = petsc_snes``: Use a PS-JFNK method with the PETSc SNES solver. Requires WarpX to be compiled with PETSc (``WarpX_PETSC=ON``).
+          The ``newton`` and ``gmres`` parameters listed above apply, except that ``newton.linear_solver`` is not used: the linear system at each nonlinear iteration is solved with the PETSc KSP solver (GMRES), whose parameters can also be given with the ``petsc_ksp`` prefix.
 
           PETSc options given on the command line (for example, ``-snes_view``) are passed to the PETSc solver.
 
@@ -311,6 +323,15 @@ Overall simulation parameters
           - ``implicit_evolve.suborbit_statistics_interval`` (``int``, default: 100)
           - ``implicit_evolve.print_unconverged_particle_details`` (``bool``, default: false)
 
+        - ``implicit_evolve.petsc_reinit_interval`` (``integer``, default: 1000 on GPU builds, 0 otherwise)
+          With ``newton.linear_solver = petsc_ksp`` or ``implicit_evolve.nonlinear_solver = petsc_snes``, finalize and re-initialize PETSc every this many steps, recreating the PETSc solver objects.
+          This works around host memory that the GPU builds of PETSc (3.24 to 3.26, CUDA and HIP) accumulate in every GMRES iteration and release only in ``PetscFinalize``, which otherwise grows without bound in long runs.
+          The leak is a few kB per GMRES iteration, so the default interval bounds it to tens of MB per rank; 0 never re-initializes PETSc.
+          Output that PETSc produces at finalization (for example with ``-log_view``) is produced at every re-initialization.
+          Set the interval to 0 if the run holds PETSc objects outside WarpX's implicit solvers (for example petsc4py objects in a PICMI script), which a re-initialization would invalidate.
+          PETSc option values that contain spaces are not preserved across a re-initialization.
+          The parameter is ignored if PETSc is built with Kokkos, which cannot be initialized twice.
+
         - ``implicit_evolve.use_mass_matrices_jacobian`` (``bool``, default: false).
           When ``true``, the plasma current density is computed using the mass matrices during the linear stage of PS-JFNK, replacing direct particle calculations. This can enable large speed ups for simulations with many particles.
           In 3D, this option is currently only implemented for ``algo.current_deposition = direct``.
@@ -323,10 +344,16 @@ Overall simulation parameters
         - ``implicit_evolve.use_mass_matrices_pc`` (``bool``, default: false).
           When ``true``, the plasma response is captured in the preconditioner.
           Requires use of a preconditioner (``jacobian.pc_type = pc_curl_curl_mlmg``, ``pc_petsc``, ``pc_algmg``, or ``pc_jacobi``).
+          In 3D, ``algo.current_deposition = villasenor`` is supported only for PC-only use
+          (``implicit_evolve.use_mass_matrices_jacobian = false``) with ``implicit_evolve.mass_matrices_pc_width = 0``.
 
-        - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 0).
-          If using ``jacobian.pc_type = pc_petsc`` or ``pc_algmg``, this parameter specifies the width of the mass matrices included in the preconditioner.
-          In most cases, a width of 1 is sufficient for good GMRES performance.
+        - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 1).
+          Specifies the non-negative spatial half-width of the mass-matrix stencil retained in the preconditioner.
+          This applies whenever ``implicit_evolve.use_mass_matrices_pc = true``, independently of whether mass matrices are also used for the Jacobian.
+          A width of 0 retains only the local diagonal entries; larger widths retain neighboring couplings, up to the full stencil extent.
+          Wider stencils are supported by ``jacobian.pc_type = pc_petsc``, ``pc_algmg``, and ``pc_jacobi``.
+          For these preconditioners, a width of 1 is sufficient for good GMRES performance in most cases.
+          The ``pc_curl_curl_mlmg`` preconditioner forces the width to 0.
 
         - ``jacobian.pc_type`` (``string``, default: None). A preconditioner can be used to minimize the number of linear GMRES iterations. The options are:
 
@@ -350,16 +377,26 @@ Overall simulation parameters
             - ``pc_curl_curl_mlmg.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_curl_curl_mlmg.absolute_tolerance`` (``float``, default: 1.0e-16)
 
-          - ``jacobian.pc_type = pc_jacobi``: Use the Point-Jacobi method. This preconditioner only captures the plasma response via the diagonal mass matrices.
+          - ``jacobian.pc_type = pc_jacobi``: Use weighted (damped) Jacobi iterations on :math:`A = \mathbb{I} + M`, where :math:`M` is the plasma response from the mass matrices (``implicit_evolve.use_mass_matrices_pc = true``).
+            The curl curl operator is not included.
+            At ``implicit_evolve.mass_matrices_pc_width = 0``, the diagonal system is solved exactly in one step.
+            For wider stencils, the iterations include the neighboring couplings.
 
-            - ``pc_jacobi.verbose`` (``bool``, default: true)
-            - ``pc_jacobi.max_iter`` (``int``, default: 10)
+            - ``pc_jacobi.verbose`` (``bool``, default: false)
+            - ``pc_jacobi.verbose_int`` (``int``) If given, overrides ``pc_jacobi.verbose``: a positive value turns on the output.
+            - ``pc_jacobi.max_iter`` (``int``, default: 200)
             - ``pc_jacobi.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_jacobi.absolute_tolerance`` (``float``, default: 1.0e-16)
+            - ``pc_jacobi.omega`` (``float``, default: Gershgorin estimate from the matrix) Relaxation factor.
+              Setting it turns off ``pc_jacobi.adaptive_omega``.
+              A warning is issued if it exceeds the Gershgorin estimate, since convergence is then not guaranteed.
+            - ``pc_jacobi.adaptive_omega`` (``bool``, default: true)
+              When ``true``, the relaxation factor is reduced by a factor of 0.9 whenever the residual increases.
 
           - ``jacobian.pc_type = pc_petsc``: Use the PETSc solver.
 
             - ``pc_petsc.type`` (``string``, default: "asm")
+              On GPUs, ``lu`` requires a single MPI rank; on several GPUs, use ``asm`` with ``pc_petsc.sub_type = lu``.
             - ``pc_petsc.asm_overlap`` (``int``, default: 0)
             - ``pc_petsc.sub_type`` (``string``, default: "ilu")
             - ``pc_petsc.ilu_factor_levels`` (``int``, default: 2)
@@ -373,10 +410,18 @@ Overall simulation parameters
             - ``pc_algmg.algmg_verbose`` (``int``, default: 0) Verbosity of the multigrid solver.
             - ``pc_algmg.max_iter`` (``int``, default: 1) Number of V-cycles per application.
             - ``pc_algmg.smoother`` (``string``, default: "chebyshev") One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only).
-            - ``pc_algmg.chebyshev_degree`` (``int``, default: 4)
+            - ``pc_algmg.chebyshev_degree`` (``int``, default: 8)
+            - ``pc_algmg.chebyshev_ratio`` (``float``, default: 50) The Chebyshev smoother damps eigenvalues from the largest down to the largest divided by this ratio. With mass matrices in the preconditioner the smallest eigenvalues are far below the diagonal, so this is much larger than the usual multigrid value of about 6.
             - ``pc_algmg.strong_threshold`` (``float``, default: 0.25)
             - ``pc_algmg.aggressive_levels`` (``int``, default: 0) Number of levels with aggressive coarsening.
             - ``pc_algmg.max_levels`` (``int``, default: 25)
+            - ``pc_algmg.nu1`` (``int``, default: 1 for "chebyshev", 2 otherwise) Smoother sweeps before the coarse correction.
+            - ``pc_algmg.nu2`` (``int``, default: 1 for "chebyshev", 2 otherwise) Smoother sweeps after the coarse correction.
+            - ``pc_algmg.nu_bottom`` (``int``, default: 4 for "chebyshev", 8 otherwise) Smoother sweeps on the coarsest level when it has more than 1024 rows and is therefore not solved directly.
+
+        - ``precon_mat.verbose`` (``bool``, default: true)
+          Print information on the assembly of the sparse matrix used by ``pc_petsc`` and ``pc_algmg``.
+          This replaces ``pc_petsc.verbose``.
 
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
@@ -3475,11 +3520,13 @@ Details about the collision models can be found in the :ref:`theory section <mul
 
     The parent species decay rate (only for ``pulsed_decay``).
 
-.. pp:param:: <collision_name>.fixed_product_weight
-    :type: `float`
+.. pp:param:: <collision_name>.weight_ratio
+    :type: ``int``
+    :default: 1
+    :optional:
 
-    Fixed particle weight of product species (only for ``pulsed_decay``).
-    Can be estimated as :math:`n_{\text{target}}dV/N_{ppc}`, where :math:`n_{\text{target}}` is the target density of the product species, :math:`dV` is the cell volume, and :math:`N_{ppc}` is the target number of particle per cell for each product species.
+    The ratio of the weight of the parent particle to the product particles (only for ``pulsed_decay``).
+    This can only be a positive integer, since this is the number of product particles of each species created from each parent particle.
 
 .. pp:param:: <collision_name>.productA_temperature_eV
     :type: `float array, size 3`
@@ -3793,6 +3840,11 @@ Particle push, charge and current deposition, field gathering
 
     Maximum number of grid crossings the particles can do per time step.
     This is only used with the Strang and theta-implicit schemes since they allow the speed of light Courant limit to be violated.
+
+    In 1D and 2D, Villasenor mass-matrix deposition requires this value to be between
+    1 and 3 (inclusive). This applies when mass matrices are used for the Jacobian,
+    the preconditioner, or both, including a preconditioner width of zero.
+    The upper limit comes from fixed-size arrays used to store orbit segments.
 
 Maxwell solver
 ^^^^^^^^^^^^^^
@@ -4203,6 +4255,10 @@ Maxwell solver: kinetic-fluid hybrid
     5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where
     :pp:param:`hybrid_pic_model.use_rkf45` is not active.
 
+    If the restart configuration enables RKF45 on any timesteps, the learned substep count is restored from the checkpoint instead of resetting it to this input value.
+    With :pp:param:`hybrid_pic_model.use_rkf45` disabled, restart uses this input value, allowing the fixed RK4 substep count to be changed.
+    Older checkpoints without this count still use the configured input value.
+
 .. pp:param:: hybrid_pic_model.use_rkf45
     :type: ``string`` or ``bool``
     :default: ``false``
@@ -4358,6 +4414,8 @@ Grid types (collocated, staggered, hybrid)
     See equations (21)-(23) of :cite:t:`param-Godfrey2013` and associated references for details.
 
     Default: :pp:param:`interpolation.galerkin_scheme = 0` with collocated grids, or momentum-conserving field gathering, or when :pp:param:`algo.current_deposition = direct` ; :pp:param:`interpolation.galerkin_scheme = 1` otherwise.
+
+    With ``algo.evolve_scheme = semi_implicit_darwin``, the particle pushes of the Darwin solver do not use this parameter: the electrostatic field is always gathered with the Galerkin scheme (unless momentum-conserving field gathering is used), while the magnetic field and the inductive electric field are always gathered without it, consistent with the mass matrices.
 
     .. warning::
 

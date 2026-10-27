@@ -1032,7 +1032,8 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                                        amrex::MultiFab* Szx, amrex::MultiFab* Szy, amrex::MultiFab* Szz,
                                        const amrex::FArrayBox* Bx, const amrex::FArrayBox* By, const amrex::FArrayBox* Bz,
                                        long offset, long np_to_deposit, int thread_num, int lev, int depos_lev,
-                                       amrex::Real dt)
+                                       amrex::Real dt,
+                                       ImplicitOptions const& implicit_options)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((depos_lev==(lev-1)) ||
                                      (depos_lev==(lev  )),
@@ -1131,6 +1132,10 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     Array4<Real> const& Szz_arr = local_Szz[thread_num].array();
 #endif
 
+    const amrex::IntVect ncomp_xx = implicit_options.ncomp_xx;
+    const amrex::IntVect ncomp_yy = implicit_options.ncomp_yy;
+    const amrex::IntVect ncomp_zz = implicit_options.ncomp_zz;
+
     const auto GetPosition = GetParticlePosition<PIdx>(pti, offset);
 
     // Lower corner of tile box physical domain
@@ -1195,7 +1200,9 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
     auto& uyp_n = pti.GetAttribs("uy_n");
     auto& uzp_n = pti.GetAttribs("uz_n");
 
-    const bool full_mass_matrices = (Szz->nComp() > 1);
+    // This flag controls whether the full set of mass matrices with the full stencil width
+    // are deposited, or a reduce subset that is only used for the PC.
+    const bool full_mass_matrices = implicit_options.use_mass_matrices_jacobian;
 
     const int* nsuborbits = (HasiAttrib("nsuborbits") ? pti.GetiAttribs("nsuborbits").dataPtr() + offset : nullptr);
 
@@ -1231,6 +1238,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1244,6 +1252,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1257,6 +1266,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1270,6 +1280,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1283,6 +1294,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1296,6 +1308,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1309,6 +1322,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1322,6 +1336,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx, ncomp_yy, ncomp_zz,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
                     np_to_deposit, dt, dinv, xyzmin, domain_double, do_cropping, lo, qs, mass);
@@ -1342,6 +1357,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1354,6 +1370,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1366,6 +1383,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1378,6 +1396,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1390,6 +1409,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1402,6 +1422,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1414,6 +1435,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1426,6 +1448,7 @@ WarpXParticleContainer::DepositMassMatrices (WarpXParIter& pti, const RealVector
                     Sxx_arr, Sxy_arr, Sxz_arr,
                     Syx_arr, Syy_arr, Syz_arr,
                     Szx_arr, Szy_arr, Szz_arr,
+                    ncomp_xx,
                     Sxx_type, Syy_type, Szz_type,
                     getExternalEB, Bx_ext, By_ext, Bz_ext,
                     Bx_arr, By_arr, Bz_arr, Bx_type, By_type, Bz_type,
@@ -1490,12 +1513,12 @@ WarpXParticleContainer::DepositCurrent (
     }
 }
 
-void WarpXParticleContainer::DepositCurrent (
+void WarpXParticleContainer::DepositCurrentOnLevel (
     const std::string& mf_name, int lev, const amrex::Real dt, const amrex::Real relative_time
 ) {
     auto& warpx = WarpX::GetInstance();
     // allocate temporary multifab to deposit current density into
-    ablastr::fields::MultiLevelVectorField current {
+    const ablastr::fields::MultiLevelVectorField current {
         warpx.m_fields.get_alldirs(mf_name, lev)
     };
 
@@ -1509,11 +1532,6 @@ void WarpXParticleContainer::DepositCurrent (
 
     // Sum guard cells
     warpx.SyncCurrent(mf_name);
-
-    // Apply boundary conditions
-    warpx.ApplyJfieldBoundary(
-        lev, current[lev][0], current[lev][1], current[lev][2], PatchType::fine
-    );
 }
 
 /* \brief Charge Deposition for thread thread_num
@@ -1832,7 +1850,6 @@ WarpXParticleContainer::DepositCharge (WarpXParIter& pti, RealVector const& wp,
 void
 WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarField& rho,
                                        const bool local, const bool reset,
-                                       const bool apply_boundary_and_scale_volume,
                                        const bool interpolate_across_levels,
                                        const int icomp)
 {
@@ -1842,8 +1859,8 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
     auto const finest_level = static_cast<int>(rho.size() - 1);
     for (int lev = 0; lev <= finest_level; ++lev)
     {
-        DepositCharge (
-            rho[lev], lev, local, reset, apply_boundary_and_scale_volume, icomp
+        DepositChargeOnLevel (
+            rho[lev], lev, local, reset, icomp
         );
     }
 
@@ -1871,9 +1888,8 @@ WarpXParticleContainer::DepositCharge (const ablastr::fields::MultiLevelScalarFi
 }
 
 void
-WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
+WarpXParticleContainer::DepositChargeOnLevel (amrex::MultiFab* rho,
                                        const int lev, const bool local, const bool reset,
-                                       const bool apply_boundary_and_scale_volume,
                                        const int icomp)
 {
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
@@ -1911,13 +1927,6 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
     }
 #endif
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        WarpX::GetInstance().ApplyInverseVolumeScalingToChargeDensity(rho, lev);
-    }
-#endif
-
     // Exchange guard cells
     if ( !local ) {
         // Possible performance optimization:
@@ -1928,19 +1937,12 @@ WarpXParticleContainer::DepositCharge (amrex::MultiFab* rho,
             m_gdb->Geom(lev).periodicity()
         );
     }
-
-#if !defined(WARPX_DIM_RZ) && !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
-    if (apply_boundary_and_scale_volume)
-    {
-        // Reflect density over PEC boundaries, if needed.
-        WarpX::GetInstance().ApplyRhofieldBoundary(lev, rho, PatchType::fine);
-    }
-#endif
 }
 
 std::unique_ptr<MultiFab>
-WarpXParticleContainer::GetChargeDensity (int lev, bool local)
+WarpXParticleContainer::GetChargeDensityOnLevel (int lev, bool local, bool finalize)
 {
+
     const auto& ba = m_gdb->ParticleBoxArray(lev);
     const auto& dm = m_gdb->DistributionMap(lev);
     BoxArray nba = ba;
@@ -1960,7 +1962,13 @@ WarpXParticleContainer::GetChargeDensity (int lev, bool local)
     const int ng_rho = warpx.get_ng_depos_rho().max();
 
     auto rho = std::make_unique<MultiFab>(nba, dm, WarpX::ncomps,ng_rho);
-    DepositCharge(rho.get(), lev, local, true, true, 0);
+    DepositChargeOnLevel(rho.get(), lev, local, /*reset=*/true, /*icomp=*/0);
+    if (finalize) { // Apply boundary conditions to rho, and then apply volume scaling
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !local,
+            "GetChargeDensityOnLevel requires local=false when finalize=true.");
+        WarpX::GetInstance().FinalizeRhoOnLevel(lev, rho.get(), PatchType::fine);
+    }
     return rho;
 }
 

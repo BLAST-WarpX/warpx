@@ -8,6 +8,7 @@
 #ifndef PETSC_KSP_WRAPPER_H_
 #define PETSC_KSP_WRAPPER_H_
 
+#include "Initialization/WarpXInit.H"
 #include "LinearSolver.H"
 #include "WarpX_PETSc.H"
 
@@ -62,6 +63,15 @@ public:
         m_solver = std::make_unique<warpx_petsc::KSP_impl>(a_linop);
     }
 
+    //! Destroy the PETSc objects around a finalize and re-initialize of PETSc;
+    //! they are created again on the next solve
+    bool reinitializePETSc () override
+    {
+        m_solver->destroyObjects();
+        warpx::initialization::reinitialize_petsc();
+        return true;
+    }
+
     /**
      * \brief Solve the linear system A x = b for x, where A is the linear
      *        operator whose action A(x) on a vector x is computed by
@@ -94,7 +104,7 @@ public:
     void setVerbose (int v) override { m_solver->setVerbose(v); }
 
     //! Sets restart length. The default is 30.
-    void setRestartLength (int rl) override { amrex::ignore_unused(rl); }
+    void setRestartLength (int rl) override { m_solver->setRestartLength(rl); }
 
     //! Sets the max number of iterations
     void setMaxIters (int niters) override { m_solver->setMaxIters(niters); }
@@ -104,6 +114,9 @@ public:
 
     //! Gets the solver status.
     [[nodiscard]] int getStatus () const override { return m_solver->getStatus(); }
+
+    //! A negative KSPConvergedReason is a failure, including the maximum iterations.
+    [[nodiscard]] bool converged () const override { return (m_solver->getStatus() > 0); }
 
     //! Gets the 2-norm of the residual.
     [[nodiscard]] RT getResidualNorm () const override { return m_solver->getResidualNorm(); }

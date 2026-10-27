@@ -96,12 +96,11 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // Initialize the mass matrices for plasma response
     InitializeMassMatrices();
+    InitializeImplicitOptions();
 
-    // The predictor velocity push in OneStep() temporarily overrides the
-    // global galerkin_interpolation flag to true, to gather with the same
-    // shape-factor order used for deposition. Skip that override, and warn,
-    // if the user has explicitly selected momentum-conserving gathering,
-    // since forcing Galerkin gathering there would silently negate that choice.
+    // The predictor velocity push gathers the electrostatic E-field with the
+    // Galerkin scheme. Skip that, and warn, if the user has explicitly selected
+    // momentum-conserving gathering.
     m_predictor_use_galerkin = (WarpX::field_gathering_algo != GatheringAlgo::MomentumConserving);
     if (!m_predictor_use_galerkin) {
         ablastr::warn_manager::WMRecordWarning("Semi-implicit Darwin solver",
@@ -154,12 +153,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     m_WarpX->SaveParticlesAtImplicitStepStart();
 
     // Push particle velocities with E_fp (which currently just contains -grad(phi) since
-    // the E-field was cleared during the last Poisson solve). Temporarily force
-    // Galerkin gathering for this predictor push (skipped if the user explicitly
-    // requested momentum-conserving gathering - see the warning issued in Define()).
-    const bool save_galerkin_interpolation = WarpX::galerkin_interpolation;
-    if (m_predictor_use_galerkin) { WarpX::galerkin_interpolation = true; }
-
+    // the E-field was cleared during the last Poisson solve). E is gathered with the
+    // Galerkin scheme (unless the user explicitly requested momentum-conserving
+    // gathering). B is gathered exactly as in the corrector push.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushP(
@@ -171,11 +167,11 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            MomentumPushType::Full
+            MomentumPushType::Full,
+            FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
+                              /*b_shape=*/WarpX::nox}
         );
     }
-
-    WarpX::galerkin_interpolation = save_galerkin_interpolation;
 
     // Prepare current deposition: the velocities are time centered with
     // u -> (u^{n+1/2} + u^{n-1/2}) / 2.0 (with just the ES acceleration applied
@@ -205,10 +201,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     m_linear_solver->setVerbose(verbosity);
     m_linear_solver->solve(m_Z, m_source, m_linsol_rtol, m_linsol_atol);
 
-    // AMReX's GMRES::getStatus() returns 0 on convergence and a positive
-    // value (e.g. 1 if the iteration count was exceeded) otherwise. Map
-    // that onto the negative-means-failure convention used by the caller.
-    const int exit_status = (m_linear_solver->getStatus() == 0) ? 0 : -1;
+    // Map a failed linear solve onto the negative-means-failure convention
+    // used by the caller.
+    const int exit_status = m_linear_solver->converged() ? 0 : -1;
     if (exit_status < 0) {
         return exit_status;
     }
@@ -220,7 +215,10 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // the acceleration due to the inductive E-field
     ClearParticleVelocities();
 
-    // Push particle velocities (E-field now only includes the inductive component)
+    // Push particle velocities (E-field now only includes the inductive component).
+    // E and B are gathered without order reduction, as the mass matrices assume: the
+    // E gather is then the transpose of the (direct) current deposition, and B is the
+    // same as in the predictor push and the mass matrices.
     for (int lev = 0; lev <= finest_level; ++lev)
     {
         m_WarpX->GetPartContainer().PushP(
@@ -232,7 +230,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
-            MomentumPushType::Full
+            MomentumPushType::Full,
+            FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/false,
+                              /*b_shape=*/WarpX::nox}
         );
     }
 
@@ -347,7 +347,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // zero-then-deposit machinery with the electromagnetic implicit solvers
     // (see ImplicitSolver::PreLinearSolve), which drive the same
     // WarpX::DepositMassMatrices() -> MultiParticleContainer::DepositMassMatrices().
-    m_WarpX->DepositMassMatrices(m_dt);
+    m_WarpX->DepositMassMatrices(m_dt, m_implicit_options);
 
     // The deposit routine only fills half of each diagonal mass matrix's
     // band (exploiting symmetry); mirror the other half to complete
@@ -356,6 +356,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
 
     // Sync current (filter and sum boundaries)
     m_WarpX->SyncCurrent("current_fp");
+    m_WarpX->FinalizeJ();
 
     // Sum boundaries for mass matrices
     m_WarpX->SyncMassMatrices();
@@ -406,12 +407,12 @@ void SemiImplicitDarwin::CalculateSourceVector ()
 
     // Calculate the vector Laplacian of B and write result into first temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeVectorLaplacian(
-        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        lapB, Bfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate the curl of J and write result into second temporary MF
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlA(
-        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag()[lev], lev
+        curlJ, jfield[lev], m_WarpX->GetEBUpdateBFlag_fp()[lev], lev
     );
 
     // Calculate 2 * laplacian(B) + 2 * mu_0 curl(J) and write result in m_source
@@ -472,7 +473,7 @@ void SemiImplicitDarwin::ComputeInductiveEfromdA ( int astep )
 
     // Calculate dA = curl(Z)
     m_WarpX->get_pointer_fdtd_solver_fp(lev)->ComputeCurlB(
-        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag()[lev], lev
+        dAfield[lev], Zscratch, m_WarpX->GetEBUpdateEFlag_fp()[lev], lev
     );
     for (int ii = 0; ii < 3; ii++)
     {

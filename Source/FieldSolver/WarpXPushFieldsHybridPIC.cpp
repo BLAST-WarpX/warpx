@@ -119,11 +119,14 @@ void WarpX::HybridPICEvolveFields ()
     // Push the B field from t=n to t=n+1/2 using the current and density
     // at t=n, while updating the E field along with B using the electron
     // momentum equation
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(rho_fp_temp);
+    }
     m_hybrid_pic_model->BfieldEvolve(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp, rho_fp_temp,
-        m_eb_update_E,
+        m_eb_update_E_fp,
         getistep(0),
         0.5_rt*dt[0],
         SubcyclingHalf::FirstHalf, guard_cells.ng_FieldSolver,
@@ -156,17 +159,20 @@ void WarpX::HybridPICEvolveFields ()
     if (m_hybrid_pic_model->m_has_per_species_eta) {
         m_hybrid_pic_model->CalculatePlasmaCurrent(
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-            m_eb_update_E);
+            m_eb_update_E_fp);
         m_hybrid_pic_model->ComputeResistiveOverlay();
     }
 
     // Now push the B field from t=n+1/2 to t=n+1 using the n+1/2 quantities
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(rho_fp_temp);
+    }
     m_hybrid_pic_model->BfieldEvolve(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         m_fields.get_mr_levels_alldirs(FieldType::current_fp, finest_level),
         rho_fp_temp,
-        m_eb_update_E,
+        m_eb_update_E_fp,
         getistep(0),
         0.5_rt*dt[0],
         SubcyclingHalf::SecondHalf, guard_cells.ng_FieldSolver,
@@ -198,15 +204,19 @@ void WarpX::HybridPICEvolveFields ()
     }
 
     // Update the E field to t=n+1 using the extrapolated J_i^n+1 value
+    if (m_hybrid_pic_model->m_solve_electron_energy_equation) {
+        m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(
+            m_fields.get_mr_levels(FieldType::rho_fp, finest_level));
+    }
     m_hybrid_pic_model->CalculatePlasmaCurrent(
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-        m_eb_update_E);
+        m_eb_update_E_fp);
     m_hybrid_pic_model->HybridPICSolveE(
         m_fields.get_mr_levels_alldirs(FieldType::Efield_fp, finest_level),
         current_fp_temp,
         m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
         m_fields.get_mr_levels(FieldType::rho_fp, finest_level),
-        m_eb_update_E, false);
+        m_eb_update_E_fp, false);
     FillBoundaryE(guard_cells.ng_FieldSolver, WarpX::sync_nodal_points);
 
     // Update Ve_fp and per-species Vs_fp at t=n+1 for the next step's
@@ -299,7 +309,6 @@ void WarpX::HybridPICDepositRhoAndJ ()
             }
             pc.DepositCurrent(J_spec, dt[0], -0.5_rt * dt[0]);
             pc.DepositCharge(rho_spec, /*local*/true, /*reset*/true,
-                             /*apply_boundary_and_scale_volume*/false,
                              /*interpolate_across_levels*/false);
             // Accumulate the RAW (locally deposited, unsummed) per-species
             // fields into the totals: shape-spread contributions near box
@@ -321,7 +330,6 @@ void WarpX::HybridPICDepositRhoAndJ ()
             // compared with the physical rho_floor (species fractions,
             // Vs = Js/rhos) and exposed to SI-unit parsers.
             for (int lev = 0; lev <= finest_level; ++lev) {
-                ApplyInverseVolumeScalingToChargeDensity(rho_spec[lev], lev);
                 ApplyInverseVolumeScalingToCurrentDensity(
                     J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
             }
@@ -342,6 +350,11 @@ void WarpX::HybridPICDepositRhoAndJ ()
                         J_spec[lev][idim]->nGrowVect(), J_spec[lev][idim]->nGrowVect(),
                         WarpX::do_single_precision_comms, Geom(lev).periodicity());
                 }
+                // Apply boundary conditions to rho_spec, and then apply volume scaling
+                FinalizeRhoOnLevel(lev, rho_spec[lev], PatchType::fine);
+                // Apply boundary conditions to J_spec
+                FinalizeJOnLevel(lev, J_spec[lev][0], J_spec[lev][1],
+                                 J_spec[lev][2], PatchType::fine);
             }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
             // Below-axis guard cells still hold raw deposit remnants after
@@ -365,7 +378,6 @@ void WarpX::HybridPICDepositRhoAndJ ()
         }
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
         for (int lev = 0; lev <= finest_level; ++lev) {
-            ApplyInverseVolumeScalingToChargeDensity(rho_fp[lev], lev);
             ApplyInverseVolumeScalingToCurrentDensity(
                 current_fp[lev][0], current_fp[lev][1], current_fp[lev][2], lev);
         }
@@ -374,7 +386,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
         // Single-pass deposition (rho at t_{n+1}, J at t_{n-1/2}): no active
         // feature consumes the per-species fields, so skip the per-species
         // deposits and guard-cell sums entirely. Zeroing and the RZ inverse
-        // volume scaling are handled inside.
+        // volume scaling (for J, not rho) are handled inside.
         mypc->DepositCharge(rho_fp, 0._rt);
         mypc->DepositCurrent(current_fp, dt[0], -0.5_rt * dt[0]);
     }
@@ -396,8 +408,11 @@ void WarpX::HybridPICDepositRhoAndJ ()
 
     // Synchronize J and rho:
     // filter (if used), exchange guard cells, interpolate across MR levels
-    // and apply boundary conditions
     SyncCurrentAndRho();
+
+    // Apply boundary conditions to J and rho, then apply volume scaling.
+    FinalizeRho();
+    FinalizeJ();
 
     // SyncCurrent does not include a call to FillBoundary, but it is needed
     // for the hybrid-PIC solver since current values are interpolated to
@@ -489,13 +504,8 @@ void WarpX::HybridPICInitializeRhoJandB ()
         // needs) rather than re-running the adiabat seed, which would
         // overwrite it and discard the evolved thermal structure.
         for (int lev = 0; lev <= finest_level; ++lev) {
-            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(lev);
-            ApplyElectronPressureBoundary(lev, PatchType::fine);
-            ablastr::utils::communication::FillBoundary(
-                *m_fields.get(FieldType::hybrid_electron_pressure_fp, lev),
-                do_single_precision_comms,
-                Geom(lev).periodicity(),
-                true);
+            m_hybrid_pic_model->QDSMCFillElectronPressureFromTe(
+                lev, *m_fields.get(FieldType::rho_fp, lev));
         }
     } else {
         m_hybrid_pic_model->CalculateElectronPressure(energy_eq);
@@ -564,7 +574,7 @@ void WarpX::HybridPICInitializeRhoJandB ()
         m_hybrid_pic_model->GetCurrentExternal();
         m_hybrid_pic_model->CalculatePlasmaCurrent(
             m_fields.get_mr_levels_alldirs(FieldType::Bfield_fp, finest_level),
-            m_eb_update_E);
+            m_eb_update_E_fp);
         m_hybrid_pic_model->CalculateElectronFluidVelocity();
         m_hybrid_pic_model->CalculateIonFluidVelocity();
     }

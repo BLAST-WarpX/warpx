@@ -1,7 +1,10 @@
 # base input parameters
-FILE = inputs_base_2d_theta_implicit_planar_pinch
+FILE = inputs_base_2d_implicit_planar_pinch
 
 # test input parameters
+algo.evolve_scheme = "theta_implicit_em"
+implicit_evolve.theta = 0.5
+particles.max_grid_crossings = 2
 newton.linear_solver = amrex_gmres
 jacobian.pc_type = pc_algmg
 pc_algmg.verbose = true

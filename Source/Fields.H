@@ -101,11 +101,13 @@ namespace warpx::fields
     );
 
     /** these are vector fields */
-    constexpr FieldType ArrayFieldTypes[] = {
+    inline constexpr FieldType ArrayFieldTypes[] = {
         FieldType::Efield_aux,
         FieldType::Bfield_aux,
         FieldType::Efield_fp,
         FieldType::Bfield_fp,
+        FieldType::Efield_fp_external,
+        FieldType::Bfield_fp_external,
         FieldType::current_fp,
         FieldType::current_fp_nodal,
         FieldType::current_fp_vay,
@@ -115,6 +117,7 @@ namespace warpx::fields
         FieldType::vector_potential_fp_nodal,
         FieldType::vector_potential_grad_buf_e_stag,
         FieldType::vector_potential_grad_buf_b_stag,
+        FieldType::hybrid_electron_velocity_fp,
         FieldType::hybrid_current_fp_temp,
         FieldType::hybrid_current_fp_plasma,
         FieldType::hybrid_current_fp_external,
@@ -127,6 +130,9 @@ namespace warpx::fields
         FieldType::Bfield_cax,
         FieldType::E_external_particle_field,
         FieldType::B_external_particle_field,
+        FieldType::edge_lengths,
+        FieldType::face_areas,
+        FieldType::area_mod,
         FieldType::pml_E_fp,
         FieldType::pml_B_fp,
         FieldType::pml_j_fp,
@@ -152,7 +158,7 @@ namespace warpx::fields
     };
 
     /** Returns true if a FieldType represents a vector field */
-    inline bool
+    [[nodiscard]] constexpr bool
     isFieldArray (const FieldType field_type)
     {
         return std::any_of( std::begin(ArrayFieldTypes), std::end(ArrayFieldTypes),
