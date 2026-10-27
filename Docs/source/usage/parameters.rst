@@ -1184,9 +1184,13 @@ Additional PML parameters
     :type: ``bool``
 
     Whether to use divergence cleaning for E in the PML region.
-    The value must match :pp:param:`warpx.do_pml_divb_cleaning` (either both false or both true).
+    For the Cartesian PSATD solver, the value must match :pp:param:`warpx.do_pml_divb_cleaning`
+    (either both false or both true); both are turned on by default.
     This option seems to be necessary in order to avoid strong Nyquist instabilities in 3D simulations with the PSATD solver, open boundary conditions and PML in all directions. 2D simulations and 3D simulations with open boundary conditions and PML only in one direction might run well even without divergence cleaning.
-    This option is implemented only for the Cartesian PSATD solver; it is turned on by default in this case.
+
+    For Cartesian FDTD solvers, this option defaults to the value of
+    :pp:param:`warpx.do_dive_cleaning` and can be set independently to enable or
+    disable electric divergence cleaning in the PML.
 
 .. pp:param:: warpx.do_pml_divb_cleaning
     :type: ``bool``
