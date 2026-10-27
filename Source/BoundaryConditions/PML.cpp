@@ -1024,9 +1024,10 @@ PML::PML (const int lev, const BoxArray& grid_ba,
                 WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
                 // The coarse-patch fields live on a coarsened grid, so they need their own
-                // EB factory, at the resolution of the coarse patch.
+                // EB factory, at the resolution of the coarse patch (i.e., of level lev-1).
+                auto const* cp_eb_index_space = WarpX::GetInstance().GetEBIndexSpace(lev-1);
                 auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    *cgeom, cba, cdm,
+                    cp_eb_index_space, *cgeom, cba, cdm,
                     {max_guard_EB, max_guard_EB, max_guard_EB},
                     amrex::EBSupport::full
                 );

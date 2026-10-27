@@ -1656,8 +1656,10 @@ void WarpX::InitializeEBGridData (int lev)
                 const amrex::BoxArray cba = amrex::convert(Efield_cp0.boxArray(), amrex::IntVect::TheCellVector());
                 const amrex::DistributionMapping& cdm = Efield_cp0.DistributionMap();
                 int const max_guard = guard_cells.ng_FieldSolver.max();
+                // The coarse patch has the resolution of level lev-1.
+                auto const* cp_eb_index_space = GetEBIndexSpace(lev-1);
                 auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    cgeom, cba, cdm,
+                    cp_eb_index_space, cgeom, cba, cdm,
                     {max_guard, max_guard, max_guard}, amrex::EBSupport::full);
 
                 warpx::embedded_boundary::MarkUpdateCellsStairCase(
