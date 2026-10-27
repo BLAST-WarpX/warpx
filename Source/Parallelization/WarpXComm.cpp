@@ -9,7 +9,7 @@
 #include "WarpX.H"
 
 #include "BoundaryConditions/PML.H"
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
 #include "Fields.H"
@@ -759,7 +759,7 @@ WarpX::FillBoundaryE (const int lev, const PatchType patch_type, const amrex::In
             pml[lev]->FillBoundary(mf_pml, patch_type, nodal_sync);
         }
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
         if (pml_rz[lev])
         {
             pml_rz[lev]->FillBoundaryE(m_fields, patch_type, do_single_precision_comms, nodal_sync);
@@ -841,7 +841,7 @@ WarpX::FillBoundaryB (const int lev, const PatchType patch_type, const amrex::In
             pml[lev]->FillBoundary(mf_pml, patch_type, nodal_sync);
         }
 
-#if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
+#if defined(WARPX_DIM_RZ) && defined(WARPX_USE_FFT)
         if (pml_rz[lev])
         {
             pml_rz[lev]->FillBoundaryB(m_fields, patch_type, do_single_precision_comms, nodal_sync);

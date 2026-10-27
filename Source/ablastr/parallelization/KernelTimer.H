@@ -34,11 +34,11 @@ public:
     AMREX_GPU_DEVICE
     KernelTimer
     (const bool do_timing, amrex::Real* cost)
-#if (defined AMREX_USE_GPU)
+#if defined(AMREX_USE_GPU)
         : m_do_timing(do_timing)
 #endif
     {
-#if (defined AMREX_USE_GPU)
+#if defined(AMREX_USE_GPU)
     if (m_do_timing && cost) {
         m_cost = cost;
 #   if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
@@ -57,7 +57,7 @@ public:
     }
 
     //! Destructor.
-#if (defined AMREX_USE_GPU)
+#if defined(AMREX_USE_GPU)
 #   if defined(AMREX_USE_CUDA) || defined(AMREX_USE_HIP)
         AMREX_GPU_DEVICE
         ~KernelTimer ()
@@ -83,7 +83,7 @@ public:
     KernelTimer ( KernelTimer&& )                  = default;
     KernelTimer& operator= ( KernelTimer&& )       = default;
 
-#if (defined AMREX_USE_GPU)
+#if defined(AMREX_USE_GPU)
 private:
     //! Stores whether kernel timer is active.
     bool m_do_timing;

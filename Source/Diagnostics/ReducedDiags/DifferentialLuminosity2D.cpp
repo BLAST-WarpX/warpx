@@ -70,7 +70,7 @@ DifferentialLuminosity2D::DifferentialLuminosity2D (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // RZ coordinate is not supported
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ)
     WARPX_ABORT_WITH_MESSAGE(
         "DifferentialLuminosity2D diagnostics does not work in RZ geometry.");
 #endif

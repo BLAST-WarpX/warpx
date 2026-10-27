@@ -27,7 +27,7 @@ EBCoveredFunctor::operator()(amrex::MultiFab& mf_dst, int dcomp, const int /*i_b
 
     if (EB::enabled()) {
         // If EB are enabled, fill the MultiFab with the volume fraction
-#if (defined AMREX_USE_EB)
+#if defined(AMREX_USE_EB)
         auto& warpx = WarpX::GetInstance();
         amrex::EBFArrayBoxFactory const& eb_fact = warpx.fieldEBFactory(m_lev);
         ablastr::coarsen::sample::Coarsen(mf_dst, eb_fact.getVolFrac(), dcomp, 0, nComp(), 0, m_crse_ratio);

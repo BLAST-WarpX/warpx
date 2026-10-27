@@ -52,7 +52,7 @@ void compute_weights (const amrex::ParticleReal xp,
         }
     }();
 
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
     const amrex::Real x = (xp - plo[0]) * dxi[0] - half_if_cell_centered;
     const amrex::Real y = (yp - plo[1]) * dxi[1] - half_if_cell_centered;
     const amrex::Real z = (zp - plo[2]) * dxi[2] - half_if_cell_centered;
@@ -114,7 +114,7 @@ void compute_weights (const amrex::ParticleReal xp,
     j = 0;
     k = 0;
 
-#elif (defined WARPX_DIM_1D_Z)
+#elif defined(WARPX_DIM_1D_Z)
     const amrex::Real z = (zp - plo[0]) * dxi[0] - half_if_cell_centered;
     amrex::ignore_unused(xp, yp);
     i = static_cast<int>(amrex::Math::floor(z));

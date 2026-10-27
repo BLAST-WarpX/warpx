@@ -128,7 +128,7 @@ WarpXLaserProfiles::GaussianLaserProfile::fill_amplitude (
     // Because diffract_factor is a complex, the code below takes into
     // account the impact of the dimensionality on both the Gouy phase
     // and the amplitude of the laser
-#if (defined(WARPX_DIM_3D) || (defined WARPX_DIM_RZ))
+#if (defined(WARPX_DIM_3D) || defined(WARPX_DIM_RZ))
     const Complex prefactor = t_prefactor / diffract_factor;
 #elif defined(WARPX_DIM_XZ)
     const Complex prefactor = t_prefactor / amrex::sqrt(diffract_factor);

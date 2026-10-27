@@ -51,7 +51,7 @@ interp_normal (amrex::ParticleReal xp, amrex::ParticleReal yp, amrex::ParticleRe
     ablastr::particles::compute_weights<amrex::IndexType::CELL>(
         xp, yp, zp, plo, dxi, ic, jc, kc, Wc);
 
-#if (defined WARPX_DIM_3D)
+#if defined(WARPX_DIM_3D)
     amrex::RealVect normal{0.0, 0.0, 0.0};
     for (int iic = 0; iic < 2; ++iic) {
         for (int kk = 0; kk < 2; ++kk) {

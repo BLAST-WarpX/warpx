@@ -47,7 +47,7 @@ FieldMaximum::FieldMaximum (const std::string& rd_name)
 : ReducedDiags{rd_name}
 {
     // Non-Cartesian coordinates not working
-#if (defined WARPX_DIM_RZ)
+#if defined(WARPX_DIM_RZ)
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(false,
         "FieldMaximum reduced diagnostics does not work for RZ coordinate.");
 #endif
