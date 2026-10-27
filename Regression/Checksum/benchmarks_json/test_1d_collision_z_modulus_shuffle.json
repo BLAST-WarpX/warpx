@@ -1,10 +1,10 @@
 {
   "ions": {
-    "particle_momentum_x": 3.42401146282787e-16,
-    "particle_momentum_y": 3.4159310542882373e-16,
-    "particle_momentum_z": 5.50417245971062e-16,
-    "particle_position_x": 719.9781818025942,
-    "particle_weight": 1.0999999999999999e+24
+    "particle_momentum_x": 3.428052590809596e-16,
+    "particle_momentum_y": 3.4401151968824746e-16,
+    "particle_momentum_z": 5.488849306106287e-16,
+    "particle_position_x": 720.0181083251009,
+    "particle_weight": 1.1e+24
   },
   "lev=0": {
     "Bx": 0.0,
