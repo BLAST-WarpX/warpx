@@ -2,6 +2,7 @@
 #define PRECONDITIONER_LIBRARY_H_
 
 #include "AlgMGPC.H"  // IWYU pragma: export
+#include "ChebyshevPC.H"  // IWYU pragma: export
 #include "CurlCurlMLMGPC.H"  // IWYU pragma: export
 #include "DarwinMLMGPC.H"  // IWYU pragma: export
 #include "ExternLibPC.H"  // IWYU pragma: export

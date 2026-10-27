@@ -128,6 +128,10 @@ class JacobianFunctionMF : public LinearFunction<T,Ops>
     [[nodiscard]] inline
     PreconditionerType pcType () const override { return m_pc_type; }
 
+    /** \brief Return the Ops pointer. */
+    [[nodiscard]] inline
+    Ops* getOps () const { return m_ops; }
+
     private:
 
     bool m_is_defined = false;
@@ -164,6 +168,8 @@ void JacobianFunctionMF<T,Ops>::define ( const T& a_U,
             m_preCond = std::make_unique<CurlCurlMLMGPC<T,Ops>>();
         } else if (m_pc_type == PreconditionerType::pc_jacobi) {
             m_preCond = std::make_unique<JacobiPC<T,Ops>>();
+        } else if (m_pc_type == PreconditionerType::pc_chebyshev) {
+            m_preCond = std::make_unique<ChebyshevPC<T,Ops>>();
         } else if (m_pc_type == PreconditionerType::pc_algmg) {
             m_preCond = std::make_unique<AlgMGPC<T,Ops>>();
         } else {

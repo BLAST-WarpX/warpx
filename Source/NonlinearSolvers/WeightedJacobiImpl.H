@@ -36,7 +36,9 @@
  *  explicitly sets omega, adaptive behavior is disabled. The solve fails
  *  if the residual still increases after the last reduction.
  *
- *  This class is used by JacobiPC (as a preconditioner).
+ *  This class is used by both:
+ *  - JacobiPC (as a preconditioner)
+ *  - JacobiSolver (as a standalone linear solver)
  */
 template <class T>
 class WeightedJacobiImpl

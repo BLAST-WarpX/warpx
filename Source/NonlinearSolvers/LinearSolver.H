@@ -38,6 +38,9 @@ public:
     //! must be called before solve() can be called.
     virtual void define (LinOp& linop) = 0;
 
+    //! Called by the nonlinear solver before each solve().
+    virtual void update () {}
+
     /**
      * \brief Solve the linear system A x = b for x, where A is the linear
      *        operator whose action A(x) on a vector x is computed by

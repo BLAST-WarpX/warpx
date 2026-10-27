@@ -7,8 +7,50 @@
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
 #include "WarpX.H"
 
+#include <AMReX_GpuLaunch.H>
+#include <AMReX_GpuQualifiers.H>
+#include <AMReX_MFIter.H>
+#include <AMReX_Periodicity.H>
+
+#include <cstdint>
+
 using warpx::fields::FieldType;
 std::unique_ptr<WarpXSolverDOF> WarpXSolverVec::m_dofs = nullptr;
+
+namespace
+{
+    // splitmix64 hash of the global index, mapped to [-1,1)
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    amrex::Real PseudoRandom (int i, int j, int k, int n, int v, int lev)
+    {
+        const int keys[6] = {i, j, k, n, v, lev};
+        std::uint64_t h = 0;
+        for (const int key : keys) {
+            h ^= static_cast<std::uint64_t>(static_cast<std::int64_t>(key));
+            h += 0x9E3779B97F4A7C15ULL;
+            h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ULL;
+            h = (h ^ (h >> 27)) * 0x94D049BB133111EBULL;
+            h ^= (h >> 31);
+        }
+        return amrex::Real(2.0) * amrex::Real(h >> 11) * amrex::Real(0x1.0p-53)
+            - amrex::Real(1.0);
+    }
+
+    void FillPseudoRandom (amrex::MultiFab& a_mf, int a_n, int a_lev,
+                           const amrex::Periodicity& a_period)
+    {
+        const int ncomp = a_mf.nComp();
+        for (amrex::MFIter mfi(a_mf); mfi.isValid(); ++mfi) {
+            auto arr = a_mf.array(mfi);
+            amrex::ParallelFor(mfi.tilebox(), ncomp,
+                [=] AMREX_GPU_DEVICE (int i, int j, int k, int v)
+            {
+                arr(i,j,k,v) = PseudoRandom(i, j, k, a_n, v, a_lev);
+            });
+        }
+        a_mf.FillBoundaryAndSync(a_period);
+    }
+}
 
 WarpXSolverVec::~WarpXSolverVec ()
 {
@@ -135,6 +177,24 @@ void WarpXSolverVec::Copy ( warpx::fields::FieldType  a_array_type,
             const amrex::MultiFab* this_mf = m_WarpX->m_fields.get(a_scalar_type,lev);
             amrex::MultiFab::Copy( *m_scalar_vec[lev], *this_mf, 0, 0, m_ncomp,
                                    amrex::IntVect::TheZeroVector() );
+        }
+    }
+}
+
+void WarpXSolverVec::setValPseudoRandom ()
+{
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        IsDefined(),
+        "WarpXSolverVec::setValPseudoRandom() called on undefined WarpXSolverVec");
+    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+        const amrex::Periodicity period = m_WarpX->Geom(lev).periodicity();
+        if (m_array_type != FieldType::None) {
+            for (int n = 0; n < 3; ++n) {
+                FillPseudoRandom(*m_array_vec[lev][n], n, lev, period);
+            }
+        }
+        if (m_scalar_type != FieldType::None) {
+            FillPseudoRandom(*m_scalar_vec[lev], 3, lev, period);
         }
     }
 }

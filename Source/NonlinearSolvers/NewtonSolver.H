@@ -179,6 +179,10 @@ void NewtonSolver<Vec,Ops>::Define ( const Vec&  a_U,
 #else
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): must compile with PETSc to use petsc_ksp (AMREX_USE_PETSC must be defined)");
 #endif
+    } else if (m_newton_params.linear_solver_type == LinearSolverType::weighted_jacobi) {
+        m_linear_solver = std::make_unique<JacobiSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
+    } else if (m_newton_params.linear_solver_type == LinearSolverType::chebyshev) {
+        m_linear_solver = std::make_unique<ChebyshevSolver<Vec,JacobianFunctionMF<Vec,Ops>>>();
     } else {
         WARPX_ABORT_WITH_MESSAGE("NewtonSolver::Define(): invalid linear solver type");
     }
@@ -301,6 +305,7 @@ void NewtonSolver<Vec,Ops>::Solve (Vec&         a_U,
             m_linear_solver->invalidatePreconditioner();
             m_pc_initialized = true;
         }
+        m_linear_solver->update();
 
         // Solve linear system for Newton step [Jac]*dU = F
         m_dU.zero();

@@ -1706,7 +1706,24 @@ class PreconditionerBase(picmistandard.PICMI_Extension):
                 setattr(bucket, attr, getattr(self, attr))
 
 
-class AssembledMatrixPreconditionerBase(PreconditionerBase):
+class PrintMatrixPreconditionerBase(PreconditionerBase):
+    """Base class of the preconditioners that can write their matrix to a file"""
+
+    print_matrix: bool | None = Field(
+        default=None,
+        description="Whether to write the matrix in MatrixMarket format (default False)",
+    )
+    print_matrix_steps: list[int] | None = Field(
+        default=None,
+        description="Zero-based time steps at which the matrix is written (default: first update only)",
+    )
+    print_matrix_dir: str | None = Field(
+        default=None,
+        description="Directory of the matrix files (default diags/pc_matrices)",
+    )
+
+
+class AssembledMatrixPreconditionerBase(PrintMatrixPreconditionerBase):
     """Base class of the preconditioners that can use the assembled sparse matrix"""
 
     other_inputs: ClassVar[tuple[str, ...]] = ("precon_mat_verbose",)
@@ -1782,6 +1799,142 @@ class PETScKSPLinearSolver(LinearSolverBase):
     def linear_solver_initialize_inputs(self, nonlinear_solver=None):
         if nonlinear_solver is not None:
             nonlinear_solver.linear_solver = "petsc_ksp"
+
+
+class WeightedJacobiLinearSolver(LinearSolverBase):
+    """
+    Sets up the weighted Jacobi linear solver for the implicit Newton nonlinear solver
+    """
+
+    verbose_int: int | None = Field(
+        default=None, description="Level of verbosity of output (default 2)"
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence (default 0.)"
+    )
+    relative_tolerance: float | None = Field(
+        default=None,
+        description="Relative tolerance of the convergence (default 1.e-4)",
+    )
+    max_iterations: int | None = Field(
+        default=None, description="Maximum number of iterations (default 1000)"
+    )
+    use_pcmat: bool | None = Field(
+        default=None,
+        description="Whether to iterate on the assembled preconditioner matrix instead of matrix-free evaluations of the Jacobian (default True)",
+    )
+    precon_mat_verbose: bool | None = Field(
+        default=None,
+        description="Whether to print information on the assembly of the sparse matrix used with use_pcmat (default True)",
+    )
+    omega: float | None = Field(
+        default=None,
+        description="Relaxation factor. Setting it turns off adaptive_omega.",
+    )
+    adaptive_omega: bool | None = Field(
+        default=None,
+        description="Whether to reduce the relaxation factor when the residual increases (default True)",
+    )
+    print_matrix: bool | None = Field(
+        default=None,
+        description="Whether to write the matrix in MatrixMarket format (default False)",
+    )
+    print_matrix_steps: list[int] | None = Field(
+        default=None,
+        description="Zero-based time steps at which the matrix is written (default: first update only)",
+    )
+    print_matrix_dir: str | None = Field(
+        default=None,
+        description="Directory of the matrix files (default diags/pc_matrices)",
+    )
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "weighted_jacobi"
+        weighted_jacobi = pywarpx.warpx.get_bucket("weighted_jacobi")
+        weighted_jacobi.verbose_int = self.verbose_int
+        weighted_jacobi.absolute_tolerance = self.absolute_tolerance
+        weighted_jacobi.relative_tolerance = self.relative_tolerance
+        weighted_jacobi.max_iterations = self.max_iterations
+        weighted_jacobi.use_pcmat = self.use_pcmat
+        if self.precon_mat_verbose is not None:
+            pywarpx.warpx.get_bucket("precon_mat").verbose = self.precon_mat_verbose
+        weighted_jacobi.omega = self.omega
+        weighted_jacobi.adaptive_omega = self.adaptive_omega
+        weighted_jacobi.print_matrix = self.print_matrix
+        weighted_jacobi.print_matrix_steps = self.print_matrix_steps
+        weighted_jacobi.print_matrix_dir = self.print_matrix_dir
+
+
+class ChebyshevLinearSolver(LinearSolverBase):
+    """
+    Sets up the Chebyshev linear solver for the implicit Newton nonlinear solver
+    """
+
+    verbose_int: int | None = Field(
+        default=None, description="Level of verbosity of output (default 2)"
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence (default 0.)"
+    )
+    relative_tolerance: float | None = Field(
+        default=None,
+        description="Relative tolerance of the convergence (default 1.e-4)",
+    )
+    max_iterations: int | None = Field(
+        default=None, description="Maximum number of iterations (default 1000)"
+    )
+    use_pcmat: bool | None = Field(
+        default=None,
+        description="Whether to iterate on the assembled preconditioner matrix instead of matrix-free evaluations of the Jacobian (default True)",
+    )
+    precon_mat_verbose: bool | None = Field(
+        default=None,
+        description="Whether to print information on the assembly of the sparse matrix used with use_pcmat (default True)",
+    )
+    power_iterations: int | None = Field(
+        default=None,
+        description="Number of power-method iterations used to estimate each eigenvalue bound (default 20)",
+    )
+    lambda_min: float | None = Field(
+        default=None,
+        description="Lower bound of the eigenvalues. Estimated with the power method if not set.",
+    )
+    lambda_max: float | None = Field(
+        default=None,
+        description="Upper bound of the eigenvalues. Estimated with the power method if not set.",
+    )
+
+    print_matrix: bool | None = Field(
+        default=None,
+        description="Whether to write the matrix in MatrixMarket format (default False)",
+    )
+    print_matrix_steps: list[int] | None = Field(
+        default=None,
+        description="Zero-based time steps at which the matrix is written (default: first update only)",
+    )
+    print_matrix_dir: str | None = Field(
+        default=None,
+        description="Directory of the matrix files (default diags/pc_matrices)",
+    )
+
+    def linear_solver_initialize_inputs(self, nonlinear_solver=None):
+        if nonlinear_solver is not None:
+            nonlinear_solver.linear_solver = "chebyshev"
+        chebyshev = pywarpx.warpx.get_bucket("chebyshev")
+        chebyshev.verbose_int = self.verbose_int
+        chebyshev.absolute_tolerance = self.absolute_tolerance
+        chebyshev.relative_tolerance = self.relative_tolerance
+        chebyshev.max_iterations = self.max_iterations
+        chebyshev.use_pcmat = self.use_pcmat
+        if self.precon_mat_verbose is not None:
+            pywarpx.warpx.get_bucket("precon_mat").verbose = self.precon_mat_verbose
+        chebyshev.power_iterations = self.power_iterations
+        chebyshev.lambda_min = self.lambda_min
+        chebyshev.lambda_max = self.lambda_max
+        chebyshev.print_matrix = self.print_matrix
+        chebyshev.print_matrix_steps = self.print_matrix_steps
+        chebyshev.print_matrix_dir = self.print_matrix_dir
 
 
 class CurlCurlMLMGPreconditioner(PreconditionerBase):
@@ -1860,7 +2013,7 @@ class DarwinMLMGPreconditioner(PreconditionerBase):
     )
 
 
-class JacobiPreconditioner(PreconditionerBase):
+class JacobiPreconditioner(AssembledMatrixPreconditionerBase):
     """
     Sets up the weighted Jacobi preconditioner used during the nonlinear solver
     """
@@ -1886,6 +2039,39 @@ class JacobiPreconditioner(PreconditionerBase):
     adaptive_omega: bool | None = Field(
         default=None,
         description="Whether to reduce the relaxation factor when the residual increases",
+    )
+
+
+class ChebyshevPreconditioner(AssembledMatrixPreconditionerBase):
+    """
+    Sets up the Chebyshev preconditioner used during the nonlinear solver
+    """
+
+    name: ClassVar[str | None] = "pc_chebyshev"
+
+    verbose: bool | None = Field(
+        default=None, description="Whether there is verbose output from the solver"
+    )
+    max_iter: int | None = Field(
+        default=None, description="Maximum number of iterations"
+    )
+    relative_tolerance: float | None = Field(
+        default=None, description="Relative tolerance of the convergence"
+    )
+    absolute_tolerance: float | None = Field(
+        default=None, description="Absolute tolerance of the convergence"
+    )
+    power_iterations: int | None = Field(
+        default=None,
+        description="Number of power-method iterations used to estimate each eigenvalue bound",
+    )
+    lambda_min: float | None = Field(
+        default=None,
+        description="Lower bound of the eigenvalues. Estimated with the power method if not set.",
+    )
+    lambda_max: float | None = Field(
+        default=None,
+        description="Upper bound of the eigenvalues. Estimated with the power method if not set.",
     )
 
 
@@ -2029,7 +2215,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
     )
     pc_type: PreconditionerBase | None = Field(
         default=None,
-        description="The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, PETScPreconditioner, or AlgMGPreconditioner",
+        description="The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, ChebyshevPreconditioner, PETScPreconditioner, or AlgMGPreconditioner",
     )
 
     def nonlinear_solver_initialize_inputs(self):

@@ -6,6 +6,7 @@
  */
 
 #include "SparseJacobianMatrix.H"
+#include "MatrixMarketWriter.H"
 #include "WarpXSolverDOF.H"
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
@@ -18,9 +19,16 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
+#include <AMReX_ParallelReduce.H>
+#include <AMReX_Reduce.H>
 
 #include <algorithm>
+#include <cstddef>
+#include <memory>
 #include <sstream>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 void SparseJacobianMatrix::readParameters ()
 {
@@ -85,6 +93,7 @@ void SparseJacobianMatrix::Update (
         "SparseJacobianMatrix::Update() called on undefined object");
 
     m_include_mass_matrices = (a_mass_matrices != nullptr);
+    m_theta_dt = a_theta_dt;
 
     const amrex::Real alpha = (a_theta_dt * PhysConst::c) * (a_theta_dt * PhysConst::c);
     if (m_verbose) {
@@ -114,6 +123,43 @@ void SparseJacobianMatrix::Update (
                         << "is greater than 1 (" << m_num_realloc << "). This is unexpected.\n";
         ablastr::warn_manager::WMRecordWarning("SparseJacobianMatrix", warning_message.str());
     }
+
+    // The column pattern is rebuilt in the same order on every assembly, so the
+    // remapped columns stay valid unless the row stride has changed.
+    if (m_is_remapped) {
+        if (m_pc_mat_nnz != m_remap_nnz) {
+            m_is_remapped = false;
+        } else {
+            ExtractDiagonal();
+        }
+    }
+}
+
+void SparseJacobianMatrix::ExtractDiagonal ()
+{
+    BL_PROFILE("SparseJacobianMatrix::ExtractDiagonal()");
+
+    m_diagonal.resize(m_ndofs_l);
+    const int nnz_max = m_pc_mat_nnz;
+    const auto* num_nz_ptr = m_num_nz.data();
+    const auto* r_g_ptr = m_r_indices_g.data();
+    const auto* c_g_ptr = m_c_indices_g.data();
+    const auto* a_ij_ptr = m_a_ij.data();
+    auto* diag_ptr = m_diagonal.data();
+
+    amrex::ParallelFor(m_ndofs_l, [=] AMREX_GPU_DEVICE (int row)
+    {
+        auto diag = amrex::Real(1.0);
+        for (int col = 0; col < num_nz_ptr[row]; col++) {
+            const int idx = row * nnz_max + col;
+            if (c_g_ptr[idx] == r_g_ptr[row]) {
+                diag = a_ij_ptr[idx];
+                break;
+            }
+        }
+        diag_ptr[row] = diag;
+    });
+    amrex::Gpu::streamSynchronize();
 }
 
 void SparseJacobianMatrix::GetMatrix (
@@ -148,6 +194,48 @@ void SparseJacobianMatrix::GetMatrix (
                           a_a_ij.begin());
 
     amrex::Gpu::streamSynchronize();
+}
+
+void SparseJacobianMatrix::PrintMatrix (const std::string& a_filename,
+                                        const std::vector<std::string>& a_header,
+                                        const WarpXSolverDOF& a_dofs) const
+{
+    BL_PROFILE("SparseJacobianMatrix::PrintMatrix()");
+    using namespace amrex;
+
+    const auto n = static_cast<std::size_t>(m_ndofs_l);
+    const auto nnz_max = static_cast<std::size_t>(m_pc_mat_nnz);
+    std::vector<int> r_h(n), nz_h(n), c_h(n*nnz_max);
+    std::vector<Real> a_h(n*nnz_max);
+    Gpu::copyAsync(Gpu::deviceToHost, m_r_indices_g.begin(), m_r_indices_g.begin() + n, r_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, m_num_nz.begin(), m_num_nz.begin() + n, nz_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, m_c_indices_g.begin(), m_c_indices_g.begin() + n*nnz_max, c_h.begin());
+    Gpu::copyAsync(Gpu::deviceToHost, m_a_ij.begin(), m_a_ij.begin() + n*nnz_max, a_h.begin());
+    Gpu::streamSynchronize();
+
+    MatrixMarketWriter::Triplets local;
+    for (std::size_t row = 0; row < n; ++row) {
+        for (std::size_t k = 0; k < static_cast<std::size_t>(nz_h[row]); ++k) {
+            local.add(r_h[row], c_h[row*nnz_max + k], a_h[row*nnz_max + k]);
+        }
+    }
+
+    const Real alpha = (m_theta_dt * PhysConst::c) * (m_theta_dt * PhysConst::c);
+    std::ostringstream ss_theta_dt, ss_alpha;
+    ss_theta_dt.precision(10);
+    ss_alpha.precision(10);
+    ss_theta_dt << "theta_dt: " << m_theta_dt;
+    ss_alpha << "alpha: " << alpha;
+    std::vector<std::string> header = a_header;
+    header.emplace_back("matrix: SparseJacobianMatrix (CSR)");
+    header.emplace_back(std::string("operator: A = I")
+                        + (m_theta_dt > 0 ? " + curl(alpha curl)" : "")
+                        + (m_include_mass_matrices ? " + M, M = PC mass matrices" : ""));
+    header.emplace_back(ss_theta_dt.str());
+    header.emplace_back(ss_alpha.str());
+    header.emplace_back("nnz_max_per_row: " + std::to_string(m_pc_mat_nnz));
+
+    MatrixMarketWriter::Write(a_filename, header, a_dofs, local);
 }
 
 int SparseJacobianMatrix::Assemble (
@@ -648,4 +736,335 @@ int SparseJacobianMatrix::Assemble (
 
     amrex::ParallelDescriptor::ReduceIntMax(&nnz_actual, 1);
     return (nnz_actual - nnz_max);
+}
+
+void SparseJacobianMatrix::RemapColumns (const WarpXSolverDOF* a_dofs)
+{
+    BL_PROFILE("SparseJacobianMatrix::RemapColumns()");
+    using namespace amrex;
+
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        IsDefined(),
+        "SparseJacobianMatrix::RemapColumns() called on undefined object");
+
+    const auto& dofs_mfarrvec = a_dofs->m_array;
+    const int num_amr_levels = static_cast<int>(dofs_mfarrvec.size());
+
+    // Step 1: Build global-to-local-extended map on host from the owned + ghost
+    // cells of the DOF iMultiFab. Owned DOFs (local id >= 0) keep their local id,
+    // in [0, m_ndofs_l). All other DOFs, including valid shared nodes owned by
+    // another box, get ghost indices from m_ndofs_l, after all owned DOFs are known.
+
+    std::vector<Gpu::PinnedVector<int>> ldofs_h;
+    std::vector<Gpu::PinnedVector<int>> gdofs_h;
+
+    for (int lev = 0; lev < num_amr_levels; lev++) {
+        for (int dir = 0; dir < 3; dir++) {
+            const auto& dof_fab = *(dofs_mfarrvec[lev][dir]);
+            for (MFIter mfi(dof_fab); mfi.isValid(); ++mfi) {
+                const Box gbx = mfi.growntilebox();
+
+                // Use a GPU kernel to read DOF data via const_array() — the
+                // same access path used by Assemble — then copy to host.
+                // Direct dataPtr() device-to-host copies returned stale data
+                // on some GPU platforms.
+                const auto npts = static_cast<int>(gbx.numPts());
+                Gpu::DeviceVector<int> ldof_d(npts), gdof_d(npts);
+                auto* ldof_ptr = ldof_d.data();
+                auto* gdof_ptr = gdof_d.data();
+                auto dof_arr = dof_fab.const_array(mfi);
+                const auto gbx_lo = lbound(gbx);
+                const auto gbx_len = length(gbx);
+                ParallelFor(npts, [=] AMREX_GPU_DEVICE (int idx)
+                {
+                    int k = idx / (gbx_len.x * gbx_len.y);
+                    int j = (idx - k * gbx_len.x * gbx_len.y) / gbx_len.x;
+                    int i = idx - k * gbx_len.x * gbx_len.y - j * gbx_len.x;
+                    i += gbx_lo.x; j += gbx_lo.y; k += gbx_lo.z;
+                    ldof_ptr[idx] = dof_arr(i, j, k, 0);
+                    gdof_ptr[idx] = dof_arr(i, j, k, 1);
+                });
+                Gpu::streamSynchronize();
+
+                ldofs_h.emplace_back(npts);
+                gdofs_h.emplace_back(npts);
+                Gpu::copyAsync(Gpu::deviceToHost, ldof_d.begin(), ldof_d.end(),
+                               ldofs_h.back().begin());
+                Gpu::copyAsync(Gpu::deviceToHost, gdof_d.begin(), gdof_d.end(),
+                               gdofs_h.back().begin());
+                Gpu::streamSynchronize();
+            }
+        }
+    }
+
+    std::unordered_map<int, int> global_to_ext;
+    for (std::size_t ibox = 0; ibox < ldofs_h.size(); ++ibox) {
+        for (std::size_t idx = 0; idx < ldofs_h[ibox].size(); ++idx) {
+            const int ldof = ldofs_h[ibox][idx];
+            if (ldof >= 0) { global_to_ext[gdofs_h[ibox][idx]] = ldof; }
+        }
+    }
+    int next_ghost_idx = m_ndofs_l;
+    for (std::size_t ibox = 0; ibox < ldofs_h.size(); ++ibox) {
+        for (std::size_t idx = 0; idx < ldofs_h[ibox].size(); ++idx) {
+            const int gdof = gdofs_h[ibox][idx];
+            if (gdof >= 0 && !global_to_ext.contains(gdof)) {
+                global_to_ext[gdof] = next_ghost_idx;
+                next_ghost_idx++;
+            }
+        }
+    }
+
+    m_ndofs_ext = next_ghost_idx;
+
+    // Step 2: Remap CSR column indices from global to local-extended.
+    // Copy global columns to host, remap, copy back to device.
+    const auto n_entries = static_cast<int>(m_c_indices_g.size());
+    Gpu::PinnedVector<int> c_global_h(n_entries);
+    Gpu::copyAsync(Gpu::deviceToHost, m_c_indices_g.begin(), m_c_indices_g.end(),
+                   c_global_h.begin());
+
+    Gpu::PinnedVector<int> num_nz_h(m_ndofs_l);
+    Gpu::copyAsync(Gpu::deviceToHost, m_num_nz.begin(), m_num_nz.end(),
+                   num_nz_h.begin());
+    Gpu::streamSynchronize();
+
+    Gpu::PinnedVector<int> c_ext_h(n_entries, -1);
+    const int nnz_max = m_pc_mat_nnz;
+
+    for (int row = 0; row < m_ndofs_l; row++) {
+        for (int col = 0; col < num_nz_h[row]; col++) {
+            const int idx = row * nnz_max + col;
+            const int gcol = c_global_h[idx];
+            if (gcol < 0) { continue; }
+            auto it = global_to_ext.find(gcol);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                it != global_to_ext.end(),
+                "SparseJacobianMatrix::RemapColumns(): column global DOF "
+                + std::to_string(gcol) + " not found in owned or ghost cells");
+            c_ext_h[idx] = it->second;
+        }
+    }
+
+    m_c_indices_ext.resize(n_entries);
+    Gpu::copyAsync(Gpu::hostToDevice, c_ext_h.begin(), c_ext_h.end(),
+                   m_c_indices_ext.begin());
+
+    // Step 3: Extract diagonal
+    ExtractDiagonal();
+
+    // Step 4: Store the local-extended index of every DOF cell, ghost cells
+    // included, for BuildExtendedDOFVector. Owned DOFs are taken only from their
+    // owned cell; cells without a DOF, or with an owned DOF, hold -1.
+    m_ext_index.resize(num_amr_levels);
+    std::size_t ibox = 0;
+    for (int lev = 0; lev < num_amr_levels; lev++) {
+        for (int dir = 0; dir < 3; dir++) {
+            const auto& dof_fab = *(dofs_mfarrvec[lev][dir]);
+            m_ext_index[lev][dir] = std::make_unique<iMultiFab>(
+                dof_fab.boxArray(), dof_fab.DistributionMap(), 1, dof_fab.nGrowVect());
+            for (MFIter mfi(dof_fab); mfi.isValid(); ++mfi, ++ibox) {
+                const Box gbx = mfi.growntilebox();
+                const auto& ldof_h = ldofs_h[ibox];
+                const auto& gdof_h = gdofs_h[ibox];
+                const auto npts = static_cast<int>(gbx.numPts());
+                Gpu::PinnedVector<int> ext_h(npts);
+                for (int idx = 0; idx < npts; ++idx) {
+                    const int gdof = gdof_h[idx];
+                    if (ldof_h[idx] >= 0) {
+                        ext_h[idx] = ldof_h[idx];
+                    } else if (gdof >= 0 && global_to_ext.at(gdof) >= m_ndofs_l) {
+                        ext_h[idx] = global_to_ext.at(gdof);
+                    } else {
+                        ext_h[idx] = -1;
+                    }
+                }
+                Gpu::DeviceVector<int> ext_d(npts);
+                Gpu::copyAsync(Gpu::hostToDevice, ext_h.begin(), ext_h.end(), ext_d.begin());
+                Gpu::streamSynchronize();
+
+                const auto* ext_ptr = ext_d.data();
+                auto ext_arr = m_ext_index[lev][dir]->array(mfi);
+                const auto gbx_lo = lbound(gbx);
+                const auto gbx_len = length(gbx);
+                ParallelFor(npts, [=] AMREX_GPU_DEVICE (int idx)
+                {
+                    int k = idx / (gbx_len.x * gbx_len.y);
+                    int j = (idx - k * gbx_len.x * gbx_len.y) / gbx_len.x;
+                    int i = idx - k * gbx_len.x * gbx_len.y - j * gbx_len.x;
+                    i += gbx_lo.x; j += gbx_lo.y; k += gbx_lo.z;
+                    ext_arr(i, j, k) = ext_ptr[idx];
+                });
+                Gpu::streamSynchronize();
+            }
+        }
+    }
+
+    m_is_remapped = true;
+    m_remap_nnz = m_pc_mat_nnz;
+
+    if (m_verbose) {
+        Print() << "SparseJacobianMatrix::RemapColumns(): "
+                << m_ndofs_l << " local DOFs, "
+                << (m_ndofs_ext - m_ndofs_l) << " ghost DOFs, "
+                << m_ndofs_ext << " total extended DOFs\n";
+    }
+}
+
+void SparseJacobianMatrix::MatVecMult (amrex::Real* a_y,
+                                        const amrex::Real* a_x) const
+{
+    BL_PROFILE("SparseJacobianMatrix::MatVecMult()");
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_is_remapped);
+
+    const int nrows = m_ndofs_l;
+    const int nnz_max = m_pc_mat_nnz;
+    const auto* num_nz_ptr = m_num_nz.data();
+    const auto* c_ext_ptr = m_c_indices_ext.data();
+    const auto* a_ij_ptr = m_a_ij.data();
+
+    ParallelFor(nrows, [=] AMREX_GPU_DEVICE (int row)
+    {
+        Real dot = Real(0.0);
+        const int ncols = num_nz_ptr[row];
+        for (int col = 0; col < ncols; col++) {
+            const int idx = row * nnz_max + col;
+            const int j_ext = c_ext_ptr[idx];
+            if (j_ext >= 0) {
+                dot += a_ij_ptr[idx] * a_x[j_ext];
+            }
+        }
+        a_y[row] = dot;
+    });
+    Gpu::streamSynchronize();
+}
+
+void SparseJacobianMatrix::MatJacobiSweep (amrex::Real* a_x_local,
+                                            const amrex::Real* a_x_ext,
+                                            const amrex::Real* a_b,
+                                            amrex::Real a_omega) const
+{
+    BL_PROFILE("SparseJacobianMatrix::MatJacobiSweep()");
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_is_remapped);
+
+    const int nrows = m_ndofs_l;
+    const int nnz_max = m_pc_mat_nnz;
+    const auto* num_nz_ptr = m_num_nz.data();
+    const auto* c_ext_ptr = m_c_indices_ext.data();
+    const auto* a_ij_ptr = m_a_ij.data();
+    const auto* diag_ptr = m_diagonal.data();
+    const Real omega = a_omega;
+
+    ParallelFor(nrows, [=] AMREX_GPU_DEVICE (int row)
+    {
+        // Compute A*x for this row
+        Real Ax = Real(0.0);
+        const int ncols = num_nz_ptr[row];
+        for (int col = 0; col < ncols; col++) {
+            const int idx = row * nnz_max + col;
+            const int j_ext = c_ext_ptr[idx];
+            if (j_ext >= 0) {
+                Ax += a_ij_ptr[idx] * a_x_ext[j_ext];
+            }
+        }
+        // Jacobi update: x += omega * (b - Ax) / diag
+        a_x_local[row] += omega * (a_b[row] - Ax) / diag_ptr[row];
+    });
+    Gpu::streamSynchronize();
+}
+
+amrex::Real SparseJacobianMatrix::MatResidualNorm (const amrex::Real* a_x_ext,
+                                                    const amrex::Real* a_b) const
+{
+    BL_PROFILE("SparseJacobianMatrix::MatResidualNorm()");
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_is_remapped);
+
+    const int nrows = m_ndofs_l;
+    const int nnz_max = m_pc_mat_nnz;
+    const auto* num_nz_ptr = m_num_nz.data();
+    const auto* c_ext_ptr = m_c_indices_ext.data();
+    const auto* a_ij_ptr = m_a_ij.data();
+
+    ReduceOps<ReduceOpSum> reduce_op;
+    ReduceData<Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+
+    reduce_op.eval(nrows, reduce_data,
+        [=] AMREX_GPU_DEVICE (int row) -> ReduceTuple
+        {
+            Real Ax = Real(0.0);
+            const int ncols = num_nz_ptr[row];
+            for (int col = 0; col < ncols; col++) {
+                const int idx = row * nnz_max + col;
+                const int j_ext = c_ext_ptr[idx];
+                if (j_ext >= 0) {
+                    Ax += a_ij_ptr[idx] * a_x_ext[j_ext];
+                }
+            }
+            const Real r = a_b[row] - Ax;
+            return {r * r};
+        });
+
+    return amrex::get<0>(reduce_data.value(reduce_op));
+}
+
+void SparseJacobianMatrix::MatInitialGuess (amrex::Real* a_x,
+                                             const amrex::Real* a_b) const
+{
+    BL_PROFILE("SparseJacobianMatrix::MatInitialGuess()");
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_is_remapped);
+
+    const int nrows = m_ndofs_l;
+    const auto* diag_ptr = m_diagonal.data();
+
+    ParallelFor(nrows, [=] AMREX_GPU_DEVICE (int row)
+    {
+        a_x[row] = a_b[row] / diag_ptr[row];
+    });
+    Gpu::streamSynchronize();
+}
+
+amrex::Real SparseJacobianMatrix::EstimateOmega () const
+{
+    BL_PROFILE("SparseJacobianMatrix::EstimateOmega()");
+    using namespace amrex;
+
+    AMREX_ALWAYS_ASSERT(m_is_remapped);
+
+    const int nrows = m_ndofs_l;
+    const int nnz = m_pc_mat_nnz;
+    const auto* aij_ptr = m_a_ij.data();
+    const auto* diag_ptr = m_diagonal.data();
+    const auto* num_nz_ptr = m_num_nz.data();
+
+    // Gershgorin: r_i = (sum_j |A_ij| - |A_ii|) / |A_ii|
+    ReduceOps<ReduceOpMax> reduce_op;
+    ReduceData<Real> reduce_data(reduce_op);
+    using ReduceTuple = typename decltype(reduce_data)::Type;
+
+    reduce_op.eval(nrows, reduce_data,
+        [=] AMREX_GPU_DEVICE (int row) -> ReduceTuple
+        {
+            Real row_sum = Real(0.0);
+            const int ncols = num_nz_ptr[row];
+            for (int col = 0; col < ncols; col++) {
+                row_sum += amrex::Math::abs(aij_ptr[row * nnz + col]);
+            }
+            const Real abs_diag = amrex::Math::abs(diag_ptr[row]);
+            const Real r = (row_sum - abs_diag) / abs_diag;
+            return {r};
+        });
+
+    Real max_r = amrex::get<0>(reduce_data.value(reduce_op));
+    ParallelAllReduce::Max(max_r, ParallelContext::CommunicatorSub());
+
+    return Real(2.0) / (Real(2.0) + max_r);
 }
