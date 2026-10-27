@@ -1,0 +1,13 @@
+# base input parameters
+FILE = inputs_base_3d
+
+# mesh refinement: coarse domain is 2x larger and 2x coarser;
+# fine patch matches the original test domain and resolution
+amr.max_level = 1
+amr.ref_ratio_vect = 2 2 2
+geometry.prob_lo = -1.6 -1.6 -1.6
+geometry.prob_hi =  1.6  1.6  1.6
+warpx.fine_tag_lo = -0.8 -0.8 -0.8
+warpx.fine_tag_hi =  0.8  0.8  0.8
+
+warpx.do_subcycling = 1

@@ -41,9 +41,10 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
         const auto& ba_Bz = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev)->boxArray();
         const auto& dm = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->DistributionMap();
         const amrex::IntVect ngb = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nGrowVect();
-        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{0}, lev, ba_Bx, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{1}, lev, ba_By, dm, 1, ngb, 0.0_rt);
-        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{2}, lev, ba_Bz, dm, 1, ngb, 0.0_rt);
+        const int ncomp = m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{0}, lev)->nComp();
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{0}, lev, ba_Bx, dm, ncomp, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{1}, lev, ba_By, dm, ncomp, ngb, 0.0_rt);
+        m_WarpX->m_fields.alloc_init(FieldType::B_old, Direction{2}, lev, ba_Bz, dm, ncomp, ngb, 0.0_rt);
     }
 
     // Reconstruct the initial guess E^{n-1/2} from checkpoint fields E^{n-1} and E^n.
@@ -59,6 +60,7 @@ void SemiImplicitEM::Define (WarpX*  a_WarpX, bool  a_from_restart)
 
     // Initialize the mass matrices for plasma response
     if (m_use_mass_matrices) { InitializeMassMatrices(); }
+    InitializeImplicitOptions();
 
     m_is_defined = true;
 
@@ -131,6 +133,10 @@ void SemiImplicitEM::ResetStep (amrex::Real start_time)
 
     m_WarpX->ResetImplicitParticleData();
 
+    // Restore E^n, including guards, before recomputing the magnetic half-step.
+    // The failed solve leaves Efield_fp containing its last nonlinear iterate.
+    CopyVectorField(FieldType::Efield_fp, FieldType::E_old);
+
     // Reset B field to start of step
     CopyVectorField(FieldType::Bfield_fp, FieldType::B_old);
 
@@ -179,11 +185,12 @@ void SemiImplicitEM::FinishStep (const amrex::Real start_time, const int a_step)
     // Bfield_fp is at t_{n+1}
 }
 
-void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
-                            const WarpXSolverVec&  a_E,
-                                  amrex::Real      start_time,
-                                  int              a_nl_iter,
-                                  bool             a_from_jacobian )
+void SemiImplicitEM::ComputeRHS (WarpXSolverVec& a_RHS,
+                           const WarpXSolverVec& a_E,
+                                 amrex::Real     start_time,
+                                 int             a_nl_iter,
+                                 bool            a_from_jacobian,
+                                 const bool      update_pc)
 {
     BL_PROFILE("SemiImplicitEM::ComputeRHS()");
 
@@ -194,7 +201,8 @@ void SemiImplicitEM::ComputeRHS ( WarpXSolverVec&  a_RHS,
 
     // Update particle positions and velocities using the current state
     // of E and B. Deposit current density at time n+1/2
-    PreRHSOp( half_time, a_nl_iter, a_from_jacobian );
+    const amrex::Real dt_scale = 1.0_rt/m_nsubsteps;
+    PreRHSOp(half_time, a_nl_iter, a_from_jacobian, dt_scale, update_pc);
 
     // RHS = cvac^2*0.5*dt*(curl(B^{n+1/2}) - mu0*J^{n+1/2})
     m_WarpX->ImplicitComputeRHSE(0.5_rt*m_dt, a_RHS);

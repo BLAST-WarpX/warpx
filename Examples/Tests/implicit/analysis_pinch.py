@@ -8,17 +8,26 @@
 # the script `inputs_test_1d_theta_implicit_planar_pinch`.
 # and script `inputs_test_1d_theta_implicit_planar_pinch_substeps`.
 # and script `inputs_test_2d_theta_implicit_planar_pinch`.
+# and script `inputs_test_2d_theta_implicit_planar_pinch_petsc_snes`.
+# and script `inputs_test_2d_semi_implicit_planar_pinch_petsc_snes`.
 # and script `inputs_test_rcylinder_theta_implicit_dynamic_pinch`.
 # and script `inputs_test_rz_theta_implicit_dynamic_pinch`.
-# This simulates a planar pinch using the theta-implicit solver with
-# the curl curl PC including the diagonal response from mass matrices.
+# This simulates a planar pinch using the theta-implicit or semi-implicit
+# solver with the curl curl PC including the diagonal response from mass matrices.
+# The tolerances on the iteration counts can be set from the command line.
 
+import argparse
 import os
-import sys
 
 import numpy as np
 import yt
 from scipy.constants import e, epsilon_0
+
+parser = argparse.ArgumentParser()
+parser.add_argument("plotfile")
+parser.add_argument("--gmres-iters-tol", type=float)
+parser.add_argument("--newton-iters-tol", type=float)
+args = parser.parse_args()
 
 test_name = os.path.split(os.getcwd())[1]
 
@@ -57,18 +66,24 @@ else:
 dE = Efields + Eplasma + dE_poynting
 rel_net_energy = np.abs(dE - dE[0]) / Eplasma
 max_rel_net_energy = rel_net_energy.max()
-rel_net_energy_tol = 3.0e-12
 print(f"max relative delta energy : {max_rel_net_energy}")
-print(f"relative delta energy tolerance : {rel_net_energy_tol}")
-assert max_rel_net_energy < rel_net_energy_tol
+# The semi-implicit scheme does not conserve energy to machine precision
+if "semi_implicit" not in test_name:
+    rel_net_energy_tol = 3.0e-12
+    print(f"relative delta energy tolerance : {rel_net_energy_tol}")
+    assert max_rel_net_energy < rel_net_energy_tol
 
 # check that the number of gmres iterations is below tolerance
+if args.gmres_iters_tol is not None:
+    gmres_iters_tol = args.gmres_iters_tol
 print(f"gmres iters per newton: {total_gmres_iters / total_newton_iters}")
 print(f"gmres iters tolerance: {gmres_iters_tol}")
 assert total_gmres_iters / total_newton_iters <= gmres_iters_tol
 
 # check that the number of newton iterations is below tolerance
-if test_name.endswith("substeps"):
+if args.newton_iters_tol is not None:
+    newton_iters_tol = args.newton_iters_tol
+elif test_name.endswith("substeps"):
     # The newton_iters_tol includes the iterations for all of the substeps
     newton_iters_tol = 9.0
 else:
@@ -80,8 +95,7 @@ assert total_newton_iters / num_steps <= newton_iters_tol
 # check for machine precision conservation of charge density
 n0 = 1.0e23
 
-pltdir = sys.argv[1]
-ds = yt.load(pltdir)
+ds = yt.load(args.plotfile)
 data = ds.covering_grid(
     level=0, left_edge=ds.domain_left_edge, dims=ds.domain_dimensions
 )

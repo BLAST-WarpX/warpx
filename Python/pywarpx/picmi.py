@@ -1694,12 +1694,32 @@ class PreconditionerBase(picmistandard.PICMI_Extension):
     # solver (rather than only via a nonlinear solver's Jacobian).
     supports_direct_gmres: ClassVar[bool] = False
 
+    # Attributes that are not written with the preconditioner name as prefix.
+    other_inputs: ClassVar[tuple[str, ...]] = ()
+
     def preconditioner_type_initialize_inputs(self, jacobian=None):
         if jacobian is not None:
             jacobian.pc_type = self.name
         bucket = pywarpx.warpx.get_bucket(self.name)
         for attr in type(self).model_fields:
-            setattr(bucket, attr, getattr(self, attr))
+            if attr not in self.other_inputs:
+                setattr(bucket, attr, getattr(self, attr))
+
+
+class AssembledMatrixPreconditionerBase(PreconditionerBase):
+    """Base class of the preconditioners that can use the assembled sparse matrix"""
+
+    other_inputs: ClassVar[tuple[str, ...]] = ("precon_mat_verbose",)
+
+    precon_mat_verbose: bool | None = Field(
+        default=None,
+        description="Whether to print information on the assembly of the sparse matrix (default True)",
+    )
+
+    def preconditioner_type_initialize_inputs(self, jacobian=None):
+        super().preconditioner_type_initialize_inputs(jacobian)
+        if self.precon_mat_verbose is not None:
+            pywarpx.warpx.get_bucket("precon_mat").verbose = self.precon_mat_verbose
 
 
 class GMRESLinearSolver(LinearSolverBase):
@@ -1842,7 +1862,7 @@ class DarwinMLMGPreconditioner(PreconditionerBase):
 
 class JacobiPreconditioner(PreconditionerBase):
     """
-    Sets up the point Jacobi preconditioner used during the nonlinear solver
+    Sets up the weighted Jacobi preconditioner used during the nonlinear solver
     """
 
     name: ClassVar[str | None] = "pc_jacobi"
@@ -1859,9 +1879,17 @@ class JacobiPreconditioner(PreconditionerBase):
     absolute_tolerance: float | None = Field(
         default=None, description="Absolute tolerance of the convergence"
     )
+    omega: float | None = Field(
+        default=None,
+        description="Relaxation factor. Setting it turns off adaptive_omega.",
+    )
+    adaptive_omega: bool | None = Field(
+        default=None,
+        description="Whether to reduce the relaxation factor when the residual increases",
+    )
 
 
-class PETScPreconditioner(PreconditionerBase):
+class PETScPreconditioner(AssembledMatrixPreconditionerBase):
     """
     Sets up the PETSc preconditioner used during the nonlinear solver
     """
@@ -1886,6 +1914,42 @@ class PETScPreconditioner(PreconditionerBase):
     )
     euclid_factor_levels: int | None = Field(
         default=None, description='When type is "hypre" and hypre_type is "euclid"'
+    )
+
+
+class AlgMGPreconditioner(AssembledMatrixPreconditionerBase):
+    """
+    Sets up the AMReX algebraic multigrid (AlgMG) preconditioner used during the nonlinear solver
+    """
+
+    name: ClassVar[str | None] = "pc_algmg"
+
+    verbose: bool | None = Field(
+        default=None,
+        description="Whether there is verbose output from the preconditioner",
+    )
+    algmg_verbose: int | None = Field(
+        default=None, description="Verbosity of the multigrid solver"
+    )
+    max_iter: int | None = Field(
+        default=None, description="Number of V-cycles per application (default 1)"
+    )
+    smoother: str | None = Field(
+        default=None,
+        description='One of "chebyshev", "l1_jacobi", "jacobi", or "l1_gauss_seidel" (CPU only) (default "chebyshev")',
+    )
+    chebyshev_degree: int | None = Field(
+        default=None, description="Degree of the Chebyshev smoother (default 4)"
+    )
+    strong_threshold: float | None = Field(
+        default=None, description="Strength threshold for coarsening (default 0.25)"
+    )
+    aggressive_levels: int | None = Field(
+        default=None,
+        description="Number of levels with aggressive coarsening (default 0)",
+    )
+    max_levels: int | None = Field(
+        default=None, description="Maximum number of multigrid levels (default 25)"
     )
 
 
@@ -1921,6 +1985,10 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
     )
     absolute_tolerance: float | None = Field(
         default=None, description="Absolute tolerance of the convergence (default 0.)"
+    )
+    divergence_tolerance: float | None = Field(
+        default=None,
+        description="The solve has diverged when the residual norm exceeds this factor times the initial residual norm (default 1.e4)",
     )
     diagnostic_file: str | None = Field(
         default=None, description="File name where solver diagnostics are written"
@@ -1961,7 +2029,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
     )
     pc_type: PreconditionerBase | None = Field(
         default=None,
-        description="The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, or PETScPreconditioner",
+        description="The preconditioner type, An instance of either CurlCurlMLMGPreconditioner, JacobiPreconditioner, PETScPreconditioner, or AlgMGPreconditioner",
     )
 
     def nonlinear_solver_initialize_inputs(self):
@@ -1982,6 +2050,7 @@ class NewtonNonlinearSolver(NonlinearSolverBase):
         newton.verbose = self.verbose
         newton.absolute_tolerance = self.absolute_tolerance
         newton.relative_tolerance = self.relative_tolerance
+        newton.divergence_tolerance = self.divergence_tolerance
         newton.max_iterations = self.max_iterations
         newton.require_convergence = self.require_convergence
         newton.diagnostic_file = self.diagnostic_file

@@ -1,4 +1,4 @@
-/* Copyright 2024 Justin Angus, Debojyoti Ghosh
+/* Copyright 2024-2026 Justin Angus, Debojyoti Ghosh
  *
  * This file is part of WarpX.
  *
@@ -10,16 +10,20 @@
 #include "ImplicitSolver_fwd.H"
 
 #include "FieldSolver/ImplicitSolvers/ImplicitOptions.H"
+#include "FieldSolver/ImplicitSolvers/SparseJacobianMatrix.H"
 
 #include "FieldSolver/ImplicitSolvers/WarpXSolverVec.H"
+#include "NonlinearSolvers/MatrixSolverOps.H"
 #include "NonlinearSolvers/NonlinearSolverLibrary.H"
 
 #include <AMReX_Array.H>
+#include <AMReX_GpuContainers.H>
 #include <AMReX_INT.H>
 #include <AMReX_REAL.H>
 #include <AMReX_LO_BCTYPES.H>
 
 #include <map>
+#include <memory>
 #include <string>
 
 /**
@@ -71,6 +75,14 @@ public:
     virtual void FinishStep(amrex::Real /* a_start_time */, int /* a_step */) {}
 
     /**
+     * \brief Finalize and re-initialize PETSc after the steps given by
+     *        implicit_evolve.petsc_reinit_interval
+     */
+    void ReinitializePETScIfDue (int a_step, bool verbose_step);
+
+    [[nodiscard]] ImplicitOptions const& GetImplicitOptions () const { return m_implicit_options; }
+
+    /**
      * \brief Advance fields and particles by one time step using the specified implicit algorithm
      */
     virtual int OneStep (amrex::Real  start_time,
@@ -94,16 +106,17 @@ public:
      * e.g., Ebar - E^n = cvac^2*0.5*dt*(curl(Bbar) - mu0*Jbar(Ebar,Bbar))
      * Here, U = Ebar, b = E^n, and the expression on the right is RHS(U).
      */
-    virtual void ComputeRHS ( WarpXSolverVec&  a_RHS,
-                        const WarpXSolverVec&  a_E,
-                              amrex::Real      a_time,
-                              int              a_nl_iter,
-                              bool             a_from_jacobian ) = 0;
+    virtual void ComputeRHS (WarpXSolverVec& a_RHS,
+                       const WarpXSolverVec& a_E,
+                             amrex::Real     a_time,
+                             int             a_nl_iter,
+                             bool            a_from_jacobian,
+                             bool            update_pc = true) = 0;
 
     /**
      * Prepare for the linear solve. This includes depositing the mass matrices and updating the PC.
      */
-    void PreLinearSolve ();
+    void PreLinearSolve (bool update_pc = true);
 
     [[nodiscard]] int numAMRLevels () const { return m_num_amr_levels; }
 
@@ -120,6 +133,11 @@ public:
         if (m_use_mass_matrices_pc) { return &m_mmpc_mfarrvec; }
         else { return nullptr; }
     }
+
+    /**
+     * \brief Create the matrix ops for the assembled preconditioner matrix of a_ops
+     */
+    [[nodiscard]] static std::unique_ptr<MatrixSolverOps<WarpXSolverVec>> MakePCMatrixOps (ImplicitSolver* a_ops);
 
     /**
      * \brief Return reference to the multifabs for curl curl mask
@@ -146,6 +164,21 @@ public:
     // treatment of light waves in the curl-curl MLMG solver.
     // This function should return zero if light waves are not treated implicitly
     [[nodiscard]] virtual amrex::Real  GetThetaForPC () const = 0;
+
+    /**
+     * \brief Assemble the sparse Jacobian matrix for the preconditioner.
+     *        Creates the SparseJacobianMatrix on first call (lazy init).
+     */
+    void AssemblePCMatrix ();
+
+    /**
+     * \brief Copy the assembled sparse matrix data to caller-provided device vectors.
+     */
+    void GetPCMatrix (amrex::Gpu::DeviceVector<int>& a_r_indices_g,
+                      amrex::Gpu::DeviceVector<int>& a_num_nz,
+                      amrex::Gpu::DeviceVector<int>& a_c_indices_g,
+                      amrex::Gpu::DeviceVector<amrex::Real>& a_a_ij,
+                      int& a_n, int& a_ncols_max);
 
     /**
      * \brief Apply deposited mass matrices to a vector field.
@@ -183,6 +216,11 @@ public:
      * \brief Finish filling the mass matrices after deposit
      */
     void FinishMassMatricesDeposition ();
+
+    /**
+     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
+     */
+    void SyncMassMatricesPCAndApplyBCs ();
 
     /**
      * \brief Finish the implicit particle update after the converged time-centered solve
@@ -257,6 +295,19 @@ protected:
      */
     bool m_print_unconverged_particle_details = false;
 
+    // Stable particle options. PreRHSOp copies this before setting per-call values.
+    ImplicitOptions m_implicit_options;
+
+    /**
+     * \brief Finalize and re-initialize PETSc every this many steps (0: never), to release
+     *        the host memory PETSc's GPU vector operations leak until PetscFinalize
+     */
+#ifdef AMREX_USE_GPU
+    int m_petsc_reinit_interval = 1000;
+#else
+    int m_petsc_reinit_interval = 0;
+#endif
+
     /**
      * \brief whether to skip the full Picard update of particles on the initial newton step
      */
@@ -309,6 +360,16 @@ protected:
     amrex::Vector<amrex::Array<amrex::MultiFab*,3>> m_mmpc_mfarrvec;
 
     /**
+     * \brief Whether InitializePCMatrixAssembly() has been called
+     */
+    bool m_pc_matrix_assembly_initialized = false;
+
+    /**
+     * \brief Sparse Jacobian matrix for the preconditioner (lazy-initialized)
+     */
+    std::unique_ptr<SparseJacobianMatrix> m_sparse_jacobian;
+
+    /**
      * \brief parse nonlinear solver parameters (if one is used)
      */
     void parseNonlinearSolverParams ( const amrex::ParmParse&  pp );
@@ -322,20 +383,18 @@ protected:
      */
     void InitializeMassMatrices ();
 
+    void InitializeImplicitOptions ();
+
     void PrintBaseImplicitSolverParameters () const;
 
     /**
      * \brief Perform operations needed before computing the Right Hand Side
      */
-    void PreRHSOp ( amrex::Real  a_cur_time,
-                    int          a_nl_iter,
-                    bool         a_from_jacobian,
-                    amrex::Real  a_dt_scale = amrex::Real(1.));
-
-    /**
-     * \brief Communicate Mass Matrices used for PC and apply boundary conditions
-     */
-    void SyncMassMatricesPCAndApplyBCs ();
+    void PreRHSOp (amrex::Real a_cur_time,
+                   int         a_nl_iter,
+                   bool        a_from_jacobian,
+                   amrex::Real a_dt_scale,
+                   bool        update_pc = true);
 
     /**
      * \brief Scale mass matrices used for PC by c^2*mu0*theta*dt and add 1 to diagonal terms
@@ -351,6 +410,12 @@ protected:
      * \brief Save E at start of each Newton step
      */
     void SaveE ();
+
+    /**
+     * \brief Perform one-time setup before assembling the preconditioner matrix.
+     *        Derived classes initialize required data, such as curl-curl BC masks.
+     */
+    virtual void InitializePCMatrixAssembly () {}
 
     /**
      * \brief Convert from WarpX FieldBoundaryType to amrex::LinOpBCType

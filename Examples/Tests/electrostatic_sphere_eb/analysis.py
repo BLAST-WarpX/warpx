@@ -6,9 +6,17 @@
 
 # Check reduced diagnostics for charge on EB
 
+import argparse
+
 import numpy as np
 from openpmd_viewer import OpenPMDTimeSeries
 from scipy.constants import epsilon_0
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--last-potential", type=float, default=1.0, help="EB potential in the last step"
+)
+args = parser.parse_args()
 
 # Theoretical charge on the embedded boundary, for sphere at potential phi_0
 phi_0 = 1.0  # V
@@ -20,6 +28,12 @@ data = np.loadtxt("diags/reducedfiles/eb_charge.txt")
 q_sim = data[1, 2]
 print("Simulation charge: ", q_sim)
 assert abs((q_sim - q_th) / q_th) < 0.06
+
+# Charge in the last step, at the potential the input sets there
+q_last_th = args.last_potential / phi_0 * q_th
+q_sim_last = data[-1, 2]
+print(f"Simulation charge at {args.last_potential} V: ", q_sim_last)
+assert abs((q_sim_last - q_last_th) / q_last_th) < 0.06
 
 data_eighth = np.loadtxt("diags/reducedfiles/eb_charge_one_eighth.txt")
 q_sim_eighth = data_eighth[1, 2]
