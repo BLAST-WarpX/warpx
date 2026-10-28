@@ -70,7 +70,10 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
             sampling_factor > 0.0_rt,
             "qed_virtual_photons_multiplier must be strictly positive.");
 
-        amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi;
+        // Number of virtual photons scales with the square of the primary particle's charge,
+        // in units of the elementary charge (e.g. Z^2 for an ion of charge Z*e).
+        amrex::Real const charge_ratio = primary.getCharge() / PhysConst::q_e;
+        amrex::Real const alpha_over_pi = PhysConst::alpha / MathConst::pi * charge_ratio * charge_ratio;
         amrex::Real constexpr inv_c2 = PhysConst::inv_c2;
         amrex::Real const mass = primary.getMass();
 
@@ -219,8 +222,11 @@ void GenerateVirtualPhotons (MultiParticleContainer* mypc){
                         const amrex::ParticleReal rnd = (umax - umin) * amrex::Random(engine) + umin ;
                         // Fractional energy of the photon, often denoted as y (or x)
                         const amrex::ParticleReal frac_energy = std::exp( - std::sqrt(rnd) );
-                        // Energy of the virtual photon
-                        const amrex::ParticleReal vphoton_energy = frac_energy * gamma_primary * PhysConst::c;
+                        // Energy of the virtual photon, in units of u = p/mass where mass is the
+                        // mass used by the diagnostics to convert the (massless) photon's u to a
+                        // momentum, i.e. the electron mass (see WarpXOpenPMD.cpp)
+                        const amrex::ParticleReal vphoton_energy =
+                            frac_energy * gamma_primary * PhysConst::c * (mass / PhysConst::m_e);
 
                         // Photon index for the current primary
                         const amrex::Long ip = offset_vp_data[i] + j;

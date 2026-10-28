@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_test_3d_virtual_photons
+
+# override parameters: fully-ionized particle other than an electron or positron
+# (muon, charge = -q_e like the electron, to isolate the mass generalization)
+beam.species_type = muon
+my_constants.mc2_eV = 206.7682830*m_e*clight*clight/q_e
