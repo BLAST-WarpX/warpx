@@ -128,6 +128,20 @@ public:
     [[nodiscard]] int GetPECInsulator_IsESet ( int  bdry_dir,
                                                int  bdry_side ) const;
 
+    /**
+     * \brief Whether a tangential B component is set by a pec_insulator parser
+     *        on a domain face (Dirichlet feed).
+     *
+     * Mirrors GetPECInsulator_IsESet for the magnetic field.
+     *
+     * \param[in] bdry_dir  boundary direction (0 .. AMREX_SPACEDIM-1)
+     * \param[in] bdry_side 0 = lo, 1 = hi
+     * \param[in] ifield    field component 0/1/2 (Bx/By/Bz)
+     */
+    [[nodiscard]] int GetPECInsulator_IsBSet ( int  bdry_dir,
+                                               int  bdry_side,
+                                               int  ifield ) const;
+
     void InitData ();
 
     void Evolve (int numsteps = -1);
