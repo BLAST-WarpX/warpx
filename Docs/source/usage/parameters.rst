@@ -1813,7 +1813,7 @@ Particle initialization
     Split particles of the species when crossing the boundary from a lower
     resolution domain to a higher resolution domain.
 
-    Currently implemented on CPU only.
+    Automatic tagging at refinement boundaries is currently implemented on CPU only.
 
 .. pp:param:: <species_name>.do_continuous_injection
     :type: ``0`` or ``1``
@@ -2151,9 +2151,17 @@ Particle initialization
     :default: ``0``
     :optional:
 
-    Splitting technique. When ``0``, particles are split along the simulation
-    axes (4 particles in 2D, 6 particles in 3D). When ``1``, particles are split
-    along the diagonals (4 particles in 2D, 8 particles in 3D).
+    Splitting technique. When ``0``, particles are split along the diagonals
+    (4 particles in 2D, 8 particles in 3D). When ``1``, particles are split
+    along the simulation axes (4 particles in 2D, 6 particles in 3D).
+
+    In cylindrical and spherical geometries, radial splitting changes the radius
+    while preserving the angular coordinates. At nonperiodic domain faces,
+    symmetric displacements that would put children outside the domain are
+    reduced to preserve total particle weight, momentum, and the spatial centroid.
+    Fully contained split patterns retain their original spacing.
+    Parents already outside the domain are left for the normal particle boundary
+    conditions. Periodic crossings are handled by particle redistribution.
 
 .. pp:param:: <species_name>.do_not_deposit
     :type: ``0`` or ``1``

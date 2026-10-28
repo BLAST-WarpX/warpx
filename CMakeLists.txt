@@ -855,6 +855,9 @@ if(BUILD_TESTING)
     if(WarpX_PYTHON)
         add_subdirectory(tests/unit)
     endif()
+    if(WarpX_LIB)
+        add_subdirectory(tests/particle_splitting)
+    endif()
 endif()
 
 
