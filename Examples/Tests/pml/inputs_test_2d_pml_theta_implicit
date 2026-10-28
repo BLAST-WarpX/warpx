@@ -1,0 +1,44 @@
+# Vacuum pulses in both polarizations leave through the faces and corners.
+max_step = 56
+amr.n_cell = 32 32
+amr.max_grid_size = 16
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = -16.e-6 -16.e-6
+geometry.prob_hi =  16.e-6  16.e-6
+boundary.field_lo = pml pml
+boundary.field_hi = pml pml
+
+algo.maxwell_solver = yee
+algo.evolve_scheme = theta_implicit_em
+warpx.cfl = 2.0
+warpx.use_filter = 0
+warpx.verbose = 0
+implicit_evolve.theta = 0.5
+implicit_evolve.nonlinear_solver = newton
+newton.relative_tolerance = 1.e-10
+newton.absolute_tolerance = 1.e-12
+newton.max_iterations = 10
+newton.require_convergence = true
+gmres.relative_tolerance = 1.e-5
+gmres.max_iterations = 300
+jacobian.pc_type = none
+
+warpx.E_ext_grid_init_style = parse_E_ext_grid_function
+my_constants.w = 2.e-6
+my_constants.dx = 1.e-6
+warpx.Ey_external_grid_function(x,y,z) = exp(-(x*x+z*z)/(2*w*w))
+# The in-plane polarization is a discrete curl of a Gaussian vector potential,
+# so its initial discrete divergence is zero. B starts at zero for both modes.
+warpx.Ex_external_grid_function(x,y,z) = -w/dx*(exp(-(x*x+(z+dx/2)^2)/(2*w*w))-exp(-(x*x+(z-dx/2)^2)/(2*w*w)))
+warpx.Ez_external_grid_function(x,y,z) = w/dx*(exp(-((x+dx/2)^2+z*z)/(2*w*w))-exp(-((x-dx/2)^2+z*z)/(2*w*w)))
+
+warpx.reduced_diags_names = field_energy
+field_energy.type = FieldEnergy
+field_energy.intervals = 1
+diagnostics.diags_names = diag1 chk
+diag1.diag_type = Full
+diag1.intervals = 56
+chk.diag_type = Full
+chk.format = checkpoint
+chk.intervals = 28

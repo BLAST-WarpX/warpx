@@ -2,6 +2,26 @@
 #
 
 add_warpx_test(
+    test_2d_pml_theta_implicit
+    2
+    2
+    inputs_test_2d_pml_theta_implicit
+    "analysis_pml_theta_implicit.py"
+    OFF
+    OFF
+)
+
+add_warpx_test(
+    test_2d_pml_theta_implicit_restart
+    2
+    2
+    inputs_test_2d_pml_theta_implicit_restart
+    "analysis_default_restart.py --path diags/diag1000056"
+    OFF
+    test_2d_pml_theta_implicit
+)
+
+add_warpx_test(
     test_2d_pml_x_ckc  # name
     2  # dims
     2  # nprocs
