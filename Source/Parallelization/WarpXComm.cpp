@@ -12,13 +12,14 @@
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
 #   include "BoundaryConditions/PML_RZ.H"
 #endif
+#include "EmbeddedBoundary/Enabled.H"
 #include "Fields.H"
 #include "Filter/BilinearFilter.H"
+#include "Particles/MultiParticleContainer.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "WarpXComm_K.H"
 #include "WarpXSumGuardCells.H"
-#include "Particles/MultiParticleContainer.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/coarsen/average.H>
@@ -28,6 +29,7 @@
 #include <AMReX.H>
 #include <AMReX_Array.H>
 #include <AMReX_Array4.H>
+#include <AMReX_BCRec.H>
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
 #include <AMReX_BoxArray.H>
@@ -39,6 +41,7 @@
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IndexType.H>
 #include <AMReX_IntVect.H>
+#include <AMReX_Interpolater.H>
 #include <AMReX_MFIter.H>
 #include <AMReX_MakeType.H>
 #include <AMReX_MultiFab.H>
@@ -463,21 +466,96 @@ namespace
                 Array4<Real const> const& fy_c = dF[1]->const_array(mfi);
                 Array4<Real const> const& fz_c = dF[2]->const_array(mfi);
 
-                amrex::ParallelFor(Box(fx_aux), Box(fy_aux), Box(fz_aux),
-                [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-                {
-                    // Add the coarse correction after refining the native fine data onto the aux grid.
-                    warpx_interp(j, k, l, fx_aux, fx_fp, fx_c, Fx_stag, refinement_ratio);
-                },
-                [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-                {
-                    warpx_interp(j, k, l, fy_aux, fy_fp, fy_c, Fy_stag, refinement_ratio);
-                },
-                [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
-                {
-                    warpx_interp(j, k, l, fz_aux, fz_fp, fz_c, Fz_stag, refinement_ratio);
-                });
+                int const components = field_aux[lev][0]->nComp();
+                amrex::ParallelFor(
+                    Box(fx_aux), Box(fy_aux), Box(fz_aux),
+                    [=] AMREX_GPU_DEVICE(int j, int k, int l) noexcept {
+                        // Add the coarse correction after refining the native fine data onto the
+                        // aux grid.
+                        for (int component = 0; component < components; ++component) {
+                            warpx_interp(j, k, l, fx_aux, fx_fp, fx_c, Fx_stag, refinement_ratio,
+                                         component);
+                        }
+                    },
+                    [=] AMREX_GPU_DEVICE(int j, int k, int l) noexcept {
+                        for (int component = 0; component < components; ++component) {
+                            warpx_interp(j, k, l, fy_aux, fy_fp, fy_c, Fy_stag, refinement_ratio,
+                                         component);
+                        }
+                    },
+                    [=] AMREX_GPU_DEVICE(int j, int k, int l) noexcept {
+                        for (int component = 0; component < components; ++component) {
+                            warpx_interp(j, k, l, fz_aux, fz_fp, fz_c, Fz_stag, refinement_ratio,
+                                         component);
+                        }
+                    });
             }
+
+#if defined(WARPX_DIM_3D) || defined(WARPX_DIM_XZ)
+            if (field_cp_type == FieldType::Bfield_cp &&
+                (EB::enabled() || WarpX::GetInstance().HasCurrentControlledPorts()) &&
+                electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
+                WarpX::grid_type == GridType::Staggered) {
+                // Interpolating face components independently introduces
+                // magnetic divergence when the coarse correction varies near an
+                // EB or PML. Interpolate the valid faces together, preserving
+                // the coarse flux.
+                auto const& warpx = WarpX::GetInstance();
+                int const components = field_aux[lev][0]->nComp();
+                Vector<Array<BCRec, AMREX_SPACEDIM>> const boundary_conditions(
+                    components);
+                Array<IArrayBox*, AMREX_SPACEDIM> const solve_mask{};
+                for (MFIter mfi(*field_aux[lev][0]); mfi.isValid(); ++mfi) {
+                    Array<FArrayBox*, AMREX_SPACEDIM> coarse_faces{};
+                    Array<FArrayBox*, AMREX_SPACEDIM> fine_faces{};
+                    for (int direction = 0; direction < AMREX_SPACEDIM;
+                         ++direction) {
+                        int const component =
+                            AMREX_SPACEDIM == 2 && direction == 1 ? 2
+                                                                  : direction;
+                        coarse_faces[direction] = &(*dF[component])[mfi];
+                        fine_faces[direction] =
+                            &(*field_aux[lev][component])[mfi];
+                    }
+                    Box const cells = amrex::enclosedCells(mfi.validbox());
+                    amrex::face_divfree_interp.interp_arr(
+                        coarse_faces, 0, fine_faces, 0, components, cells,
+                        refinement_ratio, solve_mask, warpx.Geom(lev - 1),
+                        warpx.Geom(lev), boundary_conditions, 0, 0,
+                        amrex::RunOn::Gpu);
+                    for (int direction = 0; direction < AMREX_SPACEDIM;
+                         ++direction) {
+                        int const component =
+                            AMREX_SPACEDIM == 2 && direction == 1 ? 2
+                                                                  : direction;
+                        auto const values =
+                            field_aux[lev][component]->array(mfi);
+                        auto const fine =
+                            field_fp[lev][component]->const_array(mfi);
+                        Box const faces = amrex::convert(
+                            cells, field_aux[lev][component]->ixType());
+                        amrex::ParallelFor(
+                            faces, components,
+                            [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+                                values(i, j, k, n) += fine(i, j, k, n);
+                            });
+                    }
+                }
+                // The face interpolation replaces valid values after the
+                // component-wise interpolation filled the auxiliary ghosts.
+                // Refresh shared faces and ghosts before a contour or gather
+                // reads values from a neighboring box.
+                for (int direction = 0; direction < AMREX_SPACEDIM;
+                     ++direction) {
+                    int const component =
+                        AMREX_SPACEDIM == 2 && direction == 1 ? 2 : direction;
+                    ablastr::utils::communication::FillBoundary(
+                        *field_aux[lev][component], ng_src,
+                        WarpX::do_single_precision_comms,
+                        warpx.Geom(lev).periodicity(), true);
+                }
+            }
+#endif
         }
         else // electrostatic
         {

@@ -70,6 +70,17 @@ public:
     /** return MultiFab, mu (permeability) of the medium. */
     amrex::MultiFab& getmu_mf  () {return (*m_mu_mf);}
 
+    /** Whether static material coefficients and their interpolation halo are vacuum. */
+    [[nodiscard]] bool IsVacuumPatch () const noexcept
+    {
+        return m_is_vacuum_patch;
+    }
+    /** Opt in to electric cleaning only on entirely vacuum fine/coarse patches. */
+    [[nodiscard]] bool CleanVacuumPatchesOnly () const noexcept
+    {
+        return m_clean_vacuum_patches_only;
+    }
+
     /** Initializes the Multifabs storing macroscopic properties
      *  with user-defined functions(x,y,z).
      */
@@ -94,6 +105,9 @@ public:
     amrex::GpuArray<int, 3> macro_cr_ratio;
 
 private:
+
+    bool m_is_vacuum_patch = false;
+    bool m_clean_vacuum_patches_only = false;
 
     /** Conductivity, sigma, of the medium */
     amrex::Real m_sigma = 0.0;

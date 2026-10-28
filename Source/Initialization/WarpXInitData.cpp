@@ -17,6 +17,7 @@
 #include "Diagnostics/MultiDiagnostics.H"
 #include "Diagnostics/ReducedDiags/MultiReducedDiags.H"
 #include "EmbeddedBoundary/Enabled.H"
+#include "FieldSolver/CurrentControlledPort.H"
 #ifdef AMREX_USE_EB
 #   include "EmbeddedBoundary/EmbeddedBoundaryInit.H"
 #endif
@@ -57,6 +58,9 @@
 #include <AMReX_BoxArray.H>
 #include <AMReX_BoxList.H>
 #include <AMReX_Config.H>
+#ifdef AMREX_USE_EB
+#include <AMReX_EBFabFactory.H>
+#endif
 #include <AMReX_Geometry.H>
 #include <AMReX_GpuLaunch.H>
 #include <AMReX_GpuQualifiers.H>
@@ -833,12 +837,34 @@ WarpX::InitData ()
         ComputeDt();
         ::PrintDtDxDyDz(max_level, geom, dt);
         InitFromScratch();
+        InitMacroscopicProperties();
         InitDiagnostics();
     }
     else
     {
         InitFromCheckpoint();
+        InitMacroscopicProperties();
         ::PrintDtDxDyDz(max_level, geom, dt);
+        for (auto& current_port : m_current_controlled_ports) {
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                for (auto const patch_type : {PatchType::fine, PatchType::coarse}) {
+                    if (lev == 0 && patch_type == PatchType::coarse) {
+                        continue;
+                    }
+                    current_port->InitData(
+                        m_fields.get_alldirs(patch_type == PatchType::fine
+                                                 ? FieldType::Bfield_fp
+                                                 : FieldType::Bfield_cp,
+                                             lev),
+                        GetEBUpdateBFlag(patch_type)[lev], gett_new(lev), lev,
+                        patch_type);
+                }
+            }
+        }
+        if (!m_current_controlled_ports.empty()) {
+            FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+            ApplyCompositeCurrentControlledPorts(gett_new(0));
+        }
         PostRestart();
         reduced_diags->InitData();
     }
@@ -852,16 +878,6 @@ WarpX::InitData ()
     }
 
     BuildBufferMasks();
-
-    if (m_em_solver_medium == MediumForEM::Macroscopic) {
-        const int lev_zero = 0;
-        m_macroscopic_properties->InitData(
-            Geom(lev_zero),
-            m_fields.get(FieldType::Efield_fp, Direction{0}, lev_zero)->ixType().toIntVect(),
-            m_fields.get(FieldType::Efield_fp, Direction{1}, lev_zero)->ixType().toIntVect(),
-            m_fields.get(FieldType::Efield_fp, Direction{2}, lev_zero)->ixType().toIntVect()
-        );
-    }
 
     m_electrostatic_solver->InitData();
 
@@ -921,6 +937,29 @@ WarpX::InitData ()
         for (int lev = 0; lev <= max_level; ++lev) {
             AddExternalFields(lev);
         }
+        // The port constrains the total initialized magnetic field. Build and
+        // apply it only after the initial field solves and external-field sum,
+        // so those operations cannot invalidate its current or cached status.
+        for (auto& current_port : m_current_controlled_ports) {
+            for (int lev = 0; lev <= finest_level; ++lev) {
+                for (auto const patch_type : {PatchType::fine, PatchType::coarse}) {
+                    if (lev == 0 && patch_type == PatchType::coarse) {
+                        continue;
+                    }
+                    current_port->InitData(
+                        m_fields.get_alldirs(patch_type == PatchType::fine
+                                                 ? FieldType::Bfield_fp
+                                                 : FieldType::Bfield_cp,
+                                             lev),
+                        GetEBUpdateBFlag(patch_type)[lev], gett_new(lev), lev,
+                        patch_type);
+                }
+            }
+        }
+        if (!m_current_controlled_ports.empty()) {
+            FillBoundaryB(guard_cells.ng_alloc_EB, WarpX::sync_nodal_points);
+            ApplyCompositeCurrentControlledPorts(gett_new(0));
+        }
     }
     else {
         ExecutePythonCallback("afterInitatRestart");
@@ -964,6 +1003,12 @@ WarpX::AddExternalFields (int const lev)
 {
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
+
+    // Keep fine-patch initialization consistent with the coarse and auxiliary
+    // patches: excluded levels receive the parent field through SMR substitution.
+    if (lev > maxlevel_extEMfield_init) {
+        return;
+    }
 
     // FIXME: RZ multimode has more than one component for all these
     if (m_p_ext_field_params->E_ext_grid_type != ExternalFieldType::default_zero) {
@@ -1011,6 +1056,9 @@ WarpX::InitFromScratch ()
 
     AmrCore::InitFromScratch(time);  // This will call MakeNewLevelFromScratch
 
+    // CP/PML fields must exist before the theta-implicit vectors are defined.
+    InitPML();
+
     if (m_implicit_solver) {
 
         m_implicit_solver->Define(this,/*from_restart=*/false);
@@ -1020,7 +1068,6 @@ WarpX::InitFromScratch ()
     mypc->AllocData();
     mypc->InitData();
 
-    InitPML();
 
     ExecutePythonCallback("allocdata");
 }
@@ -1038,31 +1085,59 @@ WarpX::InitPML ()
             do_pml_Hi[0][idim] = 1; // on level 0
         }
     }
-    if (max_level > 0) { do_pml = 1; }
+    if (max_level > 0) {
+        do_pml = 1;
+    }
+#ifdef WARPX_DIM_RZ
+    if (do_pml && electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            evolve_scheme == EvolveScheme::Explicit && grid_type == GridType::Staggered &&
+                !do_moving_window && !load_balance_intervals.isActivated() && !do_pml_in_domain &&
+                !pml_has_particles && !do_dive_cleaning && !do_divb_cleaning,
+            "Cylindrical QCPML requires static explicit staggered Yee grids and exterior "
+            "vacuum layers without divergence cleaning.");
+    }
+#endif
+    if (do_pml && evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
+#if !defined(WARPX_DIM_XZ) && !defined(WARPX_DIM_3D)
+        WARPX_ABORT_WITH_MESSAGE("Theta-implicit PML requires Cartesian 2D or 3D geometry.");
+#endif
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            electromagnetic_solver_id == ElectromagneticSolverAlgo::Yee &&
+                grid_type == GridType::Staggered && !do_moving_window &&
+                !load_balance_intervals.isActivated(),
+            "Theta-implicit SMR/PML requires static staggered Yee grids.");
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_pml_in_domain && !pml_has_particles && !do_pml_dive_cleaning &&
+                !do_pml_divb_cleaning && !do_dive_cleaning && !do_divb_cleaning && !use_filter,
+            "Theta-implicit SMR/PML requires exterior vacuum layers without particles, "
+            "divergence cleaning, or filtering.");
+    }
+
     if (do_pml)
     {
         bool const eb_enabled = EB::enabled();
 #if (defined WARPX_DIM_RZ) && (defined WARPX_USE_FFT)
-        do_pml_Lo[0][0] = 0; // no PML at r=0, in cylindrical geometry
-        pml_rz[0] = std::make_unique<PML_RZ>(0, boxArray(0), DistributionMap(0), &Geom(0), m_fields, pml_ncell, do_pml_in_domain);
-#else
-        // Note: fill_guards_fields and fill_guards_current are both set to
-        // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
-        // to the PML, for example in the presence of mesh refinement patches)
-        pml[0] = std::make_unique<PML>(
-            0, boxArray(0), DistributionMap(0), do_similar_dm_pml, &Geom(0), nullptr,
-            pml_ncell, pml_delta, amrex::IntVect::TheZeroVector(),
-            dt[0], nox_fft, noy_fft, noz_fft, grid_type,
-            do_moving_window, pml_has_particles, do_pml_in_domain,
-            m_psatd_solution_type, time_dependency_J, time_dependency_rho,
-            do_pml_dive_cleaning, do_pml_divb_cleaning,
-            amrex::IntVect(0), amrex::IntVect(0),
-            eb_enabled,
-            guard_cells.ng_FieldSolver.max(),
-            v_particle_pml,
-            m_fields,
-            do_pml_Lo[0], do_pml_Hi[0]);
+        if (electromagnetic_solver_id == ElectromagneticSolverAlgo::PSATD) {
+            do_pml_Lo[0][0] = 0;
+            pml_rz[0] = std::make_unique<PML_RZ>(0, boxArray(0), DistributionMap(0), &Geom(0),
+                                                 m_fields, pml_ncell, do_pml_in_domain);
+        } else
 #endif
+        {
+
+            // Note: fill_guards_fields and fill_guards_current are both set to
+            // zero (amrex::IntVect(0)) (what we do with damping BCs does not apply
+            // to the PML, for example in the presence of mesh refinement patches)
+            pml[0] = std::make_unique<PML>(
+                0, boxArray(0), DistributionMap(0), do_similar_dm_pml, &Geom(0), nullptr, pml_ncell,
+                pml_delta, amrex::IntVect::TheZeroVector(), dt[0], nox_fft, noy_fft, noz_fft,
+                grid_type, do_moving_window, pml_has_particles, do_pml_in_domain,
+                m_psatd_solution_type, time_dependency_J, time_dependency_rho, do_pml_dive_cleaning,
+                do_pml_divb_cleaning, amrex::IntVect(0), amrex::IntVect(0), eb_enabled,
+                guard_cells.ng_FieldSolver.max(), v_particle_pml, m_fields, do_pml_Lo[0],
+                do_pml_Hi[0]);
+        }
 
         for (int lev = 1; lev <= max_level; ++lev)
         {
@@ -1305,8 +1380,8 @@ WarpX::InitLevelData (int lev, Real /*time*/)
             FieldType::Bfield_cp,
             m_p_ext_field_params->Bxfield_parser->compile<4>(),
             m_p_ext_field_params->Byfield_parser->compile<4>(),
-            m_p_ext_field_params->Bzfield_parser->compile<4>(),
-            lev, PatchType::coarse, m_eb_update_B_cp);
+            m_p_ext_field_params->Bzfield_parser->compile<4>(), lev,
+            PatchType::coarse, m_eb_update_B_cp);
     }
 
     // if the input string for the E-field is "parse_e_ext_grid_function",
@@ -1343,8 +1418,8 @@ WarpX::InitLevelData (int lev, Real /*time*/)
                 FieldType::Efield_cp,
                 m_p_ext_field_params->Exfield_parser->compile<4>(),
                 m_p_ext_field_params->Eyfield_parser->compile<4>(),
-                m_p_ext_field_params->Ezfield_parser->compile<4>(),
-                lev, PatchType::coarse, m_eb_update_E_cp);
+                m_p_ext_field_params->Ezfield_parser->compile<4>(), lev,
+                PatchType::coarse, m_eb_update_E_cp);
 #ifdef AMREX_USE_EB
             if (eb_enabled) {
                 if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
@@ -1598,16 +1673,15 @@ void WarpX::CheckGuardCells()
 void WarpX::InitializeEBGridData (int lev)
 {
 #ifdef AMREX_USE_EB
-    auto const& eb_fact = fieldEBFactory(lev);
+    using warpx::fields::FieldType;
+    if (lev == maxLevel() ||
+        electromagnetic_solver_id != ElectromagneticSolverAlgo::ECT) {
 
-    if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
-    {
-        using warpx::fields::FieldType;
+        auto const& eb_fact = fieldEBFactory(lev);
 
-        if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
-
-            // The ECT solver only supports a single level for now
-            if (lev == maxLevel()) {
+        if (WarpX::electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD )
+        {
+            if (WarpX::electromagnetic_solver_id == ElectromagneticSolverAlgo::ECT) {
 
                 auto edge_lengths_lev = m_fields.get_alldirs(FieldType::edge_lengths, lev);
                 warpx::embedded_boundary::ComputeEdgeLengths(edge_lengths_lev, eb_fact);
@@ -1630,52 +1704,52 @@ void WarpX::InitializeEBGridData (int lev)
                 warpx::embedded_boundary::MarkUpdateECellsECT( m_eb_update_E_fp[lev], edge_lengths_lev );
                 // Mark on which grid points B should be updated
                 warpx::embedded_boundary::MarkUpdateBCellsECT( m_eb_update_B_fp[lev], face_areas_lev, edge_lengths_lev);
+
+            } else {
+                // Mark on which grid points E should be updated (stair-case approximation)
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                    m_eb_update_E_fp[lev],
+                    m_fields.get_alldirs(FieldType::Efield_fp, lev),
+                    eb_fact, Geom(lev).periodicity() );
+                // Mark on which grid points B should be updated (stair-case approximation)
+                warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                    m_eb_update_B_fp[lev],
+                    m_fields.get_alldirs(FieldType::Bfield_fp, lev),
+                    eb_fact, Geom(lev).periodicity() );
             }
 
-        } else {
-
-            // Mark on which grid points E and B should be updated (stair-case approximation),
-            // on the fine patch of this level.
-            warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                m_eb_update_E_fp[lev],
-                m_fields.get_alldirs(FieldType::Efield_fp, lev),
-                eb_fact, Geom(lev).periodicity() );
-            warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                m_eb_update_B_fp[lev],
-                m_fields.get_alldirs(FieldType::Bfield_fp, lev),
-                eb_fact, Geom(lev).periodicity() );
-
-            // The coarse-patch fields (Efield_cp/Bfield_cp) live on a coarsened grid, so they
-            // need their own EB flags, computed from an EB factory at the coarse-patch resolution.
-            if (lev > 0) {
-                const amrex::IntVect rr = refRatio(lev-1);
-                const amrex::Geometry cgeom = amrex::coarsen(Geom(lev), rr);
-                // Use the exact (cell-centered) BoxArray and DistributionMapping of the
-                // coarse-patch fields, so that the EB flags share their grid layout.
-                const amrex::MultiFab& Efield_cp0 = *m_fields.get(FieldType::Efield_cp, ablastr::fields::Direction{0}, lev);
-                const amrex::BoxArray cba = amrex::convert(Efield_cp0.boxArray(), amrex::IntVect::TheCellVector());
-                const amrex::DistributionMapping& cdm = Efield_cp0.DistributionMap();
-                int const max_guard = guard_cells.ng_FieldSolver.max();
-                auto const cp_eb_fact = amrex::makeEBFabFactory(
-                    cgeom, cba, cdm,
-                    {max_guard, max_guard, max_guard}, amrex::EBSupport::full);
-
-                warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                    m_eb_update_E_cp[lev],
-                    m_fields.get_alldirs(FieldType::Efield_cp, lev),
-                    *cp_eb_fact, cgeom.periodicity() );
-                warpx::embedded_boundary::MarkUpdateCellsStairCase(
-                    m_eb_update_B_cp[lev],
-                    m_fields.get_alldirs(FieldType::Bfield_cp, lev),
-                    *cp_eb_fact, cgeom.periodicity() );
-            }
         }
 
-    }
+        if (lev == maxLevel()) {
+            ComputeDistanceToEB();
+        }
+        warpx::embedded_boundary::MarkReducedShapeCells(
+            m_eb_reduce_particle_shape[lev], eb_fact, nox,
+            Geom(lev).periodicity());
 
-    if (lev == maxLevel()) {
-        ComputeDistanceToEB();
-        warpx::embedded_boundary::MarkReducedShapeCells( m_eb_reduce_particle_shape[lev], eb_fact, nox, Geom(0).periodicity());
+        if (lev > 0 &&
+            electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD &&
+            electromagnetic_solver_id != ElectromagneticSolverAlgo::ECT) {
+            auto const coarse_fields =
+                m_fields.get_alldirs(FieldType::Efield_cp, lev);
+            auto const coarse_boxes = amrex::convert(
+                coarse_fields[0]->boxArray(), amrex::IntVect::TheCellVector());
+            int const guards = guard_cells.ng_FieldSolver.max();
+            auto const coarse_factory = amrex::makeEBFabFactory(
+                GetEBIndexSpace(lev - 1), Geom(lev - 1), coarse_boxes,
+                coarse_fields[0]->DistributionMap(), {guards, guards, guards},
+                amrex::EBSupport::full);
+            warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                m_eb_update_E_cp[lev], coarse_fields, *coarse_factory,
+                Geom(lev - 1).periodicity());
+            warpx::embedded_boundary::MarkUpdateCellsStairCase(
+                m_eb_update_B_cp[lev],
+                m_fields.get_alldirs(FieldType::Bfield_cp, lev),
+                *coarse_factory, Geom(lev - 1).periodicity());
+            // The marking kernels read geometry owned by this temporary
+            // factory.
+            amrex::Gpu::streamSynchronize();
+        }
     }
 #else
     amrex::ignore_unused(lev);
@@ -1885,4 +1959,23 @@ WarpX::ReadExternalFieldFromFile (
 
     } // End loop over boxes.
 #endif
+}
+
+void
+WarpX::InitMacroscopicProperties ()
+{
+    using ablastr::fields::Direction;
+    using warpx::fields::FieldType;
+    if (m_em_solver_medium == MediumForEM::Macroscopic) {
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            for (int patch = 0; patch < (lev == 0 ? 1 : 2); ++patch) {
+                auto const field_type = patch == 0 ? FieldType::Efield_fp : FieldType::Efield_cp;
+                m_macroscopic_properties[lev][patch]->InitData(
+                    Geom(patch == 0 ? lev : lev - 1),
+                    m_fields.get(field_type, Direction{0}, lev)->ixType().toIntVect(),
+                    m_fields.get(field_type, Direction{1}, lev)->ixType().toIntVect(),
+                    m_fields.get(field_type, Direction{2}, lev)->ixType().toIntVect());
+            }
+        }
+    }
 }

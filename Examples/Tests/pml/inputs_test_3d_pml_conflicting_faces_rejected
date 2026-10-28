@@ -1,0 +1,21 @@
+# Two separated patches whose PML layers request opposite damping profiles
+# in the same cells. Unlike coincident coplanar faces, this remains invalid.
+geometry.dims = 3
+geometry.prob_lo = -0.5 -0.5 -0.5
+geometry.prob_hi = 0.5 0.5 0.5
+amr.n_cell = 32 32 32
+amr.max_level = 1
+amr.ref_ratio = 2
+amr.max_grid_size = 64
+amr.blocking_factor = 4
+amr.n_error_buf = 0
+amr.grid_eff = 1
+warpx.ref_patch_function(x,y,z) = "if(abs(x)<0.25,if(abs(x)>0.0625,if(abs(y)<0.25,if(abs(z)<0.25,1,0),0),0),0)"
+boundary.field_lo = periodic periodic periodic
+boundary.field_hi = periodic periodic periodic
+warpx.pml_ncell = 8
+warpx.pml_delta = 10
+warpx.do_subcycling = 0
+warpx.use_filter = 0
+algo.maxwell_solver = yee
+max_step = 0

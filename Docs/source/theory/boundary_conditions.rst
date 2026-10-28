@@ -321,3 +321,32 @@ The PMC boundary condition also impacts the deposition of charge and current den
 The charge and current densities deposited into the guard cells are reflected back into
 the domain, adding them to the mirror cells in the domain.
 This represents the charge and current from the virtual symmetric particles in the guard cells.
+
+Cylindrical absorbing layers
+----------------------------
+
+The explicit Yee solver in RZ uses a quasi-convolutional perfectly matched layer
+(QCPML) around physical boundaries and static refinement patches. The radial
+metric and azimuthal mode terms retain their physical radius; radial and axial
+curl terms acquire convolution memories. This follows the quasi-CPML construction
+of `Zhang et al. (2014) <https://doi.org/10.2528/PIERB14071002>`_, with unit
+stretching and zero frequency shift. Curved interfaces have residual reflection;
+the layer is not an exactly matched cylindrical coordinate transformation.
+
+For a staggered directional curl contribution :math:`D` held fixed during one
+field substep, each memory satisfies
+
+.. math::
+
+   \dot\psi=-\sigma(\psi+D),\qquad
+   \Delta F=(D+\psi_{\mathrm{old}})
+       \frac{1-e^{-\sigma\Delta t}}{\sigma},\qquad
+   \psi_{\mathrm{new}}=\psi_{\mathrm{old}}-\sigma\Delta F.
+
+The zero-damping limit is :math:`\Delta F=(D+\psi_{\mathrm{old}})\Delta t`;
+memories initialized where :math:`\sigma=0` remain zero. Each field component
+stores its physical azimuthal modes followed by radial and axial memories.
+Only physical modes are exchanged with regular grids. Axis parity applies to
+all three groups, and checkpoints preserve the memories on both fine and coarse
+patches. The implementation requires exterior vacuum layers without PML particles
+or divergence cleaning. Theta-implicit RZ layers are not supported.

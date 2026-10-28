@@ -35,7 +35,8 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
 
     m_WarpX = a_WarpX;
 
-    m_num_amr_levels = 1;
+    m_num_amr_levels =
+        m_WarpX->evolve_scheme == EvolveScheme::Theta_Implicit_EM ? m_WarpX->finestLevel() + 1 : 1;
 
     m_vector_type_name = a_vector_type_name;
     m_scalar_type_name = a_scalar_type_name;
@@ -80,6 +81,47 @@ void WarpXSolverVec::Define ( WarpX*  a_WarpX,
                                                            this_array[n]->DistributionMap(),
                                                            this_array[n]->nComp(),
                                                            amrex::IntVect::TheZeroVector() );
+            }
+        }
+    }
+
+    if (m_array_type == FieldType::Efield_fp &&
+        m_WarpX->evolve_scheme == EvolveScheme::Theta_Implicit_EM) {
+        for (int lev = 0; lev < m_num_amr_levels; ++lev) {
+            for (auto const type :
+                 {FieldType::Efield_cp, FieldType::pml_E_fp, FieldType::pml_E_cp}) {
+                if (!m_WarpX->m_fields.has_vector(type, lev)) {
+                    continue;
+                }
+                ExtraField block;
+                block.type = type;
+                block.level = lev;
+                auto const source = m_WarpX->m_fields.get_alldirs(type, lev);
+                bool const coarse = type == FieldType::Efield_cp || type == FieldType::pml_E_cp;
+                auto const& geometry = m_WarpX->Geom(coarse ? lev - 1 : lev);
+                for (int n = 0; n < 3; ++n) {
+                    block.values[n] = std::make_unique<amrex::MultiFab>(
+                        source[n]->boxArray(), source[n]->DistributionMap(), source[n]->nComp(), 0);
+                    block.dot_masks[n] = source[n]->OwnerMask(geometry.periodicity());
+                    if (type != FieldType::Efield_cp) {
+                        // Exchange gives regular cells ownership of the shared PML boundary.
+                        auto const regular_type =
+                            coarse ? FieldType::Efield_cp : FieldType::Efield_fp;
+                        auto const& regular =
+                            m_WarpX->m_fields.get(regular_type, ablastr::fields::Direction{n}, lev)
+                                ->boxArray();
+                        for (amrex::MFIter mfi(*block.dot_masks[n]); mfi.isValid(); ++mfi) {
+                            auto const mask = block.dot_masks[n]->array(mfi);
+                            for (auto const& intersection : regular.intersections(mfi.validbox())) {
+                                amrex::ParallelFor(intersection.second,
+                                                   [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+                                                       mask(i, j, k) = 0;
+                                                   });
+                            }
+                        }
+                    }
+                }
+                m_extra_fields.push_back(std::move(block));
             }
         }
     }
@@ -137,11 +179,20 @@ void WarpXSolverVec::Copy ( warpx::fields::FieldType  a_array_type,
                                    amrex::IntVect::TheZeroVector() );
         }
     }
+    // CP/PML guesses are reset to the current fields at each step, including restart.
+    for (auto& block : m_extra_fields) {
+        auto const source = m_WarpX->m_fields.get_alldirs(block.type, block.level);
+        for (int n = 0; n < 3; ++n) {
+            amrex::MultiFab::Copy(*block.values[n], *source[n], 0, 0, source[n]->nComp(), 0);
+        }
+    }
 }
 
 void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
 {
     BL_PROFILE("WarpXSolverVec::copyFrom");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_extra_fields.empty(),
+        "Packing coarse-patch or PML unknowns into PETSc arrays is not implemented.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "WarpXSolverVec::CopyFrom() called on undefined WarpXSolverVec");
@@ -193,6 +244,8 @@ void WarpXSolverVec::copyFrom ( const amrex::Real* const a_arr)
 void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
 {
     BL_PROFILE("WarpXSolverVec::copyTo");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(m_extra_fields.empty(),
+        "Packing coarse-patch or PML unknowns into PETSc arrays is not implemented.");
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
         IsDefined(),
         "WarpXSolverVec::CopyTo() called on undefined WarpXSolverVec");
@@ -264,6 +317,50 @@ void WarpXSolverVec::copyTo ( amrex::Real* const a_arr) const
             result += rtmp;
         }
     }
+    for (std::size_t b = 0; b < m_extra_fields.size(); ++b) {
+        for (int n = 0; n < 3; ++n) {
+            auto const& block = m_extra_fields[b];
+            result += amrex::MultiFab::Dot(*block.dot_masks[n], *block.values[n], 0,
+                                           *a_X.m_extra_fields[b].values[n], 0,
+                                           block.values[n]->nComp(), 0, local);
+        }
+    }
     amrex::ParallelAllReduce::Sum(result, amrex::ParallelContext::CommunicatorSub());
     return result;
+}
+
+ablastr::fields::VectorField
+WarpXSolverVec::getExtraField (FieldType type, int level) const
+{
+    for (auto const& block : m_extra_fields) {
+        if (block.type == type && block.level == level) {
+            return block.get();
+        }
+    }
+    WARPX_ABORT_WITH_MESSAGE("The implicit solver does not contain the requested field block.");
+    return {};
+}
+
+void
+WarpXSolverVec::ExtraLinComb (RT a, WarpXSolverVec const& X, RT b, WarpXSolverVec const& Y)
+{
+    for (std::size_t block = 0; block < m_extra_fields.size(); ++block) {
+        for (int n = 0; n < 3; ++n) {
+            auto& field = *m_extra_fields[block].values[n];
+            amrex::MultiFab::LinComb(field, a, *X.m_extra_fields[block].values[n], 0, b,
+                                     *Y.m_extra_fields[block].values[n], 0, 0, field.nComp(), 0);
+        }
+    }
+}
+
+void
+WarpXSolverVec::ExtraIncrement (WarpXSolverVec const& X, RT a)
+{
+    for (std::size_t block = 0; block < m_extra_fields.size(); ++block) {
+        for (int n = 0; n < 3; ++n) {
+            auto& field = *m_extra_fields[block].values[n];
+            amrex::MultiFab::Saxpy(field, a, *X.m_extra_fields[block].values[n], 0, 0,
+                                   field.nComp(), 0);
+        }
+    }
 }

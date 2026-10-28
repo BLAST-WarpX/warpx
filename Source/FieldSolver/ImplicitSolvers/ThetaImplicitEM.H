@@ -133,6 +133,14 @@ private:
      */
     WarpXSolverVec m_E_save;
 
+    /** Step-start coarse-patch and PML B, restored before every RHS evaluation. */
+    struct MagneticSnapshot {
+        warpx::fields::FieldType type;
+        int level;
+        std::array<std::unique_ptr<amrex::MultiFab>, 3> values;
+    };
+    std::vector<MagneticSnapshot> m_extra_Bold;
+
     /**
      * \brief Update the E and B fields owned by WarpX
      */

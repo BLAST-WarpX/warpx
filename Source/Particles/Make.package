@@ -4,6 +4,7 @@ CEXE_sources += RigidInjectedParticleContainer.cpp
 CEXE_sources += PhysicalParticleContainer.cpp
 CEXE_sources += PhotonParticleContainer.cpp
 CEXE_sources += LaserParticleContainer.cpp
+CEXE_sources += PrescribedCurrentParticleContainer.cpp
 CEXE_sources += ParticleBoundaryBuffer.cpp
 CEXE_sources += ParticleBoundaries.cpp
 CEXE_sources += SpeciesPhysicalProperties.cpp
