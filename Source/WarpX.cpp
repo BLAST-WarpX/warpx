@@ -114,6 +114,8 @@ bool WarpX::fft_do_time_averaging = false;
 amrex::IntVect WarpX::m_fill_guards_fields  = amrex::IntVect(0);
 amrex::IntVect WarpX::m_fill_guards_current = amrex::IntVect(0);
 
+Real WarpX::epsilon_r = 1._rt;
+
 Real WarpX::gamma_boost = 1._rt;
 Real WarpX::beta_boost = 0._rt;
 Vector<int> WarpX::boost_direction = {0,0,0};
@@ -709,6 +711,46 @@ WarpX::ReadParameters ()
                                          "Subcycling method 1 only works for 2 levels.");
 
         ReadBoostedFrameParameters(gamma_boost, beta_boost, boost_direction);
+
+        // Relative permittivity for Ampere's law. The light-speed factor is an
+        // alternative input for the same model, without changing physical c.
+        {
+            epsilon_r = 1.0_rt;
+            amrex::Real c_light_factor = 1.0_rt;
+            bool const has_epsilon_r =
+                utils::parser::queryWithParser(pp_warpx, "epsilon_r", epsilon_r);
+            bool const has_c_light_factor =
+                utils::parser::queryWithParser(pp_warpx, "c_light_factor", c_light_factor);
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(!(has_epsilon_r && has_c_light_factor),
+                "Specify only one of warpx.epsilon_r and warpx.c_light_factor.");
+            if (has_c_light_factor) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    std::isfinite(c_light_factor) && c_light_factor >= 1.0_rt &&
+                    c_light_factor <= std::sqrt(std::numeric_limits<amrex::Real>::max()),
+                    "warpx.c_light_factor must be finite, >= 1, and have a representable square.");
+                epsilon_r = c_light_factor * c_light_factor;
+            }
+            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(std::isfinite(epsilon_r) && epsilon_r >= 1.0_rt,
+                "warpx.epsilon_r must be finite and >= 1.0");
+            if (epsilon_r > 1.0) {
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    evolve_scheme == EvolveScheme::Explicit,
+                    "warpx.epsilon_r > 1 is only supported "
+                    "with the explicit FDTD solver (algo.evolve_scheme = explicit).");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    electromagnetic_solver_id != ElectromagneticSolverAlgo::PSATD,
+                    "warpx.epsilon_r > 1 is not supported "
+                    "with the PSATD spectral solver. Use an explicit FDTD solver (Yee or CKC).");
+                WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    electromagnetic_solver_id != ElectromagneticSolverAlgo::HybridPIC,
+                    "warpx.epsilon_r > 1 is not supported "
+                    "with the HybridPIC solver.");
+                amrex::Print() << "\n*** Relative permittivity in Ampere's law enabled ***\n"
+                               << "    epsilon_r = " << epsilon_r << "\n"
+                               << "    effective wave speed = " << PhysConst::c / std::sqrt(epsilon_r)
+                               << " m/s (physical c = " << PhysConst::c << " m/s)\n\n";
+            }
+        }
 
         // queryWithParser returns 1 if argument zmax_plasma_to_compute_max_step is
         // specified by the user, 0 otherwise.

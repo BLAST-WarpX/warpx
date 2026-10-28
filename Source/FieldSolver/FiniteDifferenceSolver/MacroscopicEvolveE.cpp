@@ -10,6 +10,7 @@
 #include "MacroscopicProperties/MacroscopicProperties.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+#include "WarpX.H"
 
 #include <ablastr/coarsen/sample.H>
 
@@ -126,6 +127,8 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
 #endif
     for ( MFIter mfi(*Efield[0], TilingIfNotGPU()); mfi.isValid(); ++mfi ) {
 
+        amrex::Real const epsilon_r = WarpX::epsilon_r;
+
         // Extract field data for this grid/tile
         Array4<Real> const& Ex = Efield[0]->array(mfi);
         Array4<Real> const& Ey = Efield[1]->array(mfi);
@@ -183,8 +186,11 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
             // Interpolated permittivity, epsilon, to Ex position on the grid
             amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
                                                                                 Ex_stag, macro_cr, i, j, k, scomp);
-            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+            // Scale the electric storage in both coefficients, keeping the
+            // configured conductivity and its steady Ohmic response unchanged.
+            amrex::Real const epsilon_effective = epsilon_r * epsilon_interp;
+            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_effective, dt);
+            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_effective, dt);
             Ex(i, j, k) = alpha * Ex(i, j, k)
                         + beta * ( - T_Algo::DownwardDz(Hy, coefs_z, n_coefs_z, i, j, k,0)
                                     + T_Algo::DownwardDy(Hz, coefs_y, n_coefs_y, i, j, k,0)
@@ -203,8 +209,9 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
             // Interpolated permittivity, epsilon, to Ey position on the grid
             amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
                                                                                 Ey_stag, macro_cr, i, j, k, scomp);
-            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+            amrex::Real const epsilon_effective = epsilon_r * epsilon_interp;
+            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_effective, dt);
+            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_effective, dt);
 
             Ey(i, j, k) = alpha * Ey(i, j, k)
                         + beta * ( - T_Algo::DownwardDx(Hz, coefs_x, n_coefs_x, i, j, k,0)
@@ -224,8 +231,9 @@ void FiniteDifferenceSolver::MacroscopicEvolveECartesian (
             // Interpolated permittivity, epsilon, to Ez position on the grid
             amrex::Real const epsilon_interp = ablastr::coarsen::sample::Interp(eps_arr, epsilon_stag,
                                                                                 Ez_stag, macro_cr, i, j, k, scomp);
-            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_interp, dt);
-            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_interp, dt);
+            amrex::Real const epsilon_effective = epsilon_r * epsilon_interp;
+            const amrex::Real alpha = T_MacroAlgo::alpha( sigma_interp, epsilon_effective, dt);
+            const amrex::Real beta = T_MacroAlgo::beta( sigma_interp, epsilon_effective, dt);
 
             Ez(i, j, k) = alpha * Ez(i, j, k)
                         + beta * ( - T_Algo::DownwardDy(Hx, coefs_y, n_coefs_y, i, j, k,0)
