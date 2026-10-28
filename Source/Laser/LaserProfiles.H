@@ -7,6 +7,8 @@
 #ifndef WARPX_LaserProfiles_H_
 #define WARPX_LaserProfiles_H_
 
+#include <ablastr/math/Complex.H>
+
 #include <AMReX_Gpu.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Parser.H>
@@ -21,8 +23,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-
-#include "Utils/WarpX_Complex.H"
 
 namespace WarpXLaserProfiles {
 
@@ -371,7 +371,7 @@ private:
         /** Index of the last timestep in memory */
         int last_time_index;
         /** lasy field data */
-        amrex::Gpu::DeviceVector<Complex> E_lasy_data;
+        amrex::Gpu::DeviceVector<ablastr::math::Complex> E_lasy_data;
         /** binary field data */
         amrex::Gpu::DeviceVector<amrex::Real> E_binary_data;
         /** This parameter is subtracted to simulation time before interpolating field data in file (either lasy or binary).

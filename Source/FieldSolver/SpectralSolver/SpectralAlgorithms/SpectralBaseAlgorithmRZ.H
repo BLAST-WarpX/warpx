@@ -10,6 +10,7 @@
 #include "FieldSolver/SpectralSolver/SpectralKSpaceRZ.H"
 #include "FieldSolver/SpectralSolver/SpectralFieldDataRZ.H"
 
+#include <ablastr/math/Complex.H>
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/utils/Enums.H>
 
@@ -82,7 +83,7 @@ class SpectralBaseAlgorithmRZ
     protected: // Meant to be used in the subclasses
 
         using SpectralRealCoefficients = amrex::FabArray< amrex::BaseFab <amrex::Real> >;
-        using SpectralComplexCoefficients = amrex::FabArray< amrex::BaseFab <Complex> >;
+        using SpectralComplexCoefficients = amrex::FabArray< amrex::BaseFab <ablastr::math::Complex> >;
 
         // Constructor
         SpectralBaseAlgorithmRZ(SpectralKSpaceRZ const & spectral_kspace,

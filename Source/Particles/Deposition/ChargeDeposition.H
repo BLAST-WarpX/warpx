@@ -12,8 +12,9 @@
 #include "Particles/Pusher/GetAndSetPosition.H"
 #include "Particles/ShapeFactors.H"
 #include "Utils/WarpXAlgorithmSelection.H"
+
 #ifdef WARPX_DIM_RZ
-#   include "Utils/WarpX_Complex.H"
+#   include <ablastr/math/Complex.H>
 #endif
 
 #include <AMReX.H>
@@ -45,6 +46,7 @@ void doChargeDepositionShapeN (const GetParticlePosition<PIdx>& GetPosition,
                                amrex::Real q,
                                [[maybe_unused]] int n_rz_azimuthal_modes)
 {
+    using namespace ablastr::math;
     using namespace amrex;
 
     // Whether ion_lev is a null pointer (do_ionization=0) or a real pointer
@@ -214,6 +216,7 @@ void doChargeDepositionSharedShapeN (const GetParticlePosition<PIdx>& GetPositio
                                      const amrex::IntVect bin_size
                                      )
 {
+    using namespace ablastr::math;
     using namespace amrex;
 
     const auto *permutation = a_bins.permutationPtr();

@@ -11,7 +11,6 @@
 #include "Utils/WarpXConst.H"
 
 #include <ablastr/math/FiniteDifference.H>
-#include <ablastr/utils/Enums.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_Box.H>
@@ -28,6 +27,7 @@
 #include <cmath>
 #include <vector>
 
+using namespace ablastr::math;
 using namespace amrex;
 
 /* \brief Initialize k space object.

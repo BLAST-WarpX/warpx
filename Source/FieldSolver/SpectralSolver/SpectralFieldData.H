@@ -12,8 +12,8 @@
 
 #include "SpectralKSpace.H"
 #include "Utils/WarpXAlgorithmSelection.H"
-#include "Utils/WarpX_Complex.H"
 
+#include <ablastr/math/Complex.H>
 #include <ablastr/math/fft/AnyFFT.H>
 
 #include <AMReX_BaseFab.H>
@@ -29,7 +29,7 @@
 #include <vector>
 
 // Declare type for spectral fields
-using SpectralField = amrex::FabArray< amrex::BaseFab <Complex> >;
+using SpectralField = amrex::FabArray< amrex::BaseFab <ablastr::math::Complex> >;
 
 class SpectralFieldIndex
 {

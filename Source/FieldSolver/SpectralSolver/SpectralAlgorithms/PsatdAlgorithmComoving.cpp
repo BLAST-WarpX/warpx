@@ -3,8 +3,8 @@
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXAlgorithmSelection.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpX_Complex.H"
 
+#include <ablastr/math/Complex.H>
 #include <ablastr/utils/Enums.H>
 
 #include <AMReX.H>
@@ -23,6 +23,7 @@
 
 #if WARPX_USE_FFT
 
+using namespace ablastr::math;
 using namespace amrex;
 
 PsatdAlgorithmComoving::PsatdAlgorithmComoving (const SpectralKSpace& spectral_kspace,

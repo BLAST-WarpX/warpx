@@ -31,6 +31,7 @@
 
 #if WARPX_USE_FFT
 
+using namespace ablastr::math;
 using namespace amrex;
 
 SpectralFieldIndex::SpectralFieldIndex (const bool update_with_rho,

@@ -10,7 +10,8 @@
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXConst.H"
-#include "Utils/WarpX_Complex.H"
+
+#include <ablastr/math/Complex.H>
 
 #include <AMReX_BLassert.H>
 #include <AMReX_Config.H>
@@ -27,6 +28,7 @@
 #include <numeric>
 #include <vector>
 
+using namespace ablastr::math;
 using namespace amrex;
 
 void
