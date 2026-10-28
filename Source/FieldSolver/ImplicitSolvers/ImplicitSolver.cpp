@@ -275,7 +275,8 @@ int ImplicitSolver::OneStep (const amrex::Real  start_time,
 
 void ImplicitSolver::ReinitializePETScIfDue (const int a_step, const bool verbose_step)
 {
-    if (m_petsc_reinit_interval > 0 && (a_step + 1) % m_petsc_reinit_interval == 0) {
+    // m_nlsolver is null for the semi-implicit Darwin scheme, which does not use PETSc
+    if (m_nlsolver && m_petsc_reinit_interval > 0 && (a_step + 1) % m_petsc_reinit_interval == 0) {
         if (m_nlsolver->ReinitializePETSc() && verbose_step) {
             amrex::Print() << "Re-initialized PETSc\n";
         }
