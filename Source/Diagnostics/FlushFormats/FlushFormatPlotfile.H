@@ -40,8 +40,9 @@ public:
 
     /** Write general info of the run into the plotfile */
     void WriteJobInfo(const std::string& dir) const;
-    /** Write WarpX-specific plotfile header */
-    void WriteWarpXHeader(const std::string& name, amrex::Vector<amrex::Geometry>& geom) const;
+    /** Write the WarpX-specific header, including solver state only for checkpoints. */
+    void WriteWarpXHeader(const std::string& name, amrex::Vector<amrex::Geometry>& geom,
+                         bool is_checkpoint = false) const;
     void WriteAllRawFields (bool plot_raw_fields, int nlevels,
                             const std::string& plotfilename,
                             bool plot_raw_fields_guards) const;
