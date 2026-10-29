@@ -447,27 +447,6 @@ protected:
 
     std::vector<PCTypes> species_types;
 
-    template<typename ...Args>
-    [[nodiscard]]
-    amrex::MFItInfo getMFItInfo (const WarpXParticleContainer& pc_src,
-                                 Args const&... pc_dsts) const noexcept
-    {
-        amrex::MFItInfo info;
-
-        MFItInfoCheckTiling(pc_src, pc_dsts...);
-
-        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
-            info.EnableTiling(WarpXParticleContainer::tile_size);
-        }
-
-#ifdef AMREX_USE_OMP
-        info.SetDynamic(true);
-#endif
-
-        return info;
-    }
-
-
 #ifdef WARPX_QED
     // The QED engines
     std::shared_ptr<BreitWheelerEngine> m_shr_p_bw_engine;
@@ -568,22 +547,6 @@ private:
     void mapSpeciesProduct ();
 
     bool m_do_back_transformed_particles = false;
-
-    void MFItInfoCheckTiling(const WarpXParticleContainer& /*pc_src*/) const noexcept
-    {}
-
-    template<typename First, typename ...Args>
-    void MFItInfoCheckTiling(const WarpXParticleContainer& pc_src,
-                             First const& pc_dst, Args const&... others) const noexcept
-    {
-        if (WarpXParticleContainer::do_tiling && amrex::Gpu::notInLaunchRegion()) {
-            WARPX_ALWAYS_ASSERT_WITH_MESSAGE(pc_dst.do_tiling,
-                "For particle creation processes, either all or none of the "
-                "particle species must use tiling.");
-        }
-
-        MFItInfoCheckTiling(pc_src, others...);
-    }
 
     /**
     * Should be called right after mapSpeciesProduct in InitData.
