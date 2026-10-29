@@ -62,12 +62,12 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
     // Particle shape used for the magnetostatic part of the solve (current and
     // mass matrices deposition, inductive E-field gather, and B-field gather).
     // Defaults to the electrostatic particle shape, algo.particle_shape.
-    m_ms_particle_shape = WarpX::nox;
+    m_magnetostatic_particle_shape = WarpX::nox;
     const amrex::ParmParse pp_implicit_evolve("implicit_evolve");
     utils::parser::queryWithParser(
-        pp_implicit_evolve, "magnetostatic_particle_shape", m_ms_particle_shape);
+        pp_implicit_evolve, "magnetostatic_particle_shape", m_magnetostatic_particle_shape);
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
-        m_ms_particle_shape >= 1 && m_ms_particle_shape <= WarpX::nox,
+        m_magnetostatic_particle_shape >= 1 && m_magnetostatic_particle_shape <= WarpX::nox,
         "implicit_evolve.magnetostatic_particle_shape must be between 1 and algo.particle_shape");
 
     // Set parameters used by `InitializeMassMatrices`
@@ -108,7 +108,7 @@ void SemiImplicitDarwin::Define ( WarpX*  a_WarpX, bool from_restart)
 
     // Initialize the mass matrices for plasma response (their stencil width
     // is set by the magnetostatic particle shape)
-    InitializeMassMatrices(m_ms_particle_shape);
+    InitializeMassMatrices(m_magnetostatic_particle_shape);
     InitializeImplicitOptions();
 
     // The predictor velocity push gathers the electrostatic E-field with the
@@ -140,7 +140,7 @@ void SemiImplicitDarwin::PrintParameters () const
     amrex::Print()     << "Linear solver (" << linsol_name << ") relative tolerance: " << m_linsol_rtol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") absolute tolerance: " << m_linsol_atol << "\n";
     amrex::Print()     << "Linear solver (" << linsol_name << ") preconditioner:     " << amrex::getEnumNameString(m_pc_type) << "\n";
-    amrex::Print()     << "Magnetostatic particle shape:                  " << m_ms_particle_shape << "\n";
+    amrex::Print()     << "Magnetostatic particle shape:                  " << m_magnetostatic_particle_shape << "\n";
     if (m_linear_function) { m_linear_function->printParameters(); }
     amrex::Print() << "-----------------------------------------------------------\n\n";
 }
@@ -184,7 +184,7 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
             MomentumPushType::Full,
             FieldGatherOrders{/*e_shape=*/WarpX::nox, /*e_galerkin=*/m_predictor_use_galerkin,
-                              /*b_shape=*/m_ms_particle_shape}
+                              /*b_shape=*/m_magnetostatic_particle_shape}
         );
     }
 
@@ -247,8 +247,9 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{1}, lev),
             *m_WarpX->m_fields.get(FieldType::Bfield_fp, Direction{2}, lev),
             MomentumPushType::Full,
-            FieldGatherOrders{/*e_shape=*/m_ms_particle_shape, /*e_galerkin=*/false,
-                              /*b_shape=*/m_ms_particle_shape}
+            FieldGatherOrders{/*e_shape=*/m_magnetostatic_particle_shape,
+                              /*e_galerkin=*/false,
+                              /*b_shape=*/m_magnetostatic_particle_shape}
         );
     }
 
@@ -358,7 +359,7 @@ void SemiImplicitDarwin::AccumulateCurrentAndMassMatrices ()
     // before depositing.
     m_WarpX->GetPartContainer().DepositCurrent(
         m_WarpX->m_fields.get_mr_levels_alldirs(FieldType::current_fp, lev),
-        m_dt, 0.0_rt, PushType::Implicit, m_ms_particle_shape);
+        m_dt, 0.0_rt, PushType::Implicit, m_magnetostatic_particle_shape);
 
     // Zero and accumulate the mass matrices from all species. This shares the
     // zero-then-deposit machinery with the electromagnetic implicit solvers

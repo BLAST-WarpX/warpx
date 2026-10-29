@@ -158,7 +158,7 @@ private:
      *  exceed algo.particle_shape, which is used for the electrostatic part
      *  and is the default.
      */
-    int m_ms_particle_shape;
+    int m_magnetostatic_particle_shape;
 
     /**
      * \brief Choice of linear solver
