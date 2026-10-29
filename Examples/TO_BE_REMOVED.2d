@@ -1,0 +1,51 @@
+# Test case proposed by PhysicsDan
+# Minimal reproducer: parse_field_function laser + OpenMP (OMP_NUM_THREADS >= 2)
+# crashes intermittently at step 1.
+
+max_step = 1
+amr.n_cell = 128 128
+amr.max_grid_size = 16
+amr.max_level = 0
+geometry.dims = 2
+geometry.prob_lo = -10.e-6 -10.e-6
+geometry.prob_hi =  10.e-6  10.e-6
+boundary.field_lo = pec pec
+boundary.field_hi = pec pec
+algo.particle_shape = 1
+diagnostics.enable = 0
+
+my_constants.lambda = 0.8e-6
+my_constants.omega0 = 2*pi*clight/lambda
+my_constants.w0 = 3.e-6
+my_constants.E0 = 1.e12
+
+lasers.names = laser
+laser.profile = parse_field_function
+laser.wavelength = lambda
+laser.e_max = E0
+laser.position = 0. 0. -5.e-6
+laser.direction = 0. 0. 1.
+laser.polarization = 1. 0. 0.
+# Gaussian beam, sum of 20 frequency components around omega0
+laser.field_function(X,Y,t) = "E0*exp(-X**2/w0**2)*(0
+        + cos(0.950*omega0*t)
+        + cos(0.955*omega0*t)
+        + cos(0.960*omega0*t)
+        + cos(0.965*omega0*t)
+        + cos(0.970*omega0*t)
+        + cos(0.975*omega0*t)
+        + cos(0.980*omega0*t)
+        + cos(0.985*omega0*t)
+        + cos(0.990*omega0*t)
+        + cos(0.995*omega0*t)
+        + cos(1.000*omega0*t)
+        + cos(1.005*omega0*t)
+        + cos(1.010*omega0*t)
+        + cos(1.015*omega0*t)
+        + cos(1.020*omega0*t)
+        + cos(1.025*omega0*t)
+        + cos(1.030*omega0*t)
+        + cos(1.035*omega0*t)
+        + cos(1.040*omega0*t)
+        + cos(1.045*omega0*t)
+    )/20"
