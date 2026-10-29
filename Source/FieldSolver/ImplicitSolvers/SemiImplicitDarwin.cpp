@@ -148,6 +148,11 @@ int SemiImplicitDarwin::OneStep ( [[maybe_unused]] amrex::Real  start_time,
     // Fields have E^{n} (from phi^n only), B^{n-1/2}
     // Particles have u^{n-1/2} and x^{n}.
 
+    // The electrostatic solve at the end of the previous step only sets E in the
+    // valid cells, so exchange guard cells now (this happens in
+    // WarpX::ExplicitFillBoundaryEBUpdateAux for explicit solvers).
+    m_WarpX->FillBoundaryE(m_WarpX->getngEB());
+
     // Save u and x at the start of the time step
     // TODO: only save u since we don't need to keep x
     m_WarpX->SaveParticlesAtImplicitStepStart();
