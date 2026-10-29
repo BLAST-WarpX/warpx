@@ -49,6 +49,24 @@ if(WarpX_EB)
         OFF  # dependency
     )
     add_warpx_test(
+        test_rz_voltage_clamp_pmc_exit_picmi  # name
+        RZ  # dims
+        2  # nprocs
+        "inputs_test_rz_voltage_clamp_picmi.py --case exit --max-grid-size 16"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+    add_warpx_test(
+        test_rz_voltage_clamp_pmc_vacuum_picmi  # name
+        RZ  # dims
+        1  # nprocs
+        "inputs_test_rz_voltage_clamp_picmi.py --case vacuum --z-faces pmc"  # inputs
+        OFF  # analysis
+        OFF  # checksum
+        OFF  # dependency
+    )
+    add_warpx_test(
         test_rz_voltage_clamp_vacuum_picmi  # name
         RZ  # dims
         1  # nprocs

@@ -68,12 +68,13 @@ Supported configurations
   No current/charge filter.
   Energy-conserving field gathering, and no particle E field read from file.
 * Radial boundary: the axis and a PEC outer wall, which is the grounded potential reference.
-  Axial boundaries: both periodic or both PEC.
+  Axial boundaries: periodic, or PEC or PMC (``neumann``) faces in any combination.
 * Listed conductors must be separate bodies.
 * A conductor that touches a PEC domain boundary is part of the ground: the staircase ties it to the wall, so it cannot hold another voltage.
   Such conductors (for example a curved outer wall) are found at setup; they may be listed with potential 0 or left out, and they get no unit solve.
   Listing one with another potential aborts.
   Touching is decided on the staircase, which joins a conductor to the wall across a gap smaller than one cell.
+  A PMC face is not a wall: conductors may end on it.
 * List every connected body as its own conductor, even if two bodies should share a voltage.
   The staircase keeps each connected body an equipotential, so the clamp holds each listed conductor exactly; for disconnected pieces listed as one conductor it holds only their combined charge, and the pieces can drift apart.
 * With the Verboncoeur axis correction (``boundary.verboncoeur_axis_correction``, on by default), charge on axis nodes that do not belong to a conductor aborts the run: that case is not verified yet.
@@ -146,6 +147,23 @@ This is harmless as long as the multigrid solve itself converges, since every mu
 If the multigrid solve needs many more iterations or does not converge, raise :pp:param:`warpx.self_fields_bottom_max_iters`, or allow one more coarsening level.
 A deeper cap or another bottom solver (:pp:param:`warpx.self_fields_bottom_solver`) can also be faster on large grids; check that the solve still converges for the thinnest conductor, since the depth at which it fails depends on the geometry.
 
+PMC end faces
+-------------
+
+A PMC (``neumann``) face acts as a symmetry plane: the field is that of the domain mirrored across the face, so the electric field has no component normal to the face and, unlike at a PEC wall, the potential on the face is not fixed.
+For the unit potentials this is a homogeneous Neumann condition, and conductors may end on the face.
+
+A particle absorbed at a PMC face leaves its charge in the field as a surface charge on the face, while the deposited :math:`\rho` no longer contains it.
+This charge induces charge on the conductors like any other, so with a PMC face the observer pairs the unit potentials with the Gauss charge on the free nodes instead of the deposited charge:
+
+.. math::
+
+   Q_{g,k} = -\Big[\varepsilon_0 \sum_{i \notin F} \psi_{k,i} V_i\, (\nabla_h \cdot \boldsymbol{E})_i + \sum_{i \in F} \psi_{k,i}\, q_i\Big],
+
+with :math:`F` the fixed nodes of all conductors (the other nodes are free), and the capacitance matrix calibrated with the same pairing.
+Where Gauss's law holds, :math:`\varepsilon_0 V_i (\nabla_h \cdot \boldsymbol{E})_i = q_i` on the free nodes, and this equals :math:`-\sum_i \psi_{k,i}\, q_i`.
+The clamp holds the conductors at their targets despite the face charge; it does not remove that charge.
+
 What it does not do
 -------------------
 
@@ -155,7 +173,7 @@ What it does not do
   That check holds only where the line integral is path-independent: a changing magnetic flux through the area between two paths (:math:`\oint \boldsymbol{E} \cdot d\boldsymbol{l} = -d\Phi_B/dt`) makes them differ, so compare along a path where this flux is negligible.
 * There is no circuit model (no floating electrodes, no series impedance) and no dielectric charging.
 * It is available from Python only; there is no inputs-file interface yet.
-* Cartesian geometries (XZ, 3D), PMC and open (absorbing) field boundaries are not supported yet.
+* Cartesian geometries (XZ, 3D) and open (absorbing) field boundaries are not supported yet.
 * Each correction costs one charge deposition, one nodal divergence and a few reductions; the unit potentials are solved once, at setup.
 
 Examples and tests
@@ -166,7 +184,8 @@ Examples and tests
 * vacuum: capacitance matrix against the discrete coaxial formula, static clamped field;
 * a coaxial space-charge diode with and without the clamp, including the grounded-charge cross-check;
 * the diode on two ranks with the anode joined to the outer wall, listed with potential 0 (and rejected at 100 V);
-* checkpoint/restart during emission.
+* checkpoint/restart during emission;
+* PMC faces: the vacuum case, and charge leaving through a PMC face next to a clamped rod (two ranks).
 
 .. bibliography::
     :keyprefix: vc-

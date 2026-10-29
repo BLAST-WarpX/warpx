@@ -14,8 +14,8 @@
 #include <vector>
 
 /* Voltage clamp for embedded-boundary conductors in electromagnetic runs
- * (RZ m=0, explicit staggered Yee, one level). Defined in RZ builds with embedded
- * boundaries only.
+ * (RZ m=0, explicit staggered Yee, one level; periodic, PEC or PMC z faces). Defined
+ * in RZ builds with embedded boundaries only.
  *
  * The conductors are the components of WarpX's frozen-edge staircase. The fixed
  * nodes are the endpoints of frozen E edges. Conductor k has a unit potential

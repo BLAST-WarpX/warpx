@@ -6,6 +6,7 @@
  */
 #include "VoltageClamp.H"
 
+#include "BoundaryConditions/WarpX_PEC.H"
 #include "EmbeddedBoundary/Enabled.H"
 #include "FieldSolver/ElectrostaticSolvers/ElectrostaticSolver.H"
 #include "FieldSolver/FiniteDifferenceSolver/FiniteDifferenceSolver.H"
@@ -115,14 +116,16 @@ namespace
             warpx.GetPartContainer().m_E_ext_particle_s != "read_from_file",
             "The voltage clamp requires energy-conserving field gathering and no "
             "particle E field read from file");
-        bool const z_periodic = warpx.Geom(lev).isPeriodic(1);
+        auto const face = [] (FieldBoundaryType b) {
+            return b == FieldBoundaryType::PEC || b == FieldBoundaryType::PMC;
+        };
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
             WarpX::field_boundary_lo[0] == FieldBoundaryType::None &&
             WarpX::field_boundary_hi[0] == FieldBoundaryType::PEC &&
-            (z_periodic || (WarpX::field_boundary_lo[1] == FieldBoundaryType::PEC &&
-                            WarpX::field_boundary_hi[1] == FieldBoundaryType::PEC)),
-            "The voltage clamp supports a PEC outer radius and two PEC or two "
-            "periodic z boundaries");
+            (warpx.Geom(lev).isPeriodic(1) ||
+             (face(WarpX::field_boundary_lo[1]) && face(WarpX::field_boundary_hi[1]))),
+            "The voltage clamp supports a PEC outer radius and periodic, PEC or PMC "
+            "(neumann) z boundaries");
     }
 
     // --- Geometry: everything specific to RZ is in the helpers below ---------
@@ -136,6 +139,7 @@ namespace
         amrex::Array4<int const> ur, uz;
         amrex::IntVect dlo, dhi;
         bool z_periodic;
+        bool pec_lo, pec_hi, pmc_lo, pmc_hi; // z faces
 
         // Node (i,j) is fixed if any of its four edges is frozen: the Er edges to its
         // left (i-1) and right (i), and the Ez edges below (j-1) and above (j).
@@ -152,7 +156,14 @@ namespace
         AMREX_GPU_DEVICE AMREX_FORCE_INLINE
         bool wall (int i, int j) const noexcept
         {
-            return i == dhi[0] || (!z_periodic && (j == dlo[1] || j == dhi[1]));
+            return i == dhi[0] || (pec_lo && j == dlo[1]) || (pec_hi && j == dhi[1]);
+        }
+
+        // PMC face nodes: half a control volume (the mirror image holds the other half)
+        AMREX_GPU_DEVICE AMREX_FORCE_INLINE
+        bool pmc_face (int j) const noexcept
+        {
+            return (pmc_lo && j == dlo[1]) || (pmc_hi && j == dhi[1]);
         }
     };
 
@@ -160,19 +171,32 @@ namespace
     {
         auto& update = warpx.GetEBUpdateEFlag_fp()[lev];
         amrex::Box const domain = amrex::surroundingNodes(warpx.Geom(lev).Domain());
+        auto const lo = WarpX::field_boundary_lo[1];
+        auto const hi = WarpX::field_boundary_hi[1];
         return {update[0]->const_array(mfi), update[2]->const_array(mfi),
-                domain.smallEnd(), domain.bigEnd(), warpx.Geom(lev).isPeriodic(1)};
+                domain.smallEnd(), domain.bigEnd(), warpx.Geom(lev).isPeriodic(1),
+                lo == FieldBoundaryType::PEC, hi == FieldBoundaryType::PEC,
+                lo == FieldBoundaryType::PMC, hi == FieldBoundaryType::PMC};
+    }
+
+    bool AnyPMC ()
+    {
+        return WarpX::field_boundary_lo[1] == FieldBoundaryType::PMC ||
+               WarpX::field_boundary_hi[1] == FieldBoundaryType::PMC;
     }
 
     /* Node volumes: 2 pi r dr dz off axis. On the axis, pi dr^2 dz times an axis
      * factor: RZAxisVolumeFactor() for the deposited rho (as in
      * ApplyInverseVolumeScalingToChargeDensity; 1/3 with the Verboncoeur correction)
-     * and 1/4 for the divergence control volume r <= dr/2. */
-    void FillMeasure (WarpX const& warpx, amrex::MultiFab& measure, amrex::Real axis_factor)
+     * and 1/4 for the divergence control volume r <= dr/2. PMC face nodes have half a
+     * control volume (the mirror holds the other half). The finalized rho is folded
+     * there (doubled, as WarpX folds rho at PMC faces), so V rho is the node's charge. */
+    void FillMeasure (WarpX& warpx, amrex::MultiFab& measure, amrex::Real axis_factor)
     {
         auto const dx = warpx.Geom(lev).CellSizeArray();
         auto const owner = measure.OwnerMask(warpx.Geom(lev).periodicity());
         for (amrex::MFIter mfi(measure); mfi.isValid(); ++mfi) {
+            auto const sc = MakeStaircase(warpx, mfi);
             auto const m = measure.array(mfi);
             auto const own = owner->const_array(mfi);
             amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k)
@@ -180,14 +204,17 @@ namespace
                 amrex::Real const r = i * dx[0];
                 amrex::Real const radial = (i == 0) ? MathConst::pi * dx[0] * axis_factor
                                                     : 2._rt * MathConst::pi * r;
-                m(i,j,k) = own(i,j,k) ? radial * dx[0] * dx[1] : 0._rt;
+                amrex::Real const half = sc.pmc_face(j) ? 0.5_rt : 1._rt;
+                m(i,j,k) = own(i,j,k) ? half * radial * dx[0] * dx[1] : 0._rt;
             });
         }
     }
 
-    // sum_nodes a b measure (each node once)
+    /* sum_nodes a b measure (each node once). With a mask, only nodes where
+     * (mask != 0) == on_mask contribute. */
     amrex::Real Integrate (amrex::MultiFab const& a, amrex::MultiFab const& b,
-                           amrex::MultiFab const& measure)
+                           amrex::MultiFab const& measure,
+                           amrex::MultiFab const* mask = nullptr, bool on_mask = true)
     {
         amrex::ReduceOps<amrex::ReduceOpSum> op;
         amrex::ReduceData<amrex::Real> data(op);
@@ -195,10 +222,13 @@ namespace
             auto const aa = a.const_array(mfi);
             auto const ba = b.const_array(mfi);
             auto const ma = measure.const_array(mfi);
+            auto const sel = mask ? mask->const_array(mfi) : amrex::Array4<amrex::Real const>{};
+            bool const masked = mask != nullptr;
             op.eval(mfi.validbox(), data, [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 -> amrex::GpuTuple<amrex::Real>
             {
-                return {aa(i,j,k) * ba(i,j,k) * ma(i,j,k)};
+                bool const use = !masked || ((sel(i,j,k) != 0._rt) == on_mask);
+                return {use ? aa(i,j,k) * ba(i,j,k) * ma(i,j,k) : 0._rt};
             });
         }
         amrex::Real sum = amrex::get<0>(data.value());
@@ -326,6 +356,8 @@ namespace
                 auto const r = rhs.array(mfi);
                 auto const q = source->const_array(mfi);
                 auto const m = overset.const_array(mfi);
+                // On PMC faces the Neumann equation needs the mirrored (doubled) face
+                // density, which is what the finalized rho holds there
                 amrex::ParallelFor(mfi.validbox(), [=] AMREX_GPU_DEVICE (int i, int j, int kk)
                 {
                     r(i,j,kk) = m(i,j,kk) ? -q(i,j,kk) / PhysConst::epsilon_0 : 0._rt;
@@ -445,7 +477,7 @@ namespace
         amrex::ParallelDescriptor::ReduceIntMax(host_edges.data(), 2*count);
 
         // Breadth-first search along frozen edges, starting from all wall nodes: the
-        // outer radius, and the z faces unless z is periodic
+        // outer radius, and the PEC z faces
         std::vector<int> grounded(count, 0);
         std::queue<int> queue;
         auto const visit = [&] (int i, int row) {
@@ -453,8 +485,11 @@ namespace
             if (grounded[n] == 0) { grounded[n] = 1; queue.push(n); }
         };
         for (int row = 0; row < nrow; ++row) { visit(nr-1, row); }
-        if (!z_periodic) {
-            for (int i = 0; i < nr; ++i) { visit(i, 0); visit(i, nrow-1); }
+        bool const pec_lo = WarpX::field_boundary_lo[1] == FieldBoundaryType::PEC;
+        bool const pec_hi = WarpX::field_boundary_hi[1] == FieldBoundaryType::PEC;
+        for (int i = 0; i < nr; ++i) {
+            if (pec_lo) { visit(i, 0); }
+            if (pec_hi) { visit(i, nrow-1); }
         }
         while (!queue.empty()) {
             int const n = queue.front();
@@ -498,6 +533,14 @@ namespace
         // The divergence stencil reads guard cells; syncing them from valid data
         // keeps the result independent of the domain decomposition.
         ablastr::fields::VectorField const efield = warpx.m_fields.get_alldirs(name, lev);
+        if (AnyPMC()) {
+            // Mirror images of E in the guard cells of PMC faces. At a PMC face E has the
+            // symmetry that B has at a PEC wall, so WarpX fills them with its PEC routine
+            // for B, as WarpX::ApplyEfieldBoundary does.
+            PEC::ApplyPECtoBfield(efield, WarpX::field_boundary_lo, WarpX::field_boundary_hi,
+                FieldBoundaryType::PMC, warpx.get_ng_fieldgather(), warpx.Geom(lev), lev,
+                PatchType::fine, warpx.refRatio());
+        }
         for (auto* e : efield) { e->FillBoundary(warpx.Geom(lev).periodicity()); }
         // The FDTD solver's own nodal divergence, so the observer sees exactly the
         // discrete Gauss law of the field update
@@ -614,17 +657,24 @@ void CheckSelection (int n)
         "to a PEC wall (the ground); list every conductor that does not touch a wall");
 }
 
+namespace
+{
+    std::vector<amrex::Real> GaussChargeOf (WarpX& warpx, amrex::MultiFab const& div_e, int n)
+    {
+        auto const& measure = *warpx.m_fields.get(gauss_measure, lev);
+        std::vector<amrex::Real> charge(n);
+        for (int k = 0; k < n; ++k) {
+            charge[k] = PhysConst::epsilon_0 *
+                Integrate(div_e, *warpx.m_fields.get(WeightName(k), lev), measure);
+        }
+        return charge;
+    }
+}
+
 std::vector<amrex::Real> GaussCharge (int n, std::string const& efield_name)
 {
     auto& warpx = WarpX::GetInstance();
-    auto const div_e = NodalDivE(warpx, efield_name);
-    auto const& measure = *warpx.m_fields.get(gauss_measure, lev);
-    std::vector<amrex::Real> charge(n);
-    for (int k = 0; k < n; ++k) {
-        charge[k] = PhysConst::epsilon_0 *
-            Integrate(*div_e, *warpx.m_fields.get(WeightName(k), lev), measure);
-    }
-    return charge;
+    return GaussChargeOf(warpx, *NodalDivE(warpx, efield_name), n);
 }
 
 // C is measured with the observer itself (column k = charges read for E_k) rather
@@ -632,10 +682,24 @@ std::vector<amrex::Real> GaussCharge (int n, std::string const& efield_name)
 // fields, so the readback after a correction is the target to roundoff.
 std::vector<std::vector<amrex::Real>> CapacitanceMatrix (int n)
 {
+    // With field pairing, the observer also reads eps0 psi^T div E on free nodes,
+    // which for a unit field is its (tiny) solve residual. Calibrating with the
+    // same observer makes the readback exact for any sum of unit fields.
+    auto& warpx = WarpX::GetInstance();
+    bool const field_pairing = AnyPMC();
+    auto const& fixed = *warpx.m_fields.get(fixed_nodes, lev);
+    auto const& gauss = *warpx.m_fields.get(gauss_measure, lev);
     std::vector<std::vector<amrex::Real>> cap(n, std::vector<amrex::Real>(n));
     for (int k = 0; k < n; ++k) {
-        auto const column = GaussCharge(n, EFieldName(k));
-        for (int j = 0; j < n; ++j) { cap[j][k] = column[j]; }
+        auto const div_e = NodalDivE(warpx, EFieldName(k));
+        auto const column = GaussChargeOf(warpx, *div_e, n);
+        for (int j = 0; j < n; ++j) {
+            cap[j][k] = column[j];
+            if (field_pairing) {
+                cap[j][k] += PhysConst::epsilon_0 * Integrate(
+                    *div_e, *warpx.m_fields.get(PhiName(j), lev), gauss, &fixed, false);
+            }
+        }
     }
     return cap;
 }
@@ -645,7 +709,8 @@ ChargeState (int n)
 {
     auto& warpx = WarpX::GetInstance();
     // Gauss charge of the live field on each conductor's fixed nodes
-    auto charge = GaussCharge(n, "Efield_fp");
+    auto const div_e = NodalDivE(warpx, "Efield_fp");
+    auto charge = GaussChargeOf(warpx, *div_e, n);
     auto const rho = DepositedRho(warpx);
     auto const& measure = *warpx.m_fields.get(rho_measure, lev);
 
@@ -676,10 +741,20 @@ ChargeState (int n)
     // Field charge: subtract the particle charge on the fixed nodes (it is in div E
     // but not on the conductor surface). Grounded charge: the charge the plasma
     // induces on the conductors when all are at 0 V (Shockley-Ramo), -psi_k^T V rho.
+    // With PMC faces, particles absorbed there leave charge in the field that no
+    // particle carries. The grounded charge then pairs psi with the field's charge
+    // eps0 div E on free nodes, and with the deposited rho on fixed nodes.
+    bool const field_pairing = AnyPMC();
+    auto const& fixed = *warpx.m_fields.get(fixed_nodes, lev);
+    auto const& gauss = *warpx.m_fields.get(gauss_measure, lev);
     std::vector<amrex::Real> grounded(n);
     for (int k = 0; k < n; ++k) {
+        auto const& psi = *warpx.m_fields.get(PhiName(k), lev);
         charge[k] -= Integrate(*rho, *warpx.m_fields.get(WeightName(k), lev), measure);
-        grounded[k] = -Integrate(*rho, *warpx.m_fields.get(PhiName(k), lev), measure);
+        grounded[k] = field_pairing
+            ? -PhysConst::epsilon_0 * Integrate(*div_e, psi, gauss, &fixed, false)
+              - Integrate(*rho, psi, measure, &fixed, true)
+            : -Integrate(*rho, psi, measure);
     }
     return {charge, grounded};
 }
