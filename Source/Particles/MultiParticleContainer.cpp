@@ -510,19 +510,11 @@ MultiParticleContainer::Evolve (ablastr::fields::MultiFabRegister& fields,
                 fields.get(FieldType::current_fp_non_suborbit, Direction{2}, lev)->setVal(0.0);
             }
 
-            // If using a preconditioner (pc), suborbit particles deposit their contribution
-            // during the nonlinear-stage of JFNK. Do not reset if from linear stage of JNK.
-            const bool zero_mass_matrices_pc = implicit_options->use_mass_matrices_pc &&
-                                              !implicit_options->linear_stage_of_jfnk;
-            if (zero_mass_matrices_pc) {
-                fields.get(FieldType::MassMatrices_PC, Direction{0}, lev)->setVal(0.0);
-                fields.get(FieldType::MassMatrices_PC, Direction{1}, lev)->setVal(0.0);
-                fields.get(FieldType::MassMatrices_PC, Direction{2}, lev)->setVal(0.0);
-            }
         }
     }
     for (auto& pc : allcontainers) {
-        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition, position_push_type, momentum_push_type, implicit_options);
+        pc->Evolve(fields, lev, current_fp_string, t, dt, subcycling_half, skip_deposition,
+                   position_push_type, momentum_push_type, implicit_options);
     }
 }
 

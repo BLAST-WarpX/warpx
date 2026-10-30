@@ -15,7 +15,6 @@
 #include "PushSelector.H"
 #include "UpdatePosition.H"
 #include "Particles/Deposition/CurrentDeposition.H"
-#include "Particles/Deposition/MassMatricesDeposition.H"
 #include "Particles/Gather/FieldGather.H"
 #include "Particles/Gather/GetExternalFields.H"
 #include "Utils/WarpXAlgorithmSelection.H"
@@ -714,7 +713,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  *        These are particles that failed to converge in ImplicitPushXP.
  *
  * \param[in] pti The WarpXParIter holding the particles to push
- * \param[in] fields The MultiFab register instance
  * \param[in] exfab, eyfab, ezfab The E fields
  * \param[in] bxfab, byfab, bzfab The B fields
  * \param[in] implicit_options Specifies options for implicit push
@@ -731,7 +729,6 @@ PhysicalParticleContainer::ImplicitPushXP (WarpXParIter & pti,
  */
 void
 PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
-                                                    ablastr::fields::MultiFabRegister& fields,
                                                     amrex::FArrayBox const * exfab,
                                                     amrex::FArrayBox const * eyfab,
                                                     amrex::FArrayBox const * ezfab,
@@ -751,9 +748,6 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
                                                     amrex::Gpu::DeviceVector<long> & unconverged_indices,
                                                     amrex::Gpu::DeviceVector<amrex::ParticleReal> & saved_weights)
 {
-    using ablastr::fields::Direction;
-    using warpx::fields::FieldType;
-
     WARPX_ALWAYS_ASSERT_WITH_MESSAGE((gather_lev==(lev-1)) ||
                                      (gather_lev==(lev  )),
                                      "Gather buffers only work for lev-1");
@@ -854,46 +848,7 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     amrex::IndexType const by_type = byfab->box().ixType();
     amrex::IndexType const bz_type = bzfab->box().ixType();
 
-    const bool use_mass_matrices_pc = implicit_options->use_mass_matrices_pc;
     const bool linear_stage_of_jfnk = implicit_options->linear_stage_of_jfnk;
-    const bool deposit_mass_matrices = use_mass_matrices_pc && !linear_stage_of_jfnk;
-    amrex::MultiFab *Sxx, *Sxy, *Sxz, *Syx, *Syy, *Syz, *Szx, *Szy, *Szz;
-    if (deposit_mass_matrices) {
-        // Mass matrices deposit for suborbit particles is only for the preconditioner,
-        // which currently only has the diagonal elements. The off-diagonal components
-        // (i.e., Sxy and Szx) will not be used in the deposit below, but it is required
-        // to pass them anyway. When the PC is more mature, the off-diagonal components
-        // of the MM for the PC will have unique containers that will replace those used
-        // here, which are used for the Jacobian calculation of non-suborbit particles.
-        Sxx = fields.get(FieldType::MassMatrices_PC, Direction{0}, lev);
-        Sxy = fields.get(FieldType::MassMatrices_X, Direction{1}, lev);
-        Sxz = fields.get(FieldType::MassMatrices_X, Direction{2}, lev);
-        Syx = fields.get(FieldType::MassMatrices_Y, Direction{0}, lev);
-        Syy = fields.get(FieldType::MassMatrices_PC, Direction{1}, lev);
-        Syz = fields.get(FieldType::MassMatrices_Y, Direction{2}, lev);
-        Szx = fields.get(FieldType::MassMatrices_Z, Direction{0}, lev);
-        Szy = fields.get(FieldType::MassMatrices_Z, Direction{1}, lev);
-        Szz = fields.get(FieldType::MassMatrices_PC, Direction{2}, lev);
-    }
-
-    amrex::Array4<amrex::Real> const & Sxx_arr = (deposit_mass_matrices ? Sxx->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Sxy_arr = (deposit_mass_matrices ? Sxy->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Sxz_arr = (deposit_mass_matrices ? Sxz->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Syx_arr = (deposit_mass_matrices ? Syx->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Syy_arr = (deposit_mass_matrices ? Syy->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Syz_arr = (deposit_mass_matrices ? Syz->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Szx_arr = (deposit_mass_matrices ? Szx->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Szy_arr = (deposit_mass_matrices ? Szy->array(pti) : amrex::Array4<amrex::Real>());
-    amrex::Array4<amrex::Real> const & Szz_arr = (deposit_mass_matrices ? Szz->array(pti) : amrex::Array4<amrex::Real>());
-
-    // Create Gpu::Buffer for mass matrices to reduce kernel argument size
-    amrex::Gpu::Buffer<amrex::Array4<amrex::Real>> Sbuf({Sxx_arr, Sxy_arr, Sxz_arr,
-                                                         Syx_arr, Syy_arr, Syz_arr,
-                                                         Szx_arr, Szy_arr, Szz_arr});
-    auto const* pSbuf = Sbuf.data();
-    const amrex::IntVect ncomp_pc_xx = implicit_options->ncomp_pc_xx;
-    const amrex::IntVect ncomp_pc_yy = implicit_options->ncomp_pc_yy;
-    const amrex::IntVect ncomp_pc_zz = implicit_options->ncomp_pc_zz;
 
     auto& attribs = pti.GetAttribs();
     amrex::ParticleReal* const AMREX_RESTRICT ux = attribs[PIdx::ux].dataPtr();
@@ -960,13 +915,8 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
     long * unconverged_i = unconverged_indices.data() + index_offset;
     amrex::ParticleReal * saved_w = saved_weights.data() + index_offset;
 
-    // Create error counters for device-side error detection
-    // Grid crossing error counts in x, y, z order.
-    amrex::Gpu::Buffer<int> grid_crossing_error_count({0, 0, 0});
+    // Create an error counter for device-side particle-position errors.
     amrex::Gpu::Buffer<int> position_error_count({0});
-    int* error_count_x = grid_crossing_error_count.data();
-    int* error_count_y = grid_crossing_error_count.data() + 1;
-    int* error_count_z = grid_crossing_error_count.data() + 2;
     int* position_error_count_ptr = position_error_count.data();
 
     // Using this version of For with compile time options
@@ -1096,188 +1046,43 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
 
                 const amrex::ParticleReal gaminv = GetImplicitGammaInverse(uxp_n, uyp_n, uzp_n, ux[ip], uy[ip], uz[ip]);
 
-                if (deposit_mass_matrices) {
-                    const amrex::Real wq_invvol = wq*invvol/nsuborbits[ip];
-                    const amrex::Real rhop = 2.0_rt*wq_invvol*gaminv; // approximation when neglecting MM coupling terms
+                const amrex::ParticleReal wq_n = wq/nsuborbits[ip];
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
-                    const amrex::Real rp_new = std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1);
-                    const amrex::Real rp_old = std::sqrt(xp_n*xp_n + yp_n*yp_n);
-                    const amrex::Real rp_mid = 0.5_rt*(rp_new + rp_old);
-                    const amrex::Real costh = (rp_mid > 0._rt ? xp/rp_mid : 1._rt);
-                    const amrex::Real sinth = (rp_mid > 0._rt ? yp/rp_mid : 0._rt);
-#elif defined(WARPX_DIM_RSPHERE)
-                    const amrex::Real rp_new = std::sqrt(xp_np1*xp_np1 + yp_np1*yp_np1 + zp_np1*zp_np1);
-                    const amrex::Real rp_old = std::sqrt(xp_n*xp_n + yp_n*yp_n + zp_n*zp_n);
-                    const amrex::Real rp_mid = 0.5_rt*(rp_new + rp_old);
-                    const amrex::Real rpxy_mid = std::sqrt(xp*xp + yp*yp);
-                    const amrex::Real costh = (rpxy_mid > 0._rt ? xp/rpxy_mid : 1._rt);
-                    const amrex::Real sinth = (rpxy_mid > 0._rt ? yp/rpxy_mid : 0._rt);
-                    const amrex::Real cosph = (rp_mid > 0._rt ? rpxy_mid/rp_mid : 1._rt);
-                    const amrex::Real sinph = (rp_mid > 0._rt ? zp/rp_mid : 0._rt);
-#endif
-
-                    // Set the Mass Matrices kernels
-                    amrex::ParticleReal fpxx, fpxy, fpxz;
-                    amrex::ParticleReal fpyx, fpyy, fpyz;
-                    amrex::ParticleReal fpzx, fpzy, fpzz;
-                    setMassMatricesKernels(q, mass, dt_suborbit, rhop,
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                                           costh, sinth,
-#endif
-#if defined(WARPX_DIM_RSPHERE)
-                                           cosph, sinph,
-#endif
-                                           ux[ip], uy[ip], uz[ip],
-                                           Bxp, Byp, Bzp,
-                                           fpxx, fpxy, fpxz,
-                                           fpyx, fpyy, fpyz,
-                                           fpzx, fpzy, fpzz);
-
-                    // Form grid-basis current components once, before orbit cropping.
-                    // Reuse the mapping factors used by the mass matrix kernel.
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-                    const amrex::Real vx = (rp_new - rp_old)/dt_suborbit;
-                    const amrex::Real vy = (-ux[ip]*sinth + uy[ip]*costh)*gaminv;
-#elif defined(WARPX_DIM_1D_Z)
-                    const amrex::Real vx = ux[ip]*gaminv;
-                    const amrex::Real vy = uy[ip]*gaminv;
-#else
-                    const amrex::Real vx = (xp_np1 - xp_n)/dt_suborbit;
-#if defined(WARPX_DIM_3D)
-                    const amrex::Real vy = (yp_np1 - yp_n)/dt_suborbit;
-#else
-                    const amrex::Real vy = uy[ip]*gaminv;
-#endif
-#endif
-#if defined(WARPX_DIM_RSPHERE)
-                    const amrex::Real vz = (-ux[ip]*costh*sinph - uy[ip]*sinth*sinph + uz[ip]*cosph)*gaminv;
-#elif defined(WARPX_DIM_RCYLINDER)
-                    const amrex::Real vz = uz[ip]*gaminv;
-#else
-                    const amrex::Real vz = (zp_np1 - zp_n)/dt_suborbit;
-#endif
-                    const amrex::Real wqx = wq_invvol*vx;
-                    const amrex::Real wqy = wq_invvol*vy;
-                    const amrex::Real wqz = wq_invvol*vz;
-
-                    // The ignore_unused is needed so that the variables are not first-captured
-                    // in a constexpr-if context.
-                    amrex::ignore_unused(max_grid_crossings);
-                    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
-                    amrex::ignore_unused(error_count_x, error_count_y, error_count_z);
-                    amrex::ignore_unused(ncomp_pc_xx, ncomp_pc_yy, ncomp_pc_zz);
-                    amrex::ignore_unused(pSbuf);
-                    if constexpr (depos_order_control == order_one) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        doVillasenorJandSigmaDepositionKernel<1,false,/*deposit_J=*/true,
-                                                              WarpX::villasenor_mass_matrices_max_grid_crossings>(
-                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wqx, wqy, wqz,
-                                                              fpxx, fpxy, fpxz,
-                                                              fpyx, fpyy, fpyz,
-                                                              fpzx, fpzy, fpzz,
-                                                              Jx_arr, Jy_arr, Jz_arr,
-                                                              max_grid_crossings,
-                                                              error_count_x, error_count_y, error_count_z,
-                                                              pSbuf[0], pSbuf[1], pSbuf[2],
-                                                              pSbuf[3], pSbuf[4], pSbuf[5],
-                                                              pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              ncomp_pc_xx, ncomp_pc_yy, ncomp_pc_zz,
-                                                              dinv, xyzmin, domain_double, do_cropping, lo );
-                    } else if constexpr (depos_order_control == order_two) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        doVillasenorJandSigmaDepositionKernel<2,false,/*deposit_J=*/true,
-                                                              WarpX::villasenor_mass_matrices_max_grid_crossings>(
-                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wqx, wqy, wqz,
-                                                              fpxx, fpxy, fpxz,
-                                                              fpyx, fpyy, fpyz,
-                                                              fpzx, fpzy, fpzz,
-                                                              Jx_arr, Jy_arr, Jz_arr,
-                                                              max_grid_crossings,
-                                                              error_count_x, error_count_y, error_count_z,
-                                                              pSbuf[0], pSbuf[1], pSbuf[2],
-                                                              pSbuf[3], pSbuf[4], pSbuf[5],
-                                                              pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              ncomp_pc_xx, ncomp_pc_yy, ncomp_pc_zz,
-                                                              dinv, xyzmin, domain_double, do_cropping, lo );
-                    } else if constexpr (depos_order_control == order_three) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        doVillasenorJandSigmaDepositionKernel<3,false,/*deposit_J=*/true,
-                                                              WarpX::villasenor_mass_matrices_max_grid_crossings>(
-                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wqx, wqy, wqz,
-                                                              fpxx, fpxy, fpxz,
-                                                              fpyx, fpyy, fpyz,
-                                                              fpzx, fpzy, fpzz,
-                                                              Jx_arr, Jy_arr, Jz_arr,
-                                                              max_grid_crossings,
-                                                              error_count_x, error_count_y, error_count_z,
-                                                              pSbuf[0], pSbuf[1], pSbuf[2],
-                                                              pSbuf[3], pSbuf[4], pSbuf[5],
-                                                              pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              ncomp_pc_xx, ncomp_pc_yy, ncomp_pc_zz,
-                                                              dinv, xyzmin, domain_double, do_cropping, lo );
-                    } else if constexpr (depos_order_control == order_four) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        doVillasenorJandSigmaDepositionKernel<4,false,/*deposit_J=*/true,
-                                                              WarpX::villasenor_mass_matrices_max_grid_crossings>(
-                                                              xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1,
-                                                              wqx, wqy, wqz,
-                                                              fpxx, fpxy, fpxz,
-                                                              fpyx, fpyy, fpyz,
-                                                              fpzx, fpzy, fpzz,
-                                                              Jx_arr, Jy_arr, Jz_arr,
-                                                              max_grid_crossings,
-                                                              error_count_x, error_count_y, error_count_z,
-                                                              pSbuf[0], pSbuf[1], pSbuf[2],
-                                                              pSbuf[3], pSbuf[4], pSbuf[5],
-                                                              pSbuf[6], pSbuf[7], pSbuf[8],
-                                                              ncomp_pc_xx, ncomp_pc_yy, ncomp_pc_zz,
-                                                              dinv, xyzmin, domain_double, do_cropping, lo );
-                    }
-
-                } else {
-
-                    const amrex::ParticleReal wq_n = wq/nsuborbits[ip];
-
-                    // Only CurrentDepositionAlgo::Villasenor is supported
-                    // The ignore_unused is needed so that the variables are not first-captured
-                    // in a constexpr-if context.
-                    amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
-                    if constexpr (depos_order_control == order_one) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
-                                                            ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
-                                                            lo, invvol, n_rz_azimuthal_modes);
-                    }
-                    else if constexpr (depos_order_control == order_two) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
-                                                            ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
-                                                            lo, invvol, n_rz_azimuthal_modes);
-                    }
-                    else if constexpr (depos_order_control == order_three) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
-                                                            ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
-                                                            lo, invvol, n_rz_azimuthal_modes);
-                    }
-                    else if constexpr (depos_order_control == order_four) {
-                        //NOLINTNEXTLINE(readability-suspicious-call-argument)
-                        VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
-                                                            ux[ip], uy[ip], uz[ip], gaminv,
-                                                            Jx_arr, Jy_arr, Jz_arr,
-                                                            dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
-                                                            lo, invvol, n_rz_azimuthal_modes);
-                    }
+                // Only CurrentDepositionAlgo::Villasenor is supported
+                // The ignore_unused is needed so that the variables are not first-captured
+                // in a constexpr-if context.
+                amrex::ignore_unused(Jx_arr, Jy_arr, Jz_arr, invvol);
+                if constexpr (depos_order_control == order_one) {
+                    //NOLINTNEXTLINE(readability-suspicious-call-argument)
+                    VillasenorDepositionShapeNKernel<1>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                        ux[ip], uy[ip], uz[ip], gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
+                                                        lo, invvol, n_rz_azimuthal_modes);
+                }
+                else if constexpr (depos_order_control == order_two) {
+                    //NOLINTNEXTLINE(readability-suspicious-call-argument)
+                    VillasenorDepositionShapeNKernel<2>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                        ux[ip], uy[ip], uz[ip], gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
+                                                        lo, invvol, n_rz_azimuthal_modes);
+                }
+                else if constexpr (depos_order_control == order_three) {
+                    //NOLINTNEXTLINE(readability-suspicious-call-argument)
+                    VillasenorDepositionShapeNKernel<3>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                        ux[ip], uy[ip], uz[ip], gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
+                                                        lo, invvol, n_rz_azimuthal_modes);
+                }
+                else if constexpr (depos_order_control == order_four) {
+                    //NOLINTNEXTLINE(readability-suspicious-call-argument)
+                    VillasenorDepositionShapeNKernel<4>(xp_n, yp_n, zp_n, xp_np1, yp_np1, zp_np1, wq_n,
+                                                        ux[ip], uy[ip], uz[ip], gaminv,
+                                                        Jx_arr, Jy_arr, Jz_arr,
+                                                        dt_suborbit, dinv, xyzmin, domain_double, do_cropping,
+                                                        lo, invvol, n_rz_azimuthal_modes);
                 }
             }
 
@@ -1354,5 +1159,4 @@ PhysicalParticleContainer::ImplicitPushXPSubOrbits (WarpXParIter& pti,
         amrex::Abort("Implicit suborbit particle position exceeds the permitted range for " +
                      std::to_string(h_position_error_count) + " particle(s).");
     }
-    ParticleUtils::CheckGridCrossingErrors(grid_crossing_error_count, max_grid_crossings);
 }

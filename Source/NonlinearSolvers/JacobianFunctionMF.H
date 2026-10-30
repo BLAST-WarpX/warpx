@@ -227,7 +227,7 @@ void JacobianFunctionMF<T,Ops>::apply (T& a_dF, const T& a_dU)
 
         m_Z.linComb( 1.0, m_Y0, eps, a_dU ); // Z = Y0 + eps*dU
         m_ops->ComputeRHS(m_R, m_Z, m_cur_time, /*a_nl_iter=*/-1,
-                          /*a_from_jacobian=*/true, /*update_pc=*/false);
+                          /*a_from_jacobian=*/true);
 
         // F(Y) = Y - b - R(Y) ==> dF = dF/dY*dU = [1 - dR/dY]*dU
         //                            = dU - (R(Z)-R(Y0))/eps
