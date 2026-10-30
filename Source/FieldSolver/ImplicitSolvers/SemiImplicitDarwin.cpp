@@ -600,7 +600,8 @@ void SemiImplicitDarwin::FinishVelocityUpdate ()
 
 void SemiImplicitDarwin::ApplyScaledMassMatrices (
     ablastr::fields::MultiLevelVectorField& rhs,
-    const ablastr::fields::MultiLevelVectorField& dA )
+    const ablastr::fields::MultiLevelVectorField& dA,
+    amrex::IntVect const& a_ngrow )
 {
     BL_PROFILE("SemiImplicitDarwin::ApplyScaledMassMatrices()");
     using namespace amrex::literals;
@@ -610,21 +611,20 @@ void SemiImplicitDarwin::ApplyScaledMassMatrices (
     // The mass matrices were summed over their guard cells (SyncMassMatrices),
     // so that the stencil of a valid cell reaches one cell beyond the guard
     // cells of J (see guardCellManager::Init). Check that dA has enough guard
-    // cells for the valid cells of rhs not to be clipped.
-    AssertMassMatricesStencilNotClipped(rhs, dA);
+    // cells for none of the cells of rhs filled below to be clipped.
+    AssertMassMatricesStencilNotClipped(rhs, dA, a_ngrow);
 
-    // No guard-cell exchange is needed on the result: ApplyMassMatrices()
-    // already fills as many guard cells of `rhs` as `rhs` and the mass matrices
-    // have in common, computing them from the same wide-stencil read of `dA`
-    // that the valid region uses. The caller sizes `rhs` so that this covers
-    // whatever it goes on to read.
+    // No guard-cell exchange is needed on the result: the a_ngrow guard cells
+    // of `rhs` are computed from the same wide-stencil read of `dA` that the
+    // valid region uses.
     ApplyMassMatrices(
         /* a_out           = */ rhs,
         /* a_in            = */ dA,
         /* a_in_ref        = */ nullptr,
         /* a_baseline      = */ nullptr,
         /* a_scale         = */ scale,
-        /* a_zero_out_first = */ false);
+        /* a_zero_out_first = */ false,
+        /* a_ngrow         = */ a_ngrow);
 }
 
 void SemiImplicitDarwin::ComputeScaledMassMatrixCC ( amrex::MultiFab& a_chi_xx_cc,

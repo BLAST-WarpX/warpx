@@ -81,9 +81,14 @@ public:
      *  matrix scaled by `2 mu_0 / dt`. This is the plasma response term of the
      *  magnetoinductive operator, i.e. the linear response of the deposited
      *  current to the inductive E-field being solved for.
+     *  `a_ngrow` guard cells of `rhs` are filled in addition to the valid
+     *  region, which requires `dA` to hold valid data over the mass matrix
+     *  stencil of every such cell.
      */
-    void ApplyScaledMassMatrices ( ablastr::fields::MultiLevelVectorField& rhs,
-                                   const ablastr::fields::MultiLevelVectorField& dA);
+    void ApplyScaledMassMatrices (
+        ablastr::fields::MultiLevelVectorField& rhs,
+        const ablastr::fields::MultiLevelVectorField& dA,
+        amrex::IntVect const& a_ngrow = amrex::IntVect::TheZeroVector() );
 
     /**
      * \brief Fill three cell-centered MultiFabs with the diagonal

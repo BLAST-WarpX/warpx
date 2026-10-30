@@ -27,7 +27,8 @@ void init_ImplicitSolver (py::module& m)
             py::arg("baseline").none(true) = nullptr,
             py::arg("scale") = 1.0,
             py::arg("zero_out_first") = false,
-            R"pbdoc(Apply the mass matrices to a vector field)pbdoc"
+            py::arg("ngrow") = amrex::IntVect::TheZeroVector(),
+            R"pbdoc(Apply the mass matrices to a vector field, filling `ngrow` guard cells of `out`)pbdoc"
         )
     ;
 }

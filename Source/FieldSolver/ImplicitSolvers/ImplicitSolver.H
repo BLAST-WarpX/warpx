@@ -189,6 +189,10 @@ public:
      * If a_zero_out_first is true, a_out is set to zero before accumulating,
      * so that it holds the result of this operation only; otherwise the result
      * is added on top of the existing contents of a_out.
+     * a_ngrow is the number of guard cells of a_out to fill, in addition to the
+     * valid region; a_out and the mass matrices must hold at least that many.
+     * The stencil gather over a_in is clipped at the edge of a_in's guard
+     * region (see AssertMassMatricesStencilNotClipped for when that matters).
      */
     void ApplyMassMatrices (
         ablastr::fields::MultiLevelVectorField& a_out,
@@ -196,7 +200,8 @@ public:
         const ablastr::fields::MultiLevelVectorField* a_in_ref = nullptr,
         const ablastr::fields::MultiLevelVectorField* a_baseline = nullptr,
         amrex::Real a_scale = 1.0,
-        bool a_zero_out_first = false );
+        bool a_zero_out_first = false,
+        amrex::IntVect const& a_ngrow = amrex::IntVect::TheZeroVector() );
 
     /**
      * \brief Half-width, in cells and per direction, of the stencil that
@@ -208,8 +213,9 @@ public:
     [[nodiscard]] amrex::IntVect MassMatricesStencilHalfWidth () const;
 
     /**
-     * \brief Assert that ApplyMassMatrices(a_out, a_in, ...) reads a_in over the
-     * full stencil of the mass matrices, for every valid cell of a_out.
+     * \brief Assert that ApplyMassMatrices(a_out, a_in, ..., a_ngrow) reads a_in
+     * over the full stencil of the mass matrices, for every cell of a_out it
+     * fills (the valid region plus a_ngrow guard cells).
      * ApplyMassMatrices silently clips the stencil at the edge of the guard
      * cells of a_in. This is harmless when the mass matrices have not been
      * summed over their guard cells, since the entries beyond the guard cells
@@ -217,7 +223,8 @@ public:
      */
     void AssertMassMatricesStencilNotClipped (
         const ablastr::fields::MultiLevelVectorField& a_out,
-        const ablastr::fields::MultiLevelVectorField& a_in ) const;
+        const ablastr::fields::MultiLevelVectorField& a_in,
+        amrex::IntVect const& a_ngrow = amrex::IntVect::TheZeroVector() ) const;
 
     void ComputeJfromMassMatrices (bool a_J_from_MM_only);
 
