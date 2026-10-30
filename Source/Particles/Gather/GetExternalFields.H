@@ -179,10 +179,13 @@ struct GetExternalEBField
         field_Ex += Ex;
         field_Ey += Ey;
         field_Ez += Ez;
+#if defined(WARPX_DIM_RSPHERE)
+        amrex::ignore_unused(Bx, By, Bz);
+#else
         field_Bx += Bx;
         field_By += By;
         field_Bz += Bz;
-
+#endif
     }
 };
 
