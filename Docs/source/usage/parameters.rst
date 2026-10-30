@@ -1892,8 +1892,13 @@ Particle initialization
       file must contain a field with the name given by ``<species_name>.density_mesh_name``
       (default ``density``). See
       `this file <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_3d_load_density_prepare.py>`__
-      for an example of how to prepare the openPMD data file. There is
-      another optional parameter,
+      for an example of how to prepare the openPMD data file.
+      In ``RSPHERE`` geometry, the file must contain a one-dimensional scalar mesh
+      with ``geometry = spherical`` and a single axis labeled ``r``. The density
+      is interpolated at the spherical radius :math:`r=\sqrt{x^2+y^2+z^2}` and
+      represents a number density in :math:`m^{-3}`. See
+      `this spherical example <https://github.com/BLAST-WarpX/warpx/blob/development/Examples/Tests/load_density/inputs_test_rsphere_load_density_prepare.py>`__
+      for the file format. There is another optional parameter,
       ``<species_name>.read_density_distributed=true``, which controls how the
       openPMD data are distributed among processes. If it is set to false, the
       openPMD data are loaded and duplicated on every process. If it is set to
