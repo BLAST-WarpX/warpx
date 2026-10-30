@@ -3,6 +3,7 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         BeamRelevant.cpp
+        ChargeFluxEB.cpp
         ChargeOnEB.cpp
         ColliderRelevant.cpp
         DifferentialLuminosity.cpp

@@ -1,6 +1,7 @@
 CEXE_sources += MultiReducedDiags.cpp
 CEXE_sources += ReducedDiags.cpp
 CEXE_sources += BeamRelevant.cpp
+CEXE_sources += ChargeFluxEB.cpp
 CEXE_sources += ChargeOnEB.cpp
 CEXE_sources += ColliderRelevant.cpp
 CEXE_sources += DifferentialLuminosity.cpp
