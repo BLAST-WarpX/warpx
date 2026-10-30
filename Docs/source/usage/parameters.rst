@@ -5366,6 +5366,9 @@ This shifts analysis from post-processing to runtime calculation of reduction op
     * ``FieldProbe``
         This type computes the value of each component of the electric and magnetic fields
         and of the Poynting vector (a measure of electromagnetic flux) at points in the domain.
+        With mesh refinement, each point samples the finest level covering its position.
+        Each output row contains one point's coordinates and field values, including points
+        outside refined patches and lines or planes spanning multiple levels.
 
         Multiple geometries for point probes can be specified via ``<reduced_diags_name>.probe_geometry = ...``:
 
