@@ -5108,7 +5108,8 @@ We support only field data and related options from the list at `Full Diagnostic
 
 .. note::
 
-    As with ``Full`` diagnostics, ``TimeAveraged`` diagnostics output the initial **instantaneous** conditions of the selected fields on step 0 (unless more specific output intervals exclude output for step 0).
+    Unlike ``Full`` diagnostics, ``TimeAveraged`` diagnostics in an averaging mode do not write output on step 0, since there is nothing to average yet.
+    Use an additional ``Full`` diagnostic to write the initial **instantaneous** conditions.
 
 In addition, ``TimeAveraged`` diagnostic options include:
 
@@ -5128,6 +5129,11 @@ In addition, ``TimeAveraged`` diagnostic options include:
 
         To enable time-averaged field output with intervals tightly spaced enough for overlapping averaging periods,
         please create additional instances of ``TimeAveraged`` diagnostics.
+
+    .. note::
+
+        In the ``dynamic_start`` mode, output is only written for complete averaging periods.
+        An averaging period that is incomplete because the simulation ended (see :pp:param:`<diag_name>.dump_last_timestep`) or was restarted within it is not written (with a warning).
 
 .. pp:param:: <diag_name>.average_period_steps
     :type: ``int``
