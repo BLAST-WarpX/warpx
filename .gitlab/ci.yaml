@@ -49,8 +49,18 @@ variables:
     - python3 -m pip install --upgrade -r Regression/requirements.txt
     - python3 -m pip cache purge
 
+# Submit build and test results of the development branch to CDash as Experimental.
+# after_script also runs if the build or tests failed, and its exit code does not
+# change the job status, so a CDash outage does not fail the job.
+.cdash-submit:
+  after_script:
+    - |
+      if [[ "${CI_COMMIT_BRANCH}" == "development" && "${CI_JOB_STATUS}" != "canceled" && -f build/DartConfiguration.tcl ]]; then
+        ctest --test-dir build -D ExperimentalSubmit
+      fi
+
 NVIDIA-H100:
-  extends: .install-dependencies
+  extends: [.install-dependencies, .cdash-submit]
   variables:
     BLASPP_GPU_BACKEND: cuda
   tags: [nvidia-h100]
@@ -71,6 +81,7 @@ NVIDIA-H100:
           -DWarpX_FFT=ON                                   \
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
+    # records build time and warnings for CDash; exits 0 even if the build fails
     - ctest --test-dir build -D ExperimentalBuild -V
     - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
@@ -94,15 +105,11 @@ NVIDIA-H100:
       GPU_TESTS_REGEX="^(${GPU_TESTS_REGEX})\."
       echo "Resolved GPU test regex: ${GPU_TESTS_REGEX}"
       ctest --test-dir build -N -R "${GPU_TESTS_REGEX}"
-      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
-        # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure -D ExperimentalTest -D ExperimentalSubmit
-      else
-        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure
-      fi
+      # run tests and record results for CDash (submitted in after_script)
+      ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure -D ExperimentalTest
 
 AMD-MI300:
-  extends: .install-dependencies
+  extends: [.install-dependencies, .cdash-submit]
   variables:
     BLASPP_GPU_BACKEND: hip
     ROCM_PATH: /opt/rocm-6.4.3
@@ -131,6 +138,7 @@ AMD-MI300:
           -DWarpX_PRECISION=DOUBLE                     \
           -DWarpX_PARTICLE_PRECISION=DOUBLE            \
           -DWarpX_FFT=ON
+    # records build time and warnings for CDash; exits 0 even if the build fails
     - ctest --test-dir build -D ExperimentalBuild -V
     - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
@@ -154,18 +162,14 @@ AMD-MI300:
       GPU_TESTS_REGEX="^(${GPU_TESTS_REGEX})\."
       echo "Resolved GPU test regex: ${GPU_TESTS_REGEX}"
       ctest --test-dir build -N -R "${GPU_TESTS_REGEX}"
-      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
-        # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure -D ExperimentalTest -D ExperimentalSubmit
-      else
-        ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure
-      fi
+      # run tests and record results for CDash (submitted in after_script)
+      ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure -D ExperimentalTest
 
 Intel-PVC:
   # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
   rules:
     - when: never
-  extends: .install-dependencies
+  extends: [.install-dependencies, .cdash-submit]
   tags: [intel-data-center-max-1100]
   image: intel/oneapi-basekit:2025.3.0-0-devel-ubuntu24.04
   script:
@@ -189,15 +193,11 @@ Intel-PVC:
           -DWarpX_OPENPMD=ON                    \
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
+    # records build time and warnings for CDash; exits 0 even if the build fails
     - ctest --test-dir build -D ExperimentalBuild -V
     - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
+    # run tests and record results for CDash (submitted in after_script)
     - |
-      if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
-        # run tests and submit results to CDash as Experimental
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error -D ExperimentalTest -D ExperimentalSubmit
-      else
-        ctest --test-dir build -R test_3d_laser_acceleration_btd \
-          --output-on-failure --no-tests=error
-      fi
+      ctest --test-dir build -R test_3d_laser_acceleration_btd \
+        --output-on-failure --no-tests=error -D ExperimentalTest
