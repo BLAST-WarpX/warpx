@@ -423,6 +423,10 @@ Overall simulation parameters
           Print information on the assembly of the sparse matrix used by ``pc_petsc`` and ``pc_algmg``.
           This replaces ``pc_petsc.verbose``.
 
+        - ``<pc_type>.print_matrix`` (``bool``, default: false), ``<pc_type>.print_matrix_steps`` (list of ``int``), ``<pc_type>.print_matrix_dir`` (``string``, default: ``diags/pc_matrices``)
+          Write the matrix of ``pc_jacobi``, ``pc_petsc``, or ``pc_algmg`` in MatrixMarket format.
+          See :ref:`dataanalysis-pc-matrix`.
+
       - **References:** (WarpX includes relativistic extensions not discussed in references.)
 
         - `Angus et al., On numerical energy conservation for an implicit particle-in-cell method coupled with a binary Monte-Carlo algorithm for Coulomb collisions <https://doi.org/10.1016/j.jcp.2022.111030>`__.

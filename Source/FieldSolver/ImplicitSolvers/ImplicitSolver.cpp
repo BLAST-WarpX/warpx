@@ -212,6 +212,7 @@ int ImplicitSolver::OneStep (const amrex::Real  start_time,
 
     // Set the member time step
     m_dt = a_dt;
+    m_current_step = a_step;
 
     // Setup variables to handle substepping in case it is needed
     int isubstep = 0;
@@ -1553,4 +1554,14 @@ void ImplicitSolver::GetPCMatrix (
         "ImplicitSolver::GetPCMatrix() called before AssemblePCMatrix()");
     m_sparse_jacobian->GetMatrix(a_r_indices_g, a_num_nz, a_c_indices_g,
                                  a_a_ij, a_n, a_ncols_max);
+}
+
+void ImplicitSolver::PrintPCMatrix (const std::string& a_filename,
+                                    const std::vector<std::string>& a_header) const
+{
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        m_sparse_jacobian != nullptr,
+        "ImplicitSolver::PrintPCMatrix() called before AssemblePCMatrix()");
+    const auto* dofs = WarpXSolverVec::getDOFsObject().get();
+    m_sparse_jacobian->PrintMatrix(a_filename, a_header, *dofs);
 }

@@ -25,6 +25,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 /**
  * \brief Base class for implicit time solvers. The base functions are those
@@ -179,6 +180,18 @@ public:
                       amrex::Gpu::DeviceVector<int>& a_c_indices_g,
                       amrex::Gpu::DeviceVector<amrex::Real>& a_a_ij,
                       int& a_n, int& a_ncols_max);
+
+    /**
+     * \brief Write the assembled sparse matrix in MatrixMarket format,
+     *        with a_header as metadata lines. Collective over all ranks.
+     */
+    void PrintPCMatrix (const std::string& a_filename,
+                        const std::vector<std::string>& a_header) const;
+
+    /**
+     * \brief Zero-based index of the time step being advanced.
+     */
+    [[nodiscard]] int GetCurrentStep () const { return m_current_step; }
 
     /**
      * \brief Apply deposited mass matrices to a vector field.
@@ -377,6 +390,11 @@ protected:
      * \brief Sparse Jacobian matrix for the preconditioner (lazy-initialized)
      */
     std::unique_ptr<SparseJacobianMatrix> m_sparse_jacobian;
+
+    /**
+     * \brief Zero-based index of the time step being advanced (set in OneStep)
+     */
+    int m_current_step = 0;
 
     /**
      * \brief parse nonlinear solver parameters (if one is used)

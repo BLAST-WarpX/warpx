@@ -1706,7 +1706,24 @@ class PreconditionerBase(picmistandard.PICMI_Extension):
                 setattr(bucket, attr, getattr(self, attr))
 
 
-class AssembledMatrixPreconditionerBase(PreconditionerBase):
+class PrintMatrixPreconditionerBase(PreconditionerBase):
+    """Base class of the preconditioners that can write their matrix to a file"""
+
+    print_matrix: bool | None = Field(
+        default=None,
+        description="Whether to write the matrix in MatrixMarket format (default False)",
+    )
+    print_matrix_steps: list[int] | None = Field(
+        default=None,
+        description="Zero-based time steps at which the matrix is written (default: first update only)",
+    )
+    print_matrix_dir: str | None = Field(
+        default=None,
+        description="Directory of the matrix files (default diags/pc_matrices)",
+    )
+
+
+class AssembledMatrixPreconditionerBase(PrintMatrixPreconditionerBase):
     """Base class of the preconditioners that can use the assembled sparse matrix"""
 
     other_inputs: ClassVar[tuple[str, ...]] = ("precon_mat_verbose",)
@@ -1860,7 +1877,7 @@ class DarwinMLMGPreconditioner(PreconditionerBase):
     )
 
 
-class JacobiPreconditioner(PreconditionerBase):
+class JacobiPreconditioner(PrintMatrixPreconditionerBase):
     """
     Sets up the weighted Jacobi preconditioner used during the nonlinear solver
     """
