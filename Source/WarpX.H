@@ -710,10 +710,36 @@ public:
      */
     void SyncCurrentAndRho ();
 
-    /** Apply physical boundary conditions to fine- and coarse-patch currents. */
+    /**
+     * \brief Finalize deposited current on all fine and coarse patches.
+     *
+     * - Apply physical boundary conditions: current deposited in guard cells beyond
+     *   supported physical boundaries is folded back into the valid cells next to
+     *   the boundary, and the guard cells are updated accordingly.
+     * - In cylindrical and spherical geometries, fold current deposited at negative
+     *   radius onto cells at positive radius with the appropriate component parity,
+     *   and divide by the radial volume factors to obtain physical current density.
+     *
+     * Call once per deposition, before using J in a field solver or diagnostic.
+     * Normally, call after filtering, guard-cell summation and transfers between
+     * mesh-refinement levels (i.e. after SyncCurrent()). PSATD paths that defer
+     * synchronization until after current correction retain their solver-specific ordering.
+     */
     void FinalizeJ ();
 
-    /** Apply physical boundary conditions to the supplied current components. */
+    /**
+     * \brief Finalize deposited current on one fine or coarse patch.
+     *
+     * Apply the physical-boundary and radial-axis folding and radial volume scaling
+     * described in FinalizeJ() to the supplied current components. Call once per
+     * deposition for this patch, following the ordering requirements in FinalizeJ().
+     *
+     * \param[in] lev Mesh refinement level of the patch.
+     * \param[in,out] Jx First deposited current component to finalize.
+     * \param[in,out] Jy Second deposited current component to finalize.
+     * \param[in,out] Jz Third deposited current component to finalize.
+     * \param[in] patch_type Fine or coarse patch; a coarse patch uses level lev-1 geometry.
+     */
     void FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
                            amrex::MultiFab* Jz, PatchType patch_type);
 
@@ -721,8 +747,8 @@ public:
      * \brief Finalize deposited rho on all fine and coarse patches.
      *
      * - Apply physical boundary conditions: charge deposited in guard cells beyond
-     *   a PEC, PMC or reflecting boundary is folded back into the valid cells next
-     *   to the boundary, and the guard cells are updated accordingly.
+     *   supported physical boundaries is folded back into the valid cells next to
+     *   the boundary, and the guard cells are updated accordingly.
      * - In cylindrical and spherical geometries, fold charge deposited at negative
      *   radius onto cells at positive radius and divide by the radial volume factor
      *   so that rho becomes a physical charge density.
@@ -999,13 +1025,10 @@ public:
      * \param[in] scomp The starting component index in the source MultiFab
      * \param[in] dcomp The starting component index in the destination MultiFab
      * \param[in] ncomp The number of components to filter
-     * \param[in] is_volume_scaled Whether input contains physical density.
-     *            If false, input and output contain density times the radial volume factor.
      * \returns the guard-cell width over which dst holds filtered data.
      */
     amrex::IntVect ApplyVolumeWeightedFilter (amrex::MultiFab& dst, const amrex::MultiFab& src_mf,
-                                    int lev, int scomp, int dcomp, int ncomp,
-                                    bool is_volume_scaled = true);
+                                    int lev, int scomp, int dcomp, int ncomp);
 #endif
 
     /** Filter a current density. In radial geometries this dispatches to

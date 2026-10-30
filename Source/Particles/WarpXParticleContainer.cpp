@@ -1531,12 +1531,6 @@ void WarpXParticleContainer::DepositCurrentOnLevel (
 
     DepositCurrent(current, dt, relative_time);
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        warpx.ApplyInverseVolumeScalingToCurrentDensity(
-            current[lev][0], current[lev][1], current[lev][2], lev
-        );
-#endif
-
     // Sum guard cells
     warpx.SyncCurrent(mf_name);
 }

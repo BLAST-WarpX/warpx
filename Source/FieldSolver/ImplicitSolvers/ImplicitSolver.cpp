@@ -1174,20 +1174,9 @@ void ImplicitSolver::PreRHSOp (const amrex::Real a_cur_time,
         CumulateJ();
     }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-    // Apply the inverse volume scaling for radial geometries after the total
-    // current has been accumulated from all containers above.
-    // Rho (if used) is scaled inside WarpX::FinalizeRho().
-    for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        ablastr::fields::VectorField J = m_WarpX->m_fields.get_alldirs(FieldType::current_fp, lev);
-        m_WarpX->ApplyInverseVolumeScalingToCurrentDensity(J[0], J[1], J[2], lev);
-    }
-#endif
-
-    // Apply BCs to J and communicate
-    m_WarpX->SyncCurrentAndRho();
-    m_WarpX->FinalizeRho();
-    m_WarpX->FinalizeJ();
+    m_WarpX->SyncCurrentAndRho(); // Sum guard cells
+    m_WarpX->FinalizeRho(); // Apply BCs to rho, then apply inverse volume scaling
+    m_WarpX->FinalizeJ();   // Apply Bcs to J, then apply inverse volume scaling
 
 }
 
@@ -1275,9 +1264,6 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
                 });
         }
 
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
-#endif
     }
 
     // Do addOp Exchange on MassMatrices_PC
@@ -1285,11 +1271,11 @@ void ImplicitSolver::SyncMassMatricesPCAndApplyBCs ()
 
     // Apply BCs to MassMatrices_PC
     for (int lev = 0; lev < m_num_amr_levels; ++lev) {
-        m_WarpX->ApplyJfieldBoundary(lev,
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{0}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{1}, lev),
-            m_WarpX->m_fields.get(FieldType::MassMatrices_PC, Direction{2}, lev),
-            PatchType::fine);
+        ablastr::fields::VectorField MM_PC = m_WarpX->m_fields.get_alldirs(FieldType::MassMatrices_PC, lev);
+        m_WarpX->ApplyJfieldBoundary(lev, MM_PC[0], MM_PC[1], MM_PC[2], PatchType::fine);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+        m_WarpX->ApplyInverseVolumeScalingToMassMatricesPC(MM_PC[0], MM_PC[1], MM_PC[2], lev);
+#endif
     }
 }
 

@@ -140,8 +140,8 @@ void init_WarpXParticleContainer (py::module& m)
                 pc.DepositCurrentOnLevel(mf_name, lev, dt, relative_time);
                 auto& warpx = WarpX::GetInstance();
                 auto const current = warpx.m_fields.get_alldirs(mf_name, lev);
-                warpx.FinalizeJOnLevel(
-                    lev, current[0], current[1], current[2], PatchType::fine);
+                // Apply boundary conditions to current, then apply volume scaling
+                warpx.FinalizeJOnLevel(lev, current[0], current[1], current[2], PatchType::fine);
             },
             py::arg("mf_name"), py::arg("lev"), py::arg("dt"), py::arg("relative_time"),
             R"pbdoc(Deposit current density, sum guard values, and apply boundary conditions

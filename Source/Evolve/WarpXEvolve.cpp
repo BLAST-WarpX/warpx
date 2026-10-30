@@ -924,6 +924,10 @@ void WarpX::FinalizeJOnLevel (int lev, amrex::MultiFab* Jx, amrex::MultiFab* Jy,
                               amrex::MultiFab* Jz, PatchType patch_type)
 {
     ApplyJfieldBoundary(lev, Jx, Jy, Jz, patch_type);
+#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
+    const int glev = (patch_type == PatchType::fine) ? lev : lev - 1;
+    ApplyInverseVolumeScalingToCurrentDensity(Jx, Jy, Jz, glev);
+#endif
 }
 
 void WarpX::FinalizeRho ()
@@ -1549,42 +1553,13 @@ WarpX::PushParticlesandDeposit (
         implicit_options
     );
 
-    if (!skip_deposition) {
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        // This is called after all particles have deposited their current and charge.
-        if (!implicit_options) {
-            // Skip scaling J here for the implicit solvers: the total current is
-            // accumulated from multiple containers after this call (see CumulateJ()
-            // and ComputeJfromMassMatrices()), and is scaled in PreRHSOp().
-            ApplyInverseVolumeScalingToCurrentDensity(
-                m_fields.get(FieldType::current_fp, Direction{0}, lev),
-                m_fields.get(FieldType::current_fp, Direction{1}, lev),
-                m_fields.get(FieldType::current_fp, Direction{2}, lev),
-                lev);
-            if (m_fields.has_vector(FieldType::current_buf, lev)) {
-                ApplyInverseVolumeScalingToCurrentDensity(
-                    m_fields.get(FieldType::current_buf, Direction{0}, lev),
-                    m_fields.get(FieldType::current_buf, Direction{1}, lev),
-                    m_fields.get(FieldType::current_buf, Direction{2}, lev),
-                    lev-1);
-            }
-        }
-// #else
-        // I left this comment here as a reminder that currently the
-        // boundary handling for cartesian grids are not matching the RZ handling
-        // (done in the ApplyInverseScalingToChargeDensity function). The
-        // Cartesian grid code had to be moved from here to after the application
-        // of the filter to avoid incorrect results (moved to `SyncCurrentAndRho()`).
-        // Might this be related to issue #1943?
-#endif
-        if (do_fluid_species && !implicit_options) {
-            myfl->Evolve(m_fields,
-                         lev,
-                         current_fp_string,
-                         cur_time,
-                         skip_deposition
-            );
-        }
+    if (do_fluid_species && !implicit_options && !skip_deposition) {
+        myfl->Evolve(m_fields,
+                     lev,
+                     current_fp_string,
+                     cur_time,
+                     skip_deposition
+        );
     }
 }
 

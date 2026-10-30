@@ -323,17 +323,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
                                   0, 0, 1, current_fp[lev][idim]->nGrowVect());
                 }
             }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-            // Radial geometries: apply the inverse-volume scaling to the
-            // per-species deposits so they carry physical charge/current
-            // densities, like the totals below. The per-species fields are
-            // compared with the physical rho_floor (species fractions,
-            // Vs = Js/rhos) and exposed to SI-unit parsers.
-            for (int lev = 0; lev <= finest_level; ++lev) {
-                ApplyInverseVolumeScalingToCurrentDensity(
-                    J_spec[lev][0], J_spec[lev][1], J_spec[lev][2], lev);
-            }
-#endif
+
             // The per-species fields themselves are consumed directly
             // (Vs = Js/rhos, species fractions, per-species resistivity,
             // resistive drag) and need their own guard-cell sum here;
@@ -376,12 +366,6 @@ void WarpX::HybridPICDepositRhoAndJ ()
                               0, 0, 1, rho_species_sum[lev]->nGrowVect());
             }
         }
-#if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER) || defined(WARPX_DIM_RSPHERE)
-        for (int lev = 0; lev <= finest_level; ++lev) {
-            ApplyInverseVolumeScalingToCurrentDensity(
-                current_fp[lev][0], current_fp[lev][1], current_fp[lev][2], lev);
-        }
-#endif
     } else {
         // Single-pass deposition (rho at t_{n+1}, J at t_{n-1/2}): no active
         // feature consumes the per-species fields, so skip the per-species
@@ -410,7 +394,7 @@ void WarpX::HybridPICDepositRhoAndJ ()
     // filter (if used), exchange guard cells, interpolate across MR levels
     SyncCurrentAndRho();
 
-    // Apply boundary conditions to J and rho, then apply volume scaling.
+    // Apply boundary conditions to Rho and J, and then apply volume scaling.
     FinalizeRho();
     FinalizeJ();
 
