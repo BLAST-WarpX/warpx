@@ -30,6 +30,7 @@
 #include "Initialization/ExternalField.H"
 #include "Initialization/DivCleaner/ProjectionDivCleaner.H"
 #include "Particles/MultiParticleContainer.H"
+#include "Particles/WarpXParticleContainer.H"
 #include "Utils/Logo/GetLogo.H"
 #include "Utils/Parser/ParserUtils.H"
 #include "Utils/TextMsg.H"
@@ -877,6 +878,16 @@ WarpX::InitData ()
     // Check that the number of guard cells is smaller than the number of valid cells for all MultiFabs
     // (example: a box with 16 valid cells and 32 guard cells in z will not be considered valid)
     CheckGuardCells();
+
+#ifdef AMREX_USE_GPU
+    // Tiling launches many small kernels on GPU, which severely degrades performance.
+    // It is off by default on GPU, but can be turned on by accident.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        !WarpXParticleContainer::do_tiling,
+        "particles.do_tiling is turned on, but WarpX was compiled for GPU. "
+        "Tiling on GPU leads to very poor performance. "
+        "Please set particles.do_tiling = 0 (or remove it from the input file). ");
+#endif
 
     PrintMainPICparameters();
     if (m_implicit_solver) {
