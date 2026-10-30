@@ -406,6 +406,8 @@ public:
 
     [[nodiscard]] bool DoPML () const {return do_pml;}
     [[nodiscard]] bool DoFluidSpecies () const {return do_fluid_species;}
+    [[nodiscard]] MediumForEM GetEMSolverMedium () const { return m_em_solver_medium; }
+    [[nodiscard]] bool HasMirrors () const {return m_num_mirrors != 0;}
 
     /** get low-high-low-high-... vector for each direction indicating if mother grid PMLs are enabled */
     [[nodiscard]] std::vector<bool> getPMLdirections() const;
@@ -871,6 +873,16 @@ public:
                              const std::array<amrex::Real,3>& dx, amrex::IntVect ngrow);
 
     void ComputeDivE(amrex::MultiFab& divE, int lev);
+
+#if defined(WARPX_DIM_RZ)
+    /** Axis-node radial volume factor used by charge deposition (1/3 with the
+     *  Verboncoeur correction, 1/4 without). */
+    [[nodiscard]] amrex::Real RZAxisVolumeFactor () const noexcept
+    {
+        return m_verboncoeur_axis_correction ? amrex::Real(1.0/3.0)
+                                             : amrex::Real(1.0/4.0);
+    }
+#endif
 
     void ProjectionCleanDivB ();
     void CalculateExternalCurlA ();

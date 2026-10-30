@@ -3,6 +3,7 @@ foreach(D IN LISTS WarpX_DIMS)
     target_sources(lib_${SD}
       PRIVATE
         EmbeddedBoundaryInit.cpp
+        VoltageClamp.cpp
         Enabled.cpp
         WarpXInitEB.cpp
         WarpXFaceExtensions.cpp
