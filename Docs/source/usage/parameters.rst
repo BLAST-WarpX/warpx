@@ -5412,6 +5412,38 @@ This shifts analysis from post-processing to runtime calculation of reduction op
            The FieldProbe reduced diagnostic does not yet add a Lorentz back transformation for boosted frame simulations.
            Thus, it records field data in the boosted frame, not (yet) in the lab frame.
 
+    * ``ScalarProbe``
+        Samples the electric potential :math:`\phi` (V) and total charge density
+        :math:`\rho` (C/m\ :sup:`3`) from the stored nodal ``phi_fp`` and ``rho_fp``
+        fields. This diagnostic supports Cartesian 1D, 2D and 3D simulations that
+        allocate these scalar fields, such as lab-frame electrostatic simulations.
+        It does not perform an additional field solve or charge deposition.
+
+        Probe geometry, coordinates, endpoints, resolution and plane orientation are
+        specified analogously to ``FieldProbe`` above. ScalarProbe uses the same
+        first-order interpolation behavior as FieldProbe's default. It samples the finest level
+        containing each probe. At embedded boundaries it samples the stored nodal data.
+
+        Each diagnostic writes one delimited file with one row per sample and output time:
+        ``step time(s) probe_id level x(m) y(m) z(m) phi(V) rho(C/m^3)``.
+        Probe IDs retain their geometry ordering across MPI ranks and load balancing.
+        Out-of-domain probes remain in the file with ``level=-1`` and ``NaN`` values.
+        The usual ``intervals``, ``path``, ``precision``, ``extension`` and ``separator``
+        settings apply.
+
+        Probe positions are fixed in simulation-frame coordinates. Moving-window
+        following, time integration, cylindrical geometry and boosted-to-lab-frame
+        transformations are not supported. In PICMI, for example:
+
+        .. code-block:: python
+
+            probe = picmi.ReducedDiagnostic(
+                name="potential_line", diag_type="ScalarProbe", period=10,
+                probe_geometry="Line", resolution=51,
+                x_probe=0.0, z_probe=0.0, x1_probe=0.0, z1_probe=0.01,
+            )
+            sim.add_diagnostic(probe)
+
     * ``RhoMaximum``
         This type computes the maximum and minimum values of the total charge density as well as
         the maximum absolute value of the charge density of each charged species.

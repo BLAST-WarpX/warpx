@@ -5087,6 +5087,26 @@ class ReducedDiagnostic(
     )
     # per type: the parameters and their input names, with the arguments of expressions
     _type_inputs: ClassVar[dict[str, dict[str, str]]] = {
+        "ScalarProbe": {
+            name: name
+            for name in (
+                "probe_geometry",
+                "x_probe",
+                "y_probe",
+                "z_probe",
+                "resolution",
+                "x1_probe",
+                "y1_probe",
+                "z1_probe",
+                "detector_radius",
+                "target_normal_x",
+                "target_normal_y",
+                "target_normal_z",
+                "target_up_x",
+                "target_up_y",
+                "target_up_z",
+            )
+        },
         "FieldProbe": {
             name: name
             for name in (
@@ -5165,6 +5185,7 @@ class ReducedDiagnostic(
         "ParticleHistogram2D",
         "ParticleExtrema",
         "FieldProbe",
+        "ScalarProbe",
         "FieldReduction",
         "ChargeOnEB",
     ] = Field(
@@ -5275,7 +5296,7 @@ class ReducedDiagnostic(
         description="For diagnostic type 'ChargeOnEB', the function to weight contributions to the total charge",
     )
 
-    # FieldProbe
+    # FieldProbe and ScalarProbe
     probe_geometry: str | None = Field(
         default=None,
         description="For diagnostic type 'FieldProbe', the geometry of the probe: 'Point', 'Line', or 'Plane'",
@@ -5394,7 +5415,7 @@ class ReducedDiagnostic(
             ]
         elif self.diag_type == "FieldReduction":
             required += ["reduction_type", "reduced_function"]
-        elif self.diag_type == "FieldProbe":
+        elif self.diag_type in ("FieldProbe", "ScalarProbe"):
             required += ["probe_geometry", "z_probe"]
             geometry = (self.probe_geometry or "").lower()
             if geometry != "point":
@@ -5415,6 +5436,23 @@ class ReducedDiagnostic(
                 }
             else:
                 required.append("detector_radius")
+            if self.diag_type == "ScalarProbe":
+                if self.probe_geometry not in ("Point", "Line", "Plane"):
+                    raise ValueError(
+                        "ScalarProbe probe_geometry must be Point, Line or Plane"
+                    )
+                if (
+                    geometry != "point"
+                    and self.resolution is not None
+                    and self.resolution < 2
+                ):
+                    raise ValueError("ScalarProbe resolution must be at least 2")
+                if (
+                    geometry == "plane"
+                    and self.detector_radius is not None
+                    and self.detector_radius <= 0
+                ):
+                    raise ValueError("ScalarProbe detector_radius must be positive")
 
         missing = [name for name in required if getattr(self, name) is None]
         if missing:
