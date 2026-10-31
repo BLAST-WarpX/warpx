@@ -17,7 +17,6 @@
 #include "Utils/WarpXConst.H"
 #include "Utils/TextMsg.H"
 #include "Utils/WarpXUtil.H"
-#include "Parallelization/WarpXComm_K.H"
 
 #include <ablastr/fields/MultiFabRegister.H>
 #include <ablastr/profiler/ProfilerWrapper.H>
@@ -389,32 +388,41 @@ void MagnetostaticSolver::VectorPoissonBoundaryHandler::defineVectorPotentialBCs
 void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp (amrex::MultiFab & src,
                                                                         amrex::MultiFab & dst)
 {
-    WarpX &warpx = WarpX::GetInstance();
+    using namespace amrex::literals;
 
-    // Grab Interpolation Coefficients
-    // Order of finite-order centering of fields
-    const int fg_nox = WarpX::field_centering_nox;
-    const int fg_noy = WarpX::field_centering_noy;
-    const int fg_noz = WarpX::field_centering_noz;
-
-    // Device vectors of stencil coefficients used for finite-order centering of fields
-    amrex::Real const * stencil_coeffs_x = warpx.device_field_centering_stencil_coeffs_x.data();
-    amrex::Real const * stencil_coeffs_y = warpx.device_field_centering_stencil_coeffs_y.data();
-    amrex::Real const * stencil_coeffs_z = warpx.device_field_centering_stencil_coeffs_z.data();
+    // Linear interpolation from the E-staggered grid (where the gradients of A are
+    // computed) to the B-staggered grid. Neither grid is fully nodal, so the generic
+    // centering function warpx_interp cannot be used here: it assumes that either the
+    // source or the destination is nodal, and it would also average along directions
+    // where src and dst are both cell-centered, which shifts each term of curl(A) by
+    // half a cell. Instead, interpolate only along directions where the staggering differs:
+    //   nodal -> cell-centered: dst(i) = ( src(i)   + src(i+1) ) / 2
+    //   cell-centered -> nodal: dst(i) = ( src(i-1) + src(i)   ) / 2
 
     // Synchronize the ghost cells, do halo exchange
     ablastr::utils::communication::FillBoundary(src,
                                                 src.nGrowVect(),
                                                 WarpX::do_single_precision_comms);
 
+    IntVect const src_stag = src.ixType().toIntVect();
+    IntVect const dst_stag = dst.ixType().toIntVect();
+
+    // Offset of the first point and number of points along each direction
+    int off[3] = {0, 0, 0};
+    int npts[3] = {1, 1, 1};
+    for (int idim = 0; idim < AMREX_SPACEDIM; ++idim) {
+        if (src_stag[idim] == 1 && dst_stag[idim] == 0) { off[idim] =  0; npts[idim] = 2; }
+        if (src_stag[idim] == 0 && dst_stag[idim] == 1) { off[idim] = -1; npts[idim] = 2; }
+    }
+    const int oj = off[0], ok = off[1], ol = off[2];
+    const int nj = npts[0], nk = npts[1], nl = npts[2];
+    const amrex::Real weight = 1._rt / static_cast<amrex::Real>(nj * nk * nl);
+
 #ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
     for (MFIter mfi(dst, TilingIfNotGPU()); mfi.isValid(); ++mfi)
     {
-        IntVect const src_stag = src.ixType().toIntVect();
-        IntVect const dst_stag = dst.ixType().toIntVect();
-
         Array4<amrex::Real const> const& src_arr = src.const_array(mfi);
         Array4<amrex::Real> const& dst_arr = dst.array(mfi);
 
@@ -422,8 +430,17 @@ void MagnetostaticSolver::EBCalcBfromVectorPotentialPerLevel::doInterp (amrex::M
 
         ParallelFor(bx, [=] AMREX_GPU_DEVICE (int j, int k, int l) noexcept
         {
-            warpx_interp(j, k, l, dst_arr, src_arr, dst_stag, src_stag, fg_nox, fg_noy, fg_noz,
-                stencil_coeffs_x, stencil_coeffs_y, stencil_coeffs_z);
+            amrex::Real res = 0._rt;
+            for (int ll = 0; ll < nl; ++ll) {
+                for (int kk = 0; kk < nk; ++kk) {
+                    for (int jj = 0; jj < nj; ++jj) {
+                        const int js = j + oj + jj, ks = k + ok + kk, ls = l + ol + ll;
+                        // zero beyond the allocated guard cells, as in warpx_interp
+                        res += src_arr.contains(js, ks, ls) ? src_arr(js, ks, ls) : 0._rt;
+                    }
+                }
+            }
+            dst_arr(j, k, l) = weight * res;
         });
     }
 }
