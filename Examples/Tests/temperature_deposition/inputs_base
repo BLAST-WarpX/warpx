@@ -1,0 +1,255 @@
+# Deterministic native two-particle temperature deposition regression.
+# Particle momenta stay fixed by disabling the push and gather.
+# The exact unbiased two-sample variance is (v1-v2)^2/2 at each grid point
+# receiving both particles, regardless of their positive effective weights.
+max_step = 2
+amr.max_level = 0
+amr.max_grid_size = 8
+amr.blocking_factor = 8
+warpx.verbose = 0
+warpx.const_dt = 1.e-15
+warpx.use_filter = 0
+algo.maxwell_solver = hybrid
+algo.current_deposition = direct
+algo.particle_shape = 3
+hybrid_pic_model.elec_temp = 0.
+hybrid_pic_model.n0_ref = 1.
+hybrid_pic_model.gamma = 1.
+hybrid_pic_model.n_floor = 1.
+
+particles.species_names = equal macro shape small large axis nearaxis single zero dominant biased_equal biased_macro biased_single biased_zero biased_dominant
+
+diagnostics.diags_names = diag1
+diag1.intervals = 2
+diag1.diag_type = Full
+
+# equal: independently checks this weighting/low-support case.
+equal.mass = m_p
+equal.charge = q_e
+equal.do_not_gather = 1
+equal.do_not_push = 1
+equal.do_temperature_deposition = 1
+equal.injection_style = MultipleParticles
+equal.multiple_particles_pos_x = 8.25 8.25
+equal.multiple_particles_pos_y = y0 y0
+equal.multiple_particles_pos_z = 8.25 8.25
+equal.multiple_particles_ux = 1/clight -1/clight
+equal.multiple_particles_uy = 2/clight -2/clight
+equal.multiple_particles_uz = 3/clight -3/clight
+equal.multiple_particles_weight = 1.0 1.0
+
+# macro: independently checks this weighting/low-support case.
+macro.mass = m_p
+macro.charge = q_e
+macro.do_not_gather = 1
+macro.do_not_push = 1
+macro.do_temperature_deposition = 1
+macro.temperature_deposition_bias_correction = 1
+macro.injection_style = MultipleParticles
+macro.multiple_particles_pos_x = 8.25 8.25
+macro.multiple_particles_pos_y = y0 y0
+macro.multiple_particles_pos_z = 8.25 8.25
+macro.multiple_particles_ux = 1/clight -1/clight
+macro.multiple_particles_uy = 2/clight -2/clight
+macro.multiple_particles_uz = 3/clight -3/clight
+macro.multiple_particles_weight = 1.0 9.0
+
+# shape: independently checks this weighting/low-support case.
+shape.mass = m_p
+shape.charge = q_e
+shape.do_not_gather = 1
+shape.do_not_push = 1
+shape.do_temperature_deposition = 1
+shape.injection_style = MultipleParticles
+shape.multiple_particles_pos_x = 7.75 8.25
+shape.multiple_particles_pos_y = y0 y0
+shape.multiple_particles_pos_z = 7.75 8.25
+shape.multiple_particles_ux = 1/clight -1/clight
+shape.multiple_particles_uy = 2/clight -2/clight
+shape.multiple_particles_uz = 3/clight -3/clight
+shape.multiple_particles_weight = 1.0 1.0
+
+# small: independently checks this weighting/low-support case.
+small.mass = m_p
+small.charge = q_e
+small.do_not_gather = 1
+small.do_not_push = 1
+small.do_temperature_deposition = 1
+small.injection_style = MultipleParticles
+small.multiple_particles_pos_x = 8.25 8.25
+small.multiple_particles_pos_y = y0 y0
+small.multiple_particles_pos_z = 8.25 8.25
+small.multiple_particles_ux = 1/clight -1/clight
+small.multiple_particles_uy = 2/clight -2/clight
+small.multiple_particles_uz = 3/clight -3/clight
+small.multiple_particles_weight = 1e-25 9e-25
+
+# large: independently checks this weighting/low-support case.
+large.mass = m_p
+large.charge = q_e
+large.do_not_gather = 1
+large.do_not_push = 1
+large.do_temperature_deposition = 1
+large.injection_style = MultipleParticles
+large.multiple_particles_pos_x = 8.25 8.25
+large.multiple_particles_pos_y = y0 y0
+large.multiple_particles_pos_z = 8.25 8.25
+large.multiple_particles_ux = 1/clight -1/clight
+large.multiple_particles_uy = 2/clight -2/clight
+large.multiple_particles_uz = 3/clight -3/clight
+large.multiple_particles_weight = 1e+25 9e+25
+
+# axis: independently checks this weighting/low-support case.
+axis.mass = m_p
+axis.charge = q_e
+axis.do_not_gather = 1
+axis.do_not_push = 1
+axis.do_temperature_deposition = 1
+axis.injection_style = MultipleParticles
+axis.multiple_particles_pos_x = 0.0 0.25
+axis.multiple_particles_pos_y = y0 y0
+axis.multiple_particles_pos_z = 8.25 8.25
+axis.multiple_particles_ux = 1/clight -1/clight
+axis.multiple_particles_uy = 2/clight -2/clight
+axis.multiple_particles_uz = 3/clight -3/clight
+axis.multiple_particles_weight = 1.0 9.0
+
+# nearaxis: independently checks this weighting/low-support case.
+nearaxis.mass = m_p
+nearaxis.charge = q_e
+nearaxis.do_not_gather = 1
+nearaxis.do_not_push = 1
+nearaxis.do_temperature_deposition = 1
+nearaxis.injection_style = MultipleParticles
+nearaxis.multiple_particles_pos_x = 0.2 0.8
+nearaxis.multiple_particles_pos_y = y0 y0
+nearaxis.multiple_particles_pos_z = 8.25 8.25
+nearaxis.multiple_particles_ux = 1/clight -1/clight
+nearaxis.multiple_particles_uy = 2/clight -2/clight
+nearaxis.multiple_particles_uz = 3/clight -3/clight
+nearaxis.multiple_particles_weight = 1.0 1.0
+
+# single: independently checks this weighting/low-support case.
+single.mass = m_p
+single.charge = q_e
+single.do_not_gather = 1
+single.do_not_push = 1
+single.do_temperature_deposition = 1
+single.injection_style = MultipleParticles
+single.multiple_particles_pos_x = 8.25
+single.multiple_particles_pos_y = y0
+single.multiple_particles_pos_z = 8.25
+single.multiple_particles_ux = 1/clight
+single.multiple_particles_uy = 2/clight
+single.multiple_particles_uz = 3/clight
+single.multiple_particles_weight = 1.0
+
+# zero: independently checks this weighting/low-support case.
+zero.mass = m_p
+zero.charge = q_e
+zero.do_not_gather = 1
+zero.do_not_push = 1
+zero.do_temperature_deposition = 1
+zero.injection_style = MultipleParticles
+zero.multiple_particles_pos_x = 8.25 8.25
+zero.multiple_particles_pos_y = y0 y0
+zero.multiple_particles_pos_z = 8.25 8.25
+zero.multiple_particles_ux = 1/clight -1/clight
+zero.multiple_particles_uy = 2/clight -2/clight
+zero.multiple_particles_uz = 3/clight -3/clight
+zero.multiple_particles_weight = 0.0 0.0
+
+# dominant: independently checks this weighting/low-support case.
+dominant.mass = m_p
+dominant.charge = q_e
+dominant.do_not_gather = 1
+dominant.do_not_push = 1
+dominant.do_temperature_deposition = 1
+dominant.injection_style = MultipleParticles
+dominant.multiple_particles_pos_x = 8.25 8.25
+dominant.multiple_particles_pos_y = y0 y0
+dominant.multiple_particles_pos_z = 8.25 8.25
+dominant.multiple_particles_ux = 1/clight -1/clight
+dominant.multiple_particles_uy = 2/clight -2/clight
+dominant.multiple_particles_uz = 3/clight -3/clight
+dominant.multiple_particles_weight = 1.0 1e-20
+
+# biased_equal: weighted population variance with the correction disabled.
+biased_equal.mass = m_p
+biased_equal.charge = q_e
+biased_equal.do_not_gather = 1
+biased_equal.do_not_push = 1
+biased_equal.do_temperature_deposition = 1
+biased_equal.temperature_deposition_bias_correction = 0
+biased_equal.injection_style = MultipleParticles
+biased_equal.multiple_particles_pos_x = 8.25 8.25
+biased_equal.multiple_particles_pos_y = y0 y0
+biased_equal.multiple_particles_pos_z = 8.25 8.25
+biased_equal.multiple_particles_ux = 1/clight -1/clight
+biased_equal.multiple_particles_uy = 2/clight -2/clight
+biased_equal.multiple_particles_uz = 3/clight -3/clight
+biased_equal.multiple_particles_weight = 1.0 1.0
+
+# biased_macro: weighted population variance with the correction disabled.
+biased_macro.mass = m_p
+biased_macro.charge = q_e
+biased_macro.do_not_gather = 1
+biased_macro.do_not_push = 1
+biased_macro.do_temperature_deposition = 1
+biased_macro.temperature_deposition_bias_correction = 0
+biased_macro.injection_style = MultipleParticles
+biased_macro.multiple_particles_pos_x = 8.25 8.25
+biased_macro.multiple_particles_pos_y = y0 y0
+biased_macro.multiple_particles_pos_z = 8.25 8.25
+biased_macro.multiple_particles_ux = 1/clight -1/clight
+biased_macro.multiple_particles_uy = 2/clight -2/clight
+biased_macro.multiple_particles_uz = 3/clight -3/clight
+biased_macro.multiple_particles_weight = 1.0 9.0
+
+# biased_single: weighted population variance with the correction disabled.
+biased_single.mass = m_p
+biased_single.charge = q_e
+biased_single.do_not_gather = 1
+biased_single.do_not_push = 1
+biased_single.do_temperature_deposition = 1
+biased_single.temperature_deposition_bias_correction = 0
+biased_single.injection_style = MultipleParticles
+biased_single.multiple_particles_pos_x = 8.25
+biased_single.multiple_particles_pos_y = y0
+biased_single.multiple_particles_pos_z = 8.25
+biased_single.multiple_particles_ux = 1/clight
+biased_single.multiple_particles_uy = 2/clight
+biased_single.multiple_particles_uz = 3/clight
+biased_single.multiple_particles_weight = 1.0
+
+# biased_zero: weighted population variance with the correction disabled.
+biased_zero.mass = m_p
+biased_zero.charge = q_e
+biased_zero.do_not_gather = 1
+biased_zero.do_not_push = 1
+biased_zero.do_temperature_deposition = 1
+biased_zero.temperature_deposition_bias_correction = 0
+biased_zero.injection_style = MultipleParticles
+biased_zero.multiple_particles_pos_x = 8.25 8.25
+biased_zero.multiple_particles_pos_y = y0 y0
+biased_zero.multiple_particles_pos_z = 8.25 8.25
+biased_zero.multiple_particles_ux = 1/clight -1/clight
+biased_zero.multiple_particles_uy = 2/clight -2/clight
+biased_zero.multiple_particles_uz = 3/clight -3/clight
+biased_zero.multiple_particles_weight = 0.0 0.0
+
+# biased_dominant: power-of-two velocities keep the dominant mean exact even in float.
+biased_dominant.mass = m_p
+biased_dominant.charge = q_e
+biased_dominant.do_not_gather = 1
+biased_dominant.do_not_push = 1
+biased_dominant.do_temperature_deposition = 1
+biased_dominant.temperature_deposition_bias_correction = 0
+biased_dominant.injection_style = MultipleParticles
+biased_dominant.multiple_particles_pos_x = 8.25 8.25
+biased_dominant.multiple_particles_pos_y = y0 y0
+biased_dominant.multiple_particles_pos_z = 8.25 8.25
+biased_dominant.multiple_particles_ux = 1/clight -1/clight
+biased_dominant.multiple_particles_uy = 2/clight -2/clight
+biased_dominant.multiple_particles_uz = 4/clight -4/clight
+biased_dominant.multiple_particles_weight = 1.0 1e-20
