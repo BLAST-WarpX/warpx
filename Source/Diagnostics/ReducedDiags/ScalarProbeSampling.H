@@ -11,6 +11,16 @@
 
 namespace warpx::diagnostics
 {
+    /** Data copied to the device for scalar gathering. Keep this type at named
+     * namespace scope: CUDA's extended-lambda templates cannot use function-local
+     * or private/protected nested types when DeviceVector instantiates kernels. */
+    struct ScalarProbeSample
+    {
+        int m_id;
+        amrex::IntVect m_cell;
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_fraction;
+    };
+
     /** Gather a nodal scalar in the containing cell. The tensor-product linear
      * weights are the order-one particle shape used by FieldProbe. All stencil
      * nodes belong to the cell's valid nodal box, including on box boundaries. */

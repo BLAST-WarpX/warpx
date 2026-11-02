@@ -7,7 +7,6 @@
 #include "ReducedDiags.H"
 
 #include <AMReX_GpuContainers.H>
-#include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 
 #include <string>
@@ -25,18 +24,6 @@ public:
 
 private:
     using Position = amrex::GpuArray<amrex::Real, 3>;
-
-    /** Plain data copied to the device before gathering scalar fields.
-     *
-     * Keep this declaration outside ComputeDiags so CUDA sees a stable type
-     * when instantiating AMReX's ParallelFor launch wrappers.
-     */
-    struct Sample
-    {
-        int m_id;
-        amrex::IntVect m_cell;
-        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_fraction;
-    };
 
     std::vector<Position> m_positions;
     std::vector<int> m_levels;

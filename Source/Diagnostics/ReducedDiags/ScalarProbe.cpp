@@ -177,6 +177,7 @@ void ScalarProbe::ComputeDiags (int step)
     CheckFields();
     auto const& warpx = WarpX::GetInstance();
     using warpx::fields::FieldType;
+    using Sample = warpx::diagnostics::ScalarProbeSample;
     using BoxSamples = std::vector<std::vector<Sample>>;
     std::vector<BoxSamples> samples(warpx.finestLevel()+1);
     for (int lev = 0; lev <= warpx.finestLevel(); ++lev) {
