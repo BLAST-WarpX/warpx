@@ -1576,6 +1576,8 @@ Particle initialization
 
     Controls whether tiling ('cache blocking') transformation is used for particles.
     Tiling should be on when using OpenMP and off when using GPUs.
+    When WarpX is compiled for GPUs, setting this to ``true`` results in an error,
+    since tiling severely degrades performance on GPUs.
 
 .. pp:param:: <species_name>.species_type
     :type: ``string``
