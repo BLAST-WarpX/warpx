@@ -21,6 +21,11 @@
 #include <limits>
 #include <vector>
 
+/**
+ * Construct a scalar probe and initialize its point, line, or plane locations.
+ *
+ * @param[in] rd_name name of this reduced diagnostic
+ */
 ScalarProbe::ScalarProbe (std::string const& rd_name)
     : ReducedDiags{rd_name}
 {
@@ -147,6 +152,7 @@ ScalarProbe::ScalarProbe (std::string const& rd_name)
     }
 }
 
+/** Check that nodal potential and charge-density fields are available. */
 void ScalarProbe::CheckFields () const
 {
     auto const& warpx = WarpX::GetInstance();
@@ -166,11 +172,17 @@ void ScalarProbe::CheckFields () const
     }
 }
 
+/** Validate the fields required by the scalar probe. */
 void ScalarProbe::InitData ()
 {
     CheckFields();
 }
 
+/**
+ * Interpolate potential and charge density at every probe location.
+ *
+ * @param[in] step current time step
+ */
 void ScalarProbe::ComputeDiags (int step)
 {
     if (!m_intervals.contains(step+1)) { return; }
@@ -261,6 +273,11 @@ void ScalarProbe::ComputeDiags (int step)
         amrex::ParallelDescriptor::IOProcessorNumber());
 }
 
+/**
+ * Append the sampled scalar values to the reduced-diagnostic file.
+ *
+ * @param[in] step current time step
+ */
 void ScalarProbe::WriteToFile (int step) const
 {
     if (!amrex::ParallelDescriptor::IOProcessor()) { return; }
