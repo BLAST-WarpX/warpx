@@ -32,7 +32,7 @@ the ion thermal velocity about the ion bulk, not relax the ion bulk toward the
 electron flow. The deposited ion current projected onto the force-free mode
 must therefore remain at its initial shot-noise level.
 
-This script reads domain-mean T_e(t) (Kelvin->eV) and T_i(t) (eV) from the
+This script reads domain-mean T_e(t) and T_i(t) (Kelvin->eV) from the
 post-step dumps -- the iteration-0 dump is skipped, since it is written before
 the first field solve while T_e still holds its zero allocation value (T_e is
 filled from the closure at the first step) -- so (Te0, Ti0) is the first
@@ -77,7 +77,7 @@ def domain_means(ts, its):
         w = np.asarray(rho, dtype=float) / Q_E
         wsum = float(np.sum(w))
         Te_m.append(float(np.sum(np.asarray(Te, float) * w) / wsum) / K_PER_EV)
-        Ti_m.append(float(np.sum(np.asarray(Ti, float) * w) / wsum))  # already eV
+        Ti_m.append(float(np.sum(np.asarray(Ti, float) * w) / wsum) / K_PER_EV)
     return t, np.array(Te_m), np.array(Ti_m)
 
 
