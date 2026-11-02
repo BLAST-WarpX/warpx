@@ -26,7 +26,8 @@ void FiniteDifferenceSolver::ComputeCurlB (
     ablastr::fields::VectorField& Efield,
     ablastr::fields::VectorField const& Bfield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-    int lev )
+    int lev,
+    amrex::IntVect const& ngrow )
 {
     // Select algorithm (The choice of algorithm is a runtime option,
     // but we compile code for each algorithm, using templates)
@@ -34,23 +35,23 @@ void FiniteDifferenceSolver::ComputeCurlB (
         m_fdtd_algo == ElectromagneticSolverAlgo::HybridPIC) {
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
         ComputeCurlBCylindrical <CylindricalYeeAlgorithm> (
-            Efield, Bfield, eb_update_E, lev
+            Efield, Bfield, eb_update_E, lev, ngrow
         );
 
 #elif defined(WARPX_DIM_RSPHERE)
         ComputeCurlBSpherical <SphericalYeeAlgorithm> (
-            Efield, Bfield, eb_update_E, lev
+            Efield, Bfield, eb_update_E, lev, ngrow
         );
 
 #else
     if (WarpX::grid_type == GridType::Staggered)
     {
         ComputeCurlBCartesian <CartesianYeeAlgorithm> (
-            Efield, Bfield, eb_update_E, lev
+            Efield, Bfield, eb_update_E, lev, ngrow
         );
     } else {
         ComputeCurlBCartesian <CartesianNodalAlgorithm> (
-            Efield, Bfield, eb_update_E, lev
+            Efield, Bfield, eb_update_E, lev, ngrow
         );
     }
 
@@ -68,6 +69,7 @@ void FiniteDifferenceSolver::ComputeCurlB (
 //   * \param[in] Bfield   input staggered field, should be on B mesh staggering
 //   * \param[in] eb_update_E specifies where the field should be updated
 //   * \param[in] lev refinement level
+//   * \param[in] ngrow number of guard cells of Efield to fill
 //   */
 #if defined(WARPX_DIM_RZ) || defined(WARPX_DIM_RCYLINDER)
 template<typename T_Algo>
@@ -75,10 +77,11 @@ void FiniteDifferenceSolver::ComputeCurlBCylindrical (
     ablastr::fields::VectorField& Efield,
     ablastr::fields::VectorField const& Bfield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-    int lev
+    int lev,
+    amrex::IntVect const& ngrow
 )
 {
-    amrex::ignore_unused(Efield, Bfield, eb_update_E, lev);
+    amrex::ignore_unused(Efield, Bfield, eb_update_E, lev, ngrow);
     WARPX_ABORT_WITH_MESSAGE("ComputeCurlBCylindrical not fully implemented");
 }
 
@@ -88,10 +91,11 @@ void FiniteDifferenceSolver::ComputeCurlBSpherical (
     ablastr::fields::VectorField& Efield,
     ablastr::fields::VectorField const& Bfield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-    int lev
+    int lev,
+    amrex::IntVect const& ngrow
 )
 {
-    amrex::ignore_unused(Efield, Bfield, eb_update_E, lev);
+    amrex::ignore_unused(Efield, Bfield, eb_update_E, lev, ngrow);
     WARPX_ABORT_WITH_MESSAGE("ComputeCurlBSpherical not fully implemented");
 }
 
@@ -102,10 +106,32 @@ void FiniteDifferenceSolver::ComputeCurlBCartesian (
     ablastr::fields::VectorField & Efield,
     ablastr::fields::VectorField const& Bfield,
     std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-    int lev
+    int lev,
+    amrex::IntVect const& ngrow
 )
 {
     using ablastr::fields::Direction;
+
+    // When `ngrow` guard cells of the output are requested, the stencil below
+    // reads the input one cell further out than that, and (with embedded
+    // boundaries) the update flags are read over the same region as the output.
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        Efield[0]->nGrowVect().allGE(ngrow) &&
+        Efield[1]->nGrowVect().allGE(ngrow) &&
+        Efield[2]->nGrowVect().allGE(ngrow),
+        "ComputeCurlBCartesian: Efield has fewer guard cells than the requested ngrow.");
+    WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+        Bfield[0]->nGrowVect().allGE(ngrow + 1) &&
+        Bfield[1]->nGrowVect().allGE(ngrow + 1) &&
+        Bfield[2]->nGrowVect().allGE(ngrow + 1),
+        "ComputeCurlBCartesian: Bfield needs ngrow+1 guard cells of valid data.");
+    if (EB::enabled()) {
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            eb_update_E[0]->nGrowVect().allGE(ngrow) &&
+            eb_update_E[1]->nGrowVect().allGE(ngrow) &&
+            eb_update_E[2]->nGrowVect().allGE(ngrow),
+            "ComputeCurlBCartesian: eb_update_E has fewer guard cells than the requested ngrow.");
+    }
 
     // for the profiler
     amrex::LayoutData<amrex::Real>* cost = WarpX::getCosts(lev);
@@ -150,10 +176,11 @@ void FiniteDifferenceSolver::ComputeCurlBCartesian (
         Real const * const AMREX_RESTRICT coefs_z = m_stencil_coefs_z.dataPtr();
         auto const n_coefs_z = static_cast<int>(m_stencil_coefs_z.size());
 
-        // Extract tileboxes for which to loop
-        Box const& tex  = mfi.tilebox(Efield[0]->ixType().toIntVect());
-        Box const& tey  = mfi.tilebox(Efield[1]->ixType().toIntVect());
-        Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect());
+        // Extract tileboxes for which to loop. The `ngrow` overload only grows
+        // tiles that sit at the boundary of the valid box, so tiles never overlap.
+        Box const& tex  = mfi.tilebox(Efield[0]->ixType().toIntVect(), ngrow);
+        Box const& tey  = mfi.tilebox(Efield[1]->ixType().toIntVect(), ngrow);
+        Box const& tez  = mfi.tilebox(Efield[2]->ixType().toIntVect(), ngrow);
 
         // Calculate the curl of B
         amrex::ParallelFor(tex, tey, tez,

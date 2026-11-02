@@ -18,6 +18,7 @@
 #   include <petscconf.h>
 #endif
 
+#include <algorithm>
 #include <sstream>
 
 using namespace amrex;
@@ -275,7 +276,7 @@ int ImplicitSolver::OneStep (const amrex::Real  start_time,
 
 void ImplicitSolver::ReinitializePETScIfDue (const int a_step, const bool verbose_step)
 {
-    if (m_petsc_reinit_interval > 0 && (a_step + 1) % m_petsc_reinit_interval == 0) {
+    if (m_nlsolver && m_petsc_reinit_interval > 0 && (a_step + 1) % m_petsc_reinit_interval == 0) {
         if (m_nlsolver->ReinitializePETSc() && verbose_step) {
             amrex::Print() << "Re-initialized PETSc\n";
         }
@@ -310,6 +311,24 @@ void ImplicitSolver::SaveE ()
     // Copy Efield_fp to E0.
     using warpx::fields::FieldType;
     CopyVectorField(FieldType::Efield_fp_save, FieldType::Efield_fp);
+}
+
+amrex::IntVect ImplicitSolver::MassMatricesStencilHalfWidth () const
+{
+    // For each of the nine blocks, ApplyMassMatrices() gathers over the offsets
+    // -offset_ab ... ncomp_ab-1-offset_ab, where offset_ab is either
+    // (ncomp_ab-1)/2 or ncomp_ab/2 depending on the relative staggering of the
+    // two components involved. In both cases the furthest cell reached in a
+    // given direction is ncomp_ab/2 (integer division) away, so take the
+    // largest such reach over all nine blocks.
+    amrex::IntVect half_width = amrex::IntVect::TheZeroVector();
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        half_width[dir] = std::max({
+            m_ncomp_xx[dir]/2, m_ncomp_xy[dir]/2, m_ncomp_xz[dir]/2,
+            m_ncomp_yx[dir]/2, m_ncomp_yy[dir]/2, m_ncomp_yz[dir]/2,
+            m_ncomp_zx[dir]/2, m_ncomp_zy[dir]/2, m_ncomp_zz[dir]/2 });
+    }
+    return half_width;
 }
 
 void ImplicitSolver::ApplyMassMatrices (
@@ -817,7 +836,7 @@ std::unique_ptr<MatrixSolverOps<WarpXSolverVec>> ImplicitSolver::MakePCMatrixOps
     return ops;
 }
 
-void ImplicitSolver::InitializeMassMatrices ()
+void ImplicitSolver::InitializeMassMatrices (int particle_shape)
 {
 
     // Initializes the MassMatrices and MassMatrices_PC containers
@@ -843,7 +862,9 @@ void ImplicitSolver::InitializeMassMatrices ()
     using ablastr::fields::Direction;
     using warpx::fields::FieldType;
 
-    const int shape = WarpX::nox;
+    // The mass matrices are deposited with the shape their stencil is sized for
+    m_implicit_options.particle_shape = particle_shape;
+    const int shape = particle_shape;
     const amrex::IntVect ngJ = m_WarpX->m_fields.get(FieldType::current_fp, Direction{0}, 0)->nGrowVect();
     const amrex::IntVect ngE = m_WarpX->m_fields.get(FieldType::Efield_fp, Direction{0}, 0)->nGrowVect();
 

@@ -199,6 +199,15 @@ public:
         bool a_zero_out_first = false );
 
     /**
+     * \brief Half-width, in cells and per direction, of the stencil that
+     *  ApplyMassMatrices() gathers over: evaluating the mass matrices at a cell
+     *  reads the input field no further than this many cells away.
+     *
+     *  Only valid after InitializeMassMatrices() has run.
+     */
+    [[nodiscard]] amrex::IntVect MassMatricesStencilHalfWidth () const;
+
+    /**
      * \brief Assert that ApplyMassMatrices(a_out, a_in, ...) reads a_in over the
      * full stencil of the mass matrices, for every valid cell of a_out.
      * ApplyMassMatrices silently clips the stencil at the edge of the guard
@@ -380,8 +389,11 @@ protected:
 
     /**
      * \brief Initialize the Mass Matrices used for plasma response in nonlinear Newton solver
+     *
+     * \param[in] particle_shape order of the particle shape factors used to deposit the
+     *            current and the mass matrices; this sets the width of the mass matrices stencil
      */
-    void InitializeMassMatrices ();
+    void InitializeMassMatrices (int particle_shape);
 
     void InitializeImplicitOptions ();
 

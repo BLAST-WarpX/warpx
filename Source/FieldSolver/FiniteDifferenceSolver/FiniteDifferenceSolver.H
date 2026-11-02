@@ -190,12 +190,16 @@ class FiniteDifferenceSolver
           * \param[in] Afield   vector of magnetic field MultiFabs at a given level
           * \param[in] eb_update_B  array indicating where the field should be updated with respect to the position of the embedded boundary
           * \param[in] lev  level number for the calculation
+          * \param[in] ngrow  number of guard cells of `Bfield` to fill, in addition to the
+          *            valid region. Requires `Afield` (and, with embedded boundaries,
+          *            `eb_update_B`) to hold valid data one cell further out than this.
           */
         void ComputeCurlA (
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
-            int lev );
+            int lev,
+            amrex::IntVect const& ngrow = amrex::IntVect::TheZeroVector() );
 
         /**
           * \brief Calculation of the curl of a B-staggered vector field,
@@ -206,12 +210,16 @@ class FiniteDifferenceSolver
           * \param[in] Bfield   vector of input MultiFabs at a given level
           * \param[in] eb_update_E  array indicating where the field should be updated with respect to the position of the embedded boundary
           * \param[in] lev  level number for the calculation
+          * \param[in] ngrow  number of guard cells of `Efield` to fill, in addition to the
+          *            valid region. Requires `Bfield` (and, with embedded boundaries,
+          *            `eb_update_E`) to hold valid data one cell further out than this.
           */
         void ComputeCurlB (
             ablastr::fields::VectorField& Efield,
             ablastr::fields::VectorField const& Bfield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-            int lev );
+            int lev,
+            amrex::IntVect const& ngrow = amrex::IntVect::TheZeroVector() );
 
         /**
           * \brief Calculation of the gradient of the given scalar field.
@@ -361,7 +369,8 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
-            int lev
+            int lev,
+            amrex::IntVect const& ngrow
         );
 
         template<typename T_Algo>
@@ -369,7 +378,8 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField& Efield,
             ablastr::fields::VectorField const& Bfield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-            int lev
+            int lev,
+            amrex::IntVect const& ngrow
         );
 
         template<typename T_Algo>
@@ -458,7 +468,8 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField& Bfield,
             ablastr::fields::VectorField const& Afield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
-            int lev
+            int lev,
+            amrex::IntVect const& ngrow
         );
 
         template<typename T_Algo>
@@ -466,7 +477,8 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField& Efield,
             ablastr::fields::VectorField const& Bfield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-            int lev
+            int lev,
+            amrex::IntVect const& ngrow
         );
 
         template<typename T_Algo>
@@ -610,7 +622,8 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField & Bfield,
             ablastr::fields::VectorField const& Afield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_B,
-            int lev
+            int lev,
+            amrex::IntVect const& ngrow
         );
 
         template<typename T_Algo>
@@ -618,7 +631,8 @@ class FiniteDifferenceSolver
             ablastr::fields::VectorField & Efield,
             ablastr::fields::VectorField const& Bfield,
             std::array< std::unique_ptr<amrex::iMultiFab>,3> const& eb_update_E,
-            int lev
+            int lev,
+            amrex::IntVect const& ngrow
         );
 
         template<typename T_Algo>

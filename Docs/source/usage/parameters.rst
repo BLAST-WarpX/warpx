@@ -459,6 +459,16 @@ Overall simulation parameters
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
 
+      - **Particle shapes:**
+        The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
+
+        - :pp:param:`algo.particle_shape` sets the shape used for the electrostatic part: the charge
+          density deposition, and the electric-field gather in the electrostatic (predictor) velocity push.
+        - ``implicit_evolve.magnetostatic_particle_shape`` (``int``, default: :pp:param:`algo.particle_shape`) sets the shape used for the
+          magnetostatic part: the current and mass matrices deposition, the field gather in the
+          inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
+          It must not be larger than :pp:param:`algo.particle_shape`.
+
       - **Linear (GMRES) solver options:**
         The magnetoinductive solve uses the AMReX GMRES linear solver, whose parameters are set with the
         ``amrex_gmres`` prefix:
@@ -1566,6 +1576,8 @@ Particle initialization
 
     Controls whether tiling ('cache blocking') transformation is used for particles.
     Tiling should be on when using OpenMP and off when using GPUs.
+    When WarpX is compiled for GPUs, setting this to ``true`` results in an error,
+    since tiling severely degrades performance on GPUs.
 
 .. pp:param:: <species_name>.species_type
     :type: ``string``
@@ -4254,6 +4266,10 @@ Maxwell solver: kinetic-fluid hybrid
     otherwise it decays slowly toward that target via exponential smoothing (95% of the current value,
     5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where
     :pp:param:`hybrid_pic_model.use_rkf45` is not active.
+
+    If the restart configuration enables RKF45 on any timesteps, the learned substep count is restored from the checkpoint instead of resetting it to this input value.
+    With :pp:param:`hybrid_pic_model.use_rkf45` disabled, restart uses this input value, allowing the fixed RK4 substep count to be changed.
+    Older checkpoints without this count still use the configured input value.
 
 .. pp:param:: hybrid_pic_model.use_rkf45
     :type: ``string`` or ``bool``
