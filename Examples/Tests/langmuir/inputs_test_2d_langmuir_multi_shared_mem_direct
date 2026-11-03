@@ -1,0 +1,7 @@
+# base input parameters
+FILE = inputs_base_2d
+
+# test input parameters
+algo.current_deposition = direct
+diag1.fields_to_plot = Ex Ey Ez jx jy jz part_per_cell rho divE
+warpx.do_shared_mem_current_deposition = 1

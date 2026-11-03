@@ -1146,6 +1146,11 @@ WarpX::ReadParameters ()
         utils::parser::queryWithParser(pp_warpx, "n_rz_azimuthal_modes", n_rz_azimuthal_modes);
         WARPX_ALWAYS_ASSERT_WITH_MESSAGE( n_rz_azimuthal_modes > 0,
             "The number of azimuthal modes (n_rz_azimuthal_modes) must be at least 1");
+        // The shared memory buffers hold a single component
+        WARPX_ALWAYS_ASSERT_WITH_MESSAGE(
+            !do_shared_mem_current_deposition || n_rz_azimuthal_modes == 1,
+            "Shared memory current deposition (warpx.do_shared_mem_current_deposition) "
+            "cannot be used with more than 1 azimuthal mode.");
 #endif
 
         // Check whether fluid species will be used
