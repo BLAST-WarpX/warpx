@@ -183,6 +183,7 @@ Overall simulation parameters
 
     Name of a file that WarpX writes to archive the used inputs.
     The context of this file will contain an exact copy of all explicitly and implicitly used inputs parameters, including those :ref:`extended and overwritten from the command line <usage_run>`.
+    If this parameter is set to the string ``/dev/null``, used inputs are not written to any file. Note that this works on any OS if the provided string matches exactly ``/dev/null``, regardless of the existence of a null device file.
 
 .. pp:param:: warpx.gamma_boost
     :type: ``float``
@@ -282,7 +283,10 @@ Overall simulation parameters
             solver and to PETSc SNES.
             The first required linear solve always initializes the PC, including
             after restart. During adaptive implicit substepping, PC updates are forced
-            on every Newton iteration, overriding both intervals.
+            on every Newton iteration that requires a linear solve, overriding both intervals.
+            After adaptive substepping, the PC is rebuilt at the first subsequent Newton
+            iteration that requires a linear solve, regardless of both intervals, to
+            restore the coefficients for the full time-step size.
           - ``newton.relative_tolerance`` (``float``, default: 1.0e-6)
             Must be in [0, 1). Other values are replaced by the default, with a warning.
           - ``newton.absolute_tolerance`` (``float``, default: 0.0)
@@ -346,7 +350,7 @@ Overall simulation parameters
           In 3D, ``algo.current_deposition = villasenor`` is supported only for PC-only use
           (``implicit_evolve.use_mass_matrices_jacobian = false``) with ``implicit_evolve.mass_matrices_pc_width = 0``.
 
-        - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 0).
+        - ``implicit_evolve.mass_matrices_pc_width`` (``integer``, default: 1).
           Specifies the non-negative spatial half-width of the mass-matrix stencil retained in the preconditioner.
           This applies whenever ``implicit_evolve.use_mass_matrices_pc = true``, independently of whether mass matrices are also used for the Jacobian.
           A width of 0 retains only the local diagonal entries; larger widths retain neighboring couplings, up to the full stencil extent.
@@ -376,14 +380,21 @@ Overall simulation parameters
             - ``pc_curl_curl_mlmg.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_curl_curl_mlmg.absolute_tolerance`` (``float``, default: 1.0e-16)
 
-          - ``jacobian.pc_type = pc_jacobi``: Use the damped Point-Jacobi method for the plasma response captured by the mass matrices.
-            At ``implicit_evolve.mass_matrices_pc_width = 0``, the diagonal system is solved directly.
-            For wider stencils, damped Jacobi iterations include the neighboring couplings.
+          - ``jacobian.pc_type = pc_jacobi``: Use weighted (damped) Jacobi iterations on :math:`A = \mathbb{I} + M`, where :math:`M` is the plasma response from the mass matrices (``implicit_evolve.use_mass_matrices_pc = true``).
+            The curl curl operator is not included.
+            At ``implicit_evolve.mass_matrices_pc_width = 0``, the diagonal system is solved exactly in one step.
+            For wider stencils, the iterations include the neighboring couplings.
 
-            - ``pc_jacobi.verbose`` (``bool``, default: true)
-            - ``pc_jacobi.max_iter`` (``int``, default: 10)
+            - ``pc_jacobi.verbose`` (``bool``, default: false)
+            - ``pc_jacobi.verbose_int`` (``int``) If given, overrides ``pc_jacobi.verbose``: a positive value turns on the output.
+            - ``pc_jacobi.max_iter`` (``int``, default: 200)
             - ``pc_jacobi.relative_tolerance`` (``float``, default: 1.0e-4)
             - ``pc_jacobi.absolute_tolerance`` (``float``, default: 1.0e-16)
+            - ``pc_jacobi.omega`` (``float``, default: Gershgorin estimate from the matrix) Relaxation factor.
+              Setting it turns off ``pc_jacobi.adaptive_omega``.
+              A warning is issued if it exceeds the Gershgorin estimate, since convergence is then not guaranteed.
+            - ``pc_jacobi.adaptive_omega`` (``bool``, default: true)
+              When ``true``, the relaxation factor is reduced by a factor of 0.9 whenever the residual increases.
 
           - ``jacobian.pc_type = pc_petsc``: Use the PETSc solver.
 
@@ -450,6 +461,16 @@ Overall simulation parameters
           **not** disable the electromagnetic solver, since the magnetic field is still evolved.
         - The electromagnetic solver must be the Yee solver, i.e. :pp:param:`algo.maxwell_solver` = ``yee``
           (the default). No other Maxwell solver is compatible with the Darwin scheme.
+
+      - **Particle shapes:**
+        The electrostatic and magnetostatic parts of the Darwin solve can use different particle shapes.
+
+        - :pp:param:`algo.particle_shape` sets the shape used for the electrostatic part: the charge
+          density deposition, and the electric-field gather in the electrostatic (predictor) velocity push.
+        - ``implicit_evolve.magnetostatic_particle_shape`` (``int``, default: :pp:param:`algo.particle_shape`) sets the shape used for the
+          magnetostatic part: the current and mass matrices deposition, the field gather in the
+          inductive (corrector) velocity push, and the magnetic-field gather in both pushes.
+          It must not be larger than :pp:param:`algo.particle_shape`.
 
       - **Linear (GMRES) solver options:**
         The magnetoinductive solve uses the AMReX GMRES linear solver, whose parameters are set with the
@@ -1558,6 +1579,8 @@ Particle initialization
 
     Controls whether tiling ('cache blocking') transformation is used for particles.
     Tiling should be on when using OpenMP and off when using GPUs.
+    When WarpX is compiled for GPUs, setting this to ``true`` results in an error,
+    since tiling severely degrades performance on GPUs.
 
 .. pp:param:: <species_name>.species_type
     :type: ``string``
@@ -4284,6 +4307,10 @@ Maxwell solver: kinetic-fluid hybrid
     otherwise it decays slowly toward that target via exponential smoothing (95% of the current value,
     5% of ``2 * n_attempts``). This warm-start guess also carries over to RK4 steps on timesteps where
     :pp:param:`hybrid_pic_model.use_rkf45` is not active.
+
+    If the restart configuration enables RKF45 on any timesteps, the learned substep count is restored from the checkpoint instead of resetting it to this input value.
+    With :pp:param:`hybrid_pic_model.use_rkf45` disabled, restart uses this input value, allowing the fixed RK4 substep count to be changed.
+    Older checkpoints without this count still use the configured input value.
 
 .. pp:param:: hybrid_pic_model.use_rkf45
     :type: ``string`` or ``bool``

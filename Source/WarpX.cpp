@@ -3706,8 +3706,8 @@ WarpX::getFieldDotMaskPointer ( FieldType field_type, int lev, ablastr::fields::
         case FieldType::Bfield_fp :
             ::SetDotMask( Bfield_dotMask[lev][dir], m_fields.get("Bfield_fp", dir, lev), periodicity);
             return Bfield_dotMask[lev][dir].get();
-        case FieldType::vector_potential_fp :
-            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp", dir, lev), periodicity);
+        case FieldType::vector_potential_fp_nodal :
+            ::SetDotMask( Afield_dotMask[lev][dir], m_fields.get("vector_potential_fp_nodal", dir, lev), periodicity);
             return Afield_dotMask[lev][dir].get();
         case FieldType::phi_fp :
             ::SetDotMask( phi_dotMask[lev], m_fields.get("phi_fp", lev), periodicity);

@@ -259,7 +259,7 @@ int SparseJacobianMatrix::Assemble (
 
 #if defined(WARPX_DIM_RSPHERE)
                     // 1D spherical geometry is electrostatic
-                    amrex::ignore_unused(dxi);
+                    amrex::ignore_unused(dxi, alpha, a_bc_masks);
 #else
                     const amrex::MultiFab* BC_mask_Edir = a_bc_masks[lev][dir];
                     AMREX_ALWAYS_ASSERT(BC_mask_Edir != nullptr);

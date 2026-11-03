@@ -81,8 +81,7 @@ public:
                const WarpXSolverVec& a_E,
                      amrex::Real     start_time,
                      int             a_nl_iter,
-                     bool            a_from_jacobian,
-                     bool            update_pc = true) override;
+                     bool            a_from_jacobian) override;
 
 #if defined(WARPX_DIM_1D_Z)
     void Enforce1DESPeriodic (WarpXSolverVec&  a_RHS,

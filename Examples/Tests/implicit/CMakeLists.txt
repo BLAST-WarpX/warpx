@@ -136,6 +136,16 @@ if(AMReX_PETSC)
 endif()
 
 add_warpx_test(
+    test_2d_semi_implicit_pc_jacobi  # name
+    2  # dims
+    2  # nprocs
+    inputs_test_2d_semi_implicit_pc_jacobi  # inputs
+    "analysis_planar_pinch_solvers.py diags/diag1000002 5 5"  # analysis
+    "analysis_default_regression.py --path diags/diag1000002"  # checksum
+    OFF  # dependency
+)
+
+add_warpx_test(
     test_2d_theta_implicit_jfnk_vandb  # name
     2  # dims
     2  # nprocs
