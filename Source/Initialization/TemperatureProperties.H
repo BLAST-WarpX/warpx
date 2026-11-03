@@ -67,12 +67,13 @@ struct TemperatureProperties
     /* q_e / (m c^2) factor, used for temperature_in_eV conversion */
     amrex::Real m_q_e_over_mc2{0.0};
 
+    /* Reader of the scalar temperature_in_eV field, if m_type == TempFromFileValue */
+    std::unique_ptr<ExternalFieldReader> m_temperature_in_eV_reader;
 #if defined(WARPX_USE_OPENPMD) && !defined(WARPX_DIM_RZ) && \
     !defined(WARPX_DIM_RCYLINDER) && !defined(WARPX_DIM_RSPHERE)
     std::unique_ptr<ExternalFieldReader> m_u_std_x_reader;
     std::unique_ptr<ExternalFieldReader> m_u_std_y_reader;
     std::unique_ptr<ExternalFieldReader> m_u_std_z_reader;
-    std::unique_ptr<ExternalFieldReader> m_temperature_in_eV_reader;
 #endif
 };
 
