@@ -1,11 +1,9 @@
 name: CleanUpCachePostPR
-
 on:
   workflow_run:
     workflows: [PostPR]
     types:
       - completed
-
 jobs:
   CleanUpCcacheCachePostPR:
     name: Clean Up Ccache Cache Post PR

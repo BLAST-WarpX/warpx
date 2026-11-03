@@ -1,11 +1,9 @@
 name: CleanUpCache
-
 on:
   workflow_run:
     workflows: [🧴 clang sanitizers, 🧹 clang-tidy, 🔍 CodeQL, 🐧 CUDA, 🐧 HIP, 🐧 Intel, 🍏 macOS, 🐧 OpenMP]
     types:
       - completed
-
 jobs:
   CleanUpCcacheCache:
     name: Clean Up Ccache Cache for ${{ github.event.workflow_run.name }}

@@ -1,5 +1,4 @@
 name: "WarpX CodeQL config"
-
 # ignore AMReX, pyAMReX, PICSAR, openPMD et al.
 # note: not yet suppored, thus doing post-analysis SARIF filtering
 paths-ignore:

@@ -14,46 +14,46 @@
 #
 spack:
   specs:
-  - adios2 ~fortran
-  - ascent +adios2 +python ~fortran
-  - blaspp ~cuda +openmp ~rocm
-  - boost
-  - ccache
-  - cmake
-  - conduit ~fortran
-  - fftw
-  - hdf5 ~fortran
-  - lapackpp ~cuda ~rocm ^blaspp ~cuda +openmp ~rocm
-  - mpi
-  - llvm-openmp
-  - pkgconfig
-  - python
-  - py-cython
-  - py-h5py
-  - py-libensemble +nlopt
-  - py-mpi4py
-  - py-numpy
-  - py-pip
-  - py-setuptools
-  - py-wheel
-  - sensei +ascent ~catalyst +python
-# not yet ready for macOS prime time
-#   https://github.com/spack/spack/issues/32283
-#   https://github.com/spack/spack/pull/32285
-#   https://github.com/spack/spack/pull/32284
-#  - ecp-data-vis-sdk +adios2 +ascent +hdf5 +sensei
-# skipped to save time: 3D post-processing
-#  - paraview +adios2 +python3 +qt
-# skipped to save time, because they are faster installed via pip afterwards
-# python3 -m pip install jupyter matplotlib numpy openpmd-api openpmd-viewer pandas scipy yt
-#  - py-jupyter
-#  - py-matplotlib +animation +fonts +latex +movies backend=macosx
-#  - openpmd-api +python
-#  - py-openpmd-viewer +numba +jupyter
-#  - py-pandas
-#  - py-pyqt5
-#  - py-scipy
-#  - py-yt
+    - adios2 ~fortran
+    - ascent +adios2 +python ~fortran
+    - blaspp ~cuda +openmp ~rocm
+    - boost
+    - ccache
+    - cmake
+    - conduit ~fortran
+    - fftw
+    - hdf5 ~fortran
+    - lapackpp ~cuda ~rocm ^blaspp ~cuda +openmp ~rocm
+    - mpi
+    - llvm-openmp
+    - pkgconfig
+    - python
+    - py-cython
+    - py-h5py
+    - py-libensemble +nlopt
+    - py-mpi4py
+    - py-numpy
+    - py-pip
+    - py-setuptools
+    - py-wheel
+    - sensei +ascent ~catalyst +python
+  # not yet ready for macOS prime time
+  #   https://github.com/spack/spack/issues/32283
+  #   https://github.com/spack/spack/pull/32285
+  #   https://github.com/spack/spack/pull/32284
+  #  - ecp-data-vis-sdk +adios2 +ascent +hdf5 +sensei
+  # skipped to save time: 3D post-processing
+  #  - paraview +adios2 +python3 +qt
+  # skipped to save time, because they are faster installed via pip afterwards
+  # python3 -m pip install jupyter matplotlib numpy openpmd-api openpmd-viewer pandas scipy yt
+  #  - py-jupyter
+  #  - py-matplotlib +animation +fonts +latex +movies backend=macosx
+  #  - openpmd-api +python
+  #  - py-openpmd-viewer +numba +jupyter
+  #  - py-pandas
+  #  - py-pyqt5
+  #  - py-scipy
+  #  - py-yt
 
   packages:
     all:
@@ -72,49 +72,47 @@ spack:
     # otherwise concretization error between ccache and all other variants
     zstd:
       variants: +programs
-
   compilers:
-  # macOS
-  # preparation: you first need to install xcode (app store) and gcc (homebrew) and gpg2 (homebrew)
-  - compiler:
-      spec: apple-clang@13.1.6
-      paths:
-        cc: /usr/bin/clang
-        cxx: /usr/bin/clang++
-        f77: /opt/homebrew/bin/gfortran
-        fc: /opt/homebrew/bin/gfortran
-      flags: {}
-      operating_system: monterey
-      target: aarch64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-  - compiler:
-      spec: apple-clang@13.1.6
-      paths:
-        cc: /usr/bin/clang
-        cxx: /usr/bin/clang++
-        f77: /opt/homebrew/bin/gfortran
-        fc: /opt/homebrew/bin/gfortran
-      flags: {}
-      operating_system: monterey
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
-
+    # macOS
+    # preparation: you first need to install xcode (app store) and gcc (homebrew) and gpg2 (homebrew)
+    - compiler:
+        spec: apple-clang@13.1.6
+        paths:
+          cc: /usr/bin/clang
+          cxx: /usr/bin/clang++
+          f77: /opt/homebrew/bin/gfortran
+          fc: /opt/homebrew/bin/gfortran
+        flags: {}
+        operating_system: monterey
+        target: aarch64
+        modules: []
+        environment: {}
+        extra_rpaths: []
+    - compiler:
+        spec: apple-clang@13.1.6
+        paths:
+          cc: /usr/bin/clang
+          cxx: /usr/bin/clang++
+          f77: /opt/homebrew/bin/gfortran
+          fc: /opt/homebrew/bin/gfortran
+        flags: {}
+        operating_system: monterey
+        target: x86_64
+        modules: []
+        environment: {}
+        extra_rpaths: []
   # binary caches
   mirrors:
     E4S: https://cache.e4s.io
     LLNL: https://mirror.spack.io
-# needs boto3
-#    E4Smac: s3://spack-binaries/develop/e4s-mac
+  # needs boto3
+  #    E4Smac: s3://spack-binaries/develop/e4s-mac
 
   # do not try to reuse existing packages, which can confuse the concretizer
   concretizer:
     reuse: false
     unify: true
+    # limit the build parallelism (default: call virtual cores)
 
-  # limit the build parallelism (default: call virtual cores)
 #  config:
 #    build_jobs: 6

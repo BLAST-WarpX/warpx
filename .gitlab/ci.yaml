@@ -15,7 +15,6 @@
 #
 variables:
   CMAKE_BUILD_PARALLEL_LEVEL: "16"
-
 .install-dependencies:
   timeout: 90 minutes
   before_script:
@@ -48,7 +47,6 @@ variables:
     - apt-get remove python3-matplotlib
     - python3 -m pip install --upgrade -r Regression/requirements.txt
     - python3 -m pip cache purge
-
 NVIDIA-H100:
   extends: .install-dependencies
   variables:
@@ -72,7 +70,7 @@ NVIDIA-H100:
           -DAMReX_CUDA_ERROR_CROSS_EXECUTION_SPACE_CALL=ON \
           -DAMReX_CUDA_ERROR_CAPTURE_THIS=ON
     - ctest --test-dir build -D ExperimentalBuild -V
-    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
+    - cmake --build build # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
@@ -100,7 +98,6 @@ NVIDIA-H100:
       else
         ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure
       fi
-
 AMD-MI300:
   extends: .install-dependencies
   variables:
@@ -132,7 +129,7 @@ AMD-MI300:
           -DWarpX_PARTICLE_PRECISION=DOUBLE            \
           -DWarpX_FFT=ON
     - ctest --test-dir build -D ExperimentalBuild -V
-    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
+    - cmake --build build # authoritative pass/fail (no-op if the build above succeeded)
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
@@ -160,7 +157,6 @@ AMD-MI300:
       else
         ctest --test-dir build -R "${GPU_TESTS_REGEX}" --output-on-failure
       fi
-
 Intel-PVC:
   # TODO: Re-enable the Intel PVC/SYCL runner. Runtime issues.
   rules:
@@ -190,7 +186,7 @@ Intel-PVC:
           -DWarpX_PRECISION=DOUBLE              \
           -DWarpX_PARTICLE_PRECISION=DOUBLE
     - ctest --test-dir build -D ExperimentalBuild -V
-    - cmake --build build  # authoritative pass/fail (no-op if the build above succeeded)
+    - cmake --build build # authoritative pass/fail (no-op if the build above succeeded)
     - export AMREX_DEFAULT_INIT="amrex.the_arena_init_size=0"
     - |
       if [[ "${CI_COMMIT_BRANCH}" == "development" ]]; then
