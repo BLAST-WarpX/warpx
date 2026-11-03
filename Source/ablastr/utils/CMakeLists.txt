@@ -5,6 +5,7 @@ foreach(D IN LISTS WarpX_DIMS)
         Communication.cpp
         RelativeCellPosition.cpp
         SignalHandling.cpp
+        SystemMemory.cpp
         TextMsg.cpp
         UsedInputsFile.cpp
     )

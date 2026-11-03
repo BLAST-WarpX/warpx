@@ -4,6 +4,7 @@ CEXE_sources += WarpXVersion.cpp
 CEXE_sources += Interpolate.cpp
 CEXE_sources += ParticleUtils.cpp
 CEXE_sources += SpeciesUtils.cpp
+CEXE_sources += SystemMemoryGuard.cpp
 
 include $(WARPX_HOME)/Source/Utils/Algorithms/Make.package
 include $(WARPX_HOME)/Source/Utils/Logo/Make.package
